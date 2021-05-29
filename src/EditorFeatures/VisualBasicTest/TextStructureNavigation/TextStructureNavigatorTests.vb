@@ -1,18 +1,19 @@
-' Copyright (c) Microsoft.  All Rights Reserved.  Licensed under the Apache License, Version 2.0.  See License.txt in the project root for license information.
+﻿' Licensed to the .NET Foundation under one or more agreements.
+' The .NET Foundation licenses this file to you under the MIT license.
+' See the LICENSE file in the project root for more information.
 
 Imports Microsoft.CodeAnalysis
-Imports Microsoft.CodeAnalysis.Editor.Host
 Imports Microsoft.CodeAnalysis.Editor.UnitTests.Workspaces
 Imports Microsoft.CodeAnalysis.Editor.VisualBasic.TextStructureNavigation
 Imports Microsoft.VisualStudio.Text
 Imports Microsoft.VisualStudio.Text.Operations
-Imports Microsoft.VisualStudio.Utilities
 
 Namespace Microsoft.CodeAnalysis.Editor.VisualBasic.UnitTests.TextStructureNavigation
+    <[UseExportProvider]>
     Public Class TextStructureNavigatorTests
 
         <Fact, Trait(Traits.Feature, Traits.Features.TextStructureNavigator)>
-        Public Sub Empty()
+        Public Sub TestEmpty()
             AssertExtent(
                 String.Empty,
                 pos:=0,
@@ -20,8 +21,8 @@ Namespace Microsoft.CodeAnalysis.Editor.VisualBasic.UnitTests.TextStructureNavig
                 start:=0, length:=0)
         End Sub
 
-        <Fact, Trait(Traits.Feature, Traits.Features.TextStructureNavigator)>
-        Public Sub Whitespace()
+        <WpfFact, Trait(Traits.Feature, Traits.Features.TextStructureNavigator)>
+        Public Sub TestWhitespace()
             AssertExtent(
                 "   ",
                 pos:=0,
@@ -41,8 +42,8 @@ Namespace Microsoft.CodeAnalysis.Editor.VisualBasic.UnitTests.TextStructureNavig
                 start:=0, length:=3)
         End Sub
 
-        <Fact, Trait(Traits.Feature, Traits.Features.TextStructureNavigator)>
-        Public Sub EndOfFile()
+        <WpfFact, Trait(Traits.Feature, Traits.Features.TextStructureNavigator)>
+        Public Sub TestEndOfFile()
             AssertExtent(
                 "Imports System",
                 pos:=14,
@@ -51,7 +52,7 @@ Namespace Microsoft.CodeAnalysis.Editor.VisualBasic.UnitTests.TextStructureNavig
         End Sub
 
         <Fact, Trait(Traits.Feature, Traits.Features.TextStructureNavigator)>
-        Public Sub NewLine()
+        Public Sub TestNewLine()
             AssertExtent(
                 "Module Module1" & vbCrLf & vbCrLf & "End Module",
                 pos:=14,
@@ -77,8 +78,8 @@ Namespace Microsoft.CodeAnalysis.Editor.VisualBasic.UnitTests.TextStructureNavig
                 start:=16, length:=2)
         End Sub
 
-        <Fact, Trait(Traits.Feature, Traits.Features.TextStructureNavigator)>
-        Public Sub Comment()
+        <WpfFact, Trait(Traits.Feature, Traits.Features.TextStructureNavigator)>
+        Public Sub TestComment()
             AssertExtent(
                 " ' Comment  ",
                 pos:=1,
@@ -110,8 +111,8 @@ Namespace Microsoft.CodeAnalysis.Editor.VisualBasic.UnitTests.TextStructureNavig
                 start:=5, length:=2)
         End Sub
 
-        <Fact, Trait(Traits.Feature, Traits.Features.TextStructureNavigator)>
-        Public Sub Keyword()
+        <WpfFact, Trait(Traits.Feature, Traits.Features.TextStructureNavigator)>
+        Public Sub TestKeyword()
             For i = 7 To 12
                 AssertExtent(
                     "Public Module Module1",
@@ -121,8 +122,8 @@ Namespace Microsoft.CodeAnalysis.Editor.VisualBasic.UnitTests.TextStructureNavig
             Next
         End Sub
 
-        <Fact, Trait(Traits.Feature, Traits.Features.TextStructureNavigator)>
-        Public Sub Identifier()
+        <WpfFact, Trait(Traits.Feature, Traits.Features.TextStructureNavigator)>
+        Public Sub TestIdentifier()
             For i = 13 To 13 + 8
                 AssertExtent(
                     "Public Class SomeClass : Inherits Object",
@@ -132,8 +133,8 @@ Namespace Microsoft.CodeAnalysis.Editor.VisualBasic.UnitTests.TextStructureNavig
             Next
         End Sub
 
-        <Fact, Trait(Traits.Feature, Traits.Features.TextStructureNavigator)>
-        Public Sub EscapedIdentifier()
+        <WpfFact, Trait(Traits.Feature, Traits.Features.TextStructureNavigator)>
+        Public Sub TestEscapedIdentifier()
             For i = 12 To 12 + 7
                 AssertExtent(
                     "Friend Enum [Module] As Long",
@@ -143,8 +144,8 @@ Namespace Microsoft.CodeAnalysis.Editor.VisualBasic.UnitTests.TextStructureNavig
             Next
         End Sub
 
-        <Fact, Trait(Traits.Feature, Traits.Features.TextStructureNavigator)>
-        Public Sub Number()
+        <WpfFact, Trait(Traits.Feature, Traits.Features.TextStructureNavigator)>
+        Public Sub TestNumber()
             For i = 37 To 37 + 12
                 AssertExtent(
                     "Class Test : Dim number As Double = -1.234678E-120 : End Class",
@@ -154,13 +155,13 @@ Namespace Microsoft.CodeAnalysis.Editor.VisualBasic.UnitTests.TextStructureNavig
             Next
         End Sub
 
-        <Fact, Trait(Traits.Feature, Traits.Features.TextStructureNavigator)>
-        Public Sub [String]()
+        <WpfFact, Trait(Traits.Feature, Traits.Features.TextStructureNavigator)>
+        Public Sub TestString()
             AssertExtent(
                 "Class Test : Dim str As String = "" () test  "" : End Class",
                 pos:=33,
                 isSignificant:=True,
-                start:=33, length:=12)
+                start:=33, length:=1)
 
             AssertExtent(
                 "Class Test : Dim str As String = "" () test  "" : End Class",
@@ -187,6 +188,39 @@ Namespace Microsoft.CodeAnalysis.Editor.VisualBasic.UnitTests.TextStructureNavig
                 start:=44, length:=1)
         End Sub
 
+        <WpfFact, Trait(Traits.Feature, Traits.Features.TextStructureNavigator)>
+        Public Sub TestInterpolatedString()
+            AssertExtent(
+                "Class Test : Dim str As String = $"" () test  "" : End Class",
+                pos:=33,
+                isSignificant:=True,
+                start:=33, length:=2)
+
+            AssertExtent(
+                "Class Test : Dim str As String = $"" () test  "" : End Class",
+                pos:=35,
+                isSignificant:=False,
+                start:=35, length:=1)
+
+            AssertExtent(
+                "Class Test : Dim str As String = $"" () test  "" : End Class",
+                pos:=36,
+                isSignificant:=True,
+                start:=36, length:=2)
+
+            AssertExtent(
+                "Class Test : Dim str As String = $"" () test  "" : End Class",
+                pos:=44,
+                isSignificant:=False,
+                start:=43, length:=2)
+
+            AssertExtent(
+                "Class Test : Dim str As String = "" () test  "" : End Class",
+                pos:=45,
+                isSignificant:=False,
+                start:=45, length:=1)
+        End Sub
+
         Private Shared Sub AssertExtent(
             code As String,
             pos As Integer,
@@ -194,13 +228,11 @@ Namespace Microsoft.CodeAnalysis.Editor.VisualBasic.UnitTests.TextStructureNavig
             start As Integer,
             length As Integer)
 
-            Using workspace = VisualBasicWorkspaceFactory.CreateWorkspaceFromLines(code)
+            Using workspace = TestWorkspace.CreateVisualBasic(code)
                 Dim buffer = workspace.Documents.First().GetTextBuffer()
 
-                Dim provider = New TextStructureNavigatorProvider(
-                               workspace.GetService(Of ITextStructureNavigatorSelectorService),
-                               workspace.GetService(Of IContentTypeRegistryService),
-                               workspace.GetService(Of IWaitIndicator))
+                Dim provider = Assert.IsType(Of TextStructureNavigatorProvider)(
+                    workspace.GetService(Of ITextStructureNavigatorProvider)(ContentTypeNames.VisualBasicContentType))
 
                 Dim navigator = provider.CreateTextStructureNavigator(buffer)
 

@@ -1,4 +1,8 @@
-﻿// Copyright (c) Microsoft.  All Rights Reserved.  Licensed under the Apache License, Version 2.0.  See License.txt in the project root for license information.
+﻿// Licensed to the .NET Foundation under one or more agreements.
+// The .NET Foundation licenses this file to you under the MIT license.
+// See the LICENSE file in the project root for more information.
+
+#nullable disable
 
 using Microsoft.CodeAnalysis.CSharp.Symbols;
 using Microsoft.CodeAnalysis.CSharp.Syntax;
@@ -12,13 +16,13 @@ namespace Microsoft.CodeAnalysis.CSharp.UnitTests.CodeGen
 {
     public partial class CodeGenMscorlibTests : EmitMetadataTestBase
     {
-        [WorkItem(544591, "DevDiv")]
-        [WorkItem(544609, "DevDiv")]
-        [WorkItem(544595, "DevDiv")]
-        [WorkItem(544596, "DevDiv")]
-        [WorkItem(544624, "DevDiv")]
-        [WorkItem(544592, "DevDiv")]
-        [WorkItem(544927, "DevDiv")]
+        [WorkItem(544591, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/544591")]
+        [WorkItem(544609, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/544609")]
+        [WorkItem(544595, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/544595")]
+        [WorkItem(544596, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/544596")]
+        [WorkItem(544624, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/544624")]
+        [WorkItem(544592, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/544592")]
+        [WorkItem(544927, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/544927")]
         [Fact]
         public void CoreLibrary1()
         {
@@ -146,12 +150,12 @@ namespace Microsoft.CodeAnalysis.CSharp.UnitTests.CodeGen
         public class DefaultMemberAttribute : Attribute { }
     }
 }";
-            var c = CreateCompilation(text, options: TestOptions.UnsafeReleaseDll);
+            var c = CreateEmptyCompilation(text, options: TestOptions.UnsafeReleaseDll);
 
             c.VerifyDiagnostics();
         }
 
-        [WorkItem(544918, "DevDiv")]
+        [WorkItem(544918, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/544918")]
         [Fact]
         public void CoreLibrary2()
         {
@@ -167,10 +171,10 @@ namespace Microsoft.CodeAnalysis.CSharp.UnitTests.CodeGen
     {
     }
 }";
-            CreateCompilationWithMscorlib(text).VerifyDiagnostics();
+            CreateCompilationWithMscorlib40(text).VerifyDiagnostics();
         }
 
-        [WorkItem(546832, "DevDiv")]
+        [WorkItem(546832, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/546832")]
         [Fact]
         public void CoreLibrary3()
         {
@@ -193,7 +197,7 @@ namespace Microsoft.CodeAnalysis.CSharp.UnitTests.CodeGen
     public struct Void { }
     public struct Boolean { private Boolean m_value; Boolean Use(Boolean b) { m_value = b; return m_value; } }
 }";
-            CreateCompilation(
+            CreateEmptyCompilation(
                 text,
                 options: TestOptions.ReleaseDll)
             .VerifyDiagnostics();
@@ -203,7 +207,7 @@ namespace Microsoft.CodeAnalysis.CSharp.UnitTests.CodeGen
         /// Report CS0518 for missing System.Void
         /// when generating synthesized .ctor.
         /// </summary>
-        [WorkItem(530859, "DevDiv")]
+        [WorkItem(530859, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/530859")]
         [Fact()]
         public void NoVoidForSynthesizedCtor()
         {
@@ -212,7 +216,7 @@ namespace Microsoft.CodeAnalysis.CSharp.UnitTests.CodeGen
 {
     public class Object { }
 }";
-            var compilation = CreateCompilation(source);
+            var compilation = CreateEmptyCompilation(source);
             compilation.VerifyEmitDiagnostics(
                 Diagnostic(ErrorCode.WRN_NoRuntimeMetadataVersion),
                 Diagnostic(ErrorCode.ERR_PredefinedTypeNotFound).WithArguments("System.Void")
@@ -222,8 +226,9 @@ namespace Microsoft.CodeAnalysis.CSharp.UnitTests.CodeGen
         /// <summary>
         /// Report CS0656 for missing Decimal to int conversion.
         /// </summary>
-        [WorkItem(530860, "DevDiv")]
-        [Fact(Skip = "530860")]
+        [WorkItem(530860, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/530860")]
+        [WorkItem(39962, "https://github.com/dotnet/roslyn/issues/39962")]
+        [ConditionalFact(typeof(NoUsedAssembliesValidation))] // The test hook is blocked by https://github.com/dotnet/roslyn/issues/39962
         public void NoDecimalConversion()
         {
             var source1 =
@@ -235,7 +240,7 @@ namespace Microsoft.CodeAnalysis.CSharp.UnitTests.CodeGen
     public struct Int32 { }
     public struct Decimal { }
 }";
-            var compilation1 = CreateCompilation(source1, assemblyName: GetUniqueName());
+            var compilation1 = CreateEmptyCompilation(source1, assemblyName: GetUniqueName());
             var reference1 = MetadataReference.CreateFromStream(compilation1.EmitToStream());
             var source2 =
 @"class C
@@ -245,14 +250,186 @@ namespace Microsoft.CodeAnalysis.CSharp.UnitTests.CodeGen
         return (int)d;
     }
 }";
-            var compilation2 = CreateCompilation(source2, new[] { reference1 });
+            var compilation2 = CreateEmptyCompilation(source2, new[] { reference1 });
             // Should report "CS0656: Missing compiler required member 'System.Decimal.op_Explicit_ToInt32'".
             // Instead, we report no errors and assert during emit.
+
+            // no errors for compat reasons.
             compilation2.VerifyDiagnostics();
-            var verifier = CompileAndVerify(compilation2);
+
+            // The bug has been resolved as Won't Fix for being extremely niche scenario and being a compat concern.
+            // uncomment the following code if we are fixing this
+            //var verifier = CompileAndVerify(compilation2);
         }
 
-        [WorkItem(530861, "DevDiv")]
+        [Fact, WorkItem(3593, "https://github.com/dotnet/roslyn/issues/3593")]
+        public void NoTypedRef()
+        {
+            var source1 =
+@"namespace System
+{
+    public class Object { }
+    public struct Void { }
+    public class ValueType { }
+    public struct Int32 { }
+    public struct Decimal { }
+}";
+            var compilation1 = CreateEmptyCompilation(source1, assemblyName: GetUniqueName());
+            var reference1 = MetadataReference.CreateFromStream(compilation1.EmitToStream());
+            var source2 =
+@"    
+public class C1
+{
+    public static T Read<T>()
+    {
+        T result = default(T);
+        var refresult = __makeref(result);
+
+        // ... method body
+
+        return result;
+    }
+}
+";
+            var compilation2 = CreateEmptyCompilation(source2, new[] { reference1 });
+            compilation2.VerifyDiagnostics(
+    // (7,25): error CS0518: Predefined type 'System.TypedReference' is not defined or imported
+    //         var refresult = __makeref(result);
+    Diagnostic(ErrorCode.ERR_PredefinedTypeNotFound, "__makeref(result)").WithArguments("System.TypedReference").WithLocation(7, 25)
+);
+        }
+
+        [Fact, WorkItem(3746, "https://github.com/dotnet/roslyn/issues/3746")]
+        public void NoTypedRefBox()
+        {
+            var source1 =
+@"namespace System
+{
+    public class Object { }
+    public struct Void { }
+    public class ValueType { }
+    public struct Int32 { }
+    public struct Decimal { }
+}";
+            var compilation1 = CreateEmptyCompilation(source1, assemblyName: GetUniqueName());
+            var reference1 = MetadataReference.CreateFromStream(compilation1.EmitToStream());
+            var source2 =
+@"    
+public class C1
+{
+    public static object rrr;
+
+    public static T Read<T>() where T : new()
+    {
+        T result = new T();
+        var refresult = __makeref(result);
+        rrr = refresult;
+        return result;
+    }
+}
+";
+            var compilation2 = CreateEmptyCompilation(source2, new[] { reference1 });
+            compilation2.VerifyDiagnostics(
+    // (9,25): error CS0518: Predefined type 'System.TypedReference' is not defined or imported
+    //         var refresult = __makeref(result);
+    Diagnostic(ErrorCode.ERR_PredefinedTypeNotFound, "__makeref(result)").WithArguments("System.TypedReference").WithLocation(9, 25)
+);
+        }
+
+        [Fact, WorkItem(3746, "https://github.com/dotnet/roslyn/issues/3746")]
+        public void NoTypedRefBox1()
+        {
+            var source1 =
+@"namespace System
+{
+    public class Object { }
+    public struct Void { }
+    public class ValueType { }
+    public struct Int32 { }
+    public struct Decimal { }
+    public struct TypedReference { }
+}";
+            var compilation1 = CreateEmptyCompilation(source1, assemblyName: GetUniqueName());
+            var reference1 = MetadataReference.CreateFromStream(compilation1.EmitToStream());
+            var source2 =
+@"    
+public class C1
+{
+    public static object rrr;
+
+    public static T Read<T>() where T : new()
+    {
+        T result = new T();
+        var refresult = __makeref(result);
+        rrr = refresult;
+        rrr = (object)__makeref(result);
+        return result;
+    }
+}
+";
+            var compilation2 = CreateEmptyCompilation(source2, new[] { reference1 });
+            compilation2.VerifyDiagnostics(
+    // (10,15): error CS0029: Cannot implicitly convert type 'System.TypedReference' to 'object'
+    //         rrr = refresult;
+    Diagnostic(ErrorCode.ERR_NoImplicitConv, "refresult").WithArguments("System.TypedReference", "object").WithLocation(10, 15),
+    // (11,15): error CS0030: Cannot convert type 'System.TypedReference' to 'object'
+    //         rrr = (object)__makeref(result);
+    Diagnostic(ErrorCode.ERR_NoExplicitConv, "(object)__makeref(result)").WithArguments("System.TypedReference", "object").WithLocation(11, 15)
+);
+        }
+
+        [Fact()]
+        public void NoTypedRefBox_RefStruct()
+        {
+            var source1 =
+@"namespace System
+{
+    public class Object { }
+    public class String { }
+    public struct Void { }
+    public class ValueType { }
+    public struct Int32 { }
+    public struct Boolean { }
+    public struct Decimal { }
+    public class Attribute{ }
+    public class ObsoleteAttribute: Attribute
+    {
+        public ObsoleteAttribute(string message, bool error){}
+    }
+
+    // Make the type ref struct. Should work just fine.
+    public ref struct TypedReference { }
+}";
+            var compilation1 = CreateEmptyCompilation(source1, assemblyName: GetUniqueName());
+            var reference1 = MetadataReference.CreateFromStream(compilation1.EmitToStream());
+            var source2 =
+@"    
+public class C1
+{
+    public static object rrr;
+
+    public static T Read<T>() where T : new()
+    {
+        T result = new T();
+        var refresult = __makeref(result);
+        rrr = refresult;
+        rrr = (object)__makeref(result);
+        return result;
+    }
+}
+";
+            var compilation2 = CreateEmptyCompilation(source2, new[] { reference1 });
+            compilation2.VerifyDiagnostics(
+    // (10,15): error CS0029: Cannot implicitly convert type 'System.TypedReference' to 'object'
+    //         rrr = refresult;
+    Diagnostic(ErrorCode.ERR_NoImplicitConv, "refresult").WithArguments("System.TypedReference", "object").WithLocation(10, 15),
+    // (11,15): error CS0030: Cannot convert type 'System.TypedReference' to 'object'
+    //         rrr = (object)__makeref(result);
+    Diagnostic(ErrorCode.ERR_NoExplicitConv, "(object)__makeref(result)").WithArguments("System.TypedReference", "object").WithLocation(11, 15)
+);
+        }
+
+        [WorkItem(530861, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/530861")]
         [Fact]
         public void MissingStringLengthForEach()
         {
@@ -285,7 +462,7 @@ namespace System.Collections
         bool MoveNext();
     }
 }";
-            var compilation1 = CreateCompilation(source1, assemblyName: GetUniqueName());
+            var compilation1 = CreateEmptyCompilation(source1, assemblyName: GetUniqueName());
             var reference1 = MetadataReference.CreateFromStream(compilation1.EmitToStream());
             var source2 =
 @"class C
@@ -298,7 +475,7 @@ namespace System.Collections
         }
     }
 }";
-            var compilation2 = CreateCompilation(source2, new[] { reference1 });
+            var compilation2 = CreateEmptyCompilation(source2, new[] { reference1 });
             compilation2.VerifyDiagnostics();
             compilation2.Emit(new System.IO.MemoryStream()).Diagnostics.Verify(
                 // (5,9): error CS0656: Missing compiler required member 'System.String.get_Length'
@@ -316,7 +493,7 @@ namespace System.Collections
           );
         }
 
-        [WorkItem(631443, "DevDiv")]
+        [WorkItem(631443, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/631443")]
         [Fact]
         public void CoreLibrary4()
         {
@@ -355,7 +532,7 @@ namespace System.Collections
         }
     }
 }";
-            CreateCompilation(
+            CreateEmptyCompilation(
                 text,
                 options: TestOptions.ReleaseDll)
             .VerifyDiagnostics();
@@ -420,14 +597,14 @@ namespace System.Collections
         }
     }
 }";
-            var comp = CreateCompilation(
+            var comp = CreateEmptyCompilation(
                     text,
                     options: TestOptions.ReleaseDll)
                 .VerifyDiagnostics();
 
 
-            //IMPORTANT: we shoud NOT load fields of self-containing structs like - "ldfld int int.m_value"
-            CompileAndVerify(comp, emitOptions: TestEmitters.RefEmitUnsupported, verify: false).
+            //IMPORTANT: we should NOT load fields of self-containing structs like - "ldfld int int.m_value"
+            CompileAndVerify(comp, verify: Verification.Skipped).
                 VerifyIL("int.CompareTo(int)", @"
 {
   // Code size       16 (0x10)
@@ -558,16 +735,16 @@ namespace System
         }
     }
 ";
-            var comp = CreateCompilation(
+            var comp = CreateEmptyCompilation(
                     text,
                     options: TestOptions.ReleaseDll)
                 .VerifyDiagnostics();
 
 
-            //IMPORTANT: we shoud NOT delegate E1.GetHashCode() to int.GetHashCode()
+            //IMPORTANT: we should NOT delegate E1.GetHashCode() to int.GetHashCode()
             //           it is entirely possible that Enum.GetHashCode and int.GetHashCode 
             //           have different implementations
-            CompileAndVerify(comp, emitOptions: TestEmitters.RefEmitBug, verify: false).
+            CompileAndVerify(comp, verify: Verification.Fails).
                 VerifyIL("program.Main()",
 @"
 {
@@ -605,7 +782,6 @@ namespace System
 "
                 );
         }
-
 
         [Fact]
         public void CoreLibraryIntPtr_m_value()
@@ -664,14 +840,14 @@ namespace System
             return unchecked((int)((long)m_value));
         }
 
-        public unsafe static IntPtr Foo() 
+        public unsafe static IntPtr Goo() 
         {
             return new IntPtr(0);
         }
 
         public unsafe static bool Bar(IntPtr value1) 
         {
-            return value1.m_value == Foo().m_value;
+            return value1.m_value == Goo().m_value;
         }
     }
 
@@ -683,9 +859,9 @@ namespace System
         }
     }
 }";
-            var comp = CreateCompilation(text, options: TestOptions.UnsafeReleaseDll).VerifyDiagnostics();
+            var comp = CreateEmptyCompilation(text, options: TestOptions.UnsafeReleaseDll).VerifyDiagnostics();
 
-            //IMPORTANT: we shoud NOT load fields of clr-confusing structs off the field value.
+            //IMPORTANT: we should NOT load fields of clr-confusing structs off the field value.
             //           the field should be loaded off the reference like in 
             //           the following snippet  (note ldargA, not ldarg) -
             //      IL_0000:  ldarga.s   V_0
@@ -693,9 +869,9 @@ namespace System
             //
             //           it may seem redundant since in general we can load the filed off the value
             //           but see the bug see VSW #396011, JIT needs references when loading
-            //           fields of certain clr-ambiguous structs (only possible when building mscolib)
+            //           fields of certain clr-ambiguous structs (only possible when building mscorlib)
 
-            CompileAndVerify(comp, emitOptions: TestEmitters.RefEmitUnsupported, verify: false).
+            CompileAndVerify(comp, verify: Verification.Fails).
                 VerifyIL("System.IntPtr..ctor(int)", @"
 {
   // Code size       10 (0xa)
@@ -771,7 +947,7 @@ namespace System
   .locals init (System.IntPtr V_0)
   IL_0000:  ldarga.s   V_0
   IL_0002:  ldfld      ""void* System.IntPtr.m_value""
-  IL_0007:  call       ""System.IntPtr System.IntPtr.Foo()""
+  IL_0007:  call       ""System.IntPtr System.IntPtr.Goo()""
   IL_000c:  stloc.0
   IL_000d:  ldloca.s   V_0
   IL_000f:  ldfld      ""void* System.IntPtr.m_value""
@@ -779,6 +955,241 @@ namespace System
   IL_0016:  ret
 }
 ");
+        }
+
+        [Fact]
+        public void FixedHelpersOnStringAndArray()
+        {
+            var text =
+@"
+namespace System
+{
+    public struct Void { }
+    public class ValueType { }
+    public struct Int32 { }
+    public struct Char { }
+    public struct Boolean { }
+    public class Exception { }
+
+    public class String 
+    { 
+        public ref char GetPinnableReference() => throw null;
+    }
+
+    public class Object 
+    { 
+    }
+
+    public class Array 
+    { 
+        public ref char GetPinnableReference() => throw null;
+    }
+}
+  
+unsafe internal class program
+{
+    public static void Main()
+    {
+        fixed (char* p = ""A"")
+        {
+            *p = default;
+        }
+    }
+
+    public static void Main1()
+    {
+        fixed (char* p = new char[1])
+        {
+            *p = default;
+        }
+    }
+}
+";
+            var comp = CreateEmptyCompilation(text, options: TestOptions.UnsafeReleaseDll);
+
+            comp.VerifyDiagnostics();
+
+            var c = CompileAndVerify(comp, verify: Verification.Skipped);
+
+            c.VerifyIL("program.Main()", @"
+{
+  // Code size       19 (0x13)
+  .maxstack  2
+  .locals init (pinned char& V_0)
+  IL_0000:  ldstr      ""A""
+  IL_0005:  call       ""ref char string.GetPinnableReference()""
+  IL_000a:  stloc.0
+  IL_000b:  ldloc.0
+  IL_000c:  conv.u
+  IL_000d:  ldc.i4.0
+  IL_000e:  stind.i2
+  IL_000f:  ldc.i4.0
+  IL_0010:  conv.u
+  IL_0011:  stloc.0
+  IL_0012:  ret
+}
+"
+                );
+
+            c.VerifyIL("program.Main1()", @"
+{
+  // Code size       35 (0x23)
+  .maxstack  2
+  .locals init (char* V_0, //p
+                pinned char[] V_1)
+  IL_0000:  ldc.i4.1
+  IL_0001:  newarr     ""char""
+  IL_0006:  dup
+  IL_0007:  stloc.1
+  IL_0008:  brfalse.s  IL_000f
+  IL_000a:  ldloc.1
+  IL_000b:  ldlen
+  IL_000c:  conv.i4
+  IL_000d:  brtrue.s   IL_0014
+  IL_000f:  ldc.i4.0
+  IL_0010:  conv.u
+  IL_0011:  stloc.0
+  IL_0012:  br.s       IL_001d
+  IL_0014:  ldloc.1
+  IL_0015:  ldc.i4.0
+  IL_0016:  ldelema    ""char""
+  IL_001b:  conv.u
+  IL_001c:  stloc.0
+  IL_001d:  ldloc.0
+  IL_001e:  ldc.i4.0
+  IL_001f:  stind.i2
+  IL_0020:  ldnull
+  IL_0021:  stloc.1
+  IL_0022:  ret
+}
+");
+        }
+
+        [Fact]
+        public void FixedHelperOnObject()
+        {
+            var text =
+@"
+namespace System
+{
+    public struct Void { }
+    public class ValueType { }
+    public struct Int32 { }
+    public struct Char { }
+    public struct Boolean { }
+    public class Exception { }
+
+    public class String 
+    { 
+    }
+
+    public class Object 
+    { 
+        public ref char GetPinnableReference() => throw null;
+    }
+
+    public class Array 
+    { 
+    }
+}
+
+namespace System.Runtime.CompilerServices
+{
+    public class RuntimeHelpers
+    {
+        public static int OffsetToStringData => 0;
+    }
+}
+  
+unsafe internal class program
+{
+    public static void Main()
+    {
+        fixed (char* p = ""A"")
+        {
+            *p = default;
+        }
+
+        fixed (char* p = new char[1])
+        {
+            *p = default;
+        }
+
+        fixed (char* p = 42)
+        {
+            *p = default;
+        }
+    }
+}
+";
+            var comp = CreateEmptyCompilation(text, options: TestOptions.UnsafeReleaseDll);
+
+            comp.VerifyDiagnostics();
+
+            CompileAndVerify(comp, verify: Verification.Skipped).
+                VerifyIL("program.Main()", @"
+{
+  // Code size       83 (0x53)
+  .maxstack  2
+  .locals init (char* V_0, //p
+                pinned string V_1,
+                char* V_2, //p
+                pinned char[] V_3,
+                pinned char& V_4)
+  IL_0000:  ldstr      ""A""
+  IL_0005:  stloc.1
+  IL_0006:  ldloc.1
+  IL_0007:  conv.u
+  IL_0008:  stloc.0
+  IL_0009:  ldloc.0
+  IL_000a:  brfalse.s  IL_0014
+  IL_000c:  ldloc.0
+  IL_000d:  call       ""int System.Runtime.CompilerServices.RuntimeHelpers.OffsetToStringData.get""
+  IL_0012:  add
+  IL_0013:  stloc.0
+  IL_0014:  ldloc.0
+  IL_0015:  ldc.i4.0
+  IL_0016:  stind.i2
+  IL_0017:  ldnull
+  IL_0018:  stloc.1
+  IL_0019:  ldc.i4.1
+  IL_001a:  newarr     ""char""
+  IL_001f:  dup
+  IL_0020:  stloc.3
+  IL_0021:  brfalse.s  IL_0028
+  IL_0023:  ldloc.3
+  IL_0024:  ldlen
+  IL_0025:  conv.i4
+  IL_0026:  brtrue.s   IL_002d
+  IL_0028:  ldc.i4.0
+  IL_0029:  conv.u
+  IL_002a:  stloc.2
+  IL_002b:  br.s       IL_0036
+  IL_002d:  ldloc.3
+  IL_002e:  ldc.i4.0
+  IL_002f:  ldelema    ""char""
+  IL_0034:  conv.u
+  IL_0035:  stloc.2
+  IL_0036:  ldloc.2
+  IL_0037:  ldc.i4.0
+  IL_0038:  stind.i2
+  IL_0039:  ldnull
+  IL_003a:  stloc.3
+  IL_003b:  ldc.i4.s   42
+  IL_003d:  box        ""int""
+  IL_0042:  call       ""ref char object.GetPinnableReference()""
+  IL_0047:  stloc.s    V_4
+  IL_0049:  ldloc.s    V_4
+  IL_004b:  conv.u
+  IL_004c:  ldc.i4.0
+  IL_004d:  stind.i2
+  IL_004e:  ldc.i4.0
+  IL_004f:  conv.u
+  IL_0050:  stloc.s    V_4
+  IL_0052:  ret
+}
+"
+                );
         }
     }
 }

@@ -1,6 +1,10 @@
-﻿' Copyright (c) Microsoft.  All Rights Reserved.  Licensed under the Apache License, Version 2.0.  See License.txt in the project root for license information.
+﻿' Licensed to the .NET Foundation under one or more agreements.
+' The .NET Foundation licenses this file to you under the MIT license.
+' See the LICENSE file in the project root for more information.
 
 Imports System.Collections.Immutable
+Imports Microsoft.CodeAnalysis.PooledObjects
+Imports Microsoft.CodeAnalysis.Symbols
 Imports Microsoft.CodeAnalysis.VisualBasic.Symbols
 Imports System.Runtime.InteropServices
 
@@ -15,7 +19,7 @@ Namespace Microsoft.CodeAnalysis.VisualBasic.Symbols
     ''' </summary>
     Friend MustInherit Class TypeParameterSymbol
         Inherits TypeSymbol
-        Implements ITypeParameterSymbol
+        Implements ITypeParameterSymbol, ITypeParameterSymbolInternal
 
         ' !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
         ' Changes to the public interface of this class should remain synchronized with the C# version.
@@ -46,7 +50,7 @@ Namespace Microsoft.CodeAnalysis.VisualBasic.Symbols
         ''' </summary>
         Public MustOverride ReadOnly Property Ordinal As Integer
 
-        Friend Overridable Function GetConstraintsUseSiteErrorInfo() As DiagnosticInfo
+        Friend Overridable Function GetConstraintsUseSiteInfo() As UseSiteInfo(Of AssemblySymbol)
             Return Nothing
         End Function
 
@@ -55,21 +59,15 @@ Namespace Microsoft.CodeAnalysis.VisualBasic.Symbols
         ''' Duplicates and cycles are removed, although the collection may include redundant
         ''' constraints where one constraint is a base type of another.
         ''' </summary>
-        Public ReadOnly Property ConstraintTypes As ImmutableArray(Of TypeSymbol)
-            Get
-                Return ConstraintTypesNoUseSiteDiagnostics
-            End Get
-        End Property
-
         Friend MustOverride ReadOnly Property ConstraintTypesNoUseSiteDiagnostics As ImmutableArray(Of TypeSymbol)
 
-        Friend Function ConstraintTypesWithDefinitionUseSiteDiagnostics(<[In], Out> ByRef useSiteDiagnostics As HashSet(Of DiagnosticInfo)) As ImmutableArray(Of TypeSymbol)
+        Friend Function ConstraintTypesWithDefinitionUseSiteDiagnostics(<[In], Out> ByRef useSiteInfo As CompoundUseSiteInfo(Of AssemblySymbol)) As ImmutableArray(Of TypeSymbol)
             Dim result = ConstraintTypesNoUseSiteDiagnostics
 
-            Me.AddConstraintsUseSiteDiagnostics(useSiteDiagnostics)
+            Me.AddConstraintsUseSiteInfo(useSiteInfo)
 
             For Each constraint In result
-                constraint.OriginalDefinition.AddUseSiteDiagnostics(useSiteDiagnostics)
+                constraint.OriginalDefinition.AddUseSiteInfo(useSiteInfo)
             Next
 
             Return result
@@ -307,17 +305,29 @@ Namespace Microsoft.CodeAnalysis.VisualBasic.Symbols
         ''' !!! Only code implementing construction of generic types is allowed to call this method !!!
         ''' !!! All other code should use Construct methods.                                        !!! 
         ''' </summary>
-        Friend Overrides Function InternalSubstituteTypeParameters(substitution As TypeSubstitution) As TypeSymbol
+        Friend Overrides Function InternalSubstituteTypeParameters(substitution As TypeSubstitution) As TypeWithModifiers
             If substitution IsNot Nothing Then
                 Return substitution.GetSubstitutionFor(Me)
             End If
 
-            Return Me
+            Return New TypeWithModifiers(Me)
         End Function
 
         Public MustOverride ReadOnly Property HasReferenceTypeConstraint As Boolean Implements ITypeParameterSymbol.HasReferenceTypeConstraint
 
         Public MustOverride ReadOnly Property HasValueTypeConstraint As Boolean Implements ITypeParameterSymbol.HasValueTypeConstraint
+
+        Private ReadOnly Property HasUnmanagedTypeConstraint As Boolean Implements ITypeParameterSymbol.HasUnmanagedTypeConstraint
+            Get
+                Return False
+            End Get
+        End Property
+
+        Private ReadOnly Property HasNotNullConstraint As Boolean Implements ITypeParameterSymbol.HasNotNullConstraint
+            Get
+                Return False
+            End Get
+        End Property
 
         Public MustOverride ReadOnly Property Variance As VarianceKind Implements ITypeParameterSymbol.Variance
 
@@ -335,10 +345,10 @@ Namespace Microsoft.CodeAnalysis.VisualBasic.Symbols
         ''' Return an array of substituted type parameters with duplicates removed.
         ''' </summary>
         Friend Shared Function InternalSubstituteTypeParametersDistinct(substitution As TypeSubstitution, types As ImmutableArray(Of TypeSymbol)) As ImmutableArray(Of TypeSymbol)
-            Return types.SelectAsArray(SubstituteFunc, substitution).Distinct()
+            Return types.SelectAsArray(s_substituteFunc, substitution).Distinct()
         End Function
 
-        Private Shared ReadOnly SubstituteFunc As Func(Of TypeSymbol, TypeSubstitution, TypeSymbol) = Function(type, substitution) type.InternalSubstituteTypeParameters(substitution)
+        Private Shared ReadOnly s_substituteFunc As Func(Of TypeSymbol, TypeSubstitution, TypeSymbol) = Function(type, substitution) type.InternalSubstituteTypeParameters(substitution).Type
 
         Friend Overrides ReadOnly Property EmbeddedSymbolKind As EmbeddedSymbolKind
             Get
@@ -353,6 +363,12 @@ Namespace Microsoft.CodeAnalysis.VisualBasic.Symbols
         End Property
 
 #Region "ITypeParameterSymbol"
+
+        Private ReadOnly Property ITypeParameterSymbol_ReferenceTypeConstraintNullableAnnotation As NullableAnnotation Implements ITypeParameterSymbol.ReferenceTypeConstraintNullableAnnotation
+            Get
+                Return NullableAnnotation.None
+            End Get
+        End Property
 
         Private ReadOnly Property ITypeParameterSymbol_DeclaringMethod As IMethodSymbol Implements ITypeParameterSymbol.DeclaringMethod
             Get
@@ -375,6 +391,12 @@ Namespace Microsoft.CodeAnalysis.VisualBasic.Symbols
         Private ReadOnly Property ITypeParameterSymbol_ConstraintTypes As ImmutableArray(Of ITypeSymbol) Implements ITypeParameterSymbol.ConstraintTypes
             Get
                 Return StaticCast(Of ITypeSymbol).From(Me.ConstraintTypesNoUseSiteDiagnostics)
+            End Get
+        End Property
+
+        Private ReadOnly Property ITypeParameterSymbol_ConstraintNullableAnnotations As ImmutableArray(Of NullableAnnotation) Implements ITypeParameterSymbol.ConstraintNullableAnnotations
+            Get
+                Return Me.ConstraintTypesNoUseSiteDiagnostics.SelectAsArray(Function(t) NullableAnnotation.None)
             End Get
         End Property
 

@@ -1,7 +1,11 @@
-// Copyright (c) Microsoft.  All Rights Reserved.  Licensed under the Apache License, Version 2.0.  See License.txt in the project root for license information.
+﻿// Licensed to the .NET Foundation under one or more agreements.
+// The .NET Foundation licenses this file to you under the MIT license.
+// See the LICENSE file in the project root for more information.
 
 using System.Collections.Generic;
+using System.Diagnostics.CodeAnalysis;
 using System.Linq;
+using Microsoft.CodeAnalysis.Editor.Shared.Extensions;
 using Microsoft.VisualStudio.Text;
 using Roslyn.Utilities;
 
@@ -9,7 +13,7 @@ namespace Microsoft.CodeAnalysis.Editor.Shared.Utilities
 {
     internal class LinkedEditsTracker
     {
-        private static readonly object s_propagateSpansEditTag = new object();
+        private static readonly object s_propagateSpansEditTag = new();
 
         private readonly ITextBuffer _subjectBuffer;
 
@@ -27,9 +31,7 @@ namespace Microsoft.CodeAnalysis.Editor.Shared.Utilities
         }
 
         public IList<SnapshotSpan> GetActiveSpansForSnapshot(ITextSnapshot snapshot)
-        {
-            return _trackingSpans.Select(ts => ts.GetSpan(snapshot)).ToList();
-        }
+            => _trackingSpans.Select(ts => ts.GetSpan(snapshot)).ToList();
 
         public void AddSpans(IEnumerable<ITrackingSpan> spans)
         {
@@ -51,15 +53,13 @@ namespace Microsoft.CodeAnalysis.Editor.Shared.Utilities
             AddSpans(newTrackingSpans);
         }
 
-        public bool MyOwnChanges(TextContentChangedEventArgs args)
-        {
-            return args.EditTag == s_propagateSpansEditTag;
-        }
+        public static bool MyOwnChanges(TextContentChangedEventArgs args)
+            => args.EditTag == s_propagateSpansEditTag;
 
-        public bool TryGetTextChanged(TextContentChangedEventArgs args, out string replacementText)
+        public bool TryGetTextChanged(TextContentChangedEventArgs args, [NotNullWhen(true)] out string? replacementText)
         {
             // make sure I am not called with my own changes
-            Contract.ThrowIfTrue(this.MyOwnChanges(args));
+            Contract.ThrowIfTrue(MyOwnChanges(args));
 
             // initialize out parameter
             replacementText = null;
@@ -73,42 +73,47 @@ namespace Microsoft.CodeAnalysis.Editor.Shared.Utilities
                 return false;
             }
 
+            // We want to find the single tracking span that encompasses all the edits made.  If there 
+            // is no such tracking span (or there are multiple), then we consider the change invalid
+            // and we don't return any changed text.  If there is only one, then we find the text in
+            // the new document.
+            //
+            // Note there may be multiple intersecting spans in the case where user typing causes 
+            // multiple edits to happen.  For example, if the user has "Sub" and replaces it with "fu<tab>"
+            // Then there will be multiple edits due to the text change and then the case correction.
+            // However, both edits will be encompassed in one tracking span.
             var spansTouchedInEdit = new NormalizedSpanCollection(args.Changes.Select(c => c.NewSpan));
             var intersection = NormalizedSpanCollection.Intersection(normalizedTrackingSpansAfterEdit, spansTouchedInEdit);
 
-            if (intersection.Count == 0)
+            var query = from trackingSpan in _trackingSpans
+                        let mappedSpan = trackingSpan.GetSpan(args.After)
+                        where intersection.All(intersectionSpan => mappedSpan.IntersectsWith(intersectionSpan))
+                        select trackingSpan;
+
+            var trackingSpansThatIntersect = query.ToList();
+            if (trackingSpansThatIntersect.Count != 1)
             {
-                // This edit didn't touch any spans, so ignore it
-                return false;
-            }
-            else if (intersection.Count > 1)
-            {
-                // TODO: figure out what the proper bail is in the new model
                 return false;
             }
 
-            // Good, we touched just one, so let's propagate it
-            var intersectionSpan = intersection.Single();
-            var singleTrackingSpanTouched = _trackingSpans.Single(ts => ts.GetSpan(args.After).IntersectsWith(intersectionSpan));
-
-            replacementText = singleTrackingSpanTouched.GetText(args.After);
+            var singleIntersectingTrackingSpan = trackingSpansThatIntersect.Single();
+            replacementText = singleIntersectingTrackingSpan.GetText(args.After);
             return true;
         }
 
         public void ApplyReplacementText(string replacementText)
         {
-            using (var edit = _subjectBuffer.CreateEdit(new EditOptions(), null, s_propagateSpansEditTag))
-            {
-                foreach (var span in _trackingSpans)
-                {
-                    if (span.GetText(_subjectBuffer.CurrentSnapshot) != replacementText)
-                    {
-                        edit.Replace(span.GetSpan(_subjectBuffer.CurrentSnapshot), replacementText);
-                    }
-                }
+            using var edit = _subjectBuffer.CreateEdit(new EditOptions(), null, s_propagateSpansEditTag);
 
-                edit.Apply();
+            foreach (var span in _trackingSpans)
+            {
+                if (span.GetText(_subjectBuffer.CurrentSnapshot) != replacementText)
+                {
+                    edit.Replace(span.GetSpan(_subjectBuffer.CurrentSnapshot), replacementText);
+                }
             }
+
+            edit.ApplyAndLogExceptions();
         }
     }
 }

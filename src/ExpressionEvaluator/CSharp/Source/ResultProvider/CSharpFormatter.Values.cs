@@ -1,12 +1,16 @@
-// Copyright (c) Microsoft.  All Rights Reserved.  Licensed under the Apache License, Version 2.0.  See License.txt in the project root for license information.
+﻿// Licensed to the .NET Foundation under one or more agreements.
+// The .NET Foundation licenses this file to you under the MIT license.
+// See the LICENSE file in the project root for more information.
+
+#nullable disable
 
 using System;
 using System.Collections.ObjectModel;
 using System.Diagnostics;
 using System.Text;
-using Microsoft.CodeAnalysis.Collections;
 using Microsoft.CodeAnalysis.ExpressionEvaluator;
-using Microsoft.VisualStudio.Debugger.Evaluation.ClrCompilation;
+using Microsoft.CodeAnalysis.PooledObjects;
+using Microsoft.VisualStudio.Debugger.Clr;
 using Roslyn.Utilities;
 using Type = Microsoft.VisualStudio.Debugger.Metadata.Type;
 
@@ -18,9 +22,21 @@ namespace Microsoft.CodeAnalysis.CSharp.ExpressionEvaluator
         {
             if (typeToDisplayOpt != null)
             {
-                AppendQualifiedTypeName(builder, typeToDisplayOpt, escapeKeywordIdentifiers: true);
+                // We're showing the type of a value, so "dynamic" does not apply.
+                bool unused;
+                int index1 = 0;
+                int index2 = 0;
+                AppendQualifiedTypeName(
+                    builder,
+                    typeToDisplayOpt,
+                    null,
+                    ref index1,
+                    null,
+                    ref index2,
+                    escapeKeywordIdentifiers: true,
+                    sawInvalidIdentifier: out unused);
                 builder.Append('.');
-                AppendIdentifierEscapingPotentialKeywords(builder, name);
+                AppendIdentifierEscapingPotentialKeywords(builder, name, sawInvalidIdentifier: out unused);
             }
             else
             {
@@ -28,7 +44,7 @@ namespace Microsoft.CodeAnalysis.CSharp.ExpressionEvaluator
             }
         }
 
-        internal override string GetArrayDisplayString(Type lmrType, ReadOnlyCollection<int> sizes, ReadOnlyCollection<int> lowerBounds, ObjectDisplayOptions options)
+        internal override string GetArrayDisplayString(DkmClrAppDomain appDomain, Type lmrType, ReadOnlyCollection<int> sizes, ReadOnlyCollection<int> lowerBounds, ObjectDisplayOptions options)
         {
             Debug.Assert(lmrType.IsArray);
 
@@ -44,7 +60,9 @@ namespace Microsoft.CodeAnalysis.CSharp.ExpressionEvaluator
             var builder = pooled.Builder;
             builder.Append('{');
 
-            builder.Append(GetTypeName(lmrType)); // NOTE: call our impl directly, since we're coupled anyway.
+            // We're showing the type of a value, so "dynamic" does not apply.
+            bool unused;
+            builder.Append(GetTypeName(new TypeAndCustomInfo(DkmClrType.Create(appDomain, lmrType)), escapeKeywordIdentifiers: false, sawInvalidIdentifier: out unused)); // NOTE: call our impl directly, since we're coupled anyway.
 
             var numSizes = sizes.Count;
 
@@ -84,30 +102,12 @@ namespace Microsoft.CodeAnalysis.CSharp.ExpressionEvaluator
             return pooled.ToStringAndFree();
         }
 
-        internal override string GetArrayIndexExpression(int[] indices)
+        internal override string GetArrayIndexExpression(string[] indices)
         {
-            Debug.Assert(indices != null);
-
-            var pooled = PooledStringBuilder.GetInstance();
-            var builder = pooled.Builder;
-
-            builder.Append('[');
-            bool any = false;
-            foreach (var index in indices)
-            {
-                if (any)
-                {
-                    builder.Append(", ");
-                }
-                builder.Append(index);
-                any = true;
-            }
-            builder.Append(']');
-
-            return pooled.ToStringAndFree();
+            return indices.ToCommaSeparatedString('[', ']');
         }
 
-        internal override string GetCastExpression(string argument, string type, bool parenthesizeArgument = false, bool parenthesizeEntireExpression = false)
+        internal override string GetCastExpression(string argument, string type, DkmClrCastExpressionOptions options)
         {
             Debug.Assert(!string.IsNullOrEmpty(argument));
             Debug.Assert(!string.IsNullOrEmpty(type));
@@ -115,20 +115,38 @@ namespace Microsoft.CodeAnalysis.CSharp.ExpressionEvaluator
             var pooled = PooledStringBuilder.GetInstance();
             var builder = pooled.Builder;
 
-            if (parenthesizeEntireExpression)
+            if ((options & DkmClrCastExpressionOptions.ParenthesizeEntireExpression) != 0)
             {
                 builder.Append('(');
             }
-
-            var castExpressionFormat = parenthesizeArgument ? "({0})({1})" : "({0}){1}";
-            builder.AppendFormat(castExpressionFormat, type, argument);
-
-            if (parenthesizeEntireExpression)
+            if ((options & DkmClrCastExpressionOptions.ParenthesizeArgument) != 0)
+            {
+                argument = $"({argument})";
+            }
+            if ((options & DkmClrCastExpressionOptions.ConditionalCast) != 0)
+            {
+                builder.Append(argument);
+                builder.Append(" as ");
+                builder.Append(type);
+            }
+            else
+            {
+                builder.Append('(');
+                builder.Append(type);
+                builder.Append(')');
+                builder.Append(argument);
+            }
+            if ((options & DkmClrCastExpressionOptions.ParenthesizeEntireExpression) != 0)
             {
                 builder.Append(')');
             }
 
             return pooled.ToStringAndFree();
+        }
+
+        internal override string GetTupleExpression(string[] values)
+        {
+            return values.ToCommaSeparatedString('(', ')');
         }
 
         internal override string GetNamesForFlagsEnumValue(ArrayBuilder<EnumField> fields, object value, ulong underlyingValue, ObjectDisplayOptions options, Type typeToDisplayOpt)
@@ -178,7 +196,7 @@ namespace Microsoft.CodeAnalysis.CSharp.ExpressionEvaluator
             return null;
         }
 
-        internal override string GetObjectCreationExpression(string type, string arguments)
+        internal override string GetObjectCreationExpression(string type, string[] arguments)
         {
             Debug.Assert(!string.IsNullOrEmpty(type));
 
@@ -188,7 +206,7 @@ namespace Microsoft.CodeAnalysis.CSharp.ExpressionEvaluator
             builder.Append("new ");
             builder.Append(type);
             builder.Append('(');
-            builder.Append(arguments);
+            builder.AppendCommaSeparatedList(arguments);
             builder.Append(')');
 
             return pooled.ToStringAndFree();
@@ -201,7 +219,7 @@ namespace Microsoft.CodeAnalysis.CSharp.ExpressionEvaluator
 
         internal override string FormatLiteral(int value, ObjectDisplayOptions options)
         {
-            return ObjectDisplay.FormatLiteral(value, options & ~ObjectDisplayOptions.UseQuotes);
+            return ObjectDisplay.FormatLiteral(value, options & ~(ObjectDisplayOptions.UseQuotes | ObjectDisplayOptions.EscapeNonPrintableCharacters));
         }
 
         internal override string FormatPrimitiveObject(object value, ObjectDisplayOptions options)
@@ -211,7 +229,7 @@ namespace Microsoft.CodeAnalysis.CSharp.ExpressionEvaluator
 
         internal override string FormatString(string str, ObjectDisplayOptions options)
         {
-            return ObjectDisplay.FormatString(str, quote: options.IncludesOption(ObjectDisplayOptions.UseQuotes) ? '"' : '\0', escapeNonPrintable: false);
+            return ObjectDisplay.FormatLiteral(str, options);
         }
     }
 }

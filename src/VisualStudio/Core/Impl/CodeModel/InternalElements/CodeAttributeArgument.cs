@@ -1,4 +1,8 @@
-// Copyright (c) Microsoft.  All Rights Reserved.  Licensed under the Apache License, Version 2.0.  See License.txt in the project root for license information.
+﻿// Licensed to the .NET Foundation under one or more agreements.
+// The .NET Foundation licenses this file to you under the MIT license.
+// See the LICENSE file in the project root for more information.
+
+#nullable disable
 
 using System;
 using System.Diagnostics;
@@ -34,25 +38,35 @@ namespace Microsoft.VisualStudio.LanguageServices.Implementation.CodeModel.Inter
         }
 
         protected override EnvDTE.CodeElements GetCollection()
-        {
-            return GetCollection<CodeAttributeArgument>(this.Parent);
-        }
+            => GetCollection<CodeAttributeArgument>(this.Parent);
 
         internal override SyntaxNode LookupNode()
         {
+            if (!TryLookupNode(out var node))
+            {
+                throw Exceptions.ThrowEUnexpected();
+            }
+
+            return node;
+        }
+
+        internal override bool TryLookupNode(out SyntaxNode node)
+        {
+            node = null;
+
             var attributeNode = _parentHandle.Value.LookupNode();
             if (attributeNode == null)
             {
-                throw Exceptions.ThrowEUnexpected();
+                return false;
             }
 
-            SyntaxNode attributeArgumentNode;
-            if (!CodeModelService.TryGetAttributeArgumentNode(attributeNode, _index, out attributeArgumentNode))
+            if (!CodeModelService.TryGetAttributeArgumentNode(attributeNode, _index, out var attributeArgumentNode))
             {
-                throw Exceptions.ThrowEUnexpected();
+                return false;
             }
 
-            return attributeArgumentNode;
+            node = attributeArgumentNode;
+            return node != null;
         }
 
         public override EnvDTE.vsCMElement Kind
@@ -74,13 +88,10 @@ namespace Microsoft.VisualStudio.LanguageServices.Implementation.CodeModel.Inter
             get { return EmptyCollection.Create(this.State, this); }
         }
 
-        public override string FullName
+        protected override string GetFullName()
         {
-            get
-            {
-                // TODO: VB throws E_NOTIMPL
-                throw Exceptions.ThrowEFail();
-            }
+            // TODO: VB throws E_NOTIMPL
+            throw Exceptions.ThrowEFail();
         }
 
         public string Value
@@ -97,8 +108,6 @@ namespace Microsoft.VisualStudio.LanguageServices.Implementation.CodeModel.Inter
         }
 
         public new void Delete()
-        {
-            base.Delete();
-        }
+            => base.Delete();
     }
 }

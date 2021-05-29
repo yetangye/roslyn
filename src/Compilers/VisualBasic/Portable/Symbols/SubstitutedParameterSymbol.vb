@@ -1,4 +1,6 @@
-﻿' Copyright (c) Microsoft.  All Rights Reserved.  Licensed under the Apache License, Version 2.0.  See License.txt in the project root for license information.
+﻿' Licensed to the .NET Foundation under one or more agreements.
+' The .NET Foundation licenses this file to you under the MIT license.
+' See the LICENSE file in the project root for more information.
 
 Imports System.Collections.Generic
 Imports System.Collections.Immutable
@@ -100,7 +102,7 @@ Namespace Microsoft.CodeAnalysis.VisualBasic.Symbols
 
         Public Overrides ReadOnly Property Type As TypeSymbol
             Get
-                Return _originalDefinition.Type.InternalSubstituteTypeParameters(TypeSubstitution)
+                Return _originalDefinition.Type.InternalSubstituteTypeParameters(TypeSubstitution).Type
             End Get
         End Property
 
@@ -164,9 +166,9 @@ Namespace Microsoft.CodeAnalysis.VisualBasic.Symbols
             End Get
         End Property
 
-        Friend NotOverridable Overrides ReadOnly Property HasByRefBeforeCustomModifiers As Boolean
+        Public Overrides ReadOnly Property RefCustomModifiers As ImmutableArray(Of CustomModifier)
             Get
-                Return _originalDefinition.HasByRefBeforeCustomModifiers
+                Return TypeSubstitution.SubstituteCustomModifiers(_originalDefinition.RefCustomModifiers)
             End Get
         End Property
 
@@ -178,7 +180,7 @@ Namespace Microsoft.CodeAnalysis.VisualBasic.Symbols
 
         Public Overrides ReadOnly Property CustomModifiers As ImmutableArray(Of CustomModifier)
             Get
-                Return _originalDefinition.CustomModifiers
+                Return TypeSubstitution.SubstituteCustomModifiers(_originalDefinition.Type, _originalDefinition.CustomModifiers)
             End Get
         End Property
 

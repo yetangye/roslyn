@@ -1,16 +1,20 @@
-﻿// Copyright (c) Microsoft.  All Rights Reserved.  Licensed under the Apache License, Version 2.0.  See License.txt in the project root for license information.
+﻿// Licensed to the .NET Foundation under one or more agreements.
+// The .NET Foundation licenses this file to you under the MIT license.
+// See the LICENSE file in the project root for more information.
+
+#nullable disable
 
 using Microsoft.CodeAnalysis.CSharp.Symbols;
 using Roslyn.Utilities;
+using System;
 using System.Collections.Immutable;
 using System.Diagnostics;
-using System.Threading;
 
 namespace Microsoft.CodeAnalysis.CSharp
 {
     /// <summary>
     /// Some error messages are particularly confusing if multiple placeholders are substituted
-    /// with the same string.  For example, "cannot convert from 'Foo' to 'Foo'".  Usually, this
+    /// with the same string.  For example, "cannot convert from 'Goo' to 'Goo'".  Usually, this
     /// occurs because there are two types in different contexts with the same qualified name.
     /// The solution is to provide additional qualification on each symbol - either a source
     /// location, an assembly path, or an assembly identity.
@@ -20,13 +24,13 @@ namespace Microsoft.CodeAnalysis.CSharp
     /// </remarks>
     internal sealed class SymbolDistinguisher
     {
-        private readonly Compilation _compilation;
+        private readonly CSharpCompilation _compilation;
         private readonly Symbol _symbol0;
         private readonly Symbol _symbol1;
 
         private ImmutableArray<string> _lazyDescriptions;
 
-        public SymbolDistinguisher(Compilation compilation, Symbol symbol0, Symbol symbol1)
+        public SymbolDistinguisher(CSharpCompilation compilation, Symbol symbol0, Symbol symbol1)
         {
             Debug.Assert(symbol0 != symbol1);
             CheckSymbolKind(symbol0);
@@ -37,12 +41,12 @@ namespace Microsoft.CodeAnalysis.CSharp
             _symbol1 = symbol1;
         }
 
-        public IMessageSerializable First
+        public IFormattable First
         {
             get { return new Description(this, 0); }
         }
 
-        public IMessageSerializable Second
+        public IFormattable Second
         {
             get { return new Description(this, 1); }
         }
@@ -64,8 +68,9 @@ namespace Microsoft.CodeAnalysis.CSharp
                 case SymbolKind.PointerType:
                 case SymbolKind.Parameter:
                     break; // Can sensibly append location, after unwrapping.
-                case SymbolKind.DynamicType:
-                    break; // Can't sensibly append location, but it should never be ambiguous.
+                case SymbolKind.DynamicType: // Can't sensibly append location, but it should never be ambiguous.
+                case SymbolKind.FunctionPointerType: // Can't sensibly append location
+                    break;
                 case SymbolKind.Namespace:
                 case SymbolKind.Alias:
                 case SymbolKind.Assembly:
@@ -74,8 +79,6 @@ namespace Microsoft.CodeAnalysis.CSharp
                 case SymbolKind.Local:
                 case SymbolKind.RangeVariable:
                 case SymbolKind.Preprocessing:
-                    Debug.Assert(false, "Unsupported symbol kind " + symbol.Kind);
-                    break;
                 default:
                     throw ExceptionUtilities.UnexpectedValue(symbol.Kind);
             }
@@ -106,27 +109,28 @@ namespace Microsoft.CodeAnalysis.CSharp
                     // May not be the case if there are error types.
                     if ((object)containingAssembly0 != null && (object)containingAssembly1 != null)
                     {
+                        // Use the assembly identities rather than locations. Note that the
+                        // assembly identities may be identical as well. (For instance, the
+                        // symbols are type arguments to the same generic type, and the type
+                        // arguments have the same string representation. The assembly
+                        // identities will refer to the generic types, not the type arguments.)
                         location0 = containingAssembly0.Identity.ToString();
                         location1 = containingAssembly1.Identity.ToString();
-
-                        // Even if the friendly locations produced by GetLocationString aren't
-                        // distinct, the containing assembly identities should be.
-                        Debug.Assert(location0 != location1);
                     }
                 }
 
-                if (location0 != null)
+                if (location0 != location1)
                 {
-                    description0 = $"{description0} [{location0}]";
-                }
-
-                if (location1 != null)
-                {
-                    description1 = $"{description1} [{location1}]";
+                    if (location0 != null)
+                    {
+                        description0 = $"{description0} [{location0}]";
+                    }
+                    if (location1 != null)
+                    {
+                        description1 = $"{description1} [{location1}]";
+                    }
                 }
             }
-
-            Debug.Assert(description0 != description1);
 
             if (!_lazyDescriptions.IsDefault) return;
 
@@ -154,8 +158,7 @@ namespace Microsoft.CodeAnalysis.CSharp
             }
         }
 
-
-        private static string GetLocationString(Compilation compilation, Symbol unwrappedSymbol)
+        private static string GetLocationString(CSharpCompilation compilation, Symbol unwrappedSymbol)
         {
             Debug.Assert((object)unwrappedSymbol == UnwrapSymbol(unwrappedSymbol));
 
@@ -190,7 +193,7 @@ namespace Microsoft.CodeAnalysis.CSharp
                 return containingAssembly.Identity.ToString();
             }
 
-            Debug.Assert(unwrappedSymbol.Kind == SymbolKind.DynamicType || unwrappedSymbol.Kind == SymbolKind.ErrorType);
+            Debug.Assert(unwrappedSymbol.Kind == SymbolKind.DynamicType || unwrappedSymbol.Kind == SymbolKind.ErrorType || unwrappedSymbol.Kind == SymbolKind.FunctionPointerType);
             return null;
         }
 
@@ -200,7 +203,7 @@ namespace Microsoft.CodeAnalysis.CSharp
             return _lazyDescriptions[index];
         }
 
-        private class Description : IMessageSerializable
+        private sealed class Description : IFormattable
         {
             private readonly SymbolDistinguisher _distinguisher;
             private readonly int _index;
@@ -211,9 +214,38 @@ namespace Microsoft.CodeAnalysis.CSharp
                 _index = index;
             }
 
+            private Symbol GetSymbol()
+            {
+                return (_index == 0) ? _distinguisher._symbol0 : _distinguisher._symbol1;
+            }
+
+            public override bool Equals(object obj)
+            {
+                var other = obj as Description;
+                return other != null &&
+                    _distinguisher._compilation == other._distinguisher._compilation &&
+                    GetSymbol() == other.GetSymbol();
+            }
+
+            public override int GetHashCode()
+            {
+                int result = GetSymbol().GetHashCode();
+                var compilation = _distinguisher._compilation;
+                if (compilation != null)
+                {
+                    result = Hash.Combine(result, compilation.GetHashCode());
+                }
+                return result;
+            }
+
             public override string ToString()
             {
                 return _distinguisher.GetDescription(_index);
+            }
+
+            string IFormattable.ToString(string format, IFormatProvider formatProvider)
+            {
+                return ToString();
             }
         }
     }

@@ -1,9 +1,12 @@
-' Copyright (c) Microsoft.  All Rights Reserved.  Licensed under the Apache License, Version 2.0.  See License.txt in the project root for license information.
+﻿' Licensed to the .NET Foundation under one or more agreements.
+' The .NET Foundation licenses this file to you under the MIT license.
+' See the LICENSE file in the project root for more information.
 
 Imports System.Threading
 Imports System.Xml.Linq
 Imports Microsoft.CodeAnalysis
-Imports Microsoft.CodeAnalysis.Editor.Host
+Imports Microsoft.CodeAnalysis.Editor.Shared.Utilities
+Imports Microsoft.CodeAnalysis.Editor.UnitTests
 Imports Microsoft.CodeAnalysis.Editor.UnitTests.Workspaces
 Imports Microsoft.CodeAnalysis.Editor.VisualBasic.LineCommit
 Imports Microsoft.CodeAnalysis.Text
@@ -22,32 +25,37 @@ Namespace Microsoft.CodeAnalysis.Editor.VisualBasic.UnitTests.LineCommit
         Public ReadOnly Workspace As TestWorkspace
         Public ReadOnly View As ITextView
         Public ReadOnly UndoHistory As ITextUndoHistory
-        Private ReadOnly Formatter As FormatterMock
-        Private ReadOnly InlineRenameService As InlineRenameServiceMock
+        Private ReadOnly _formatter As FormatterMock
+        Private ReadOnly _inlineRenameService As InlineRenameServiceMock
 
-        Public Sub New(test As XElement)
-            Workspace = TestWorkspaceFactory.CreateWorkspace(test)
-            View = Workspace.Documents.Single().GetTextView()
-            EditorOperations = Workspace.GetService(Of IEditorOperationsFactoryService).GetEditorOperations(View)
+        Public Shared Function Create(test As XElement) As CommitTestData
+            Dim workspace = TestWorkspace.Create(test, composition:=EditorTestCompositions.EditorFeaturesWpf)
+            Return New CommitTestData(workspace)
+        End Function
 
-            Dim position = Workspace.Documents.Single(Function(d) d.CursorPosition.HasValue).CursorPosition.Value
+        Public Sub New(workspace As TestWorkspace)
+            Me.Workspace = workspace
+            View = workspace.Documents.Single().GetTextView()
+            EditorOperations = workspace.GetService(Of IEditorOperationsFactoryService).GetEditorOperations(View)
+
+            Dim position = workspace.Documents.Single(Function(d) d.CursorPosition.HasValue).CursorPosition.Value
             View.Caret.MoveTo(New SnapshotPoint(View.TextSnapshot, position))
 
-            Buffer = Workspace.Documents.Single().TextBuffer
+            Buffer = workspace.Documents.Single().GetTextBuffer()
 
             ' HACK: We may have already created a CommitBufferManager for the buffer, so remove it
-            If (Buffer.Properties.ContainsProperty(GetType(CommitBufferManager))) Then
+            If Buffer.Properties.ContainsProperty(GetType(CommitBufferManager)) Then
                 Dim oldManager = Buffer.Properties.GetProperty(Of CommitBufferManager)(GetType(CommitBufferManager))
                 oldManager.RemoveReferencingView()
                 Buffer.Properties.RemoveProperty(GetType(CommitBufferManager))
             End If
 
-            Dim textUndoHistoryRegistry = Workspace.GetService(Of ITextUndoHistoryRegistry)()
+            Dim textUndoHistoryRegistry = workspace.GetService(Of ITextUndoHistoryRegistry)()
             UndoHistory = textUndoHistoryRegistry.GetHistory(View.TextBuffer)
 
-            Formatter = New FormatterMock(Workspace)
-            InlineRenameService = New InlineRenameServiceMock()
-            Dim commitManagerFactory As New CommitBufferManagerFactory(Formatter, InlineRenameService)
+            _formatter = New FormatterMock(workspace)
+            _inlineRenameService = New InlineRenameServiceMock()
+            Dim commitManagerFactory As New CommitBufferManagerFactory(_formatter, _inlineRenameService, workspace.GetService(Of IThreadingContext))
 
             ' Make sure the manager exists for the buffer
             Dim commitManager = commitManagerFactory.CreateForBuffer(Buffer)
@@ -55,22 +63,21 @@ Namespace Microsoft.CodeAnalysis.Editor.VisualBasic.UnitTests.LineCommit
 
             CommandHandler = New CommitCommandHandler(
                 commitManagerFactory,
-                Workspace.GetService(Of IEditorOperationsFactoryService),
-                Workspace.GetService(Of ISmartIndentationService),
-                textUndoHistoryRegistry,
-                Workspace.GetService(Of Microsoft.CodeAnalysis.Editor.Host.IWaitIndicator))
+                workspace.GetService(Of IEditorOperationsFactoryService),
+                workspace.GetService(Of ISmartIndentationService),
+                textUndoHistoryRegistry)
         End Sub
 
         Friend Sub AssertHadCommit(expectCommit As Boolean)
-            Assert.Equal(expectCommit, Formatter.GotCommit)
+            Assert.Equal(expectCommit, _formatter.GotCommit)
         End Sub
 
         Friend Sub AssertUsedSemantics(expected As Boolean)
-            Assert.Equal(expected, Formatter.UsedSemantics)
+            Assert.Equal(expected, _formatter.UsedSemantics)
         End Sub
 
         Friend Sub StartInlineRenameSession()
-            InlineRenameService.HasSession = True
+            _inlineRenameService.HasSession = True
         End Sub
 
         Public Sub Dispose() Implements IDisposable.Dispose
@@ -135,7 +142,7 @@ Namespace Microsoft.CodeAnalysis.Editor.VisualBasic.UnitTests.LineCommit
                     Assert.Equal(trackingSpan.GetSpan(spanToFormat.Snapshot), spanToFormat.Span)
                 End If
 
-                Dim realCommitFormatter As New CommitFormatter()
+                Dim realCommitFormatter As New CommitFormatter(_testWorkspace.GetService(Of IIndentationManagerService))
                 realCommitFormatter.CommitRegion(spanToFormat, isExplicitFormat, useSemantics, dirtyRegion, baseSnapshot, baseTree, cancellationToken)
             End Sub
         End Class

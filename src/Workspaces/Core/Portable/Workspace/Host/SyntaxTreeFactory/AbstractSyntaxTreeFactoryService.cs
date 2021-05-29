@@ -1,4 +1,8 @@
-﻿// Copyright (c) Microsoft.  All Rights Reserved.  Licensed under the Apache License, Version 2.0.  See License.txt in the project root for license information.
+﻿// Licensed to the .NET Foundation under one or more agreements.
+// The .NET Foundation licenses this file to you under the MIT license.
+// See the LICENSE file in the project root for more information.
+
+#nullable disable
 
 using System.IO;
 using System.Text;
@@ -12,20 +16,26 @@ namespace Microsoft.CodeAnalysis.Host
     {
         // Recoverable trees only save significant memory for larger trees
         internal readonly int MinimumLengthForRecoverableTree;
+        private readonly bool _hasCachingService;
 
-        internal HostLanguageServices LanguageServices { get; private set; }
+        internal HostLanguageServices LanguageServices { get; }
 
         public AbstractSyntaxTreeFactoryService(HostLanguageServices languageServices)
         {
             this.LanguageServices = languageServices;
             this.MinimumLengthForRecoverableTree = languageServices.WorkspaceServices.Workspace.Options.GetOption(CacheOptions.RecoverableTreeLengthThreshold);
+            _hasCachingService = languageServices.WorkspaceServices.GetService<IProjectCacheHostService>() != null;
         }
 
         public abstract ParseOptions GetDefaultParseOptions();
-        public abstract SyntaxTree CreateSyntaxTree(string filePath, ParseOptions options, SyntaxNode node, Encoding encoding);
+        public abstract SyntaxTree CreateSyntaxTree(string filePath, ParseOptions options, Encoding encoding, SyntaxNode root);
         public abstract SyntaxTree ParseSyntaxTree(string filePath, ParseOptions options, SourceText text, CancellationToken cancellationToken);
-        public abstract SyntaxTree CreateRecoverableTree(ProjectId cacheKey, string filePath, ParseOptions options, ValueSource<TextAndVersion> text, SyntaxNode root);
+        public abstract SyntaxTree CreateRecoverableTree(ProjectId cacheKey, string filePath, ParseOptions options, ValueSource<TextAndVersion> text, Encoding encoding, SyntaxNode root);
         public abstract SyntaxNode DeserializeNodeFrom(Stream stream, CancellationToken cancellationToken);
+        public abstract ParseOptions GetDefaultParseOptionsWithLatestLanguageVersion();
+
+        public virtual bool CanCreateRecoverableTree(SyntaxNode root)
+            => _hasCachingService && root.FullSpan.Length >= this.MinimumLengthForRecoverableTree;
 
         protected static SyntaxNode RecoverNode(SyntaxTree tree, TextSpan textSpan, int kind)
         {
@@ -39,8 +49,7 @@ namespace Microsoft.CodeAnalysis.Host
                     return node;
                 }
 
-                var structuredTrivia = node as IStructuredTriviaSyntax;
-                if (structuredTrivia != null)
+                if (node is IStructuredTriviaSyntax structuredTrivia)
                 {
                     node = structuredTrivia.ParentTrivia.Token.Parent;
                 }

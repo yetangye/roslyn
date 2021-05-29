@@ -1,10 +1,12 @@
-﻿// Copyright (c) Microsoft.  All Rights Reserved.  Licensed under the Apache License, Version 2.0.  See License.txt in the project root for license information.
+﻿// Licensed to the .NET Foundation under one or more agreements.
+// The .NET Foundation licenses this file to you under the MIT license.
+// See the LICENSE file in the project root for more information.
+
+#nullable disable
 
 using System;
 using System.Collections.Generic;
 using System.Linq;
-using Microsoft.CodeAnalysis.Rename.ConflictEngine;
-using Microsoft.CodeAnalysis.Text;
 using Microsoft.CodeAnalysis.Text.Shared.Extensions;
 using Microsoft.VisualStudio.Text;
 using Microsoft.VisualStudio.Text.Tagging;
@@ -37,7 +39,7 @@ namespace Microsoft.CodeAnalysis.Editor.Implementation.InlineRename
         {
             if (e.PreviousSession != null)
             {
-                DetachFromSession(e.PreviousSession);
+                DetachFromSession();
             }
 
             if (_renameService.ActiveSession != null)
@@ -55,7 +57,7 @@ namespace Microsoft.CodeAnalysis.Editor.Implementation.InlineRename
             }
         }
 
-        private void DetachFromSession(InlineRenameSession session)
+        private void DetachFromSession()
         {
             if (_bufferManager != null)
             {
@@ -74,13 +76,7 @@ namespace Microsoft.CodeAnalysis.Editor.Implementation.InlineRename
         }
 
         private void RaiseTagsChangedForEntireBuffer()
-        {
-            var tagsChanged = TagsChanged;
-            if (tagsChanged != null)
-            {
-                tagsChanged(this, new SnapshotSpanEventArgs(new SnapshotSpan(_buffer.CurrentSnapshot, 0, _buffer.CurrentSnapshot.Length)));
-            }
-        }
+            => TagsChanged?.Invoke(this, new SnapshotSpanEventArgs(_buffer.CurrentSnapshot.GetFullSpan()));
 
         public void Dispose()
         {
@@ -88,7 +84,7 @@ namespace Microsoft.CodeAnalysis.Editor.Implementation.InlineRename
 
             if (_renameService.ActiveSession != null)
             {
-                DetachFromSession(_renameService.ActiveSession);
+                DetachFromSession();
             }
         }
 
@@ -110,8 +106,7 @@ namespace Microsoft.CodeAnalysis.Editor.Implementation.InlineRename
                     var span = renameSpan.TrackingSpan.GetSpan(snapshot);
                     if (spans.OverlapsWith(span))
                     {
-                        TagSpan<T> tagSpan;
-                        if (TryCreateTagSpan(span, renameSpan.Type, out tagSpan))
+                        if (TryCreateTagSpan(span, renameSpan.Type, out var tagSpan))
                         {
                             yield return tagSpan;
                         }

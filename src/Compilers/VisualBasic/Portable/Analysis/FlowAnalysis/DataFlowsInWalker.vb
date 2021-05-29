@@ -1,4 +1,6 @@
-﻿' Copyright (c) Microsoft.  All Rights Reserved.  Licensed under the Apache License, Version 2.0.  See License.txt in the project root for license information.
+﻿' Licensed to the .NET Foundation under one or more agreements.
+' The .NET Foundation licenses this file to you under the MIT license.
+' See the LICENSE file in the project root for more information.
 
 Imports System.Collections.Generic
 Imports Microsoft.CodeAnalysis.Text
@@ -10,15 +12,15 @@ Namespace Microsoft.CodeAnalysis.VisualBasic
     ''' <summary>
     ''' A region analysis walker that computes the set of variables whose values flow into (are used in)
     ''' the region.
-    ''' An variable assigned outside is used inside if an analysis
+    ''' A variable assigned outside is used inside if an analysis
     ''' that leaves the variable unassigned on entry to the region would cause the
     ''' generation of "unassigned" errors within the region.
     ''' </summary>
-    Class DataFlowsInWalker
+    Friend Class DataFlowsInWalker
         Inherits AbstractRegionDataFlowPass
 
         ' TODO: normalize the result by removing variables that are unassigned in an unmodified flow analysis.
-        Sub New(info As FlowAnalysisInfo, region As FlowAnalysisRegionInfo, unassignedVariables As HashSet(Of Symbol))
+        Private Sub New(info As FlowAnalysisInfo, region As FlowAnalysisRegionInfo, unassignedVariables As HashSet(Of Symbol))
             MyBase.New(info, region, unassignedVariables, trackStructsWithIntrinsicTypedFields:=True)
         End Sub
 
@@ -39,13 +41,13 @@ Namespace Microsoft.CodeAnalysis.VisualBasic
             Try
                 succeeded = walker.Analyze() AndAlso Not walker.InvalidRegionDetected
                 invalidRegionDetected = walker.InvalidRegionDetected
-                Return If(succeeded, walker.dataFlowsIn, New HashSet(Of Symbol)())
+                Return If(succeeded, walker._dataFlowsIn, New HashSet(Of Symbol)())
             Finally
                 walker.Free()
             End Try
         End Function
 
-        Dim dataFlowsIn As HashSet(Of Symbol) = New HashSet(Of Symbol)()
+        Private ReadOnly _dataFlowsIn As HashSet(Of Symbol) = New HashSet(Of Symbol)()
 
         Private Function ResetState(state As LocalState) As LocalState
             Dim unreachable As Boolean = Not state.Reachable
@@ -58,7 +60,7 @@ Namespace Microsoft.CodeAnalysis.VisualBasic
 
         Protected Overrides Sub EnterRegion()
             Me.SetState(ResetState(Me.State))
-            Me.dataFlowsIn.Clear()
+            Me._dataFlowsIn.Clear()
             MyBase.EnterRegion()
         End Sub
 
@@ -79,7 +81,7 @@ Namespace Microsoft.CodeAnalysis.VisualBasic
                IsInside AndAlso
                Not IsInsideRegion(node.RangeVariable.Syntax.Span) Then
 
-                dataFlowsIn.Add(node.RangeVariable)
+                _dataFlowsIn.Add(node.RangeVariable)
             End If
 
             Return Nothing
@@ -89,7 +91,7 @@ Namespace Microsoft.CodeAnalysis.VisualBasic
             MyBase.VisitAmbiguousLocalSymbol(ambiguous)
 
             ' Locals from ambiguous implicit receiver can only be unassigned in *REGION* flow analysis 
-            ' if a new region starts after they are declared and begore the implicit receiver is referenced; 
+            ' if a new region starts after they are declared and before the implicit receiver is referenced; 
             ' region data flow analysis for such regions is prohibited and should return Succeeded = False.
 
             ' Check if the first local in the collection was 'unassigned' by entering a region, 
@@ -103,7 +105,7 @@ Namespace Microsoft.CodeAnalysis.VisualBasic
         End Sub
 
         Protected Overrides Sub ReportUnassigned(local As Symbol,
-                                                 node As VisualBasicSyntaxNode,
+                                                 node As SyntaxNode,
                                                  rwContext As ReadWriteContext,
                                                  Optional slot As Integer = SlotKind.NotTracked,
                                                  Optional boundFieldAccess As BoundFieldAccess = Nothing)
@@ -121,11 +123,11 @@ Namespace Microsoft.CodeAnalysis.VisualBasic
                     Debug.Assert(Not TypeOf sym Is AmbiguousLocalsPseudoSymbol)
 
                     If sym IsNot Nothing Then
-                        dataFlowsIn.Add(sym)
+                        _dataFlowsIn.Add(sym)
                     End If
 
                 Else
-                    dataFlowsIn.Add(local)
+                    _dataFlowsIn.Add(local)
                 End If
             End If
 

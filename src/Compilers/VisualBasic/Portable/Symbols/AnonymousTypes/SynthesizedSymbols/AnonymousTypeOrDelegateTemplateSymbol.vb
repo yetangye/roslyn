@@ -1,4 +1,6 @@
-﻿' Copyright (c) Microsoft.  All Rights Reserved.  Licensed under the Apache License, Version 2.0.  See License.txt in the project root for license information.
+﻿' Licensed to the .NET Foundation under one or more agreements.
+' The .NET Foundation licenses this file to you under the MIT license.
+' See the LICENSE file in the project root for more information.
 
 Imports System.Collections.Immutable
 Imports System.Runtime.InteropServices
@@ -6,11 +8,12 @@ Imports System.Threading
 Imports Microsoft.Cci
 Imports Microsoft.CodeAnalysis
 Imports Microsoft.CodeAnalysis.Emit
+Imports Microsoft.CodeAnalysis.Symbols
 
 Namespace Microsoft.CodeAnalysis.VisualBasic.Symbols
     Partial Friend NotInheritable Class AnonymousTypeManager
 
-        Private NotInheritable Class NameAndIndex
+        Friend NotInheritable Class NameAndIndex
             Public Sub New(name As String, index As Integer)
                 Me.Name = name
                 Me.Index = index
@@ -20,7 +23,7 @@ Namespace Microsoft.CodeAnalysis.VisualBasic.Symbols
             Public ReadOnly Index As Integer
         End Class
 
-        Private MustInherit Class AnonymousTypeOrDelegateTemplateSymbol
+        Friend MustInherit Class AnonymousTypeOrDelegateTemplateSymbol
             Inherits InstanceTypeSymbol
 
             Public ReadOnly Manager As AnonymousTypeManager
@@ -30,10 +33,13 @@ Namespace Microsoft.CodeAnalysis.VisualBasic.Symbols
             ''' metadata is ready to be emitted, Name property will throw exception if this field 
             ''' is queried before that moment because the name is not defined yet.
             ''' </summary>
-            Private m_nameAndIndex As NameAndIndex
+            Private _nameAndIndex As NameAndIndex
 
-            Private ReadOnly m_typeParameters As ImmutableArray(Of TypeParameterSymbol)
-            Private m_adjustedPropertyNames As LocationAndNames
+            Private ReadOnly _typeParameters As ImmutableArray(Of TypeParameterSymbol)
+            Private _adjustedPropertyNames As LocationAndNames
+#If DEBUG Then
+            Private _locationAndNamesAreLocked As Boolean
+#End If
 
             ''' <summary>
             ''' The key of the anonymous type descriptor used for this type template
@@ -47,7 +53,7 @@ Namespace Microsoft.CodeAnalysis.VisualBasic.Symbols
                 Debug.Assert(TypeKind = TypeKind.Class OrElse TypeKind = TypeKind.Delegate)
                 Me.Manager = manager
                 Me.TypeDescriptorKey = typeDescr.Key
-                m_adjustedPropertyNames = New LocationAndNames(typeDescr)
+                _adjustedPropertyNames = New LocationAndNames(typeDescr)
 
                 Dim arity As Integer = typeDescr.Fields.Length
 
@@ -61,7 +67,7 @@ Namespace Microsoft.CodeAnalysis.VisualBasic.Symbols
                     Debug.Assert(TypeKind = TypeKind.Delegate)
                     Debug.Assert(typeDescr.Parameters.Length = 1)
                     Debug.Assert(typeDescr.Parameters.IsSubDescription())
-                    m_typeParameters = ImmutableArray(Of TypeParameterSymbol).Empty
+                    _typeParameters = ImmutableArray(Of TypeParameterSymbol).Empty
                 Else
                     Dim typeParameters = New TypeParameterSymbol(arity - 1) {}
 
@@ -69,7 +75,7 @@ Namespace Microsoft.CodeAnalysis.VisualBasic.Symbols
                         typeParameters(ordinal) = New AnonymousTypeOrDelegateTypeParameterSymbol(Me, ordinal)
                     Next
 
-                    m_typeParameters = typeParameters.AsImmutable()
+                    _typeParameters = typeParameters.AsImmutable()
                 End If
             End Sub
 
@@ -77,13 +83,13 @@ Namespace Microsoft.CodeAnalysis.VisualBasic.Symbols
 
             Public Overrides ReadOnly Property Name As String
                 Get
-                    Return m_nameAndIndex.Name
+                    Return _nameAndIndex.Name
                 End Get
             End Property
 
             Friend Overrides ReadOnly Property MangleName As Boolean
                 Get
-                    Return m_typeParameters.Length > 0
+                    Return _typeParameters.Length > 0
                 End Get
             End Property
 
@@ -93,7 +99,7 @@ Namespace Microsoft.CodeAnalysis.VisualBasic.Symbols
                 End Get
             End Property
 
-            Friend NotOverridable Overrides ReadOnly Property IsSerializable As Boolean
+            Public NotOverridable Overrides ReadOnly Property IsSerializable As Boolean
                 Get
                     Return False
                 End Get
@@ -115,13 +121,13 @@ Namespace Microsoft.CodeAnalysis.VisualBasic.Symbols
 
             Public Overrides ReadOnly Property Arity As Integer
                 Get
-                    Return m_typeParameters.Length
+                    Return _typeParameters.Length
                 End Get
             End Property
 
             Public Overrides ReadOnly Property TypeParameters As ImmutableArray(Of TypeParameterSymbol)
                 Get
-                    Return m_typeParameters
+                    Return _typeParameters
                 End Get
             End Property
 
@@ -143,7 +149,13 @@ Namespace Microsoft.CodeAnalysis.VisualBasic.Symbols
                 End Get
             End Property
 
-            Friend Overrides ReadOnly Property HasEmbeddedAttribute As Boolean
+            Friend Overrides ReadOnly Property HasCodeAnalysisEmbeddedAttribute As Boolean
+                Get
+                    Return False
+                End Get
+            End Property
+
+            Friend Overrides ReadOnly Property HasVisualBasicEmbeddedAttribute As Boolean
                 Get
                     Return False
                 End Get
@@ -203,11 +215,11 @@ Namespace Microsoft.CodeAnalysis.VisualBasic.Symbols
                 End Get
             End Property
 
-            Friend Overrides Function MakeDeclaredBase(basesBeingResolved As ConsList(Of Symbol), diagnostics As DiagnosticBag) As NamedTypeSymbol
+            Friend Overrides Function MakeDeclaredBase(basesBeingResolved As BasesBeingResolved, diagnostics As BindingDiagnosticBag) As NamedTypeSymbol
                 Return MakeAcyclicBaseType(diagnostics)
             End Function
 
-            Friend Overrides Function MakeDeclaredInterfaces(basesBeingResolved As ConsList(Of Symbol), diagnostics As DiagnosticBag) As ImmutableArray(Of NamedTypeSymbol)
+            Friend Overrides Function MakeDeclaredInterfaces(basesBeingResolved As BasesBeingResolved, diagnostics As BindingDiagnosticBag) As ImmutableArray(Of NamedTypeSymbol)
                 Return MakeAcyclicInterfaces(diagnostics)
             End Function
 
@@ -225,7 +237,7 @@ Namespace Microsoft.CodeAnalysis.VisualBasic.Symbols
 
             Public Overrides ReadOnly Property ContainingSymbol As Symbol
                 Get
-                    Return Me.Manager.ContainingModule.RootNamespace
+                    Return Me.Manager.ContainingModule.GlobalNamespace
                 End Get
             End Property
 
@@ -280,10 +292,10 @@ Namespace Microsoft.CodeAnalysis.VisualBasic.Symbols
 
             Friend Property NameAndIndex As NameAndIndex
                 Get
-                    Return m_nameAndIndex
+                    Return _nameAndIndex
                 End Get
                 Set(value As NameAndIndex)
-                    Dim oldValue = Interlocked.CompareExchange(Me.m_nameAndIndex, value, Nothing)
+                    Dim oldValue = Interlocked.CompareExchange(Me._nameAndIndex, value, Nothing)
                     Debug.Assert(oldValue Is Nothing OrElse
                                  (oldValue.Name = value.Name AndAlso oldValue.Index = value.Index))
                 End Set
@@ -306,7 +318,10 @@ Namespace Microsoft.CodeAnalysis.VisualBasic.Symbols
 
             Public ReadOnly Property SmallestLocation As Location
                 Get
-                    Return Me.m_adjustedPropertyNames.Location
+#If DEBUG Then
+                    _locationAndNamesAreLocked = True
+#End If
+                    Return Me._adjustedPropertyNames.Location
                 End Get
             End Property
 
@@ -324,17 +339,21 @@ Namespace Microsoft.CodeAnalysis.VisualBasic.Symbols
                 Do
                     ' Loop until we managed to set location and names OR we detected that we don't need 
                     ' to set it ('location' in type descriptor is bigger that the one in m_adjustedPropertyNames)
-                    Dim currentAdjustedNames As LocationAndNames = Me.m_adjustedPropertyNames
+                    Dim currentAdjustedNames As LocationAndNames = Me._adjustedPropertyNames
                     If currentAdjustedNames IsNot Nothing AndAlso
-                            Me.Manager.Compilation.CompareSourceLocations(currentAdjustedNames.Location, newLocation) < 0 Then
+                            Me.Manager.Compilation.CompareSourceLocations(currentAdjustedNames.Location, newLocation) <= 0 Then
 
                         ' The template's adjusted property names do not need to be changed
                         Exit Sub
                     End If
 
+#If DEBUG Then
+                    Debug.Assert(Not _locationAndNamesAreLocked)
+#End If
+
                     Dim newAdjustedNames As New LocationAndNames(typeDescr)
 
-                    If Interlocked.CompareExchange(Me.m_adjustedPropertyNames, newAdjustedNames, currentAdjustedNames) Is currentAdjustedNames Then
+                    If Interlocked.CompareExchange(Me._adjustedPropertyNames, newAdjustedNames, currentAdjustedNames) Is currentAdjustedNames Then
                         ' Changed successfully, proceed to updating the fields
                         Exit Do
                     End If
@@ -342,7 +361,10 @@ Namespace Microsoft.CodeAnalysis.VisualBasic.Symbols
             End Sub
 
             Friend Function GetAdjustedName(index As Integer) As String
-                Dim names = Me.m_adjustedPropertyNames
+#If DEBUG Then
+                _locationAndNamesAreLocked = True
+#End If
+                Dim names = Me._adjustedPropertyNames
                 Debug.Assert(names IsNot Nothing)
                 Debug.Assert(names.Names.Length > index)
                 Return names.Names(index)
@@ -355,6 +377,9 @@ Namespace Microsoft.CodeAnalysis.VisualBasic.Symbols
                 Throw ExceptionUtilities.Unreachable
             End Sub
 
+            Friend NotOverridable Overrides Function GetSynthesizedWithEventsOverrides() As IEnumerable(Of PropertySymbol)
+                Return SpecializedCollections.EmptyEnumerable(Of PropertySymbol)()
+            End Function
         End Class
 
     End Class

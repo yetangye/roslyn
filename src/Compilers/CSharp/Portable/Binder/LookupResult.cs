@@ -1,7 +1,12 @@
-﻿// Copyright (c) Microsoft.  All Rights Reserved.  Licensed under the Apache License, Version 2.0.  See License.txt in the project root for license information.
+﻿// Licensed to the .NET Foundation under one or more agreements.
+// The .NET Foundation licenses this file to you under the MIT license.
+// See the LICENSE file in the project root for more information.
+
+#nullable disable
 
 using System.Diagnostics;
 using Microsoft.CodeAnalysis.CSharp.Symbols;
+using Microsoft.CodeAnalysis.PooledObjects;
 using Roslyn.Utilities;
 
 namespace Microsoft.CodeAnalysis.CSharp
@@ -25,16 +30,16 @@ namespace Microsoft.CodeAnalysis.CSharp
     ///                      non-viable results.
     ///    a non-viable result - a result that means that the search continues into further scopes of lower priority for
     ///                          a viable or non-accessible result. An error is attached with the error that indicates
-    ///                          why the result is non-viable.  A typical readon would be that it is the wrong kind of symbol.
+    ///                          why the result is non-viable.  A typical reason would be that it is the wrong kind of symbol.
     /// 
-    /// Note that the class is poolable so its instances can be obtained from a pool vai GetInstance.
+    /// Note that the class is poolable so its instances can be obtained from a pool via GetInstance.
     /// Also it is a good idea to call Free on instances after they no longer needed.
     /// 
     /// The typical pattern is "caller allocates / caller frees" -
     ///    
     ///    var result = LookupResult.GetInstance();
     ///  
-    ///    scope.Lookup(result, "foo");
+    ///    scope.Lookup(result, "goo");
     ///    ... use result ...
     ///         
     ///    result.Clear();
@@ -157,6 +162,11 @@ namespace Microsoft.CodeAnalysis.CSharp
             return new SingleLookupResult(LookupResultKind.WrongArity, symbol, error);
         }
 
+        internal static SingleLookupResult Empty()
+        {
+            return new SingleLookupResult(LookupResultKind.Empty, null, null);
+        }
+
         internal static SingleLookupResult NotReferencable(Symbol symbol, DiagnosticInfo error)
         {
             return new SingleLookupResult(LookupResultKind.NotReferencable, symbol, error);
@@ -191,7 +201,7 @@ namespace Microsoft.CodeAnalysis.CSharp
         internal static SingleLookupResult NotTypeOrNamespace(Symbol unwrappedSymbol, Symbol symbol, bool diagnose)
         {
             // TODO: determine correct diagnosis 
-            var diagInfo = diagnose ? new CSDiagnosticInfo(ErrorCode.ERR_BadSKknown, unwrappedSymbol, unwrappedSymbol.GetKindText(), MessageID.IDS_SK_TYPE.Localize()) : null;
+            var diagInfo = diagnose ? new CSDiagnosticInfo(ErrorCode.ERR_BadSKknown, unwrappedSymbol.Name, unwrappedSymbol.GetKindText(), MessageID.IDS_SK_TYPE.Localize()) : null;
             return new SingleLookupResult(LookupResultKind.NotATypeOrNamespace, symbol, diagInfo);
         }
 

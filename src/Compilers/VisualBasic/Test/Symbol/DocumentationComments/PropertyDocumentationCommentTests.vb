@@ -1,4 +1,6 @@
-﻿' Copyright (c) Microsoft.  All Rights Reserved.  Licensed under the Apache License, Version 2.0.  See License.txt in the project root for license information.
+﻿' Licensed to the .NET Foundation under one or more agreements.
+' The .NET Foundation licenses this file to you under the MIT license.
+' See the LICENSE file in the project root for more information.
 
 Imports Microsoft.CodeAnalysis.Text
 Imports Microsoft.CodeAnalysis.VisualBasic.Symbols
@@ -6,12 +8,12 @@ Imports Microsoft.CodeAnalysis.VisualBasic.Syntax
 Namespace Microsoft.CodeAnalysis.VisualBasic.UnitTests
     Public Class PropertyDocumentationCommentTests
 
-        Private m_compilation As VisualBasicCompilation
-        Private m_acmeNamespace As NamespaceSymbol
-        Private m_widgetClass As NamedTypeSymbol
+        Private ReadOnly _compilation As VisualBasicCompilation
+        Private ReadOnly _acmeNamespace As NamespaceSymbol
+        Private ReadOnly _widgetClass As NamedTypeSymbol
 
         Public Sub New()
-            m_compilation = CompilationUtils.CreateCompilationWithMscorlib(
+            _compilation = CompilationUtils.CreateCompilationWithMscorlib40(
                 <compilation name="PropertyDocumentationCommentTests">
                     <file name="a.vb">
                     Namespace Acme
@@ -42,26 +44,26 @@ Namespace Microsoft.CodeAnalysis.VisualBasic.UnitTests
                     </file>
                 </compilation>)
 
-            m_acmeNamespace = DirectCast(m_compilation.GlobalNamespace.GetMembers("Acme").Single(), NamespaceSymbol)
-            m_widgetClass = DirectCast(m_acmeNamespace.GetTypeMembers("Widget").Single(), NamedTypeSymbol)
+            _acmeNamespace = DirectCast(_compilation.GlobalNamespace.GetMembers("Acme").Single(), NamespaceSymbol)
+            _widgetClass = DirectCast(_acmeNamespace.GetTypeMembers("Widget").Single(), NamedTypeSymbol)
         End Sub
 
         <Fact>
         Public Sub TestProperty()
             Assert.Equal("P:Acme.Widget.Width",
-                         m_widgetClass.GetMembers("Width").Single().GetDocumentationCommentId())
+                         _widgetClass.GetMembers("Width").Single().GetDocumentationCommentId())
         End Sub
 
         <Fact>
         Public Sub TestIndexer1()
             Assert.Equal("P:Acme.Widget.Item(System.Int32)",
-                         m_widgetClass.GetMembers("Item")(0).GetDocumentationCommentId())
+                         _widgetClass.GetMembers("Item")(0).GetDocumentationCommentId())
         End Sub
 
         <Fact>
         Public Sub TestIndexer2()
             Assert.Equal("P:Acme.Widget.Item(System.String,System.Int32)",
-                         m_widgetClass.GetMembers("Item")(1).GetDocumentationCommentId())
+                         _widgetClass.GetMembers("Item")(1).GetDocumentationCommentId())
         End Sub
 
     End Class

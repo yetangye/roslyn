@@ -1,36 +1,31 @@
-' Copyright (c) Microsoft.  All Rights Reserved.  Licensed under the Apache License, Version 2.0.  See License.txt in the project root for license information.
-
-Imports Microsoft.CodeAnalysis.Text
-Imports Microsoft.CodeAnalysis.VisualBasic
-Imports Microsoft.CodeAnalysis.VisualBasic.Symbols
-Imports Microsoft.CodeAnalysis.VisualBasic.Syntax
-Imports Roslyn.Test.Utilities
-Imports Xunit
+﻿' Licensed to the .NET Foundation under one or more agreements.
+' The .NET Foundation licenses this file to you under the MIT license.
+' See the LICENSE file in the project root for more information.
 
 Namespace Microsoft.CodeAnalysis.Editor.VisualBasic.UnitTests.Recommendations.Declarations
     Public Class CustomEventKeywordRecommenderTests
         <Fact>
         <Trait(Traits.Feature, Traits.Features.KeywordRecommending)>
-        Public Sub CustomEventInClassDeclaration()
+        Public Sub CustomEventInClassDeclarationTest()
             VerifyRecommendationsContain(<ClassDeclaration>|</ClassDeclaration>, "Custom Event")
         End Sub
 
         <Fact>
         <Trait(Traits.Feature, Traits.Features.KeywordRecommending)>
-        Public Sub CustomEventInStructureDeclaration()
+        Public Sub CustomEventInStructureDeclarationTest()
             VerifyRecommendationsContain(<StructureDeclaration>|</StructureDeclaration>, "Custom Event")
         End Sub
 
         <Fact>
-        <WorkItem(544999)>
+        <WorkItem(544999, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/544999")>
         <Trait(Traits.Feature, Traits.Features.KeywordRecommending)>
-        Public Sub CustomEventNotInInterfaceDeclaration()
+        Public Sub CustomEventNotInInterfaceDeclarationTest()
             VerifyRecommendationsMissing(<InterfaceDeclaration>|</InterfaceDeclaration>, "Custom Event")
         End Sub
 
-        <WorkItem(674791)>
+        <WorkItem(674791, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/674791")>
         <Fact, Trait(Traits.Feature, Traits.Features.KeywordRecommending)>
-        Public Sub NotAfterHash()
+        Public Sub NotAfterHashTest()
             VerifyRecommendationsMissing(<File>
 Imports System
 

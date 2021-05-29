@@ -1,4 +1,6 @@
-﻿' Copyright (c) Microsoft.  All Rights Reserved.  Licensed under the Apache License, Version 2.0.  See License.txt in the project root for license information.
+﻿' Licensed to the .NET Foundation under one or more agreements.
+' The .NET Foundation licenses this file to you under the MIT license.
+' See the LICENSE file in the project root for more information.
 
 Imports Microsoft.CodeAnalysis.Text
 Imports Microsoft.CodeAnalysis.VisualBasic.Symbols
@@ -13,7 +15,7 @@ Namespace Microsoft.CodeAnalysis.VisualBasic.UnitTests
 
         <Fact()>
         Public Sub XDocumentTypesMissing()
-            Dim compilation1 = CreateCompilationWithMscorlibAndVBRuntime(
+            Dim compilation1 = CreateCompilationWithMscorlib40AndVBRuntime(
 <compilation>
     <file name="c.vb"><![CDATA[
 Option Strict On
@@ -38,7 +40,7 @@ End Namespace
     ]]></file>
 </compilation>)
             compilation1.AssertNoErrors()
-            Dim compilation2 = CreateCompilationWithMscorlibAndReferences(
+            Dim compilation2 = CreateCompilationWithMscorlib40AndReferences(
 <compilation name="XDocumentTypesMissing">
     <file name="c.vb"><![CDATA[
 Option Strict On
@@ -62,7 +64,7 @@ BC31091: Import of type 'XProcessingInstruction' from assembly or module 'XDocum
 
         <Fact()>
         Public Sub XCommentTypeMissing()
-            Dim compilation1 = CreateCompilationWithMscorlibAndVBRuntime(
+            Dim compilation1 = CreateCompilationWithMscorlib40AndVBRuntime(
 <compilation>
     <file name="c.vb"><![CDATA[
 Option Strict On
@@ -73,7 +75,7 @@ End Namespace
     ]]></file>
 </compilation>)
             compilation1.AssertNoErrors()
-            Dim compilation2 = CreateCompilationWithMscorlibAndReferences(
+            Dim compilation2 = CreateCompilationWithMscorlib40AndReferences(
 <compilation name="XCommentTypeMissing">
     <file name="c.vb"><![CDATA[
 Option Strict On
@@ -91,7 +93,7 @@ BC31091: Import of type 'XComment' from assembly or module 'XCommentTypeMissing.
 
         <Fact()>
         Public Sub XElementTypeMissing()
-            Dim compilation1 = CreateCompilationWithMscorlibAndVBRuntime(
+            Dim compilation1 = CreateCompilationWithMscorlib40AndVBRuntime(
 <compilation>
     <file name="c.vb"><![CDATA[
 Option Strict On
@@ -116,7 +118,7 @@ End Namespace
     ]]></file>
 </compilation>)
             compilation1.AssertNoErrors()
-            Dim compilation2 = CreateCompilationWithMscorlibAndReferences(
+            Dim compilation2 = CreateCompilationWithMscorlib40AndReferences(
 <compilation name="XElementTypeMissing">
     <file name="c.vb"><![CDATA[
 Option Strict On
@@ -143,7 +145,7 @@ BC36808: XML attributes cannot be selected from type 'XContainer'.
 
         <Fact()>
         Public Sub XElementConstructorInaccessible()
-            Dim compilation1 = CreateCompilationWithMscorlibAndVBRuntime(
+            Dim compilation1 = CreateCompilationWithMscorlib40AndVBRuntime(
 <compilation>
     <file name="c.vb"><![CDATA[
 Option Strict On
@@ -162,7 +164,7 @@ End Namespace
     ]]></file>
 </compilation>)
             compilation1.AssertNoErrors()
-            Dim compilation2 = CreateCompilationWithMscorlibAndReferences(
+            Dim compilation2 = CreateCompilationWithMscorlib40AndReferences(
 <compilation>
     <file name="c.vb"><![CDATA[
 Option Strict On
@@ -182,7 +184,7 @@ BC30517: Overload resolution failed because no 'New' is accessible.
 
         <Fact()>
         Public Sub XAttributeTypeMissing()
-            Dim compilation1 = CreateCompilationWithMscorlibAndVBRuntime(
+            Dim compilation1 = CreateCompilationWithMscorlib40AndVBRuntime(
 <compilation>
     <file name="c.vb"><![CDATA[
 Option Strict On
@@ -208,6 +210,24 @@ Namespace System.Xml.Linq
     Public Class XNamespace
     End Class
 End Namespace
+Namespace Microsoft.VisualBasic.CompilerServices
+    Public Class StandardModuleAttribute : Inherits System.Attribute
+    End Class
+End Namespace
+    ]]></file>
+</compilation>)
+            compilation1.AssertNoErrors()
+            Dim compilation2 = CreateCompilationWithMscorlib40AndReferences(
+<compilation name="XAttributeTypeMissing">
+    <file name="c.vb"><![CDATA[
+Option Strict On
+Imports System.Collections.Generic
+Imports System.Xml.Linq
+Class C
+    Private F1 As Object = <x <%= Nothing %>/>
+    Private F2 As Object = <x <%= "a" %>="b"/>
+    Private F3 As Object = <x a=<%= "b" %>/>
+End Class
 Namespace My
     Public Module InternalXmlHelper
         Public Function RemoveNamespaceAttributes(prefixes As String(), namespaces As XNamespace(), attributes As Object, o As Object) As Object
@@ -215,18 +235,6 @@ Namespace My
         End Function
     End Module
 End Namespace
-    ]]></file>
-</compilation>)
-            compilation1.AssertNoErrors()
-            Dim compilation2 = CreateCompilationWithMscorlibAndReferences(
-<compilation name="XAttributeTypeMissing">
-    <file name="c.vb"><![CDATA[
-Option Strict On
-Class C
-    Private F1 As Object = <x <%= Nothing %>/>
-    Private F2 As Object = <x <%= "a" %>="b"/>
-    Private F3 As Object = <x a=<%= "b" %>/>
-End Class
     ]]></file>
 </compilation>, references:={New VisualBasicCompilationReference(compilation1)})
             compilation2.AssertTheseDiagnostics(<errors><![CDATA[
@@ -241,7 +249,7 @@ BC30456: 'CreateAttribute' is not a member of 'InternalXmlHelper'.
 
         <Fact()>
         Public Sub XAttributeConstructorMissing()
-            Dim compilation1 = CreateCompilationWithMscorlibAndVBRuntime(
+            Dim compilation1 = CreateCompilationWithMscorlib40AndVBRuntime(
 <compilation>
     <file name="c.vb"><![CDATA[
 Option Strict On
@@ -271,6 +279,24 @@ Namespace System.Xml.Linq
     Public Class XNamespace
     End Class
 End Namespace
+Namespace Microsoft.VisualBasic.CompilerServices
+    Public Class StandardModuleAttribute : Inherits System.Attribute
+    End Class
+End Namespace
+    ]]></file>
+</compilation>)
+            compilation1.AssertNoErrors()
+            Dim compilation2 = CreateCompilationWithMscorlib40AndReferences(
+<compilation name="XAttributeTypeMissing">
+    <file name="c.vb"><![CDATA[
+Option Strict On
+Imports System.Collections.Generic
+Imports System.Xml.Linq
+Class C
+    Private F1 As Object = <x <%= Nothing %>/>
+    Private F2 As Object = <x <%= "a" %>="b"/>
+    Private F3 As Object = <x a=<%= "b" %>/>
+End Class
 Namespace My
     Public Module InternalXmlHelper
         Public Function RemoveNamespaceAttributes(prefixes As String(), namespaces As XNamespace(), attributes As List(Of XAttribute), o As Object) As Object
@@ -278,18 +304,6 @@ Namespace My
         End Function
     End Module
 End Namespace
-    ]]></file>
-</compilation>)
-            compilation1.AssertNoErrors()
-            Dim compilation2 = CreateCompilationWithMscorlibAndReferences(
-<compilation name="XAttributeTypeMissing">
-    <file name="c.vb"><![CDATA[
-Option Strict On
-Class C
-    Private F1 As Object = <x <%= Nothing %>/>
-    Private F2 As Object = <x <%= "a" %>="b"/>
-    Private F3 As Object = <x a=<%= "b" %>/>
-End Class
     ]]></file>
 </compilation>, references:={New VisualBasicCompilationReference(compilation1)})
             compilation2.AssertTheseDiagnostics(<errors><![CDATA[
@@ -304,7 +318,7 @@ BC30456: 'CreateAttribute' is not a member of 'InternalXmlHelper'.
 
         <Fact()>
         Public Sub XNameTypeMissing()
-            Dim compilation1 = CreateCompilationWithMscorlibAndVBRuntime(
+            Dim compilation1 = CreateCompilationWithMscorlib40AndVBRuntime(
 <compilation>
     <file name="c.vb"><![CDATA[
 Option Strict On
@@ -332,7 +346,7 @@ End Namespace
     ]]></file>
 </compilation>)
             compilation1.AssertNoErrors()
-            Dim compilation2 = CreateCompilationWithMscorlibAndReferences(
+            Dim compilation2 = CreateCompilationWithMscorlib40AndReferences(
 <compilation name="XNameTypeMissing">
     <file name="c.vb"><![CDATA[
 Option Strict On
@@ -354,7 +368,7 @@ BC31091: Import of type 'XName' from assembly or module 'XNameTypeMissing.dll' f
 
         <Fact()>
         Public Sub XContainerTypeMissing()
-            Dim compilation1 = CreateCompilationWithMscorlibAndVBRuntime(
+            Dim compilation1 = CreateCompilationWithMscorlib40AndVBRuntime(
 <compilation>
     <file name="c.vb"><![CDATA[
 Option Strict On
@@ -382,7 +396,7 @@ End Namespace
     ]]></file>
 </compilation>)
             compilation1.AssertNoErrors()
-            Dim compilation2 = CreateCompilationWithMscorlibAndReferences(
+            Dim compilation2 = CreateCompilationWithMscorlib40AndReferences(
 <compilation name="XContainerTypeMissing">
     <file name="c.vb"><![CDATA[
 Option Strict On
@@ -413,7 +427,7 @@ BC36807: XML elements cannot be selected from type 'XElement'.
 
         <Fact()>
         Public Sub XContainerMemberNotInvocable()
-            Dim compilation1 = CreateCompilationWithMscorlibAndVBRuntime(
+            Dim compilation1 = CreateCompilationWithMscorlib40AndVBRuntime(
 <compilation>
     <file name="c.vb"><![CDATA[
 Option Strict On
@@ -437,7 +451,7 @@ End Namespace
     ]]></file>
 </compilation>)
             compilation1.AssertNoErrors()
-            Dim compilation2 = CreateCompilationWithMscorlibAndReferences(
+            Dim compilation2 = CreateCompilationWithMscorlib40AndReferences(
 <compilation>
     <file name="c.vb"><![CDATA[
 Option Strict On
@@ -455,7 +469,7 @@ BC30456: 'Add' is not a member of 'XContainer'.
 
         <Fact()>
         Public Sub XCDataTypeMissing()
-            Dim compilation1 = CreateCompilationWithMscorlibAndVBRuntime(
+            Dim compilation1 = CreateCompilationWithMscorlib40AndVBRuntime(
 <compilation>
     <file name="c.vb"><![CDATA[
 Option Strict On
@@ -466,7 +480,7 @@ End Namespace
     ]]></file>
 </compilation>)
             compilation1.AssertNoErrors()
-            Dim compilation2 = CreateCompilationWithMscorlibAndVBRuntimeAndReferences(
+            Dim compilation2 = CreateCompilationWithMscorlib40AndVBRuntimeAndReferences(
 <compilation name="XCDataTypeMissing">
     <file name="c.vb">
 Option Strict On
@@ -474,7 +488,7 @@ Module M
     Private F As Object = &lt;![CDATA[value]]&gt;
 End Module
 </file>
-</compilation>, additionalRefs:={New VisualBasicCompilationReference(compilation1)})
+</compilation>, references:={New VisualBasicCompilationReference(compilation1)})
             compilation2.AssertTheseDiagnostics(<errors>
 BC31091: Import of type 'XCData' from assembly or module 'XCDataTypeMissing.dll' failed.
     Private F As Object = &lt;![CDATA[value]]&gt;
@@ -484,7 +498,7 @@ BC31091: Import of type 'XCData' from assembly or module 'XCDataTypeMissing.dll'
 
         <Fact()>
         Public Sub XNamespaceTypeMissing()
-            Dim compilation1 = CreateCompilationWithMscorlibAndVBRuntime(
+            Dim compilation1 = CreateCompilationWithMscorlib40AndVBRuntime(
 <compilation>
     <file name="c.vb"><![CDATA[
 Option Strict On
@@ -495,7 +509,7 @@ End Namespace
     ]]></file>
 </compilation>)
             compilation1.AssertNoErrors()
-            Dim compilation2 = CreateCompilationWithMscorlibAndReferences(
+            Dim compilation2 = CreateCompilationWithMscorlib40AndReferences(
 <compilation name="XNamespaceTypeMissing">
     <file name="c.vb"><![CDATA[
 Class C
@@ -512,7 +526,7 @@ BC31091: Import of type 'XNamespace' from assembly or module 'XNamespaceTypeMiss
 
         <Fact()>
         Public Sub XNamespaceTypeMissing_2()
-            Dim compilation1 = CreateCompilationWithMscorlibAndVBRuntime(
+            Dim compilation1 = CreateCompilationWithMscorlib40AndVBRuntime(
 <compilation>
     <file name="c.vb"><![CDATA[
 Option Strict On
@@ -545,7 +559,7 @@ End Namespace
     ]]></file>
 </compilation>)
             compilation1.AssertNoErrors()
-            Dim compilation2 = CreateCompilationWithMscorlibAndReferences(
+            Dim compilation2 = CreateCompilationWithMscorlib40AndReferences(
 <compilation name="XNamespaceTypeMissing_2">
     <file name="c.vb"><![CDATA[
 Imports <xmlns:p="http://roslyn/">
@@ -566,7 +580,7 @@ BC31091: Import of type 'XNamespace' from assembly or module 'XNamespaceTypeMiss
 
         <Fact()>
         Public Sub XNamespaceGetMissing()
-            Dim compilation1 = CreateCompilationWithMscorlibAndVBRuntime(
+            Dim compilation1 = CreateCompilationWithMscorlib40AndVBRuntime(
 <compilation>
     <file name="c.vb"><![CDATA[
 Option Strict On
@@ -599,6 +613,22 @@ Namespace System.Xml.Linq
     Public Class XNamespace
     End Class
 End Namespace
+Namespace Microsoft.VisualBasic.CompilerServices
+    Public Class StandardModuleAttribute : Inherits System.Attribute
+    End Class
+End Namespace
+    ]]></file>
+</compilation>)
+            compilation1.AssertNoErrors()
+            Dim compilation2 = CreateCompilationWithMscorlib40AndReferences(
+<compilation name="XNamespaceGetMissing">
+    <file name="c.vb"><![CDATA[
+Imports <xmlns:p="http://roslyn/">
+Imports System.Collections.Generic
+Imports System.Xml.Linq
+Class C
+    Shared F As Object = <p:x><%= Nothing %></>
+End Class
 Namespace My
     Public Module InternalXmlHelper
         Public Function CreateNamespaceAttribute(name As XName, ns As XNamespace) As XAttribute
@@ -610,16 +640,6 @@ Namespace My
     End Module
 End Namespace
     ]]></file>
-</compilation>)
-            compilation1.AssertNoErrors()
-            Dim compilation2 = CreateCompilationWithMscorlibAndReferences(
-<compilation name="XNamespaceGetMissing">
-    <file name="c.vb"><![CDATA[
-Imports <xmlns:p="http://roslyn/">
-Class C
-    Shared F As Object = <p:x><%= Nothing %></>
-End Class
-    ]]></file>
 </compilation>, references:={New VisualBasicCompilationReference(compilation1)})
             compilation2.AssertTheseDiagnostics(<errors><![CDATA[
 BC30456: 'Get' is not a member of 'XNamespace'.
@@ -630,7 +650,7 @@ BC30456: 'Get' is not a member of 'XNamespace'.
 
         <Fact()>
         Public Sub ExtensionTypesMissing()
-            Dim compilation1 = CreateCompilationWithMscorlib(
+            Dim compilation1 = CreateCompilationWithMscorlib40(
 <compilation>
     <file name="c.vb"><![CDATA[
 Option Strict On
@@ -659,7 +679,7 @@ End Namespace
     ]]></file>
 </compilation>)
             compilation1.AssertNoErrors()
-            Dim compilation2 = CreateCompilationWithMscorlibAndReferences(
+            Dim compilation2 = CreateCompilationWithMscorlib40AndReferences(
 <compilation name="ExtensionTypesMissing">
     <file name="c.vb"><![CDATA[
 Option Strict On
@@ -690,7 +710,7 @@ BC36808: XML attributes cannot be selected from type 'XElement'.
 
         <Fact()>
         Public Sub ExtensionMethodAndPropertyMissing()
-            Dim compilation1 = CreateCompilationWithMscorlibAndVBRuntime(
+            Dim compilation1 = CreateCompilationWithMscorlib40AndVBRuntime(
 <compilation>
     <file name="c.vb"><![CDATA[
 Option Strict On
@@ -711,14 +731,14 @@ Namespace System.Xml.Linq
     Public Module Extensions
     End Module
 End Namespace
-Namespace My
-    Public Module InternalXmlHelper
-    End Module
+Namespace Microsoft.VisualBasic.CompilerServices
+    Public Class StandardModuleAttribute : Inherits System.Attribute
+    End Class
 End Namespace
     ]]></file>
 </compilation>)
             compilation1.AssertNoErrors()
-            Dim compilation2 = CreateCompilationWithMscorlibAndReferences(
+            Dim compilation2 = CreateCompilationWithMscorlib40AndReferences(
 <compilation>
     <file name="c.vb"><![CDATA[
 Option Strict On
@@ -728,6 +748,10 @@ Class C
     Private F2 As Object = F1.<x>
     Private F3 As Object = F1.@x
 End Class
+Namespace My
+    Public Module InternalXmlHelper
+    End Module
+End Namespace
     ]]></file>
 </compilation>, references:={New VisualBasicCompilationReference(compilation1)})
             compilation2.AssertTheseDiagnostics(<errors><![CDATA[
@@ -748,7 +772,7 @@ BC36808: XML attributes cannot be selected from type 'XElement'.
 
         <Fact()>
         Public Sub ValueExtensionPropertyMissing()
-            Dim compilation1 = CreateCompilationWithMscorlibAndVBRuntime(
+            Dim compilation1 = CreateCompilationWithMscorlib40AndVBRuntime(
 <compilation>
     <file name="c.vb"><![CDATA[
 Namespace System.Xml.Linq
@@ -758,13 +782,13 @@ Namespace System.Xml.Linq
     End Class
 End Namespace
 Namespace Microsoft.VisualBasic.CompilerServices
-    Public Module InternalXmlHelper
-    End Module
+    Public Class StandardModuleAttribute : Inherits System.Attribute
+    End Class
 End Namespace
     ]]></file>
 </compilation>)
             compilation1.AssertNoErrors()
-            Dim compilation2 = CreateCompilationWithMscorlibAndReferences(
+            Dim compilation2 = CreateCompilationWithMscorlib40AndReferences(
 <compilation>
     <file name="c.vb"><![CDATA[
 Option Strict On
@@ -775,6 +799,10 @@ Class C
         Return x.Value
     End Function
 End Class
+Namespace My
+    Public Module InternalXmlHelper
+    End Module
+End Namespace
     ]]></file>
 </compilation>, references:={New VisualBasicCompilationReference(compilation1)})
             compilation2.AssertTheseDiagnostics(<errors><![CDATA[
@@ -786,7 +814,7 @@ BC31190: XML literals and XML axis properties are not available. Add references 
 
         <Fact()>
         Public Sub ValueExtensionPropertyUnexpectedSignature()
-            Dim compilation1 = CreateCompilationWithMscorlibAndVBRuntime(
+            Dim compilation1 = CreateCompilationWithMscorlib40AndVBRuntime(
 <compilation>
     <file name="c.vb"><![CDATA[
 Imports System.Collections.Generic
@@ -798,18 +826,13 @@ Namespace System.Xml.Linq
     End Class
 End Namespace
 Namespace Microsoft.VisualBasic.CompilerServices
-    Public Module InternalXmlHelper
-        Public ReadOnly Property Value(x As IEnumerable(Of XElement), y As Object, z As Object) As Object
-            Get
-                Return Nothing
-            End Get
-        End Property
-    End Module
+    Public Class StandardModuleAttribute : Inherits System.Attribute
+    End Class
 End Namespace
     ]]></file>
 </compilation>)
             compilation1.AssertNoErrors()
-            Dim compilation2 = CreateCompilationWithMscorlibAndReferences(
+            Dim compilation2 = CreateCompilationWithMscorlib40AndReferences(
 <compilation>
     <file name="c.vb"><![CDATA[
 Option Strict On
@@ -820,6 +843,15 @@ Class C
         Return x.VALUE
     End Function
 End Class
+Namespace My
+    Public Module InternalXmlHelper
+        Public ReadOnly Property Value(x As IEnumerable(Of XElement), y As Object, z As Object) As Object
+            Get
+                Return Nothing
+            End Get
+        End Property
+    End Module
+End Namespace
     ]]></file>
 </compilation>, references:={New VisualBasicCompilationReference(compilation1)})
             compilation2.AssertTheseDiagnostics(<errors><![CDATA[

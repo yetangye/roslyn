@@ -1,119 +1,119 @@
-' Copyright (c) Microsoft.  All Rights Reserved.  Licensed under the Apache License, Version 2.0.  See License.txt in the project root for license information.
+﻿' Licensed to the .NET Foundation under one or more agreements.
+' The .NET Foundation licenses this file to you under the MIT license.
+' See the LICENSE file in the project root for more information.
 
-Imports Microsoft.CodeAnalysis.Text
 Namespace Microsoft.CodeAnalysis.Editor.VisualBasic.UnitTests.Recommendations.Expressions
     Public Class LambdaKeywordRecommenderTests
         ' TODO: potentially restrict this to smarter cases where you'd need a parenthesis around the lambda to actually
         ' call it
 
         <Fact, Trait(Traits.Feature, Traits.Features.KeywordRecommending)>
-        Public Sub SubFunctionNotInStatement()
+        Public Sub SubFunctionNotInStatementTest()
             VerifyRecommendationsMissing(<MethodBody>|</MethodBody>, "Sub", "Function", "Async", "Iterator")
         End Sub
 
         <Fact, Trait(Traits.Feature, Traits.Features.KeywordRecommending)>
-        Public Sub SubFunctionAfterReturn()
+        Public Sub SubFunctionAfterReturnTest()
             VerifyRecommendationsContain(<MethodBody>Return |</MethodBody>, "Sub", "Function", "Async", "Iterator")
         End Sub
 
         <Fact, Trait(Traits.Feature, Traits.Features.KeywordRecommending)>
-        Public Sub SubFunctionAfterArgument1()
-            VerifyRecommendationsContain(<MethodBody>Foo(|</MethodBody>, "Sub", "Function", "Async", "Iterator")
+        Public Sub SubFunctionAfterArgument1Test()
+            VerifyRecommendationsContain(<MethodBody>Goo(|</MethodBody>, "Sub", "Function", "Async", "Iterator")
         End Sub
 
         <Fact, Trait(Traits.Feature, Traits.Features.KeywordRecommending)>
-        Public Sub SubFunctionAfterArgument2()
-            VerifyRecommendationsContain(<MethodBody>Foo(bar, |</MethodBody>, "Sub", "Function", "Async", "Iterator")
+        Public Sub SubFunctionAfterArgument2Test()
+            VerifyRecommendationsContain(<MethodBody>Goo(bar, |</MethodBody>, "Sub", "Function", "Async", "Iterator")
         End Sub
 
         <Fact, Trait(Traits.Feature, Traits.Features.KeywordRecommending)>
-        Public Sub SubFunctionAfterBinaryExpression()
-            VerifyRecommendationsContain(<MethodBody>Foo(bar + |</MethodBody>, "Sub", "Function", "Async", "Iterator")
+        Public Sub SubFunctionAfterBinaryExpressionTest()
+            VerifyRecommendationsContain(<MethodBody>Goo(bar + |</MethodBody>, "Sub", "Function", "Async", "Iterator")
         End Sub
 
         <Fact, Trait(Traits.Feature, Traits.Features.KeywordRecommending)>
-        Public Sub SubFunctionAfterNot()
-            VerifyRecommendationsContain(<MethodBody>Foo(Not |</MethodBody>, "Sub", "Function", "Async", "Iterator")
+        Public Sub SubFunctionAfterNotTest()
+            VerifyRecommendationsContain(<MethodBody>Goo(Not |</MethodBody>, "Sub", "Function", "Async", "Iterator")
         End Sub
 
         <Fact, Trait(Traits.Feature, Traits.Features.KeywordRecommending)>
-        Public Sub SubFunctionAfterTypeOf()
+        Public Sub SubFunctionAfterTypeOfTest()
             VerifyRecommendationsContain(<MethodBody>If TypeOf |</MethodBody>, "Sub", "Function", "Async", "Iterator")
         End Sub
 
         <Fact, Trait(Traits.Feature, Traits.Features.KeywordRecommending)>
-        Public Sub SubFunctionAfterDoWhile()
+        Public Sub SubFunctionAfterDoWhileTest()
             VerifyRecommendationsContain(<MethodBody>Do While |</MethodBody>, "Sub", "Function", "Async", "Iterator")
         End Sub
 
         <Fact, Trait(Traits.Feature, Traits.Features.KeywordRecommending)>
-        Public Sub SubFunctionAfterDoUntil()
+        Public Sub SubFunctionAfterDoUntilTest()
             VerifyRecommendationsContain(<MethodBody>Do Until |</MethodBody>, "Sub", "Function", "Async", "Iterator")
         End Sub
 
         <Fact, Trait(Traits.Feature, Traits.Features.KeywordRecommending)>
-        Public Sub SubFunctionAfterLoopWhile()
+        Public Sub SubFunctionAfterLoopWhileTest()
             VerifyRecommendationsContain(<MethodBody>
 Do
 Loop While |</MethodBody>, "Sub", "Function", "Async", "Iterator")
         End Sub
 
         <Fact, Trait(Traits.Feature, Traits.Features.KeywordRecommending)>
-        Public Sub SubFunctionAfterLoopUntil()
+        Public Sub SubFunctionAfterLoopUntilTest()
             VerifyRecommendationsContain(<MethodBody>
 Do
 Loop Until |</MethodBody>, "Sub", "Function", "Async", "Iterator")
         End Sub
 
         <Fact, Trait(Traits.Feature, Traits.Features.KeywordRecommending)>
-        Public Sub SubFunctionAfterIf()
+        Public Sub SubFunctionAfterIfTest()
             VerifyRecommendationsContain(<MethodBody>If |</MethodBody>, "Sub", "Function", "Async", "Iterator")
         End Sub
 
         <Fact, Trait(Traits.Feature, Traits.Features.KeywordRecommending)>
-        Public Sub SubFunctionAfterElseIf()
+        Public Sub SubFunctionAfterElseIfTest()
             VerifyRecommendationsContain(<MethodBody>ElseIf |</MethodBody>, "Sub", "Function", "Async", "Iterator")
         End Sub
 
         <Fact, Trait(Traits.Feature, Traits.Features.KeywordRecommending)>
-        Public Sub SubFunctionAfterElseSpaceIf()
+        Public Sub SubFunctionAfterElseSpaceIfTest()
             VerifyRecommendationsContain(<MethodBody>Else If |</MethodBody>, "Sub", "Function", "Async", "Iterator")
         End Sub
 
         <Fact, Trait(Traits.Feature, Traits.Features.KeywordRecommending)>
-        Public Sub SubFunctionAfterError()
+        Public Sub SubFunctionAfterErrorTest()
             VerifyRecommendationsContain(<MethodBody>Error |</MethodBody>, "Sub", "Function", "Async", "Iterator")
         End Sub
 
         <Fact, Trait(Traits.Feature, Traits.Features.KeywordRecommending)>
-        Public Sub SubFunctionAfterThrow()
+        Public Sub SubFunctionAfterThrowTest()
             VerifyRecommendationsContain(<MethodBody>Throw |</MethodBody>, "Sub", "Function", "Async", "Iterator")
         End Sub
 
         <Fact, Trait(Traits.Feature, Traits.Features.KeywordRecommending)>
-        Public Sub SubFunctionAfterInitializer()
+        Public Sub SubFunctionAfterInitializerTest()
             VerifyRecommendationsContain(<MethodBody>Dim x = |</MethodBody>, "Sub", "Function", "Async", "Iterator")
         End Sub
 
         <Fact, Trait(Traits.Feature, Traits.Features.KeywordRecommending)>
-        Public Sub SubFunctionAfterArrayInitializerSquiggle()
+        Public Sub SubFunctionAfterArrayInitializerSquiggleTest()
             VerifyRecommendationsContain(<MethodBody>Dim x = {|</MethodBody>, "Sub", "Function", "Async", "Iterator")
         End Sub
 
         <Fact, Trait(Traits.Feature, Traits.Features.KeywordRecommending)>
-        Public Sub SubFunctionAfterArrayInitializerComma()
+        Public Sub SubFunctionAfterArrayInitializerCommaTest()
             VerifyRecommendationsContain(<MethodBody>Dim x = {0, |</MethodBody>, "Sub", "Function", "Async", "Iterator")
         End Sub
 
         <Fact, Trait(Traits.Feature, Traits.Features.KeywordRecommending)>
-        Public Sub OnlyFunctionAfterIterator()
+        Public Sub OnlyFunctionAfterIteratorTest()
             VerifyRecommendationsContain(<MethodBody>Dim x = Iterator |</MethodBody>, "Function")
         End Sub
 
         <Fact, Trait(Traits.Feature, Traits.Features.KeywordRecommending)>
-        Public Sub OnlyFunctionAndSubAfterAsync()
+        Public Sub OnlyFunctionAndSubAfterAsyncTest()
             VerifyRecommendationsContain(<MethodBody>Dim x = Async |</MethodBody>, "Function", "Sub")
         End Sub
-
     End Class
 End Namespace

@@ -1,11 +1,13 @@
-﻿' Copyright (c) Microsoft.  All Rights Reserved.  Licensed under the Apache License, Version 2.0.  See License.txt in the project root for license information.
+﻿' Licensed to the .NET Foundation under one or more agreements.
+' The .NET Foundation licenses this file to you under the MIT license.
+' See the LICENSE file in the project root for more information.
 
 Imports System.Globalization
 Imports System.IO
 Imports System.Text
 Imports System.Threading
 Imports Microsoft.CodeAnalysis.Collections
-Imports Microsoft.CodeAnalysis.Instrumentation
+Imports Microsoft.CodeAnalysis.PooledObjects
 Imports Microsoft.CodeAnalysis.VisualBasic.Symbols
 Imports System.Xml.Linq
 Imports Microsoft.CodeAnalysis.Text
@@ -20,9 +22,8 @@ Namespace Microsoft.CodeAnalysis.VisualBasic
             Private ReadOnly _compilation As VisualBasicCompilation
             Private ReadOnly _processIncludes As Boolean
             Private ReadOnly _isForSingleSymbol As Boolean ' minor differences in behavior between batch case and API case.
-            Private ReadOnly _diagnostics As DiagnosticBag
+            Private ReadOnly _diagnostics As BindingDiagnosticBag
             Private ReadOnly _cancellationToken As CancellationToken
-            Private ReadOnly _preferredCulture As CultureInfo
             Private ReadOnly _filterSyntaxTree As SyntaxTree ' if not null, limit analysis to types residing in this tree
             Private ReadOnly _filterSpanWithinTree As TextSpan? ' if filterTree and filterSpanWithinTree is not null, limit analysis to types residing within this span in the filterTree.
             Private _writer As DocWriter
@@ -32,7 +33,7 @@ Namespace Microsoft.CodeAnalysis.VisualBasic
             Private _includedFileCache As DocumentationCommentIncludeCache
 
             Private Sub New(assemblyName As String, compilation As VisualBasicCompilation, writer As TextWriter,
-                processIncludes As Boolean, isForSingleSymbol As Boolean, diagnostics As DiagnosticBag,
+                processIncludes As Boolean, isForSingleSymbol As Boolean, diagnostics As BindingDiagnosticBag,
                 filterTree As SyntaxTree, filterSpanWithinTree As TextSpan?,
                 preferredCulture As CultureInfo, cancellationToken As CancellationToken)
 
@@ -45,7 +46,6 @@ Namespace Microsoft.CodeAnalysis.VisualBasic
                 Me._filterSyntaxTree = filterTree
                 Me._filterSpanWithinTree = filterSpanWithinTree
                 Me._cancellationToken = cancellationToken
-                Me._preferredCulture = If(preferredCulture, CultureInfo.InvariantCulture)
             End Sub
 
             ''' <summary>
@@ -61,19 +61,17 @@ Namespace Microsoft.CodeAnalysis.VisualBasic
             Friend Shared Sub WriteDocumentationCommentXml(compilation As VisualBasicCompilation,
                                                            assemblyName As String,
                                                            xmlDocStream As Stream,
-                                                           diagnostics As DiagnosticBag,
+                                                           diagnostics As BindingDiagnosticBag,
                                                            cancellationToken As CancellationToken,
                                                            Optional filterTree As SyntaxTree = Nothing,
                                                            Optional filterSpanWithinTree As TextSpan? = Nothing)
 
-                Using Logger.LogBlock(FunctionId.VisualBasic_DocumentationCommentCompiler_WriteDocumentationCommentXml,
-                                      message:=compilation.AssemblyName, cancellationToken:=cancellationToken)
+                Dim writer As StreamWriter = Nothing
+                If xmlDocStream IsNot Nothing AndAlso xmlDocStream.CanWrite Then
+                    writer = New StreamWriter(xmlDocStream, New UTF8Encoding(True, False), bufferSize:=&H400, leaveOpen:=True)
+                End If
 
-                    Dim writer As StreamWriter = Nothing
-                    If xmlDocStream IsNot Nothing AndAlso xmlDocStream.CanWrite Then
-                        writer = New StreamWriter(xmlDocStream, New UTF8Encoding(True, False), bufferSize:=&H400, leaveOpen:=True)
-                    End If
-
+                Try
                     Using writer
                         ' TODO: get preferred culture from compilation(?)
                         Dim compiler As New DocumentationCommentCompiler(If(assemblyName, compilation.SourceAssembly.Name), compilation, writer, True, False,
@@ -81,12 +79,21 @@ Namespace Microsoft.CodeAnalysis.VisualBasic
 
                         compiler.Visit(compilation.SourceAssembly.GlobalNamespace)
                         Debug.Assert(compiler._writer.IndentDepth = 0)
+                        writer?.Flush()
                     End Using
+                Catch ex As Exception
+                    diagnostics.Add(ERRID.ERR_DocFileGen, Location.None, ex.Message)
+                End Try
 
-                    For Each tree In compilation.SyntaxTrees
-                        MislocatedDocumentationCommentFinder.ReportUnprocessed(tree, filterSpanWithinTree, diagnostics, cancellationToken)
-                    Next
-                End Using
+                If diagnostics.AccumulatesDiagnostics Then
+                    If filterTree IsNot Nothing Then
+                        MislocatedDocumentationCommentFinder.ReportUnprocessed(filterTree, filterSpanWithinTree, diagnostics.DiagnosticBag, cancellationToken)
+                    Else
+                        For Each tree In compilation.SyntaxTrees
+                            MislocatedDocumentationCommentFinder.ReportUnprocessed(tree, filterSpanWithinTree:=Nothing, diagnostics.DiagnosticBag, cancellationToken)
+                        Next
+                    End If
+                End If
             End Sub
 
             Private ReadOnly Property [Module] As SourceModuleSymbol
@@ -118,14 +125,12 @@ Namespace Microsoft.CodeAnalysis.VisualBasic
 
                 Dim pooled As PooledStringBuilder = PooledStringBuilder.GetInstance()
                 Dim writer As New StringWriter(pooled.Builder, CultureInfo.InvariantCulture)
-                Dim discardedDiagnostics As DiagnosticBag = DiagnosticBag.GetInstance()
 
                 Dim compiler = New DocumentationCommentCompiler(Nothing, compilation, writer, processIncludes,
-                    True, discardedDiagnostics, Nothing, Nothing, preferredCulture, cancellationToken)
+                    True, BindingDiagnosticBag.Discarded, Nothing, Nothing, preferredCulture, cancellationToken)
                 compiler.Visit(symbol)
                 Debug.Assert(compiler._writer.IndentDepth = 0)
 
-                discardedDiagnostics.Free()
                 writer.Dispose()
                 Return pooled.ToStringAndFree()
             End Function

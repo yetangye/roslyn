@@ -1,4 +1,6 @@
-' Copyright (c) Microsoft.  All Rights Reserved.  Licensed under the Apache License, Version 2.0.  See License.txt in the project root for license information.
+﻿' Licensed to the .NET Foundation under one or more agreements.
+' The .NET Foundation licenses this file to you under the MIT license.
+' See the LICENSE file in the project root for more information.
 
 Imports Microsoft.CodeAnalysis.Editor.VisualBasic.KeywordHighlighting
 
@@ -6,43 +8,43 @@ Namespace Microsoft.CodeAnalysis.Editor.VisualBasic.UnitTests.KeywordHighlightin
     Public Class SingleLineIfBlockHighlighterTests
         Inherits AbstractVisualBasicKeywordHighlighterTests
 
-        Friend Overrides Function CreateHighlighter() As IHighlighter
-            Return New SingleLineIfBlockHighlighter()
+        Friend Overrides Function GetHighlighterType() As Type
+            Return GetType(SingleLineIfBlockHighlighter)
         End Function
 
         <Fact, Trait(Traits.Feature, Traits.Features.KeywordHighlighting)>
-        Public Sub TestSinglelineIf1()
-            Test(<Text><![CDATA[
+        Public Async Function TestSinglelineIf1() As Task
+            Await TestAsync(<Text><![CDATA[
 Class C
 Sub M()
 {|Cursor:[|If|]|} a < b [|Then|] a = b [|Else|] b = a
 End Sub
 End Class]]></Text>)
-        End Sub
+        End Function
 
         <Fact, Trait(Traits.Feature, Traits.Features.KeywordHighlighting)>
-        Public Sub TestSinglelineIf2()
-            Test(<Text><![CDATA[
+        Public Async Function TestSinglelineIf2() As Task
+            Await TestAsync(<Text><![CDATA[
 Class C
 Sub M()
 [|If|] a < b {|Cursor:[|Then|]|} a = b [|Else|] b = a
 End Sub
 End Class]]></Text>)
-        End Sub
+        End Function
 
         <Fact, Trait(Traits.Feature, Traits.Features.KeywordHighlighting)>
-        Public Sub TestSinglelineIf3()
-            Test(<Text><![CDATA[
+        Public Async Function TestSinglelineIf3() As Task
+            Await TestAsync(<Text><![CDATA[
 Class C
 Sub M()
 [|If|] a < b [|Then|] a = b {|Cursor:[|Else|]|} b = a
 End Sub
 End Class]]></Text>)
-        End Sub
+        End Function
 
         <Fact, Trait(Traits.Feature, Traits.Features.KeywordHighlighting)>
-        Public Sub TestSinglelineIfNestedInMultilineIf1()
-            Test(<Text><![CDATA[
+        Public Async Function TestSinglelineIfNestedInMultilineIf1() As Task
+            Await TestAsync(<Text><![CDATA[
 Class C
 Sub M()
 If a < b Then
@@ -54,11 +56,11 @@ Else
 End If
 End Sub
 End Class]]></Text>)
-        End Sub
+        End Function
 
         <Fact, Trait(Traits.Feature, Traits.Features.KeywordHighlighting)>
-        Public Sub TestSinglelineIfNestedInMultilineIf2()
-            Test(<Text><![CDATA[
+        Public Async Function TestSinglelineIfNestedInMultilineIf2() As Task
+            Await TestAsync(<Text><![CDATA[
 Class C
 Sub M()
 If a < b Then
@@ -70,11 +72,11 @@ Else
 End If
 End Sub
 End Class]]></Text>)
-        End Sub
+        End Function
 
         <Fact, Trait(Traits.Feature, Traits.Features.KeywordHighlighting)>
-        Public Sub TestSinglelineIfNestedInMultilineIf3()
-            Test(<Text><![CDATA[
+        Public Async Function TestSinglelineIfNestedInMultilineIf3() As Task
+            Await TestAsync(<Text><![CDATA[
 Class C
 Sub M()
 If a < b Then
@@ -86,6 +88,6 @@ Else
 End If
 End Sub
 End Class]]></Text>)
-        End Sub
+        End Function
     End Class
 End Namespace

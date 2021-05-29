@@ -1,23 +1,18 @@
-' Copyright (c) Microsoft.  All Rights Reserved.  Licensed under the Apache License, Version 2.0.  See License.txt in the project root for license information.
-
-Imports Microsoft.CodeAnalysis.Text
-Imports Microsoft.CodeAnalysis.VisualBasic
-Imports Microsoft.CodeAnalysis.VisualBasic.Symbols
-Imports Microsoft.CodeAnalysis.VisualBasic.Syntax
-Imports Roslyn.Test.Utilities
-Imports Xunit
+﻿' Licensed to the .NET Foundation under one or more agreements.
+' The .NET Foundation licenses this file to you under the MIT license.
+' See the LICENSE file in the project root for more information.
 
 Namespace Microsoft.CodeAnalysis.Editor.VisualBasic.UnitTests.Recommendations.Statements
     Public Class NextKeywordRecommenderTests
         <Fact>
         <Trait(Traits.Feature, Traits.Features.KeywordRecommending)>
-        Public Sub NextNotInMethodBody()
+        Public Sub NextNotInMethodBodyTest()
             VerifyRecommendationsMissing(<MethodBody>|</MethodBody>, "Next")
         End Sub
 
         <Fact>
         <Trait(Traits.Feature, Traits.Features.KeywordRecommending)>
-        Public Sub NextNotInLambda()
+        Public Sub NextNotInLambdaTest()
             VerifyRecommendationsMissing(<MethodBody>
 Dim x = Sub()
 |
@@ -26,7 +21,7 @@ Dim x = Sub()
 
         <Fact>
         <Trait(Traits.Feature, Traits.Features.KeywordRecommending)>
-        Public Sub NextNotAfterStatement()
+        Public Sub NextNotAfterStatementTest()
             VerifyRecommendationsMissing(<MethodBody>
 Dim x
 |</MethodBody>, "Next")
@@ -34,7 +29,7 @@ Dim x
 
         <Fact>
         <Trait(Traits.Feature, Traits.Features.KeywordRecommending)>
-        Public Sub NextAfterForStatement()
+        Public Sub NextAfterForStatementTest()
             VerifyRecommendationsContain(<MethodBody>
 For i = 1 To 10
 |</MethodBody>, "Next")
@@ -42,7 +37,7 @@ For i = 1 To 10
 
         <Fact>
         <Trait(Traits.Feature, Traits.Features.KeywordRecommending)>
-        Public Sub NextAfterForEachStatement()
+        Public Sub NextAfterForEachStatementTest()
             VerifyRecommendationsContain(<MethodBody>
 For i = 1 To 10
 |</MethodBody>, "Next")

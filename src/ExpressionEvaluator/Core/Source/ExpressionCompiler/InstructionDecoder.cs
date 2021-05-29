@@ -1,19 +1,21 @@
-// Copyright (c) Microsoft.  All Rights Reserved.  Licensed under the Apache License, Version 2.0.  See License.txt in the project root for license information.
+﻿// Licensed to the .NET Foundation under one or more agreements.
+// The .NET Foundation licenses this file to you under the MIT license.
+// See the LICENSE file in the project root for more information.
 
 using System.Collections.Immutable;
-using System.Diagnostics;
 using System.Text;
-using Microsoft.CodeAnalysis.Collections;
+using Microsoft.CodeAnalysis.PooledObjects;
+using Microsoft.CodeAnalysis.Symbols;
 using Microsoft.VisualStudio.Debugger.Clr;
 
 namespace Microsoft.CodeAnalysis.ExpressionEvaluator
 {
     internal abstract class InstructionDecoder<TCompilation, TMethodSymbol, TModuleSymbol, TTypeSymbol, TTypeParameterSymbol>
         where TCompilation : Compilation
-        where TMethodSymbol : class, IMethodSymbol
-        where TModuleSymbol : class, IModuleSymbol
-        where TTypeSymbol : class, ITypeSymbol
-        where TTypeParameterSymbol : class, ITypeParameterSymbol
+        where TMethodSymbol : class, IMethodSymbolInternal
+        where TModuleSymbol : class, IModuleSymbolInternal
+        where TTypeSymbol : class, ITypeSymbolInternal
+        where TTypeParameterSymbol : class, ITypeParameterSymbolInternal
     {
         internal static readonly SymbolDisplayFormat DisplayFormat = new SymbolDisplayFormat(
             typeQualificationStyle: SymbolDisplayTypeQualificationStyle.NameAndContainingTypesAndNamespaces,
@@ -21,7 +23,25 @@ namespace Microsoft.CodeAnalysis.ExpressionEvaluator
             memberOptions: SymbolDisplayMemberOptions.IncludeContainingType | SymbolDisplayMemberOptions.IncludeExplicitInterface,
             miscellaneousOptions: SymbolDisplayMiscellaneousOptions.UseSpecialTypes);
 
+        private readonly bool _useReferencedAssembliesOnly;
+
+        internal InstructionDecoder()
+        {
+            // Should be passed by the ExpressionCompiler as an argument to this constructor.
+            _useReferencedAssembliesOnly = ExpressionCompiler.GetUseReferencedAssembliesOnlySetting();
+        }
+
+        internal MakeAssemblyReferencesKind GetMakeAssemblyReferencesKind()
+        {
+            return _useReferencedAssembliesOnly ? MakeAssemblyReferencesKind.AllReferences : MakeAssemblyReferencesKind.AllAssemblies;
+        }
+
         internal abstract void AppendFullName(StringBuilder builder, TMethodSymbol method);
+
+        internal virtual void AppendParameterTypeName(StringBuilder builder, IParameterSymbol parameter)
+        {
+            builder.Append(parameter.Type.ToDisplayString(DisplayFormat));
+        }
 
         /// <summary>
         /// Constructs a method and any of its generic containing types using the specified <paramref name="typeArguments"/>.
@@ -30,14 +50,12 @@ namespace Microsoft.CodeAnalysis.ExpressionEvaluator
 
         internal abstract ImmutableArray<TTypeParameterSymbol> GetAllTypeParameters(TMethodSymbol method);
 
-        internal abstract TCompilation GetCompilation(DkmClrInstructionAddress instructionAddress);
+        internal abstract TCompilation GetCompilation(DkmClrModuleInstance moduleInstance);
 
         internal abstract TMethodSymbol GetMethod(TCompilation compilation, DkmClrInstructionAddress instructionAddress);
 
-        internal string GetName(TMethodSymbol method, bool includeParameterTypes, bool includeParameterNames, ArrayBuilder<string> argumentValues = null)
+        internal string GetName(TMethodSymbol method, bool includeParameterTypes, bool includeParameterNames, ArrayBuilder<string?>? argumentValues = null)
         {
-            Debug.Assert((argumentValues == null) || (method.Parameters.Length == argumentValues.Count));
-
             var pooled = PooledStringBuilder.GetInstance();
             var builder = pooled.Builder;
 
@@ -45,11 +63,11 @@ namespace Microsoft.CodeAnalysis.ExpressionEvaluator
             AppendFullName(builder, method);
 
             // parameter list...
-            var includeArgumentValues = argumentValues != null;
+            var parameters = ((IMethodSymbol)method.GetISymbol()).Parameters;
+            var includeArgumentValues = argumentValues != null && parameters.Length == argumentValues.Count;
             if (includeParameterTypes || includeParameterNames || includeArgumentValues)
             {
                 builder.Append('(');
-                var parameters = method.Parameters;
                 for (int i = 0; i < parameters.Length; i++)
                 {
                     if (i > 0)
@@ -61,7 +79,7 @@ namespace Microsoft.CodeAnalysis.ExpressionEvaluator
 
                     if (includeParameterTypes)
                     {
-                        builder.Append(parameter.Type.ToDisplayString(DisplayFormat));
+                        AppendParameterTypeName(builder, parameter);
                     }
 
                     if (includeParameterNames)
@@ -76,7 +94,7 @@ namespace Microsoft.CodeAnalysis.ExpressionEvaluator
 
                     if (includeArgumentValues)
                     {
-                        var argumentValue = argumentValues[i];
+                        var argumentValue = argumentValues![i];
                         if (argumentValue != null)
                         {
                             if (includeParameterTypes || includeParameterNames)
@@ -96,13 +114,18 @@ namespace Microsoft.CodeAnalysis.ExpressionEvaluator
 
         internal string GetReturnTypeName(TMethodSymbol method)
         {
-            return method.ReturnType.ToDisplayString(DisplayFormat);
+            return ((IMethodSymbol)method.GetISymbol()).ReturnType.ToDisplayString(DisplayFormat);
         }
 
         internal abstract TypeNameDecoder<TModuleSymbol, TTypeSymbol> GetTypeNameDecoder(TCompilation compilation, TMethodSymbol method);
 
-        internal ImmutableArray<TTypeSymbol> GetTypeSymbols(TCompilation compilation, TMethodSymbol method, string[] serializedTypeNames)
+        internal ImmutableArray<TTypeSymbol> GetTypeSymbols(TCompilation compilation, TMethodSymbol method, string?[]? serializedTypeNames)
         {
+            if (serializedTypeNames == null)
+            {
+                return ImmutableArray<TTypeSymbol>.Empty;
+            }
+
             var builder = ArrayBuilder<TTypeSymbol>.GetInstance();
             foreach (var name in serializedTypeNames)
             {

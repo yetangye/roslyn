@@ -1,24 +1,19 @@
-// Copyright (c) Microsoft.  All Rights Reserved.  Licensed under the Apache License, Version 2.0.  See License.txt in the project root for license information.
+﻿// Licensed to the .NET Foundation under one or more agreements.
+// The .NET Foundation licenses this file to you under the MIT license.
+// See the LICENSE file in the project root for more information.
+
+#nullable disable
 
 using System;
-using System.Collections.Concurrent;
-using System.Collections.Generic;
-using System.Collections.Immutable;
-using System.Diagnostics;
-using System.Diagnostics.CodeAnalysis;
-using System.IO;
 using System.Runtime.InteropServices;
 using Microsoft.CodeAnalysis;
-using Microsoft.CodeAnalysis.CSharp;
-using Microsoft.CodeAnalysis.CSharp.Utilities;
-using Microsoft.CodeAnalysis.Diagnostics;
-using Microsoft.CodeAnalysis.Editor.Shared.Diagnostics;
+using Microsoft.CodeAnalysis.Editor.Shared.Utilities;
+using Microsoft.VisualStudio.ComponentModelHost;
 using Microsoft.VisualStudio.LanguageServices.CSharp.ProjectSystemShim.Interop;
+using Microsoft.VisualStudio.LanguageServices.Implementation.CodeModel;
 using Microsoft.VisualStudio.LanguageServices.Implementation.ProjectSystem;
-using Microsoft.VisualStudio.LanguageServices.Implementation.TaskList;
+using Microsoft.VisualStudio.LanguageServices.Implementation.ProjectSystem.Legacy;
 using Microsoft.VisualStudio.Shell.Interop;
-using Microsoft.VisualStudio.TextManager.Interop;
-using Roslyn.Utilities;
 
 namespace Microsoft.VisualStudio.LanguageServices.CSharp.ProjectSystemShim
 {
@@ -30,8 +25,7 @@ namespace Microsoft.VisualStudio.LanguageServices.CSharp.ProjectSystemShim
     /// are in a separate files. Methods that are shared across multiple interfaces (which are
     /// effectively methods that just QI from one interface to another), are implemented here.
     /// </remarks>
-    [ExcludeFromCodeCoverage]
-    internal abstract partial class CSharpProjectShim : CSharpProject
+    internal sealed partial class CSharpProjectShim : AbstractLegacyProject, ICodeModelInstanceFactory
     {
         /// <summary>
         /// This member is used to store a raw array of warning numbers, which is needed to properly implement
@@ -41,40 +35,42 @@ namespace Microsoft.VisualStudio.LanguageServices.CSharp.ProjectSystemShim
 
         private ICSharpProjectRoot _projectRoot;
 
-        private OutputKind _outputKind = OutputKind.DynamicallyLinkedLibrary;
-        private Platform _platform = Platform.AnyCpu;
-        private string _mainTypeName;
-        private object[] _options = new object[(int)CompilerOptions.LARGEST_OPTION_ID];
+        private readonly IServiceProvider _serviceProvider;
+
+        /// <summary>
+        /// Fetches the options processor for this C# project. Equivalent to the underlying member, but fixed to the derived type.
+        /// </summary>
+        private new OptionsProcessor VisualStudioProjectOptionsProcessor
+        {
+            get => (OptionsProcessor)base.VisualStudioProjectOptionsProcessor;
+            set => base.VisualStudioProjectOptionsProcessor = value;
+        }
 
         public CSharpProjectShim(
             ICSharpProjectRoot projectRoot,
-            VisualStudioProjectTracker projectTracker,
-            Func<ProjectId, IVsReportExternalErrors> reportExternalErrorCreatorOpt,
             string projectSystemName,
             IVsHierarchy hierarchy,
             IServiceProvider serviceProvider,
-            MiscellaneousFilesWorkspace miscellaneousFilesWorkspaceOpt,
-            VisualStudioWorkspaceImpl visualStudioWorkspaceOpt,
-            HostDiagnosticUpdateSource hostDiagnosticUpdateSourceOpt)
-            : base(projectTracker,
-                   reportExternalErrorCreatorOpt,
-                   projectSystemName,
+            IThreadingContext threadingContext)
+            : base(projectSystemName,
                    hierarchy,
+                   LanguageNames.CSharp,
+                   isVsIntellisenseProject: projectRoot is IVsIntellisenseProject,
                    serviceProvider,
-                   miscellaneousFilesWorkspaceOpt,
-                   visualStudioWorkspaceOpt,
-                   hostDiagnosticUpdateSourceOpt)
+                   threadingContext,
+                   externalErrorReportingPrefix: "CS")
         {
             _projectRoot = projectRoot;
+            _serviceProvider = serviceProvider;
             _warningNumberArrayPointer = Marshal.AllocHGlobal(0);
-        }
 
-        protected override void InitializeOptions()
-        {
+            var componentModel = (IComponentModel)serviceProvider.GetService(typeof(SComponentModel));
+
+            this.ProjectCodeModel = componentModel.GetService<IProjectCodeModelFactory>().CreateProjectCodeModel(VisualStudioProject.Id, this);
+            this.VisualStudioProjectOptionsProcessor = new OptionsProcessor(this.VisualStudioProject, Workspace.Services);
+
             // Ensure the default options are set up
             ResetAllOptions();
-
-            base.InitializeOptions();
         }
 
         public override void Disconnect()
@@ -82,188 +78,6 @@ namespace Microsoft.VisualStudio.LanguageServices.CSharp.ProjectSystemShim
             _projectRoot = null;
 
             base.Disconnect();
-        }
-
-        private string GetIdForErrorCode(int errorCode)
-        {
-            return "CS" + errorCode.ToString("0000");
-        }
-
-        protected override CSharpCompilationOptions CreateCompilationOptions()
-        {
-            IDictionary<string, ReportDiagnostic> warningOptions = null;
-
-            // Get options from the ruleset file, if any, first. That way project-specific
-            // options can override them.
-            ReportDiagnostic? ruleSetGeneralDiagnosticOption = null;
-            if (this.ruleSet != null)
-            {
-                ruleSetGeneralDiagnosticOption = this.ruleSet.GetGeneralDiagnosticOption();
-                warningOptions = new Dictionary<string, ReportDiagnostic>(this.ruleSet.GetSpecificDiagnosticOptions());
-            }
-            else
-            {
-                warningOptions = new Dictionary<string, ReportDiagnostic>();
-            }
-
-            UpdateRuleSetError(ruleSet);
-
-            UpdateWarning(warningOptions, CompilerOptions.OPTID_WARNASERRORLIST, ReportDiagnostic.Error);
-            UpdateWarning(warningOptions, CompilerOptions.OPTID_WARNNOTASERRORLIST, ReportDiagnostic.Warn);
-
-            // Add the warning supressions second, since the if a warning appears in both lists the
-            // supression takes priority
-            UpdateWarning(warningOptions, CompilerOptions.OPTID_NOWARNLIST, ReportDiagnostic.Suppress);
-
-            Platform platform;
-
-            if (!Enum.TryParse(GetStringOption(CompilerOptions.OPTID_PLATFORM, ""), ignoreCase: true, result: out platform))
-            {
-                platform = Platform.AnyCpu;
-            }
-
-            int warningLevel;
-
-            if (!int.TryParse(GetStringOption(CompilerOptions.OPTID_WARNINGLEVEL, defaultValue: ""), out warningLevel))
-            {
-                warningLevel = 4;
-            }
-
-            string projectDirectory = this.ContainingDirectoryPathOpt;
-
-            // TODO: #r support, should it include bin path?
-            var referenceSearchPaths = ImmutableArray<string>.Empty;
-
-            // TODO: #load support
-            var sourceSearchPaths = ImmutableArray<string>.Empty;
-
-            ReportDiagnostic generalDiagnosticOption;
-            var warningsAreErrors = GetNullableBooleanOption(CompilerOptions.OPTID_WARNINGSAREERRORS);
-            if (warningsAreErrors.HasValue)
-            {
-                generalDiagnosticOption = warningsAreErrors.Value ? ReportDiagnostic.Error : ReportDiagnostic.Default;
-            }
-            else if (ruleSetGeneralDiagnosticOption.HasValue)
-            {
-                generalDiagnosticOption = ruleSetGeneralDiagnosticOption.Value;
-            }
-            else
-            {
-                generalDiagnosticOption = ReportDiagnostic.Default;
-            }
-
-            MetadataReferenceResolver referenceResolver;
-            if (this.Workspace != null)
-            {
-                referenceResolver = new AssemblyReferenceResolver(
-                    new MetadataFileReferenceResolver(referenceSearchPaths, projectDirectory),
-                    this.Workspace.CurrentSolution.Services.MetadataService.GetProvider());
-            }
-            else
-            {
-                // can only happen in tests
-                referenceResolver = null;
-            }
-
-            // TODO: appConfigPath: GetFilePathOption(CompilerOptions.OPTID_FUSIONCONFIG), bug #869604
-            return new CSharpCompilationOptions(
-                allowUnsafe: GetBooleanOption(CompilerOptions.OPTID_UNSAFE),
-                checkOverflow: GetBooleanOption(CompilerOptions.OPTID_CHECKED),
-                concurrentBuild: false,
-                cryptoKeyContainer: GetStringOption(CompilerOptions.OPTID_KEYNAME, defaultValue: null),
-                cryptoKeyFile: GetFilePathRelativeOption(CompilerOptions.OPTID_KEYFILE),
-                delaySign: GetNullableBooleanOption(CompilerOptions.OPTID_DELAYSIGN),
-                generalDiagnosticOption: generalDiagnosticOption,
-                mainTypeName: _mainTypeName,
-                moduleName: GetStringOption(CompilerOptions.OPTID_MODULEASSEMBLY, defaultValue: null),
-                optimizationLevel: GetBooleanOption(CompilerOptions.OPTID_OPTIMIZATIONS) ? OptimizationLevel.Release : OptimizationLevel.Debug,
-                outputKind: _outputKind,
-                platform: platform,
-                specificDiagnosticOptions: warningOptions,
-                warningLevel: warningLevel,
-                xmlReferenceResolver: new XmlFileResolver(projectDirectory),
-                sourceReferenceResolver: new SourceFileResolver(sourceSearchPaths, projectDirectory),
-                metadataReferenceResolver: referenceResolver,
-                assemblyIdentityComparer: DesktopAssemblyIdentityComparer.Default,
-                strongNameProvider: new DesktopStrongNameProvider(GetStrongNameKeyPaths()));
-        }
-
-        private void UpdateWarning(IDictionary<string, ReportDiagnostic> warningOptions, CompilerOptions compilerOptions, ReportDiagnostic reportDiagnostic)
-        {
-            Contract.ThrowIfFalse(compilerOptions == CompilerOptions.OPTID_NOWARNLIST || compilerOptions == CompilerOptions.OPTID_WARNASERRORLIST || compilerOptions == CompilerOptions.OPTID_WARNNOTASERRORLIST);
-            foreach (var warning in GetStringOption(compilerOptions, defaultValue: "").Split(new[] { ' ', ',', ';' }, StringSplitOptions.RemoveEmptyEntries))
-            {
-                int warningId;
-                var warningStringID = warning;
-                if (int.TryParse(warning, out warningId))
-                {
-                    warningStringID = GetIdForErrorCode(warningId);
-                }
-
-                warningOptions[warningStringID] = reportDiagnostic;
-            }
-        }
-
-        private bool? GetNullableBooleanOption(CompilerOptions optionID)
-        {
-            return (bool?)_options[(int)optionID];
-        }
-
-        private bool GetBooleanOption(CompilerOptions optionID)
-        {
-            return GetNullableBooleanOption(optionID).GetValueOrDefault(defaultValue: false);
-        }
-
-        private string GetFilePathRelativeOption(CompilerOptions optionID)
-        {
-            var path = GetStringOption(optionID, defaultValue: null);
-
-            if (string.IsNullOrEmpty(path))
-            {
-                return null;
-            }
-
-            var directory = this.ContainingDirectoryPathOpt;
-
-            if (!string.IsNullOrEmpty(directory))
-            {
-                return FileUtilities.ResolveRelativePath(path, directory);
-            }
-
-            return null;
-        }
-
-        private string GetStringOption(CompilerOptions optionID, string defaultValue)
-        {
-            string value = (string)_options[(int)optionID];
-
-            if (string.IsNullOrEmpty(value))
-            {
-                return defaultValue;
-            }
-            else
-            {
-                return value;
-            }
-        }
-
-        protected override CSharpParseOptions CreateParseOptions()
-        {
-            var symbols = GetStringOption(CompilerOptions.OPTID_CCSYMBOLS, defaultValue: "").Split(new[] { ';' }, StringSplitOptions.RemoveEmptyEntries);
-
-            DocumentationMode documentationMode = DocumentationMode.Parse;
-            if (GetStringOption(CompilerOptions.OPTID_XML_DOCFILE, defaultValue: null) != null)
-            {
-                documentationMode = DocumentationMode.Diagnose;
-            }
-
-            var languageVersion = CompilationOptionsConversion.GetLanguageVersion(GetStringOption(CompilerOptions.OPTID_COMPATIBILITY, defaultValue: ""))
-                                  ?? CSharpParseOptions.Default.LanguageVersion;
-
-            return new CSharpParseOptions(
-                languageVersion: languageVersion,
-                preprocessorSymbols: symbols.AsImmutable(),
-                documentationMode: documentationMode);
         }
 
         ~CSharpProjectShim()
@@ -281,15 +95,17 @@ namespace Microsoft.VisualStudio.LanguageServices.CSharp.ProjectSystemShim
             }
         }
 
-        internal bool CanCreateFileCodeModelThroughProject(string fileName)
+        EnvDTE.FileCodeModel ICodeModelInstanceFactory.TryCreateFileCodeModelThroughProjectSystem(string filePath)
         {
-            return _projectRoot.CanCreateFileCodeModel(fileName);
-        }
-
-        internal object CreateFileCodeModelThroughProject(string fileName)
-        {
-            var iid = VSConstants.IID_IUnknown;
-            return _projectRoot.CreateFileCodeModel(fileName, ref iid);
+            if (_projectRoot.CanCreateFileCodeModel(filePath))
+            {
+                var iid = VSConstants.IID_IUnknown;
+                return _projectRoot.CreateFileCodeModel(filePath, ref iid) as EnvDTE.FileCodeModel;
+            }
+            else
+            {
+                return null;
+            }
         }
     }
 }

@@ -1,4 +1,6 @@
-﻿' Copyright (c) Microsoft.  All Rights Reserved.  Licensed under the Apache License, Version 2.0.  See License.txt in the project root for license information.
+﻿' Licensed to the .NET Foundation under one or more agreements.
+' The .NET Foundation licenses this file to you under the MIT license.
+' See the LICENSE file in the project root for more information.
 
 Imports System.Collections.Immutable
 Imports System.Threading
@@ -10,41 +12,41 @@ Namespace Microsoft.CodeAnalysis.VisualBasic.Symbols
         Private NotInheritable Class AnonymousTypePropertySymbol
             Inherits PropertySymbol
 
-            Private ReadOnly m_containingType As AnonymousTypeTemplateSymbol
-            Private ReadOnly m_type As TypeSymbol
-            Private ReadOnly m_name As String
+            Private ReadOnly _containingType As AnonymousTypeTemplateSymbol
+            Private ReadOnly _type As TypeSymbol
+            Private ReadOnly _name As String
 
-            Private ReadOnly m_getMethod As MethodSymbol
-            Private ReadOnly m_setMethod As MethodSymbol
-            Private ReadOnly m_backingField As FieldSymbol
+            Private ReadOnly _getMethod As MethodSymbol
+            Private ReadOnly _setMethod As MethodSymbol
+            Private ReadOnly _backingField As FieldSymbol
 
             ''' <summary> Index of the property in the containing anonymous type </summary>
             Friend ReadOnly PropertyIndex As Integer
 
             Public Sub New(container As AnonymousTypeTemplateSymbol, field As AnonymousTypeField, index As Integer, typeSymbol As TypeSymbol)
 
-                m_containingType = container
+                _containingType = container
 
-                m_type = typeSymbol
-                m_name = field.Name
+                _type = typeSymbol
+                _name = field.Name
                 PropertyIndex = index
 
-                m_getMethod = New AnonymousTypePropertyGetAccessorSymbol(Me)
+                _getMethod = New AnonymousTypePropertyGetAccessorSymbol(Me)
                 If Not field.IsKey Then
-                    m_setMethod = New AnonymousTypePropertySetAccessorSymbol(Me, container.Manager.System_Void)
+                    _setMethod = New AnonymousTypePropertySetAccessorSymbol(Me, container.Manager.System_Void)
                 End If
-                m_backingField = New AnonymousTypePropertyBackingFieldSymbol(Me)
+                _backingField = New AnonymousTypePropertyBackingFieldSymbol(Me)
             End Sub
 
             Friend ReadOnly Property AnonymousType As AnonymousTypeTemplateSymbol
                 Get
-                    Return m_containingType
+                    Return _containingType
                 End Get
             End Property
 
             Friend Overrides ReadOnly Property AssociatedField As FieldSymbol
                 Get
-                    Return m_backingField
+                    Return _backingField
                 End Get
             End Property
 
@@ -66,27 +68,39 @@ Namespace Microsoft.CodeAnalysis.VisualBasic.Symbols
                 End Get
             End Property
 
+            Public Overrides ReadOnly Property RefCustomModifiers As ImmutableArray(Of CustomModifier)
+                Get
+                    Return ImmutableArray(Of CustomModifier).Empty
+                End Get
+            End Property
+
             Public Overrides ReadOnly Property SetMethod As MethodSymbol
                 Get
-                    Return m_setMethod
+                    Return _setMethod
                 End Get
             End Property
 
             Public Overrides ReadOnly Property GetMethod As MethodSymbol
                 Get
-                    Return m_getMethod
+                    Return _getMethod
+                End Get
+            End Property
+
+            Public Overrides ReadOnly Property ReturnsByRef As Boolean
+                Get
+                    Return False
                 End Get
             End Property
 
             Public Overrides ReadOnly Property Type As TypeSymbol
                 Get
-                    Return m_type
+                    Return _type
                 End Get
             End Property
 
             Public Overrides ReadOnly Property Name As String
                 Get
-                    Return Me.m_name
+                    Return Me._name
                 End Get
             End Property
 
@@ -116,13 +130,13 @@ Namespace Microsoft.CodeAnalysis.VisualBasic.Symbols
 
             Public Overrides ReadOnly Property ContainingSymbol As Symbol
                 Get
-                    Return m_containingType
+                    Return _containingType
                 End Get
             End Property
 
             Public Overrides ReadOnly Property ContainingType As NamedTypeSymbol
                 Get
-                    Return m_containingType
+                    Return _containingType
                 End Get
             End Property
 

@@ -1,4 +1,6 @@
-﻿' Copyright (c) Microsoft.  All Rights Reserved.  Licensed under the Apache License, Version 2.0.  See License.txt in the project root for license information.
+﻿' Licensed to the .NET Foundation under one or more agreements.
+' The .NET Foundation licenses this file to you under the MIT license.
+' See the LICENSE file in the project root for more information.
 
 Imports System
 Imports System.Collections.Immutable
@@ -18,12 +20,12 @@ Namespace Microsoft.CodeAnalysis.VisualBasic
     Friend NotInheritable Class LambdaCapturedVariable
         Inherits SynthesizedFieldSymbol
 
-        Private ReadOnly m_isMe As Boolean
+        Private ReadOnly _isMe As Boolean
 
         Friend Sub New(frame As LambdaFrame, captured As Symbol, type As TypeSymbol, fieldName As String, isMeParameter As Boolean)
             MyBase.New(frame, captured, type, fieldName, accessibility:=Accessibility.Public)
 
-            Me.m_isMe = isMeParameter
+            Me._isMe = isMeParameter
         End Sub
 
         Public Shared Function Create(frame As LambdaFrame, captured As Symbol, ByRef uniqueId As Integer) As LambdaCapturedVariable
@@ -75,12 +77,12 @@ Namespace Microsoft.CodeAnalysis.VisualBasic
                     ' if we're capturing a generic frame pointer, construct it with the new frame's type parameters
                     type = LambdaRewriter.ConstructFrameType(localTypeAsFrame, frame.TypeArgumentsNoUseSiteDiagnostics)
                 Else
-                    type = local.Type.InternalSubstituteTypeParameters(frame.TypeMap)
+                    type = local.Type.InternalSubstituteTypeParameters(frame.TypeMap).Type
                 End If
             Else
                 ' it must be a parameter
                 Dim parameter = DirectCast(captured, ParameterSymbol)
-                type = parameter.Type.InternalSubstituteTypeParameters(frame.TypeMap)
+                type = parameter.Type.InternalSubstituteTypeParameters(frame.TypeMap).Type
             End If
 
             Return type
@@ -117,7 +119,7 @@ Namespace Microsoft.CodeAnalysis.VisualBasic
 
         Friend Overrides ReadOnly Property IsCapturedFrame As Boolean
             Get
-                Return Me.m_isMe
+                Return Me._isMe
             End Get
         End Property
     End Class

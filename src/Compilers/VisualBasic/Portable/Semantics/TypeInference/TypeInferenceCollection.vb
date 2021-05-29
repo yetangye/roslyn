@@ -1,10 +1,15 @@
-﻿' Copyright (c) Microsoft.  All Rights Reserved.  Licensed under the Apache License, Version 2.0.  See License.txt in the project root for license information.
+﻿' Licensed to the .NET Foundation under one or more agreements.
+' The .NET Foundation licenses this file to you under the MIT license.
+' See the LICENSE file in the project root for more information.
 
+Imports System.Collections.Immutable
 Imports System.Diagnostics
 Imports System.Runtime.InteropServices
 Imports Microsoft.CodeAnalysis.Collections
+Imports Microsoft.CodeAnalysis.PooledObjects
 Imports Microsoft.CodeAnalysis.Text
 Imports Microsoft.CodeAnalysis.VisualBasic.Symbols
+Imports Microsoft.CodeAnalysis.VisualBasic.Symbols.Metadata.PE
 Imports Microsoft.CodeAnalysis.VisualBasic.Syntax
 
 Namespace Microsoft.CodeAnalysis.VisualBasic
@@ -34,14 +39,14 @@ Namespace Microsoft.CodeAnalysis.VisualBasic
 
 
     Friend Class TypeInferenceCollection(Of TDominantTypeData As DominantTypeData)
-        Private ReadOnly m_dominantTypeDataList As ArrayBuilder(Of TDominantTypeData)
+        Private ReadOnly _dominantTypeDataList As ArrayBuilder(Of TDominantTypeData)
 
         Public Sub New()
-            m_dominantTypeDataList = New ArrayBuilder(Of TDominantTypeData)()
+            _dominantTypeDataList = New ArrayBuilder(Of TDominantTypeData)()
         End Sub
 
         Public Function GetTypeDataList() As ArrayBuilder(Of TDominantTypeData)
-            Return m_dominantTypeDataList
+            Return _dominantTypeDataList
         End Function
 
         Public Enum HintSatisfaction
@@ -59,7 +64,7 @@ Namespace Microsoft.CodeAnalysis.VisualBasic
         Friend Sub FindDominantType(
             resultList As ArrayBuilder(Of TDominantTypeData),
             ByRef inferenceErrorReasons As InferenceErrorReasons,
-            <[In], Out> ByRef useSiteDiagnostics As HashSet(Of DiagnosticInfo)
+            <[In], Out> ByRef useSiteInfo As CompoundUseSiteInfo(Of AssemblySymbol)
         )
 
             ' THE RULES FOR DOMINANT TYPE ARE THESE:
@@ -75,7 +80,7 @@ Namespace Microsoft.CodeAnalysis.VisualBasic
             ' candidate:D    A <= D   B <= D   D <= C   D <= D
             '
             ' 1. If there is a unique "strict" candidate for which every check is ID/Widening, then return it.
-            ' 2. If there are multiple "strict" candidates for which each each check is ID/Widening, but these
+            ' 2. If there are multiple "strict" candidates for which each check is ID/Widening, but these
             '    candidates have a unique widest ("dominant") type, then pick it.
             ' 3. If there are no "strict" candidates for which each check is ID/Widening, but there is
             '    one "unstrict" candidate for which each check is ID/Widening/Narrowing, then pick it.
@@ -108,7 +113,7 @@ Namespace Microsoft.CodeAnalysis.VisualBasic
             ' e.g. T:{Tiger+, Mammal-, Animal-},
             ' candidate "Tiger":  ID, Widening, Widening  <-- a strict candidate
             ' candidate "Mammal": Widening, ID, Widening  <-- a strict candidate; also the unique widest one
-            ' candidate "Animal": Widening, Narowing, ID  <-- an unstrict candidate
+            ' candidate "Animal": Widening, Narrowing, ID  <-- an unstrict candidate
             ' 
             resultList.Clear()
 
@@ -122,7 +127,7 @@ Namespace Microsoft.CodeAnalysis.VisualBasic
             Dim numberSatisfied = ArrayBuilder(Of Integer).GetInstance(HintSatisfaction.Count, fillWithValue:=0)
 
             ' Now check each candidate against all its hints.
-            For Each candidateTypeData As TDominantTypeData In m_dominantTypeDataList
+            For Each candidateTypeData As TDominantTypeData In _dominantTypeDataList
 
                 ' expression-only nodes aren't real candidates for dominant type; they're here solely as hints:
                 If candidateTypeData.ResultType Is Nothing Then
@@ -134,13 +139,13 @@ Namespace Microsoft.CodeAnalysis.VisualBasic
                 ' set all elements of array to 0
                 numberSatisfied.ZeroInit(HintSatisfaction.Count)
 
-                For Each hintTypeData As TDominantTypeData In m_dominantTypeDataList
+                For Each hintTypeData As TDominantTypeData In _dominantTypeDataList
 
                     Dim hintSatisfaction As HintSatisfaction = CheckHintSatisfaction(
                                                                     candidateTypeData,
                                                                     hintTypeData,
                                                                     hintTypeData.InferenceRestrictions,
-                                                                    useSiteDiagnostics)
+                                                                    useSiteInfo)
 
                     numberSatisfied(hintSatisfaction) += 1
                 Next
@@ -185,7 +190,7 @@ Namespace Microsoft.CodeAnalysis.VisualBasic
             ' Rule 4. "Otherwise, fail."
             If numberOfUnstrictCandidates = 0 Then
                 Debug.Assert(numberOfStrictCandidates = 0, "code logic error: since every strict candidate is also an unstrict candidate.")
-                inferenceErrorReasons = inferenceErrorReasons Or inferenceErrorReasons.NoBest
+                inferenceErrorReasons = inferenceErrorReasons Or InferenceErrorReasons.NoBest
                 Return
             End If
 
@@ -193,21 +198,21 @@ Namespace Microsoft.CodeAnalysis.VisualBasic
             If numberOfStrictCandidates = 0 Then
                 Debug.Assert(numberOfUnstrictCandidates > 1, "code logic error: we should already have covered this case")
 
-                For Each iCurrent In m_dominantTypeDataList
+                For Each iCurrent In _dominantTypeDataList
                     If iCurrent.IsUnstrictCandidate Then
                         resultList.Add(iCurrent)
                     End If
                 Next
 
                 Debug.Assert(resultList.Count() = numberOfUnstrictCandidates, "code logic error: we should have >1 unstrict candidates, like we calculated earlier")
-                inferenceErrorReasons = inferenceErrorReasons Or inferenceErrorReasons.Ambiguous
+                inferenceErrorReasons = inferenceErrorReasons Or InferenceErrorReasons.Ambiguous
                 Return
             End If
 
             ' The only possibility remaining is that there were several widening candidates.
             Debug.Assert(numberOfStrictCandidates > 1, "code logic error: we should have >1 widening candidates; all other possibilities have already been covered")
 
-            ' Rule 2. "If there are multiple candidates for which each each check is ID/Widening, but these
+            ' Rule 2. "If there are multiple candidates for which each check is ID/Widening, but these
             ' candidates have a unique dominant type, then pick it."
             '
             ' Note that we're only now looking for a unique dominant type amongst the IsStrictCandidates;
@@ -220,7 +225,7 @@ Namespace Microsoft.CodeAnalysis.VisualBasic
             ' are strict candidates. But we won't bother with this optimization, since it would break the modularity
             ' of the "CheckHintSatisfaction" routine, and is a rare case anyway.
 
-            For Each outer As TDominantTypeData In m_dominantTypeDataList
+            For Each outer As TDominantTypeData In _dominantTypeDataList
                 ' We're only now looking for widest candidates amongst the strict candidates;
                 ' so we're not concerned about conversions to candidates that weren't strict.
                 If Not outer.IsStrictCandidate Then
@@ -230,7 +235,7 @@ Namespace Microsoft.CodeAnalysis.VisualBasic
                 ' we'll assume it is a (possibly-joint-)widest candidate, and only put "false" if it turns out not to be.
                 Dim isOuterAWidestCandidate As Boolean = True
 
-                For Each inner As TDominantTypeData In m_dominantTypeDataList
+                For Each inner As TDominantTypeData In _dominantTypeDataList
 
                     ' We're only now looking for widest candidates amongst the strict candidates;
                     ' so we're not concerned about conversions from candidates that weren't strict.
@@ -257,13 +262,13 @@ Namespace Microsoft.CodeAnalysis.VisualBasic
                     Dim arrayLiteralType = TryCast(inner.ResultType, ArrayLiteralTypeSymbol)
 
                     If arrayLiteralType Is Nothing Then
-                        conversion = Conversions.ClassifyConversion(inner.ResultType, outer.ResultType, useSiteDiagnostics).Key
+                        conversion = Conversions.ClassifyConversion(inner.ResultType, outer.ResultType, useSiteInfo).Key
                     Else
                         ' If source is an array literal then use ClassifyArrayLiteralConversion
                         Dim arrayLiteral = arrayLiteralType.ArrayLiteral
-                        conversion = Conversions.ClassifyConversion(arrayLiteral, outer.ResultType, arrayLiteral.Binder, useSiteDiagnostics).Key
+                        conversion = Conversions.ClassifyConversion(arrayLiteral, outer.ResultType, arrayLiteral.Binder, useSiteInfo).Key
                         If Conversions.IsWideningConversion(conversion) AndAlso
-                            IsSameTypeIgnoringCustomModifiers(arrayLiteralType, outer.ResultType) Then
+                            IsSameTypeIgnoringAll(arrayLiteralType, outer.ResultType) Then
                             conversion = ConversionKind.Identity
                         End If
                     End If
@@ -294,14 +299,14 @@ Namespace Microsoft.CodeAnalysis.VisualBasic
                 If lastNonArrayLiteral > -1 Then
                     resultList.Clip(lastNonArrayLiteral + 1)
                 Else
-                    ' All candidates are array literals convertable to each other,
+                    ' All candidates are array literals convertible to each other,
                     ' Let's infer element type across all of them.
 
                     ' Trivial case - all types are the same
                     Dim inferredType As TypeSymbol = resultList(0).ResultType
 
                     For i As Integer = 1 To resultList.Count - 1
-                        If Not resultList(i).ResultType.IsSameTypeIgnoringCustomModifiers(inferredType) Then
+                        If Not resultList(i).ResultType.IsSameTypeIgnoringAll(inferredType) Then
                             inferredType = Nothing
                             Exit For
                         End If
@@ -328,17 +333,20 @@ Namespace Microsoft.CodeAnalysis.VisualBasic
                                 AppendArrayElements(DirectCast(candidate.ResultType, ArrayLiteralTypeSymbol).ArrayLiteral.Initializer, elements)
                             Next
 
+                            Dim dominantTypeDiagnostics = New BindingDiagnosticBag(diagnosticBag:=Nothing, PooledHashSet(Of AssemblySymbol).GetInstance())
                             Dim inferredElementType = DirectCast(resultList(0).ResultType, ArrayLiteralTypeSymbol).ArrayLiteral.
-                                    Binder.InferDominantTypeOfExpressions(VisualBasicSyntaxTree.Dummy.GetRoot(Nothing), elements, New DiagnosticBag(), Nothing)
+                                    Binder.InferDominantTypeOfExpressions(VisualBasicSyntaxTree.Dummy.GetRoot(Nothing), elements, dominantTypeDiagnostics, Nothing)
 
                             If inferredElementType IsNot Nothing Then
+                                useSiteInfo.AddDependencies(dominantTypeDiagnostics.DependenciesBag)
+
                                 ' That should match an element type inferred for one of the array literals 
                                 Dim match As TDominantTypeData = Nothing
                                 Dim matchLiteral As BoundArrayLiteral = Nothing
 
                                 For Each candidate In resultList
                                     Dim candidateType = DirectCast(candidate.ResultType, ArrayLiteralTypeSymbol)
-                                    If candidateType.ElementType.IsSameTypeIgnoringCustomModifiers(inferredElementType) Then
+                                    If candidateType.ElementType.IsSameTypeIgnoringAll(inferredElementType) Then
                                         Dim candidateLiteral As BoundArrayLiteral = candidateType.ArrayLiteral
                                         If match Is Nothing OrElse
                                             (candidateLiteral.HasDominantType AndAlso
@@ -358,12 +366,14 @@ Namespace Microsoft.CodeAnalysis.VisualBasic
                                     resultList.Add(match)
                                 End If
                             End If
+
+                            dominantTypeDiagnostics.Free()
                         End If
                     End If
                 End If
             End If
 
-            ' // Rule 2. "If there are multiple candidates for which each each check is ID/Widening, but these
+            ' // Rule 2. "If there are multiple candidates for which each check is ID/Widening, but these
             ' // candidates have a unique dominant type, then pick it."
 
             If resultList.Count = 1 Then
@@ -372,7 +382,7 @@ Namespace Microsoft.CodeAnalysis.VisualBasic
 
             ' If there were multiple dominant types out of that set, then return them all and say "ambiguous"
             If resultList.Count > 1 Then
-                inferenceErrorReasons = inferenceErrorReasons Or inferenceErrorReasons.Ambiguous
+                inferenceErrorReasons = inferenceErrorReasons Or InferenceErrorReasons.Ambiguous
                 Return
             End If
 
@@ -383,14 +393,14 @@ Namespace Microsoft.CodeAnalysis.VisualBasic
             ' So I'll leave the code in for now.
             Debug.Assert(False, "unexpected: how can there be multiple strict candidates and no widest ones??? please tell lwischik if you find such a case.")
 
-            For Each returnAllStrictCandidatesIterCurrent In m_dominantTypeDataList
+            For Each returnAllStrictCandidatesIterCurrent In _dominantTypeDataList
                 If returnAllStrictCandidatesIterCurrent.IsStrictCandidate Then
                     resultList.Add(returnAllStrictCandidatesIterCurrent)
                 End If
             Next
 
             Debug.Assert(resultList.Count > 0, "code logic error: we already said there were multiple strict candidates")
-            inferenceErrorReasons = inferenceErrorReasons Or inferenceErrorReasons.Ambiguous
+            inferenceErrorReasons = inferenceErrorReasons Or InferenceErrorReasons.Ambiguous
         End Sub
 
         Private Shared Sub AppendArrayElements(source As BoundArrayInitialization, elements As ArrayBuilder(Of BoundExpression))
@@ -407,7 +417,7 @@ Namespace Microsoft.CodeAnalysis.VisualBasic
             candidateData As DominantTypeData,
             hintData As DominantTypeData,
             hintRestrictions As RequiredConversion,
-            <[In], Out> ByRef useSiteDiagnostics As HashSet(Of DiagnosticInfo)
+            <[In], Out> ByRef useSiteInfo As CompoundUseSiteInfo(Of AssemblySymbol)
         ) As HintSatisfaction
             ' This algorithm is used in type inference (where we examine whether a candidate works against a set of hints)
             ' It is also used in inferring a dominant type out of a collection e.g. for array literals:
@@ -427,7 +437,7 @@ Namespace Microsoft.CodeAnalysis.VisualBasic
             ElseIf hintRestrictions = RequiredConversion.None Then
                 conversion = ConversionKind.Identity
             ElseIf hintRestrictions = RequiredConversion.Identity Then
-                conversion = Conversions.ClassifyDirectCastConversion(hint, candidate, useSiteDiagnostics)
+                conversion = Conversions.ClassifyDirectCastConversion(hint, candidate, useSiteInfo)
 
                 If Not Conversions.IsIdentityConversion(conversion) Then
                     conversion = Nothing
@@ -439,23 +449,23 @@ Namespace Microsoft.CodeAnalysis.VisualBasic
                 Dim arrayLiteralType = TryCast(hint, ArrayLiteralTypeSymbol)
 
                 If arrayLiteralType Is Nothing Then
-                    conversion = Conversions.ClassifyConversion(hint, candidate, useSiteDiagnostics).Key
+                    conversion = Conversions.ClassifyConversion(hint, candidate, useSiteInfo).Key
                 Else
                     ' If source is an array literal then use ClassifyArrayLiteralConversion
                     Dim arrayLiteral = arrayLiteralType.ArrayLiteral
-                    conversion = Conversions.ClassifyConversion(arrayLiteral, candidate, arrayLiteral.Binder, useSiteDiagnostics).Key
+                    conversion = Conversions.ClassifyConversion(arrayLiteral, candidate, arrayLiteral.Binder, useSiteInfo).Key
                     If Conversions.IsWideningConversion(conversion) Then
-                        If IsSameTypeIgnoringCustomModifiers(arrayLiteralType, candidate) Then
-                            ' ClassifyConversion returns widening for identity.  For hint satisafaction it should be promoted to Identity
+                        If IsSameTypeIgnoringAll(arrayLiteralType, candidate) Then
+                            ' ClassifyConversion returns widening for identity.  For hint satisfaction it should be promoted to Identity
                             conversion = ConversionKind.Identity
                         ElseIf (conversion And ConversionKind.InvolvesNarrowingFromNumericConstant) <> 0 Then
                             ' ClassifyConversion returns Widening with InvolvesNarrowingFromNumericConstant for {1L, 2L} and {1, 2}.
                             ' For hint satisfaction it should be demoted to Narrowing. This is required for the following case, otherwise,
                             ' type of t is ambiguous.
                             '
-                            '    Foo2Params({1, 2, 3}, {1L, 2L, 3L})
+                            '    Goo2Params({1, 2, 3}, {1L, 2L, 3L})
                             '
-                            '    Function Foo2Params(Of t)(x As t, y As t) As String
+                            '    Function Goo2Params(Of t)(x As t, y As t) As String
 
                             conversion = ConversionKind.Narrowing
                         End If
@@ -464,14 +474,14 @@ Namespace Microsoft.CodeAnalysis.VisualBasic
 
             ElseIf hintRestrictions = RequiredConversion.AnyReverse Then
                 ' copyback TO the hint (i.e. argument) FROM the candidate for parameter type T
-                conversion = Conversions.ClassifyConversion(candidate, hint, useSiteDiagnostics).Key
+                conversion = Conversions.ClassifyConversion(candidate, hint, useSiteInfo).Key
 
             ElseIf hintRestrictions = RequiredConversion.AnyAndReverse Then
                 ' forwards copy of argument into parameter
-                Dim inConversion As ConversionKind = Conversions.ClassifyConversion(hint, candidate, useSiteDiagnostics).Key
+                Dim inConversion As ConversionKind = Conversions.ClassifyConversion(hint, candidate, useSiteInfo).Key
 
                 ' back copy from the parameter back into the argument
-                Dim outConversion As ConversionKind = Conversions.ClassifyConversion(candidate, hint, useSiteDiagnostics).Key
+                Dim outConversion As ConversionKind = Conversions.ClassifyConversion(candidate, hint, useSiteInfo).Key
 
                 ' Pick the lowest for our classification of identity/widening/narrowing/error.
                 If Conversions.NoConversion(inConversion) OrElse Conversions.NoConversion(outConversion) Then
@@ -487,12 +497,12 @@ Namespace Microsoft.CodeAnalysis.VisualBasic
                 End If
 
             ElseIf hintRestrictions = RequiredConversion.ArrayElement Then
-                conversion = Conversions.ClassifyArrayElementConversion(hint, candidate, useSiteDiagnostics)
+                conversion = Conversions.ClassifyArrayElementConversion(hint, candidate, useSiteInfo)
 
             ElseIf hintRestrictions = RequiredConversion.Reference Then
 
                 If hint.IsReferenceType AndAlso candidate.IsReferenceType Then
-                    conversion = Conversions.ClassifyDirectCastConversion(hint, candidate, useSiteDiagnostics)
+                    conversion = Conversions.ClassifyDirectCastConversion(hint, candidate, useSiteInfo)
 
 
 
@@ -504,7 +514,7 @@ Namespace Microsoft.CodeAnalysis.VisualBasic
                     If Conversions.IsNarrowingConversion(conversion) Then
                         conversion = Nothing
                     End If
-                ElseIf hint.IsSameTypeIgnoringCustomModifiers(candidate) Then
+                ElseIf hint.IsSameTypeIgnoringAll(candidate) Then
                     conversion = ConversionKind.Identity
                 Else
                     conversion = Nothing
@@ -514,13 +524,13 @@ Namespace Microsoft.CodeAnalysis.VisualBasic
 
                 If hint.IsReferenceType AndAlso candidate.IsReferenceType Then
                     '  in reverse
-                    conversion = Conversions.ClassifyDirectCastConversion(candidate, hint, useSiteDiagnostics)
+                    conversion = Conversions.ClassifyDirectCastConversion(candidate, hint, useSiteInfo)
 
                     ' Dev10#595234: as above, if there's narrowing inside a generic type parameter context is unforgivable.
                     If Conversions.IsNarrowingConversion(conversion) Then
                         conversion = Nothing
                     End If
-                ElseIf candidate.IsSameTypeIgnoringCustomModifiers(hint) Then
+                ElseIf candidate.IsSameTypeIgnoringAll(hint) Then
                     conversion = ConversionKind.Identity
                 Else
                     conversion = Nothing
@@ -562,8 +572,8 @@ Namespace Microsoft.CodeAnalysis.VisualBasic
             End If
 
             ' Don't add error types to the dominant type inference collection.
-            If type.IsErrorType then
-                return
+            If type.IsErrorType Then
+                Return
             End If
 
             ' We will add only unique types into this collection. Otherwise, say, if we added two types
@@ -577,11 +587,11 @@ Namespace Microsoft.CodeAnalysis.VisualBasic
                 For Each competitor As DominantTypeData In Me.GetTypeDataList()
 
                     ' Do not merge array literals with other expressions
-                    If TypeOf competitor.ResultType IsNot ArrayLiteralTypeSymbol AndAlso type.IsSameTypeIgnoringCustomModifiers(competitor.ResultType) Then
-
+                    If TypeOf competitor.ResultType IsNot ArrayLiteralTypeSymbol AndAlso type.IsSameTypeIgnoringAll(competitor.ResultType) Then
+                        competitor.ResultType = MergeTupleNames(type, competitor.ResultType)
                         competitor.InferenceRestrictions = Conversions.CombineConversionRequirements(
-                                                            competitor.InferenceRestrictions,
-                                                            conversion)
+                                                        competitor.InferenceRestrictions,
+                                                        conversion)
 
                         ' TODO: should we simply get out of the loop here? For some reason Dev10 continues, I guess it verifies uniqueness this way.
                         Debug.Assert(Not foundInList, "List is supposed to be unique: how can we already find two of the same type in this list.")
@@ -599,6 +609,36 @@ Namespace Microsoft.CodeAnalysis.VisualBasic
             End If
         End Sub
 
+        ''' <summary>
+        ''' Returns first Or a modified version Of first With common tuple names from both types.
+        ''' </summary>
+        Friend Shared Function MergeTupleNames(first As TypeSymbol, second As TypeSymbol) As TypeSymbol
+            If first.IsSameType(second, TypeCompareKind.AllIgnoreOptionsForVB And Not TypeCompareKind.IgnoreTupleNames) OrElse
+                Not first.ContainsTupleNames() Then
+
+                Return first
+            End If
+
+            If Not second.ContainsTupleNames() Then
+                Return second
+            End If
+
+            Dim names1 As ImmutableArray(Of String) = VisualBasicCompilation.TupleNamesEncoder.Encode(first)
+            Dim names2 As ImmutableArray(Of String) = VisualBasicCompilation.TupleNamesEncoder.Encode(second)
+
+            Dim mergedNames As ImmutableArray(Of String)
+            If names1.IsDefault OrElse names2.IsDefault Then
+                mergedNames = Nothing
+            Else
+                Debug.Assert(names1.Length = names2.Length)
+                mergedNames = names1.ZipAsArray(names2, Function(n1, n2) If(IdentifierComparison.Equals(n1, n2), n1, Nothing))
+                If mergedNames.All(Function(n) n Is Nothing) Then
+                    mergedNames = Nothing
+                End If
+            End If
+
+            Return TupleTypeDecoder.DecodeTupleTypesIfApplicable(first, mergedNames)
+        End Function
     End Class
 
 End Namespace

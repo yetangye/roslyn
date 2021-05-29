@@ -1,4 +1,6 @@
-﻿' Copyright (c) Microsoft.  All Rights Reserved.  Licensed under the Apache License, Version 2.0.  See License.txt in the project root for license information.
+﻿' Licensed to the .NET Foundation under one or more agreements.
+' The .NET Foundation licenses this file to you under the MIT license.
+' See the LICENSE file in the project root for more information.
 
 Imports System.Collections.Generic
 Imports System.Collections.Immutable
@@ -15,20 +17,20 @@ Namespace Microsoft.CodeAnalysis.VisualBasic
     Friend NotInheritable Class VisualBasicCompilationReference
         Inherits CompilationReference
 
-        Private ReadOnly m_Compilation As VisualBasicCompilation
+        Private ReadOnly _compilation As VisualBasicCompilation
 
         ''' <summary>
         ''' Returns the referenced <see cref="Compilation"/>.
         ''' </summary>
         Public Shadows ReadOnly Property Compilation As VisualBasicCompilation
             Get
-                Return m_Compilation
+                Return _compilation
             End Get
         End Property
 
         Friend Overrides ReadOnly Property CompilationCore As Compilation
             Get
-                Return m_Compilation
+                Return _compilation
             End Get
         End Property
 
@@ -51,7 +53,7 @@ Namespace Microsoft.CodeAnalysis.VisualBasic
             ' Only enable this code if this retargeting functionality is required to be tested.    
 #If Retargeting Then
             retargetingreferenceCount += 1
-            Console.WriteLine("Created Comnpilation Reference :" & retargetingreferenceCount .ToString)
+            Console.WriteLine("Created Compilation Reference :" & retargetingreferenceCount .ToString)
 
             Dim OldReference As MetadataReference = Nothing
             Dim OldVBReference As MetadataReference = Nothing
@@ -111,20 +113,20 @@ Namespace Microsoft.CodeAnalysis.VisualBasic
 #Else
             newCompilation = compilation
 #End If
-            m_Compilation = newCompilation
+            _compilation = newCompilation
         End Sub
 
         Private Sub New(compilation As VisualBasicCompilation, properties As MetadataReferenceProperties)
             MyBase.New(properties)
-            m_Compilation = compilation
+            _compilation = compilation
         End Sub
 
         Friend Overrides Function WithPropertiesImpl(properties As MetadataReferenceProperties) As CompilationReference
-            Return New VisualBasicCompilationReference(m_Compilation, properties)
+            Return New VisualBasicCompilationReference(_compilation, properties)
         End Function
 
         Private Function GetDebuggerDisplay() As String
-            Return VBResources.CompilationVisualBasic + m_Compilation.AssemblyName
+            Return VBResources.CompilationVisualBasic + _compilation.AssemblyName
         End Function
     End Class
 End Namespace

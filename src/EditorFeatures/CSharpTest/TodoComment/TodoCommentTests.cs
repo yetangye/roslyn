@@ -1,132 +1,137 @@
-// Copyright (c) Microsoft.  All Rights Reserved.  Licensed under the Apache License, Version 2.0.  See License.txt in the project root for license information.
+﻿// Licensed to the .NET Foundation under one or more agreements.
+// The .NET Foundation licenses this file to you under the MIT license.
+// See the LICENSE file in the project root for more information.
 
-using System.Linq;
-using System.Threading;
-using Microsoft.CodeAnalysis.Editor.Implementation.TodoComments;
+#nullable disable
+
+using System.Threading.Tasks;
 using Microsoft.CodeAnalysis.Editor.UnitTests.Workspaces;
-using Microsoft.CodeAnalysis.SolutionCrawler;
-using Microsoft.CodeAnalysis.Text.Shared.Extensions;
-using Roslyn.Utilities;
+using Microsoft.CodeAnalysis.Test.Utilities;
+using Microsoft.CodeAnalysis.Test.Utilities.TodoComments;
 using Xunit;
 
 namespace Microsoft.CodeAnalysis.Editor.CSharp.UnitTests.TodoComment
 {
-    public class TodoCommentTests
+    [UseExportProvider]
+    public class TodoCommentTests : AbstractTodoCommentTests
     {
+        protected override TestWorkspace CreateWorkspace(string codeWithMarker)
+            => TestWorkspace.CreateCSharp(codeWithMarker);
+
         [Fact]
-        public void SingleLineTodoComment_Colon()
+        public async Task SingleLineTodoComment_Colon()
         {
             var code = @"// [|TODO:test|]";
 
-            Test(code);
+            await TestAsync(code);
         }
 
         [Fact]
-        public void SingleLineTodoComment_Space()
+        public async Task SingleLineTodoComment_Space()
         {
             var code = @"// [|TODO test|]";
 
-            Test(code);
+            await TestAsync(code);
         }
 
         [Fact]
-        public void SingleLineTodoComment_Underscore()
+        public async Task SingleLineTodoComment_Underscore()
         {
             var code = @"// TODO_test";
 
-            Test(code);
+            await TestAsync(code);
         }
 
         [Fact]
-        public void SingleLineTodoComment_Number()
+        public async Task SingleLineTodoComment_Number()
         {
             var code = @"// TODO1 test";
 
-            Test(code);
+            await TestAsync(code);
         }
 
         [Fact]
-        public void SingleLineTodoComment_Quote()
+        public async Task SingleLineTodoComment_Quote()
         {
             var code = @"// ""TODO test""";
 
-            Test(code);
+            await TestAsync(code);
         }
 
         [Fact]
-        public void SingleLineTodoComment_Middle()
+        public async Task SingleLineTodoComment_Middle()
         {
             var code = @"// Hello TODO test";
 
-            Test(code);
+            await TestAsync(code);
         }
 
         [Fact]
-        public void SingleLineTodoComment_Document()
+        public async Task SingleLineTodoComment_Document()
         {
             var code = @"///    [|TODO test|]";
 
-            Test(code);
+            await TestAsync(code);
         }
 
         [Fact]
-        public void SingleLineTodoComment_Preprocessor1()
+        public async Task SingleLineTodoComment_Preprocessor1()
         {
             var code = @"#if DEBUG // [|TODO test|]";
 
-            Test(code);
+            await TestAsync(code);
         }
 
         [Fact]
-        public void SingleLineTodoComment_Preprocessor2()
+        public async Task SingleLineTodoComment_Preprocessor2()
         {
             var code = @"#if DEBUG ///    [|TODO test|]";
 
-            Test(code);
+            await TestAsync(code);
         }
 
         [Fact]
-        public void SingleLineTodoComment_Region()
+        public async Task SingleLineTodoComment_Region()
         {
             var code = @"#region // TODO test";
 
-            Test(code);
+            await TestAsync(code);
         }
 
         [Fact]
-        public void SingleLineTodoComment_EndRegion()
+        public async Task SingleLineTodoComment_EndRegion()
         {
             var code = @"#endregion // [|TODO test|]";
 
-            Test(code);
+            await TestAsync(code);
         }
 
         [Fact]
-        public void SingleLineTodoComment_TrailingSpan()
+        public async Task SingleLineTodoComment_TrailingSpan()
         {
             var code = @"// [|TODO test                        |]";
 
-            Test(code);
+            await TestAsync(code);
         }
 
         [Fact]
-        public void MultilineTodoComment_Singleline()
+        public async Task MultilineTodoComment_Singleline()
         {
             var code = @"/* [|TODO: hello    |]*/";
 
-            Test(code);
+            await TestAsync(code);
         }
 
         [Fact]
-        public void MultilineTodoComment_Singleline_Document()
+        public async Task MultilineTodoComment_Singleline_Document()
         {
             var code = @"/** [|TODO: hello    |]*/";
 
-            Test(code);
+            await TestAsync(code);
         }
 
         [Fact]
-        public void MultilineTodoComment_Multiline()
+        public async Task MultilineTodoComment_Multiline()
         {
             var code = @"
 /* [|TODO: hello    |]
@@ -135,11 +140,11 @@ namespace Microsoft.CodeAnalysis.Editor.CSharp.UnitTests.TodoComment
     * [|TODO: hello    |]
     [|TODO: hello    |]*/";
 
-            Test(code);
+            await TestAsync(code);
         }
 
         [Fact]
-        public void MultilineTodoComment_Multiline_DocComment()
+        public async Task MultilineTodoComment_Multiline_DocComment()
         {
             var code = @"
 /** [|TODO: hello    |]
@@ -148,11 +153,11 @@ namespace Microsoft.CodeAnalysis.Editor.CSharp.UnitTests.TodoComment
     * [|TODO: hello    |]
     [|TODO: hello    |]*/";
 
-            Test(code);
+            await TestAsync(code);
         }
 
         [Fact]
-        public void SinglelineDocumentComment_Multiline()
+        public async Task SinglelineDocumentComment_Multiline()
         {
             var code = @"
         /// <summary>
@@ -160,40 +165,7 @@ namespace Microsoft.CodeAnalysis.Editor.CSharp.UnitTests.TodoComment
         /// </summary>
         ///         [|UNDONE: test2             |]";
 
-            Test(code);
-        }
-
-        private static void Test(string codeWithMarker)
-        {
-            using (var workspace = CSharpWorkspaceFactory.CreateWorkspaceFromLines(codeWithMarker))
-            {
-                var commentTokens = new TodoCommentTokens();
-                var provider = new TodoCommentIncrementalAnalyzerProvider(commentTokens);
-                var worker = (TodoCommentIncrementalAnalyzer)provider.CreateIncrementalAnalyzer(workspace);
-
-                var document = workspace.Documents.First();
-                var documentId = document.Id;
-                var reasons = new InvocationReasons(PredefinedInvocationReasons.DocumentAdded);
-                worker.AnalyzeSyntaxAsync(workspace.CurrentSolution.GetDocument(documentId), CancellationToken.None).Wait();
-
-                var todoLists = worker.GetItems_TestingOnly(documentId);
-                var expectedLists = document.SelectedSpans;
-
-                Assert.Equal(todoLists.Length, expectedLists.Count);
-
-                for (int i = 0; i < todoLists.Length; i++)
-                {
-                    var todo = todoLists[i];
-                    var span = expectedLists[i];
-
-                    var line = document.InitialTextSnapshot.GetLineFromPosition(span.Start);
-                    var text = document.InitialTextSnapshot.GetText(span.ToSpan());
-
-                    Assert.Equal(todo.MappedLine, line.LineNumber);
-                    Assert.Equal(todo.MappedColumn, span.Start - line.Start);
-                    Assert.Equal(todo.Message, text);
-                }
-            }
+            await TestAsync(code);
         }
     }
 }

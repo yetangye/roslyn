@@ -1,15 +1,21 @@
-﻿// Copyright (c) Microsoft.  All Rights Reserved.  Licensed under the Apache License, Version 2.0.  See License.txt in the project root for license information.
+﻿// Licensed to the .NET Foundation under one or more agreements.
+// The .NET Foundation licenses this file to you under the MIT license.
+// See the LICENSE file in the project root for more information.
 
+#nullable disable
+
+using System;
 using System.Collections.Immutable;
 using System.Diagnostics;
 using System.Linq;
 using System.Reflection.Metadata;
 using Microsoft.CodeAnalysis.CSharp.Symbols;
+using Microsoft.CodeAnalysis.PooledObjects;
 
 namespace Microsoft.CodeAnalysis.CSharp.Symbols.Metadata.PE
 {
     /// <summary>
-    /// Decodes <see cref="System.Runtime.CompilerServices.DynamicAttribute"/> applied to a specified metadata symbol and
+    /// Decodes System.Runtime.CompilerServices.DynamicAttribute applied to a specified metadata symbol and
     /// transforms the specified metadata type, using the decoded dynamic transforms attribute argument,
     /// by replacing each occurrence of <see cref="System.Object"/> type with dynamic type.
     /// </summary>
@@ -18,9 +24,9 @@ namespace Microsoft.CodeAnalysis.CSharp.Symbols.Metadata.PE
     /// Comments from the C# design document for Dynamic:
     /// SPEC:   To represent the dynamic type in metadata, any indexer, field or return value typed as dynamic or known to be a constructed type
     /// SPEC:   containing dynamic will have each occurrence of dynamic erased to object and will be annotated with a [DynamicAttribute].
-    /// SPEC:   If the relevant type is a constructed type, the attribute’s constructor is passed a bool array.
-    /// SPEC:   This array represents a preorder traversal of each “node” in the constructed type’s “tree of types”,
-    /// SPEC:   with true set for each “node” that is dynamic, and false set for all other types.
+    /// SPEC:   If the relevant type is a constructed type, the attribute's constructor is passed a bool array.
+    /// SPEC:   This array represents a preorder traversal of each "node" in the constructed type's "tree of types",
+    /// SPEC:   with true set for each "node" that is dynamic, and false set for all other types.
     /// SPEC:   When dynamic occurs as part of the base type of a type, the applicable [DynamicAttribute] is applied to the type itself.
     /// </remarks>
     internal struct DynamicTypeDecoder
@@ -28,9 +34,14 @@ namespace Microsoft.CodeAnalysis.CSharp.Symbols.Metadata.PE
         private readonly ImmutableArray<bool> _dynamicTransformFlags;
         private readonly AssemblySymbol _containingAssembly;
         private readonly bool _haveCustomModifierFlags;
+        private readonly bool _checkLength;
+
+        /// <remarks>
+        /// Should be accessed through <see cref="HasFlag"/>, <see cref="PeekFlag"/>, and <see cref="ConsumeFlag"/>.
+        /// </remarks>
         private int _index;
 
-        private DynamicTypeDecoder(ImmutableArray<bool> dynamicTransformFlags, bool haveCustomModifierFlags, AssemblySymbol containingAssembly)
+        private DynamicTypeDecoder(ImmutableArray<bool> dynamicTransformFlags, bool haveCustomModifierFlags, bool checkLength, AssemblySymbol containingAssembly)
         {
             Debug.Assert(!dynamicTransformFlags.IsEmpty);
             Debug.Assert((object)containingAssembly != null);
@@ -38,21 +49,22 @@ namespace Microsoft.CodeAnalysis.CSharp.Symbols.Metadata.PE
             _dynamicTransformFlags = dynamicTransformFlags;
             _containingAssembly = containingAssembly;
             _haveCustomModifierFlags = haveCustomModifierFlags;
+            _checkLength = checkLength;
             _index = 0;
         }
 
         /// <summary>
-        /// Decodes the attributes applied to the given <see paramref="targetSymbol"/> from metadata and checks if <see cref="System.Runtime.CompilerServices.DynamicAttribute"/> is applied.
+        /// Decodes the attributes applied to the given <see paramref="targetSymbol"/> from metadata and checks if System.Runtime.CompilerServices.DynamicAttribute is applied.
         /// If so, it transforms the given <see paramref="metadataType"/>, using the decoded dynamic transforms attribute argument,
         /// by replacing each occurrence of <see cref="System.Object"/> type with dynamic type.
-        /// If no <see cref="System.Runtime.CompilerServices.DynamicAttribute"/> is applied or the decoded dynamic transforms attribute argument is errorneous,
+        /// If no System.Runtime.CompilerServices.DynamicAttribute is applied or the decoded dynamic transforms attribute argument is erroneous,
         /// returns the unchanged <see paramref="metadataType"/>.
         /// </summary>
         /// <remarks>This method is a port of TypeManager::ImportDynamicTransformType from the native compiler.</remarks>
         internal static TypeSymbol TransformType(
             TypeSymbol metadataType,
             int targetSymbolCustomModifierCount,
-            Handle targetSymbolToken,
+            EntityHandle targetSymbolToken,
             PEModuleSymbol containingModule,
             RefKind targetSymbolRefKind = RefKind.None)
         {
@@ -63,7 +75,8 @@ namespace Microsoft.CodeAnalysis.CSharp.Symbols.Metadata.PE
             {
                 return TransformTypeInternal(metadataType, containingModule.ContainingAssembly,
                     targetSymbolCustomModifierCount, targetSymbolRefKind, dynamicTransformFlags,
-                    haveCustomModifierFlags: true);
+                    haveCustomModifierFlags: true,
+                    checkLength: true);
             }
 
             // No DynamicAttribute applied to the target symbol, return unchanged metadataType.
@@ -74,10 +87,17 @@ namespace Microsoft.CodeAnalysis.CSharp.Symbols.Metadata.PE
             TypeSymbol type,
             AssemblySymbol containingAssembly,
             RefKind targetSymbolRefKind,
-            ImmutableArray<bool> dynamicTransformFlags)
+            ImmutableArray<bool> dynamicTransformFlags,
+            bool checkLength = true)
         {
-            Debug.Assert(containingAssembly is SourceAssemblySymbol); // Doesn't happen during decoding.
-            return TransformTypeInternal(type, containingAssembly, 0, targetSymbolRefKind, dynamicTransformFlags, haveCustomModifierFlags: false);
+            return TransformTypeInternal(
+                type,
+                containingAssembly,
+                0,
+                targetSymbolRefKind,
+                dynamicTransformFlags,
+                haveCustomModifierFlags: false,
+                checkLength: checkLength);
         }
 
         private static TypeSymbol TransformTypeInternal(
@@ -86,7 +106,8 @@ namespace Microsoft.CodeAnalysis.CSharp.Symbols.Metadata.PE
             int targetSymbolCustomModifierCount,
             RefKind targetSymbolRefKind,
             ImmutableArray<bool> dynamicTransformFlags,
-            bool haveCustomModifierFlags)
+            bool haveCustomModifierFlags,
+            bool checkLength)
         {
             Debug.Assert((object)metadataType != null);
             Debug.Assert((object)containingAssembly != null);
@@ -97,15 +118,17 @@ namespace Microsoft.CodeAnalysis.CSharp.Symbols.Metadata.PE
                 return new UnsupportedMetadataTypeSymbol();
             }
 
-            var decoder = new DynamicTypeDecoder(dynamicTransformFlags, haveCustomModifierFlags, containingAssembly);
+            var decoder = new DynamicTypeDecoder(dynamicTransformFlags, haveCustomModifierFlags, checkLength, containingAssembly);
 
             // Native compiler encodes bools (always false) for custom modifiers and parameter ref-kinds, if ref-kind is ref or out.
-            if (decoder.HandleCustomModifiers(targetSymbolCustomModifierCount) && decoder.HandleParameterRefKind(targetSymbolRefKind))
+            if (decoder.HandleCustomModifiers(targetSymbolCustomModifierCount) && decoder.HandleRefKind(targetSymbolRefKind))
             {
                 TypeSymbol transformedType = decoder.TransformType(metadataType);
 
-                if ((object)transformedType != null && decoder._index == dynamicTransformFlags.Length)
+                if ((object)transformedType != null && (!checkLength || decoder._index == dynamicTransformFlags.Length))
                 {
+                    // Even when we're not checking the length, there shouldn't be any unconsumed "true"s.
+                    Debug.Assert(checkLength || decoder._dynamicTransformFlags.LastIndexOf(true) < decoder._index);
                     return transformedType;
                 }
             }
@@ -118,9 +141,10 @@ namespace Microsoft.CodeAnalysis.CSharp.Symbols.Metadata.PE
         {
             Debug.Assert(_index >= 0);
 
-            if (_index >= _dynamicTransformFlags.Length ||
-                _dynamicTransformFlags[_index] && type.SpecialType != SpecialType.System_Object)
+            if (!HasFlag ||
+                PeekFlag() && (type.SpecialType != SpecialType.System_Object && !type.IsDynamic()))
             {
+                // Bail, since flags are invalid.
                 return null;
             }
 
@@ -131,7 +155,7 @@ namespace Microsoft.CodeAnalysis.CSharp.Symbols.Metadata.PE
                     if (type.SpecialType == SpecialType.System_Object)
                     {
                         // Replace the given System.Object type with dynamic type if the corresponding dynamicTransformFlag is set to true.
-                        return _dynamicTransformFlags[_index++] ? DynamicTypeSymbol.Instance : type;
+                        return ConsumeFlag() ? DynamicTypeSymbol.Instance : type;
                     }
 
                     return TransformNamedType((NamedTypeSymbol)type);
@@ -142,14 +166,17 @@ namespace Microsoft.CodeAnalysis.CSharp.Symbols.Metadata.PE
                 case SymbolKind.PointerType:
                     return TransformPointerType((PointerTypeSymbol)type);
 
+                case SymbolKind.FunctionPointerType:
+                    return TransformFunctionPointerType((FunctionPointerTypeSymbol)type);
+
                 case SymbolKind.DynamicType:
                     Debug.Assert(!_haveCustomModifierFlags, "This shouldn't happen during decoding.");
-                    return _dynamicTransformFlags[_index++]
+                    return ConsumeFlag()
                         ? type
                         : _containingAssembly.GetSpecialType(SpecialType.System_Object);
 
                 default:
-                    _index++;
+                    ConsumeFlag();
                     return HandleCustomModifiers(type.CustomModifierCount()) ? type : null;
             }
         }
@@ -167,41 +194,31 @@ namespace Microsoft.CodeAnalysis.CSharp.Symbols.Metadata.PE
 
             Debug.Assert(customModifiersCount >= 0);
 
-            if (customModifiersCount > 0)
+            for (int i = 0; i < customModifiersCount; i++)
             {
-                if (_index + customModifiersCount > _dynamicTransformFlags.Length)
+                if (!HasFlag || ConsumeFlag())
                 {
                     return false;
-                }
-
-                for (int i = 0; i < customModifiersCount; i++, _index++)
-                {
-                    if (_dynamicTransformFlags[_index])
-                    {
-                        return false;
-                    }
                 }
             }
 
             return true;
         }
 
-        // Native compiler encodes bools (always false) for custom modifiers and parameter ref-kinds, if ref-kind is ref or out.
-        private bool HandleParameterRefKind(RefKind refKind)
+        // Native compiler encodes bools (always false) for custom modifiers and parameter ref-kinds, if ref-kind is not none.
+        private bool HandleRefKind(RefKind refKind)
         {
             Debug.Assert(_index >= 0);
-            return refKind == RefKind.None ||
-                _index < _dynamicTransformFlags.Length && !_dynamicTransformFlags[_index++];
+            return refKind == RefKind.None || !ConsumeFlag();
         }
 
         private NamedTypeSymbol TransformNamedType(NamedTypeSymbol namedType, bool isContaining = false)
         {
-            Debug.Assert(!_dynamicTransformFlags[_index] || isContaining);
-
             // Native compiler encodes a bool for the given namedType, but none for its containing types.
             if (!isContaining)
             {
-                _index++;
+                var flag = ConsumeFlag();
+                Debug.Assert(!flag);
             }
 
             NamedTypeSymbol containingType = namedType.ContainingType;
@@ -222,8 +239,9 @@ namespace Microsoft.CodeAnalysis.CSharp.Symbols.Metadata.PE
             }
 
             // Native compiler encodes bools for each type argument, starting from type arguments for the outermost containing type to those for the given namedType.
-            ImmutableArray<TypeSymbol> typeArguments = namedType.TypeArgumentsNoUseSiteDiagnostics;
-            ImmutableArray<TypeSymbol> transformedTypeArguments = TransformTypeArguments(typeArguments);
+            ImmutableArray<TypeWithAnnotations> typeArguments = namedType.TypeArgumentsWithAnnotationsNoUseSiteDiagnostics;
+
+            ImmutableArray<TypeWithAnnotations> transformedTypeArguments = TransformTypeArguments(typeArguments); // Note, modifiers are not involved, this is behavior of the native compiler.
 
             if (transformedTypeArguments.IsDefault)
             {
@@ -231,14 +249,17 @@ namespace Microsoft.CodeAnalysis.CSharp.Symbols.Metadata.PE
             }
 
             // Construct a new namedType, if required.
-            if (newContainingType != containingType)
+            bool containerIsChanged = (!TypeSymbol.Equals(newContainingType, containingType, TypeCompareKind.ConsiderEverything2));
+
+            if (containerIsChanged || transformedTypeArguments != typeArguments)
             {
-                namedType = namedType.OriginalDefinition.AsMember(newContainingType);
-                return namedType.ConstructIfGeneric(transformedTypeArguments);
-            }
-            else if (transformedTypeArguments != typeArguments)
-            {
-                return namedType.ConstructedFrom.Construct(transformedTypeArguments);
+                if (containerIsChanged)
+                {
+                    namedType = namedType.OriginalDefinition.AsMember(newContainingType);
+                    return namedType.ConstructIfGeneric(transformedTypeArguments);
+                }
+
+                return namedType.ConstructedFrom.Construct(transformedTypeArguments, unbound: false).WithTupleDataFrom(namedType);
             }
             else
             {
@@ -246,26 +267,27 @@ namespace Microsoft.CodeAnalysis.CSharp.Symbols.Metadata.PE
             }
         }
 
-        private ImmutableArray<TypeSymbol> TransformTypeArguments(ImmutableArray<TypeSymbol> typeArguments)
+        private ImmutableArray<TypeWithAnnotations> TransformTypeArguments(ImmutableArray<TypeWithAnnotations> typeArguments)
         {
             if (!typeArguments.Any())
             {
                 return typeArguments;
             }
 
-            var transformedTypeArgsBuilder = ArrayBuilder<TypeSymbol>.GetInstance();
+            var transformedTypeArgsBuilder = ArrayBuilder<TypeWithAnnotations>.GetInstance();
             bool anyTransformed = false;
             foreach (var typeArg in typeArguments)
             {
-                TypeSymbol transformedTypeArg = TransformType(typeArg);
+                TypeSymbol transformedTypeArg = TransformType(typeArg.Type);
                 if ((object)transformedTypeArg == null)
                 {
                     transformedTypeArgsBuilder.Free();
-                    return default(ImmutableArray<TypeSymbol>);
+                    return default(ImmutableArray<TypeWithAnnotations>);
                 }
 
-                transformedTypeArgsBuilder.Add(transformedTypeArg);
-                anyTransformed |= transformedTypeArg != typeArg;
+                // Note, modifiers are not involved, this is behavior of the native compiler.
+                transformedTypeArgsBuilder.Add(typeArg.WithTypeAndModifiers(transformedTypeArg, typeArg.CustomModifiers));
+                anyTransformed |= !TypeSymbol.Equals(transformedTypeArg, typeArg.Type, TypeCompareKind.ConsiderEverything2);
             }
 
             if (!anyTransformed)
@@ -279,10 +301,10 @@ namespace Microsoft.CodeAnalysis.CSharp.Symbols.Metadata.PE
 
         private ArrayTypeSymbol TransformArrayType(ArrayTypeSymbol arrayType)
         {
-            Debug.Assert(!_dynamicTransformFlags[_index]);
+            var flag = ConsumeFlag();
+            Debug.Assert(!flag);
 
-            _index++;
-            if (!HandleCustomModifiers(arrayType.CustomModifiers.Length))
+            if (!HandleCustomModifiers(arrayType.ElementTypeWithAnnotations.CustomModifiers.Length))
             {
                 return null;
             }
@@ -293,17 +315,19 @@ namespace Microsoft.CodeAnalysis.CSharp.Symbols.Metadata.PE
                 return null;
             }
 
-            return transformedElementType == arrayType.ElementType ?
+            return TypeSymbol.Equals(transformedElementType, arrayType.ElementType, TypeCompareKind.ConsiderEverything2) ?
                 arrayType :
-                new ArrayTypeSymbol(_containingAssembly, transformedElementType, arrayType.CustomModifiers, arrayType.Rank);
+                arrayType.IsSZArray ?
+                    ArrayTypeSymbol.CreateSZArray(_containingAssembly, arrayType.ElementTypeWithAnnotations.WithTypeAndModifiers(transformedElementType, arrayType.ElementTypeWithAnnotations.CustomModifiers)) :
+                    ArrayTypeSymbol.CreateMDArray(_containingAssembly, arrayType.ElementTypeWithAnnotations.WithTypeAndModifiers(transformedElementType, arrayType.ElementTypeWithAnnotations.CustomModifiers), arrayType.Rank, arrayType.Sizes, arrayType.LowerBounds);
         }
 
         private PointerTypeSymbol TransformPointerType(PointerTypeSymbol pointerType)
         {
-            Debug.Assert(!_dynamicTransformFlags[_index]);
+            var flag = ConsumeFlag();
+            Debug.Assert(!flag);
 
-            _index++;
-            if (!HandleCustomModifiers(pointerType.CustomModifiers.Length))
+            if (!HandleCustomModifiers(pointerType.PointedAtTypeWithAnnotations.CustomModifiers.Length))
             {
                 return null;
             }
@@ -314,9 +338,97 @@ namespace Microsoft.CodeAnalysis.CSharp.Symbols.Metadata.PE
                 return null;
             }
 
-            return transformedPointedAtType == pointerType.PointedAtType ?
+            return TypeSymbol.Equals(transformedPointedAtType, pointerType.PointedAtType, TypeCompareKind.ConsiderEverything2) ?
                 pointerType :
-                new PointerTypeSymbol(transformedPointedAtType, pointerType.CustomModifiers);
+                new PointerTypeSymbol(pointerType.PointedAtTypeWithAnnotations.WithTypeAndModifiers(transformedPointedAtType, pointerType.PointedAtTypeWithAnnotations.CustomModifiers));
+        }
+
+#nullable enable
+        private FunctionPointerTypeSymbol? TransformFunctionPointerType(FunctionPointerTypeSymbol type)
+        {
+            var flag = ConsumeFlag();
+            Debug.Assert(!flag);
+
+            var sig = type.Signature;
+
+            var (transformedReturnWithAnnotations, madeChanges) = handle(ref this, sig.RefKind, sig.RefCustomModifiers, sig.ReturnTypeWithAnnotations);
+            if (transformedReturnWithAnnotations.IsDefault)
+            {
+                return null;
+            }
+
+            var transformedParameters = ImmutableArray<TypeWithAnnotations>.Empty;
+            if (sig.ParameterCount > 0)
+            {
+                var paramsTransformed = false;
+                var paramsBuilder = ArrayBuilder<TypeWithAnnotations>.GetInstance(sig.ParameterCount);
+                try
+                {
+                    foreach (var param in sig.Parameters)
+                    {
+                        var (transformedParamType, paramTransformed) = handle(ref this, param.RefKind, param.RefCustomModifiers, param.TypeWithAnnotations);
+                        if (transformedParamType.IsDefault)
+                        {
+                            return null;
+                        }
+
+                        paramsBuilder.Add(transformedParamType);
+                        paramsTransformed |= paramTransformed;
+                    }
+
+                    transformedParameters = paramsTransformed ? paramsBuilder.ToImmutable() : sig.ParameterTypesWithAnnotations;
+                    madeChanges |= paramsTransformed;
+                }
+                finally
+                {
+                    paramsBuilder.Free();
+                }
+            }
+
+            if (madeChanges)
+            {
+                return type.SubstituteTypeSymbol(transformedReturnWithAnnotations, transformedParameters,
+                                                 refCustomModifiers: default, paramRefCustomModifiers: default);
+            }
+            else
+            {
+                return type;
+            }
+
+            static (TypeWithAnnotations, bool madeChanges) handle(ref DynamicTypeDecoder decoder, RefKind refKind, ImmutableArray<CustomModifier> refCustomModifiers, TypeWithAnnotations typeWithAnnotations)
+            {
+                if (!decoder.HandleCustomModifiers(refCustomModifiers.Length)
+                    || !decoder.HandleRefKind(refKind)
+                    || !decoder.HandleCustomModifiers(typeWithAnnotations.CustomModifiers.Length))
+                {
+                    return (default, false);
+                }
+
+                var transformedType = decoder.TransformType(typeWithAnnotations.Type);
+                if (transformedType is null)
+                {
+                    return (default, false);
+                }
+
+                if (transformedType.Equals(typeWithAnnotations.Type, TypeCompareKind.ConsiderEverything))
+                {
+                    return (typeWithAnnotations, false);
+                }
+
+                return (typeWithAnnotations.WithType(transformedType), true);
+            }
+        }
+#nullable disable
+
+        private bool HasFlag => _index < _dynamicTransformFlags.Length || !_checkLength;
+
+        private bool PeekFlag() => _index < _dynamicTransformFlags.Length && _dynamicTransformFlags[_index];
+
+        private bool ConsumeFlag()
+        {
+            var result = PeekFlag();
+            _index++;
+            return result;
         }
     }
 }

@@ -1,8 +1,11 @@
-﻿' Copyright (c) Microsoft.  All Rights Reserved.  Licensed under the Apache License, Version 2.0.  See License.txt in the project root for license information.
+﻿' Licensed to the .NET Foundation under one or more agreements.
+' The .NET Foundation licenses this file to you under the MIT license.
+' See the LICENSE file in the project root for more information.
 
 Imports Microsoft.CodeAnalysis.Test.Utilities
 Imports Microsoft.CodeAnalysis.VisualBasic.Symbols
 Imports Roslyn.Test.Utilities
+Imports Roslyn.Test.Utilities.TestMetadata
 
 Namespace Microsoft.CodeAnalysis.VisualBasic.UnitTests.Emit
 
@@ -25,7 +28,7 @@ Public Class C
 End Class
     </file>
 </compilation>
-            Dim compilation = CreateCompilationWithMscorlib(source, options:=TestOptions.ReleaseExe)
+            Dim compilation = CreateCompilationWithMscorlib40(source, options:=TestOptions.ReleaseExe)
             Dim verifier = CompileAndVerify(compilation, expectedOutput:="2")
 
             verifier.VerifyDiagnostics()
@@ -47,7 +50,7 @@ Public Class C
 End Class
     </file>
 </compilation>
-            Dim compilation = CreateCompilationWithMscorlib(source, options:=TestOptions.ReleaseDll)
+            Dim compilation = CreateCompilationWithMscorlib40(source, options:=TestOptions.ReleaseDll)
             Dim verifier = CompileAndVerify(compilation)
             verifier.VerifyDiagnostics()
         End Sub
@@ -76,7 +79,7 @@ End Class
     </file>
 </compilation>
 
-            Dim compilation = CreateCompilationWithMscorlib(source, options:=TestOptions.ReleaseExe)
+            Dim compilation = CreateCompilationWithMscorlib40(source, options:=TestOptions.ReleaseExe)
             compilation.VerifyDiagnostics(
                 Diagnostic(ERRID.ERR_InValidSubMainsFound1).WithArguments("a"))
         End Sub
@@ -108,13 +111,14 @@ End Class
     </file>
 </compilation>
 
-            Dim compilation = CreateCompilationWithMscorlib(source, options:=TestOptions.ReleaseExe)
+            Dim compilation = CreateCompilationWithMscorlib40(source, options:=TestOptions.ReleaseExe)
 
             compilation.VerifyDiagnostics(
                 Diagnostic(ERRID.ERR_MoreThanOneValidMainWasFound2).WithArguments("a", "C.Main(), C.Main(a As String())"))
         End Sub
 
-        <Fact()>
+        <ConditionalFact(GetType(NoUsedAssembliesValidation))> ' https://github.com/dotnet/roslyn/issues/40682: The test hook is blocked by this issue.
+        <WorkItem(40682, "https://github.com/dotnet/roslyn/issues/40682")>
         Public Sub ERR_MultipleEntryPoints_Script()
             Dim vbx = <text>
 Public Shared Sub Main()
@@ -130,14 +134,14 @@ Public Class C
 End Class
 </text>
 
-            Dim compilation = CreateCompilationWithMscorlib(
+            Dim compilation = CreateCompilationWithMscorlib40(
                 {VisualBasicSyntaxTree.ParseText(vbx.Value, options:=TestOptions.Script),
-                 VisualBasicSyntaxTree.ParseText(vb.Value, options:=VisualBasicParseOptions.Default)}, compOptions:=TestOptions.ReleaseExe)
+                 VisualBasicSyntaxTree.ParseText(vb.Value, options:=VisualBasicParseOptions.Default)}, options:=TestOptions.ReleaseExe)
 
             ' TODO: compilation.VerifyDiagnostics(Diagnostic(ErrorCode.WRN_MainIgnored, "Main").WithArguments("Main()"), Diagnostic(ErrorCode.WRN_MainIgnored, "Main").WithArguments("C.Main()"))
         End Sub
 
-        <WorkItem(528677, "DevDiv")>
+        <WorkItem(528677, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/528677")>
         <Fact()>
         Public Sub ERR_OneEntryPointAndOverload()
             Dim source =
@@ -155,7 +159,7 @@ End Class
     </file>
 </compilation>
 
-            Dim compilation = CreateCompilationWithMscorlib(source, options:=TestOptions.ReleaseExe)
+            Dim compilation = CreateCompilationWithMscorlib40(source, options:=TestOptions.ReleaseExe)
             compilation.VerifyDiagnostics()
         End Sub
 
@@ -171,7 +175,7 @@ End Namespace
     </file>
 </compilation>
 
-            Dim compilation = CreateCompilationWithMscorlib(source, options:=TestOptions.ReleaseExe.WithMainTypeName("N.M"))
+            Dim compilation = CreateCompilationWithMscorlib40(source, options:=TestOptions.ReleaseExe.WithMainTypeName("N.M"))
             compilation.VerifyDiagnostics(Diagnostic(ERRID.ERR_StartupCodeNotFound1).WithArguments("N.M"))
         End Sub
 
@@ -190,7 +194,7 @@ End Namespace
     </file>
 </compilation>
 
-            Dim compilation = CreateCompilationWithMscorlibAndVBRuntime(source, TestOptions.ReleaseExe.WithMainTypeName("N.M"))
+            Dim compilation = CreateCompilationWithMscorlib40AndVBRuntime(source, TestOptions.ReleaseExe.WithMainTypeName("N.M"))
             compilation.VerifyDiagnostics()
         End Sub
 
@@ -208,7 +212,7 @@ End Structure
     </file>
 </compilation>
 
-            Dim compilation = CreateCompilationWithMscorlib(source, options:=TestOptions.ReleaseExe.WithMainTypeName("C.D"))
+            Dim compilation = CreateCompilationWithMscorlib40(source, options:=TestOptions.ReleaseExe.WithMainTypeName("C.D"))
             compilation.VerifyDiagnostics()
         End Sub
 
@@ -226,7 +230,7 @@ End Class
     </file>
 </compilation>
 
-            Dim compilation = CreateCompilationWithMscorlib(source, options:=TestOptions.ReleaseExe.WithMainTypeName("C.D"))
+            Dim compilation = CreateCompilationWithMscorlib40(source, options:=TestOptions.ReleaseExe.WithMainTypeName("C.D"))
             compilation.VerifyDiagnostics(Diagnostic(ERRID.ERR_GenericSubMainsFound1).WithArguments("C(Of T).D"))
         End Sub
 
@@ -273,17 +277,17 @@ End Interface
     </file>
 </compilation>
 
-            Dim compilation = CreateCompilationWithMscorlib(vb, options:=TestOptions.ReleaseExe)
+            Dim compilation = CreateCompilationWithMscorlib40(vb, options:=TestOptions.ReleaseExe)
             compilation.VerifyDiagnostics()
             CompileAndVerify(compilation, expectedOutput:="5")
 
-            compilation = CreateCompilationWithMscorlib(vb, options:=TestOptions.ReleaseExe.WithMainTypeName("C"))
+            compilation = CreateCompilationWithMscorlib40(vb, options:=TestOptions.ReleaseExe.WithMainTypeName("C"))
             compilation.VerifyDiagnostics(Diagnostic(ERRID.ERR_GenericSubMainsFound1).WithArguments("C"))
 
-            compilation = CreateCompilationWithMscorlib(vb, options:=TestOptions.ReleaseExe.WithMainTypeName("D.DD"))
+            compilation = CreateCompilationWithMscorlib40(vb, options:=TestOptions.ReleaseExe.WithMainTypeName("D.DD"))
             compilation.VerifyDiagnostics(Diagnostic(ERRID.ERR_GenericSubMainsFound1).WithArguments("D(Of T).DD"))
 
-            compilation = CreateCompilationWithMscorlib(vb, options:=TestOptions.ReleaseExe.WithMainTypeName("I"))
+            compilation = CreateCompilationWithMscorlib40(vb, options:=TestOptions.ReleaseExe.WithMainTypeName("I"))
             compilation.VerifyDiagnostics(Diagnostic(ERRID.ERR_StartupCodeNotFound1).WithArguments("I"))
         End Sub
 
@@ -372,7 +376,7 @@ End Class
 
             ' error BC30796: None of the accessible 'Main' methods with the appropriate signatures found in 'A.B(Of T).C'
             ' can be the startup method since they are all either generic or nested in generic types.
-            CreateCompilationWithMscorlib(source, options:=TestOptions.ReleaseExe.WithMainTypeName("A.B.C")).VerifyDiagnostics(Diagnostic(ERRID.ERR_GenericSubMainsFound1).WithArguments("A.B(Of T).C"))
+            CreateCompilationWithMscorlib40(source, options:=TestOptions.ReleaseExe.WithMainTypeName("A.B.C")).VerifyDiagnostics(Diagnostic(ERRID.ERR_GenericSubMainsFound1).WithArguments("A.B(Of T).C"))
         End Sub
 
         ''' <summary> 
@@ -394,7 +398,7 @@ End Class
     </file>
 </compilation>
 
-            Dim compilation = CreateCompilationWithMscorlib(source, options:=TestOptions.ReleaseExe.WithMainTypeName("C"))
+            Dim compilation = CreateCompilationWithMscorlib40(source, options:=TestOptions.ReleaseExe.WithMainTypeName("C"))
             compilation.VerifyDiagnostics()
         End Sub
 
@@ -418,7 +422,7 @@ End Class
     </file>
 </compilation>
 
-            Dim compilation = CreateCompilationWithMscorlib(source, options:=TestOptions.ReleaseExe.WithMainTypeName("C"))
+            Dim compilation = CreateCompilationWithMscorlib40(source, options:=TestOptions.ReleaseExe.WithMainTypeName("C"))
 
             ' Dev10 reports: BC30420: 'Sub Main' was not found in 'C'.
 
@@ -451,7 +455,7 @@ Public Class C
 End Class
     </file>
 </compilation>
-            Dim compilation = CreateCompilationWithMscorlib(source, options:=TestOptions.ReleaseExe.WithMainTypeName("C"))
+            Dim compilation = CreateCompilationWithMscorlib40(source, options:=TestOptions.ReleaseExe.WithMainTypeName("C"))
             compilation.VerifyDiagnostics(Diagnostic(ERRID.ERR_GenericSubMainsFound1).WithArguments("C"))
         End Sub
 
@@ -483,7 +487,7 @@ Public Class C
 End Class
     </file>
 </compilation>
-            Dim compilation = CreateCompilationWithMscorlib(source, options:=TestOptions.ReleaseExe.WithMainTypeName("C"))
+            Dim compilation = CreateCompilationWithMscorlib40(source, options:=TestOptions.ReleaseExe.WithMainTypeName("C"))
             compilation.VerifyDiagnostics()
         End Sub
 
@@ -519,7 +523,7 @@ Class C
 End Class
     </file>
 </compilation>
-            Dim compilation = CreateCompilationWithMscorlib(source, options:=TestOptions.ReleaseExe.WithMainTypeName("C"))
+            Dim compilation = CreateCompilationWithMscorlib40(source, options:=TestOptions.ReleaseExe.WithMainTypeName("C"))
 
             ' Dev10 displays return type, we don't; methods can't be overloaded on return type so the type is not necessary
             compilation.VerifyDiagnostics(
@@ -536,7 +540,7 @@ Public Class G
 End Class
     </file>
 </compilation>
-            Dim compilation = CreateCompilationWithMscorlib(source, options:=TestOptions.ReleaseExe)
+            Dim compilation = CreateCompilationWithMscorlib40(source, options:=TestOptions.ReleaseExe)
             compilation.VerifyDiagnostics(Diagnostic(ERRID.ERR_StartupCodeNotFound1).WithArguments("a"))
         End Sub
 
@@ -545,8 +549,8 @@ End Class
             Dim vbx = <text>
 System.Console.WriteLine(1)
 </text>
-            Dim compilation = CreateCompilationWithMscorlib(
-                {VisualBasicSyntaxTree.ParseText(vbx.Value, options:=TestOptions.Script)}, compOptions:=TestOptions.ReleaseExe)
+            Dim compilation = CreateEmptyCompilation(
+                {VisualBasicSyntaxTree.ParseText(vbx.Value, options:=TestOptions.Script)}, options:=TestOptions.ReleaseExe, references:=LatestVbReferences)
 
             CompileAndVerify(compilation, expectedOutput:="1")
         End Sub
@@ -564,9 +568,9 @@ Public Class C
   End Sub
 End Class
 </text>
-            Dim compilation = CreateCompilationWithMscorlib(
+            Dim compilation = CreateEmptyCompilation(
                 {VisualBasicSyntaxTree.ParseText(vbx.Value, options:=TestOptions.Script),
-                 VisualBasicSyntaxTree.ParseText(vb.Value, options:=VisualBasicParseOptions.Default)}, compOptions:=TestOptions.ReleaseExe)
+                 VisualBasicSyntaxTree.ParseText(vb.Value, options:=VisualBasicParseOptions.Default)}, options:=TestOptions.ReleaseExe, references:=LatestVbReferences)
 
             ' TODO: compilation.VerifyDiagnostics(Diagnostic(ErrorCode.WRN_MainIgnored, "Main").WithArguments("C.Main()"))
             CompileAndVerify(compilation, expectedOutput:="1")
@@ -591,9 +595,9 @@ Public Class D
     End Sub
 End Class
 </text>
-            Dim compilation = CreateCompilationWithMscorlib(
+            Dim compilation = CreateEmptyCompilation(
                 {VisualBasicSyntaxTree.ParseText(vbx.Value, options:=TestOptions.Script),
-                 VisualBasicSyntaxTree.ParseText(vb.Value, options:=VisualBasicParseOptions.Default)}, compOptions:=TestOptions.ReleaseExe)
+                 VisualBasicSyntaxTree.ParseText(vb.Value, options:=VisualBasicParseOptions.Default)}, options:=TestOptions.ReleaseExe, references:=LatestVbReferences)
 
             ' TODO: compilation.VerifyDiagnostics(Diagnostic(ErrorCode.WRN_MainIgnored, "Main").WithArguments("C.Main()"), Diagnostic(ErrorCode.WRN_MainIgnored, "Main").WithArguments("D.Main()"))
             CompileAndVerify(compilation, expectedOutput:="1")
@@ -618,10 +622,10 @@ End Class
     </file>
 </compilation>
 
-            Dim compilation = CreateCompilationWithMscorlib(source, options:=TestOptions.ReleaseExe.WithMainTypeName("C"))
+            Dim compilation = CreateCompilationWithMscorlib40(source, options:=TestOptions.ReleaseExe.WithMainTypeName("C"))
             CompileAndVerify(compilation, expectedOutput:="1")
 
-            compilation = CreateCompilationWithMscorlib(source, options:=TestOptions.ReleaseExe.WithMainTypeName("D"))
+            compilation = CreateCompilationWithMscorlib40(source, options:=TestOptions.ReleaseExe.WithMainTypeName("D"))
             CompileAndVerify(compilation, expectedOutput:="2")
         End Sub
 
@@ -637,7 +641,7 @@ Class C
 End Class
     </file>
 </compilation>
-            Dim compilation = CreateCompilationWithMscorlib(source, options:=TestOptions.ReleaseExe.WithMainTypeName("D"))
+            Dim compilation = CreateCompilationWithMscorlib40(source, options:=TestOptions.ReleaseExe.WithMainTypeName("D"))
             compilation.VerifyDiagnostics(Diagnostic(ERRID.ERR_StartupCodeNotFound1).WithArguments("D"))
         End Sub
 
@@ -656,15 +660,15 @@ Interface I
 End Interface
     </file>
 </compilation>
-            Dim compilation = CreateCompilationWithMscorlib(source, options:=TestOptions.ReleaseExe.WithMainTypeName("C"))
+            Dim compilation = CreateCompilationWithMscorlib40(source, options:=TestOptions.ReleaseExe.WithMainTypeName("C"))
             compilation.VerifyDiagnostics(
                 Diagnostic(ERRID.ERR_StartupCodeNotFound1).WithArguments("C"))
 
-            compilation = CreateCompilationWithMscorlib(source, options:=TestOptions.ReleaseExe.WithMainTypeName("D"))
+            compilation = CreateCompilationWithMscorlib40(source, options:=TestOptions.ReleaseExe.WithMainTypeName("D"))
             compilation.VerifyDiagnostics(
                 Diagnostic(ERRID.ERR_StartupCodeNotFound1).WithArguments("D"))
 
-            compilation = CreateCompilationWithMscorlib(source, options:=TestOptions.ReleaseExe.WithMainTypeName("I"))
+            compilation = CreateCompilationWithMscorlib40(source, options:=TestOptions.ReleaseExe.WithMainTypeName("I"))
             compilation.VerifyDiagnostics(
                 Diagnostic(ERRID.ERR_StartupCodeNotFound1).WithArguments("I"))
         End Sub
@@ -711,26 +715,27 @@ Class G
 End Class
     </file>
 </compilation>
-            Dim compilation = CreateCompilationWithMscorlib(source, options:=TestOptions.ReleaseExe.WithMainTypeName("C"))
+            Dim compilation = CreateCompilationWithMscorlib40(source, options:=TestOptions.ReleaseExe.WithMainTypeName("C"))
             compilation.VerifyDiagnostics(Diagnostic(ERRID.ERR_InValidSubMainsFound1).WithArguments("C"))
 
-            compilation = CreateCompilationWithMscorlib(source, options:=TestOptions.ReleaseExe.WithMainTypeName("D"))
+            compilation = CreateCompilationWithMscorlib40(source, options:=TestOptions.ReleaseExe.WithMainTypeName("D"))
             compilation.VerifyDiagnostics(Diagnostic(ERRID.ERR_InValidSubMainsFound1).WithArguments("D"))
 
-            compilation = CreateCompilationWithMscorlib(source, options:=TestOptions.ReleaseExe.WithMainTypeName("E"))
+            compilation = CreateCompilationWithMscorlib40(source, options:=TestOptions.ReleaseExe.WithMainTypeName("E"))
             compilation.VerifyDiagnostics(Diagnostic(ERRID.ERR_StartupCodeNotFound1).WithArguments("E"))
 
-            compilation = CreateCompilationWithMscorlib(source, options:=TestOptions.ReleaseExe.WithMainTypeName("F"))
+            compilation = CreateCompilationWithMscorlib40(source, options:=TestOptions.ReleaseExe.WithMainTypeName("F"))
             compilation.VerifyDiagnostics(Diagnostic(ERRID.ERR_InValidSubMainsFound1).WithArguments("F"))
 
-            compilation = CreateCompilationWithMscorlib(source, options:=TestOptions.ReleaseExe.WithMainTypeName("G.P"))
+            compilation = CreateCompilationWithMscorlib40(source, options:=TestOptions.ReleaseExe.WithMainTypeName("G.P"))
             compilation.VerifyDiagnostics(Diagnostic(ERRID.ERR_InValidSubMainsFound1).WithArguments("G.P"))
 
-            compilation = CreateCompilationWithMscorlib(source, options:=TestOptions.ReleaseExe.WithMainTypeName("G.P.Q"))
+            compilation = CreateCompilationWithMscorlib40(source, options:=TestOptions.ReleaseExe.WithMainTypeName("G.P.Q"))
             compilation.VerifyDiagnostics(Diagnostic(ERRID.ERR_InValidSubMainsFound1).WithArguments("G.P.Q"))
         End Sub
 
-        <Fact()>
+        <ConditionalFact(GetType(NoUsedAssembliesValidation))> ' https://github.com/dotnet/roslyn/issues/40682: The test hook is blocked by this issue.
+        <WorkItem(40682, "https://github.com/dotnet/roslyn/issues/40682")>
         Public Sub ERR_NoMainInClass_Script()
             Dim vbx = <text>
 System.Console.WriteLine(2)
@@ -743,9 +748,9 @@ Class C
     End Sub
 End Class
 </text>
-            Dim compilation = CreateCompilationWithMscorlib(
+            Dim compilation = CreateCompilationWithMscorlib40(
                 {VisualBasicSyntaxTree.ParseText(vbx.Value, options:=TestOptions.Script),
-                 VisualBasicSyntaxTree.ParseText(vb.Value, options:=TestOptions.Regular)}, compOptions:=TestOptions.ReleaseExe.WithMainTypeName("C"))
+                 VisualBasicSyntaxTree.ParseText(vb.Value, options:=TestOptions.Regular)}, options:=TestOptions.ReleaseExe.WithMainTypeName("C"))
 
             ' TODO: compilation.VerifyDiagnostics(Diagnostic(ErrorCode.WRN_MainIgnored).WithArguments("C"))
         End Sub
@@ -761,7 +766,7 @@ Public Class C
 End Class
     </file>
 </compilation>
-            Dim compilation = CreateCompilationWithMscorlib(source, options:=TestOptions.ReleaseExe)
+            Dim compilation = CreateCompilationWithMscorlib40(source, options:=TestOptions.ReleaseExe)
             compilation.VerifyDiagnostics(
                  Diagnostic(ERRID.ERR_InValidSubMainsFound1).WithArguments("a"))
         End Sub
@@ -779,7 +784,7 @@ End Class
         End Class
     </file>
 </compilation>
-            CreateCompilationWithMscorlib(source, options:=TestOptions.ReleaseExe).VerifyDiagnostics(
+            CreateCompilationWithMscorlib40(source, options:=TestOptions.ReleaseExe).VerifyDiagnostics(
                  Diagnostic(ERRID.ERR_InValidSubMainsFound1).WithArguments("a"))
 
         End Sub
@@ -802,7 +807,7 @@ End Class
         End Class
     </file>
 </compilation>
-            CreateCompilationWithMscorlib(source, options:=TestOptions.ReleaseExe).VerifyDiagnostics(
+            CreateCompilationWithMscorlib40(source, options:=TestOptions.ReleaseExe).VerifyDiagnostics(
                  Diagnostic(ERRID.ERR_InValidSubMainsFound1).WithArguments("a"))
 
         End Sub
@@ -818,7 +823,7 @@ End Class
         End Class
     </file>
 </compilation>
-            CreateCompilationWithMscorlib(source, options:=TestOptions.ReleaseExe).VerifyDiagnostics(
+            CreateCompilationWithMscorlib40(source, options:=TestOptions.ReleaseExe).VerifyDiagnostics(
                  Diagnostic(ERRID.ERR_InValidSubMainsFound1).WithArguments("a"))
 
         End Sub
@@ -835,7 +840,7 @@ End Class
         End Class
     </file>
 </compilation>
-            CreateCompilationWithMscorlib(source, options:=TestOptions.ReleaseExe).VerifyDiagnostics(
+            CreateCompilationWithMscorlib40(source, options:=TestOptions.ReleaseExe).VerifyDiagnostics(
                  Diagnostic(ERRID.ERR_InValidSubMainsFound1).WithArguments("a"))
         End Sub
 
@@ -855,7 +860,7 @@ End Class
         End Class
     </file>
 </compilation>
-            CreateCompilationWithMscorlib(source, options:=TestOptions.ReleaseExe).VerifyDiagnostics(
+            CreateCompilationWithMscorlib40(source, options:=TestOptions.ReleaseExe).VerifyDiagnostics(
                  Diagnostic(ERRID.ERR_StartupCodeNotFound1).WithArguments("a"))
         End Sub
 
@@ -871,7 +876,7 @@ End Class
         End Class
     </file>
 </compilation>
-            CreateCompilationWithMscorlib(source, options:=TestOptions.ReleaseExe).VerifyDiagnostics(
+            CreateCompilationWithMscorlib40(source, options:=TestOptions.ReleaseExe).VerifyDiagnostics(
                  Diagnostic(ERRID.ERR_InValidSubMainsFound1).WithArguments("a"))
         End Sub
 
@@ -887,7 +892,7 @@ End Class
         End Class
     </file>
 </compilation>
-            CreateCompilationWithMscorlib(source, options:=TestOptions.ReleaseExe).VerifyDiagnostics()
+            CreateCompilationWithMscorlib40(source, options:=TestOptions.ReleaseExe).VerifyDiagnostics()
         End Sub
 
         <Fact()>
@@ -902,7 +907,7 @@ End Class
         End Class
     </file>
 </compilation>
-            CreateCompilationWithMscorlib(source, options:=TestOptions.ReleaseExe).VerifyDiagnostics(
+            CreateCompilationWithMscorlib40(source, options:=TestOptions.ReleaseExe).VerifyDiagnostics(
                 Diagnostic(ERRID.ERR_InValidSubMainsFound1).WithArguments("a"))
         End Sub
 
@@ -918,7 +923,7 @@ End Class
         End Class
     </file>
 </compilation>
-            CreateCompilationWithMscorlib(source, options:=TestOptions.ReleaseExe).VerifyDiagnostics(
+            CreateCompilationWithMscorlib40(source, options:=TestOptions.ReleaseExe).VerifyDiagnostics(
                 Diagnostic(ERRID.ERR_InValidSubMainsFound1).WithArguments("a"))
         End Sub
 
@@ -934,7 +939,7 @@ End Class
         End Class
     </file>
 </compilation>
-            CreateCompilationWithMscorlib(source, options:=TestOptions.ReleaseExe).VerifyDiagnostics(
+            CreateCompilationWithMscorlib40(source, options:=TestOptions.ReleaseExe).VerifyDiagnostics(
                 Diagnostic(ERRID.ERR_InValidSubMainsFound1).WithArguments("a"))
         End Sub
 
@@ -950,7 +955,7 @@ End Class
         End Class
     </file>
 </compilation>
-            CreateCompilationWithMscorlib(source, options:=TestOptions.ReleaseExe).VerifyDiagnostics(
+            CreateCompilationWithMscorlib40(source, options:=TestOptions.ReleaseExe).VerifyDiagnostics(
                 Diagnostic(ERRID.ERR_InValidSubMainsFound1).WithArguments("a"))
         End Sub
 
@@ -966,7 +971,7 @@ End Class
         End Class
     </file>
 </compilation>
-            CreateCompilationWithMscorlib(source, options:=TestOptions.ReleaseExe).VerifyDiagnostics(
+            CreateCompilationWithMscorlib40(source, options:=TestOptions.ReleaseExe).VerifyDiagnostics(
                 Diagnostic(ERRID.ERR_InValidSubMainsFound1).WithArguments("a"))
         End Sub
 
@@ -978,14 +983,14 @@ End Class
         Imports System.Runtime.CompilerServices
         Class B
         End Class
-        Module extention
+        Module Extension
             &lt;Extension()&gt;
             Public Sub Main(x As B, args As String())
             End Sub
         End Module
     </file>
 </compilation>
-            CreateCompilationWithMscorlibAndVBRuntimeAndReferences(source, {SystemCoreRef}, options:=TestOptions.ReleaseExe).VerifyDiagnostics(
+            CreateCompilationWithMscorlib40AndVBRuntimeAndReferences(source, {Net40.SystemCore}, options:=TestOptions.ReleaseExe).VerifyDiagnostics(
                 Diagnostic(ERRID.ERR_InValidSubMainsFound1).WithArguments("a"))
         End Sub
 
@@ -997,14 +1002,14 @@ End Class
         Imports System.Runtime.CompilerServices
         Class B
         End Class
-        Module extention
+        Module Extension
             &lt;Extension()&gt;
             Public Sub Main(x As B)
             End Sub
         End Module
     </file>
 </compilation>
-            CreateCompilationWithMscorlibAndVBRuntimeAndReferences(source, {SystemCoreRef}, options:=TestOptions.ReleaseExe).VerifyDiagnostics(
+            CreateCompilationWithMscorlib40AndVBRuntimeAndReferences(source, {Net40.SystemCore}, options:=TestOptions.ReleaseExe).VerifyDiagnostics(
                 Diagnostic(ERRID.ERR_InValidSubMainsFound1).WithArguments("a"))
         End Sub
 
@@ -1016,14 +1021,14 @@ End Class
         Imports System.Runtime.CompilerServices
         Class B
         End Class
-        Module extention
+        Module Extension
             &lt;Extension()&gt;
             Public Sub Main(x As String)
             End Sub
         End Module
     </file>
 </compilation>
-            CreateCompilationWithMscorlibAndVBRuntimeAndReferences(source, {SystemCoreRef}, options:=TestOptions.ReleaseExe).VerifyDiagnostics(
+            CreateCompilationWithMscorlib40AndVBRuntimeAndReferences(source, {Net40.SystemCore}, options:=TestOptions.ReleaseExe).VerifyDiagnostics(
                 Diagnostic(ERRID.ERR_InValidSubMainsFound1).WithArguments("a"))
         End Sub
 
@@ -1043,7 +1048,7 @@ End Class
         End Module
     </file>
 </compilation>
-            CreateCompilationWithMscorlibAndVBRuntime(source, Nothing, options:=TestOptions.ReleaseExe).VerifyDiagnostics(
+            CreateCompilationWithMscorlib40AndVBRuntime(source, Nothing, options:=TestOptions.ReleaseExe).VerifyDiagnostics(
                 Diagnostic(ERRID.ERR_MoreThanOneValidMainWasFound2).WithArguments("a", "A.main(args As String()), M1.mAIN()"))
         End Sub
 
@@ -1062,11 +1067,11 @@ End Class
         End Module
     </file>
 </compilation>
-            CreateCompilationWithMscorlibAndVBRuntime(source, Nothing, options:=TestOptions.ReleaseExe).VerifyDiagnostics(
+            CreateCompilationWithMscorlib40AndVBRuntime(source, Nothing, options:=TestOptions.ReleaseExe).VerifyDiagnostics(
                 Diagnostic(ERRID.ERR_MoreThanOneValidMainWasFound2).WithArguments("a", "A.mAIN(), M1.mAIN()"))
         End Sub
 
-        <Fact, WorkItem(543591, "DevDiv")>
+        <Fact, WorkItem(543591, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/543591")>
         Public Sub MainInPrivateClass()
             Dim source =
 <compilation name="a">
@@ -1082,11 +1087,11 @@ End Class
 
             ' Dev10 reports BC30420: 'Sub Main' was not found in 'a'.
             ' We report BC30737: No accessible 'Main' method with an appropriate signature was found in 'a'.
-            CreateCompilationWithMscorlibAndVBRuntime(source, Nothing, options:=TestOptions.ReleaseExe).VerifyDiagnostics(
+            CreateCompilationWithMscorlib40AndVBRuntime(source, Nothing, options:=TestOptions.ReleaseExe).VerifyDiagnostics(
                 Diagnostic(ERRID.ERR_InValidSubMainsFound1).WithArguments("a"))
         End Sub
 
-        <Fact, WorkItem(543591, "DevDiv")>
+        <Fact, WorkItem(543591, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/543591")>
         Public Sub MainInPrivateClass_1()
             Dim source =
 <compilation>
@@ -1101,10 +1106,10 @@ End Class
         End Class
     </file>
 </compilation>
-            CreateCompilationWithMscorlibAndVBRuntime(source, Nothing, options:=TestOptions.ReleaseExe).VerifyDiagnostics()
+            CreateCompilationWithMscorlib40AndVBRuntime(source, Nothing, options:=TestOptions.ReleaseExe).VerifyDiagnostics()
         End Sub
 
-        <Fact, WorkItem(543591, "DevDiv")>
+        <Fact, WorkItem(543591, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/543591")>
         Public Sub MainInPrivateClass_2()
             Dim source =
 <compilation>
@@ -1121,7 +1126,7 @@ End Class
         End Module
     </file>
 </compilation>
-            CreateCompilationWithMscorlibAndVBRuntime(source, Nothing, options:=TestOptions.ReleaseExe).VerifyDiagnostics()
+            CreateCompilationWithMscorlib40AndVBRuntime(source, Nothing, options:=TestOptions.ReleaseExe).VerifyDiagnostics()
         End Sub
 
         <Fact()>
@@ -1139,7 +1144,7 @@ End Class
         End Module
     </file>
 </compilation>
-            CreateCompilationWithMscorlibAndVBRuntime(source, Nothing, options:=TestOptions.ReleaseExe).VerifyDiagnostics(
+            CreateCompilationWithMscorlib40AndVBRuntime(source, Nothing, options:=TestOptions.ReleaseExe).VerifyDiagnostics(
                 Diagnostic(ERRID.ERR_InValidSubMainsFound1).WithArguments("a"))
         End Sub
 
@@ -1159,7 +1164,7 @@ End Class
         End Class
     </file>
 </compilation>
-            CreateCompilationWithMscorlibAndVBRuntime(source, Nothing, options:=TestOptions.ReleaseExe).VerifyDiagnostics(
+            CreateCompilationWithMscorlib40AndVBRuntime(source, Nothing, options:=TestOptions.ReleaseExe).VerifyDiagnostics(
                 Diagnostic(ERRID.ERR_MoreThanOneValidMainWasFound2).WithArguments("a", "BaseClass.Main(), Derived.Main()"))
         End Sub
 
@@ -1179,7 +1184,7 @@ End Class
         End Structure
     </file>
 </compilation>
-            CreateCompilationWithMscorlibAndVBRuntime(source, Nothing, options:=TestOptions.ReleaseExe).VerifyDiagnostics(
+            CreateCompilationWithMscorlib40AndVBRuntime(source, Nothing, options:=TestOptions.ReleaseExe).VerifyDiagnostics(
                 Diagnostic(ERRID.ERR_InValidSubMainsFound1).WithArguments("a"))
         End Sub
 
@@ -1194,7 +1199,7 @@ End Class
         End Class
     </file>
 </compilation>
-            CreateCompilationWithMscorlibAndVBRuntime(source, Nothing, options:=TestOptions.ReleaseExe).VerifyDiagnostics(
+            CreateCompilationWithMscorlib40AndVBRuntime(source, Nothing, options:=TestOptions.ReleaseExe).VerifyDiagnostics(
                 Diagnostic(ERRID.ERR_StartupCodeNotFound1).WithArguments("a"))
         End Sub
 
@@ -1210,7 +1215,7 @@ End Class
     </file>
 </compilation>
 
-            CreateCompilationWithMscorlib(source, options:=TestOptions.ReleaseExe.WithMainTypeName("Main")).VerifyDiagnostics(
+            CreateCompilationWithMscorlib40(source, options:=TestOptions.ReleaseExe.WithMainTypeName("Main")).VerifyDiagnostics(
                 Diagnostic(ERRID.ERR_InValidSubMainsFound1).WithArguments("Main"))
         End Sub
 
@@ -1225,7 +1230,7 @@ Class Main
 End Class
     </file>
 </compilation>
-            AssertTheseDiagnostics(CreateCompilationWithMscorlib(source, options:=TestOptions.ReleaseExe.WithMainTypeName("")),
+            AssertTheseDiagnostics(CreateCompilationWithMscorlib40(source, options:=TestOptions.ReleaseExe.WithMainTypeName("")),
                                                                  <expected>
 BC2014: the value '' is invalid for option 'MainTypeName'
                                                                  </expected>)
@@ -1242,7 +1247,7 @@ End Class
     </file>
 </compilation>
 
-            CreateCompilationWithMscorlib(source, options:=TestOptions.ReleaseExe.WithMainTypeName("Main")).VerifyDiagnostics(
+            CreateCompilationWithMscorlib40(source, options:=TestOptions.ReleaseExe.WithMainTypeName("Main")).VerifyDiagnostics(
                  Diagnostic(ERRID.ERR_StartupCodeNotFound1).WithArguments("Main"))
 
         End Sub
@@ -1258,7 +1263,7 @@ Class Main
 End Class
     </file>
 </compilation>
-            CreateCompilationWithMscorlib(source, options:=TestOptions.ReleaseExe.WithMainTypeName("main")).VerifyDiagnostics()
+            CreateCompilationWithMscorlib40(source, options:=TestOptions.ReleaseExe.WithMainTypeName("main")).VerifyDiagnostics()
         End Sub
 
         <Fact()>
@@ -1269,18 +1274,18 @@ End Class
         Imports System.Runtime.CompilerServices
         Class B
         End Class
-        Module extention
+        Module Extension
             &lt;Extension()&gt;
             Public Sub Main(x As B, args As String())
             End Sub
         End Module
     </file>
 </compilation>
-            CreateCompilationWithMscorlibAndVBRuntimeAndReferences(source, {SystemCoreRef}, options:=TestOptions.ReleaseExe.WithMainTypeName("B")).VerifyDiagnostics(
+            CreateCompilationWithMscorlib40AndVBRuntimeAndReferences(source, {Net40.SystemCore}, options:=TestOptions.ReleaseExe.WithMainTypeName("B")).VerifyDiagnostics(
                 Diagnostic(ERRID.ERR_StartupCodeNotFound1).WithArguments("B"))
 
-            CreateCompilationWithMscorlibAndVBRuntimeAndReferences(source, {SystemCoreRef}, options:=TestOptions.ReleaseExe.WithMainTypeName("extention")).VerifyDiagnostics(
-                Diagnostic(ERRID.ERR_InValidSubMainsFound1).WithArguments("extention"))
+            CreateCompilationWithMscorlib40AndVBRuntimeAndReferences(source, {Net40.SystemCore}, options:=TestOptions.ReleaseExe.WithMainTypeName("Extension")).VerifyDiagnostics(
+                Diagnostic(ERRID.ERR_InValidSubMainsFound1).WithArguments("Extension"))
         End Sub
 
         <Fact()>
@@ -1297,13 +1302,13 @@ End Class
         Delegate Sub mydelegate(args As String()) 
     </file>
 </compilation>
-            CreateCompilationWithMscorlibAndVBRuntimeAndReferences(source, {SystemCoreRef}, options:=TestOptions.ReleaseExe.WithMainTypeName("I1")).VerifyDiagnostics(
+            CreateCompilationWithMscorlib40AndVBRuntimeAndReferences(source, {Net40.SystemCore}, options:=TestOptions.ReleaseExe.WithMainTypeName("I1")).VerifyDiagnostics(
                 Diagnostic(ERRID.ERR_StartupCodeNotFound1).WithArguments("i1"))
 
-            CreateCompilationWithMscorlibAndVBRuntimeAndReferences(source, {SystemCoreRef}, options:=TestOptions.ReleaseExe.WithMainTypeName("COLOR")).VerifyDiagnostics(
+            CreateCompilationWithMscorlib40AndVBRuntimeAndReferences(source, {Net40.SystemCore}, options:=TestOptions.ReleaseExe.WithMainTypeName("COLOR")).VerifyDiagnostics(
                 Diagnostic(ERRID.ERR_StartupCodeNotFound1).WithArguments("color"))
 
-            CreateCompilationWithMscorlibAndVBRuntimeAndReferences(source, {SystemCoreRef}, options:=TestOptions.ReleaseExe.WithMainTypeName("mydelegate")).VerifyDiagnostics(
+            CreateCompilationWithMscorlib40AndVBRuntimeAndReferences(source, {Net40.SystemCore}, options:=TestOptions.ReleaseExe.WithMainTypeName("mydelegate")).VerifyDiagnostics(
                 Diagnostic(ERRID.ERR_StartupCodeNotFound1).WithArguments("mydelegate"))
         End Sub
 
@@ -1316,7 +1321,7 @@ End Class
         end class
     </file>
 </compilation>
-            CreateCompilationWithMscorlib(source, options:=TestOptions.ReleaseExe.WithMainTypeName("1")).VerifyDiagnostics(
+            CreateCompilationWithMscorlib40(source, options:=TestOptions.ReleaseExe.WithMainTypeName("1")).VerifyDiagnostics(
                 Diagnostic(ERRID.ERR_StartupCodeNotFound1).WithArguments("1"))
 
         End Sub
@@ -1330,12 +1335,12 @@ End Class
         end class
     </file>
 </compilation>
-            CreateCompilationWithMscorlib(source, options:=TestOptions.ReleaseExe.WithMainTypeName("<")).VerifyDiagnostics(
+            CreateCompilationWithMscorlib40(source, options:=TestOptions.ReleaseExe.WithMainTypeName("<")).VerifyDiagnostics(
                 Diagnostic(ERRID.ERR_StartupCodeNotFound1).WithArguments("<"))
 
         End Sub
 
-        <WorkItem(545803, "DevDiv")>
+        <WorkItem(545803, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/545803")>
         <Fact()>
         Public Sub ExplicitMainTypeName_PublicInBase()
             Dim source =
@@ -1351,13 +1356,13 @@ End Class
         End Class
     </file>
 </compilation>
-            Dim compilation As VisualBasicCompilation = CreateCompilationWithMscorlib(source, options:=TestOptions.ReleaseExe.WithMainTypeName("B"))
+            Dim compilation As VisualBasicCompilation = CreateCompilationWithMscorlib40(source, options:=TestOptions.ReleaseExe.WithMainTypeName("B"))
             compilation.VerifyDiagnostics()
             Assert.Equal(compilation.GlobalNamespace.GetMember(Of NamedTypeSymbol)("A").GetMember(Of MethodSymbol)("Main"),
                          compilation.GetEntryPoint(Nothing))
         End Sub
 
-        <WorkItem(545803, "DevDiv")>
+        <WorkItem(545803, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/545803")>
         <Fact()>
         Public Sub ExplicitMainTypeName_ProtectedInBase()
             Dim source =
@@ -1373,13 +1378,13 @@ End Class
         End Class
     </file>
 </compilation>
-            Dim compilation As VisualBasicCompilation = CreateCompilationWithMscorlib(source, options:=TestOptions.ReleaseExe.WithMainTypeName("B"))
+            Dim compilation As VisualBasicCompilation = CreateCompilationWithMscorlib40(source, options:=TestOptions.ReleaseExe.WithMainTypeName("B"))
             compilation.VerifyDiagnostics()
             Assert.Equal(compilation.GlobalNamespace.GetMember(Of NamedTypeSymbol)("A").GetMember(Of MethodSymbol)("Main"),
                          compilation.GetEntryPoint(Nothing))
         End Sub
 
-        <WorkItem(545803, "DevDiv")>
+        <WorkItem(545803, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/545803")>
         <Fact()>
         Public Sub ExplicitMainTypeName_PrivateInBase()
             Dim source =
@@ -1395,13 +1400,13 @@ End Class
         End Class
     </file>
 </compilation>
-            Dim compilation As VisualBasicCompilation = CreateCompilationWithMscorlib(source, options:=TestOptions.ReleaseExe.WithMainTypeName("B"))
+            Dim compilation As VisualBasicCompilation = CreateCompilationWithMscorlib40(source, options:=TestOptions.ReleaseExe.WithMainTypeName("B"))
             compilation.VerifyDiagnostics(
                 Diagnostic(ERRID.ERR_StartupCodeNotFound1).WithArguments("B"))
             Assert.Null(compilation.GetEntryPoint(Nothing))
         End Sub
 
-        <WorkItem(545803, "DevDiv")>
+        <WorkItem(545803, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/545803")>
         <Fact()>
         Public Sub ExplicitMainTypeName_InGenericBase()
             Dim source =
@@ -1417,13 +1422,13 @@ End Class
         End Class
     </file>
 </compilation>
-            Dim compilation As VisualBasicCompilation = CreateCompilationWithMscorlib(source, options:=TestOptions.ReleaseExe.WithMainTypeName("B"))
+            Dim compilation As VisualBasicCompilation = CreateCompilationWithMscorlib40(source, options:=TestOptions.ReleaseExe.WithMainTypeName("B"))
             compilation.VerifyDiagnostics(
                 Diagnostic(ERRID.ERR_GenericSubMainsFound1).WithArguments("B"))
             Assert.Null(compilation.GetEntryPoint(Nothing))
         End Sub
 
-        <WorkItem(545803, "DevDiv")>
+        <WorkItem(545803, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/545803")>
         <Fact()>
         Public Sub ExplicitMainTypeName_InBaseHiddenByField()
             Dim source =
@@ -1441,13 +1446,13 @@ End Class
         End Class
     </file>
 </compilation>
-            Dim compilation As VisualBasicCompilation = CreateCompilationWithMscorlib(source, options:=TestOptions.ReleaseExe.WithMainTypeName("B"))
+            Dim compilation As VisualBasicCompilation = CreateCompilationWithMscorlib40(source, options:=TestOptions.ReleaseExe.WithMainTypeName("B"))
             compilation.VerifyDiagnostics(
                 Diagnostic(ERRID.ERR_StartupCodeNotFound1).WithArguments("B"))
             Assert.Null(compilation.GetEntryPoint(Nothing))
         End Sub
 
-        <WorkItem(545803, "DevDiv")>
+        <WorkItem(545803, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/545803")>
         <Fact()>
         Public Sub ExplicitMainTypeName_InBaseInOtherAssembly()
             Dim source1 =
@@ -1467,14 +1472,14 @@ End Class
         End Class
     </file>
 </compilation>
-            Dim compilation1 As VisualBasicCompilation = CreateCompilationWithMscorlib(source1)
-            Dim compilation2 As VisualBasicCompilation = CreateCompilationWithMscorlibAndReferences(source2, {New VisualBasicCompilationReference(compilation1)}, options:=TestOptions.ReleaseExe.WithMainTypeName("B"))
+            Dim compilation1 As VisualBasicCompilation = CreateCompilationWithMscorlib40(source1)
+            Dim compilation2 As VisualBasicCompilation = CreateCompilationWithMscorlib40AndReferences(source2, {New VisualBasicCompilationReference(compilation1)}, options:=TestOptions.ReleaseExe.WithMainTypeName("B"))
             compilation2.VerifyDiagnostics(
                 Diagnostic(ERRID.ERR_StartupCodeNotFound1).WithArguments("B"))
             Assert.Null(compilation2.GetEntryPoint(Nothing))
         End Sub
 
-        <WorkItem(630763, "DevDiv")>
+        <WorkItem(630763, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/630763")>
         <Fact()>
         Public Sub Bug630763()
             Dim source =
@@ -1488,12 +1493,12 @@ End Class
     </file>
 </compilation>
 
-            Dim compilation = CreateCompilationWithMscorlib(source, options:=TestOptions.ReleaseExe)
+            Dim compilation = CreateCompilationWithMscorlib40(source, options:=TestOptions.ReleaseExe)
             compilation.VerifyDiagnostics()
 
-            Dim netModule = CreateCompilationWithMscorlib(source, options:=TestOptions.ReleaseModule)
+            Dim netModule = CreateCompilationWithMscorlib40(source, options:=TestOptions.ReleaseModule)
 
-            compilation = CreateCompilationWithMscorlibAndReferences(
+            compilation = CreateCompilationWithMscorlib40AndReferences(
 <compilation name="Bug630763">
     <file>
     </file>
@@ -1505,12 +1510,12 @@ BC30420: 'Sub Main' was not found in 'Bug630763'.
 </expected>)
         End Sub
 
-        <WorkItem(753028, "DevDiv")>
+        <WorkItem(753028, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/753028")>
         <Fact>
         Public Sub RootMemberNamedScript()
             Dim comp As VisualBasicCompilation
 
-            comp = CompilationUtils.CreateCompilationWithMscorlib(options:=TestOptions.ReleaseExe, sources:=
+            comp = CompilationUtils.CreateCompilationWithMscorlib40(options:=TestOptions.ReleaseExe, source:=
 <compilation name="20781949-2709-424e-b174-dec81a202016">
     <file name="a.vb">
 Namespace Script
@@ -1521,7 +1526,7 @@ End Namespace
 BC30420: 'Sub Main' was not found in '20781949-2709-424e-b174-dec81a202016'.
 </errors>)
 
-            comp = CompilationUtils.CreateCompilationWithMscorlib(options:=TestOptions.ReleaseExe, sources:=
+            comp = CompilationUtils.CreateCompilationWithMscorlib40(options:=TestOptions.ReleaseExe, source:=
 <compilation name="20781949-2709-424e-b174-dec81a202017">
     <file name="a.vb">
 Class Script
@@ -1532,7 +1537,7 @@ End Class
 BC30420: 'Sub Main' was not found in '20781949-2709-424e-b174-dec81a202017'.
 </errors>)
 
-            comp = CompilationUtils.CreateCompilationWithMscorlib(options:=TestOptions.ReleaseExe, sources:=
+            comp = CompilationUtils.CreateCompilationWithMscorlib40(options:=TestOptions.ReleaseExe, source:=
 <compilation name="20781949-2709-424e-b174-dec81a202018">
     <file name="a.vb">
 Structure Script
@@ -1543,7 +1548,7 @@ End Structure
 BC30420: 'Sub Main' was not found in '20781949-2709-424e-b174-dec81a202018'.
 </errors>)
 
-            comp = CompilationUtils.CreateCompilationWithMscorlib(options:=TestOptions.ReleaseExe, sources:=
+            comp = CompilationUtils.CreateCompilationWithMscorlib40(options:=TestOptions.ReleaseExe, source:=
 <compilation name="20781949-2709-424e-b174-dec81a202019">
     <file name="a.vb">
 Interface Script(Of T)
@@ -1554,7 +1559,7 @@ End Interface
 BC30420: 'Sub Main' was not found in '20781949-2709-424e-b174-dec81a202019'.
 </errors>)
 
-            comp = CompilationUtils.CreateCompilationWithMscorlib(options:=TestOptions.ReleaseExe, sources:=
+            comp = CompilationUtils.CreateCompilationWithMscorlib40(options:=TestOptions.ReleaseExe, source:=
 <compilation name="20781949-2709-424e-b174-dec81a202020">
     <file name="a.vb">
 Enum Script
@@ -1566,7 +1571,7 @@ End Enum
 BC30420: 'Sub Main' was not found in '20781949-2709-424e-b174-dec81a202020'.
 </errors>)
 
-            comp = CompilationUtils.CreateCompilationWithMscorlib(options:=TestOptions.ReleaseExe, sources:=
+            comp = CompilationUtils.CreateCompilationWithMscorlib40(options:=TestOptions.ReleaseExe, source:=
 <compilation name="20781949-2709-424e-b174-dec81a202021">
     <file name="a.vb">
 Delegate Sub Script()

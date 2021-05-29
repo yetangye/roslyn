@@ -1,10 +1,13 @@
-﻿' Copyright (c) Microsoft.  All Rights Reserved.  Licensed under the Apache License, Version 2.0.  See License.txt in the project root for license information.
+﻿' Licensed to the .NET Foundation under one or more agreements.
+' The .NET Foundation licenses this file to you under the MIT license.
+' See the LICENSE file in the project root for more information.
 
 Imports System.Collections.Concurrent
 Imports System.Collections.Generic
 Imports System.Runtime.InteropServices
 Imports System.Threading
 Imports Microsoft.CodeAnalysis.Collections
+Imports Microsoft.CodeAnalysis.PooledObjects
 Imports Microsoft.CodeAnalysis.Text
 Imports Microsoft.CodeAnalysis.VisualBasic.Symbols
 Imports Microsoft.CodeAnalysis.VisualBasic.Syntax
@@ -131,16 +134,14 @@ Namespace Microsoft.CodeAnalysis.VisualBasic.Symbols
         Public Sub MarkSymbolAsReferenced(symbol As Symbol, allSymbols As ConcurrentSet(Of Symbol))
 #If Not Debug Then
             ' In RELEASE don't add anything if the collection is sealed
-            If _sealed = 0 Then
-#End If
-
-                Debug.Assert(symbol.IsDefinition)
-                Debug.Assert(symbol.IsEmbedded)
-                AddReferencedSymbolWithDependents(symbol, allSymbols)
-
-#If Not Debug Then
+            If _sealed <> 0 Then
+                Return
             End If
 #End If
+
+            Debug.Assert(symbol.IsDefinition)
+            Debug.Assert(symbol.IsEmbedded)
+            AddReferencedSymbolWithDependents(symbol, allSymbols)
         End Sub
 
         Public Sub MarkSymbolAsReferenced(symbol As Symbol)
@@ -185,13 +186,13 @@ Namespace Microsoft.CodeAnalysis.VisualBasic.Symbols
         '''          T1.M1 -> { T1,  T1..ctor, Attr1, Attr1..ctor, ... }
         ''' 
         ''' we cannot just check if T1.M1 exists in the collection of referenced symbols and not 
-        ''' add dependant symbols if it does; the reason is that T1.M1 may be added by a concurrent 
+        ''' add dependent symbols if it does; the reason is that T1.M1 may be added by a concurrent 
         ''' thread, but its dependencies may not be added by that thread yet. So we need to 
         ''' calculate all dependencies and try add all the symbols together.
         ''' 
         ''' On the other hand it should be avoided that the method *always* goes through all
         ''' the dependencies for each symbol even though it may be definitely known that the symbol
-        ''' is added in one of the previous operatinos by *the same thread*. To serve this purpose 
+        ''' is added in one of the previous operations by *the same thread*. To serve this purpose 
         ''' the method uses 'allSymbols' collection to actually check whether or not the symbol 
         ''' is added to the collection. This makes possible to reuse the same collection in several 
         ''' consequent calls to AddReferencedSymbolWithDependents from the same thread; for example 
@@ -350,7 +351,7 @@ Namespace Microsoft.CodeAnalysis.VisualBasic.Symbols
 
                     Case Else
                         ' No other symbol kinds are allowed
-                        Debug.Assert(False)
+                        Throw ExceptionUtilities.UnexpectedValue(member.Kind)
 
                 End Select
 

@@ -1,29 +1,31 @@
-﻿' Copyright (c) Microsoft.  All Rights Reserved.  Licensed under the Apache License, Version 2.0.  See License.txt in the project root for license information.
+﻿' Licensed to the .NET Foundation under one or more agreements.
+' The .NET Foundation licenses this file to you under the MIT license.
+' See the LICENSE file in the project root for more information.
 
 Imports System.IO
 Imports System.Text
 
-Module Program
-    Sub Main()
-        Dim args = Environment.GetCommandLineArgs()
-
-        If args.Length <> 3 Then
+Friend Module Program
+    Public Function Main(args As String()) As Integer
+        If args.Length <> 2 Then
             Console.WriteLine(
-"Usage: {0} input output
+"Usage: VBErrorFactsGenerator.exe input output
   input     The path to Errors.vb
-  output    The path to ErrorFacts.Generated.vb",
-                Path.GetFileNameWithoutExtension(args(0)))
-            Environment.Exit(-1)
+  output    The path to ErrorFacts.Generated.vb")
+            Return -1
         End If
 
-        Dim inputPath = args(1)
-        Dim outputPath = args(2)
+        Dim inputPath = args(0)
+        Dim outputPath = args(1)
 
         Dim outputText = New StringBuilder
         outputText.AppendLine("Namespace Microsoft.CodeAnalysis.VisualBasic")
         outputText.AppendLine("    Friend Partial Module ErrorFacts")
 
-        Dim warningCodeNames, fatalCodeNames, infoCodeNames, hiddenCodeNames As New List(Of String)
+        Dim warningCodeNames As New List(Of String)
+        Dim fatalCodeNames As New List(Of String)
+        Dim infoCodeNames As New List(Of String)
+        Dim hiddenCodeNames As New List(Of String)
         For Each line In From l In File.ReadAllLines(inputPath) Select l.Trim
             If line.StartsWith("WRN_", StringComparison.OrdinalIgnoreCase) Then
                 warningCodeNames.Add(line.Substring(0, line.IndexOf(" "c)))
@@ -46,8 +48,10 @@ Module Program
 
         outputText.AppendLine("    End Module")
         outputText.AppendLine("End Namespace")
-        File.WriteAllText(outputPath, outputText.ToString())
-    End Sub
+        File.WriteAllText(outputPath, outputText.ToString(), Encoding.UTF8)
+
+        Return 0
+    End Function
 
     Private Sub GenerateErrorFactsFunction(functionName As String, codeNames As List(Of String), outputText As StringBuilder)
         outputText.AppendLine(String.Format("        Public Function {0}(code as ERRID) As Boolean", functionName))

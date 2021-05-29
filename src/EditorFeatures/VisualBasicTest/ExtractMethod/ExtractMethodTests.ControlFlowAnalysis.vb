@@ -1,4 +1,6 @@
-' Copyright (c) Microsoft.  All Rights Reserved.  Licensed under the Apache License, Version 2.0.  See License.txt in the project root for license information.
+﻿' Licensed to the .NET Foundation under one or more agreements.
+' The .NET Foundation licenses this file to you under the MIT license.
+' See the LICENSE file in the project root for more information.
 
 Namespace Microsoft.CodeAnalysis.Editor.VisualBasic.UnitTests.ExtractMethod
     Partial Public Class ExtractMethodTests
@@ -8,21 +10,22 @@ Namespace Microsoft.CodeAnalysis.Editor.VisualBasic.UnitTests.ExtractMethod
         ''' (B) Analyzer
         ''' </summary>
         ''' <remarks></remarks>
+        <[UseExportProvider]>
         Public Class FlowAnalysis
 
             <Fact, Trait(Traits.Feature, Traits.Features.ExtractMethod)>
-            Public Sub TestExitSub()
+            Public Async Function TestExitSub() As Threading.Tasks.Task
                 Dim code = <text>Class Test
     Sub Test()
         [|Exit Sub|]
     End Sub
 End Class</text>
 
-                ExpectExtractMethodToFail(code)
-            End Sub
+                Await ExpectExtractMethodToFailAsync(code)
+            End Function
 
             <Fact, Trait(Traits.Feature, Traits.Features.ExtractMethod)>
-            Public Sub TestExitFunction()
+            Public Async Function TestExitFunction() As Threading.Tasks.Task
                 Dim code = <text>Class Test
     Function Test1() As Integer
         Console.Write(42)
@@ -32,12 +35,12 @@ End Class</text>
     End Function
 End Class</text>
 
-                ExpectExtractMethodToFail(code)
-            End Sub
+                Await ExpectExtractMethodToFailAsync(code)
+            End Function
 
-            <WorkItem(540046)>
+            <WorkItem(540046, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/540046")>
             <Fact, Trait(Traits.Feature, Traits.Features.ExtractMethod)>
-            Public Sub TestReturnStatement()
+            Public Async Function TestReturnStatement() As Task
                 Dim code = <text>Class A
     Function Test1() As Integer
         Dim x As Integer = 5
@@ -58,11 +61,11 @@ End Class</text>
     End Function
 End Class</text>
 
-                TestExtractMethod(code, expected)
-            End Sub
+                Await TestExtractMethodAsync(code, expected)
+            End Function
 
             <Fact, Trait(Traits.Feature, Traits.Features.ExtractMethod)>
-            Public Sub TestDoBranch()
+            Public Async Function TestDoBranch() As Task
                 Dim code = <text>Class A
     Function Test1() As Integer
         Dim x As Integer = 5
@@ -81,23 +84,25 @@ End Class</text>
         Dim x As Integer = 5
         Console.Write(x)
         Dim i As Integer
-        NewMethod(i)
+        i = NewMethod(i)
         Return x
     End Function
 
-    Private Shared Sub NewMethod(i As Integer)
+    Private Shared Function NewMethod(i As Integer) As Integer
         Do
             Console.Write(i)
             i = i + 1
-        Loop Until i > 5
-    End Sub
+        Loop Until i &gt; 5
+
+        Return i
+    End Function
 End Class</text>
 
-                TestExtractMethod(code, expected)
-            End Sub
+                Await TestExtractMethodAsync(code, expected)
+            End Function
 
             <Fact, Trait(Traits.Feature, Traits.Features.ExtractMethod)>
-            Public Sub TestDoBranchInvalidSelection()
+            Public Async Function TestDoBranchInvalidSelection() As Task
                 Dim code = <text>Class A
     Function Test1() As Integer
         Dim x As Integer = 5
@@ -116,23 +121,25 @@ End Class</text>
         Dim x As Integer = 5
         Console.Write(x)
         Dim i As Integer
-        NewMethod(i)
+        i = NewMethod(i)
         Return x
     End Function
 
-    Private Shared Sub NewMethod(i As Integer)
+    Private Shared Function NewMethod(i As Integer) As Integer
         Do
             Console.Write(i)
             i = i + 1
-        Loop Until i > 5
-    End Sub
+        Loop Until i &gt; 5
+
+        Return i
+    End Function
 End Class</text>
 
-                TestExtractMethod(code, expected)
-            End Sub
+                Await TestExtractMethodAsync(code, expected)
+            End Function
 
             <Fact, Trait(Traits.Feature, Traits.Features.ExtractMethod)>
-            Public Sub TestDoBranchWithContinue()
+            Public Async Function TestDoBranchWithContinue() As Task
                 Dim code = <text>Class A
     Function Test1() As Integer
         Dim x As Integer = 5
@@ -153,25 +160,27 @@ End Class</text>
         Dim x As Integer = 5
         Console.Write(x)
         Dim i As Integer
-        NewMethod(i)
+        i = NewMethod(i)
         Return x
     End Function
 
-    Private Shared Sub NewMethod(i As Integer)
+    Private Shared Function NewMethod(i As Integer) As Integer
         Do
             Console.Write(i)
             i = i + 1
             Continue Do
             'Blah
         Loop Until i > 5
-    End Sub
+
+        Return i
+    End Function
 End Class</text>
 
-                TestExtractMethod(code, expected)
-            End Sub
+                Await TestExtractMethodAsync(code, expected)
+            End Function
 
             <Fact, Trait(Traits.Feature, Traits.Features.ExtractMethod)>
-            Public Sub TestInvalidSelectionLeftOfAssignment()
+            Public Async Function TestInvalidSelectionLeftOfAssignment() As Task
                 Dim code = <text>Class A
     Protected x As Integer = 1
     Public Sub New()
@@ -190,11 +199,11 @@ End Class</text>
     End Sub
 End Class</text>
 
-                TestExtractMethod(code, expected)
-            End Sub
+                Await TestExtractMethodAsync(code, expected)
+            End Function
 
             <Fact, Trait(Traits.Feature, Traits.Features.ExtractMethod)>
-            Public Sub TestInvalidSelectionOfArrayLiterals()
+            Public Async Function TestInvalidSelectionOfArrayLiterals() As Task
                 Dim code = <text>Class A
     Public Sub Test()
         Dim numbers = New Integer() [|{1,2,3,4}|]
@@ -211,12 +220,12 @@ End Class</text>
     End Function
 End Class</text>
 
-                TestExtractMethod(code, expected)
-            End Sub
+                Await TestExtractMethodAsync(code, expected)
+            End Function
 
-            <WorkItem(540154)>
+            <WorkItem(540154, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/540154")>
             <Fact, Trait(Traits.Feature, Traits.Features.ExtractMethod)>
-            Public Sub BugFix6313()
+            Public Async Function TestBugFix6313() As Task
                 Dim code = <text>Imports System
 
 Class A
@@ -243,12 +252,12 @@ Class A
     End Sub
 End Class</text>
 
-                TestExtractMethod(code, expected)
-            End Sub
+                Await TestExtractMethodAsync(code, expected)
+            End Function
 
-            <WorkItem(540154)>
+            <WorkItem(540154, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/540154")>
             <Fact, Trait(Traits.Feature, Traits.Features.ExtractMethod)>
-            Public Sub BugFix6313_1()
+            Public Async Function BugFix6313_1() As Task
                 Dim code = <text>Imports System
 
 Class A
@@ -260,12 +269,12 @@ Class A
     End Sub
 End Class</text>
 
-                ExpectExtractMethodToFail(code)
-            End Sub
+                Await ExpectExtractMethodToFailAsync(code)
+            End Function
 
-            <WorkItem(540154)>
+            <WorkItem(540154, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/540154")>
             <Fact, Trait(Traits.Feature, Traits.Features.ExtractMethod)>
-            Public Sub BugFix6313_2()
+            Public Async Function BugFix6313_2() As Threading.Tasks.Task
                 Dim code = <text>Imports System
 
 Class A
@@ -277,12 +286,12 @@ Class A
     End Function
 End Class</text>
 
-                ExpectExtractMethodToFail(code)
-            End Sub
+                Await ExpectExtractMethodToFailAsync(code)
+            End Function
 
-            <WorkItem(540154)>
+            <WorkItem(540154, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/540154")>
             <Fact, Trait(Traits.Feature, Traits.Features.ExtractMethod)>
-            Public Sub BugFix6313_3()
+            Public Async Function TestBugFix6313_3() As Task
                 Dim code = <text>Imports System
 
 Class A
@@ -323,12 +332,12 @@ Class A
     End Sub
 End Class</text>
 
-                TestExtractMethod(code, expected)
-            End Sub
+                Await TestExtractMethodAsync(code, expected)
+            End Function
 
-            <WorkItem(540154)>
+            <WorkItem(540154, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/540154")>
             <Fact, Trait(Traits.Feature, Traits.Features.ExtractMethod)>
-            Public Sub BugFix6313_4()
+            Public Async Function TestBugFix6313_4() As Task
                 Dim code = <text>Imports System
 
 Class A
@@ -339,7 +348,7 @@ Class A
                                   Return
                               End If
                               Console.WriteLine(1)
-                          End Sub
+                            End Sub
 
         Dim d2 As Action = Sub()
                                Dim i As Integer = 1
@@ -381,12 +390,12 @@ Class A
     End Sub
 End Class</text>
 
-                TestExtractMethod(code, expected)
-            End Sub
+                Await TestExtractMethodAsync(code, expected)
+            End Function
 
-            <WorkItem(540154)>
+            <WorkItem(540154, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/540154")>
             <Fact, Trait(Traits.Feature, Traits.Features.ExtractMethod)>
-            Public Sub BugFix6313_5()
+            Public Async Function TestBugFix6313_5() As Task
                 Dim code = <text>Imports System
 
 Class A
@@ -419,12 +428,12 @@ Class A
     End Sub
 End Class</text>
 
-                TestExtractMethod(code, expected)
-            End Sub
+                Await TestExtractMethodAsync(code, expected)
+            End Function
 
-            <WorkItem(540154), WorkItem(541484)>
+            <WorkItem(540154, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/540154"), WorkItem(541484, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/541484")>
             <Fact, Trait(Traits.Feature, Traits.Features.ExtractMethod)>
-            Public Sub BugFix6313_6()
+            Public Async Function BugFix6313_6() As Task
                 Dim code = <text>Imports System
 
 Class A
@@ -435,16 +444,16 @@ Class A
                                   Return
                               End If|]
                               Console.WriteLine(1)
-                          End Sub
+                          End Function
     End Sub
 End Class</text>
 
-                ExpectExtractMethodToFail(code)
-            End Sub
+                Await ExpectExtractMethodToFailAsync(code)
+            End Function
 
-            <WorkItem(543670)>
+            <WorkItem(543670, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/543670")>
             <Fact, Trait(Traits.Feature, Traits.Features.ExtractMethod)>
-            Public Sub AnonymousLambdaInVarDecl()
+            Public Async Function AnonymousLambdaInVarDecl() As Task
                 Dim code = <text>Imports System
 
 Module Program
@@ -454,11 +463,11 @@ Module Program
     End Sub
 End Module</text>
 
-                ExpectExtractMethodToFail(code)
-            End Sub
+                Await ExpectExtractMethodToFailAsync(code)
+            End Function
 
-            <Fact, WorkItem(531451), Trait(Traits.Feature, Traits.Features.ExtractMethod)>
-            Public Sub TestInvalidSelectionNonExecutableStatementSyntax_01()
+            <Fact, WorkItem(531451, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/531451"), Trait(Traits.Feature, Traits.Features.ExtractMethod)>
+            Public Async Function TestInvalidSelectionNonExecutableStatementSyntax_01() As Task
                 Dim code = <text>Module Program
     Sub Main(args As String())
         [|If True Then ElseIf True Then Return|]
@@ -475,11 +484,11 @@ End Module</text>
 End Sub
 End Module</text>
 
-                TestExtractMethod(code, expected)
-            End Sub
+                Await TestExtractMethodAsync(code, expected)
+            End Function
 
-            <Fact, WorkItem(547156), Trait(Traits.Feature, Traits.Features.ExtractMethod)>
-            Public Sub TestInvalidSelectionNonExecutableStatementSyntax_02()
+            <Fact, WorkItem(547156, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/547156"), Trait(Traits.Feature, Traits.Features.ExtractMethod)>
+            Public Async Function TestInvalidSelectionNonExecutableStatementSyntax_02() As Task
                 Dim code = <text>Module Program
     Sub Main()
         If True Then Dim x
@@ -487,13 +496,13 @@ End Module</text>
     End Sub
 End Module</text>
 
-                ExpectExtractMethodToFail(code)
-            End Sub
+                Await ExpectExtractMethodToFailAsync(code)
+            End Function
 
-            <Fact, WorkItem(530625), Trait(Traits.Feature, Traits.Features.ExtractMethod)>
-            Public Sub TestUnreachableEndInFunction()
+            <Fact, WorkItem(530625, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/530625"), Trait(Traits.Feature, Traits.Features.ExtractMethod)>
+            Public Async Function TestUnreachableEndInFunction() As Task
                 Dim code = <text>Module Program
-    Function Foo() As Integer
+    Function Goo() As Integer
         If True Then
             [|Do : Loop|] ' Extract method
             Exit Function
@@ -504,7 +513,7 @@ End Module</text>
 End Module</text>
 
                 Dim expected = <text>Module Program
-    Function Foo() As Integer
+    Function Goo() As Integer
         If True Then
             NewMethod() ' Extract method
             Exit Function
@@ -518,11 +527,11 @@ End Module</text>
     End Sub
 End Module</text>
 
-                TestExtractMethod(code, expected)
-            End Sub
+                Await TestExtractMethodAsync(code, expected)
+            End Function
 
-            <Fact, WorkItem(578066), Trait(Traits.Feature, Traits.Features.ExtractMethod)>
-            Public Sub TestExitAsSupportedExitPoints()
+            <Fact, WorkItem(578066, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/578066"), Trait(Traits.Feature, Traits.Features.ExtractMethod)>
+            Public Async Function TestExitAsSupportedExitPoints() As Task
                 Dim code = <text>Imports System.Threading
 Imports System.Threading.Tasks
 
@@ -537,10 +546,10 @@ Module Module1
         If x = 1 Then
             Return 1
         Else
-            GoTo foo
+            GoTo goo
         End If
         Exit Function
-foo:
+goo:
         Return 2L|]
     End Function
 End Module</text>
@@ -563,16 +572,16 @@ Module Module1
         If x = 1 Then
             Return 1
         Else
-            GoTo foo
+            GoTo goo
         End If
         Exit Function
-foo:
+goo:
         Return 2L
     End Function
 End Module</text>
 
-                TestExtractMethod(code, expected)
-            End Sub
+                Await TestExtractMethodAsync(code, expected)
+            End Function
         End Class
     End Class
 End Namespace

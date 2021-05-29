@@ -1,7 +1,8 @@
-' Copyright (c) Microsoft.  All Rights Reserved.  Licensed under the Apache License, Version 2.0.  See License.txt in the project root for license information.
+﻿' Licensed to the .NET Foundation under one or more agreements.
+' The .NET Foundation licenses this file to you under the MIT license.
+' See the LICENSE file in the project root for more information.
 
 Imports Microsoft.CodeAnalysis
-Imports Microsoft.CodeAnalysis.Formatting
 Imports Microsoft.CodeAnalysis.Text.Shared.Extensions
 Imports Microsoft.CodeAnalysis.VisualBasic.Syntax
 
@@ -21,6 +22,9 @@ Namespace Microsoft.CodeAnalysis.Editor.VisualBasic.EndConstructGeneration
             Dim newLineTrivia = originalNode.GetTrailingTrivia().SkipWhile(Function(t) Not t.IsKind(SyntaxKind.EndOfLineTrivia))
             Dim node = originalNode.WithTrailingTrivia(originalNode.GetTrailingTrivia().TakeWhile(Function(t) Not t.IsKind(SyntaxKind.EndOfLineTrivia)))
 
+            Dim tokenNextToLambda = originalNode.GetLastToken().GetNextToken()
+            Dim isNextToXmlEmbeddedExpression = tokenNextToLambda.IsKind(SyntaxKind.PercentGreaterThanToken) AndAlso tokenNextToLambda.Parent.IsKind(SyntaxKind.XmlEmbeddedExpression)
+
             Dim aligningWhitespace = _subjectBuffer.CurrentSnapshot.GetAligningWhitespace(originalNode.SpanStart)
             Dim indentedWhitespace = aligningWhitespace & "    "
 
@@ -28,7 +32,7 @@ Namespace Microsoft.CodeAnalysis.Editor.VisualBasic.EndConstructGeneration
             Dim endStatementKind = If(originalNode.Kind = SyntaxKind.SingleLineSubLambdaExpression, SyntaxKind.EndSubStatement, SyntaxKind.EndFunctionStatement)
             Dim endStatement = SyntaxFactory.EndBlockStatement(endStatementKind, SyntaxFactory.Token(originalNode.SubOrFunctionHeader.DeclarationKeyword.Kind).WithLeadingTrivia(SyntaxFactory.WhitespaceTrivia(" "))) _
                         .WithLeadingTrivia(SyntaxFactory.WhitespaceTrivia(aligningWhitespace)) _
-                        .WithTrailingTrivia(newLineTrivia)
+                        .WithTrailingTrivia(If(isNextToXmlEmbeddedExpression, SyntaxFactory.TriviaList(SyntaxFactory.WhitespaceTrivia(" ")), newLineTrivia))
 
             ' We are hitting enter after a single line. Let's transform it to a multi-line form
             If node.Kind = SyntaxKind.SingleLineSubLambdaExpression Then
@@ -73,7 +77,7 @@ Namespace Microsoft.CodeAnalysis.Editor.VisualBasic.EndConstructGeneration
                     End If
 
                     ' It's still missing entirely, so just spit normally
-                    Return CreateSpitLinesForLambdaHeader(node.SubOrFunctionHeader)
+                    Return CreateSpitLinesForLambdaHeader(node.SubOrFunctionHeader, isNextToXmlEmbeddedExpression, originalNode.SpanStart)
                 End If
 
                 Dim newHeader = node.SubOrFunctionHeader.WithTrailingTrivia(SyntaxFactory.EndOfLineTrivia(_state.NewLineCharacter))
@@ -104,7 +108,7 @@ Namespace Microsoft.CodeAnalysis.Editor.VisualBasic.EndConstructGeneration
             ' We have to be careful here: just because the Lambda's End isn't missing doesn't mean we shouldn't spit a
             ' End Sub / End Function. A good example is an unterminated multi-line sub in a sub, like this:
             '
-            ' Sub foo()
+            ' Sub goo()
             '    Dim x = Sub()
             ' End Sub
             '
@@ -127,14 +131,15 @@ Namespace Microsoft.CodeAnalysis.Editor.VisualBasic.EndConstructGeneration
             End If
         End Function
 
-        Private Function CreateSpitLinesForLambdaHeader(node As LambdaHeaderSyntax) As AbstractEndConstructResult
-            Dim endConstruct = _subjectBuffer.CurrentSnapshot.GetAligningWhitespace(node.SpanStart) & "End " & node.DeclarationKeyword.ToString()
+        Private Function CreateSpitLinesForLambdaHeader(node As LambdaHeaderSyntax, Optional isNextToXmlEmbeddedExpression As Boolean = False, Optional originalNodeSpanStart? As Integer = Nothing) As AbstractEndConstructResult
+            Dim spanStart As Integer = If(originalNodeSpanStart.HasValue, originalNodeSpanStart.Value, node.SpanStart)
+            Dim endConstruct = _subjectBuffer.CurrentSnapshot.GetAligningWhitespace(spanStart) & "End " & node.DeclarationKeyword.ToString()
 
             ' We may wish to spit () at the end of if we are missing our parenthesis
             If node.ParameterList Is Nothing OrElse (node.ParameterList.OpenParenToken.IsMissing AndAlso node.ParameterList.CloseParenToken.IsMissing) Then
                 Return New SpitLinesResult({"()", "", endConstruct}, startOnCurrentLine:=True)
             Else
-                Return New SpitLinesResult({"", endConstruct})
+                Return New SpitLinesResult({"", If(isNextToXmlEmbeddedExpression, endConstruct & " ", endConstruct)})
             End If
         End Function
     End Class

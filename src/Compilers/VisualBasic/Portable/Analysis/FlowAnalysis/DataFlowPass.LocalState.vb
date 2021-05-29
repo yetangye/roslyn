@@ -1,4 +1,6 @@
-﻿' Copyright (c) Microsoft.  All Rights Reserved.  Licensed under the Apache License, Version 2.0.  See License.txt in the project root for license information.
+﻿' Licensed to the .NET Foundation under one or more agreements.
+' The .NET Foundation licenses this file to you under the MIT license.
+' See the LICENSE file in the project root for more information.
 
 Imports System
 Imports System.Collections.Generic
@@ -8,8 +10,12 @@ Imports Microsoft.CodeAnalysis.Text
 Imports Microsoft.CodeAnalysis.VisualBasic.Symbols
 Imports Microsoft.CodeAnalysis.VisualBasic.Syntax
 
+#If DEBUG Then
+#Const REFERENCE_STATE = True
+#End If
+
 Namespace Microsoft.CodeAnalysis.VisualBasic
-    Partial Class DataFlowPass
+    Partial Friend Class DataFlowPass
         Inherits AbstractFlowPass(Of LocalState)
 
         Protected Overrides Function IntersectWith(ByRef self As LocalState, ByRef other As LocalState) As Boolean
@@ -45,9 +51,9 @@ Namespace Microsoft.CodeAnalysis.VisualBasic
             Next
         End Sub
 
-        Private Shared ReadOnly Property UnreachableBitsSet As BitArray
+        Private Shared ReadOnly Property UnreachableBitsSet As BitVector
             Get
-                Return BitArray.AllSet(1)
+                Return BitVector.AllSet(1)
             End Get
         End Property
 
@@ -55,7 +61,7 @@ Namespace Microsoft.CodeAnalysis.VisualBasic
         ''' Intersect bit arrays taking into account 'all bits set' flag
         ''' </summary>
         ''' <remarks>receiver will be changed as a result</remarks>
-        Private Shared Function IntersectBitArrays(ByRef receiver As BitArray, other As BitArray) As Boolean
+        Private Shared Function IntersectBitArrays(ByRef receiver As BitVector, other As BitVector) As Boolean
             ' NOTE: a state with 'unreachable' slot set to 'assigned' means 'all bits are set'
             If other(SlotKind.Unreachable) Then
                 ' OTHER state has 'all bits set', thus, RECEIVER does not need to be changed
@@ -76,7 +82,7 @@ Namespace Microsoft.CodeAnalysis.VisualBasic
         ''' Union bit arrays taking into account 'all bits set' flag
         ''' </summary>
         ''' <remarks>receiver will be changed as a result</remarks>
-        Private Shared Sub UnionBitArrays(ByRef receiver As BitArray, other As BitArray)
+        Private Shared Sub UnionBitArrays(ByRef receiver As BitVector, other As BitVector)
             ' NOTE: a state with 'unreachable' slot set to 'assigned' means 'all bits are set'
             If receiver(SlotKind.Unreachable) Then
                 ' RECEIVER state has 'all bits set', thus, it does not need to be changed
@@ -102,12 +108,16 @@ Namespace Microsoft.CodeAnalysis.VisualBasic
             Next
         End Sub
 
+#If REFERENCE_STATE Then
+        Friend Class LocalState
+#Else
         Friend Structure LocalState
+#End If
             Implements AbstractLocalState
 
-            Friend Assigned As BitArray
+            Friend Assigned As BitVector
 
-            Friend Sub New(assigned As BitArray)
+            Friend Sub New(assigned As BitVector)
                 Debug.Assert(Not assigned.IsNull)
                 Me.Assigned = assigned
             End Sub
@@ -150,7 +160,11 @@ Namespace Microsoft.CodeAnalysis.VisualBasic
                 End Get
             End Property
 
+#If REFERENCE_STATE Then
+        End Class
+#Else
         End Structure
+#End If
 
     End Class
 

@@ -1,4 +1,8 @@
-﻿Imports System.Collections.Immutable
+﻿' Licensed to the .NET Foundation under one or more agreements.
+' The .NET Foundation licenses this file to you under the MIT license.
+' See the LICENSE file in the project root for more information.
+
+Imports System.Collections.Immutable
 Imports Microsoft.CodeAnalysis.ExpressionEvaluator
 Imports Microsoft.CodeAnalysis.VisualBasic.Symbols
 
@@ -28,7 +32,7 @@ Namespace Microsoft.CodeAnalysis.VisualBasic.ExpressionEvaluator
         End Function
 
         Private Class BlockChecker
-            Inherits BoundTreeWalker
+            Inherits BoundTreeWalkerWithStackGuard
 
             Private ReadOnly _typeParameterChecker As TypeParameterChecker
 
@@ -41,6 +45,7 @@ Namespace Microsoft.CodeAnalysis.VisualBasic.ExpressionEvaluator
                 If expression IsNot Nothing Then
                     _typeParameterChecker.Visit(expression.ExpressionSymbol)
                 End If
+
                 Return MyBase.Visit(node)
             End Function
         End Class

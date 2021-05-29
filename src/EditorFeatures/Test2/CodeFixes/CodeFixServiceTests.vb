@@ -1,137 +1,165 @@
-' Copyright (c) Microsoft.  All Rights Reserved.  Licensed under the Apache License, Version 2.0.  See License.txt in the project root for license information.
+﻿' Licensed to the .NET Foundation under one or more agreements.
+' The .NET Foundation licenses this file to you under the MIT license.
+' See the LICENSE file in the project root for more information.
 
 Imports System.Collections.Immutable
 Imports System.Composition
+Imports System.Diagnostics.CodeAnalysis
 Imports System.Reflection
 Imports System.Threading
-Imports System.Threading.Tasks
 Imports Microsoft.CodeAnalysis.CodeActions
 Imports Microsoft.CodeAnalysis.CodeFixes
-Imports Microsoft.CodeAnalysis.CodeFixes.Suppression
 Imports Microsoft.CodeAnalysis.Diagnostics
+Imports Microsoft.CodeAnalysis.Editor.Implementation.Diagnostics.UnitTests
+Imports Microsoft.CodeAnalysis.Editor.UnitTests
+Imports Microsoft.CodeAnalysis.Editor.UnitTests.Diagnostics
 Imports Microsoft.CodeAnalysis.Editor.UnitTests.Workspaces
+Imports Microsoft.CodeAnalysis.ErrorLogger
 Imports Microsoft.CodeAnalysis.Host
+Imports Microsoft.CodeAnalysis.Host.Mef
 Imports Roslyn.Utilities
 
 Namespace Microsoft.CodeAnalysis.Editor.Implementation.CodeFixes.UnitTests
 
+    <[UseExportProvider]>
     Public Class CodeFixServiceTests
 
+        Private Shared ReadOnly s_compositionWithMockDiagnosticUpdateSourceRegistrationService As TestComposition = EditorTestCompositions.EditorFeatures _
+            .AddExcludedPartTypes(GetType(IDiagnosticUpdateSourceRegistrationService)) _
+            .AddParts(GetType(MockDiagnosticUpdateSourceRegistrationService))
+
+        Private ReadOnly _assemblyLoader As IAnalyzerAssemblyLoader = New InMemoryAssemblyLoader()
+
+        Public Function CreateAnalyzerFileReference(ByVal fullPath As String) As AnalyzerFileReference
+            Return New AnalyzerFileReference(fullPath, _assemblyLoader)
+        End Function
+
         <Fact, Trait(Traits.Feature, Traits.Features.Diagnostics)>
-        Public Sub TestProjectCodeFix()
+        Public Async Function TestProjectCodeFix() As Task
             Dim test = <Workspace>
                            <Project Language="C#" CommonReferences="true">
                                <Document FilePath="Test.cs">
-                                        class Foo { }
+                                        class Goo { }
                                     </Document>
                            </Project>
                        </Workspace>
 
-            Using workspace = TestWorkspaceFactory.CreateWorkspace(test)
-                Dim project = workspace.CurrentSolution.Projects(0)
+            Using workspace = TestWorkspace.Create(test, composition:=s_compositionWithMockDiagnosticUpdateSourceRegistrationService)
                 Dim workspaceDiagnosticAnalyzer = New WorkspaceDiagnosticAnalyzer()
                 Dim workspaceCodeFixProvider = New WorkspaceCodeFixProvider()
 
-                Dim diagnosticService = New DiagnosticAnalyzerService(LanguageNames.CSharp, workspaceDiagnosticAnalyzer)
+                Dim analyzerReference = New AnalyzerImageReference(ImmutableArray.Create(Of DiagnosticAnalyzer)(workspaceDiagnosticAnalyzer))
+                workspace.TryApplyChanges(workspace.CurrentSolution.WithAnalyzerReferences({analyzerReference}))
+
+                Dim project = workspace.CurrentSolution.Projects(0)
+
+                Assert.IsType(Of MockDiagnosticUpdateSourceRegistrationService)(workspace.GetService(Of IDiagnosticUpdateSourceRegistrationService)())
+                Dim diagnosticService = Assert.IsType(Of DiagnosticAnalyzerService)(workspace.GetService(Of IDiagnosticAnalyzerService)())
                 Dim analyzer = diagnosticService.CreateIncrementalAnalyzer(workspace)
+                Dim logger = SpecializedCollections.SingletonEnumerable(New Lazy(Of IErrorLoggerService)(Function() workspace.Services.GetService(Of IErrorLoggerService)))
                 Dim codefixService = New CodeFixService(
-                                        diagnosticService,
-                                        {New Lazy(Of CodeFixProvider, Mef.CodeChangeProviderMetadata)(
-                                            Function() workspaceCodeFixProvider,
-                                            New Mef.CodeChangeProviderMetadata(New Dictionary(Of String, Object)() From {{"Name", "C#"}, {"Languages", {LanguageNames.CSharp}}}))},
-                                        SpecializedCollections.EmptyEnumerable(Of Lazy(Of ISuppressionFixProvider, Mef.CodeChangeProviderMetadata)))
+                    diagnosticService,
+                    logger,
+                    {New Lazy(Of CodeFixProvider, Mef.CodeChangeProviderMetadata)(
+                        Function() workspaceCodeFixProvider,
+                        New Mef.CodeChangeProviderMetadata(New Dictionary(Of String, Object)() From {{"Name", "C#"}, {"Languages", {LanguageNames.CSharp}}}))},
+                    SpecializedCollections.EmptyEnumerable(Of Lazy(Of IConfigurationFixProvider, Mef.CodeChangeProviderMetadata)))
 
                 ' Verify available diagnostics
                 Dim document = project.Documents.Single()
-                Dim diagnostics = diagnosticService.GetDiagnosticsForSpanAsync(document,
-                    document.GetSyntaxRootAsync().WaitAndGetResult(CancellationToken.None).FullSpan,
-                    CancellationToken.None).WaitAndGetResult(CancellationToken.None)
+                Dim diagnostics = Await diagnosticService.GetDiagnosticsForSpanAsync(document,
+                    (Await document.GetSyntaxRootAsync()).FullSpan)
 
                 Assert.Equal(1, diagnostics.Count())
 
                 ' Verify available codefix with a global fixer
-                Dim fixes = codefixService.GetFixesAsync(document,
-                                                         document.GetSyntaxRootAsync().WaitAndGetResult(CancellationToken.None).FullSpan,
-                                                         CancellationToken.None).WaitAndGetResult(CancellationToken.None)
+                Dim fixes = Await codefixService.GetFixesAsync(document,
+                    (Await document.GetSyntaxRootAsync()).FullSpan,
+                    includeConfigurationFixes:=True, cancellationToken:=CancellationToken.None)
                 Assert.Equal(0, fixes.Count())
 
                 ' Verify available codefix with a global fixer + a project fixer
                 ' We will use this assembly as a project fixer provider.
                 Dim _assembly = Assembly.GetExecutingAssembly()
-                Dim projectAnalyzerReference = New AnalyzerFileReference(_assembly.Location)
+                Dim projectAnalyzerReference = CreateAnalyzerFileReference(_assembly.Location)
 
                 Dim projectAnalyzerReferences = ImmutableArray.Create(Of AnalyzerReference)(projectAnalyzerReference)
                 project = project.WithAnalyzerReferences(projectAnalyzerReferences)
                 document = project.Documents.Single()
-                fixes = codefixService.GetFixesAsync(document,
-                                                     document.GetSyntaxRootAsync().WaitAndGetResult(CancellationToken.None).FullSpan,
-                                                     CancellationToken.None).WaitAndGetResult(CancellationToken.None)
+                fixes = Await codefixService.GetFixesAsync(document,
+                                                     (Await document.GetSyntaxRootAsync()).FullSpan,
+                                                     includeConfigurationFixes:=True, cancellationToken:=CancellationToken.None)
                 Assert.Equal(1, fixes.Count())
 
                 ' Remove a project analyzer
                 project = project.RemoveAnalyzerReference(projectAnalyzerReference)
                 document = project.Documents.Single()
-                fixes = codefixService.GetFixesAsync(document,
-                                                     document.GetSyntaxRootAsync().WaitAndGetResult(CancellationToken.None).FullSpan,
-                                                     CancellationToken.None).WaitAndGetResult(CancellationToken.None)
+                fixes = Await codefixService.GetFixesAsync(document,
+                                                     (Await document.GetSyntaxRootAsync()).FullSpan,
+                                                     includeConfigurationFixes:=True, cancellationToken:=CancellationToken.None)
                 Assert.Equal(0, fixes.Count())
             End Using
-        End Sub
+        End Function
 
         <Fact, Trait(Traits.Feature, Traits.Features.Diagnostics)>
-        Public Sub TestDifferentLanguageProjectCodeFix()
+        Public Async Function TestDifferentLanguageProjectCodeFix() As Task
             Dim test = <Workspace>
                            <Project Language="Visual Basic" CommonReferences="true">
                                <Document FilePath="Test.vb">
-                                        Class Foo
+                                        Class Goo
                                         End Class
                                     </Document>
                            </Project>
                        </Workspace>
 
-            Using workspace = TestWorkspaceFactory.CreateWorkspace(test)
-                Dim project = workspace.CurrentSolution.Projects(0)
+            Using workspace = TestWorkspace.Create(test, composition:=s_compositionWithMockDiagnosticUpdateSourceRegistrationService)
                 Dim workspaceDiagnosticAnalyzer = New WorkspaceDiagnosticAnalyzer()
                 Dim workspaceCodeFixProvider = New WorkspaceCodeFixProvider()
 
-                Dim diagnosticService = New DiagnosticAnalyzerService(LanguageNames.VisualBasic, workspaceDiagnosticAnalyzer)
-                Dim analyzer = diagnosticService.CreateIncrementalAnalyzer(workspace)
+                Dim analyzerReference = New AnalyzerImageReference(ImmutableArray.Create(Of DiagnosticAnalyzer)(workspaceDiagnosticAnalyzer))
+                workspace.TryApplyChanges(workspace.CurrentSolution.WithAnalyzerReferences({analyzerReference}))
 
+                Dim project = workspace.CurrentSolution.Projects(0)
+
+                Assert.IsType(Of MockDiagnosticUpdateSourceRegistrationService)(workspace.GetService(Of IDiagnosticUpdateSourceRegistrationService)())
+                Dim diagnosticService = Assert.IsType(Of DiagnosticAnalyzerService)(workspace.GetService(Of IDiagnosticAnalyzerService)())
+                Dim analyzer = diagnosticService.CreateIncrementalAnalyzer(workspace)
+                Dim logger = SpecializedCollections.SingletonEnumerable(New Lazy(Of IErrorLoggerService)(Function() workspace.Services.GetService(Of IErrorLoggerService)))
                 Dim codefixService = New CodeFixService(
-                                        diagnosticService,
-                                        {New Lazy(Of CodeFixProvider, Mef.CodeChangeProviderMetadata)(
-                                            Function() workspaceCodeFixProvider,
-                                            New Mef.CodeChangeProviderMetadata(New Dictionary(Of String, Object)() From {{"Name", "C#"}, {"Languages", {LanguageNames.CSharp}}}))},
-                                        SpecializedCollections.EmptyEnumerable(Of Lazy(Of ISuppressionFixProvider, Mef.CodeChangeProviderMetadata)))
+                    diagnosticService,
+                    logger,
+                    {New Lazy(Of CodeFixProvider, Mef.CodeChangeProviderMetadata)(
+                        Function() workspaceCodeFixProvider,
+                        New Mef.CodeChangeProviderMetadata(New Dictionary(Of String, Object)() From {{"Name", "C#"}, {"Languages", {LanguageNames.CSharp}}}))},
+                    SpecializedCollections.EmptyEnumerable(Of Lazy(Of IConfigurationFixProvider, Mef.CodeChangeProviderMetadata)))
 
                 ' Verify available diagnostics
                 Dim document = project.Documents.Single()
-                Dim diagnostics = diagnosticService.GetDiagnosticsForSpanAsync(document,
-                    document.GetSyntaxRootAsync().WaitAndGetResult(CancellationToken.None).FullSpan,
-                    CancellationToken.None).WaitAndGetResult(CancellationToken.None)
+                Dim diagnostics = Await diagnosticService.GetDiagnosticsForSpanAsync(document,
+                    (Await document.GetSyntaxRootAsync()).FullSpan)
 
                 Assert.Equal(1, diagnostics.Count())
 
                 ' Verify no codefix with a global fixer
-                Dim fixes = codefixService.GetFixesAsync(document,
-                                                         document.GetSyntaxRootAsync().WaitAndGetResult(CancellationToken.None).FullSpan,
-                                                         CancellationToken.None).WaitAndGetResult(CancellationToken.None)
+                Dim fixes = Await codefixService.GetFixesAsync(document,
+                                                         (Await document.GetSyntaxRootAsync()).FullSpan,
+                                                         includeConfigurationFixes:=True, cancellationToken:=CancellationToken.None)
                 Assert.Equal(0, fixes.Count())
 
                 ' Verify no codefix with a global fixer + a project fixer
                 ' We will use this assembly as a project fixer provider.
                 Dim _assembly = Assembly.GetExecutingAssembly()
-                Dim projectAnalyzerReference = New AnalyzerFileReference(_assembly.Location)
+                Dim projectAnalyzerReference = CreateAnalyzerFileReference(_assembly.Location)
 
                 Dim projectAnalyzerReferences = ImmutableArray.Create(Of AnalyzerReference)(projectAnalyzerReference)
                 project = project.WithAnalyzerReferences(projectAnalyzerReferences)
                 document = project.Documents.Single()
-                fixes = codefixService.GetFixesAsync(document,
-                                                     document.GetSyntaxRootAsync().WaitAndGetResult(CancellationToken.None).FullSpan,
-                                                     CancellationToken.None).WaitAndGetResult(CancellationToken.None)
+                fixes = Await codefixService.GetFixesAsync(document,
+                                                     (Await document.GetSyntaxRootAsync()).FullSpan,
+                                                     includeConfigurationFixes:=True, cancellationToken:=CancellationToken.None)
                 Assert.Equal(0, fixes.Count())
             End Using
-        End Sub
+        End Function
 
         Private Class WorkspaceDiagnosticAnalyzer
             Inherits AbstractDiagnosticAnalyzer
@@ -175,6 +203,11 @@ Namespace Microsoft.CodeAnalysis.Editor.Implementation.CodeFixes.UnitTests
         Private Class WorkspaceCodeFixProvider
             Inherits CodeFixProvider
 
+            <ImportingConstructor>
+            <SuppressMessage("RoslynDiagnosticsReliability", "RS0033:Importing constructor should be [Obsolete]", Justification:="Used in test code: https://github.com/dotnet/roslyn/issues/42814")>
+            Public Sub New()
+            End Sub
+
             Public NotOverridable Overrides ReadOnly Property FixableDiagnosticIds As ImmutableArray(Of String)
                 Get
                     Return ImmutableArray.Create("TEST0000")
@@ -194,6 +227,11 @@ Namespace Microsoft.CodeAnalysis.Editor.Implementation.CodeFixes.UnitTests
         <ExportCodeFixProvider(LanguageNames.CSharp, Name:="ProjectCodeFixProvider"), [Shared]>
         Public Class ProjectCodeFixProvider
             Inherits CodeFixProvider
+
+            <ImportingConstructor>
+            <Obsolete(MefConstruction.ImportingConstructorMessage, True)>
+            Public Sub New()
+            End Sub
 
             Public NotOverridable Overrides ReadOnly Property FixableDiagnosticIds As ImmutableArray(Of String)
                 Get

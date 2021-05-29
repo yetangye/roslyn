@@ -1,9 +1,13 @@
-﻿' Copyright (c) Microsoft.  All Rights Reserved.  Licensed under the Apache License, Version 2.0.  See License.txt in the project root for license information.
+﻿' Licensed to the .NET Foundation under one or more agreements.
+' The .NET Foundation licenses this file to you under the MIT license.
+' See the LICENSE file in the project root for more information.
 
 Imports System.Collections.Concurrent
 Imports System.Collections.Generic
+Imports System.Collections.Immutable
 Imports System.Runtime.InteropServices
 Imports System.Threading
+Imports Microsoft.CodeAnalysis.PooledObjects
 Imports Microsoft.CodeAnalysis.RuntimeMembers
 Imports Microsoft.CodeAnalysis.Text
 Imports Microsoft.CodeAnalysis.VisualBasic.Symbols
@@ -20,22 +24,22 @@ Namespace Microsoft.CodeAnalysis.VisualBasic
     Friend Class NamespaceBinder
         Inherits Binder
 
-        Private ReadOnly m_nsSymbol As NamespaceSymbol
+        Private ReadOnly _nsSymbol As NamespaceSymbol
 
         Public Sub New(containingBinder As Binder, nsSymbol As NamespaceSymbol)
             MyBase.New(containingBinder)
-            m_nsSymbol = nsSymbol
+            _nsSymbol = nsSymbol
         End Sub
 
         Public Overrides ReadOnly Property ContainingNamespaceOrType As NamespaceOrTypeSymbol
             Get
-                Return m_nsSymbol
+                Return _nsSymbol
             End Get
         End Property
 
         Public ReadOnly Property NamespaceSymbol As NamespaceSymbol
             Get
-                Return m_nsSymbol
+                Return _nsSymbol
             End Get
         End Property
 
@@ -47,7 +51,13 @@ Namespace Microsoft.CodeAnalysis.VisualBasic
 
         Public Overrides ReadOnly Property ContainingMember As Symbol
             Get
-                Return m_nsSymbol
+                Return _nsSymbol
+            End Get
+        End Property
+
+        Public Overrides ReadOnly Property AdditionalContainingMembers As ImmutableArray(Of Symbol)
+            Get
+                Return ImmutableArray(Of Symbol).Empty
             End Get
         End Property
 
@@ -62,9 +72,9 @@ Namespace Microsoft.CodeAnalysis.VisualBasic
                                                       arity As Integer,
                                                       options As LookupOptions,
                                                       originalBinder As Binder,
-                                                      <[In], Out> ByRef useSiteDiagnostics As HashSet(Of DiagnosticInfo))
+                                                      <[In], Out> ByRef useSiteInfo As CompoundUseSiteInfo(Of AssemblySymbol))
             ' Look it up in the associated namespace.
-            originalBinder.LookupMember(lookupResult, m_nsSymbol, name, arity, options Or LookupOptions.IgnoreExtensionMethods, useSiteDiagnostics)
+            originalBinder.LookupMember(lookupResult, _nsSymbol, name, arity, options Or LookupOptions.IgnoreExtensionMethods, useSiteInfo)
         End Sub
 
         ''' <summary>
@@ -76,18 +86,18 @@ Namespace Microsoft.CodeAnalysis.VisualBasic
                                                                       methods As ArrayBuilder(Of MethodSymbol),
                                                                       originalBinder As Binder)
             Debug.Assert(methods.Count = 0)
-            m_nsSymbol.AppendProbableExtensionMethods(name, methods)
+            _nsSymbol.AppendProbableExtensionMethods(name, methods)
         End Sub
 
         Protected Overrides Sub AddExtensionMethodLookupSymbolsInfoInSingleBinder(nameSet As LookupSymbolsInfo,
                                                                                    options As LookupOptions,
                                                                                    originalBinder As Binder)
-            m_nsSymbol.AddExtensionMethodLookupSymbolsInfo(nameSet, options, originalBinder)
+            _nsSymbol.AddExtensionMethodLookupSymbolsInfo(nameSet, options, originalBinder)
         End Sub
 
         Friend Overrides Sub AddLookupSymbolsInfoInSingleBinder(nameSet As LookupSymbolsInfo, options As LookupOptions, originalBinder As Binder)
             ' Get names from the associated namespace
-            originalBinder.AddMemberLookupSymbolsInfo(nameSet, m_nsSymbol, options Or LookupOptions.IgnoreExtensionMethods)
+            originalBinder.AddMemberLookupSymbolsInfo(nameSet, _nsSymbol, options Or LookupOptions.IgnoreExtensionMethods)
         End Sub
     End Class
 

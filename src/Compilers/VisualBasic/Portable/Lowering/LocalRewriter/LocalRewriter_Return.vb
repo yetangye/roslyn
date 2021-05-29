@@ -1,4 +1,6 @@
-﻿' Copyright (c) Microsoft.  All Rights Reserved.  Licensed under the Apache License, Version 2.0.  See License.txt in the project root for license information.
+﻿' Licensed to the .NET Foundation under one or more agreements.
+' The .NET Foundation licenses this file to you under the MIT license.
+' See the LICENSE file in the project root for more information.
 
 Imports System.Collections.Immutable
 Imports System.Diagnostics
@@ -12,8 +14,8 @@ Namespace Microsoft.CodeAnalysis.VisualBasic
     Partial Friend NotInheritable Class LocalRewriter
         Public Overrides Function VisitReturnStatement(node As BoundReturnStatement) As BoundNode
             Debug.Assert(node.FunctionLocalOpt Is Nothing OrElse
-                         (Not Me.currentMethodOrLambda.IsIterator AndAlso
-                            Not (Me.currentMethodOrLambda.IsAsync AndAlso Me.currentMethodOrLambda.ReturnType.Equals(Compilation.GetWellKnownType(WellKnownType.System_Threading_Tasks_Task)))))
+                         (Not Me._currentMethodOrLambda.IsIterator AndAlso
+                            Not (Me._currentMethodOrLambda.IsAsync AndAlso Me._currentMethodOrLambda.ReturnType.Equals(Compilation.GetWellKnownType(WellKnownType.System_Threading_Tasks_Task)))))
 
             Dim rewritten = RewriteReturnStatement(node)
 
@@ -21,7 +23,12 @@ Namespace Microsoft.CodeAnalysis.VisualBasic
                 rewritten = RegisterUnstructuredExceptionHandlingResumeTarget(node.Syntax, rewritten, canThrow:=node.ExpressionOpt IsNot Nothing)
             End If
 
-            Return MarkStatementWithSequencePoint(rewritten)
+            ' Instrument synthesized returns when expressions are not compiler generated.
+            If Instrument(node, rewritten) OrElse (node.ExpressionOpt IsNot Nothing AndAlso Instrument(node.ExpressionOpt)) Then
+                rewritten = _instrumenterOpt.InstrumentReturnStatement(node, rewritten)
+            End If
+
+            Return rewritten
         End Function
 
         ''' <summary>
@@ -30,7 +37,7 @@ Namespace Microsoft.CodeAnalysis.VisualBasic
         Private Function RewriteReturnStatement(node As BoundReturnStatement) As BoundStatement
             node = DirectCast(MyBase.VisitReturnStatement(node), BoundReturnStatement)
 
-            If inExpressionLambda Then
+            If _inExpressionLambda Then
                 ' In expression tree lambdas, we just want to translate a direct return, not a jump.
                 ' Remove function local system and label to indicate a direct return.
                 node = node.Update(node.ExpressionOpt, Nothing, Nothing)
@@ -44,7 +51,7 @@ Namespace Microsoft.CodeAnalysis.VisualBasic
 
                     If functionLocal IsNot Nothing Then
 
-                        If currentMethodOrLambda.IsAsync Then
+                        If _currentMethodOrLambda.IsAsync Then
                             ' For Async method bodies we don't rewrite Return statements into GoTo's to the method's 
                             ' epilogue in AsyncRewriter, but rather rewrite them to proper jumps to the exit label of 
                             ' MoveNext() method of the generated state machine; we keep the node unmodified to be 
@@ -59,7 +66,7 @@ Namespace Microsoft.CodeAnalysis.VisualBasic
                         '
                         Dim boundFunctionLocal = New BoundLocal(node.Syntax, functionLocal, functionLocal.Type)
 
-                        Dim syntaxNode As VisualBasicSyntaxNode = node.Syntax
+                        Dim syntaxNode As SyntaxNode = node.Syntax
 
                         Dim assignment As BoundStatement = New BoundExpressionStatement(
                                                                 syntaxNode,
@@ -82,14 +89,14 @@ Namespace Microsoft.CodeAnalysis.VisualBasic
                     Return New BoundGotoStatement(node.Syntax, node.ExitLabelOpt, Nothing)
                 End If
 
-            ElseIf Me.currentMethodOrLambda.IsAsync AndAlso (Me.Flags And RewritingFlags.AllowEndOfMethodReturnWithExpression) = 0 Then
+            ElseIf Me._currentMethodOrLambda.IsAsync AndAlso (Me._flags And RewritingFlags.AllowEndOfMethodReturnWithExpression) = 0 Then
 
                 ' This is a synthesized end-of-method return, in case it is inside Async method/lambda it needs
                 ' to be rewritten so it does not return any value. Reasoning: all Return statements will be 
                 ' rewritten into GoTo to the value return label of the MoveNext() method rather than exit label 
                 ' of THIS method, so this return is only reachable for the code that falls through the block; 
-                ' in which case the function is supposed to return the default value of the return type, wich is 
-                ' exaclty what will happen in this case;
+                ' in which case the function is supposed to return the default value of the return type, which is 
+                ' exactly what will happen in this case;
                 '
                 ' Also note that Async methods are lowered twice and this handling is only to be done as the 
                 ' first pass; which is guarded by RewritingFlags.AllowEndOfMethodReturnWithExpression flag

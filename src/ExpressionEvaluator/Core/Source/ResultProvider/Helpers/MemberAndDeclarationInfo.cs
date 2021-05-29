@@ -1,13 +1,16 @@
-// Copyright (c) Microsoft.  All Rights Reserved.  Licensed under the Apache License, Version 2.0.  See License.txt in the project root for license information.
+﻿// Licensed to the .NET Foundation under one or more agreements.
+// The .NET Foundation licenses this file to you under the MIT license.
+// See the LICENSE file in the project root for more information.
+
+#nullable disable
 
 using System;
 using System.Collections.Generic;
 using System.Diagnostics;
 using Microsoft.VisualStudio.Debugger.Evaluation.ClrCompilation;
 using Microsoft.VisualStudio.Debugger.Metadata;
-using MemberTypes = System.Reflection.MemberTypes;
-using Type = Microsoft.VisualStudio.Debugger.Metadata.Type;
 using Roslyn.Utilities;
+using Type = Microsoft.VisualStudio.Debugger.Metadata.Type;
 
 namespace Microsoft.CodeAnalysis.ExpressionEvaluator
 {
@@ -60,13 +63,15 @@ namespace Microsoft.CodeAnalysis.ExpressionEvaluator
         public readonly bool HideNonPublic;
         public readonly bool IncludeTypeInMemberName;
         public readonly bool RequiresExplicitCast;
+        public readonly bool CanFavorite;
+        public readonly bool IsFavorite;
 
         /// <summary>
         /// Exists to correctly order fields with the same name from different types in the inheritance hierarchy.
         /// </summary>
         private readonly int _inheritanceLevel;
 
-        public MemberAndDeclarationInfo(MemberInfo member, DkmClrDebuggerBrowsableAttributeState? browsableState, DeclarationInfo info, int inheritanceLevel)
+        public MemberAndDeclarationInfo(MemberInfo member, DkmClrDebuggerBrowsableAttributeState? browsableState, DeclarationInfo info, int inheritanceLevel, bool canFavorite, bool isFavorite)
         {
             Debug.Assert(member != null);
 
@@ -75,6 +80,8 @@ namespace Microsoft.CodeAnalysis.ExpressionEvaluator
             this.HideNonPublic = info.IsSet(DeclarationInfo.HideNonPublic);
             this.IncludeTypeInMemberName = info.IsSet(DeclarationInfo.IncludeTypeInMemberName);
             this.RequiresExplicitCast = info.IsSet(DeclarationInfo.RequiresExplicitCast);
+            this.CanFavorite = canFavorite && SupportsCanFavorite(member, info);
+            this.IsFavorite = isFavorite;
 
             _inheritanceLevel = inheritanceLevel;
         }
@@ -99,15 +106,7 @@ namespace Microsoft.CodeAnalysis.ExpressionEvaluator
         {
             get
             {
-                switch (_member.MemberType)
-                {
-                    case MemberTypes.Field:
-                        return ((FieldInfo)_member).IsStatic;
-                    case MemberTypes.Property:
-                        return ((PropertyInfo)_member).GetGetMethod(nonPublic: true).IsStatic;
-                    default:
-                        throw ExceptionUtilities.UnexpectedValue(_member.MemberType);
-                }
+                return IsMemberStatic(_member);
             }
         }
 
@@ -131,13 +130,82 @@ namespace Microsoft.CodeAnalysis.ExpressionEvaluator
         {
             get
             {
+                return GetMemberType(_member);
+            }
+        }
+
+        public Type OriginalDefinitionType
+        {
+            get
+            {
+                return GetMemberType(_member.GetOriginalDefinition());
+            }
+        }
+
+        private static Type GetMemberType(MemberInfo member)
+        {
+            switch (member.MemberType)
+            {
+                case MemberTypes.Field:
+                    return ((FieldInfo)member).FieldType;
+                case MemberTypes.Property:
+                    return ((PropertyInfo)member).PropertyType;
+                default:
+                    throw ExceptionUtilities.UnexpectedValue(member.MemberType);
+            }
+        }
+
+        private static bool SupportsCanFavorite(MemberInfo member, DeclarationInfo info)
+        {
+            if (IsMemberStatic(member))
+            {
+                return false;
+            }
+
+            Type memberType = GetMemberType(member);
+
+            if (memberType.IsByRef || memberType.IsPointer)
+            {
+                return false;
+            }
+
+            if (member.Name.Contains("."))
+            {
+                return false;
+            }
+
+            if (info.IsSet(DeclarationInfo.IncludeTypeInMemberName))
+            {
+                return false;
+            }
+
+            return true;
+        }
+
+        private static bool IsMemberStatic(MemberInfo member)
+        {
+            switch (member.MemberType)
+            {
+                case MemberTypes.Field:
+                    return ((FieldInfo)member).IsStatic;
+                case MemberTypes.Property:
+                    return ((PropertyInfo)member).GetGetMethod(nonPublic: true).IsStatic;
+                default:
+                    throw ExceptionUtilities.UnexpectedValue(member.MemberType);
+            }
+        }
+
+        public DkmClrCustomTypeInfo TypeInfo
+        {
+            get
+            {
                 switch (_member.MemberType)
                 {
                     case MemberTypes.Field:
-                        return ((FieldInfo)_member).FieldType;
                     case MemberTypes.Property:
-                        return ((PropertyInfo)_member).PropertyType;
+                        return _member.GetCustomAttributesData().GetCustomTypeInfo();
                     default:
+                        // If we ever see a method, we'll have to use ReturnTypeCustomAttributes.
                         throw ExceptionUtilities.UnexpectedValue(_member.MemberType);
                 }
             }
@@ -154,7 +222,7 @@ namespace Microsoft.CodeAnalysis.ExpressionEvaluator
                 // implements an interface member, but it does characterize the set of members we're
                 // interested in displaying differently.  For example, if the property is from VB, it will
                 // be an explicit interface implementation, but will not have a dot.
-                var dotPos = memberName.LastIndexOf(".");
+                var dotPos = memberName.LastIndexOf('.');
                 if (dotPos >= 0)
                 {
                     var property = (PropertyInfo)_member;

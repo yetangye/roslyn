@@ -1,4 +1,6 @@
-' Copyright (c) Microsoft.  All Rights Reserved.  Licensed under the Apache License, Version 2.0.  See License.txt in the project root for license information.
+﻿' Licensed to the .NET Foundation under one or more agreements.
+' The .NET Foundation licenses this file to you under the MIT license.
+' See the LICENSE file in the project root for more information.
 
 Imports Microsoft.CodeAnalysis.Editor.VisualBasic.KeywordHighlighting
 
@@ -6,13 +8,13 @@ Namespace Microsoft.CodeAnalysis.Editor.VisualBasic.UnitTests.KeywordHighlightin
     Public Class XmlEmbeddedExpressionHighlighterTests
         Inherits AbstractVisualBasicKeywordHighlighterTests
 
-        Friend Overrides Function CreateHighlighter() As IHighlighter
-            Return New XmlEmbeddedExpressionHighlighter()
+        Friend Overrides Function GetHighlighterType() As Type
+            Return GetType(XmlEmbeddedExpressionHighlighter)
         End Function
 
         <Fact, Trait(Traits.Feature, Traits.Features.KeywordHighlighting)>
-        Public Sub TestXmlLiteralSample5_1()
-            Test(<Text><![CDATA[
+        Public Async Function TestXmlLiteralSample5_1() As Task
+            Await TestAsync(<Text><![CDATA[
 Class C
 Sub M()
 Dim q = <?xml version="1.0"?>
@@ -25,11 +27,11 @@ Dim q = <?xml version="1.0"?>
 </contact>
 End Sub
 End Class]]></Text>)
-        End Sub
+        End Function
 
         <Fact, Trait(Traits.Feature, Traits.Features.KeywordHighlighting)>
-        Public Sub TestXmlLiteralSample5_2()
-            Test(<Text><![CDATA[
+        Public Async Function TestXmlLiteralSample5_2() As Task
+            Await TestAsync(<Text><![CDATA[
 Class C
 Sub M()
 Dim q = <?xml version="1.0"?>
@@ -42,11 +44,11 @@ Dim q = <?xml version="1.0"?>
 </contact>
 End Sub
 End Class]]></Text>)
-        End Sub
+        End Function
 
         <Fact, Trait(Traits.Feature, Traits.Features.KeywordHighlighting)>
-        Public Sub TestXmlLiteralSample5_3()
-            Test(<Text><![CDATA[
+        Public Async Function TestXmlLiteralSample5_3() As Task
+            Await TestAsync(<Text><![CDATA[
 Class C
 Sub M()
 Dim q = <?xml version="1.0"?>
@@ -59,6 +61,6 @@ Dim q = <?xml version="1.0"?>
 </contact>
 End Sub
 End Class]]></Text>)
-        End Sub
+        End Function
     End Class
 End Namespace

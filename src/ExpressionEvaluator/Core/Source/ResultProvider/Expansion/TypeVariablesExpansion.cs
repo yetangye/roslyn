@@ -1,4 +1,8 @@
-// Copyright (c) Microsoft.  All Rights Reserved.  Licensed under the Apache License, Version 2.0.  See License.txt in the project root for license information.
+﻿// Licensed to the .NET Foundation under one or more agreements.
+// The .NET Foundation licenses this file to you under the MIT license.
+// See the LICENSE file in the project root for more information.
+
+#nullable disable
 
 using System;
 using System.Diagnostics;
@@ -13,11 +17,15 @@ namespace Microsoft.CodeAnalysis.ExpressionEvaluator
     {
         private readonly Type[] _typeParameters;
         private readonly Type[] _typeArguments;
+        private readonly CustomTypeInfoTypeArgumentMap _customTypeInfoMap;
 
-        internal TypeVariablesExpansion(Type declaredType)
+        internal TypeVariablesExpansion(TypeAndCustomInfo declaredTypeAndInfo)
         {
+            var declaredType = declaredTypeAndInfo.Type;
             Debug.Assert(declaredType.IsGenericType);
             Debug.Assert(!declaredType.IsGenericTypeDefinition);
+
+            _customTypeInfoMap = CustomTypeInfoTypeArgumentMap.Create(declaredTypeAndInfo);
 
             var typeDef = declaredType.GetGenericTypeDefinition();
             _typeParameters = typeDef.GetGenericArguments();
@@ -30,7 +38,7 @@ namespace Microsoft.CodeAnalysis.ExpressionEvaluator
 
         internal override void GetRows(
             ResultProvider resultProvider,
-            ArrayBuilder<DkmEvaluationResult> rows,
+            ArrayBuilder<EvalResult> rows,
             DkmInspectionContext inspectionContext,
             EvalResultDataItem parent,
             DkmClrValue value,
@@ -46,51 +54,39 @@ namespace Microsoft.CodeAnalysis.ExpressionEvaluator
             int offset = startIndex2 - index;
             for (int i = 0; i < count2; i++)
             {
-                rows.Add(GetRow(resultProvider, value, i + offset, parent));
+                rows.Add(GetRow(inspectionContext, value, i + offset, parent));
             }
 
             index += _typeArguments.Length;
         }
 
-        private DkmEvaluationResult GetRow(ResultProvider resultProvider, DkmClrValue value, int index, EvalResultDataItem parent)
+        private EvalResult GetRow(
+            DkmInspectionContext inspectionContext,
+            DkmClrValue value,
+            int index,
+            EvalResultDataItem parent)
         {
-            var inspectionContext = value.InspectionContext;
-            var appDomain = value.Type.AppDomain;
             var typeParameter = _typeParameters[index];
             var typeArgument = _typeArguments[index];
-            var type = DkmClrType.Create(appDomain, typeArgument);
-            var name = typeParameter.Name;
-            var dataItem = new EvalResultDataItem(
-                name,
-                typeDeclaringMember: null,
-                declaredType: typeArgument,
-                value: null,
+            var typeArgumentInfo = _customTypeInfoMap.SubstituteCustomTypeInfo(typeParameter, customInfo: null);
+            var formatSpecifiers = Formatter.NoFormatSpecifiers;
+            return new EvalResult(
+                ExpansionKind.TypeVariable,
+                typeParameter.Name,
+                typeDeclaringMemberAndInfo: default(TypeAndCustomInfo),
+                declaredTypeAndInfo: new TypeAndCustomInfo(DkmClrType.Create(value.Type.AppDomain, typeArgument), typeArgumentInfo),
+                useDebuggerDisplay: parent != null,
+                value: value,
+                displayValue: inspectionContext.GetTypeName(DkmClrType.Create(value.Type.AppDomain, typeArgument), typeArgumentInfo, formatSpecifiers),
                 expansion: null,
                 childShouldParenthesize: false,
                 fullName: null,
                 childFullNamePrefixOpt: null,
-                formatSpecifiers: Formatter.NoFormatSpecifiers,
+                formatSpecifiers: formatSpecifiers,
                 category: DkmEvaluationResultCategory.Data,
                 flags: DkmEvaluationResultFlags.ReadOnly,
-                editableValue: null);
-            var typeName = inspectionContext.GetTypeName(DkmClrType.Create(appDomain, typeArgument));
-            return DkmSuccessEvaluationResult.Create(
-                inspectionContext,
-                value.StackFrame,
-                name,
-                dataItem.FullName,
-                dataItem.Flags,
-                Value: typeName,
-                EditableValue: null,
-                Type: typeName,
-                Category: dataItem.Category,
-                Access: value.Access,
-                StorageType: value.StorageType,
-                TypeModifierFlags: value.TypeModifierFlags,
-                Address: value.Address,
-                CustomUIVisualizers: null,
-                ExternalModules: null,
-                DataItem: dataItem);
+                editableValue: null,
+                inspectionContext: inspectionContext);
         }
     }
 }

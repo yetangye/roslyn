@@ -1,4 +1,6 @@
-﻿' Copyright (c) Microsoft.  All Rights Reserved.  Licensed under the Apache License, Version 2.0.  See License.txt in the project root for license information.
+﻿' Licensed to the .NET Foundation under one or more agreements.
+' The .NET Foundation licenses this file to you under the MIT license.
+' See the LICENSE file in the project root for more information.
 
 Imports System
 Imports System.Collections.Immutable
@@ -19,17 +21,17 @@ Namespace Microsoft.CodeAnalysis.VisualBasic
     Friend Class SynthesizedLambdaCopyConstructor
         Inherits SynthesizedLambdaConstructor
 
-        Private ReadOnly m_parameters As ImmutableArray(Of ParameterSymbol)
+        Private ReadOnly _parameters As ImmutableArray(Of ParameterSymbol)
 
-        Friend Sub New(syntaxNode As VisualBasicSyntaxNode, containingType As LambdaFrame)
+        Friend Sub New(syntaxNode As SyntaxNode, containingType As LambdaFrame)
             MyBase.New(syntaxNode, containingType)
 
-            m_parameters = ImmutableArray.Create(Of ParameterSymbol)(New SourceSimpleParameterSymbol(Me, "arg0", 0, containingType, Nothing))
+            _parameters = ImmutableArray.Create(Of ParameterSymbol)(New SourceSimpleParameterSymbol(Me, "arg0", 0, containingType, Nothing))
         End Sub
 
         Public Overrides ReadOnly Property Parameters As ImmutableArray(Of ParameterSymbol)
             Get
-                Return m_parameters
+                Return _parameters
             End Get
         End Property
 
@@ -39,5 +41,4 @@ Namespace Microsoft.CodeAnalysis.VisualBasic
             End Get
         End Property
     End Class
-
 End Namespace

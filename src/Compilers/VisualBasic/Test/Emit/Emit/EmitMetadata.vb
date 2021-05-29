@@ -1,4 +1,6 @@
-﻿' Copyright (c) Microsoft.  All Rights Reserved.  Licensed under the Apache License, Version 2.0.  See License.txt in the project root for license information.
+﻿' Licensed to the .NET Foundation under one or more agreements.
+' The .NET Foundation licenses this file to you under the MIT license.
+' See the LICENSE file in the project root for more information.
 
 Imports System.Collections.Immutable
 Imports System.IO
@@ -9,21 +11,22 @@ Imports Microsoft.CodeAnalysis.Test.Utilities
 Imports Microsoft.CodeAnalysis.VisualBasic.Symbols
 Imports Microsoft.CodeAnalysis.VisualBasic.Symbols.Metadata.PE
 Imports Roslyn.Test.Utilities
+Imports Roslyn.Test.Utilities.TestMetadata
 
 Namespace Microsoft.CodeAnalysis.VisualBasic.UnitTests.Emit
 
     Public Class EmitMetadata
         Inherits BasicTestBase
 
-        <Fact, WorkItem(547015, "DevDiv")>
+        <Fact, WorkItem(547015, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/547015")>
         Public Sub IncorrectCustomAssemblyTableSize_TooManyMethodSpecs()
             Dim source = TestResources.MetadataTests.Invalid.ManyMethodSpecs
-            CompileAndVerify(VisualBasicCompilation.Create("Foo", syntaxTrees:={Parse(source)}, references:={MscorlibRef, SystemCoreRef, MsvbRef}))
+            CompileAndVerify(VisualBasicCompilation.Create("Goo", syntaxTrees:={Parse(source)}, references:={MscorlibRef, SystemCoreRef, MsvbRef}))
         End Sub
 
         <Fact>
         Public Sub InstantiatedGenerics()
-            Dim mscorlibRef = TestReferences.NetFx.v4_0_21006.mscorlib
+            Dim mscorlibRef = Net40.mscorlib
             Dim source As String = <text> 
 Class A(Of T)
 
@@ -93,10 +96,38 @@ End Class
 
             CompileAndVerify(c1, symbolValidator:=
                 Sub([Module])
-                    Dim baseLine = Xml.Linq.XElement.Load(New StringReader(My.Resources.Resource.EmitSimpleBaseLine1))
-                    Dim dumpXML As Xml.Linq.XElement = DumpTypeInfo([Module])
+                    Dim dump = DumpTypeInfo([Module]).ToString()
 
-                    Assert.Equal(baseLine.ToString(), dumpXML.ToString())
+                    AssertEx.AssertEqualToleratingWhitespaceDifferences("
+<Global>
+<type name=""&lt;Module&gt;"" />
+<type name=""A"" Of=""T"" base=""System.Object"">
+  <field name=""x1"" type=""A(Of T)"" />
+  <field name=""x2"" type=""A(Of D)"" />
+  <type name=""B"" base=""A(Of T)"">
+  <field name=""y1"" type=""A(Of T).B"" />
+  <field name=""y2"" type=""A(Of D).B"" />
+  <type name=""C"" base=""A(Of T).B"" />
+  </type>
+  <type name=""H"" Of=""S"" base=""System.Object"">
+  <type name=""I"" base=""A(Of T).H(Of S)"" />
+  </type>
+</type>
+<type name=""D"" base=""System.Object"">
+  <type name=""K"" Of=""T"" base=""System.Object"">
+  <type name=""L"" base=""D.K(Of T)"" />
+  </type>
+</type>
+<type name=""F"" base=""A(Of D)"" />
+<type name=""G"" base=""A(Of NS1.E).B"" />
+<type name=""J"" base=""A(Of D).H(Of D)"" />
+<type name=""M"" base=""System.Object"" />
+<type name=""N"" base=""D.K(Of M)"" />
+<NS1>
+  <type name=""E"" base=""D"" />
+</NS1>
+</Global>
+", dump)
                 End Sub)
         End Sub
 
@@ -165,7 +196,7 @@ End Class
 
         <Fact>
         Public Sub FakeILGen()
-            Dim comp = CompilationUtils.CreateCompilationWithReferences(
+            Dim comp = CompilationUtils.CreateEmptyCompilationWithReferences(
 <compilation>
     <file name="a.vb"> 
 Public Class D
@@ -187,18 +218,18 @@ Public Class D
     Shared arrayField As String()
 End Class 
 </file>
-</compilation>, {TestReferences.NetFx.v4_0_21006.mscorlib}, TestOptions.ReleaseExe)
+</compilation>, {Net40.mscorlib}, TestOptions.ReleaseExe)
 
             CompileAndVerify(comp,
                              expectedOutput:=
-                                "65536" & vbCrLf &
-                                "string2" & vbCrLf &
-                                "string1" & vbCrLf)
+                                "65536" & Environment.NewLine &
+                                "string2" & Environment.NewLine &
+                                "string1" & Environment.NewLine)
         End Sub
 
         <Fact>
         Public Sub AssemblyRefs()
-            Dim mscorlibRef = TestReferences.NetFx.v4_0_21006.mscorlib
+            Dim mscorlibRef = Net40.mscorlib
             Dim metadataTestLib1 = TestReferences.SymbolsTests.MDTestLib1
             Dim metadataTestLib2 = TestReferences.SymbolsTests.MDTestLib2
 
@@ -257,7 +288,7 @@ End Class
 
         <Fact>
         Public Sub AddModule()
-            Dim mscorlibRef = TestReferences.NetFx.v4_0_21006.mscorlib
+            Dim mscorlibRef = Net40.mscorlib
             Dim netModule1 = ModuleMetadata.CreateFromImage(TestResources.SymbolsTests.netModule.netModule1)
             Dim netModule2 = ModuleMetadata.CreateFromImage(TestResources.SymbolsTests.netModule.netModule2)
 
@@ -296,13 +327,25 @@ End Class
 
                 Dim moduleRefName = reader.GetModuleReference(reader.GetModuleReferences().Single()).Name
                 Assert.Equal("netModule1.netmodule", reader.GetString(moduleRefName))
-                Assert.Equal(5, reader.GetTableRowCount(TableIndex.ExportedType))
+
+                Dim actual = From h In reader.ExportedTypes
+                             Let et = reader.GetExportedType(h)
+                             Select $"{reader.GetString(et.NamespaceDefinition)}.{reader.GetString(et.Name)} 0x{MetadataTokens.GetToken(et.Implementation):X8} ({et.Implementation.Kind}) 0x{CInt(et.Attributes):X4}"
+
+                AssertEx.Equal(
+                {
+                    "NS1.Class4 0x26000001 (AssemblyFile) 0x0001",
+                    ".Class7 0x27000001 (ExportedType) 0x0002",
+                    ".Class1 0x26000001 (AssemblyFile) 0x0001",
+                    ".Class3 0x27000003 (ExportedType) 0x0002",
+                    ".Class2 0x26000002 (AssemblyFile) 0x0001"
+                }, actual)
             End Using
         End Sub
 
         <Fact>
         Public Sub ImplementingAnInterface()
-            Dim mscorlibRef = TestReferences.NetFx.v4_0_21006.mscorlib
+            Dim mscorlibRef = Net40.mscorlib
 
             Dim source As String = <text>
 Public Interface I1
@@ -359,7 +402,7 @@ End Class
 
         <Fact>
         Public Sub Types()
-            Dim mscorlibRef = TestReferences.NetFx.v4_0_21006.mscorlib
+            Dim mscorlibRef = Net40.mscorlib
             Dim source As String = <text>
 Public MustInherit Class A
 
@@ -425,8 +468,10 @@ End Class
                         Dim method3Ret = DirectCast(m3.ReturnType, ArrayTypeSymbol)
 
                         Assert.Equal(1, method1Ret.Rank)
+                        Assert.True(method1Ret.IsSZArray)
                         Assert.Same(classA, method1Ret.ElementType)
                         Assert.Equal(2, method2Ret.Rank)
+                        Assert.False(method2Ret.IsSZArray)
                         Assert.Same(classA, method2Ret.ElementType)
                         Assert.Equal(3, method3Ret.Rank)
                         Assert.Same(classA, method3Ret.ElementType)
@@ -505,7 +550,7 @@ End Class
 
         <Fact>
         Public Sub Fields()
-            Dim mscorlibRef = TestReferences.NetFx.v4_0_21006.mscorlib
+            Dim mscorlibRef = Net40.mscorlib
             Dim source As String = <text> 
 Public Class A
     public F1 As Integer
@@ -538,7 +583,7 @@ End Class
 </compilation>, validator:=AddressOf EmittedModuleRecordValidator)
         End Sub
 
-        Private Sub EmittedModuleRecordValidator(assembly As PEAssembly, _omitted As TestEmitters)
+        Private Sub EmittedModuleRecordValidator(assembly As PEAssembly)
             Dim reader = assembly.GetMetadataReader()
 
             Dim typeDefs As TypeDefinitionHandle() = reader.TypeDefinitions.AsEnumerable().ToArray()
@@ -551,7 +596,7 @@ End Class
             Assert.Equal(0, reader.GetTypeDefinition(typeDefs(0)).Attributes)
         End Sub
 
-        <WorkItem(543517, "DevDiv")>
+        <WorkItem(543517, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/543517")>
         <Fact()>
         Public Sub EmitBeforeFieldInit()
             CompileAndVerify(
@@ -594,7 +639,7 @@ End Class
 </compilation>, validator:=AddressOf EmitBeforeFieldInitValidator)
         End Sub
 
-        Private Sub EmitBeforeFieldInitValidator(assembly As PEAssembly, _omitted As TestEmitters)
+        Private Sub EmitBeforeFieldInitValidator(assembly As PEAssembly)
             Dim reader = assembly.GetMetadataReader()
             Dim typeDefs = reader.TypeDefinitions.AsEnumerable().ToArray()
 
@@ -635,7 +680,7 @@ End Class
 
         <Fact()>
         Public Sub GenericMethods2()
-            Dim compilation = CompilationUtils.CreateCompilationWithMscorlibAndVBRuntime(
+            Dim compilation = CompilationUtils.CreateCompilationWithMscorlib40AndVBRuntime(
 <compilation>
     <file name="a.vb">
 
@@ -902,9 +947,11 @@ End Class
 
         End Sub
 
-        <Fact, WorkItem(90)>
+        <Fact,
+         WorkItem(6190, "https://github.com/dotnet/roslyn/issues/6190"),
+         WorkItem(90, "https://github.com/dotnet/roslyn/issues/90")>
         Public Sub EmitWithNoResourcesAllPlatforms()
-            Dim comp = CreateCompilationWithMscorlib(
+            Dim comp = CreateCompilationWithMscorlib40(
                 <compilation>
                     <file>
 Class Test
@@ -914,24 +961,17 @@ End Class
                     </file>
                 </compilation>)
 
-            VerifyEmitWithNoResources(comp, Platform.AnyCpu)
-            VerifyEmitWithNoResources(comp, Platform.AnyCpu32BitPreferred)
-            VerifyEmitWithNoResources(comp, Platform.Arm)     ' broken before fix
-            VerifyEmitWithNoResources(comp, Platform.Itanium) ' broken before fix
-            VerifyEmitWithNoResources(comp, Platform.X64)     ' broken before fix
-            VerifyEmitWithNoResources(comp, Platform.X86)
+            VerifyEmitWithNoResources(comp.WithAssemblyName("EmitWithNoResourcesAllPlatforms_AnyCpu"), Platform.AnyCpu)
+            VerifyEmitWithNoResources(comp.WithAssemblyName("EmitWithNoResourcesAllPlatforms_AnyCpu32BitPreferred"), Platform.AnyCpu32BitPreferred)
+            VerifyEmitWithNoResources(comp.WithAssemblyName("EmitWithNoResourcesAllPlatforms_Arm"), Platform.Arm)     ' broken before fix
+            VerifyEmitWithNoResources(comp.WithAssemblyName("EmitWithNoResourcesAllPlatforms_Itanium"), Platform.Itanium) ' broken before fix
+            VerifyEmitWithNoResources(comp.WithAssemblyName("EmitWithNoResourcesAllPlatforms_X64"), Platform.X64)     ' broken before fix
+            VerifyEmitWithNoResources(comp.WithAssemblyName("EmitWithNoResourcesAllPlatforms_X86"), Platform.X86)
         End Sub
 
-        Private Shared Sub VerifyEmitWithNoResources(comp As VisualBasicCompilation, platform As Platform)
+        Private Sub VerifyEmitWithNoResources(comp As VisualBasicCompilation, platform As Platform)
             Dim options = TestOptions.ReleaseExe.WithPlatform(platform)
-
-            Using outputStream As New MemoryStream()
-                Dim success = comp.WithOptions(options).Emit(outputStream).Success
-                Assert.True(success)
-
-                Dim peVerifyOutput = CLRHelpers.PeVerify(outputStream.ToImmutable()).Join(Environment.NewLine)
-                Assert.Equal(String.Empty, peVerifyOutput)
-            End Using
+            CompileAndVerify(comp.WithOptions(options))
         End Sub
     End Class
 End Namespace

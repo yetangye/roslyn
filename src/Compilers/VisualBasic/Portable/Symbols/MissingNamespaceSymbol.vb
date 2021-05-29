@@ -1,9 +1,12 @@
-﻿' Copyright (c) Microsoft.  All Rights Reserved.  Licensed under the Apache License, Version 2.0.  See License.txt in the project root for license information.
+﻿' Licensed to the .NET Foundation under one or more agreements.
+' The .NET Foundation licenses this file to you under the MIT license.
+' See the LICENSE file in the project root for more information.
 
 Imports System
 Imports System.Collections.Immutable
 Imports System.Reflection
 Imports System.Threading
+Imports Microsoft.CodeAnalysis.PooledObjects
 Imports Microsoft.CodeAnalysis.Text
 Imports Microsoft.CodeAnalysis.VisualBasic.Symbols
 Imports Microsoft.CodeAnalysis.VisualBasic.Syntax
@@ -19,60 +22,54 @@ Namespace Microsoft.CodeAnalysis.VisualBasic.Symbols
     Friend Class MissingNamespaceSymbol
         Inherits NamespaceSymbol
 
-        Private ReadOnly m_Name As String
-        Private ReadOnly m_ContainingSymbol As Symbol
+        Private ReadOnly _name As String
+        Private ReadOnly _containingSymbol As Symbol
 
         Public Sub New(containingModule As MissingModuleSymbol)
             Debug.Assert(containingModule IsNot Nothing)
 
-            m_ContainingSymbol = containingModule
-            m_Name = String.Empty
+            _containingSymbol = containingModule
+            _name = String.Empty
         End Sub
 
         Public Sub New(containingNamespace As NamespaceSymbol, name As String)
             Debug.Assert(containingNamespace IsNot Nothing)
             Debug.Assert(name IsNot Nothing)
 
-            m_ContainingSymbol = containingNamespace
-            m_Name = name
+            _containingSymbol = containingNamespace
+            _name = name
         End Sub
 
         Public Overrides ReadOnly Property Name As String
             Get
-                Return m_Name
+                Return _name
             End Get
         End Property
 
         Public Overrides ReadOnly Property ContainingSymbol As Symbol
             Get
-                Return m_ContainingSymbol
+                Return _containingSymbol
             End Get
         End Property
 
         Public Overrides ReadOnly Property ContainingAssembly As AssemblySymbol
             Get
-                Return ContainingModule.ContainingAssembly
+                Return _containingSymbol.ContainingAssembly
             End Get
         End Property
 
         Friend Overrides ReadOnly Property Extent As NamespaceExtent
             Get
-                Return New NamespaceExtent(ContainingModule)
-            End Get
-        End Property
-
-        Public Overrides ReadOnly Property ContainingModule As ModuleSymbol
-            Get
-                If m_ContainingSymbol.Kind = SymbolKind.NetModule Then
-                    Return DirectCast(m_ContainingSymbol, ModuleSymbol)
+                If _containingSymbol.Kind = SymbolKind.NetModule Then
+                    Return New NamespaceExtent(DirectCast(_containingSymbol, ModuleSymbol))
                 End If
 
-                Return m_ContainingSymbol.ContainingModule
+                Return DirectCast(_containingSymbol, NamespaceSymbol).Extent
             End Get
         End Property
 
         Public Overrides Function GetHashCode() As Integer
-            Return Hash.Combine(m_ContainingSymbol.GetHashCode(), m_Name.GetHashCode())
+            Return Hash.Combine(_containingSymbol.GetHashCode(), _name.GetHashCode())
         End Function
 
         Public Overrides Function Equals(obj As Object) As Boolean
@@ -82,7 +79,7 @@ Namespace Microsoft.CodeAnalysis.VisualBasic.Symbols
 
             Dim other = TryCast(obj, MissingNamespaceSymbol)
 
-            Return other IsNot Nothing AndAlso String.Equals(m_Name, other.m_Name, StringComparison.Ordinal) AndAlso m_ContainingSymbol.Equals(other.m_ContainingSymbol)
+            Return other IsNot Nothing AndAlso String.Equals(_name, other._name, StringComparison.Ordinal) AndAlso _containingSymbol.Equals(other._containingSymbol)
         End Function
 
         Public Overrides ReadOnly Property Locations As ImmutableArray(Of Location)

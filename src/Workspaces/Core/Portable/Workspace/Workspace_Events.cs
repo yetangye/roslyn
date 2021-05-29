@@ -1,14 +1,23 @@
-﻿// Copyright (c) Microsoft.  All Rights Reserved.  Licensed under the Apache License, Version 2.0.  See License.txt in the project root for license information.
+﻿// Licensed to the .NET Foundation under one or more agreements.
+// The .NET Foundation licenses this file to you under the MIT license.
+// See the LICENSE file in the project root for more information.
+
+#nullable disable
 
 using System;
+using System.Threading;
 using System.Threading.Tasks;
+using Microsoft.CodeAnalysis.Host;
+using Microsoft.CodeAnalysis.Internal.Log;
+using Microsoft.CodeAnalysis.Text;
 using Roslyn.Utilities;
 
 namespace Microsoft.CodeAnalysis
 {
     public abstract partial class Workspace
     {
-        private readonly EventMap _eventMap = new EventMap();
+        private readonly EventMap _eventMap = new();
+
         private const string WorkspaceChangeEventName = "WorkspaceChanged";
         private const string WorkspaceFailedEventName = "WorkspaceFailed";
         private const string DocumentOpenedEventName = "DocumentOpened";
@@ -35,12 +44,12 @@ namespace Microsoft.CodeAnalysis
         {
             if (newSolution == null)
             {
-                throw new ArgumentNullException("newSolution");
+                throw new ArgumentNullException(nameof(newSolution));
             }
 
             if (oldSolution == newSolution)
             {
-                return SpecializedTasks.EmptyTask;
+                return Task.CompletedTask;
             }
 
             if (projectId == null && documentId != null)
@@ -48,21 +57,21 @@ namespace Microsoft.CodeAnalysis
                 projectId = documentId.ProjectId;
             }
 
-            var handlers = _eventMap.GetEventHandlers<EventHandler<WorkspaceChangeEventArgs>>(WorkspaceChangeEventName);
-            if (handlers.Length > 0)
+            var ev = GetEventHandlers<WorkspaceChangeEventArgs>(WorkspaceChangeEventName);
+            if (ev.HasHandlers)
             {
                 return this.ScheduleTask(() =>
                 {
-                    var args = new WorkspaceChangeEventArgs(kind, oldSolution, newSolution, projectId, documentId);
-                    foreach (var handler in handlers)
+                    using (Logger.LogBlock(FunctionId.Workspace_Events, (s, p, d, k) => $"{s.Id} - {p} - {d} {kind.ToString()}", newSolution, projectId, documentId, kind, CancellationToken.None))
                     {
-                        handler(this, args);
+                        var args = new WorkspaceChangeEventArgs(kind, oldSolution, newSolution, projectId, documentId);
+                        ev.RaiseEvent(handler => handler(this, args));
                     }
-                }, "Workspace.WorkspaceChanged");
+                }, WorkspaceChangeEventName);
             }
             else
             {
-                return SpecializedTasks.EmptyTask;
+                return Task.CompletedTask;
             }
         }
 
@@ -85,14 +94,11 @@ namespace Microsoft.CodeAnalysis
 
         protected internal virtual void OnWorkspaceFailed(WorkspaceDiagnostic diagnostic)
         {
-            var handlers = _eventMap.GetEventHandlers<EventHandler<WorkspaceDiagnosticEventArgs>>(WorkspaceFailedEventName);
-            if (handlers.Length > 0)
+            var ev = GetEventHandlers<WorkspaceDiagnosticEventArgs>(WorkspaceFailedEventName);
+            if (ev.HasHandlers)
             {
                 var args = new WorkspaceDiagnosticEventArgs(diagnostic);
-                foreach (var handler in handlers)
-                {
-                    handler(this, args);
-                }
+                ev.RaiseEvent(handler => handler(this, args));
             }
         }
 
@@ -114,21 +120,18 @@ namespace Microsoft.CodeAnalysis
 
         protected Task RaiseDocumentOpenedEventAsync(Document document)
         {
-            var handlers = _eventMap.GetEventHandlers<EventHandler<DocumentEventArgs>>(DocumentOpenedEventName);
-            if (handlers.Length > 0)
+            var ev = GetEventHandlers<DocumentEventArgs>(DocumentOpenedEventName);
+            if (ev.HasHandlers && document != null)
             {
                 return this.ScheduleTask(() =>
                 {
                     var args = new DocumentEventArgs(document);
-                    foreach (var handler in handlers)
-                    {
-                        handler(this, args);
-                    }
-                }, "Workspace.WorkspaceChanged");
+                    ev.RaiseEvent(handler => handler(this, args));
+                }, DocumentOpenedEventName);
             }
             else
             {
-                return SpecializedTasks.EmptyTask;
+                return Task.CompletedTask;
             }
         }
 
@@ -150,21 +153,18 @@ namespace Microsoft.CodeAnalysis
 
         protected Task RaiseDocumentClosedEventAsync(Document document)
         {
-            var handlers = _eventMap.GetEventHandlers<EventHandler<DocumentEventArgs>>(DocumentClosedEventName);
-            if (handlers.Length > 0)
+            var ev = GetEventHandlers<DocumentEventArgs>(DocumentClosedEventName);
+            if (ev.HasHandlers && document != null)
             {
                 return this.ScheduleTask(() =>
                 {
                     var args = new DocumentEventArgs(document);
-                    foreach (var handler in handlers)
-                    {
-                        handler(this, args);
-                    }
-                }, "Workspace.DocumentClosed");
+                    ev.RaiseEvent(handler => handler(this, args));
+                }, DocumentClosedEventName);
             }
             else
             {
-                return SpecializedTasks.EmptyTask;
+                return Task.CompletedTask;
             }
         }
 
@@ -172,7 +172,7 @@ namespace Microsoft.CodeAnalysis
         /// An event that is fired when the active context document associated with a buffer 
         /// changes.
         /// </summary>
-        internal event EventHandler<DocumentEventArgs> DocumentActiveContextChanged
+        public event EventHandler<DocumentActiveContextChangedEventArgs> DocumentActiveContextChanged
         {
             add
             {
@@ -185,24 +185,36 @@ namespace Microsoft.CodeAnalysis
             }
         }
 
+        [Obsolete("This member is obsolete. Use the RaiseDocumentActiveContextChangedEventAsync(SourceTextContainer, DocumentId, DocumentId) overload instead.", error: true)]
         protected Task RaiseDocumentActiveContextChangedEventAsync(Document document)
+            => throw new NotImplementedException();
+
+        protected Task RaiseDocumentActiveContextChangedEventAsync(SourceTextContainer sourceTextContainer, DocumentId oldActiveContextDocumentId, DocumentId newActiveContextDocumentId)
         {
-            var handlers = _eventMap.GetEventHandlers<EventHandler<DocumentEventArgs>>(DocumentActiveContextChangedName);
-            if (handlers.Length > 0)
+            var ev = GetEventHandlers<DocumentActiveContextChangedEventArgs>(DocumentActiveContextChangedName);
+            if (ev.HasHandlers && sourceTextContainer != null && oldActiveContextDocumentId != null && newActiveContextDocumentId != null)
             {
+                // Capture the current solution snapshot (inside the _serializationLock of OnDocumentContextUpdated)
+                var currentSolution = this.CurrentSolution;
+
                 return this.ScheduleTask(() =>
                 {
-                    var args = new DocumentEventArgs(document);
-                    foreach (var handler in handlers)
-                    {
-                        handler(this, args);
-                    }
+                    var args = new DocumentActiveContextChangedEventArgs(currentSolution, sourceTextContainer, oldActiveContextDocumentId, newActiveContextDocumentId);
+                    ev.RaiseEvent(handler => handler(this, args));
                 }, "Workspace.WorkspaceChanged");
             }
             else
             {
-                return SpecializedTasks.EmptyTask;
+                return Task.CompletedTask;
             }
+        }
+
+        private EventMap.EventHandlerSet<EventHandler<T>> GetEventHandlers<T>(string eventName) where T : EventArgs
+        {
+            // this will register features that want to listen to workspace events
+            // lazily first time workspace event is actually fired
+            this.Services.GetService<IWorkspaceEventListenerService>()?.EnsureListeners();
+            return _eventMap.GetEventHandlers<EventHandler<T>>(eventName);
         }
     }
 }

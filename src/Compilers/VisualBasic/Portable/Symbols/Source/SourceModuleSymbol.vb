@@ -1,4 +1,6 @@
-﻿' Copyright (c) Microsoft.  All Rights Reserved.  Licensed under the Apache License, Version 2.0.  See License.txt in the project root for license information.
+﻿' Licensed to the .NET Foundation under one or more agreements.
+' The .NET Foundation licenses this file to you under the MIT license.
+' See the LICENSE file in the project root for more information.
 
 Imports System.Collections.Concurrent
 Imports System.Collections.Generic
@@ -7,6 +9,7 @@ Imports System.Collections.ObjectModel
 Imports System.Runtime.InteropServices
 Imports System.Threading
 Imports System.Threading.Tasks
+Imports Microsoft.CodeAnalysis.PooledObjects
 Imports Microsoft.CodeAnalysis.Text
 Imports Microsoft.CodeAnalysis.VisualBasic.Symbols
 Imports Microsoft.CodeAnalysis.VisualBasic.Syntax
@@ -26,34 +29,36 @@ Namespace Microsoft.CodeAnalysis.VisualBasic.Symbols
         ''' Owning assembly.
         ''' </summary>
         ''' <remarks></remarks>
-        Private ReadOnly m_AssemblySymbol As SourceAssemblySymbol
+        Private ReadOnly _assemblySymbol As SourceAssemblySymbol
 
         ' The declaration table for all the source files.
-        Private ReadOnly m_declarationTable As DeclarationTable
+        Private ReadOnly _declarationTable As DeclarationTable
 
         ' Options that control compilation
-        Private ReadOnly m_options As VisualBasicCompilationOptions
+        Private ReadOnly _options As VisualBasicCompilationOptions
 
         ' Module attributes
-        Private m_lazyCustomAttributesBag As CustomAttributesBag(Of VisualBasicAttributeData)
+        Private _lazyCustomAttributesBag As CustomAttributesBag(Of VisualBasicAttributeData)
 
-        Private m_lazyContainsExtensionMethods As Byte = ThreeState.Unknown
+        Private _lazyContainsExtensionMethods As Byte = ThreeState.Unknown
 
-        Private m_lazyAssembliesToEmbedTypesFrom As ImmutableArray(Of AssemblySymbol)
+        Private _lazyAssembliesToEmbedTypesFrom As ImmutableArray(Of AssemblySymbol)
 
-        Private m_lazyContainsExplicitDefinitionOfNoPiaLocalTypes As ThreeState = ThreeState.Unknown
+        Private _lazyContainsExplicitDefinitionOfNoPiaLocalTypes As ThreeState = ThreeState.Unknown
 
-        Private m_locations As ImmutableArray(Of Location)
+        Private _locations As ImmutableArray(Of Location)
 
-        ' holds diagnostics not related to source code 
-        ' in any particular source file, for each stage.
-        Private m_diagnosticBagDeclare As New DiagnosticBag()
-        'Private m_diagnosticBagCompile As New DiagnosticBag()
-        'Private m_diagnosticBagEmit As New DiagnosticBag()
+        ''' <summary>
+        ''' Holds diagnostics not related to source code
+        ''' in any particular source file
+        ''' </summary>
+        Private ReadOnly _diagnosticBagDeclare As New DiagnosticBag()
+
+        Private _hasBadAttributes As Boolean
 
         Friend ReadOnly Property Options As VisualBasicCompilationOptions
             Get
-                Return m_options
+                Return _options
             End Get
         End Property
 
@@ -61,22 +66,22 @@ Namespace Microsoft.CodeAnalysis.VisualBasic.Symbols
         ' on demand. Each source file object holds information about the source that is specific to a particular
         ' compilation and doesn't survive edits in any way (unlike the declaration table, which is incrementally
         ' updated between compilations as edits occur.)
-        Private ReadOnly m_sourceFileMap As New ConcurrentDictionary(Of SyntaxTree, SourceFile)
+        Private ReadOnly _sourceFileMap As New ConcurrentDictionary(Of SyntaxTree, SourceFile)
 
         ' lazily populated with the global namespace symbol
-        Private m_lazyGlobalNamespace As SourceNamespaceSymbol
+        Private _lazyGlobalNamespace As SourceNamespaceSymbol
 
         ' lazily populated with the bound imports
-        Private m_lazyBoundImports As BoundImports
+        Private _lazyBoundImports As BoundImports
 
         ' lazily populate with quick attribute checker that is initialized with the imports.
-        Private m_lazyQuickAttributeChecker As QuickAttributeChecker
+        Private _lazyQuickAttributeChecker As QuickAttributeChecker
 
         ' lazily populate with diagnostics validating linked assemblies.
-        Private m_lazyLinkedAssemblyDiagnostics As ImmutableArray(Of Diagnostic)
+        Private _lazyLinkedAssemblyDiagnostics As ImmutableArray(Of Diagnostic)
 
-        Private m_lazyTypesWithDefaultInstanceAlias As Dictionary(Of NamedTypeSymbol, SynthesizedMyGroupCollectionPropertySymbol)
-        Private Shared ReadOnly m_NoTypesWithDefaultInstanceAlias As New Dictionary(Of NamedTypeSymbol, SynthesizedMyGroupCollectionPropertySymbol)()
+        Private _lazyTypesWithDefaultInstanceAlias As Dictionary(Of NamedTypeSymbol, SynthesizedMyGroupCollectionPropertySymbol)
+        Private Shared ReadOnly s_noTypesWithDefaultInstanceAlias As New Dictionary(Of NamedTypeSymbol, SynthesizedMyGroupCollectionPropertySymbol)()
 
         Friend Sub New(assemblySymbol As SourceAssemblySymbol,
                        declarationTable As DeclarationTable,
@@ -84,10 +89,10 @@ Namespace Microsoft.CodeAnalysis.VisualBasic.Symbols
                        nameAndExtension As String)
             Debug.Assert(assemblySymbol IsNot Nothing)
 
-            m_AssemblySymbol = assemblySymbol
-            m_declarationTable = declarationTable
-            m_options = options
-            m_nameAndExtension = nameAndExtension
+            _assemblySymbol = assemblySymbol
+            _declarationTable = declarationTable
+            _options = options
+            _nameAndExtension = nameAndExtension
         End Sub
 
         Friend Overrides ReadOnly Property Ordinal As Integer
@@ -99,10 +104,12 @@ Namespace Microsoft.CodeAnalysis.VisualBasic.Symbols
         Friend Overrides ReadOnly Property Machine As System.Reflection.PortableExecutable.Machine
             Get
                 Select Case DeclaringCompilation.Options.Platform
+                    Case Platform.Arm64
+                        Return System.Reflection.PortableExecutable.Machine.Arm64
                     Case Platform.Arm
-                        Return System.Reflection.PortableExecutable.Machine.ARMThumb2
+                        Return System.Reflection.PortableExecutable.Machine.ArmThumb2
                     Case Platform.X64
-                        Return System.Reflection.PortableExecutable.Machine.AMD64
+                        Return System.Reflection.PortableExecutable.Machine.Amd64
                     Case Platform.Itanium
                         Return System.Reflection.PortableExecutable.Machine.IA64
                     Case Else
@@ -119,19 +126,19 @@ Namespace Microsoft.CodeAnalysis.VisualBasic.Symbols
 
         Public Overrides ReadOnly Property ContainingSymbol As Symbol
             Get
-                Return m_AssemblySymbol
+                Return _assemblySymbol
             End Get
         End Property
 
         Public Overrides ReadOnly Property ContainingAssembly As AssemblySymbol
             Get
-                Return m_AssemblySymbol
+                Return _assemblySymbol
             End Get
         End Property
 
         Public ReadOnly Property ContainingSourceAssembly As SourceAssemblySymbol
             Get
-                Return m_AssemblySymbol
+                Return _assemblySymbol
             End Get
         End Property
 
@@ -140,41 +147,47 @@ Namespace Microsoft.CodeAnalysis.VisualBasic.Symbols
         ''' </summary>
         Friend Overrides ReadOnly Property DeclaringCompilation As VisualBasicCompilation
             Get
-                Return m_AssemblySymbol.DeclaringCompilation
+                Return _assemblySymbol.DeclaringCompilation
             End Get
         End Property
 
-        Private m_nameAndExtension As String
+        Private ReadOnly _nameAndExtension As String
 
         Public Overrides ReadOnly Property Name As String
             Get
-                Return m_nameAndExtension
+                Return _nameAndExtension
             End Get
         End Property
 
-        ' Get the SourceFile object associated with a root declaration.
-        Friend Function GetSourceFile(tree As SyntaxTree) As SourceFile
+        ''' <summary>
+        ''' Get the SourceFile object associated with a root declaration.
+        ''' Returns Nothing if the tree doesn't belong to the compilation.
+        ''' </summary>
+        Friend Function TryGetSourceFile(tree As SyntaxTree) As SourceFile
             Debug.Assert(tree IsNot Nothing)
-            Debug.Assert(tree.IsEmbeddedOrMyTemplateTree() OrElse m_AssemblySymbol.DeclaringCompilation.SyntaxTrees.Contains(tree))
 
             Dim srcFile As SourceFile = Nothing
-            If m_sourceFileMap.TryGetValue(tree, srcFile) Then
+            If _sourceFileMap.TryGetValue(tree, srcFile) Then
                 Return srcFile
-            Else
+
+            ElseIf _assemblySymbol.DeclaringCompilation.AllSyntaxTrees.Contains(tree) Then
                 srcFile = New SourceFile(Me, tree)
-                Return m_sourceFileMap.GetOrAdd(tree, srcFile)
+                Return _sourceFileMap.GetOrAdd(tree, srcFile)
+
+            Else
+                Return Nothing
             End If
         End Function
 
         ' Gets the global namespace for that merges the global namespace across all source files.
         Public Overrides ReadOnly Property GlobalNamespace As NamespaceSymbol
             Get
-                If m_lazyGlobalNamespace Is Nothing Then
-                    Dim globalNS = New SourceNamespaceSymbol(m_declarationTable.MergedRoot, Nothing, Me)
-                    Interlocked.CompareExchange(m_lazyGlobalNamespace, globalNS, Nothing)
+                If _lazyGlobalNamespace Is Nothing Then
+                    Dim globalNS = New SourceNamespaceSymbol(DeclaringCompilation.MergedRootDeclaration, Nothing, Me)
+                    Interlocked.CompareExchange(_lazyGlobalNamespace, globalNS, Nothing)
                 End If
 
-                Return m_lazyGlobalNamespace
+                Return _lazyGlobalNamespace
             End Get
         End Property
 
@@ -190,23 +203,23 @@ Namespace Microsoft.CodeAnalysis.VisualBasic.Symbols
 
         Public Overrides ReadOnly Property Locations As ImmutableArray(Of Location)
             Get
-                If m_locations.IsDefault Then
-                    Dim locs = m_declarationTable.AllRootNamespaces().SelectAsArray(Function(n) n.Location)
-
-                    ImmutableInterlocked.InterlockedCompareExchange(m_locations, locs, Nothing)
+                If _locations.IsDefault Then
+                    ImmutableInterlocked.InterlockedInitialize(
+                        _locations,
+                        DeclaringCompilation.MergedRootDeclaration.Declarations.SelectAsArray(Function(d) d.Location))
                 End If
 
-                Return m_locations
+                Return _locations
             End Get
         End Property
 
         Friend ReadOnly Property SyntaxTrees As IEnumerable(Of SyntaxTree)
             Get
-                Return m_AssemblySymbol.DeclaringCompilation.AllSyntaxTrees
+                Return _assemblySymbol.DeclaringCompilation.AllSyntaxTrees
             End Get
         End Property
 
-        ReadOnly Property DefaultAttributeLocation As AttributeLocation Implements IAttributeTargetSymbol.DefaultAttributeLocation
+        Public ReadOnly Property DefaultAttributeLocation As AttributeLocation Implements IAttributeTargetSymbol.DefaultAttributeLocation
             Get
                 Return AttributeLocation.Module
             End Get
@@ -225,15 +238,15 @@ Namespace Microsoft.CodeAnalysis.VisualBasic.Symbols
         End Function
 
         Private Function GetAttributesBag() As CustomAttributesBag(Of VisualBasicAttributeData)
-            If m_lazyCustomAttributesBag Is Nothing OrElse Not m_lazyCustomAttributesBag.IsSealed Then
+            If _lazyCustomAttributesBag Is Nothing OrElse Not _lazyCustomAttributesBag.IsSealed Then
                 Dim mergedAttributes = DirectCast(Me.ContainingAssembly, SourceAssemblySymbol).GetAttributeDeclarations()
-                LoadAndValidateAttributes(OneOrMany.Create(mergedAttributes), m_lazyCustomAttributesBag)
+                LoadAndValidateAttributes(OneOrMany.Create(mergedAttributes), _lazyCustomAttributesBag)
             End If
-            Return m_lazyCustomAttributesBag
+            Return _lazyCustomAttributesBag
         End Function
 
         Friend Function GetDecodedWellKnownAttributeData() As CommonModuleWellKnownAttributeData
-            Dim attributesBag As CustomAttributesBag(Of VisualBasicAttributeData) = Me.m_lazyCustomAttributesBag
+            Dim attributesBag As CustomAttributesBag(Of VisualBasicAttributeData) = Me._lazyCustomAttributesBag
             If attributesBag Is Nothing OrElse Not attributesBag.IsDecodedWellKnownAttributeDataComputed Then
                 attributesBag = Me.GetAttributesBag()
             End If
@@ -245,11 +258,11 @@ Namespace Microsoft.CodeAnalysis.VisualBasic.Symbols
         ' aliases.
         Public ReadOnly Property QuickAttributeChecker As QuickAttributeChecker
             Get
-                If m_lazyQuickAttributeChecker Is Nothing Then
-                    Interlocked.CompareExchange(m_lazyQuickAttributeChecker, CreateQuickAttributeChecker(), Nothing)
+                If _lazyQuickAttributeChecker Is Nothing Then
+                    Interlocked.CompareExchange(_lazyQuickAttributeChecker, CreateQuickAttributeChecker(), Nothing)
                 End If
 
-                Return m_lazyQuickAttributeChecker
+                Return _lazyQuickAttributeChecker
             End Get
         End Property
 
@@ -265,7 +278,7 @@ Namespace Microsoft.CodeAnalysis.VisualBasic.Symbols
         End Function
 
         Friend Function GetAssembliesToEmbedTypesFrom() As ImmutableArray(Of AssemblySymbol)
-            If m_lazyAssembliesToEmbedTypesFrom.IsDefault Then
+            If _lazyAssembliesToEmbedTypesFrom.IsDefault Then
                 AssertReferencesInitialized()
                 Dim assemblies = ArrayBuilder(Of AssemblySymbol).GetInstance()
 
@@ -275,25 +288,21 @@ Namespace Microsoft.CodeAnalysis.VisualBasic.Symbols
                     End If
                 Next
 
-                ImmutableInterlocked.InterlockedInitialize(m_lazyAssembliesToEmbedTypesFrom, assemblies.ToImmutableAndFree())
+                ImmutableInterlocked.InterlockedInitialize(_lazyAssembliesToEmbedTypesFrom, assemblies.ToImmutableAndFree())
             End If
 
-            Debug.Assert(Not m_lazyAssembliesToEmbedTypesFrom.IsDefault)
-            Return m_lazyAssembliesToEmbedTypesFrom
+            Debug.Assert(Not _lazyAssembliesToEmbedTypesFrom.IsDefault)
+            Return _lazyAssembliesToEmbedTypesFrom
         End Function
 
         Friend ReadOnly Property ContainsExplicitDefinitionOfNoPiaLocalTypes As Boolean
             Get
-                If m_lazyContainsExplicitDefinitionOfNoPiaLocalTypes = ThreeState.Unknown Then
-                    ' TODO: This will recursively visit all top level types and bind attributes on them.
-                    '       This might be very expensive to do, but explicitly declared local types are 
-                    '       very uncommon. We should consider optimizing this by analyzing syntax first, 
-                    '       for example, the way VB handles ExtensionAttribute, etc.
-                    m_lazyContainsExplicitDefinitionOfNoPiaLocalTypes = NamespaceContainsExplicitDefinitionOfNoPiaLocalTypes(GlobalNamespace).ToThreeState()
+                If _lazyContainsExplicitDefinitionOfNoPiaLocalTypes = ThreeState.Unknown Then
+                    _lazyContainsExplicitDefinitionOfNoPiaLocalTypes = NamespaceContainsExplicitDefinitionOfNoPiaLocalTypes(GlobalNamespace).ToThreeState()
                 End If
 
-                Debug.Assert(m_lazyContainsExplicitDefinitionOfNoPiaLocalTypes <> ThreeState.Unknown)
-                Return m_lazyContainsExplicitDefinitionOfNoPiaLocalTypes = ThreeState.True
+                Debug.Assert(_lazyContainsExplicitDefinitionOfNoPiaLocalTypes <> ThreeState.Unknown)
+                Return _lazyContainsExplicitDefinitionOfNoPiaLocalTypes = ThreeState.True
             End Get
         End Property
 
@@ -316,10 +325,12 @@ Namespace Microsoft.CodeAnalysis.VisualBasic.Symbols
         Private Function CreateQuickAttributeChecker() As QuickAttributeChecker
             ' First, initialize for the predefined attributes.
             Dim checker As New QuickAttributeChecker()
-            checker.AddName("ExtensionAttribute", QuickAttributes.Extension)
-            checker.AddName("ObsoleteAttribute", QuickAttributes.Obsolete)
-            checker.AddName("DeprecatedAttribute", QuickAttributes.Obsolete)
-            checker.AddName("MyGroupCollectionAttribute", QuickAttributes.MyGroupCollection)
+            checker.AddName(AttributeDescription.CaseInsensitiveExtensionAttribute.Name, QuickAttributes.Extension)
+            checker.AddName(AttributeDescription.ObsoleteAttribute.Name, QuickAttributes.Obsolete)
+            checker.AddName(AttributeDescription.DeprecatedAttribute.Name, QuickAttributes.Obsolete)
+            checker.AddName(AttributeDescription.ExperimentalAttribute.Name, QuickAttributes.Obsolete)
+            checker.AddName(AttributeDescription.MyGroupCollectionAttribute.Name, QuickAttributes.MyGroupCollection)
+            checker.AddName(AttributeDescription.TypeIdentifierAttribute.Name, QuickAttributes.TypeIdentifier)
 
             ' Now process alias imports
             For Each globalImport In Options.GlobalImports
@@ -338,16 +349,16 @@ Namespace Microsoft.CodeAnalysis.VisualBasic.Symbols
 
         ' Make sure the project level imports are bound.
         Private Sub EnsureImportsAreBound(cancellationToken As CancellationToken)
-            If m_lazyBoundImports Is Nothing Then
-                If Interlocked.CompareExchange(m_lazyBoundImports, BindImports(cancellationToken), Nothing) Is Nothing Then
-                    ValidateImports(m_lazyBoundImports.MemberImports, m_lazyBoundImports.MemberImportsInfo, m_lazyBoundImports.AliasImports, m_lazyBoundImports.AliasImportsInfo, m_lazyBoundImports.Diagnostics)
+            If _lazyBoundImports Is Nothing Then
+                If Interlocked.CompareExchange(_lazyBoundImports, BindImports(cancellationToken), Nothing) Is Nothing Then
+                    ValidateImports(_lazyBoundImports.MemberImports, _lazyBoundImports.MemberImportsInfo, _lazyBoundImports.AliasImports, _lazyBoundImports.AliasImportsInfo, _lazyBoundImports.Diagnostics)
                 End If
             End If
         End Sub
 
         ' Bind the project level imports.
         Private Function BindImports(cancellationToken As CancellationToken) As BoundImports
-            Dim diagBag As New DiagnosticBag
+            Dim diagBag As New BindingDiagnosticBag
 
             Dim membersMap = New HashSet(Of NamespaceOrTypeSymbol)
             Dim aliasesMap = New Dictionary(Of String, AliasAndImportsClausePosition)(IdentifierComparison.Comparer)
@@ -356,25 +367,28 @@ Namespace Microsoft.CodeAnalysis.VisualBasic.Symbols
             Dim aliasesBuilder = ArrayBuilder(Of AliasAndImportsClausePosition).GetInstance()
             Dim aliasesInfoBuilder = ArrayBuilder(Of GlobalImportInfo).GetInstance()
             Dim xmlNamespaces = New Dictionary(Of String, XmlNamespaceAndImportsClausePosition)
+            Dim diagBagForThisImport = BindingDiagnosticBag.GetInstance()
 
             Try
                 For Each globalImport In Options.GlobalImports
                     cancellationToken.ThrowIfCancellationRequested()
 
-                    Dim data = New ModuleImportData(globalImport, membersMap, aliasesMap, membersBuilder, membersInfoBuilder, aliasesBuilder, aliasesInfoBuilder, xmlNamespaces)
-                    Dim diagBagForThisImport = DiagnosticBag.GetInstance()
-                    Dim binder As binder = BinderBuilder.CreateBinderForProjectImports(Me, VisualBasicSyntaxTree.Dummy)
-                    binder.BindImportClause(globalImport.Clause, data, diagBagForThisImport)
+                    diagBagForThisImport.Clear()
+                    Dim data = New ModuleImportData(globalImport, membersMap, aliasesMap, membersBuilder, membersInfoBuilder, aliasesBuilder, aliasesInfoBuilder, xmlNamespaces, diagBagForThisImport.DependenciesBag)
+                    Dim binder As Binder = BinderBuilder.CreateBinderForProjectImports(Me, VisualBasicSyntaxTree.Dummy)
+                    binder.BindImportClause(globalImport.Clause, data, diagBagForThisImport.DiagnosticBag)
 
                     ' Map diagnostics to new ones.
-                    For Each d As Diagnostic In diagBagForThisImport.AsEnumerable()
+                    ' Note, it is safe to resolve diagnostics here because we suppress obsolete diagnostics
+                    ' in ProjectImportsBinder.
+                    For Each d As Diagnostic In diagBagForThisImport.DiagnosticBag.AsEnumerable()
                         ' NOTE: Dev10 doesn't report 'ERR_DuplicateImport1' for project level imports. 
                         If d.Code <> ERRID.ERR_DuplicateImport1 Then
                             diagBag.Add(globalImport.MapDiagnostic(d))
                         End If
                     Next
 
-                    diagBagForThisImport.Free()
+                    diagBag.AddDependencies(diagBagForThisImport)
                 Next
 
                 Return New BoundImports(
@@ -390,6 +404,7 @@ Namespace Microsoft.CodeAnalysis.VisualBasic.Symbols
                 membersInfoBuilder.Free()
                 aliasesBuilder.Free()
                 aliasesInfoBuilder.Free()
+                diagBagForThisImport.Free()
             End Try
         End Function
 
@@ -407,6 +422,7 @@ Namespace Microsoft.CodeAnalysis.VisualBasic.Symbols
             Private ReadOnly _membersInfoBuilder As ArrayBuilder(Of GlobalImportInfo)
             Private ReadOnly _aliasesBuilder As ArrayBuilder(Of AliasAndImportsClausePosition)
             Private ReadOnly _aliasesInfoBuilder As ArrayBuilder(Of GlobalImportInfo)
+            Private ReadOnly _dependencies As ICollection(Of AssemblySymbol)
 
             Public Sub New(globalImport As GlobalImport,
                            membersMap As HashSet(Of NamespaceOrTypeSymbol),
@@ -415,27 +431,37 @@ Namespace Microsoft.CodeAnalysis.VisualBasic.Symbols
                            membersInfoBuilder As ArrayBuilder(Of GlobalImportInfo),
                            aliasesBuilder As ArrayBuilder(Of AliasAndImportsClausePosition),
                            aliasesInfoBuilder As ArrayBuilder(Of GlobalImportInfo),
-                           xmlNamespaces As Dictionary(Of String, XmlNamespaceAndImportsClausePosition))
+                           xmlNamespaces As Dictionary(Of String, XmlNamespaceAndImportsClausePosition),
+                           dependencies As ICollection(Of AssemblySymbol))
                 MyBase.New(membersMap, aliasesMap, xmlNamespaces)
                 _globalImport = globalImport
                 _membersBuilder = membersBuilder
                 _membersInfoBuilder = membersInfoBuilder
                 _aliasesBuilder = aliasesBuilder
                 _aliasesInfoBuilder = aliasesInfoBuilder
+                _dependencies = dependencies
             End Sub
 
-            Public Overrides Sub AddMember(syntaxRef As SyntaxReference, member As NamespaceOrTypeSymbol, importsClausePosition As Integer)
-                Dim pair = New NamespaceOrTypeAndImportsClausePosition(member, importsClausePosition)
+            Public Overrides Sub AddMember(syntaxRef As SyntaxReference, member As NamespaceOrTypeSymbol, importsClausePosition As Integer, dependencies As IReadOnlyCollection(Of AssemblySymbol))
+                Dim pair = New NamespaceOrTypeAndImportsClausePosition(member, importsClausePosition, ImmutableArray(Of AssemblySymbol).Empty)
                 Members.Add(member)
                 _membersBuilder.Add(pair)
                 _membersInfoBuilder.Add(New GlobalImportInfo(_globalImport, syntaxRef))
+                AddDependencies(dependencies)
             End Sub
 
-            Public Overrides Sub AddAlias(syntaxRef As SyntaxReference, name As String, [alias] As AliasSymbol, importsClausePosition As Integer)
-                Dim pair = New AliasAndImportsClausePosition([alias], importsClausePosition)
+            Private Sub AddDependencies(dependencies As IReadOnlyCollection(Of AssemblySymbol))
+                For Each dependency In dependencies
+                    _dependencies.Add(dependency)
+                Next
+            End Sub
+
+            Public Overrides Sub AddAlias(syntaxRef As SyntaxReference, name As String, [alias] As AliasSymbol, importsClausePosition As Integer, dependencies As IReadOnlyCollection(Of AssemblySymbol))
+                Dim pair = New AliasAndImportsClausePosition([alias], importsClausePosition, ImmutableArray(Of AssemblySymbol).Empty)
                 Aliases.Add(name, pair)
                 _aliasesBuilder.Add(pair)
                 _aliasesInfoBuilder.Add(New GlobalImportInfo(_globalImport, syntaxRef))
+                AddDependencies(dependencies)
             End Sub
         End Class
 
@@ -443,29 +469,35 @@ Namespace Microsoft.CodeAnalysis.VisualBasic.Symbols
         ''' Perform any validation of import statements that must occur
         ''' after the import statements have been added to the module.
         ''' </summary>
-        Private Shared Sub ValidateImports(
+        Private Sub ValidateImports(
                                          memberImports As ImmutableArray(Of NamespaceOrTypeAndImportsClausePosition),
                                          memberImportsInfo As ImmutableArray(Of GlobalImportInfo),
                                          aliasImports As ImmutableArray(Of AliasAndImportsClausePosition),
                                          aliasImportsInfo As ImmutableArray(Of GlobalImportInfo),
-                                         diagnostics As DiagnosticBag)
+                                         diagnostics As BindingDiagnosticBag)
             ' TODO: Dev10 reports error on specific type parts rather than the import
             ' (reporting error on Object rather than C in C = A(Of Object) for instance).
 
             If Not memberImports.IsDefault Then
                 For i = 0 To memberImports.Length - 1
-                    Dim type = TryCast(memberImports(i).NamespaceOrType, TypeSymbol)
+                    Dim namespaceOrType As NamespaceOrTypeSymbol = memberImports(i).NamespaceOrType
+                    Dim type = TryCast(namespaceOrType, TypeSymbol)
                     If type IsNot Nothing Then
                         ValidateImport(type, memberImportsInfo(i), diagnostics)
+                    Else
+                        diagnostics.AddAssembliesUsedByNamespaceReference(DirectCast(namespaceOrType, NamespaceSymbol))
                     End If
                 Next
             End If
 
             If Not aliasImports.IsDefault Then
                 For i = 0 To aliasImports.Length - 1
-                    Dim type = TryCast(aliasImports(i).Alias.Target, TypeSymbol)
+                    Dim target As NamespaceOrTypeSymbol = aliasImports(i).Alias.Target
+                    Dim type = TryCast(target, TypeSymbol)
                     If type IsNot Nothing Then
                         ValidateImport(type, aliasImportsInfo(i), diagnostics)
+                    Else
+                        diagnostics.AddAssembliesUsedByNamespaceReference(DirectCast(target, NamespaceSymbol))
                     End If
                 Next
             End If
@@ -476,17 +508,21 @@ Namespace Microsoft.CodeAnalysis.VisualBasic.Symbols
         ''' after the statement has been added to the module. Specifically,
         ''' constraints are checked for generic type references.
         ''' </summary>
-        Private Shared Sub ValidateImport(type As TypeSymbol, info As GlobalImportInfo, diagnostics As DiagnosticBag)
+        Private Sub ValidateImport(type As TypeSymbol, info As GlobalImportInfo, diagnostics As BindingDiagnosticBag)
             Dim diagnosticsBuilder = ArrayBuilder(Of TypeParameterDiagnosticInfo).GetInstance()
             Dim useSiteDiagnosticsBuilder As ArrayBuilder(Of TypeParameterDiagnosticInfo) = Nothing
-            type.CheckAllConstraints(diagnosticsBuilder, useSiteDiagnosticsBuilder)
+            type.CheckAllConstraints(diagnosticsBuilder, useSiteDiagnosticsBuilder, template:=New CompoundUseSiteInfo(Of AssemblySymbol)(diagnostics, ContainingAssembly))
 
             If useSiteDiagnosticsBuilder IsNot Nothing Then
                 diagnosticsBuilder.AddRange(useSiteDiagnosticsBuilder)
             End If
 
             For Each pair In diagnosticsBuilder
-                diagnostics.Add(info.Import.MapDiagnostic(New VBDiagnostic(pair.DiagnosticInfo, info.SyntaxReference.GetLocation())))
+                If pair.UseSiteInfo.DiagnosticInfo IsNot Nothing Then
+                    diagnostics.Add(info.Import.MapDiagnostic(New VBDiagnostic(pair.UseSiteInfo.DiagnosticInfo, info.SyntaxReference.GetLocation())))
+                End If
+
+                diagnostics.AddDependencies(pair.UseSiteInfo)
             Next
             diagnosticsBuilder.Free()
         End Sub
@@ -495,14 +531,14 @@ Namespace Microsoft.CodeAnalysis.VisualBasic.Symbols
         Friend ReadOnly Property MemberImports As ImmutableArray(Of NamespaceOrTypeAndImportsClausePosition)
             Get
                 EnsureImportsAreBound(CancellationToken.None)
-                Return m_lazyBoundImports.MemberImports
+                Return _lazyBoundImports.MemberImports
             End Get
         End Property
 
         Friend ReadOnly Property AliasImports As ImmutableArray(Of AliasAndImportsClausePosition)
             Get
                 EnsureImportsAreBound(CancellationToken.None)
-                Return m_lazyBoundImports.AliasImports
+                Return _lazyBoundImports.AliasImports
             End Get
         End Property
 
@@ -510,7 +546,7 @@ Namespace Microsoft.CodeAnalysis.VisualBasic.Symbols
         Friend ReadOnly Property AliasImportsMap As Dictionary(Of String, AliasAndImportsClausePosition)
             Get
                 EnsureImportsAreBound(CancellationToken.None)
-                Return m_lazyBoundImports.AliasImportsMap
+                Return _lazyBoundImports.AliasImportsMap
             End Get
         End Property
 
@@ -518,7 +554,7 @@ Namespace Microsoft.CodeAnalysis.VisualBasic.Symbols
         Friend ReadOnly Property XmlNamespaces As Dictionary(Of String, XmlNamespaceAndImportsClausePosition)
             Get
                 EnsureImportsAreBound(CancellationToken.None)
-                Return m_lazyBoundImports.XmlNamespaces
+                Return _lazyBoundImports.XmlNamespaces
             End Get
         End Property
 
@@ -532,7 +568,9 @@ Namespace Microsoft.CodeAnalysis.VisualBasic.Symbols
             Dim builder = ArrayBuilder(Of Diagnostic).GetInstance()
 
             ' Force source file to generate errors for Imports and the like.
-            Dim sourceFile As SourceFile = GetSourceFile(tree)
+            Dim sourceFile As SourceFile = TryGetSourceFile(tree)
+            Debug.Assert(sourceFile IsNot Nothing)
+
             If filterSpanWithinTree.HasValue Then
                 Dim diagnostics = sourceFile.GetDeclarationErrorsInSpan(filterSpanWithinTree.Value, cancellationToken)
                 diagnostics = locationFilter(diagnostics, tree, filterSpanWithinTree)
@@ -574,7 +612,7 @@ Namespace Microsoft.CodeAnalysis.VisualBasic.Symbols
             End If
 
             ' Get all the errors that were generated. 
-            Dim declarationDiagnostics = sourceFile.DeclarationErrors.AsEnumerable()
+            Dim declarationDiagnostics = sourceFile.DeclarationDiagnostics.AsEnumerable()
 
             ' Filter diagnostics outside the tree/span of interest.
             If locationFilter IsNot Nothing Then
@@ -592,7 +630,7 @@ Namespace Microsoft.CodeAnalysis.VisualBasic.Symbols
         ''' <summary>
         ''' Get all the declaration errors.
         ''' </summary>
-        Friend Function GetAllDeclarationErrors(cancellationToken As CancellationToken, ByRef hasExtensionMethods As Boolean) As ImmutableArray(Of Diagnostic)
+        Friend Sub GetAllDeclarationErrors(diagnostics As BindingDiagnosticBag, cancellationToken As CancellationToken, ByRef hasExtensionMethods As Boolean)
             ' Bind project level imports
             EnsureImportsAreBound(cancellationToken)
 
@@ -601,18 +639,19 @@ Namespace Microsoft.CodeAnalysis.VisualBasic.Symbols
                 Dim trees = ArrayBuilder(Of SyntaxTree).GetInstance()
                 trees.AddRange(SyntaxTrees)
 
-                Dim options = New ParallelOptions() With {.CancellationToken = cancellationToken}
-                Parallel.For(0, trees.Count, options,
+                RoslynParallel.For(
+                    0,
+                    trees.Count,
                     UICultureUtilities.WithCurrentUICulture(
                         Sub(i As Integer)
-                            cancellationToken.ThrowIfCancellationRequested()
-                            GetSourceFile(trees(i)).GenerateAllDeclarationErrors()
-                        End Sub))
+                            TryGetSourceFile(trees(i)).GenerateAllDeclarationErrors()
+                        End Sub),
+                    cancellationToken)
                 trees.Free()
             Else
                 For Each tree In SyntaxTrees
                     cancellationToken.ThrowIfCancellationRequested()
-                    GetSourceFile(tree).GenerateAllDeclarationErrors()
+                    TryGetSourceFile(tree).GenerateAllDeclarationErrors()
                 Next
             End If
 
@@ -645,25 +684,21 @@ Namespace Microsoft.CodeAnalysis.VisualBasic.Symbols
             End If
 
             ' At this point we should have recorded presence of extension methods.
-            If m_lazyContainsExtensionMethods = ThreeState.Unknown Then
-                m_lazyContainsExtensionMethods = ThreeState.False
+            If _lazyContainsExtensionMethods = ThreeState.Unknown Then
+                _lazyContainsExtensionMethods = ThreeState.False
             End If
 
-            hasExtensionMethods = m_lazyContainsExtensionMethods = ThreeState.True
+            hasExtensionMethods = _lazyContainsExtensionMethods = ThreeState.True
 
             ' Accumulate all the errors that were generated.
-            Dim builder = DiagnosticBag.GetInstance()
-            builder.AddRange(Me.m_diagnosticBagDeclare)
-            builder.AddRange(Me.m_lazyBoundImports.Diagnostics)
-            builder.AddRange(Me.m_lazyLinkedAssemblyDiagnostics)
-            builder.AddRange(Me.m_declarationTable.ReferenceDirectiveDiagnostics)
+            diagnostics.AddRange(Me._diagnosticBagDeclare)
+            diagnostics.AddRange(Me._lazyBoundImports.Diagnostics, allowMismatchInDependencyAccumulation:=True)
+            diagnostics.AddRange(Me._lazyLinkedAssemblyDiagnostics)
 
             For Each tree In SyntaxTrees
-                builder.AddRange(GetSourceFile(tree).DeclarationErrors)
+                diagnostics.AddRange(TryGetSourceFile(tree).DeclarationDiagnostics)
             Next
-
-            Return builder.ToReadOnlyAndFree(Of Diagnostic)()
-        End Function
+        End Sub
 
         ' Visit all of the source types within this source module.
         Private Sub VisitAllSourceTypesAndNamespaces(visitor As Action(Of NamespaceOrTypeSymbol), tasks As ConcurrentStack(Of Task), cancellationToken As CancellationToken)
@@ -685,7 +720,7 @@ Namespace Microsoft.CodeAnalysis.VisualBasic.Symbols
                                 Sub()
                                     Try
                                         visitor(symbol)
-                                    Catch e As Exception When FatalError.ReportUnlessCanceled(e)
+                                    Catch e As Exception When FatalError.ReportAndPropagateUnlessCanceled(e)
                                         Throw ExceptionUtilities.Unreachable
                                     End Try
                                 End Sub),
@@ -705,10 +740,10 @@ Namespace Microsoft.CodeAnalysis.VisualBasic.Symbols
         End Sub
 
         Private Sub EnsureLinkedAssembliesAreValidated(cancellationToken As CancellationToken)
-            If m_lazyLinkedAssemblyDiagnostics.IsDefault Then
+            If _lazyLinkedAssemblyDiagnostics.IsDefault Then
                 Dim diagnostics = DiagnosticBag.GetInstance()
                 ValidateLinkedAssemblies(diagnostics, cancellationToken)
-                ImmutableInterlocked.InterlockedInitialize(m_lazyLinkedAssemblyDiagnostics, diagnostics.ToReadOnlyAndFree)
+                ImmutableInterlocked.InterlockedInitialize(_lazyLinkedAssemblyDiagnostics, diagnostics.ToReadOnlyAndFree)
             End If
         End Sub
 
@@ -726,7 +761,7 @@ Namespace Microsoft.CodeAnalysis.VisualBasic.Symbols
                 For Each attrData In assembly.GetAttributes()
                     If attrData.IsTargetAttribute(assembly, AttributeDescription.GuidAttribute) Then
                         If attrData.CommonConstructorArguments.Length = 1 Then
-                            Dim value = attrData.CommonConstructorArguments(0).Value
+                            Dim value = attrData.CommonConstructorArguments(0).ValueInternal
                             If value Is Nothing OrElse TypeOf value Is String Then
                                 hasGuidAttribute = True
                             End If
@@ -767,7 +802,7 @@ Namespace Microsoft.CodeAnalysis.VisualBasic.Symbols
         End Sub
 
         ' This lock is used in the implementation of AtomicStoreReferenceAndDiagnostics
-        Private ReadOnly diagnosticLock As New Object()
+        Private ReadOnly _diagnosticLock As New Object()
 
         ' Checks if the given diagnostic bag has all lazy obsolete diagnostics.
         Private Shared Function HasAllLazyDiagnostics(diagBag As DiagnosticBag) As Boolean
@@ -792,20 +827,19 @@ Namespace Microsoft.CodeAnalysis.VisualBasic.Symbols
         ''' </summary>
         Friend Function AtomicStoreReferenceAndDiagnostics(Of T As Class)(ByRef variable As T,
                                                                      value As T,
-                                                                     diagBag As DiagnosticBag,
-                                                                     stage As CompilationStage,
+                                                                     diagBag As BindingDiagnosticBag,
                                                                      Optional comparand As T = Nothing) As Boolean
             Debug.Assert(value IsNot comparand)
 
-            If diagBag Is Nothing OrElse diagBag.IsEmptyWithoutResolution Then
+            If diagBag Is Nothing OrElse diagBag.IsEmpty Then
                 Return Interlocked.CompareExchange(variable, value, comparand) Is comparand AndAlso comparand Is Nothing
             Else
                 Dim stored = False
-                SyncLock diagnosticLock
+                SyncLock _diagnosticLock
                     If variable Is comparand Then
-                        StoreDiagnostics(diagBag, stage)
+                        StoreDeclarationDiagnostics(diagBag)
                         stored = Interlocked.CompareExchange(variable, value, comparand) Is comparand
-                        If Not stored AndAlso Not HasAllLazyDiagnostics(diagBag) Then
+                        If Not stored AndAlso Not IsEmptyIgnoringLazyDiagnostics(diagBag) Then
 
                             ' If this gets hit, then someone wrote to variable without going through this
                             ' routine, or else someone wrote to variable with this routine but an empty
@@ -818,22 +852,26 @@ Namespace Microsoft.CodeAnalysis.VisualBasic.Symbols
             End If
         End Function
 
+        Private Shared Function IsEmptyIgnoringLazyDiagnostics(diagBag As BindingDiagnosticBag) As Boolean
+            Return diagBag.DependenciesBag.IsNullOrEmpty() AndAlso
+                   (Not diagBag.AccumulatesDiagnostics OrElse HasAllLazyDiagnostics(diagBag.DiagnosticBag))
+        End Function
+
         ' Atomically store value into variable, and store the diagnostics away for later retrieval.
         ' When this routine returns, variable is not equal to comparand. If this routine stored value into variable,
         ' then the diagnostic bag is saved away before the variable is stored.
         Friend Sub AtomicStoreIntegerAndDiagnostics(ByRef variable As Integer,
                                                     value As Integer,
                                                     comparand As Integer,
-                                                    diagBag As DiagnosticBag,
-                                                    stage As CompilationStage)
-            If diagBag Is Nothing OrElse diagBag.IsEmptyWithoutResolution Then
+                                                    diagBag As BindingDiagnosticBag)
+            If diagBag Is Nothing OrElse diagBag.IsEmpty Then
                 Interlocked.CompareExchange(variable, value, comparand)
             Else
-                SyncLock diagnosticLock
+                SyncLock _diagnosticLock
                     If variable = comparand Then
-                        StoreDiagnostics(diagBag, stage)
+                        StoreDeclarationDiagnostics(diagBag)
                         If Interlocked.CompareExchange(variable, value, comparand) <> comparand AndAlso
-                            Not HasAllLazyDiagnostics(diagBag) Then
+                            Not IsEmptyIgnoringLazyDiagnostics(diagBag) Then
 
                             ' If this gets hit, then someone wrote to variable without going through this
                             ' routine, or else someone wrote to variable with this routine but an empty
@@ -851,18 +889,17 @@ Namespace Microsoft.CodeAnalysis.VisualBasic.Symbols
         Friend Function AtomicSetFlagAndStoreDiagnostics(ByRef variable As Integer,
                                                mask As Integer,
                                                comparand As Integer,
-                                               diagBag As DiagnosticBag,
-                                               stage As CompilationStage) As Boolean
-            If diagBag Is Nothing OrElse diagBag.IsEmptyWithoutResolution Then
+                                               diagBag As BindingDiagnosticBag) As Boolean
+            If diagBag Is Nothing OrElse diagBag.IsEmpty Then
                 Return ThreadSafeFlagOperations.Set(variable, mask)
             Else
-                SyncLock diagnosticLock
+                SyncLock _diagnosticLock
                     Dim change = (variable And mask) = comparand
                     If change Then
-                        StoreDiagnostics(diagBag, stage)
+                        StoreDeclarationDiagnostics(diagBag)
 
                         If Not ThreadSafeFlagOperations.Set(variable, mask) AndAlso
-                             Not HasAllLazyDiagnostics(diagBag) Then
+                             Not IsEmptyIgnoringLazyDiagnostics(diagBag) Then
 
                             ' If this gets hit, then someone wrote to variable without going through this
                             ' routine, or else someone wrote to variable with this routine but an empty
@@ -884,7 +921,7 @@ Namespace Microsoft.CodeAnalysis.VisualBasic.Symbols
                                                symbol As Symbol) As Boolean
             Debug.Assert(Me.DeclaringCompilation.EventQueue IsNot Nothing)
 
-            SyncLock diagnosticLock
+            SyncLock _diagnosticLock
                 Dim change = (variable And mask) = comparand
                 If change Then
                     Me.DeclaringCompilation.SymbolDeclaredEvent(symbol)
@@ -901,18 +938,17 @@ Namespace Microsoft.CodeAnalysis.VisualBasic.Symbols
 
         Friend Function AtomicStoreArrayAndDiagnostics(Of T)(ByRef variable As ImmutableArray(Of T),
                                                              value As ImmutableArray(Of T),
-                                                             diagBag As DiagnosticBag,
-                                                             stage As CompilationStage) As Boolean
+                                                             diagBag As BindingDiagnosticBag) As Boolean
             Debug.Assert(Not value.IsDefault)
 
-            If diagBag Is Nothing OrElse diagBag.IsEmptyWithoutResolution Then
+            If diagBag Is Nothing OrElse diagBag.IsEmpty Then
                 Return ImmutableInterlocked.InterlockedInitialize(variable, value)
             Else
-                SyncLock diagnosticLock
+                SyncLock _diagnosticLock
                     If variable.IsDefault Then
-                        StoreDiagnostics(diagBag, stage)
+                        StoreDeclarationDiagnostics(diagBag)
                         Dim stored = ImmutableInterlocked.InterlockedInitialize(variable, value)
-                        If Not stored AndAlso Not HasAllLazyDiagnostics(diagBag) Then
+                        If Not stored AndAlso Not IsEmptyIgnoringLazyDiagnostics(diagBag) Then
 
                             ' If this gets hit, then someone wrote to variable without going through this
                             ' routine, or else someone wrote to variable with this routine but an empty
@@ -929,19 +965,21 @@ Namespace Microsoft.CodeAnalysis.VisualBasic.Symbols
 
         Friend Sub AtomicStoreAttributesAndDiagnostics(attributesBag As CustomAttributesBag(Of VisualBasicAttributeData),
                                                        attributesToStore As ImmutableArray(Of VisualBasicAttributeData),
-                                                       diagBag As DiagnosticBag)
+                                                       diagBag As BindingDiagnosticBag)
             Debug.Assert(attributesBag IsNot Nothing)
             Debug.Assert(Not attributesToStore.IsDefault)
 
-            If diagBag Is Nothing OrElse diagBag.IsEmptyWithoutResolution Then
+            RecordPresenceOfBadAttributes(attributesToStore)
+
+            If diagBag Is Nothing OrElse diagBag.IsEmpty Then
                 attributesBag.SetAttributes(attributesToStore)
             Else
-                SyncLock diagnosticLock
+                SyncLock _diagnosticLock
                     If Not attributesBag.IsSealed Then
-                        StoreDiagnostics(diagBag, CompilationStage.Declare)
+                        StoreDeclarationDiagnostics(diagBag)
 
                         If Not attributesBag.SetAttributes(attributesToStore) AndAlso
-                            Not HasAllLazyDiagnostics(diagBag) Then
+                            Not IsEmptyIgnoringLazyDiagnostics(diagBag) Then
 
                             ' If this gets hit, then someone set attributes in the bag without going through this
                             ' routine, or else someone set attributes in the bag with this routine but an empty
@@ -955,11 +993,28 @@ Namespace Microsoft.CodeAnalysis.VisualBasic.Symbols
             End If
         End Sub
 
+        Private Sub RecordPresenceOfBadAttributes(attributes As ImmutableArray(Of VisualBasicAttributeData))
+            If Not _hasBadAttributes Then
+                For Each attribute In attributes
+                    If attribute.HasErrors Then
+                        _hasBadAttributes = True
+                        Exit For
+                    End If
+                Next
+            End If
+        End Sub
+
+        Friend ReadOnly Property HasBadAttributes As Boolean
+            Get
+                Return _hasBadAttributes
+            End Get
+        End Property
+
         ' same as AtomicStoreReferenceAndDiagnostics, but without storing any references
-        Friend Sub AddDiagnostics(diagBag As DiagnosticBag, stage As CompilationStage)
-            If Not diagBag.IsEmptyWithoutResolution Then
-                SyncLock diagnosticLock
-                    StoreDiagnostics(diagBag, stage)
+        Friend Sub AddDeclarationDiagnostics(diagBag As BindingDiagnosticBag)
+            If Not diagBag.IsEmpty Then
+                SyncLock _diagnosticLock
+                    StoreDeclarationDiagnostics(diagBag)
                 End SyncLock
             End If
         End Sub
@@ -968,41 +1023,37 @@ Namespace Microsoft.CodeAnalysis.VisualBasic.Symbols
         ' NOTE: This is called from AtomicStoreReferenceAndDiagnostics, which takes a lock.
         ' NOTE: It is important that it doesn't do any operation that wants to acquire another lock.
         ' NOTE: Copy without resolving diagnostics.
-        Private Sub StoreDiagnostics(diagBag As DiagnosticBag, stage As CompilationStage)
-            If Not diagBag.IsEmptyWithoutResolution Then
-                For Each d As Diagnostic In diagBag.AsEnumerableWithoutResolution()
-                    Dim loc = d.Location
-                    If loc.IsInSource Then
-                        Dim tree = DirectCast(loc.SourceTree, VisualBasicSyntaxTree)
-                        Dim sourceFile = GetSourceFile(tree)
-                        sourceFile.AddDiagnostic(d, stage)
-                    Else
-                        Me.AddDiagnostic(d, stage)
-                    End If
-                Next
+        Private Sub StoreDeclarationDiagnostics(diagBag As BindingDiagnosticBag)
+            If Not diagBag.IsEmpty Then
+                If Not diagBag.DiagnosticBag?.IsEmptyWithoutResolution Then
+                    For Each d As Diagnostic In diagBag.DiagnosticBag.AsEnumerableWithoutResolution()
+                        Dim loc = d.Location
+                        If loc.IsInSource Then
+                            Dim tree = DirectCast(loc.SourceTree, VisualBasicSyntaxTree)
+                            Dim sourceFile = TryGetSourceFile(tree)
+                            Debug.Assert(sourceFile IsNot Nothing)
+                            sourceFile.DeclarationDiagnostics.Add(d)
+                        Else
+                            Me._diagnosticBagDeclare.Add(d)
+                        End If
+                    Next
+                End If
+
+                If Not diagBag.DependenciesBag.IsNullOrEmpty() Then
+                    DeclaringCompilation.AddUsedAssemblies(diagBag.DependenciesBag)
+                End If
             End If
-        End Sub
-
-        ' Add a diagnostic to this source file.
-        Private Sub AddDiagnostic(d As Diagnostic, stage As CompilationStage)
-            Select Case stage
-                Case CompilationStage.Declare
-                    m_diagnosticBagDeclare.Add(d)
-
-                Case Else
-                    Throw ExceptionUtilities.UnexpectedValue(stage)
-            End Select
         End Sub
 
         Friend Overrides ReadOnly Property TypeNames As ICollection(Of String)
             Get
-                Return m_declarationTable.TypeNames
+                Return _declarationTable.TypeNames
             End Get
         End Property
 
         Friend Overrides ReadOnly Property NamespaceNames As ICollection(Of String)
             Get
-                Return m_declarationTable.NamespaceNames
+                Return _declarationTable.NamespaceNames
             End Get
         End Property
 
@@ -1010,19 +1061,19 @@ Namespace Microsoft.CodeAnalysis.VisualBasic.Symbols
             Get
                 ' Only primary module of an assembly marked with an Extension attribute
                 ' can contain extension methods recognized by the language (Dev10 behavior).
-                If m_lazyContainsExtensionMethods = ThreeState.Unknown Then
-                    If Not (m_AssemblySymbol.Modules(0) Is Me) Then
-                        m_lazyContainsExtensionMethods = ThreeState.False
+                If _lazyContainsExtensionMethods = ThreeState.Unknown Then
+                    If Not (_assemblySymbol.Modules(0) Is Me) Then
+                        _lazyContainsExtensionMethods = ThreeState.False
                     End If
                 End If
 
-                Return m_lazyContainsExtensionMethods <> ThreeState.False
+                Return _lazyContainsExtensionMethods <> ThreeState.False
             End Get
         End Property
 
         Friend Sub RecordPresenceOfExtensionMethods()
-            Debug.Assert(m_lazyContainsExtensionMethods <> ThreeState.False)
-            m_lazyContainsExtensionMethods = ThreeState.True
+            Debug.Assert(_lazyContainsExtensionMethods <> ThreeState.False)
+            _lazyContainsExtensionMethods = ThreeState.True
         End Sub
 
         Friend Overrides Sub DecodeWellKnownAttribute(ByRef arguments As DecodeWellKnownAttributeArguments(Of AttributeSyntax, VisualBasicAttributeData, AttributeLocation))
@@ -1032,10 +1083,14 @@ Namespace Microsoft.CodeAnalysis.VisualBasic.Symbols
             Debug.Assert(Not attrData.HasErrors)
             Debug.Assert(arguments.SymbolPart = AttributeLocation.None)
 
+            If attrData.IsTargetAttribute(Me, AttributeDescription.TupleElementNamesAttribute) Then
+                DirectCast(arguments.Diagnostics, BindingDiagnosticBag).Add(ERRID.ERR_ExplicitTupleElementNamesAttribute, arguments.AttributeSyntaxOpt.Location)
+            End If
+
             If attrData.IsTargetAttribute(Me, AttributeDescription.DefaultCharSetAttribute) Then
                 Dim charSet As CharSet = attrData.GetConstructorArgument(Of CharSet)(0, SpecialType.System_Enum)
                 If Not CommonModuleWellKnownAttributeData.IsValidCharSet(charSet) Then
-                    arguments.Diagnostics.Add(ERRID.ERR_BadAttribute1, arguments.AttributeSyntaxOpt.ArgumentList.Arguments(0).GetLocation(), attrData.AttributeClass)
+                    DirectCast(arguments.Diagnostics, BindingDiagnosticBag).Add(ERRID.ERR_BadAttribute1, arguments.AttributeSyntaxOpt.ArgumentList.Arguments(0).GetLocation(), attrData.AttributeClass)
                 Else
                     arguments.GetOrCreateData(Of CommonModuleWellKnownAttributeData)().DefaultCharacterSet = charSet
                 End If
@@ -1067,17 +1122,17 @@ Namespace Microsoft.CodeAnalysis.VisualBasic.Symbols
             End Get
         End Property
 
-        Function GetMyGroupCollectionPropertyWithDefaultInstanceAlias(classType As NamedTypeSymbol) As SynthesizedMyGroupCollectionPropertySymbol
+        Public Function GetMyGroupCollectionPropertyWithDefaultInstanceAlias(classType As NamedTypeSymbol) As SynthesizedMyGroupCollectionPropertySymbol
             Debug.Assert(classType.IsDefinition AndAlso Not classType.IsGenericType)
 
-            If m_lazyTypesWithDefaultInstanceAlias Is Nothing Then
-                m_lazyTypesWithDefaultInstanceAlias = GetTypesWithDefaultInstanceAlias()
+            If _lazyTypesWithDefaultInstanceAlias Is Nothing Then
+                _lazyTypesWithDefaultInstanceAlias = GetTypesWithDefaultInstanceAlias()
             End If
 
             Dim result As SynthesizedMyGroupCollectionPropertySymbol = Nothing
 
-            If m_lazyTypesWithDefaultInstanceAlias IsNot m_NoTypesWithDefaultInstanceAlias AndAlso
-               m_lazyTypesWithDefaultInstanceAlias.TryGetValue(classType, result) Then
+            If _lazyTypesWithDefaultInstanceAlias IsNot s_noTypesWithDefaultInstanceAlias AndAlso
+               _lazyTypesWithDefaultInstanceAlias.TryGetValue(classType, result) Then
                 Return result
             End If
 
@@ -1087,12 +1142,12 @@ Namespace Microsoft.CodeAnalysis.VisualBasic.Symbols
         Private Function GetTypesWithDefaultInstanceAlias() As Dictionary(Of NamedTypeSymbol, SynthesizedMyGroupCollectionPropertySymbol)
             Dim result As Dictionary(Of NamedTypeSymbol, SynthesizedMyGroupCollectionPropertySymbol) = Nothing
 
-            If m_AssemblySymbol.DeclaringCompilation.MyTemplate IsNot Nothing Then
+            If _assemblySymbol.DeclaringCompilation.MyTemplate IsNot Nothing Then
                 GetTypesWithDefaultInstanceAlias(GlobalNamespace, result)
             End If
 
             If result Is Nothing Then
-                result = m_NoTypesWithDefaultInstanceAlias
+                result = s_noTypesWithDefaultInstanceAlias
             End If
 
             Return result
@@ -1141,5 +1196,9 @@ Namespace Microsoft.CodeAnalysis.VisualBasic.Symbols
                 End Select
             Next
         End Sub
+
+        Public Overrides Function GetMetadata() As ModuleMetadata
+            Return Nothing
+        End Function
     End Class
 End Namespace

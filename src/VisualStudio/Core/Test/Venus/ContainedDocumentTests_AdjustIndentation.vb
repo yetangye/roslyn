@@ -1,4 +1,6 @@
-' Copyright (c) Microsoft.  All Rights Reserved.  Licensed under the Apache License, Version 2.0.  See License.txt in the project root for license information.
+﻿' Licensed to the .NET Foundation under one or more agreements.
+' The .NET Foundation licenses this file to you under the MIT license.
+' See the LICENSE file in the project root for more information.
 
 #If False Then
 Imports Microsoft.CodeAnalysis
@@ -13,7 +15,7 @@ Namespace Microsoft.VisualStudio.LanguageServices.UnitTests.Venus
     Public Class ContainedDocumentTests_AdjustIndentation
         Inherits AbstractContainedDocumentTests
 
-        <Fact, Trait(Traits.Feature, Traits.Features.Venus)>
+        <WpfFact, Trait(Traits.Feature, Traits.Features.Venus)>
         Public Sub NoNewLines()
             Dim subjectBuffer =
                 <Text>
@@ -33,7 +35,7 @@ public class Default
             AssertAdjustIndentation(HtmlMarkup, subjectBuffer, spansToAdjust, baseIndentations, Enumerable.Empty(Of TextChange)(), LanguageNames.CSharp)
         End Sub
 
-        <Fact, Trait(Traits.Feature, Traits.Features.Venus)>
+        <WpfFact, Trait(Traits.Feature, Traits.Features.Venus)>
         Public Sub OnSingleLine()
             Dim subjectBuffer =
                 <Text>
@@ -41,7 +43,7 @@ public class Default
 {
     void PreRender()
     {
-#line "Foo.aspx", 1{|S1:[|
+#line "Goo.aspx", 1{|S1:[|
 int x = 1;
 |]|}#line hidden
 #line default
@@ -56,7 +58,7 @@ int x = 1;
             AssertAdjustIndentation(HtmlMarkup, subjectBuffer, spansToAdjust, baseIndentations, {New TextChange(New TextSpan(startOfIndent, 0), "       ")}, LanguageNames.CSharp)
         End Sub
 
-        <Fact, Trait(Traits.Feature, Traits.Features.Venus)>
+        <WpfFact, Trait(Traits.Feature, Traits.Features.Venus)>
         Public Sub OnMultipleLines()
             Dim subjectBuffer =
                 <Text>
@@ -64,7 +66,7 @@ public class Default
 {
     void PreRender()
     {
-#line "Foo.aspx", 1{|S1:[|
+#line "Goo.aspx", 1{|S1:[|
 if(true)
 {
 }
@@ -103,7 +105,7 @@ if(true)
                                     LanguageNames.CSharp)
         End Sub
 
-        <Fact, Trait(Traits.Feature, Traits.Features.Venus)>
+        <WpfFact, Trait(Traits.Feature, Traits.Features.Venus)>
         Public Sub IndentationInNestedStatements()
             Dim subjectBuffer =
                 <Text>
@@ -111,7 +113,7 @@ public class Default
 {
     void PreRender()
     {
-#line "Foo.aspx", 1{|S1:[|
+#line "Goo.aspx", 1{|S1:[|
 if(true)
 {
 Console.WriteLine(5);
@@ -143,7 +145,7 @@ Console.WriteLine(5);
                                     LanguageNames.CSharp)
         End Sub
 
-        <Fact, Trait(Traits.Feature, Traits.Features.Venus)>
+        <WpfFact, Trait(Traits.Feature, Traits.Features.Venus)>
         Public Sub InQuery()
             Dim subjectBuffer =
                 <Text>
@@ -151,7 +153,7 @@ public class Default
 {
     void PreRender()
     {
-#line "Foo.aspx", 1{|S1:[|
+#line "Goo.aspx", 1{|S1:[|
 int[] numbers = { 5, 4, 1 };
 var even = from n in numbers
 where n % 2 == 0
@@ -185,7 +187,7 @@ select n;
                                     LanguageNames.CSharp)
         End Sub
 
-        <Fact, Trait(Traits.Feature, Traits.Features.Venus)>
+        <WpfFact, Trait(Traits.Feature, Traits.Features.Venus)>
         Public Sub AtEndOfSpan()
             Dim subjectBuffer =
                 <Text>
@@ -205,7 +207,7 @@ public class Default
             AssertAdjustIndentation(HtmlMarkup, subjectBuffer, spansToAdjust, baseIndentations, {expected}, LanguageNames.CSharp)
         End Sub
 
-        <Fact, Trait(Traits.Feature, Traits.Features.Venus), WorkItem(529885)>
+        <WpfFact, Trait(Traits.Feature, Traits.Features.Venus), WorkItem(529885)>
         Public Sub EndInSpan()
             Dim subjectBuffer =
                 <Text>

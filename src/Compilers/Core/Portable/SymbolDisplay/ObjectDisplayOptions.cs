@@ -1,4 +1,8 @@
-﻿// Copyright (c) Microsoft.  All Rights Reserved.  Licensed under the Apache License, Version 2.0.  See License.txt in the project root for license information.
+﻿// Licensed to the .NET Foundation under one or more agreements.
+// The .NET Foundation licenses this file to you under the MIT license.
+// See the LICENSE file in the project root for more information.
+
+#nullable disable
 
 using System;
 
@@ -31,8 +35,14 @@ namespace Microsoft.CodeAnalysis
         UseHexadecimalNumbers = 1 << 2,
 
         /// <summary>
-        /// Whether or not to quote character and string literals. In Visual Basic, this also enables pretty-listing of non-printable characters using ChrW function and vb* constants.
+        /// Whether or not to quote character and string literals.
         /// </summary>
         UseQuotes = 1 << 3,
+
+        /// <summary>
+        /// In C#, replace non-printable (e.g. control) characters with dedicated (e.g. \t) or unicode (\u0001) escape sequences.
+        /// In Visual Basic, replace non-printable characters with calls to ChrW and vb* constants.
+        /// </summary>
+        EscapeNonPrintableCharacters = 1 << 4,
     }
 }

@@ -1,200 +1,195 @@
-' Copyright (c) Microsoft.  All Rights Reserved.  Licensed under the Apache License, Version 2.0.  See License.txt in the project root for license information.
-
-Imports Microsoft.CodeAnalysis.Text
-Imports Microsoft.CodeAnalysis.VisualBasic
-Imports Microsoft.CodeAnalysis.VisualBasic.Symbols
-Imports Microsoft.CodeAnalysis.VisualBasic.Syntax
-Imports Roslyn.Test.Utilities
-Imports Xunit
+﻿' Licensed to the .NET Foundation under one or more agreements.
+' The .NET Foundation licenses this file to you under the MIT license.
+' See the LICENSE file in the project root for more information.
 
 Namespace Microsoft.CodeAnalysis.Editor.VisualBasic.UnitTests.Recommendations.Declarations
     Public Class OperatorKeywordRecommenderTests
         <Fact>
         <Trait(Traits.Feature, Traits.Features.KeywordRecommending)>
-        Public Sub OperatorInClassDeclaration()
+        Public Sub OperatorInClassDeclarationTest()
             VerifyRecommendationsContain(<ClassDeclaration>|</ClassDeclaration>, "Operator")
         End Sub
 
         <Fact>
         <Trait(Traits.Feature, Traits.Features.KeywordRecommending)>
-        Public Sub OperatorNotInMethodDeclaration()
+        Public Sub OperatorNotInMethodDeclarationTest()
             VerifyRecommendationsMissing(<MethodBody>|</MethodBody>, "Operator")
         End Sub
 
         <Fact>
         <Trait(Traits.Feature, Traits.Features.KeywordRecommending)>
-        Public Sub OperatorNotInNamespace()
+        Public Sub OperatorNotInNamespaceTest()
             VerifyRecommendationsMissing(<NamespaceDeclaration>|</NamespaceDeclaration>, "Operator")
         End Sub
 
         <Fact>
         <Trait(Traits.Feature, Traits.Features.KeywordRecommending)>
-        Public Sub OperatorNotInInterface()
+        Public Sub OperatorNotInInterfaceTest()
             VerifyRecommendationsMissing(<InterfaceDeclaration>|</InterfaceDeclaration>, "Operator")
         End Sub
 
         <Fact>
         <Trait(Traits.Feature, Traits.Features.KeywordRecommending)>
-        Public Sub OperatorNotInEnum()
+        Public Sub OperatorNotInEnumTest()
             VerifyRecommendationsMissing(<EnumDeclaration>|</EnumDeclaration>, "Operator")
         End Sub
 
         <Fact>
         <Trait(Traits.Feature, Traits.Features.KeywordRecommending)>
-        Public Sub OperatorInStructure()
+        Public Sub OperatorInStructureTest()
             VerifyRecommendationsContain(<StructureDeclaration>|</StructureDeclaration>, "Operator")
         End Sub
 
         <Fact>
-        <WorkItem(544630)>
+        <WorkItem(544630, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/544630")>
         <Trait(Traits.Feature, Traits.Features.KeywordRecommending)>
-        Public Sub OperatorNotInModule()
+        Public Sub OperatorNotInModuleTest()
             VerifyRecommendationsMissing(<ModuleDeclaration>|</ModuleDeclaration>, "Operator")
         End Sub
 
         <Fact>
         <Trait(Traits.Feature, Traits.Features.KeywordRecommending)>
-        Public Sub OperatorNotAfterPartial()
+        Public Sub OperatorNotAfterPartialTest()
             VerifyRecommendationsMissing(<ClassDeclaration>Partial |</ClassDeclaration>, "Operator")
         End Sub
 
         <Fact>
         <Trait(Traits.Feature, Traits.Features.KeywordRecommending)>
-        Public Sub OperatorAfterPublic()
+        Public Sub OperatorAfterPublicTest()
             VerifyRecommendationsContain(<ClassDeclaration>Public |</ClassDeclaration>, "Operator")
         End Sub
 
         <Fact>
         <Trait(Traits.Feature, Traits.Features.KeywordRecommending)>
-        Public Sub OperatorNotAfterProtected()
+        Public Sub OperatorNotAfterProtectedTest()
             VerifyRecommendationsMissing(<ClassDeclaration>Protected |</ClassDeclaration>, "Operator")
         End Sub
 
         <Fact>
         <Trait(Traits.Feature, Traits.Features.KeywordRecommending)>
-        Public Sub OperatorNotAfterFriend()
+        Public Sub OperatorNotAfterFriendTest()
             VerifyRecommendationsMissing(<ClassDeclaration>Friend |</ClassDeclaration>, "Operator")
         End Sub
 
         <Fact>
         <Trait(Traits.Feature, Traits.Features.KeywordRecommending)>
-        Public Sub OperatorNotAfterPrivate()
+        Public Sub OperatorNotAfterPrivateTest()
             VerifyRecommendationsMissing(<ClassDeclaration>Private |</ClassDeclaration>, "Operator")
         End Sub
 
         <Fact>
         <Trait(Traits.Feature, Traits.Features.KeywordRecommending)>
-        Public Sub OperatorNotAfterProtectedFriend()
+        Public Sub OperatorNotAfterProtectedFriendTest()
             VerifyRecommendationsMissing(<ClassDeclaration>Protected Friend |</ClassDeclaration>, "Operator")
         End Sub
 
         <Fact>
         <Trait(Traits.Feature, Traits.Features.KeywordRecommending)>
-        Public Sub OperatorAfterOverloads()
+        Public Sub OperatorAfterOverloadsTest()
             VerifyRecommendationsContain(<ClassDeclaration>Overloads |</ClassDeclaration>, "Operator")
         End Sub
 
         <Fact>
         <Trait(Traits.Feature, Traits.Features.KeywordRecommending)>
-        Public Sub OperatorNotAfterOverrides()
+        Public Sub OperatorNotAfterOverridesTest()
             VerifyRecommendationsMissing(<ClassDeclaration>Overrides |</ClassDeclaration>, "Operator")
         End Sub
 
         <Fact>
         <Trait(Traits.Feature, Traits.Features.KeywordRecommending)>
-        Public Sub OperatorNotAfterOverridable()
+        Public Sub OperatorNotAfterOverridableTest()
             VerifyRecommendationsMissing(<ClassDeclaration>Overridable |</ClassDeclaration>, "Operator")
         End Sub
 
         <Fact>
         <Trait(Traits.Feature, Traits.Features.KeywordRecommending)>
-        Public Sub OperatorNotAfterNotOverridable()
+        Public Sub OperatorNotAfterNotOverridableTest()
             VerifyRecommendationsMissing(<ClassDeclaration>NotOverridable |</ClassDeclaration>, "Operator")
         End Sub
 
         <Fact>
         <Trait(Traits.Feature, Traits.Features.KeywordRecommending)>
-        Public Sub OperatorNotAfterMustOverride()
+        Public Sub OperatorNotAfterMustOverrideTest()
             VerifyRecommendationsMissing(<ClassDeclaration>MustOverride |</ClassDeclaration>, "Operator")
         End Sub
 
         <Fact>
         <Trait(Traits.Feature, Traits.Features.KeywordRecommending)>
-        Public Sub OperatorNotAfterMustOverrideOverrides()
+        Public Sub OperatorNotAfterMustOverrideOverridesTest()
             VerifyRecommendationsMissing(<ClassDeclaration>MustOverride Overrides |</ClassDeclaration>, "Operator")
         End Sub
 
         <Fact>
         <Trait(Traits.Feature, Traits.Features.KeywordRecommending)>
-        Public Sub OperatorNotAfterNotOverridableOverrides()
+        Public Sub OperatorNotAfterNotOverridableOverridesTest()
             VerifyRecommendationsMissing(<ClassDeclaration>NotOverridable Overrides |</ClassDeclaration>, "Operator")
         End Sub
 
         <Fact>
         <Trait(Traits.Feature, Traits.Features.KeywordRecommending)>
-        Public Sub OperatorNotAfterConst()
+        Public Sub OperatorNotAfterConstTest()
             VerifyRecommendationsMissing(<ClassDeclaration>Const |</ClassDeclaration>, "Operator")
         End Sub
 
         <Fact>
         <Trait(Traits.Feature, Traits.Features.KeywordRecommending)>
-        Public Sub OperatorNotAfterDefault()
+        Public Sub OperatorNotAfterDefaultTest()
             VerifyRecommendationsMissing(<ClassDeclaration>Default |</ClassDeclaration>, "Operator")
         End Sub
 
         <Fact>
         <Trait(Traits.Feature, Traits.Features.KeywordRecommending)>
-        Public Sub OperatorNotAfterMustInherit()
+        Public Sub OperatorNotAfterMustInheritTest()
             VerifyRecommendationsMissing(<ClassDeclaration>MustInherit |</ClassDeclaration>, "Operator")
         End Sub
 
         <Fact>
         <Trait(Traits.Feature, Traits.Features.KeywordRecommending)>
-        Public Sub OperatorNotAfterNotInheritable()
+        Public Sub OperatorNotAfterNotInheritableTest()
             VerifyRecommendationsMissing(<ClassDeclaration>NotInheritable |</ClassDeclaration>, "Operator")
         End Sub
 
         <Fact>
         <Trait(Traits.Feature, Traits.Features.KeywordRecommending)>
-        Public Sub OperatorCTypeAfterNarrowing()
+        Public Sub OperatorCTypeAfterNarrowingTest()
             VerifyRecommendationsContain(<ClassDeclaration>Narrowing |</ClassDeclaration>, "Operator CType")
             VerifyRecommendationsMissing(<ClassDeclaration>Narrowing |</ClassDeclaration>, "Operator")
         End Sub
 
         <Fact>
         <Trait(Traits.Feature, Traits.Features.KeywordRecommending)>
-        Public Sub OperatorCTypeAfterWidening()
+        Public Sub OperatorCTypeAfterWideningTest()
             VerifyRecommendationsContain(<ClassDeclaration>Widening |</ClassDeclaration>, "Operator CType")
             VerifyRecommendationsMissing(<ClassDeclaration>Widening |</ClassDeclaration>, "Operator")
         End Sub
 
         <Fact>
         <Trait(Traits.Feature, Traits.Features.KeywordRecommending)>
-        Public Sub OperatorNotAfterReadOnly()
+        Public Sub OperatorNotAfterReadOnlyTest()
             VerifyRecommendationsMissing(<ClassDeclaration>ReadOnly |</ClassDeclaration>, "Operator")
         End Sub
 
         <Fact>
         <Trait(Traits.Feature, Traits.Features.KeywordRecommending)>
-        Public Sub OperatorNotAfterWriteOnly()
+        Public Sub OperatorNotAfterWriteOnlyTest()
             VerifyRecommendationsMissing(<ClassDeclaration>WriteOnly |</ClassDeclaration>, "Operator")
         End Sub
 
         <Fact>
         <Trait(Traits.Feature, Traits.Features.KeywordRecommending)>
-        Public Sub OperatorNotAfterCustom()
+        Public Sub OperatorNotAfterCustomTest()
             VerifyRecommendationsMissing(<ClassDeclaration>Custom |</ClassDeclaration>, "Operator")
         End Sub
 
         <Fact>
         <Trait(Traits.Feature, Traits.Features.KeywordRecommending)>
-        Public Sub OperatorAfterShared()
+        Public Sub OperatorAfterSharedTest()
             VerifyRecommendationsContain(<ClassDeclaration>Shared |</ClassDeclaration>, "Operator")
         End Sub
 
-        <WorkItem(674791)>
+        <WorkItem(674791, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/674791")>
         <Fact, Trait(Traits.Feature, Traits.Features.KeywordRecommending)>
-        Public Sub NotAfterHash()
+        Public Sub NotAfterHashTest()
             VerifyRecommendationsMissing(<File>
 Imports System
 

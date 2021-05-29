@@ -1,4 +1,8 @@
-﻿// Copyright (c) Microsoft.  All Rights Reserved.  Licensed under the Apache License, Version 2.0.  See License.txt in the project root for license information.
+﻿// Licensed to the .NET Foundation under one or more agreements.
+// The .NET Foundation licenses this file to you under the MIT license.
+// See the LICENSE file in the project root for more information.
+
+#nullable disable
 
 using System;
 using System.Collections.Immutable;
@@ -14,12 +18,13 @@ using Roslyn.Test.Utilities;
 using Xunit;
 using System.Threading.Tasks;
 using Microsoft.CodeAnalysis.Emit;
+using Roslyn.Utilities;
 
 namespace Microsoft.CodeAnalysis.CSharp.UnitTests.Symbols
 {
     public class AnonymousTypesSymbolTests : CompilingTestBase
     {
-        [Fact]
+        [ClrOnlyFact]
         public void AnonymousTypeSymbol_InQuery()
         {
             var source = LINQ + @"
@@ -49,7 +54,7 @@ class Query
             TestAnonymousTypeFieldSymbols_InQuery(verifier.EmittedAssemblyData);
         }
 
-        [Fact()]
+        [ClrOnlyFact]
         public void AnonymousTypeSymbol_Mix()
         {
             var source = @"
@@ -89,7 +94,7 @@ namespace Test
             CompileAndVerify(source);
         }
 
-        [Fact()]
+        [ClrOnlyFact]
         public void AnonymousTypeInConstructedMethod_NonEmpty()
         {
             var source = @"
@@ -99,10 +104,10 @@ class Program
 {
     static void Main(string[] args)
     {
-        Console.WriteLine(Foo<int>()());
+        Console.WriteLine(Goo<int>()());
     }
 
-    static Func<object> Foo<T>()
+    static Func<object> Goo<T>()
     {
         T x2 = default(T);
         return (Func<object>) (() => new { x2 });
@@ -114,7 +119,7 @@ class Program
             );
         }
 
-        [Fact()]
+        [ClrOnlyFact]
         public void AnonymousTypeInConstructedMethod_NonEmpty2()
         {
             var source = @"
@@ -124,10 +129,10 @@ class Program
 {
     static void Main(string[] args)
     {
-        Console.WriteLine(Foo<int>()());
+        Console.WriteLine(Goo<int>()());
     }
 
-    static Func<object> Foo<T>()
+    static Func<object> Goo<T>()
     {
         T x2 = default(T);
         Func<object> x3 = () => new { x2 };
@@ -140,7 +145,7 @@ class Program
             );
         }
 
-        [Fact()]
+        [ClrOnlyFact]
         public void AnonymousTypeInConstructedMethod_NonEmpty3()
         {
             var source = @"
@@ -150,12 +155,12 @@ class Program
 {
     static void Main(string[] args)
     {
-        Console.WriteLine(Foo<int>());
-        Console.WriteLine(Foo<string>());
-        Console.WriteLine(Foo<int?>());
+        Console.WriteLine(Goo<int>());
+        Console.WriteLine(Goo<string>());
+        Console.WriteLine(Goo<int?>());
     }
 
-    static object Foo<T>()
+    static object Goo<T>()
     {
         T x2 = default(T);
         return new { x2 };
@@ -170,7 +175,7 @@ class Program
             );
         }
 
-        [Fact()]
+        [ClrOnlyFact]
         public void AnonymousTypeInConstructedMethod_NonEmpty4()
         {
             var source = @"
@@ -181,13 +186,13 @@ class Program
 {
     static void Main(string[] args)
     {
-        foreach(var x in Foo<int>())
+        foreach(var x in Goo<int>())
         {
             Console.Write(x);
         }
     }
 
-    static IEnumerable<object> Foo<T>()
+    static IEnumerable<object> Goo<T>()
     {
         T x2 = default(T);
         yield return new { x2 }.ToString();
@@ -200,7 +205,7 @@ class Program
             );
         }
 
-        [Fact()]
+        [ClrOnlyFact]
         public void AnonymousTypeInConstructedMethod_Empty()
         {
             var source = @"
@@ -210,10 +215,10 @@ class Program
 {
     static void Main(string[] args)
     {
-        Console.WriteLine(Foo<int>()());
+        Console.WriteLine(Goo<int>()());
     }
 
-    static Func<object> Foo<T>()
+    static Func<object> Goo<T>()
     {
         T x2 = default(T);
         return (Func<object>) (() => new { });
@@ -245,9 +250,9 @@ class Program
             Assert.Equal(fieldType, field.FieldType);
             Assert.Equal(FieldAttributes.Private | FieldAttributes.InitOnly, field.Attributes);
 
-            var attrs = field.GetCustomAttributesData().ToArray();
-            Assert.Equal(1, attrs.Length);
-            Assert.Equal(typeof(DebuggerBrowsableAttribute), attrs[0].Constructor.DeclaringType);
+            var attrs = field.CustomAttributes.ToList();
+            Assert.Equal(1, attrs.Count);
+            Assert.Equal(typeof(DebuggerBrowsableAttribute), attrs[0].AttributeType);
 
             var args = attrs[0].ConstructorArguments.ToArray();
             Assert.Equal(1, args.Length);
@@ -257,7 +262,7 @@ class Program
 
         #endregion
 
-        [Fact]
+        [ClrOnlyFact]
         public void AnonymousTypeSymbol_Simple()
         {
             var source = @"
@@ -359,37 +364,42 @@ class Query
             ).VerifyIL(
                 "<>f__AnonymousType1<<Length>j__TPar, <at1>j__TPar, <C>j__TPar>.Equals",
 @"{
-  // Code size       83 (0x53)
+  // Code size       89 (0x59)
   .maxstack  3
   .locals init (<>f__AnonymousType1<<Length>j__TPar, <at1>j__TPar, <C>j__TPar> V_0)
   IL_0000:  ldarg.1
   IL_0001:  isinst     ""<>f__AnonymousType1<<Length>j__TPar, <at1>j__TPar, <C>j__TPar>""
   IL_0006:  stloc.0
-  IL_0007:  ldloc.0
-  IL_0008:  brfalse.s  IL_0051
-  IL_000a:  call       ""System.Collections.Generic.EqualityComparer<<Length>j__TPar> System.Collections.Generic.EqualityComparer<<Length>j__TPar>.Default.get""
-  IL_000f:  ldarg.0
-  IL_0010:  ldfld      ""<Length>j__TPar <>f__AnonymousType1<<Length>j__TPar, <at1>j__TPar, <C>j__TPar>.<Length>i__Field""
-  IL_0015:  ldloc.0
-  IL_0016:  ldfld      ""<Length>j__TPar <>f__AnonymousType1<<Length>j__TPar, <at1>j__TPar, <C>j__TPar>.<Length>i__Field""
-  IL_001b:  callvirt   ""bool System.Collections.Generic.EqualityComparer<<Length>j__TPar>.Equals(<Length>j__TPar, <Length>j__TPar)""
-  IL_0020:  brfalse.s  IL_0051
-  IL_0022:  call       ""System.Collections.Generic.EqualityComparer<<at1>j__TPar> System.Collections.Generic.EqualityComparer<<at1>j__TPar>.Default.get""
-  IL_0027:  ldarg.0
-  IL_0028:  ldfld      ""<at1>j__TPar <>f__AnonymousType1<<Length>j__TPar, <at1>j__TPar, <C>j__TPar>.<at1>i__Field""
-  IL_002d:  ldloc.0
-  IL_002e:  ldfld      ""<at1>j__TPar <>f__AnonymousType1<<Length>j__TPar, <at1>j__TPar, <C>j__TPar>.<at1>i__Field""
-  IL_0033:  callvirt   ""bool System.Collections.Generic.EqualityComparer<<at1>j__TPar>.Equals(<at1>j__TPar, <at1>j__TPar)""
-  IL_0038:  brfalse.s  IL_0051
-  IL_003a:  call       ""System.Collections.Generic.EqualityComparer<<C>j__TPar> System.Collections.Generic.EqualityComparer<<C>j__TPar>.Default.get""
-  IL_003f:  ldarg.0
-  IL_0040:  ldfld      ""<C>j__TPar <>f__AnonymousType1<<Length>j__TPar, <at1>j__TPar, <C>j__TPar>.<C>i__Field""
-  IL_0045:  ldloc.0
-  IL_0046:  ldfld      ""<C>j__TPar <>f__AnonymousType1<<Length>j__TPar, <at1>j__TPar, <C>j__TPar>.<C>i__Field""
-  IL_004b:  callvirt   ""bool System.Collections.Generic.EqualityComparer<<C>j__TPar>.Equals(<C>j__TPar, <C>j__TPar)""
-  IL_0050:  ret
-  IL_0051:  ldc.i4.0
-  IL_0052:  ret
+  IL_0007:  ldarg.0
+  IL_0008:  ldloc.0
+  IL_0009:  beq.s      IL_0057
+  IL_000b:  ldloc.0
+  IL_000c:  brfalse.s  IL_0055
+  IL_000e:  call       ""System.Collections.Generic.EqualityComparer<<Length>j__TPar> System.Collections.Generic.EqualityComparer<<Length>j__TPar>.Default.get""
+  IL_0013:  ldarg.0
+  IL_0014:  ldfld      ""<Length>j__TPar <>f__AnonymousType1<<Length>j__TPar, <at1>j__TPar, <C>j__TPar>.<Length>i__Field""
+  IL_0019:  ldloc.0
+  IL_001a:  ldfld      ""<Length>j__TPar <>f__AnonymousType1<<Length>j__TPar, <at1>j__TPar, <C>j__TPar>.<Length>i__Field""
+  IL_001f:  callvirt   ""bool System.Collections.Generic.EqualityComparer<<Length>j__TPar>.Equals(<Length>j__TPar, <Length>j__TPar)""
+  IL_0024:  brfalse.s  IL_0055
+  IL_0026:  call       ""System.Collections.Generic.EqualityComparer<<at1>j__TPar> System.Collections.Generic.EqualityComparer<<at1>j__TPar>.Default.get""
+  IL_002b:  ldarg.0
+  IL_002c:  ldfld      ""<at1>j__TPar <>f__AnonymousType1<<Length>j__TPar, <at1>j__TPar, <C>j__TPar>.<at1>i__Field""
+  IL_0031:  ldloc.0
+  IL_0032:  ldfld      ""<at1>j__TPar <>f__AnonymousType1<<Length>j__TPar, <at1>j__TPar, <C>j__TPar>.<at1>i__Field""
+  IL_0037:  callvirt   ""bool System.Collections.Generic.EqualityComparer<<at1>j__TPar>.Equals(<at1>j__TPar, <at1>j__TPar)""
+  IL_003c:  brfalse.s  IL_0055
+  IL_003e:  call       ""System.Collections.Generic.EqualityComparer<<C>j__TPar> System.Collections.Generic.EqualityComparer<<C>j__TPar>.Default.get""
+  IL_0043:  ldarg.0
+  IL_0044:  ldfld      ""<C>j__TPar <>f__AnonymousType1<<Length>j__TPar, <at1>j__TPar, <C>j__TPar>.<C>i__Field""
+  IL_0049:  ldloc.0
+  IL_004a:  ldfld      ""<C>j__TPar <>f__AnonymousType1<<Length>j__TPar, <at1>j__TPar, <C>j__TPar>.<C>i__Field""
+  IL_004f:  callvirt   ""bool System.Collections.Generic.EqualityComparer<<C>j__TPar>.Equals(<C>j__TPar, <C>j__TPar)""
+  IL_0054:  ret
+  IL_0055:  ldc.i4.0
+  IL_0056:  ret
+  IL_0057:  ldc.i4.1
+  IL_0058:  ret
 }"
             ).VerifyIL(
                 "<>f__AnonymousType1<<Length>j__TPar, <at1>j__TPar, <C>j__TPar>.GetHashCode",
@@ -423,14 +433,11 @@ class Query
             ).VerifyIL(
                 "<>f__AnonymousType1<<Length>j__TPar, <at1>j__TPar, <C>j__TPar>.ToString",
 @"{
-  // Code size      199 (0xc7)
+  // Code size      138 (0x8a)
   .maxstack  7
   .locals init (<Length>j__TPar V_0,
-                <Length>j__TPar V_1,
-                <at1>j__TPar V_2,
-                <at1>j__TPar V_3,
-                <C>j__TPar V_4,
-                <C>j__TPar V_5)
+                <at1>j__TPar V_1,
+                <C>j__TPar V_2)
   IL_0000:  ldnull
   IL_0001:  ldstr      ""{{ Length = {0}, at1 = {1}, C = {2} }}""
   IL_0006:  ldc.i4.3
@@ -441,71 +448,50 @@ class Query
   IL_000f:  ldfld      ""<Length>j__TPar <>f__AnonymousType1<<Length>j__TPar, <at1>j__TPar, <C>j__TPar>.<Length>i__Field""
   IL_0014:  stloc.0
   IL_0015:  ldloca.s   V_0
-  IL_0017:  ldloca.s   V_1
-  IL_0019:  initobj    ""<Length>j__TPar""
-  IL_001f:  ldloc.1
-  IL_0020:  box        ""<Length>j__TPar""
-  IL_0025:  brtrue.s   IL_003b
-  IL_0027:  ldobj      ""<Length>j__TPar""
-  IL_002c:  stloc.1
-  IL_002d:  ldloca.s   V_1
-  IL_002f:  ldloc.1
-  IL_0030:  box        ""<Length>j__TPar""
-  IL_0035:  brtrue.s   IL_003b
-  IL_0037:  pop
-  IL_0038:  ldnull
-  IL_0039:  br.s       IL_0046
-  IL_003b:  constrained. ""<Length>j__TPar""
-  IL_0041:  callvirt   ""string object.ToString()""
-  IL_0046:  stelem.ref
-  IL_0047:  dup
-  IL_0048:  ldc.i4.1
-  IL_0049:  ldarg.0
-  IL_004a:  ldfld      ""<at1>j__TPar <>f__AnonymousType1<<Length>j__TPar, <at1>j__TPar, <C>j__TPar>.<at1>i__Field""
-  IL_004f:  stloc.2
-  IL_0050:  ldloca.s   V_2
-  IL_0052:  ldloca.s   V_3
-  IL_0054:  initobj    ""<at1>j__TPar""
-  IL_005a:  ldloc.3
-  IL_005b:  box        ""<at1>j__TPar""
-  IL_0060:  brtrue.s   IL_0076
-  IL_0062:  ldobj      ""<at1>j__TPar""
-  IL_0067:  stloc.3
-  IL_0068:  ldloca.s   V_3
-  IL_006a:  ldloc.3
-  IL_006b:  box        ""<at1>j__TPar""
-  IL_0070:  brtrue.s   IL_0076
-  IL_0072:  pop
-  IL_0073:  ldnull
-  IL_0074:  br.s       IL_0081
-  IL_0076:  constrained. ""<at1>j__TPar""
-  IL_007c:  callvirt   ""string object.ToString()""
-  IL_0081:  stelem.ref
-  IL_0082:  dup
-  IL_0083:  ldc.i4.2
-  IL_0084:  ldarg.0
-  IL_0085:  ldfld      ""<C>j__TPar <>f__AnonymousType1<<Length>j__TPar, <at1>j__TPar, <C>j__TPar>.<C>i__Field""
-  IL_008a:  stloc.s    V_4
-  IL_008c:  ldloca.s   V_4
-  IL_008e:  ldloca.s   V_5
-  IL_0090:  initobj    ""<C>j__TPar""
-  IL_0096:  ldloc.s    V_5
-  IL_0098:  box        ""<C>j__TPar""
-  IL_009d:  brtrue.s   IL_00b5
-  IL_009f:  ldobj      ""<C>j__TPar""
-  IL_00a4:  stloc.s    V_5
-  IL_00a6:  ldloca.s   V_5
-  IL_00a8:  ldloc.s    V_5
-  IL_00aa:  box        ""<C>j__TPar""
-  IL_00af:  brtrue.s   IL_00b5
-  IL_00b1:  pop
-  IL_00b2:  ldnull
-  IL_00b3:  br.s       IL_00c0
-  IL_00b5:  constrained. ""<C>j__TPar""
-  IL_00bb:  callvirt   ""string object.ToString()""
-  IL_00c0:  stelem.ref
-  IL_00c1:  call       ""string string.Format(System.IFormatProvider, string, params object[])""
-  IL_00c6:  ret
+  IL_0017:  dup
+  IL_0018:  ldobj      ""<Length>j__TPar""
+  IL_001d:  box        ""<Length>j__TPar""
+  IL_0022:  brtrue.s   IL_0028
+  IL_0024:  pop
+  IL_0025:  ldnull
+  IL_0026:  br.s       IL_0033
+  IL_0028:  constrained. ""<Length>j__TPar""
+  IL_002e:  callvirt   ""string object.ToString()""
+  IL_0033:  stelem.ref
+  IL_0034:  dup
+  IL_0035:  ldc.i4.1
+  IL_0036:  ldarg.0
+  IL_0037:  ldfld      ""<at1>j__TPar <>f__AnonymousType1<<Length>j__TPar, <at1>j__TPar, <C>j__TPar>.<at1>i__Field""
+  IL_003c:  stloc.1
+  IL_003d:  ldloca.s   V_1
+  IL_003f:  dup
+  IL_0040:  ldobj      ""<at1>j__TPar""
+  IL_0045:  box        ""<at1>j__TPar""
+  IL_004a:  brtrue.s   IL_0050
+  IL_004c:  pop
+  IL_004d:  ldnull
+  IL_004e:  br.s       IL_005b
+  IL_0050:  constrained. ""<at1>j__TPar""
+  IL_0056:  callvirt   ""string object.ToString()""
+  IL_005b:  stelem.ref
+  IL_005c:  dup
+  IL_005d:  ldc.i4.2
+  IL_005e:  ldarg.0
+  IL_005f:  ldfld      ""<C>j__TPar <>f__AnonymousType1<<Length>j__TPar, <at1>j__TPar, <C>j__TPar>.<C>i__Field""
+  IL_0064:  stloc.2
+  IL_0065:  ldloca.s   V_2
+  IL_0067:  dup
+  IL_0068:  ldobj      ""<C>j__TPar""
+  IL_006d:  box        ""<C>j__TPar""
+  IL_0072:  brtrue.s   IL_0078
+  IL_0074:  pop
+  IL_0075:  ldnull
+  IL_0076:  br.s       IL_0083
+  IL_0078:  constrained. ""<C>j__TPar""
+  IL_007e:  callvirt   ""string object.ToString()""
+  IL_0083:  stelem.ref
+  IL_0084:  call       ""string string.Format(System.IFormatProvider, string, params object[])""
+  IL_0089:  ret
 }"
             );
         }
@@ -594,7 +580,7 @@ class Query
 ";
             for (int i = 0; i < 100; i++)
             {
-                var compilation = CreateCompilationWithMscorlibAndSystemCore(source, options: TestOptions.ReleaseExe);
+                var compilation = CreateCompilationWithMscorlib40AndSystemCore(source, options: TestOptions.ReleaseExe);
 
                 var tasks = new Task[10];
                 for (int j = 0; j < tasks.Length; j++)
@@ -615,8 +601,7 @@ class Query
             }
         }
 
-
-        [Fact]
+        [ClrOnlyFact]
         public void AnonymousTypeSymbol_Empty()
         {
             var source = @"
@@ -673,13 +658,21 @@ class Query
             ).VerifyIL(
                 "<>f__AnonymousType0.Equals",
 @"{
-  // Code size       10 (0xa)
+  // Code size       18 (0x12)
   .maxstack  2
+  .locals init (<>f__AnonymousType0 V_0)
   IL_0000:  ldarg.1
   IL_0001:  isinst     ""<>f__AnonymousType0""
-  IL_0006:  ldnull
-  IL_0007:  cgt.un
-  IL_0009:  ret
+  IL_0006:  stloc.0
+  IL_0007:  ldarg.0
+  IL_0008:  ldloc.0
+  IL_0009:  beq.s      IL_0010
+  IL_000b:  ldloc.0
+  IL_000c:  ldnull
+  IL_000d:  cgt.un
+  IL_000f:  ret
+  IL_0010:  ldc.i4.1
+  IL_0011:  ret
 }"
             ).VerifyIL(
                 "<>f__AnonymousType0.GetHashCode",
@@ -700,8 +693,8 @@ class Query
             );
         }
 
-        [WorkItem(543022, "DevDiv")]
-        [Fact()]
+        [WorkItem(543022, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/543022")]
+        [ClrOnlyFact]
         public void AnonymousTypeSymbol_StandardNames()
         {
             var source = @"
@@ -723,8 +716,8 @@ class Query
                 expectedOutput: "<>f__AnonymousType0`1[<>f__AnonymousType1]-<>f__AnonymousType1");
         }
 
-        [WorkItem(543022, "DevDiv")]
-        [Fact()]
+        [WorkItem(543022, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/543022")]
+        [ClrOnlyFact]
         public void AnonymousTypeSymbol_StandardNames2()
         {
             var source = @"
@@ -809,48 +802,49 @@ class Query
             ).VerifyIL(
                 "<>f__AnonymousType0<<ToString>j__TPar, <Equals>j__TPar, <GetHashCode>j__TPar>.Equals",
 @"{
-  // Code size       83 (0x53)
+  // Code size       89 (0x59)
   .maxstack  3
   .locals init (<>f__AnonymousType0<<ToString>j__TPar, <Equals>j__TPar, <GetHashCode>j__TPar> V_0)
   IL_0000:  ldarg.1
   IL_0001:  isinst     ""<>f__AnonymousType0<<ToString>j__TPar, <Equals>j__TPar, <GetHashCode>j__TPar>""
   IL_0006:  stloc.0
-  IL_0007:  ldloc.0
-  IL_0008:  brfalse.s  IL_0051
-  IL_000a:  call       ""System.Collections.Generic.EqualityComparer<<ToString>j__TPar> System.Collections.Generic.EqualityComparer<<ToString>j__TPar>.Default.get""
-  IL_000f:  ldarg.0
-  IL_0010:  ldfld      ""<ToString>j__TPar <>f__AnonymousType0<<ToString>j__TPar, <Equals>j__TPar, <GetHashCode>j__TPar>.<ToString>i__Field""
-  IL_0015:  ldloc.0
-  IL_0016:  ldfld      ""<ToString>j__TPar <>f__AnonymousType0<<ToString>j__TPar, <Equals>j__TPar, <GetHashCode>j__TPar>.<ToString>i__Field""
-  IL_001b:  callvirt   ""bool System.Collections.Generic.EqualityComparer<<ToString>j__TPar>.Equals(<ToString>j__TPar, <ToString>j__TPar)""
-  IL_0020:  brfalse.s  IL_0051
-  IL_0022:  call       ""System.Collections.Generic.EqualityComparer<<Equals>j__TPar> System.Collections.Generic.EqualityComparer<<Equals>j__TPar>.Default.get""
-  IL_0027:  ldarg.0
-  IL_0028:  ldfld      ""<Equals>j__TPar <>f__AnonymousType0<<ToString>j__TPar, <Equals>j__TPar, <GetHashCode>j__TPar>.<Equals>i__Field""
-  IL_002d:  ldloc.0
-  IL_002e:  ldfld      ""<Equals>j__TPar <>f__AnonymousType0<<ToString>j__TPar, <Equals>j__TPar, <GetHashCode>j__TPar>.<Equals>i__Field""
-  IL_0033:  callvirt   ""bool System.Collections.Generic.EqualityComparer<<Equals>j__TPar>.Equals(<Equals>j__TPar, <Equals>j__TPar)""
-  IL_0038:  brfalse.s  IL_0051
-  IL_003a:  call       ""System.Collections.Generic.EqualityComparer<<GetHashCode>j__TPar> System.Collections.Generic.EqualityComparer<<GetHashCode>j__TPar>.Default.get""
-  IL_003f:  ldarg.0
-  IL_0040:  ldfld      ""<GetHashCode>j__TPar <>f__AnonymousType0<<ToString>j__TPar, <Equals>j__TPar, <GetHashCode>j__TPar>.<GetHashCode>i__Field""
-  IL_0045:  ldloc.0
-  IL_0046:  ldfld      ""<GetHashCode>j__TPar <>f__AnonymousType0<<ToString>j__TPar, <Equals>j__TPar, <GetHashCode>j__TPar>.<GetHashCode>i__Field""
-  IL_004b:  callvirt   ""bool System.Collections.Generic.EqualityComparer<<GetHashCode>j__TPar>.Equals(<GetHashCode>j__TPar, <GetHashCode>j__TPar)""
-  IL_0050:  ret
-  IL_0051:  ldc.i4.0
-  IL_0052:  ret
+  IL_0007:  ldarg.0
+  IL_0008:  ldloc.0
+  IL_0009:  beq.s      IL_0057
+  IL_000b:  ldloc.0
+  IL_000c:  brfalse.s  IL_0055
+  IL_000e:  call       ""System.Collections.Generic.EqualityComparer<<ToString>j__TPar> System.Collections.Generic.EqualityComparer<<ToString>j__TPar>.Default.get""
+  IL_0013:  ldarg.0
+  IL_0014:  ldfld      ""<ToString>j__TPar <>f__AnonymousType0<<ToString>j__TPar, <Equals>j__TPar, <GetHashCode>j__TPar>.<ToString>i__Field""
+  IL_0019:  ldloc.0
+  IL_001a:  ldfld      ""<ToString>j__TPar <>f__AnonymousType0<<ToString>j__TPar, <Equals>j__TPar, <GetHashCode>j__TPar>.<ToString>i__Field""
+  IL_001f:  callvirt   ""bool System.Collections.Generic.EqualityComparer<<ToString>j__TPar>.Equals(<ToString>j__TPar, <ToString>j__TPar)""
+  IL_0024:  brfalse.s  IL_0055
+  IL_0026:  call       ""System.Collections.Generic.EqualityComparer<<Equals>j__TPar> System.Collections.Generic.EqualityComparer<<Equals>j__TPar>.Default.get""
+  IL_002b:  ldarg.0
+  IL_002c:  ldfld      ""<Equals>j__TPar <>f__AnonymousType0<<ToString>j__TPar, <Equals>j__TPar, <GetHashCode>j__TPar>.<Equals>i__Field""
+  IL_0031:  ldloc.0
+  IL_0032:  ldfld      ""<Equals>j__TPar <>f__AnonymousType0<<ToString>j__TPar, <Equals>j__TPar, <GetHashCode>j__TPar>.<Equals>i__Field""
+  IL_0037:  callvirt   ""bool System.Collections.Generic.EqualityComparer<<Equals>j__TPar>.Equals(<Equals>j__TPar, <Equals>j__TPar)""
+  IL_003c:  brfalse.s  IL_0055
+  IL_003e:  call       ""System.Collections.Generic.EqualityComparer<<GetHashCode>j__TPar> System.Collections.Generic.EqualityComparer<<GetHashCode>j__TPar>.Default.get""
+  IL_0043:  ldarg.0
+  IL_0044:  ldfld      ""<GetHashCode>j__TPar <>f__AnonymousType0<<ToString>j__TPar, <Equals>j__TPar, <GetHashCode>j__TPar>.<GetHashCode>i__Field""
+  IL_0049:  ldloc.0
+  IL_004a:  ldfld      ""<GetHashCode>j__TPar <>f__AnonymousType0<<ToString>j__TPar, <Equals>j__TPar, <GetHashCode>j__TPar>.<GetHashCode>i__Field""
+  IL_004f:  callvirt   ""bool System.Collections.Generic.EqualityComparer<<GetHashCode>j__TPar>.Equals(<GetHashCode>j__TPar, <GetHashCode>j__TPar)""
+  IL_0054:  ret
+  IL_0055:  ldc.i4.0
+  IL_0056:  ret
+  IL_0057:  ldc.i4.1
+  IL_0058:  ret
 }"
             ).VerifyIL(
                 "<>f__AnonymousType0<<ToString>j__TPar, <Equals>j__TPar, <GetHashCode>j__TPar>.GetHashCode",
 @"{
   // Code size       75 (0x4b)
   .maxstack  3
-" +
-  (IntPtr.Size == 4 ?
-    "  IL_0000:  ldc.i4     0x78ce6eb1" :
-    "  IL_0000:  ldc.i4     0x983c2cef") +
-@"
+  IL_0000:  ldc.i4     0x3711624
   IL_0005:  ldc.i4     0xa5555529
   IL_000a:  mul
   IL_000b:  call       ""System.Collections.Generic.EqualityComparer<<ToString>j__TPar> System.Collections.Generic.EqualityComparer<<ToString>j__TPar>.Default.get""
@@ -877,14 +871,11 @@ class Query
             ).VerifyIL(
                 "<>f__AnonymousType0<<ToString>j__TPar, <Equals>j__TPar, <GetHashCode>j__TPar>.ToString",
 @"{
-  // Code size      199 (0xc7)
+  // Code size      138 (0x8a)
   .maxstack  7
   .locals init (<ToString>j__TPar V_0,
-                <ToString>j__TPar V_1,
-                <Equals>j__TPar V_2,
-                <Equals>j__TPar V_3,
-                <GetHashCode>j__TPar V_4,
-                <GetHashCode>j__TPar V_5)
+                <Equals>j__TPar V_1,
+                <GetHashCode>j__TPar V_2)
   IL_0000:  ldnull
   IL_0001:  ldstr      ""{{ ToString = {0}, Equals = {1}, GetHashCode = {2} }}""
   IL_0006:  ldc.i4.3
@@ -895,71 +886,50 @@ class Query
   IL_000f:  ldfld      ""<ToString>j__TPar <>f__AnonymousType0<<ToString>j__TPar, <Equals>j__TPar, <GetHashCode>j__TPar>.<ToString>i__Field""
   IL_0014:  stloc.0
   IL_0015:  ldloca.s   V_0
-  IL_0017:  ldloca.s   V_1
-  IL_0019:  initobj    ""<ToString>j__TPar""
-  IL_001f:  ldloc.1
-  IL_0020:  box        ""<ToString>j__TPar""
-  IL_0025:  brtrue.s   IL_003b
-  IL_0027:  ldobj      ""<ToString>j__TPar""
-  IL_002c:  stloc.1
-  IL_002d:  ldloca.s   V_1
-  IL_002f:  ldloc.1
-  IL_0030:  box        ""<ToString>j__TPar""
-  IL_0035:  brtrue.s   IL_003b
-  IL_0037:  pop
-  IL_0038:  ldnull
-  IL_0039:  br.s       IL_0046
-  IL_003b:  constrained. ""<ToString>j__TPar""
-  IL_0041:  callvirt   ""string object.ToString()""
-  IL_0046:  stelem.ref
-  IL_0047:  dup
-  IL_0048:  ldc.i4.1
-  IL_0049:  ldarg.0
-  IL_004a:  ldfld      ""<Equals>j__TPar <>f__AnonymousType0<<ToString>j__TPar, <Equals>j__TPar, <GetHashCode>j__TPar>.<Equals>i__Field""
-  IL_004f:  stloc.2
-  IL_0050:  ldloca.s   V_2
-  IL_0052:  ldloca.s   V_3
-  IL_0054:  initobj    ""<Equals>j__TPar""
-  IL_005a:  ldloc.3
-  IL_005b:  box        ""<Equals>j__TPar""
-  IL_0060:  brtrue.s   IL_0076
-  IL_0062:  ldobj      ""<Equals>j__TPar""
-  IL_0067:  stloc.3
-  IL_0068:  ldloca.s   V_3
-  IL_006a:  ldloc.3
-  IL_006b:  box        ""<Equals>j__TPar""
-  IL_0070:  brtrue.s   IL_0076
-  IL_0072:  pop
-  IL_0073:  ldnull
-  IL_0074:  br.s       IL_0081
-  IL_0076:  constrained. ""<Equals>j__TPar""
-  IL_007c:  callvirt   ""string object.ToString()""
-  IL_0081:  stelem.ref
-  IL_0082:  dup
-  IL_0083:  ldc.i4.2
-  IL_0084:  ldarg.0
-  IL_0085:  ldfld      ""<GetHashCode>j__TPar <>f__AnonymousType0<<ToString>j__TPar, <Equals>j__TPar, <GetHashCode>j__TPar>.<GetHashCode>i__Field""
-  IL_008a:  stloc.s    V_4
-  IL_008c:  ldloca.s   V_4
-  IL_008e:  ldloca.s   V_5
-  IL_0090:  initobj    ""<GetHashCode>j__TPar""
-  IL_0096:  ldloc.s    V_5
-  IL_0098:  box        ""<GetHashCode>j__TPar""
-  IL_009d:  brtrue.s   IL_00b5
-  IL_009f:  ldobj      ""<GetHashCode>j__TPar""
-  IL_00a4:  stloc.s    V_5
-  IL_00a6:  ldloca.s   V_5
-  IL_00a8:  ldloc.s    V_5
-  IL_00aa:  box        ""<GetHashCode>j__TPar""
-  IL_00af:  brtrue.s   IL_00b5
-  IL_00b1:  pop
-  IL_00b2:  ldnull
-  IL_00b3:  br.s       IL_00c0
-  IL_00b5:  constrained. ""<GetHashCode>j__TPar""
-  IL_00bb:  callvirt   ""string object.ToString()""
-  IL_00c0:  stelem.ref
-  IL_00c1:  call       ""string string.Format(System.IFormatProvider, string, params object[])""
-  IL_00c6:  ret
+  IL_0017:  dup
+  IL_0018:  ldobj      ""<ToString>j__TPar""
+  IL_001d:  box        ""<ToString>j__TPar""
+  IL_0022:  brtrue.s   IL_0028
+  IL_0024:  pop
+  IL_0025:  ldnull
+  IL_0026:  br.s       IL_0033
+  IL_0028:  constrained. ""<ToString>j__TPar""
+  IL_002e:  callvirt   ""string object.ToString()""
+  IL_0033:  stelem.ref
+  IL_0034:  dup
+  IL_0035:  ldc.i4.1
+  IL_0036:  ldarg.0
+  IL_0037:  ldfld      ""<Equals>j__TPar <>f__AnonymousType0<<ToString>j__TPar, <Equals>j__TPar, <GetHashCode>j__TPar>.<Equals>i__Field""
+  IL_003c:  stloc.1
+  IL_003d:  ldloca.s   V_1
+  IL_003f:  dup
+  IL_0040:  ldobj      ""<Equals>j__TPar""
+  IL_0045:  box        ""<Equals>j__TPar""
+  IL_004a:  brtrue.s   IL_0050
+  IL_004c:  pop
+  IL_004d:  ldnull
+  IL_004e:  br.s       IL_005b
+  IL_0050:  constrained. ""<Equals>j__TPar""
+  IL_0056:  callvirt   ""string object.ToString()""
+  IL_005b:  stelem.ref
+  IL_005c:  dup
+  IL_005d:  ldc.i4.2
+  IL_005e:  ldarg.0
+  IL_005f:  ldfld      ""<GetHashCode>j__TPar <>f__AnonymousType0<<ToString>j__TPar, <Equals>j__TPar, <GetHashCode>j__TPar>.<GetHashCode>i__Field""
+  IL_0064:  stloc.2
+  IL_0065:  ldloca.s   V_2
+  IL_0067:  dup
+  IL_0068:  ldobj      ""<GetHashCode>j__TPar""
+  IL_006d:  box        ""<GetHashCode>j__TPar""
+  IL_0072:  brtrue.s   IL_0078
+  IL_0074:  pop
+  IL_0075:  ldnull
+  IL_0076:  br.s       IL_0083
+  IL_0078:  constrained. ""<GetHashCode>j__TPar""
+  IL_007e:  callvirt   ""string object.ToString()""
+  IL_0083:  stelem.ref
+  IL_0084:  call       ""string string.Format(System.IFormatProvider, string, params object[])""
+  IL_0089:  ret
 }"
             ).VerifyIL(
                 "<>f__AnonymousType0<<ToString>j__TPar, <Equals>j__TPar, <GetHashCode>j__TPar>.ToString.get",
@@ -1003,7 +973,7 @@ class Query
             int init = 0;
             foreach (var name in names)
             {
-                init = unchecked(init * HASH_FACTOR + name.GetHashCode());
+                init = unchecked(init * HASH_FACTOR + Hash.GetFNVHashCode(name));
             }
             return "0x" + init.ToString("X").ToLower();
         }
@@ -1027,7 +997,7 @@ class Query
 
         private void TestAnonymousType(NamedTypeSymbol type, int typeIndex, TypeDescr typeDescr)
         {
-            Assert.NotNull(typeDescr);
+            Assert.NotEqual(default, typeDescr);
             Assert.NotNull(typeDescr.FieldNames);
 
             //  prepare 
@@ -1048,13 +1018,13 @@ class Query
 
             //  test
             Assert.Equal(typeViewName, type.ToDisplayString());
-            Assert.Equal("object", type.BaseType.ToDisplayString());
+            Assert.Equal("object", type.BaseType().ToDisplayString());
             Assert.True(fieldsCount == 0 ? !type.IsGenericType : type.IsGenericType);
             Assert.Equal(fieldsCount, type.Arity);
             Assert.Equal(Accessibility.Internal, type.DeclaredAccessibility);
             Assert.True(type.IsSealed);
             Assert.False(type.IsStatic);
-            Assert.Equal(0, type.Interfaces.Length);
+            Assert.Equal(0, type.Interfaces().Length);
 
             //  test non-existing members
             Assert.Equal(0, type.GetMembers("doesnotexist").Length);
@@ -1161,7 +1131,7 @@ class Query
             Assert.False(method.IsVararg);
             Assert.False(method.IsVirtual);
             Assert.Equal(isVirtualAndOverride, method.IsMetadataVirtual());
-            Assert.Equal(retType, method.ReturnType.ToDisplayString());
+            Assert.Equal(retType, method.ReturnTypeWithAnnotations.ToDisplayString());
 
             TestAttributeOnSymbol(method, attr == null ? new AttributeInfo[] { } : new AttributeInfo[] { attr });
         }
@@ -1196,7 +1166,7 @@ class Query
 
         #endregion
 
-        [Fact]
+        [ClrOnlyFact]
         public void AnonymousType_BaseAccess()
         {
             var source = @"
@@ -1225,7 +1195,7 @@ class Derived: Base
                 expectedOutput: "{ field = 123 }");
         }
 
-        [Fact]
+        [ClrOnlyFact]
         public void AnonymousType_PropertyAccess()
         {
             var source = @"
@@ -1249,7 +1219,7 @@ class Class1
                 expectedOutput: "{ PropertyA = pa-value }");
         }
 
-        [Fact]
+        [ClrOnlyFact]
         public void AnonymousType_Simple()
         {
             var source = @"
@@ -1270,7 +1240,7 @@ class Query
                 expectedOutput: "a=1; b=text");
         }
 
-        [Fact]
+        [ClrOnlyFact]
         public void AnonymousType_CustModifiersOnPropertyFields()
         {
             var source = @"
@@ -1290,17 +1260,14 @@ class Query
 ";
             CompileAndVerify(
                 source,
-                additionalRefs: new[] { TestReferences.SymbolsTests.CustomModifiers.Modifiers.dll },
-                emitOptions: TestEmitters.RefEmitUnsupported_646023);
+                references: new[] { TestReferences.SymbolsTests.CustomModifiers.Modifiers.dll });
         }
 
-        [Fact]
+        [ClrOnlyFact]
         public void AnonymousType_ToString()
         {
             // test AnonymousType.ToString()
-            var currCulture = System.Threading.Thread.CurrentThread.CurrentCulture;
-            System.Threading.Thread.CurrentThread.CurrentCulture = new System.Globalization.CultureInfo("en-US");
-            try
+            using (new EnsureInvariantCulture())
             {
                 var source = @"
 using System;
@@ -1316,14 +1283,11 @@ class Query
                 CompileAndVerify(
                     source,
                     expectedOutput: "{ a = 1, b = text, c = 123.456 }");
-            }
-            finally
-            {
-                System.Threading.Thread.CurrentThread.CurrentCulture = currCulture;
+
             }
         }
 
-        [Fact]
+        [ClrOnlyFact]
         public void AnonymousType_Equals()
         {
             var source = @"
@@ -1385,7 +1349,7 @@ class Query
 ");
         }
 
-        [Fact]
+        [ClrOnlyFact]
         public void AnonymousType_GetHashCode()
         {
             var source = @"
@@ -1440,12 +1404,12 @@ class Query
 ");
         }
 
-        [Fact]
+        [ClrOnlyFact]
         public void AnonymousType_MultiplyEmitDoesNotChangeTheOrdering()
         {
             //  this test checks whether or not anonymous types which came from speculative 
             //  semantic API have any effect on the anonymous types emitted and
-            //  wherer or not the order is still the same accross several emits
+            //  whether or not the order is still the same across several emits
 
             var source1 = @"
 using System;
@@ -1485,7 +1449,7 @@ class Class3
     }
 }
 ";
-            var compilation = GetCompilationForEmit(new string[] { source1, source2, source3 }, null, TestOptions.ReleaseDll.WithMetadataImportOptions(MetadataImportOptions.Internal));
+            var compilation = CreateCompilationWithMscorlib40(new string[] { source1, source2, source3 }, options: TestOptions.ReleaseDll.WithMetadataImportOptions(MetadataImportOptions.Internal), parseOptions: TestOptions.Regular);
 
             for (int i = 0; i < 10; i++)
             {
@@ -1494,7 +1458,7 @@ class Class3
                     symbolValidator: module =>
                     {
                         var types = module.GlobalNamespace.GetTypeMembers()
-                                        .Where(t => t.Name.StartsWith("<>"))
+                                        .Where(t => t.Name.StartsWith("<>", StringComparison.Ordinal))
                                         .Select(t => t.ToDisplayString())
                                         .OrderBy(t => t)
                                         .ToArray();
@@ -1505,20 +1469,20 @@ class Class3
                         Assert.Equal("<>f__AnonymousType2", types[2]);
                         Assert.Equal("<>f__AnonymousType3<<b>j__TPar, <a>j__TPar>", types[3]);
                     },
-                    verify: false
+                    verify: Verification.Passes
                 );
 
                 // do some speculative semantic query
                 var model = compilation.GetSemanticModel(compilation.SyntaxTrees[0]);
-                var position = source1.IndexOf("var d") - 1;
+                var position = source1.IndexOf("var d", StringComparison.Ordinal) - 1;
                 var expr1 = SyntaxFactory.ParseExpression("new { x = 1, y" + i.ToString() + " = \"---\" }");
                 var info1 = model.GetSpeculativeTypeInfo(position, expr1, SpeculativeBindingOption.BindAsExpression);
                 Assert.NotNull(info1.Type);
             }
         }
 
-        [WorkItem(543134)]
-        [Fact()]
+        [WorkItem(543134, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/543134")]
+        [ClrOnlyFact]
         public void AnonymousTypeSymbol_Simple_1()
         {
             var source = @"
@@ -1534,7 +1498,7 @@ class Test
             CompileAndVerify(source);
         }
 
-        [Fact()]
+        [ClrOnlyFact]
         public void AnonymousTypeSymbol_NamesConflictInsideLambda()
         {
             var source = @"
@@ -1556,8 +1520,8 @@ class Test
             CompileAndVerify(source, expectedOutput: "1221");
         }
 
-        [WorkItem(543693, "DevDiv")]
-        [Fact()]
+        [WorkItem(543693, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/543693")]
+        [ClrOnlyFact]
         public void Bug11593a()
         {
             var source = @"
@@ -1593,8 +1557,8 @@ class P
             CompileAndVerify(source, expectedOutput: "Success");
         }
 
-        [WorkItem(543693, "DevDiv")]
-        [Fact()]
+        [WorkItem(543693, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/543693")]
+        [ClrOnlyFact]
         public void Bug11593b()
         {
             var source = @"
@@ -1632,8 +1596,8 @@ class P
             CompileAndVerify(source, expectedOutput: "Success");
         }
 
-        [WorkItem(543177, "DevDiv")]
-        [Fact()]
+        [WorkItem(543177, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/543177")]
+        [ClrOnlyFact]
         public void AnonymousTypePropertyValueWithWarning()
         {
             var source = @"
@@ -1656,7 +1620,7 @@ class Program
             CompileAndVerify(source, expectedOutput: "True");
         }
 
-        [Fact(), WorkItem(544323, "DevDiv")]
+        [Fact(), WorkItem(544323, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/544323")]
         public void AnonymousTypeAndMemberSymbolsLocations()
         {
             var source = @"
@@ -1671,13 +1635,13 @@ class Program
 }
 ";
             var tree = SyntaxFactory.ParseSyntaxTree(source);
-            var comp = CreateCompilationWithMscorlib(tree);
+            var comp = CreateCompilation(tree);
             var model = comp.GetSemanticModel(tree);
             var expr = tree.GetCompilationUnitRoot().DescendantNodes().OfType<AnonymousObjectCreationExpressionSyntax>().Single();
 
             var sym = model.GetSymbolInfo(expr);
             Assert.NotNull(sym.Symbol);
-            Assert.True(((Symbol)sym.Symbol).IsFromCompilation(comp), "IsFromCompilation");
+            Assert.True(sym.Symbol.GetSymbol().IsFromCompilation(comp), "IsFromCompilation");
             Assert.False(sym.Symbol.Locations.IsEmpty, "Symbol Location");
             Assert.True(sym.Symbol.Locations[0].IsInSource);
 
@@ -1686,7 +1650,7 @@ class Program
             var mems = info.Type.GetMembers();
             foreach (var m in mems)
             {
-                Assert.True(((Symbol)m).IsFromCompilation(comp), "IsFromCompilation");
+                Assert.True(m.GetSymbol().IsFromCompilation(comp), "IsFromCompilation");
                 Assert.False(m.Locations.IsEmpty, String.Format("No Location: {0}", m));
                 Assert.True(m.Locations[0].IsInSource);
             }
@@ -1712,7 +1676,7 @@ class Program
 }
 ";
             var tree = SyntaxFactory.ParseSyntaxTree(source);
-            var comp = CreateCompilationWithMscorlib(tree);
+            var comp = CreateCompilation(tree);
             var model = comp.GetSemanticModel(tree);
             var programType = (NamedTypeSymbol)(comp.GlobalNamespace.GetTypeMembers("Program").Single());
             var mainMethod = (MethodSymbol)(programType.GetMembers("Main").Single());
@@ -1722,8 +1686,8 @@ class Program
             var statement2 = mainBlock.Statements[1] as LocalDeclarationStatementSyntax;
             var statement3 = mainBlock.Statements[2] as LocalDeclarationStatementSyntax;
             var statement4 = mainBlock.Statements[3] as LocalDeclarationStatementSyntax;
-            var localA3 = model.GetDeclaredSymbol(statement3.Declaration.Variables[0]) as LocalSymbol;
-            var localA4 = model.GetDeclaredSymbol(statement4.Declaration.Variables[0]) as LocalSymbol;
+            var localA3 = model.GetDeclaredSymbol(statement3.Declaration.Variables[0]) as ILocalSymbol;
+            var localA4 = model.GetDeclaredSymbol(statement4.Declaration.Variables[0]) as ILocalSymbol;
             var typeA3 = localA3.Type;
             var typeA4 = localA4.Type;
 
@@ -1739,7 +1703,7 @@ class Program
             Assert.True(statement2.Span.Contains(typeA4.Locations[0].SourceSpan));
         }
 
-        private static SyntaxTree s_equalityComparerSourceTree = Parse(@"
+        private static readonly SyntaxTree s_equalityComparerSourceTree = Parse(@"
 namespace System.Collections
 {
   public interface IEqualityComparer
@@ -1774,7 +1738,7 @@ namespace System.Collections.Generic
         /// <summary>
         /// Bug#15914: Breaking Changes
         /// </summary>
-        [Fact, WorkItem(530365, "DevDiv")]
+        [Fact, WorkItem(530365, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/530365")]
         public void NoStdLibNoEmitToStringForAnonymousType()
         {
             var source = @"
@@ -1790,7 +1754,7 @@ class Program
             // Dev11: omits methods that are not defined on Object (see also Dev10 bug 487707)
             // Roslyn: we require Equals, ToString, GetHashCode, Format to be defined
 
-            var comp = CreateCompilation(new[] { Parse(source), s_equalityComparerSourceTree }, new[] { MinCorlibRef });
+            var comp = CreateEmptyCompilation(new[] { Parse(source), s_equalityComparerSourceTree }, new[] { MinCorlibRef });
             var result = comp.Emit(new MemoryStream());
 
             result.Diagnostics.Verify(
@@ -1804,7 +1768,7 @@ class Program
                 Diagnostic(ErrorCode.ERR_MissingPredefinedMember).WithArguments("System.String", "Format"));
         }
 
-        [Fact, WorkItem(530365, "DevDiv")]
+        [Fact, WorkItem(530365, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/530365")]
         public void NoDebuggerBrowsableStateType()
         {
             var stateSource = @"
@@ -1818,7 +1782,7 @@ namespace System.Diagnostics
     }
 }
 ";
-            var stateLib = CreateCompilation(stateSource, new[] { MinCorlibRef });
+            var stateLib = CreateEmptyCompilation(stateSource, new[] { MinCorlibRef });
 
             var attributeSource = @"
 namespace System.Diagnostics
@@ -1832,7 +1796,7 @@ namespace System.Diagnostics
     }
 }
 ";
-            var attributeLib = CreateCompilation(attributeSource, new[] { MinCorlibRef, stateLib.ToMetadataReference() });
+            var attributeLib = CreateEmptyCompilation(attributeSource, new[] { MinCorlibRef, stateLib.ToMetadataReference() });
 
             var source = @"
 class Program
@@ -1844,7 +1808,7 @@ class Program
     }
 }";
 
-            var comp = CreateCompilation(new[] { Parse(source), s_equalityComparerSourceTree }, new[] { MinCorlibRef, attributeLib.ToMetadataReference() });
+            var comp = CreateEmptyCompilation(new[] { Parse(source), s_equalityComparerSourceTree }, new[] { MinCorlibRef, attributeLib.ToMetadataReference() });
             var result = comp.Emit(new MemoryStream());
 
             result.Diagnostics.Verify(
@@ -1878,16 +1842,18 @@ class C
 }
 ";
 
-            var comp = CreateCompilationWithMscorlib(source);
+            var comp = CreateCompilation(source);
             comp.VerifyDiagnostics(
-                // error CS0746: Invalid anonymous type member declarator. Anonymous type members must be declared with a member assignment, simple name or member access.
+                // (12,24): error CS0746: Invalid anonymous type member declarator. Anonymous type members must be declared with a member assignment, simple name or member access.
+                //         var x1 = new { local?.M() };
                 Diagnostic(ErrorCode.ERR_InvalidAnonymousTypeMemberDeclarator, "local?.M()").WithLocation(12, 24),
-                // error CS0746: Invalid anonymous type member declarator. Anonymous type members must be declared with a member assignment, simple name or member access.
+                // (13,24): error CS0746: Invalid anonymous type member declarator. Anonymous type members must be declared with a member assignment, simple name or member access.
+                //         var x2 = new { array?[0] };
                 Diagnostic(ErrorCode.ERR_InvalidAnonymousTypeMemberDeclarator, "array?[0]").WithLocation(13, 24));
         }
 
-        [Fact]
-        [WorkItem(991505, "DevDiv")]
+        [ClrOnlyFact]
+        [WorkItem(991505, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/991505")]
         [WorkItem(199, "CodePlex")]
         public void Bug991505()
         {
@@ -1928,6 +1894,38 @@ class C
                         new TypeDescr() { FieldNames = new[] { "L" } },
                         new TypeDescr() { FieldNames = new[] { "M" } },
                         new TypeDescr() { FieldNames = new[] { "N" } }));
+        }
+
+        [ClrOnlyFact]
+        public void CallingCreateAnonymousTypeDoesNotChangeIL()
+        {
+            var source = @"
+class C
+{
+    public static void Main(string[] args)
+    {
+        var v = new { m1 = 1, m2 = true };
+    }
+}";
+
+            var expectedIL = @"{
+  // Code size        9 (0x9)
+  .maxstack  2
+  IL_0000:  ldc.i4.1
+  IL_0001:  ldc.i4.1
+  IL_0002:  newobj     ""<>f__AnonymousType0<int, bool>..ctor(int, bool)""
+  IL_0007:  pop
+  IL_0008:  ret
+}";
+
+            CompileAndVerify(source).VerifyIL("C.Main", expectedIL);
+
+            var compilation = CreateCompilationWithMscorlib40(source);
+            compilation.CreateAnonymousTypeSymbol(
+                ImmutableArray.Create<ITypeSymbol>(compilation.GetSpecialType(SpecialType.System_Int32).GetPublicSymbol(), compilation.GetSpecialType(SpecialType.System_Boolean).GetPublicSymbol()),
+                ImmutableArray.Create("m1", "m2"));
+
+            this.CompileAndVerify(compilation).VerifyIL("C.Main", expectedIL);
         }
     }
 }

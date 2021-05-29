@@ -1,8 +1,7 @@
-﻿// Copyright (c) Microsoft.  All Rights Reserved.  Licensed under the Apache License, Version 2.0.  See License.txt in the project root for license information.
+﻿// Licensed to the .NET Foundation under one or more agreements.
+// The .NET Foundation licenses this file to you under the MIT license.
+// See the LICENSE file in the project root for more information.
 
-using Microsoft.CodeAnalysis.CSharp.Symbols;
-using Microsoft.CodeAnalysis.CSharp.Syntax;
-using Microsoft.CodeAnalysis.Text;
 using Roslyn.Utilities;
 using System;
 
@@ -23,9 +22,14 @@ namespace Microsoft.CodeAnalysis.CSharp
         }
 
         /// <summary>
-        /// The .Cast&lt;T&gt;() operation generated from the query range variable's type restriction.
-        /// If you want the type restriction, when this is non-null use Cast.TypeArguments[0].
+        /// The .Cast&lt;T&gt;() operation generated from the query range variable's type restriction,
+        /// or null if the type restriction isn't specified. 
         /// </summary>
+        /// <remarks>
+        /// The operation, when present is implemented via <see cref="IMethodSymbol"/>.
+        /// To access the type, when this is non-null use <see cref="IMethodSymbol.TypeArguments"/>[0].
+        /// If it is an extension method, it is returned in reduced form.
+        /// </remarks>
         public SymbolInfo CastInfo
         {
             get { return _castInfo; }
@@ -33,14 +37,18 @@ namespace Microsoft.CodeAnalysis.CSharp
 
         /// <summary>
         /// The operation (e.g. Select(), Where(), etc) that implements the given clause.
-        /// If it is an extension method, it is returned in reduced form.
         /// </summary>
+        /// <remarks>
+        /// The clause can be implemented via <see cref="IMethodSymbol"/>, or 
+        /// <see cref="IFieldSymbol"/> or <see cref="IPropertySymbol"/> that return a delegate.
+        /// If it is an extension method, it is returned in reduced form.
+        /// </remarks>
         public SymbolInfo OperationInfo
         {
             get { return _operationInfo; }
         }
 
-        public override bool Equals(object obj)
+        public override bool Equals(object? obj)
         {
             return obj is QueryClauseInfo && Equals((QueryClauseInfo)obj);
         }

@@ -1,16 +1,20 @@
-' Copyright (c) Microsoft.  All Rights Reserved.  Licensed under the Apache License, Version 2.0.  See License.txt in the project root for license information.
+﻿' Licensed to the .NET Foundation under one or more agreements.
+' The .NET Foundation licenses this file to you under the MIT license.
+' See the LICENSE file in the project root for more information.
+
+Imports Microsoft.CodeAnalysis.Remote.Testing
 
 Namespace Microsoft.CodeAnalysis.Editor.UnitTests.FindReferences
     Partial Public Class FindReferencesTests
-        <Fact, Trait(Traits.Feature, Traits.Features.FindReferences)>
-        Public Sub TestLocal()
+        <WpfTheory, CombinatorialData, Trait(Traits.Feature, Traits.Features.FindReferences)>
+        Public Async Function TestLocal(kind As TestKind, host As TestHost) As Task
             Dim input =
 <Workspace>
     <Project Language="C#" CommonReferences="true">
         <Document>
         class C
         {
-            void Foo()
+            void Goo()
             {
                 int {|Definition:$$i|} = 0;
                 Console.WriteLine([|i|]);
@@ -19,11 +23,34 @@ Namespace Microsoft.CodeAnalysis.Editor.UnitTests.FindReferences
         </Document>
     </Project>
 </Workspace>
-            Test(input)
-        End Sub
+            Await TestAPIAndFeature(input, kind, host)
+        End Function
 
-        <Fact, Trait(Traits.Feature, Traits.Features.FindReferences)>
-        Public Sub TestLocalInFieldInitializerLambda1()
+        <WorkItem(10714, "https://github.com/dotnet/roslyn/issues/10714")>
+        <WpfTheory, CombinatorialData, Trait(Traits.Feature, Traits.Features.FindReferences)>
+        Public Async Function TestLocalInAutoPropInitializer(kind As TestKind, host As TestHost) As Task
+            Dim input =
+<Workspace>
+    <Project Language="C#" CommonReferences="true">
+        <Document>
+using System;
+
+class Program
+{
+    public Action&lt;object&gt; Test { get; set; } = test =>
+    {
+        var $${|Definition:goo|} = 1;
+        [|goo|] = 3;
+    };
+}
+        </Document>
+    </Project>
+</Workspace>
+            Await TestAPIAndFeature(input, kind, host)
+        End Function
+
+        <WpfTheory, CombinatorialData, Trait(Traits.Feature, Traits.Features.FindReferences)>
+        Public Async Function TestLocalInFieldInitializerLambda1(kind As TestKind, host As TestHost) As Task
             Dim input =
 <Workspace>
     <Project Language="C#" CommonReferences="true">
@@ -40,11 +67,11 @@ Namespace Microsoft.CodeAnalysis.Editor.UnitTests.FindReferences
         </Document>
     </Project>
 </Workspace>
-            Test(input)
-        End Sub
+            Await TestAPIAndFeature(input, kind, host)
+        End Function
 
-        <Fact, Trait(Traits.Feature, Traits.Features.FindReferences)>
-        Public Sub TestLocalInFieldInitializerLambda2()
+        <WpfTheory, CombinatorialData, Trait(Traits.Feature, Traits.Features.FindReferences)>
+        Public Async Function TestLocalInFieldInitializerLambda2(kind As TestKind, host As TestHost) As Task
             Dim input =
 <Workspace>
     <Project Language="C#" CommonReferences="true">
@@ -61,18 +88,18 @@ Namespace Microsoft.CodeAnalysis.Editor.UnitTests.FindReferences
         </Document>
     </Project>
 </Workspace>
-            Test(input)
-        End Sub
+            Await TestAPIAndFeature(input, kind, host)
+        End Function
 
-        <Fact, Trait(Traits.Feature, Traits.Features.FindReferences)>
-        Public Sub TestLocalCaseSensitivity()
+        <WpfTheory, CombinatorialData, Trait(Traits.Feature, Traits.Features.FindReferences)>
+        Public Async Function TestLocalCaseSensitivity(kind As TestKind, host As TestHost) As Task
             Dim input =
 <Workspace>
     <Project Language="C#" CommonReferences="true">
         <Document>
         class C
         {
-            void Foo()
+            void Goo()
             {
                 int {|Definition:$$i|} = 0;
                 Console.WriteLine(I);
@@ -81,17 +108,17 @@ Namespace Microsoft.CodeAnalysis.Editor.UnitTests.FindReferences
         </Document>
     </Project>
 </Workspace>
-            Test(input)
-        End Sub
+            Await TestAPIAndFeature(input, kind, host)
+        End Function
 
-        <Fact, Trait(Traits.Feature, Traits.Features.FindReferences)>
-        Public Sub TestLocalCaseInsensitivity()
+        <WpfTheory, CombinatorialData, Trait(Traits.Feature, Traits.Features.FindReferences)>
+        Public Async Function TestLocalCaseInsensitivity(kind As TestKind, host As TestHost) As Task
             Dim input =
 <Workspace>
     <Project Language="Visual Basic" CommonReferences="true">
         <Document>
         class C
-            sub Foo()
+            sub Goo()
                 dim {|Definition:$$i|} = 0
                 Console.WriteLine([|i|])
                 Console.WriteLine([|I|])
@@ -101,12 +128,12 @@ Namespace Microsoft.CodeAnalysis.Editor.UnitTests.FindReferences
         </Document>
     </Project>
 </Workspace>
-            Test(input)
-        End Sub
+            Await TestAPIAndFeature(input, kind, host)
+        End Function
 
-        <WorkItem(530636)>
-        <Fact, Trait(Traits.Feature, Traits.Features.FindReferences)>
-        Public Sub TestLocalInLambdaInField1()
+        <WorkItem(530636, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/530636")>
+        <WpfTheory, CombinatorialData, Trait(Traits.Feature, Traits.Features.FindReferences)>
+        Public Async Function TestLocalInLambdaInField1(kind As TestKind, host As TestHost) As Task
             Dim input =
 <Workspace>
     <Project Language="Visual Basic" CommonReferences="true">
@@ -117,12 +144,12 @@ End Module
         </Document>
     </Project>
 </Workspace>
-            Test(input)
-        End Sub
+            Await TestAPIAndFeature(input, kind, host)
+        End Function
 
-        <WorkItem(530636)>
-        <Fact, Trait(Traits.Feature, Traits.Features.FindReferences)>
-        Public Sub TestLocalInLambdaInField2()
+        <WorkItem(530636, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/530636")>
+        <WpfTheory, CombinatorialData, Trait(Traits.Feature, Traits.Features.FindReferences)>
+        Public Async Function TestLocalInLambdaInField2(kind As TestKind, host As TestHost) As Task
             Dim input =
 <Workspace>
     <Project Language="Visual Basic" CommonReferences="true">
@@ -133,12 +160,12 @@ End Module
         </Document>
     </Project>
 </Workspace>
-            Test(input)
-        End Sub
+            Await TestAPIAndFeature(input, kind, host)
+        End Function
 
-        <Fact, Trait(Traits.Feature, Traits.Features.FindReferences)>
-        <WorkItem(608210)>
-        Public Sub TestLocalInPropertyInitializer()
+        <WpfTheory, CombinatorialData, Trait(Traits.Feature, Traits.Features.FindReferences)>
+        <WorkItem(608210, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/608210")>
+        Public Async Function TestLocalInPropertyInitializer(kind As TestKind, host As TestHost) As Task
             Dim input =
 <Workspace>
     <Project Language="Visual Basic" CommonReferences="true">
@@ -153,13 +180,40 @@ End Module
         </Document>
     </Project>
 </Workspace>
-            Test(input)
-        End Sub
+            Await TestAPIAndFeature(input, kind, host)
+        End Function
 
+        <WpfTheory, CombinatorialData, Trait(Traits.Feature, Traits.Features.FindReferences)>
+        <WorkItem(2667, "https://github.com/dotnet/roslyn/issues/2667")>
+        Public Async Function TestLocalWithWithStatement(kind As TestKind, host As TestHost) As Task
+            Dim input =
+<Workspace>
+    <Project Language="Visual Basic" CommonReferences="true">
+        <Document>
+        Class C
+            Public Property P As String
+            Public Property L As New List(Of String)
+            Sub M()
+                Dim {|Definition:$$x|} As New C
+                With [|x|]
+                    .P = "abcd"
+                End With
+
+                With [|x|].L
+                    .Add("efgh")
+                End With
+            End Function
+        End Class
+        </Document>
+    </Project>
+</Workspace>
+            Await TestAPIAndFeature(input, kind, host)
+        End Function
 
 #Region "FAR on collection initializers"
-        <Fact, Trait(Traits.Feature, Traits.Features.FindReferences)>
-        Public Sub TestLocal_CSharpNamedIdentifiersUsedInNestedColInit()
+
+        <WpfTheory, CombinatorialData, Trait(Traits.Feature, Traits.Features.FindReferences)>
+        Public Async Function TestLocal_CSharpNamedIdentifiersUsedInNestedColInit(kind As TestKind, host As TestHost) As Task
             Dim input =
 <Workspace>
     <Project Language="C#" CommonReferences="true">
@@ -177,11 +231,11 @@ End Module
         </Document>
     </Project>
 </Workspace>
-            Test(input)
-        End Sub
+            Await TestAPIAndFeature(input, kind, host)
+        End Function
 
-        <Fact, Trait(Traits.Feature, Traits.Features.FindReferences)>
-        Public Sub TestLocal_VBNamedIdentifiersUsedInNestedColInit()
+        <WpfTheory, CombinatorialData, Trait(Traits.Feature, Traits.Features.FindReferences)>
+        Public Async Function TestLocal_VBNamedIdentifiersUsedInNestedColInit(kind As TestKind, host As TestHost) As Task
             Dim input =
 <Workspace>
     <Project Language="Visual Basic" CommonReferences="true">
@@ -197,11 +251,11 @@ End Module
         </Document>
     </Project>
 </Workspace>
-            Test(input)
-        End Sub
+            Await TestAPIAndFeature(input, kind, host)
+        End Function
 
-        <Fact, Trait(Traits.Feature, Traits.Features.FindReferences)>
-        Public Sub TestLocal_CSharpNamedIdentifiersUsedInAVeryLongColInitExp()
+        <WpfTheory, CombinatorialData, Trait(Traits.Feature, Traits.Features.FindReferences)>
+        Public Async Function TestLocal_CSharpNamedIdentifiersUsedInAVeryLongColInitExp(kind As TestKind, host As TestHost) As Task
             Dim input =
 <Workspace>
     <Project Language="C#" CommonReferences="true">
@@ -217,11 +271,11 @@ End Module
         </Document>
     </Project>
 </Workspace>
-            Test(input)
-        End Sub
+            Await TestAPIAndFeature(input, kind, host)
+        End Function
 
-        <Fact, Trait(Traits.Feature, Traits.Features.FindReferences)>
-        Public Sub TestLocal_VBNamedIdentifiersUsedInAVeryLongColInitEx()
+        <WpfTheory, CombinatorialData, Trait(Traits.Feature, Traits.Features.FindReferences)>
+        Public Async Function TestLocal_VBNamedIdentifiersUsedInAVeryLongColInitEx(kind As TestKind, host As TestHost) As Task
             Dim input =
 <Workspace>
     <Project Language="Visual Basic" CommonReferences="true">
@@ -235,8 +289,336 @@ End Module
         </Document>
     </Project>
 </Workspace>
-            Test(input)
-        End Sub
+            Await TestAPIAndFeature(input, kind, host)
+        End Function
 #End Region
+
+        <WpfTheory, CombinatorialData, Trait(Traits.Feature, Traits.Features.FindReferences)>
+        <CompilerTrait(CompilerFeature.Tuples)>
+        <WorkItem(14881, "https://github.com/dotnet/roslyn/issues/14881")>
+        <WorkItem(15476, "https://github.com/dotnet/roslyn/issues/15476")>
+        Public Async Function TupleElementVsLocal_CS_01(kind As TestKind, host As TestHost) As Task
+            Dim input =
+<Workspace>
+    <Project Language="C#" CommonReferences="true">
+        <Document>
+using System;
+
+static class Program
+{
+    static void Main()
+    {
+        (int elem1, int elem2) tuple;
+        int {|Definition:$$elem2|};
+
+        tuple = (5, 6);
+        tuple.elem2 = 23;
+        [|elem2|] = 10;
+
+        Console.WriteLine(tuple.elem2);
+        Console.WriteLine([|elem2|]);
+    }
+}
+        </Document>
+    </Project>
+</Workspace>
+            Await TestAPIAndFeature(input, kind, host)
+        End Function
+
+        <WpfTheory, CombinatorialData, Trait(Traits.Feature, Traits.Features.FindReferences)>
+        <CompilerTrait(CompilerFeature.Tuples)>
+        <WorkItem(14881, "https://github.com/dotnet/roslyn/issues/14881")>
+        <WorkItem(15476, "https://github.com/dotnet/roslyn/issues/15476")>
+        Public Async Function TupleElementVsLocal_CS_02(kind As TestKind, host As TestHost) As Task
+            Dim input =
+<Workspace>
+    <Project Language="C#" CommonReferences="true">
+        <Document>
+using System;
+
+static class Program
+{
+    static void Main()
+    {
+        (int elem1, int elem2) tuple;
+        int {|Definition:elem2|};
+
+        tuple = (5, 6);
+        tuple.elem2 = 23;
+        [|elem2|] = 10;
+
+        Console.WriteLine(tuple.elem2);
+        Console.WriteLine([|$$elem2|]);
+    }
+}
+        </Document>
+    </Project>
+</Workspace>
+            Await TestAPIAndFeature(input, kind, host)
+        End Function
+
+        <WpfTheory, CombinatorialData, Trait(Traits.Feature, Traits.Features.FindReferences)>
+        <CompilerTrait(CompilerFeature.Tuples)>
+        <WorkItem(14881, "https://github.com/dotnet/roslyn/issues/14881")>
+        <WorkItem(15476, "https://github.com/dotnet/roslyn/issues/15476")>
+        Public Async Function TupleElementVsLocal_CS_03(kind As TestKind, host As TestHost) As Task
+            Dim input =
+<Workspace>
+    <Project Language="C#" CommonReferences="true">
+        <Document>
+using System;
+
+static class Program
+{
+    static void Main()
+    {
+        (int elem1, int {|Definition:$$elem2|}) tuple;
+        int elem2;
+
+        tuple = (5, 6);
+        tuple.[|elem2|] = 23;
+        elem2 = 10;
+
+        Console.WriteLine(tuple.[|elem2|]);
+        Console.WriteLine(elem2);
+    }
+}
+        </Document>
+    </Project>
+</Workspace>
+            Await TestAPIAndFeature(input, kind, host)
+        End Function
+
+        <WpfTheory, CombinatorialData, Trait(Traits.Feature, Traits.Features.FindReferences)>
+        <CompilerTrait(CompilerFeature.Tuples)>
+        <WorkItem(14881, "https://github.com/dotnet/roslyn/issues/14881")>
+        <WorkItem(15476, "https://github.com/dotnet/roslyn/issues/15476")>
+        Public Async Function TupleElementVsLocal_CS_04(kind As TestKind, host As TestHost) As Task
+            Dim input =
+<Workspace>
+    <Project Language="C#" CommonReferences="true">
+        <Document>
+using System;
+
+static class Program
+{
+    static void Main()
+    {
+        (int elem1, int {|Definition:elem2|}) tuple;
+        int elem2;
+
+        tuple = (5, 6);
+        tuple.[|elem2|] = 23;
+        elem2 = 10;
+
+        Console.WriteLine(tuple.[|$$elem2|]);
+        Console.WriteLine(elem2);
+    }
+}
+        </Document>
+    </Project>
+</Workspace>
+            Await TestAPIAndFeature(input, kind, host)
+        End Function
+
+        <WpfTheory, CombinatorialData, Trait(Traits.Feature, Traits.Features.FindReferences)>
+        <CompilerTrait(CompilerFeature.Tuples)>
+        <WorkItem(14881, "https://github.com/dotnet/roslyn/issues/14881")>
+        <WorkItem(15476, "https://github.com/dotnet/roslyn/issues/15476")>
+        Public Async Function TupleElementVsLocal_VB_01(kind As TestKind, host As TestHost) As Task
+            Dim input =
+<Workspace>
+    <Project Language="Visual Basic" CommonReferences="true">
+        <Document>
+Imports System
+Module C
+
+    Sub Main()
+        Dim tuple As (elem1 As Integer, elem2 As Integer)
+        Dim {|Definition:$$elem2|} As Integer
+
+        tuple = (5, 6)
+        tuple.elem2 = 23
+        [|elem2|] = 10
+
+        Console.WriteLine(tuple.elem2)
+        Console.WriteLine([|elem2|])
+    End Sub
+End Module
+        </Document>
+    </Project>
+</Workspace>
+            Await TestAPIAndFeature(input, kind, host)
+        End Function
+
+        <WpfTheory, CombinatorialData, Trait(Traits.Feature, Traits.Features.FindReferences)>
+        <CompilerTrait(CompilerFeature.Tuples)>
+        <WorkItem(14881, "https://github.com/dotnet/roslyn/issues/14881")>
+        <WorkItem(15476, "https://github.com/dotnet/roslyn/issues/15476")>
+        Public Async Function TupleElementVsLocal_VB_02(kind As TestKind, host As TestHost) As Task
+            Dim input =
+<Workspace>
+    <Project Language="Visual Basic" CommonReferences="true">
+        <Document>
+Imports System
+Module C
+
+    Sub Main()
+        Dim tuple As (elem1 As Integer, elem2 As Integer)
+        Dim {|Definition:elem2|} As Integer
+
+        tuple = (5, 6)
+        tuple.elem2 = 23
+        [|elem2|] = 10
+
+        Console.WriteLine(tuple.elem2)
+        Console.WriteLine([|$$elem2|])
+    End Sub
+End Module
+        </Document>
+    </Project>
+</Workspace>
+            Await TestAPIAndFeature(input, kind, host)
+        End Function
+
+        <WpfTheory, CombinatorialData, Trait(Traits.Feature, Traits.Features.FindReferences)>
+        <CompilerTrait(CompilerFeature.Tuples)>
+        <WorkItem(14881, "https://github.com/dotnet/roslyn/issues/14881")>
+        <WorkItem(15476, "https://github.com/dotnet/roslyn/issues/15476")>
+        Public Async Function TupleElementVsLocal_VB_03(kind As TestKind, host As TestHost) As Task
+            Dim input =
+<Workspace>
+    <Project Language="Visual Basic" CommonReferences="true">
+        <Document>
+Imports System
+Module C
+
+    Sub Main()
+        Dim tuple As (elem1 As Integer, {|Definition:$$elem2|} As Integer)
+        Dim elem2 As Integer
+
+        tuple = (5, 6)
+        tuple.[|elem2|] = 23
+        elem2 = 10
+
+        Console.WriteLine(tuple.[|elem2|])
+        Console.WriteLine(elem2)
+    End Sub
+End Module
+        </Document>
+    </Project>
+</Workspace>
+            Await TestAPIAndFeature(input, kind, host)
+        End Function
+
+        <WpfTheory, CombinatorialData, Trait(Traits.Feature, Traits.Features.FindReferences)>
+        <CompilerTrait(CompilerFeature.Tuples)>
+        <WorkItem(14881, "https://github.com/dotnet/roslyn/issues/14881")>
+        <WorkItem(15476, "https://github.com/dotnet/roslyn/issues/15476")>
+        Public Async Function TupleElementVsLocal_VB_04(kind As TestKind, host As TestHost) As Task
+            Dim input =
+<Workspace>
+    <Project Language="Visual Basic" CommonReferences="true">
+        <Document>
+Imports System
+Module C
+
+    Sub Main()
+        Dim tuple As (elem1 As Integer, {|Definition:elem2|} As Integer)
+        Dim elem2 As Integer
+
+        tuple = (5, 6)
+        tuple.[|elem2|] = 23
+        elem2 = 10
+
+        Console.WriteLine(tuple.[|$$elem2|])
+        Console.WriteLine(elem2)
+    End Sub
+End Module
+        </Document>
+    </Project>
+</Workspace>
+            Await TestAPIAndFeature(input, kind, host)
+        End Function
+
+        <WpfTheory, CombinatorialData, Trait(Traits.Feature, Traits.Features.FindReferences)>
+        Public Async Function TestLocal_ValueUsageInfo(kind As TestKind, host As TestHost) As Task
+            Dim input =
+<Workspace>
+    <Project Language="C#" CommonReferences="true">
+        <Document>
+        class C
+        {
+            void Goo()
+            {
+                int {|Definition:$$i|} = 0;
+                Console.WriteLine({|ValueUsageInfo.Read:[|i|]|});
+                {|ValueUsageInfo.Write:[|i|]|} = 0;
+                {|ValueUsageInfo.ReadWrite:[|i|]|}++;
+                Goo2(in {|ValueUsageInfo.ReadableReference:[|i|]|}, ref {|ValueUsageInfo.ReadableWritableReference:[|i|]|});
+                Goo3(out {|ValueUsageInfo.WritableReference:[|i|]|});
+                Console.WriteLine(nameof({|ValueUsageInfo.Name:[|i|]|}));
+            }
+
+            void Goo2(in int j, ref int k)
+            {
+            }
+
+            void Goo3(out int i)
+            {
+                i = 0;
+            }
+        }
+        </Document>
+    </Project>
+</Workspace>
+            Await TestAPIAndFeature(input, kind, host)
+        End Function
+
+        <WpfTheory, CombinatorialData, Trait(Traits.Feature, Traits.Features.FindReferences)>
+        <WorkItem(50589, "https://github.com/dotnet/roslyn/issues/50589")>
+        Public Async Function TestLocal_NoMatchWithImplicitObjectNamedParameter_1(kind As TestKind, host As TestHost) As Task
+            Dim input =
+<Workspace>
+    <Project Language="C#" CommonReferences="true">
+        <Document>
+class C
+{
+    C(int goo) { }
+
+    C M()
+    {
+        var {|Definition:$$goo|} = 1;
+        return new(goo: 2);
+    }
+}
+        </Document>
+    </Project>
+</Workspace>
+            Await TestAPIAndFeature(input, kind, host)
+        End Function
+
+        <WpfTheory, CombinatorialData, Trait(Traits.Feature, Traits.Features.FindReferences)>
+        <WorkItem(50589, "https://github.com/dotnet/roslyn/issues/50589")>
+        Public Async Function TestLocal_NoMatchWithImplicitObjectNamedParameter_2(kind As TestKind, host As TestHost) As Task
+            Dim input =
+<Workspace>
+    <Project Language="C#" CommonReferences="true">
+        <Document>
+class C
+{
+    C(int {|Definition:$$goo|}) { }
+
+    C M()
+    {
+        var goo = 1;
+        return new([|goo|]: 2);
+    }
+}
+        </Document>
+    </Project>
+</Workspace>
+            Await TestAPIAndFeature(input, kind, host)
+        End Function
     End Class
 End Namespace

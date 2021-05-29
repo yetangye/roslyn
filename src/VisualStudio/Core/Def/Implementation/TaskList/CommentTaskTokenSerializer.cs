@@ -1,32 +1,48 @@
-// Copyright (c) Microsoft.  All Rights Reserved.  Licensed under the Apache License, Version 2.0.  See License.txt in the project root for license information.
+﻿// Licensed to the .NET Foundation under one or more agreements.
+// The .NET Foundation licenses this file to you under the MIT license.
+// See the LICENSE file in the project root for more information.
 
+#nullable disable
+
+using System;
 using System.Collections.Generic;
-using System.Composition;
-using Microsoft.CodeAnalysis;
+using System.ComponentModel;
+using System.ComponentModel.Composition;
 using Microsoft.CodeAnalysis.Editor.Implementation.TodoComments;
+using Microsoft.CodeAnalysis.Host.Mef;
 using Microsoft.CodeAnalysis.Options;
-using Microsoft.CodeAnalysis.Options.Providers;
-using Microsoft.VisualStudio.LanguageServices.Implementation.Options;
 using Microsoft.VisualStudio.Shell;
 using Microsoft.VisualStudio.Shell.Interop;
-using Roslyn.Utilities;
 
 namespace Microsoft.VisualStudio.LanguageServices.Implementation.TaskList
 {
-    [ExportOptionSerializer(TodoCommentOptions.OptionName), Shared]
-    internal class CommentTaskTokenSerializer : IOptionSerializer
+    [Export(typeof(IOptionPersister))]
+    internal class CommentTaskTokenSerializer : IOptionPersister
     {
-        // it seems VS doesn't give a way to get notified if this setting gets changed.
-        // so we will only read it once and keep using it until next vs run
-        private readonly string _taskTokenList;
+        private readonly ITaskList _taskList;
+        private readonly IGlobalOptionService _globalOptionService;
+
+        private string _lastCommentTokenCache = null;
 
         [ImportingConstructor]
-        public CommentTaskTokenSerializer(SVsServiceProvider serviceProvider)
+        [Obsolete(MefConstruction.ImportingConstructorMessage, error: true)]
+        public CommentTaskTokenSerializer(
+            IGlobalOptionService globalOptionService,
+            [Import(typeof(SVsServiceProvider))] IServiceProvider serviceProvider)
         {
-            var tokenInfo = serviceProvider.GetService(typeof(SVsTaskList)) as IVsCommentTaskInfo;
+            _globalOptionService = globalOptionService;
 
-            // The SVsTaskList may not be available (e.g. during "devenv /build")
-            _taskTokenList = tokenInfo != null ? GetTaskTokenList(tokenInfo) : string.Empty;
+            // The SVsTaskList may not be available or doesn't actually implement ITaskList
+            // in the "devenv /build" scenario
+            _taskList = serviceProvider.GetService(typeof(SVsTaskList)) as ITaskList;
+
+            // GetTaskTokenList is safe in the face of nulls
+            _lastCommentTokenCache = GetTaskTokenList(_taskList);
+
+            if (_taskList != null)
+            {
+                _taskList.PropertyChanged += OnPropertyChanged;
+            }
         }
 
         public bool TryFetch(OptionKey optionKey, out object value)
@@ -37,7 +53,7 @@ namespace Microsoft.VisualStudio.LanguageServices.Implementation.TaskList
                 return false;
             }
 
-            value = _taskTokenList;
+            value = _lastCommentTokenCache;
             return true;
         }
 
@@ -47,44 +63,48 @@ namespace Microsoft.VisualStudio.LanguageServices.Implementation.TaskList
             return false;
         }
 
-        public static string GetTaskTokenList(IVsCommentTaskInfo tokenInfo)
+        private void OnPropertyChanged(object sender, PropertyChangedEventArgs e)
         {
-            int tokenCount;
-            if (Succeeded(tokenInfo.TokenCount(out tokenCount)) && tokenCount > 0)
+            if (e.PropertyName != nameof(ITaskList.CommentTokens))
             {
-                var tokens = new IVsCommentTaskToken[tokenCount];
-                var tokensEnum = default(IVsEnumCommentTaskTokens);
-                if (Succeeded(tokenInfo.EnumTokens(out tokensEnum)))
-                {
-                    uint count;
-                    if (Succeeded(tokensEnum.Next((uint)tokenCount, tokens, out count)))
-                    {
-                        Contract.Requires(tokenCount == count);
-
-                        string text;
-                        var priority = new VSTASKPRIORITY[1];
-                        var result = new List<string>();
-                        foreach (var token in tokens)
-                        {
-                            if (Succeeded(token.Text(out text)) &&
-                                Succeeded(token.Priority(priority)) &&
-                                !string.IsNullOrWhiteSpace(text))
-                            {
-                                result.Add(string.Format("{0}:{1}", text, (int)priority[0]));
-                            }
-                        }
-
-                        return string.Join("|", result);
-                    }
-                }
+                return;
             }
 
-            return string.Empty;
+            var commentString = GetTaskTokenList(_taskList);
+
+            var optionValue = _globalOptionService.GetOption(TodoCommentOptions.TokenList);
+            if (optionValue == commentString)
+            {
+                return;
+            }
+
+            // cache last result
+            _lastCommentTokenCache = commentString;
+
+            // let people to know that comment string has changed
+            _globalOptionService.RefreshOption(TodoCommentOptions.TokenList, _lastCommentTokenCache);
         }
 
-        private static bool Succeeded(int hr)
+        private static string GetTaskTokenList(ITaskList taskList)
         {
-            return hr == VSConstants.S_OK;
+            var commentTokens = taskList?.CommentTokens;
+            if (commentTokens == null || commentTokens.Count == 0)
+            {
+                return string.Empty;
+            }
+
+            var result = new List<string>();
+            foreach (var commentToken in commentTokens)
+            {
+                if (string.IsNullOrWhiteSpace(commentToken.Text))
+                {
+                    continue;
+                }
+
+                result.Add($"{commentToken.Text}:{((int)commentToken.Priority).ToString()}");
+            }
+
+            return string.Join("|", result);
         }
     }
 }

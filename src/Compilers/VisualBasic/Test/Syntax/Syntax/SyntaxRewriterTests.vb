@@ -1,12 +1,9 @@
-﻿' Copyright (c) Microsoft.  All Rights Reserved.  Licensed under the Apache License, Version 2.0.  See License.txt in the project root for license information.
+﻿' Licensed to the .NET Foundation under one or more agreements.
+' The .NET Foundation licenses this file to you under the MIT license.
+' See the LICENSE file in the project root for more information.
 
-Imports System
-Imports System.Xml.Linq
-Imports Microsoft.CodeAnalysis.Text
-Imports Microsoft.CodeAnalysis.VisualBasic.Symbols
 Imports Microsoft.CodeAnalysis.VisualBasic.Syntax
 Imports Roslyn.Test.Utilities
-Imports Xunit
 
 Namespace Microsoft.CodeAnalysis.VisualBasic.UnitTests
     Public Class SyntaxRewriterTests
@@ -505,7 +502,7 @@ End Class
             Assert.Equal(expectedNewSource.Value, newRoot.ToFullString())
         End Sub
 
-        <WorkItem(991474, "DevDiv")>
+        <WorkItem(991474, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/991474")>
         <Fact>
         Public Sub ReturnNothingFromStructuredTriviaRoot_Succeeds()
             Dim Text =
@@ -525,6 +522,188 @@ End Class
             Assert.Equal(expectedText, newRoot.ToFullString())
         End Sub
 
+        <Fact>
+        <WorkItem(22010, "https://github.com/dotnet/roslyn/issues/22010")>
+        Public Sub TestReplaceNodeShouldNotLoseParseOptions()
+            Dim tree = SyntaxFactory.ParseSyntaxTree("System.Console.Write(""Before"")", TestOptions.Script)
+            Assert.Equal(SourceCodeKind.Script, tree.Options.Kind)
+
+            Dim root = tree.GetRoot()
+            Dim before = root.DescendantNodes().OfType(Of LiteralExpressionSyntax)().Single()
+            Dim after = SyntaxFactory.LiteralExpression(SyntaxKind.StringLiteralExpression, SyntaxFactory.Literal("After"))
+
+            Dim newRoot = root.ReplaceNode(before, after)
+            Dim newTree = newRoot.SyntaxTree
+            Assert.Equal(SourceCodeKind.Script, newTree.Options.Kind)
+            Assert.Equal(tree.Options, newTree.Options)
+        End Sub
+
+        <Fact>
+        <WorkItem(22010, "https://github.com/dotnet/roslyn/issues/22010")>
+        Public Sub TestReplaceNodeInListShouldNotLoseParseOptions()
+
+            Dim tree = SyntaxFactory.ParseSyntaxTree("m(a, b)", TestOptions.Script)
+            Assert.Equal(SourceCodeKind.Script, tree.Options.Kind)
+
+            Dim argC = SyntaxFactory.SimpleArgument(SyntaxFactory.ParseExpression("c"))
+            Dim argD = SyntaxFactory.SimpleArgument(SyntaxFactory.ParseExpression("d"))
+            Dim root = tree.GetRoot()
+            Dim invocation = root.DescendantNodes().OfType(Of InvocationExpressionSyntax)().Single()
+            Dim newRoot = root.ReplaceNode(invocation.ArgumentList.Arguments(0), New SyntaxNode() {argC, argD})
+            Assert.Equal("m(c,d, b)", newRoot.ToFullString())
+
+            Dim newTree = newRoot.SyntaxTree
+            Assert.Equal(SourceCodeKind.Script, newTree.Options.Kind)
+            Assert.Equal(tree.Options, newTree.Options)
+        End Sub
+
+        <Fact>
+        <WorkItem(22010, "https://github.com/dotnet/roslyn/issues/22010")>
+        Public Sub TestInsertNodeShouldNotLoseParseOptions()
+
+            Dim tree = SyntaxFactory.ParseSyntaxTree("m(a, b)", TestOptions.Script)
+            Assert.Equal(SourceCodeKind.Script, tree.Options.Kind)
+
+            Dim argC = SyntaxFactory.SimpleArgument(SyntaxFactory.ParseExpression("c"))
+            Dim argD = SyntaxFactory.SimpleArgument(SyntaxFactory.ParseExpression("d"))
+            Dim root = tree.GetRoot()
+            Dim invocation = root.DescendantNodes().OfType(Of InvocationExpressionSyntax)().Single()
+
+            ' insert before first
+            Dim newNode = invocation.InsertNodesBefore(invocation.ArgumentList.Arguments(0), New SyntaxNode() {argC, argD})
+            Assert.Equal("m(c,d,a, b)", newNode.ToFullString())
+            Dim newTree = newNode.SyntaxTree
+            Assert.Equal(SourceCodeKind.Script, newTree.Options.Kind)
+            Assert.Equal(tree.Options, newTree.Options)
+
+            ' insert after first
+            Dim newNode2 = invocation.InsertNodesAfter(invocation.ArgumentList.Arguments(0), New SyntaxNode() {argC, argD})
+            Assert.Equal("m(a,c,d, b)", newNode2.ToFullString())
+            Dim newTree2 = newNode2.SyntaxTree
+            Assert.Equal(SourceCodeKind.Script, newTree2.Options.Kind)
+            Assert.Equal(tree.Options, newTree2.Options)
+        End Sub
+
+        <Fact>
+        <WorkItem(22010, "https://github.com/dotnet/roslyn/issues/22010")>
+        Public Sub TestReplaceTokenShouldNotLoseParseOptions()
+
+            Dim tree = SyntaxFactory.ParseSyntaxTree("Private Class C  ", options:=TestOptions.Script)
+            Assert.Equal(SourceCodeKind.Script, tree.Options.Kind)
+
+            Dim root = tree.GetRoot()
+            Dim privateToken = root.DescendantTokens().First()
+            Dim publicToken = SyntaxFactory.ParseToken("Public ")
+            Dim partialToken = SyntaxFactory.ParseToken("Partial ")
+
+            Dim newRoot = root.ReplaceToken(privateToken, New SyntaxToken() {publicToken, partialToken})
+            Assert.Equal("Public Partial Class C  ", newRoot.ToFullString())
+
+            Dim newTree = newRoot.SyntaxTree
+            Assert.Equal(SourceCodeKind.Script, newTree.Options.Kind)
+            Assert.Equal(tree.Options, newTree.Options)
+        End Sub
+
+        <Fact>
+        <WorkItem(22010, "https://github.com/dotnet/roslyn/issues/22010")>
+        Public Sub TestInsertTokenShouldNotLoseParseOptions()
+
+            Dim tree = SyntaxFactory.ParseSyntaxTree("Public Class C" & vbCrLf & "End Class", options:=TestOptions.Script)
+            Dim root = tree.GetRoot()
+            Dim publicToken = root.DescendantTokens().First()
+            Dim partialToken = SyntaxFactory.ParseToken("Partial ")
+            Dim staticToken = SyntaxFactory.ParseToken("Shared ")
+
+            Dim newRoot = root.InsertTokensBefore(publicToken, New SyntaxToken() {staticToken})
+            Assert.Equal("Shared Public Class C" & vbCrLf & "End Class", newRoot.ToFullString())
+
+            Dim newTree = newRoot.SyntaxTree
+            Assert.Equal(SourceCodeKind.Script, newTree.Options.Kind)
+            Assert.Equal(tree.Options, newTree.Options)
+
+            Dim newRoot2 = root.InsertTokensAfter(publicToken, New SyntaxToken() {staticToken})
+            Assert.Equal("Public Shared Class C" & vbCrLf & "End Class", newRoot2.ToFullString())
+            Dim newTree2 = newRoot2.SyntaxTree
+            Assert.Equal(SourceCodeKind.Script, newTree2.Options.Kind)
+            Assert.Equal(tree.Options, newTree2.Options)
+        End Sub
+
+        <Fact>
+        <WorkItem(22010, "https://github.com/dotnet/roslyn/issues/22010")>
+        Public Sub TestReplaceTriviaShouldNotLoseParseOptions()
+
+            Dim tree = SyntaxFactory.ParseSyntaxTree("Dim identifier 'c", options:=TestOptions.Script)
+            Dim field = tree.GetRoot().DescendantNodes().OfType(Of FieldDeclarationSyntax).Single()
+            Dim trailingTrivia = field.GetTrailingTrivia()
+            Assert.Equal(2, trailingTrivia.Count)
+            Dim comment1 = trailingTrivia(1)
+            Assert.Equal(SyntaxKind.CommentTrivia, comment1.Kind())
+
+            Dim newComment1 = SyntaxFactory.ParseLeadingTrivia("'a")(0)
+            Dim newComment2 = SyntaxFactory.ParseLeadingTrivia("'b")(0)
+
+            Dim newField = field.ReplaceTrivia(comment1, New SyntaxTrivia() {newComment1, newComment2})
+            Assert.Equal("Dim identifier 'a'b", newField.ToFullString())
+            Dim newTree = newField.SyntaxTree
+            Assert.Equal(SourceCodeKind.Script, newTree.Options.Kind)
+            Assert.Equal(tree.Options, newTree.Options)
+
+            Dim newRoot2 = field.ReplaceTrivia(comment1, New SyntaxTrivia() {})
+            Assert.Equal("Dim identifier ", newRoot2.ToFullString())
+            Dim newTree2 = newRoot2.SyntaxTree
+            Assert.Equal(SourceCodeKind.Script, newTree2.Options.Kind)
+            Assert.Equal(tree.Options, newTree2.Options)
+        End Sub
+
+        <Fact>
+        <WorkItem(22010, "https://github.com/dotnet/roslyn/issues/22010")>
+        Public Sub TestInsertTriviaShouldNotLoseParseOptions()
+
+            Dim tree = SyntaxFactory.ParseSyntaxTree("Dim identifier 'c", options:=TestOptions.Script)
+            Dim field = tree.GetRoot().DescendantNodes().OfType(Of FieldDeclarationSyntax).Single()
+            Dim trailingTrivia = field.GetTrailingTrivia()
+            Assert.Equal(2, trailingTrivia.Count)
+            Dim comment1 = trailingTrivia(1)
+            Assert.Equal(SyntaxKind.CommentTrivia, comment1.Kind())
+
+            Dim newComment1 = SyntaxFactory.ParseLeadingTrivia("'a")(0)
+            Dim newComment2 = SyntaxFactory.ParseLeadingTrivia("'b")(0)
+
+            Dim newField = field.InsertTriviaAfter(comment1, New SyntaxTrivia() {newComment1, newComment2})
+            Assert.Equal("Dim identifier 'c'a'b", newField.ToFullString())
+
+            Dim newTree = newField.SyntaxTree
+            Assert.Equal(SourceCodeKind.Script, newTree.Options.Kind)
+            Assert.Equal(tree.Options, newTree.Options)
+        End Sub
+
+        <Fact>
+        <WorkItem(22010, "https://github.com/dotnet/roslyn/issues/22010")>
+        Public Sub TestRemoveNodeShouldNotLoseParseOptions()
+
+            Dim tree = SyntaxFactory.ParseSyntaxTree("Private Class C" & vbCrLf & "End Class", options:=TestOptions.Script)
+            Dim root = tree.GetRoot()
+            Dim newRoot = root.RemoveNode(root.DescendantNodes().First(), SyntaxRemoveOptions.KeepDirectives)
+
+            Dim newTree = newRoot.SyntaxTree
+            Assert.Equal(SourceCodeKind.Script, newTree.Options.Kind)
+            Assert.Equal(tree.Options, newTree.Options)
+        End Sub
+
+        <Fact>
+        <WorkItem(22010, "https://github.com/dotnet/roslyn/issues/22010")>
+        Public Sub TestNormalizeWhitespaceShouldNotLoseParseOptions()
+
+            Dim tree = SyntaxFactory.ParseSyntaxTree("Private Class C" & vbCrLf & "End Class", options:=TestOptions.Script)
+            Dim root = tree.GetRoot()
+            Dim newRoot = root.NormalizeWhitespace("  ")
+
+            Dim newTree = newRoot.SyntaxTree
+            Assert.Equal(SourceCodeKind.Script, newTree.Options.Kind)
+            Assert.Equal(tree.Options, newTree.Options)
+        End Sub
+
+
         Private Class RemoveRegionRewriter
             Inherits VisualBasicSyntaxRewriter
 
@@ -543,139 +722,139 @@ End Class
 #Region "Helper Types"
 
         Private Sub TestGreen(input As String, output As String, rewriter As GreenRewriter, isStmt As Boolean)
-                Dim red As VisualBasicSyntaxNode
-                If isStmt Then
-                    red = SyntaxFactory.ParseExecutableStatement(input)
-                Else
-                    red = SyntaxFactory.ParseCompilationUnit(input)
-                End If
+            Dim red As VisualBasicSyntaxNode
+            If isStmt Then
+                red = SyntaxFactory.ParseExecutableStatement(input)
+            Else
+                red = SyntaxFactory.ParseCompilationUnit(input)
+            End If
 
-                Dim green = red.ToGreen()
+            Dim green = red.ToGreen()
 
-                Assert.False(green.ContainsDiagnostics)
+            Assert.False(green.ContainsDiagnostics)
 
-                Dim result As InternalSyntax.VisualBasicSyntaxNode = rewriter.Visit(green)
+            Dim result As InternalSyntax.VisualBasicSyntaxNode = rewriter.Visit(green)
 
-                Assert.Equal(input = output, green Is result)
-                Assert.Equal(output.Trim(), result.ToFullString().Trim())
-            End Sub
+            Assert.Equal(input = output, green Is result)
+            Assert.Equal(output.Trim(), result.ToFullString().Trim())
+        End Sub
 
-            Private Sub TestRed(input As String, output As String, rewriter As RedRewriter, isStmt As Boolean)
-                Dim red As VisualBasicSyntaxNode
-                If isStmt Then
-                    red = SyntaxFactory.ParseExecutableStatement(input)
-                Else
-                    red = SyntaxFactory.ParseCompilationUnit(input)
-                End If
+        Private Sub TestRed(input As String, output As String, rewriter As RedRewriter, isStmt As Boolean)
+            Dim red As VisualBasicSyntaxNode
+            If isStmt Then
+                red = SyntaxFactory.ParseExecutableStatement(input)
+            Else
+                red = SyntaxFactory.ParseCompilationUnit(input)
+            End If
 
-                Assert.False(red.ContainsDiagnostics)
+            Assert.False(red.ContainsDiagnostics)
 
-                Dim result = rewriter.Visit(red)
+            Dim result = rewriter.Visit(red)
 
-                Assert.Equal(input = output, red Is result)
-                Assert.Equal(output.Trim(), result.ToFullString().Trim())
-            End Sub
+            Assert.Equal(input = output, red Is result)
+            Assert.Equal(output.Trim(), result.ToFullString().Trim())
+        End Sub
 
 #End Region ' Helper Types
 
 #Region "Helper Types"
 
-            ''' <summary>
-            ''' This Rewriter exposes delegates for the methods that would normally be overridden.
-            ''' </summary>
-            Friend Class GreenRewriter
-                Inherits InternalSyntax.VisualBasicSyntaxRewriter
+        ''' <summary>
+        ''' This Rewriter exposes delegates for the methods that would normally be overridden.
+        ''' </summary>
+        Friend Class GreenRewriter
+            Inherits InternalSyntax.VisualBasicSyntaxRewriter
 
-                Private ReadOnly rewriteNode As Func(Of InternalSyntax.VisualBasicSyntaxNode, InternalSyntax.VisualBasicSyntaxNode)
-                Private ReadOnly rewriteToken As Func(Of InternalSyntax.SyntaxToken, InternalSyntax.SyntaxToken)
-                Private ReadOnly rewriteTrivia As Func(Of InternalSyntax.SyntaxTrivia, InternalSyntax.SyntaxTrivia)
+            Private ReadOnly _rewriteNode As Func(Of InternalSyntax.VisualBasicSyntaxNode, InternalSyntax.VisualBasicSyntaxNode)
+            Private ReadOnly _rewriteToken As Func(Of InternalSyntax.SyntaxToken, InternalSyntax.SyntaxToken)
+            Private ReadOnly _rewriteTrivia As Func(Of InternalSyntax.SyntaxTrivia, InternalSyntax.SyntaxTrivia)
 
-                Friend Sub New(
-                        Optional rewriteNode As Func(Of InternalSyntax.VisualBasicSyntaxNode, InternalSyntax.VisualBasicSyntaxNode) = Nothing,
-                        Optional rewriteToken As Func(Of InternalSyntax.SyntaxToken, InternalSyntax.SyntaxToken) = Nothing,
-                        Optional rewriteTrivia As Func(Of InternalSyntax.SyntaxTrivia, InternalSyntax.SyntaxTrivia) = Nothing)
-                    Me.rewriteNode = rewriteNode
-                    Me.rewriteToken = rewriteToken
-                    Me.rewriteTrivia = rewriteTrivia
-                End Sub
+            Friend Sub New(
+                    Optional rewriteNode As Func(Of InternalSyntax.VisualBasicSyntaxNode, InternalSyntax.VisualBasicSyntaxNode) = Nothing,
+                    Optional rewriteToken As Func(Of InternalSyntax.SyntaxToken, InternalSyntax.SyntaxToken) = Nothing,
+                    Optional rewriteTrivia As Func(Of InternalSyntax.SyntaxTrivia, InternalSyntax.SyntaxTrivia) = Nothing)
+                Me._rewriteNode = rewriteNode
+                Me._rewriteToken = rewriteToken
+                Me._rewriteTrivia = rewriteTrivia
+            End Sub
 
-                Public Overrides Function Visit(node As InternalSyntax.VisualBasicSyntaxNode) As InternalSyntax.VisualBasicSyntaxNode
-                    Dim visited As InternalSyntax.VisualBasicSyntaxNode = MyBase.Visit(node)
-                    If rewriteNode Is Nothing OrElse visited Is Nothing Then
-                        Return visited
-                    Else
-                        Return rewriteNode(visited)
-                    End If
-                End Function
+            Public Overrides Function Visit(node As InternalSyntax.VisualBasicSyntaxNode) As InternalSyntax.VisualBasicSyntaxNode
+                Dim visited As InternalSyntax.VisualBasicSyntaxNode = MyBase.Visit(node)
+                If _rewriteNode Is Nothing OrElse visited Is Nothing Then
+                    Return visited
+                Else
+                    Return _rewriteNode(visited)
+                End If
+            End Function
 
-                Public Overrides Function VisitSyntaxToken(token As InternalSyntax.SyntaxToken) As InternalSyntax.SyntaxToken
-                    Dim visited = MyBase.VisitSyntaxToken(token)
-                    If rewriteToken Is Nothing Then
-                        Return visited
-                    Else
-                        Return rewriteToken(visited)
-                    End If
-                End Function
+            Public Overrides Function VisitSyntaxToken(token As InternalSyntax.SyntaxToken) As InternalSyntax.SyntaxToken
+                Dim visited = MyBase.VisitSyntaxToken(token)
+                If _rewriteToken Is Nothing Then
+                    Return visited
+                Else
+                    Return _rewriteToken(visited)
+                End If
+            End Function
 
-                Public Overrides Function VisitSyntaxTrivia(trivia As InternalSyntax.SyntaxTrivia) As InternalSyntax.SyntaxTrivia
-                    Dim visited As InternalSyntax.SyntaxTrivia = MyBase.VisitSyntaxTrivia(trivia)
-                    If rewriteTrivia Is Nothing Then
-                        Return visited
-                    Else
-                        Return rewriteTrivia(visited)
-                    End If
-                End Function
-            End Class
+            Public Overrides Function VisitSyntaxTrivia(trivia As InternalSyntax.SyntaxTrivia) As InternalSyntax.SyntaxTrivia
+                Dim visited As InternalSyntax.SyntaxTrivia = MyBase.VisitSyntaxTrivia(trivia)
+                If _rewriteTrivia Is Nothing Then
+                    Return visited
+                Else
+                    Return _rewriteTrivia(visited)
+                End If
+            End Function
+        End Class
 
 
-            ''' <summary>
-            ''' This Rewriter exposes delegates for the methods that would normally be overridden.
-            ''' </summary>
-            Friend Class RedRewriter
-                Inherits VisualBasicSyntaxRewriter
+        ''' <summary>
+        ''' This Rewriter exposes delegates for the methods that would normally be overridden.
+        ''' </summary>
+        Friend Class RedRewriter
+            Inherits VisualBasicSyntaxRewriter
 
-                Private ReadOnly rewriteNode As Func(Of SyntaxNode, SyntaxNode)
-                Private ReadOnly rewriteToken As Func(Of SyntaxToken, SyntaxToken)
-                Private ReadOnly rewriteTrivia As Func(Of SyntaxTrivia, SyntaxTrivia)
+            Private ReadOnly _rewriteNode As Func(Of SyntaxNode, SyntaxNode)
+            Private ReadOnly _rewriteToken As Func(Of SyntaxToken, SyntaxToken)
+            Private ReadOnly _rewriteTrivia As Func(Of SyntaxTrivia, SyntaxTrivia)
 
-                Friend Sub New(
-                        Optional rewriteNode As Func(Of SyntaxNode, SyntaxNode) = Nothing,
-                        Optional rewriteToken As Func(Of SyntaxToken, SyntaxToken) = Nothing,
-                        Optional rewriteTrivia As Func(Of SyntaxTrivia, SyntaxTrivia) = Nothing)
-                    Me.rewriteNode = rewriteNode
-                    Me.rewriteToken = rewriteToken
-                    Me.rewriteTrivia = rewriteTrivia
-                End Sub
+            Friend Sub New(
+                    Optional rewriteNode As Func(Of SyntaxNode, SyntaxNode) = Nothing,
+                    Optional rewriteToken As Func(Of SyntaxToken, SyntaxToken) = Nothing,
+                    Optional rewriteTrivia As Func(Of SyntaxTrivia, SyntaxTrivia) = Nothing)
+                Me._rewriteNode = rewriteNode
+                Me._rewriteToken = rewriteToken
+                Me._rewriteTrivia = rewriteTrivia
+            End Sub
 
-                Public Overrides Function Visit(node As SyntaxNode) As SyntaxNode
-                    Dim visited = MyBase.Visit(node)
-                    If rewriteNode Is Nothing OrElse visited Is Nothing Then
-                        Return visited
-                    Else
-                        Return rewriteNode(visited)
-                    End If
-                End Function
+            Public Overrides Function Visit(node As SyntaxNode) As SyntaxNode
+                Dim visited = MyBase.Visit(node)
+                If _rewriteNode Is Nothing OrElse visited Is Nothing Then
+                    Return visited
+                Else
+                    Return _rewriteNode(visited)
+                End If
+            End Function
 
-                Public Overrides Function VisitToken(token As SyntaxToken) As SyntaxToken
-                    Dim visited As SyntaxToken = MyBase.VisitToken(token)
-                    If rewriteToken Is Nothing Then
-                        Return visited
-                    Else
-                        Return rewriteToken(visited)
-                    End If
-                End Function
+            Public Overrides Function VisitToken(token As SyntaxToken) As SyntaxToken
+                Dim visited As SyntaxToken = MyBase.VisitToken(token)
+                If _rewriteToken Is Nothing Then
+                    Return visited
+                Else
+                    Return _rewriteToken(visited)
+                End If
+            End Function
 
-                Public Overrides Function VisitTrivia(trivia As SyntaxTrivia) As SyntaxTrivia
-                    Dim visited As SyntaxTrivia = MyBase.VisitTrivia(trivia)
-                    If rewriteTrivia Is Nothing Then
-                        Return visited
-                    Else
-                        Return rewriteTrivia(visited)
-                    End If
-                End Function
-            End Class
+            Public Overrides Function VisitTrivia(trivia As SyntaxTrivia) As SyntaxTrivia
+                Dim visited As SyntaxTrivia = MyBase.VisitTrivia(trivia)
+                If _rewriteTrivia Is Nothing Then
+                    Return visited
+                Else
+                    Return _rewriteTrivia(visited)
+                End If
+            End Function
+        End Class
 
 #End Region ' Helper Types
-        End Class
+    End Class
 
 End Namespace

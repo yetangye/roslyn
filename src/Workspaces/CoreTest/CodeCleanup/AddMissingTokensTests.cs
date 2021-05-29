@@ -1,7 +1,11 @@
-﻿// Copyright (c) Microsoft.  All Rights Reserved.  Licensed under the Apache License, Version 2.0.  See License.txt in the project root for license information.
+﻿// Licensed to the .NET Foundation under one or more agreements.
+// The .NET Foundation licenses this file to you under the MIT license.
+// See the LICENSE file in the project root for more information.
 
-using System.Collections.Generic;
-using System.Linq;
+#nullable disable
+
+using System.Collections.Immutable;
+using System.Threading.Tasks;
 using Microsoft.CodeAnalysis.CodeCleanup;
 using Microsoft.CodeAnalysis.CodeCleanup.Providers;
 using Microsoft.CodeAnalysis.Test.Utilities;
@@ -11,11 +15,12 @@ using Xunit;
 
 namespace Microsoft.CodeAnalysis.UnitTests.CodeCleanup
 {
+    [UseExportProvider]
     public class AddMissingTokensTests
     {
         [Fact]
         [Trait(Traits.Feature, Traits.Features.AddMissingTokens)]
-        public void MultipleLineIfStatementThen()
+        public async Task MultipleLineIfStatementThen()
         {
             var code = @"[|
         If True
@@ -27,12 +32,12 @@ namespace Microsoft.CodeAnalysis.UnitTests.CodeCleanup
             Dim a = 1
         End If";
 
-            Verify(CreateMethod(code), CreateMethod(expected));
+            await VerifyAsync(CreateMethod(code), CreateMethod(expected));
         }
 
         [Fact]
         [Trait(Traits.Feature, Traits.Features.AddMissingTokens)]
-        public void TypeArgumentOf()
+        public async Task TypeArgumentOf()
         {
             var code = @"[|
         Dim a As List(Integer)|]";
@@ -40,12 +45,12 @@ namespace Microsoft.CodeAnalysis.UnitTests.CodeCleanup
             var expected = @"
         Dim a As List(Of Integer)";
 
-            Verify(CreateMethod(code), CreateMethod(expected));
+            await VerifyAsync(CreateMethod(code), CreateMethod(expected));
         }
 
         [Fact]
         [Trait(Traits.Feature, Traits.Features.AddMissingTokens)]
-        public void TypeParameterOf()
+        public async Task TypeParameterOf()
         {
             var code = @"[|Class A(T)
 End Class|]";
@@ -53,12 +58,12 @@ End Class|]";
             var expected = @"Class A(Of T)
 End Class";
 
-            Verify(code, expected);
+            await VerifyAsync(code, expected);
         }
 
         [Fact]
         [Trait(Traits.Feature, Traits.Features.AddMissingTokens)]
-        public void MethodDeclaration()
+        public async Task MethodDeclaration()
         {
             var code = @"Class A
     [|Sub Test
@@ -70,13 +75,13 @@ End Class";
     End Sub
 End Class";
 
-            Verify(code, expected);
+            await VerifyAsync(code, expected);
         }
 
         [Fact]
-        [WorkItem(544318, "DevDiv")]
+        [WorkItem(544318, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/544318")]
         [Trait(Traits.Feature, Traits.Features.AddMissingTokens)]
-        public void MethodInvocation_TypeArgParens()
+        public async Task MethodInvocation_TypeArgParens()
         {
             var code = @"[|Imports System
 Imports System.Collections.Generic
@@ -100,12 +105,12 @@ Module Program
 
     End Sub";
 
-            Verify(code, expected);
+            await VerifyAsync(code, expected);
         }
 
         [Fact]
         [Trait(Traits.Feature, Traits.Features.AddMissingTokens)]
-        public void MethodInvocation_Sub()
+        public async Task MethodInvocation_Sub()
         {
             var code = @"Class A
     Sub Test
@@ -119,12 +124,12 @@ End Class";
     End Sub
 End Class";
 
-            Verify(code, expected);
+            await VerifyAsync(code, expected);
         }
 
         [Fact]
         [Trait(Traits.Feature, Traits.Features.AddMissingTokens)]
-        public void MethodInvocation_Function()
+        public async Task MethodInvocation_Function()
         {
             var code = @"Class A
     Function Test() As Integer
@@ -140,12 +145,12 @@ End Class";
     End Function
 End Class";
 
-            Verify(code, expected);
+            await VerifyAsync(code, expected);
         }
 
         [Fact]
         [Trait(Traits.Feature, Traits.Features.AddMissingTokens)]
-        public void IdentifierMethod_Return()
+        public async Task IdentifierMethod_Return()
         {
             var code = @"Class A
     Function Test() As Integer
@@ -167,12 +172,12 @@ End Class";
     End Function
 End Class";
 
-            Verify(code, expected);
+            await VerifyAsync(code, expected);
         }
 
         [Fact]
         [Trait(Traits.Feature, Traits.Features.AddMissingTokens)]
-        public void IdentifierMethod_Assign()
+        public async Task IdentifierMethod_Assign()
         {
             var code = @"Class A
     Function Test() As Integer
@@ -196,12 +201,12 @@ End Class";
     End Function
 End Class";
 
-            Verify(code, expected);
+            await VerifyAsync(code, expected);
         }
 
         [Fact]
         [Trait(Traits.Feature, Traits.Features.AddMissingTokens)]
-        public void IdentifierMethod_DotName_DontAdd()
+        public async Task IdentifierMethod_DotName_DontAdd()
         {
             var code = @"Class A
     Function Test() As Integer
@@ -225,12 +230,12 @@ End Class";
     End Function
 End Class";
 
-            Verify(code, expected);
+            await VerifyAsync(code, expected);
         }
 
         [Fact]
         [Trait(Traits.Feature, Traits.Features.AddMissingTokens)]
-        public void MethodInvocation_DotName()
+        public async Task MethodInvocation_DotName()
         {
             var code = @"Class A
     Function Test() As Integer
@@ -254,12 +259,12 @@ End Class";
     End Function
 End Class";
 
-            Verify(code, expected);
+            await VerifyAsync(code, expected);
         }
 
         [Fact]
         [Trait(Traits.Feature, Traits.Features.AddMissingTokens)]
-        public void MethodInvocation_Generic()
+        public async Task MethodInvocation_Generic()
         {
             var code = @"Class A
     Function Test() As Integer
@@ -283,12 +288,12 @@ End Class";
     End Function
 End Class";
 
-            Verify(code, expected);
+            await VerifyAsync(code, expected);
         }
 
         [Fact]
         [Trait(Traits.Feature, Traits.Features.AddMissingTokens)]
-        public void MethodInvocation_Call()
+        public async Task MethodInvocation_Call()
         {
             var code = @"Class A
     Function Test() As Integer
@@ -312,12 +317,12 @@ End Class";
     End Function
 End Class";
 
-            Verify(code, expected);
+            await VerifyAsync(code, expected);
         }
 
         [Fact]
         [Trait(Traits.Feature, Traits.Features.AddMissingTokens)]
-        public void EventHandler_AddressOf1()
+        public async Task EventHandler_AddressOf1()
         {
             var code = @"Class A
     Sub EventMethod()
@@ -335,12 +340,12 @@ End Class";
     Public Event TestEvent()
 End Class";
 
-            Verify(code, expected);
+            await VerifyAsync(code, expected);
         }
 
         [Fact]
         [Trait(Traits.Feature, Traits.Features.AddMissingTokens)]
-        public void EventHandler_AddressOf2()
+        public async Task EventHandler_AddressOf2()
         {
             var code = @"Class A
     Sub EventMethod()
@@ -358,12 +363,12 @@ End Class";
     Public Event TestEvent()
 End Class";
 
-            Verify(code, expected);
+            await VerifyAsync(code, expected);
         }
 
         [Fact]
         [Trait(Traits.Feature, Traits.Features.AddMissingTokens)]
-        public void Delegate_AddressOf()
+        public async Task Delegate_AddressOf()
         {
             var code = @"Class A
     Sub Method()
@@ -377,12 +382,12 @@ End Class";
     End Sub
 End Class";
 
-            Verify(code, expected);
+            await VerifyAsync(code, expected);
         }
 
         [Fact]
         [Trait(Traits.Feature, Traits.Features.AddMissingTokens)]
-        public void EventDeclaration()
+        public async Task EventDeclaration()
         {
             var code = @"Class A
     Sub EventMethod()
@@ -400,12 +405,12 @@ End Class";
     Public Event TestEvent()
 End Class";
 
-            Verify(code, expected);
+            await VerifyAsync(code, expected);
         }
 
         [Fact]
         [Trait(Traits.Feature, Traits.Features.AddMissingTokens)]
-        public void RaiseEvent()
+        public async Task RaiseEvent()
         {
             var code = @"Class A
     Sub EventMethod()
@@ -423,12 +428,12 @@ End Class";
     Public Event TestEvent()
 End Class";
 
-            Verify(code, expected);
+            await VerifyAsync(code, expected);
         }
 
         [Fact]
         [Trait(Traits.Feature, Traits.Features.AddMissingTokens)]
-        public void DelegateInvocation()
+        public async Task DelegateInvocation()
         {
             var code = @"
         Dim a As Action
@@ -438,12 +443,12 @@ End Class";
         Dim a As Action
         a()";
 
-            Verify(CreateMethod(code), CreateMethod(expected));
+            await VerifyAsync(CreateMethod(code), CreateMethod(expected));
         }
 
         [Fact]
         [Trait(Traits.Feature, Traits.Features.AddMissingTokens)]
-        public void Attribute()
+        public async Task Attribute()
         {
             var code = @"[|<Obsolete>
 Class C(Of T)
@@ -459,12 +464,12 @@ Class C(Of T)
     End Sub
 End Class";
 
-            Verify(code, expected);
+            await VerifyAsync(code, expected);
         }
 
         [Fact]
         [Trait(Traits.Feature, Traits.Features.AddMissingTokens)]
-        public void ObjectCreation()
+        public async Task ObjectCreation()
         {
             var code = @"[|Module Program
     Sub Main(args As String())
@@ -496,12 +501,12 @@ End Class
 Class ClassInNewFile
 End Class";
 
-            Verify(code, expected);
+            await VerifyAsync(code, expected);
         }
 
         [Fact]
         [Trait(Traits.Feature, Traits.Features.AddMissingTokens)]
-        public void Constructor()
+        public async Task Constructor()
         {
             var code = @"[|Class C
     Sub New
@@ -513,12 +518,12 @@ End Class|]";
     End Sub
 End Class";
 
-            Verify(code, expected);
+            await VerifyAsync(code, expected);
         }
 
         [Fact]
         [Trait(Traits.Feature, Traits.Features.AddMissingTokens)]
-        public void DeclareStatement()
+        public async Task DeclareStatement()
         {
             var code = @"[|Class C
     Declare Function getUserName Lib ""advapi32.dll"" Alias ""GetUserNameA"" 
@@ -528,12 +533,12 @@ End Class|]";
     Declare Function getUserName Lib ""advapi32.dll"" Alias ""GetUserNameA"" ()
 End Class";
 
-            Verify(code, expected);
+            await VerifyAsync(code, expected);
         }
 
         [Fact]
         [Trait(Traits.Feature, Traits.Features.AddMissingTokens)]
-        public void DelegateStatement()
+        public async Task DelegateStatement()
         {
             var code = @"[|Class C
     Delegate Sub Test
@@ -543,12 +548,12 @@ End Class|]";
     Delegate Sub Test()
 End Class";
 
-            Verify(code, expected);
+            await VerifyAsync(code, expected);
         }
 
         [Fact]
         [Trait(Traits.Feature, Traits.Features.AddMissingTokens)]
-        public void MethodStatementWithComment()
+        public async Task MethodStatementWithComment()
         {
             var code = @"[|Class C
     [|Sub Test ' test
@@ -560,12 +565,12 @@ End Class|]";
     End Sub
 End Class";
 
-            Verify(code, expected);
+            await VerifyAsync(code, expected);
         }
 
         [Fact]
         [Trait(Traits.Feature, Traits.Features.AddMissingTokens)]
-        public void MultipleLineIfStatementThenWithComment()
+        public async Task MultipleLineIfStatementThenWithComment()
         {
             var code = @"[|
         If True ' test
@@ -577,12 +582,12 @@ End Class";
             Dim a = 1
         End If";
 
-            Verify(CreateMethod(code), CreateMethod(expected));
+            await VerifyAsync(CreateMethod(code), CreateMethod(expected));
         }
 
         [Fact]
         [Trait(Traits.Feature, Traits.Features.AddMissingTokens)]
-        public void TypeArgumentOf_Comment_DontAdd()
+        public async Task TypeArgumentOf_Comment_DontAdd()
         {
             var code = @"[|
         Dim a As List( ' test
@@ -593,12 +598,12 @@ End Class";
                       Integer)";
 
             // parser doesn't recognize the broken list as Type Argument List
-            Verify(CreateMethod(code), CreateMethod(expected));
+            await VerifyAsync(CreateMethod(code), CreateMethod(expected));
         }
 
         [Fact]
         [Trait(Traits.Feature, Traits.Features.AddMissingTokens)]
-        public void TypeParameterOf_Comment()
+        public async Task TypeParameterOf_Comment()
         {
             var code = @"[|Class A( ' test
                                    T)
@@ -608,12 +613,12 @@ End Class|]";
                                    T)
 End Class";
 
-            Verify(code, expected);
+            await VerifyAsync(code, expected);
         }
 
         [Fact]
         [Trait(Traits.Feature, Traits.Features.AddMissingTokens)]
-        public void MethodInvocation_Function_Comment()
+        public async Task MethodInvocation_Function_Comment()
         {
             var code = @"Class A
     Function Test() As Integer
@@ -629,12 +634,12 @@ End Class";
     End Function
 End Class";
 
-            Verify(code, expected);
+            await VerifyAsync(code, expected);
         }
 
         [Fact]
         [Trait(Traits.Feature, Traits.Features.AddMissingTokens)]
-        public void IdentifierMethod_Return_Comment()
+        public async Task IdentifierMethod_Return_Comment()
         {
             var code = @"Class A
     Function Test() As Integer
@@ -656,12 +661,12 @@ End Class";
     End Function
 End Class";
 
-            Verify(code, expected);
+            await VerifyAsync(code, expected);
         }
 
         [Fact]
         [Trait(Traits.Feature, Traits.Features.AddMissingTokens)]
-        public void ImplementsClause()
+        public async Task ImplementsClause()
         {
             var code = @"Class Program
     Implements I
@@ -683,12 +688,12 @@ Interface I
     Sub Method()
 End Interface";
 
-            Verify(code, expected);
+            await VerifyAsync(code, expected);
         }
 
         [Fact]
         [Trait(Traits.Feature, Traits.Features.AddMissingTokens)]
-        public void OperatorStatement()
+        public async Task OperatorStatement()
         {
             var code = @"[|Public Structure abc
     Public Shared Operator And(ByVal x As abc, ByVal y As abc) As abc
@@ -706,12 +711,12 @@ End Structure|]";
     End Operator
 End Structure";
 
-            Verify(code, expected);
+            await VerifyAsync(code, expected);
         }
 
         [Fact]
         [Trait(Traits.Feature, Traits.Features.AddMissingTokens)]
-        public void PropertyAndAccessorStatement()
+        public async Task PropertyAndAccessorStatement()
         {
             var code = @"[|Class Class1
     Private propertyValue As String
@@ -737,12 +742,12 @@ End Class|]";
     End Property
 End Class";
 
-            Verify(code, expected);
+            await VerifyAsync(code, expected);
         }
 
         [Fact]
         [Trait(Traits.Feature, Traits.Features.AddMissingTokens)]
-        public void LambdaExpression()
+        public async Task LambdaExpression()
         {
             var code = @"[|Class Class1
     Dim f as Action = Sub()
@@ -754,50 +759,50 @@ End Class|]";
                       End Sub
 End Class";
 
-            Verify(code, expected);
+            await VerifyAsync(code, expected);
         }
 
         [Fact]
-        [WorkItem(544225, "DevDiv")]
+        [WorkItem(544225, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/544225")]
         [Trait(Traits.Feature, Traits.Features.AddMissingTokens)]
-        public void StructuredTrivia_Expression_DontCrash()
+        public async Task StructuredTrivia_Expression_DontCrash()
         {
-            var code = @"[|#Const Foo1 = 1
-#Const Foo2 = 2
-#If Foo1 Then
-#ElseIf Foo2 Then
+            var code = @"[|#Const Goo1 = 1
+#Const Goo2 = 2
+#If Goo1 Then
+#ElseIf Goo2 Then
 #Else
 #End If|]";
-            var expected = @"#Const Foo1 = 1
-#Const Foo2 = 2
-#If Foo1 Then
-#ElseIf Foo2 Then
+            var expected = @"#Const Goo1 = 1
+#Const Goo2 = 2
+#If Goo1 Then
+#ElseIf Goo2 Then
 #Else
 #End If";
-            Verify(code, expected);
+            await VerifyAsync(code, expected);
         }
 
         [Fact]
-        [WorkItem(544169, "DevDiv")]
+        [WorkItem(544169, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/544169")]
         [Trait(Traits.Feature, Traits.Features.AddMissingTokens)]
-        public void EventStatement_AsClause()
+        public async Task EventStatement_AsClause()
         {
             var code = @"[|Imports System.ComponentModel
-Class Foo
+Class Goo
     Public Event PropertyChanged As PropertyChangedEventHandler
 End Class|]";
             var expected = @"Imports System.ComponentModel
-Class Foo
+Class Goo
     Public Event PropertyChanged As PropertyChangedEventHandler
 End Class";
 
-            Verify(code, expected);
+            await VerifyAsync(code, expected);
         }
 
         [Fact]
-        [WorkItem(544167, "DevDiv")]
+        [WorkItem(544167, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/544167")]
         [Trait(Traits.Feature, Traits.Features.AddMissingTokens)]
-        public void InvocationExpression_NoParentheseForPredefinedCastExpression()
+        public async Task InvocationExpression_NoParenthesesForPredefinedCastExpression()
         {
             var code = @"[|Class Program
     Sub Main(args As String())
@@ -810,14 +815,14 @@ End Class|]";
     End Sub
 End Class";
 
-            Verify(code, expected);
+            await VerifyAsync(code, expected);
         }
 
         [Fact]
-        [WorkItem(544178, "DevDiv")]
-        [WorkItem(544317, "DevDiv")]
+        [WorkItem(544178, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/544178")]
+        [WorkItem(544317, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/544317")]
         [Trait(Traits.Feature, Traits.Features.AddMissingTokens)]
-        public void ObjectCreationExpression()
+        public async Task ObjectCreationExpression()
         {
             var code = @"[|Class C
     Function F() As C
@@ -830,36 +835,36 @@ End Class|]";
     End Function
 End Class";
 
-            Verify(code, expected);
+            await VerifyAsync(code, expected);
         }
 
         [Fact]
-        [WorkItem(544317, "DevDiv")]
+        [WorkItem(544317, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/544317")]
         [Trait(Traits.Feature, Traits.Features.AddMissingTokens)]
-        public void ObjectCreationExpression_Initializer()
+        public async Task ObjectCreationExpression_Initializer()
         {
             var code = @"[|Public Class SomeClass
-    Public foo As Integer
+    Public goo As Integer
 
     Sub SomeSub()
-        [|Dim c = New SomeClass With {.foo = 23}|]
+        [|Dim c = New SomeClass With {.goo = 23}|]
     End Sub
 End Class|]";
             var expected = @"Public Class SomeClass
-    Public foo As Integer
+    Public goo As Integer
 
     Sub SomeSub()
-        Dim c = New SomeClass With {.foo = 23}
+        Dim c = New SomeClass With {.goo = 23}
     End Sub
 End Class";
 
-            Verify(code, expected);
+            await VerifyAsync(code, expected);
         }
 
         [Fact]
-        [WorkItem(544178, "DevDiv")]
+        [WorkItem(544178, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/544178")]
         [Trait(Traits.Feature, Traits.Features.AddMissingTokens)]
-        public void ObjectCreationExpression_GenericName()
+        public async Task ObjectCreationExpression_GenericName()
         {
             var code = @"[|Imports System
 
@@ -877,13 +882,13 @@ Module Program
     End Sub
 End Module";
 
-            Verify(code, expected);
+            await VerifyAsync(code, expected);
         }
 
         [Fact]
-        [WorkItem(544178, "DevDiv")]
+        [WorkItem(544178, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/544178")]
         [Trait(Traits.Feature, Traits.Features.AddMissingTokens)]
-        public void ObjectCreationExpression_AsNewClause()
+        public async Task ObjectCreationExpression_AsNewClause()
         {
             var code = @"[|Class C
     Dim a As New C
@@ -892,13 +897,13 @@ End Class|]";
     Dim a As New C
 End Class";
 
-            Verify(code, expected);
+            await VerifyAsync(code, expected);
         }
 
         [Fact]
-        [WorkItem(544301, "DevDiv")]
+        [WorkItem(544301, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/544301")]
         [Trait(Traits.Feature, Traits.Features.AddMissingTokens)]
-        public void ContinueStatement_While()
+        public async Task ContinueStatement_While()
         {
             var code = @"Module M
     Sub S()
@@ -915,13 +920,13 @@ End Module";
     End Sub
 End Module";
 
-            Verify(code, expected);
+            await VerifyAsync(code, expected);
         }
 
         [Fact]
-        [WorkItem(544301, "DevDiv")]
+        [WorkItem(544301, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/544301")]
         [Trait(Traits.Feature, Traits.Features.AddMissingTokens)]
-        public void ContinueStatement_For()
+        public async Task ContinueStatement_For()
         {
             var code = @"Module M
     Sub S()
@@ -938,13 +943,13 @@ End Module";
     End Sub
 End Module";
 
-            Verify(code, expected);
+            await VerifyAsync(code, expected);
         }
 
         [Fact]
-        [WorkItem(544380, "DevDiv")]
+        [WorkItem(544380, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/544380")]
         [Trait(Traits.Feature, Traits.Features.AddMissingTokens)]
-        public void IfDirective()
+        public async Task IfDirective()
         {
             var code = @"[|#If VBC_VER >= 9.0
 
@@ -955,38 +960,38 @@ End Class|]";
 Class C
 End Class";
 
-            Verify(code, expected);
+            await VerifyAsync(code, expected);
         }
 
         [Fact]
-        [WorkItem(544386, "DevDiv")]
+        [WorkItem(544386, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/544386")]
         [Trait(Traits.Feature, Traits.Features.AddMissingTokens)]
-        public void NamedFieldInitializer()
+        public async Task NamedFieldInitializer()
         {
             var code = @"[|Class S
-    Public Sub Foo()
+    Public Sub Goo()
     End Sub
     Property X
     Sub test()
-        Dim x = New S With {.X = 0,.Foo}
+        Dim x = New S With {.X = 0,.Goo}
     End Sub
 End Class|]";
             var expected = @"Class S
-    Public Sub Foo()
+    Public Sub Goo()
     End Sub
     Property X
     Sub test()
-        Dim x = New S With {.X = 0, .Foo}
+        Dim x = New S With {.X = 0, .Goo}
     End Sub
 End Class";
 
-            Verify(code, expected);
+            await VerifyAsync(code, expected);
         }
 
         [Fact]
-        [WorkItem(544526, "DevDiv")]
+        [WorkItem(544526, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/544526")]
         [Trait(Traits.Feature, Traits.Features.AddMissingTokens)]
-        public void DontCrash_ImplementsStatement()
+        public async Task DontCrash_ImplementsStatement()
         {
             var code = @"[|Class C
     Sub Main() 
@@ -999,13 +1004,13 @@ End Class|]";
     End Sub
 End Class";
 
-            Verify(code, expected);
+            await VerifyAsync(code, expected);
         }
 
         [Fact]
-        [WorkItem(544525, "DevDiv")]
+        [WorkItem(544525, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/544525")]
         [Trait(Traits.Feature, Traits.Features.AddMissingTokens)]
-        public void AccessorStatement_AddRemoveHandler_RaiseEvent()
+        public async Task AccessorStatement_AddRemoveHandler_RaiseEvent()
         {
             var code = @"[|Class C
     Public Custom Event E1 As Action
@@ -1028,13 +1033,13 @@ End Class|]";
     End Event
 End Class";
 
-            Verify(code, expected);
+            await VerifyAsync(code, expected);
         }
 
         [Fact]
-        [WorkItem(545176, "DevDiv")]
+        [WorkItem(545176, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/545176")]
         [Trait(Traits.Feature, Traits.Features.AddMissingTokens)]
-        public void CallStatement_Lambda()
+        public async Task CallStatement_Lambda()
         {
             var code = @"[|Module Program
     Sub Main()
@@ -1047,95 +1052,95 @@ End Module|]";
     End Sub
 End Module";
 
-            Verify(code, expected);
+            await VerifyAsync(code, expected);
         }
 
         [Fact]
-        [WorkItem(545256, "DevDiv")]
+        [WorkItem(545256, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/545256")]
         [Trait(Traits.Feature, Traits.Features.AddMissingTokens)]
-        public void HandlesClauseItem_DontAddParenthese()
+        public async Task HandlesClauseItem_DontAddParentheses()
         {
             var code = @"[|Structure s1
-    Sub Foo() Handles Me.Foo
+    Sub Goo() Handles Me.Goo
  
     End Sub
 End Structure|]";
             var expected = @"Structure s1
-    Sub Foo() Handles Me.Foo
+    Sub Goo() Handles Me.Goo
 
     End Sub
 End Structure";
 
-            Verify(code, expected);
+            await VerifyAsync(code, expected);
         }
 
         [Fact]
-        [WorkItem(545380, "DevDiv")]
+        [WorkItem(545380, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/545380")]
         [Trait(Traits.Feature, Traits.Features.AddMissingTokens)]
-        public void DontAddParentheseInForEachControlVariable()
+        public async Task DontAddParenthesesInForEachControlVariable()
         {
             var code = @"[|Module Module1
     Sub Main()
-        For Each foo in {} 
+        For Each goo in {} 
     End Sub
  
-    Sub Foo()
+    Sub Goo()
     End Sub
 End Module|]";
             var expected = @"Module Module1
     Sub Main()
-        For Each foo in {}
+        For Each goo in {}
     End Sub
 
-    Sub Foo()
+    Sub Goo()
     End Sub
 End Module";
 
-            Verify(code, expected);
+            await VerifyAsync(code, expected);
         }
 
         [Fact]
-        [WorkItem(545380, "DevDiv")]
+        [WorkItem(545380, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/545380")]
         [Trait(Traits.Feature, Traits.Features.AddMissingTokens)]
-        public void DontAddParentheseInForControlVariable()
+        public async Task DontAddParenthesesInForControlVariable()
         {
             var code = @"[|Module Module1
     Sub Main()
-        For foo to 
+        For goo to 
     End Sub
  
-    Sub Foo()
+    Sub Goo()
     End Sub
 End Module|]";
             var expected = @"Module Module1
     Sub Main()
-        For foo to 
+        For goo to 
     End Sub
 
-    Sub Foo()
+    Sub Goo()
     End Sub
 End Module";
 
-            Verify(code, expected);
+            await VerifyAsync(code, expected);
         }
 
         [Fact]
-        [WorkItem(545483, "DevDiv")]
+        [WorkItem(545483, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/545483")]
         [Trait(Traits.Feature, Traits.Features.AddMissingTokens)]
-        public void DontAddParentheseForMissingName()
+        public async Task DontAddParenthesesForMissingName()
         {
             var code = @"[|Class C
     Public Overrides Function|]";
             var expected = @"Class C
     Public Overrides Function";
 
-            Verify(code, expected);
+            await VerifyAsync(code, expected);
         }
 
         [Fact]
-        [WorkItem(545483, "DevDiv")]
+        [WorkItem(545483, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/545483")]
         [Trait(Traits.Feature, Traits.Features.AddMissingTokens)]
-        public void CombinedDelegates()
+        public async Task CombinedDelegates()
         {
             var code = @"[|Imports System
 Class A
@@ -1156,51 +1161,51 @@ Class A
     End Sub
 End Class";
 
-            Verify(code, expected);
+            await VerifyAsync(code, expected);
         }
 
         [Fact]
-        [WorkItem(546581, "DevDiv")]
+        [WorkItem(546581, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/546581")]
         [Trait(Traits.Feature, Traits.Features.AddMissingTokens)]
-        public void ThenOmittedWithSurroundingErrors()
+        public async Task ThenOmittedWithSurroundingErrors()
         {
             var code = @"[|
         If True OrElse|]";
             var expected = @"
         If True OrElse";
 
-            Verify(CreateMethod(code), CreateMethod(expected));
+            await VerifyAsync(CreateMethod(code), CreateMethod(expected));
         }
 
         [Fact]
-        [WorkItem(546581, "DevDiv")]
+        [WorkItem(546581, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/546581")]
         [Trait(Traits.Feature, Traits.Features.AddMissingTokens)]
-        public void ThenOmittedWithSurroundingErrors1()
+        public async Task ThenOmittedWithSurroundingErrors1()
         {
             var code = @"[|
         If True|]";
             var expected = @"
         If True Then";
 
-            Verify(CreateMethod(code), CreateMethod(expected));
+            await VerifyAsync(CreateMethod(code), CreateMethod(expected));
         }
 
         [Fact]
-        [WorkItem(546797, "DevDiv")]
+        [WorkItem(546797, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/546797")]
         [Trait(Traits.Feature, Traits.Features.AddMissingTokens)]
-        public void ParenthesisWithLineContinuation()
+        public async Task ParenthesisWithLineContinuation()
         {
             var code = @"[|
             System.Diagnostics.Debug.Assert _ (True)|]";
             var expected = @"
         System.Diagnostics.Debug.Assert _ (True)";
-            Verify(CreateMethod(code), CreateMethod(expected));
+            await VerifyAsync(CreateMethod(code), CreateMethod(expected));
         }
 
         [Fact]
-        [WorkItem(546806, "DevDiv")]
+        [WorkItem(546806, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/546806")]
         [Trait(Traits.Feature, Traits.Features.AddMissingTokens)]
-        public void ThenWithLineContinuation()
+        public async Task ThenWithLineContinuation()
         {
             var code = @"[|
 #If Condition _ Then
@@ -1210,13 +1215,13 @@ End Class";
 #If Condition _ Then
         ' blah
 #End If";
-            Verify(CreateMethod(code), CreateMethod(expected));
+            await VerifyAsync(CreateMethod(code), CreateMethod(expected));
         }
 
         [Fact]
-        [WorkItem(531278, "DevDiv")]
+        [WorkItem(531278, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/531278")]
         [Trait(Traits.Feature, Traits.Features.AddMissingTokens)]
-        public void ThenInIfDirective()
+        public async Task ThenInIfDirective()
         {
             var code = @"#Const ccConst = 0
 [|#If ccConst
@@ -1238,13 +1243,13 @@ Module Program
     Sub Main(args As String())
     End Sub
 End Module";
-            Verify(code, expected);
+            await VerifyAsync(code, expected);
         }
 
         [Fact]
-        [WorkItem(607792, "DevDiv")]
+        [WorkItem(607792, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/607792")]
         [Trait(Traits.Feature, Traits.Features.AddMissingTokens)]
-        public void CaseKeywordInSelectStatement()
+        public async Task CaseKeywordInSelectStatement()
         {
             var code = @"
 Module Program
@@ -1280,13 +1285,13 @@ Module Program
     End Sub
 End Module";
 
-            Verify(code, expected);
+            await VerifyAsync(code, expected);
         }
 
         [Fact]
-        [WorkItem(530789, "DevDiv")]
+        [WorkItem(530789, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/530789")]
         [Trait(Traits.Feature, Traits.Features.AddMissingTokens)]
-        public void Bug530789()
+        public async Task Bug530789()
         {
             var code = @"Imports System
 Module Program
@@ -1302,13 +1307,13 @@ Module Program
     End Sub
 End Module";
 
-            Verify(code, expected);
+            await VerifyAsync(code, expected);
         }
 
         [Fact]
-        [WorkItem(530039, "DevDiv")]
+        [WorkItem(530039, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/530039")]
         [Trait(Traits.Feature, Traits.Features.AddMissingTokens)]
-        public void TestArraySyntax()
+        public async Task TestArraySyntax()
         {
             var code = @"[|Module TestMod
 Sub Main()
@@ -1324,142 +1329,142 @@ End Module|]";
     End Sub
 End Module";
 
-            Verify(code, expected);
+            await VerifyAsync(code, expected);
         }
 
         [Fact]
-        [WorkItem(602932, "DevDiv")]
+        [WorkItem(602932, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/602932")]
         [Trait(Traits.Feature, Traits.Features.AddMissingTokens)]
-        public void TestAsyncFunctionWithoutAsClause()
+        public async Task TestAsyncFunctionWithoutAsClause()
         {
             var code = @"[|
 Interface I
-    Function Foo() As System.Threading.Tasks.Task
+    Function Goo() As System.Threading.Tasks.Task
 End Interface
 
 Class Test
     Implements I
 
     '   a. Basic
-    Async Function Foo1()
+    Async Function Goo1()
     End Function
 
     '   b. With Trailing trivia
-    Async Function Foo2()   ' Trailing
+    Async Function Goo2()   ' Trailing
     End Function
 
     '   c. Without Parenthesis
-    Async Function Foo4
+    Async Function Goo4
     End Function
 
     '   d. With Implements/Handles clause
-    Async Function Foo5() Implements I.Foo
+    Async Function Goo5() Implements I.Goo
     End Function
 
     '   e. With Implements/Handles clause with trivia
-    Async Function Foo6()      Implements I.Foo  ' Trailing
+    Async Function Goo6()      Implements I.Goo  ' Trailing
     End Function
 
     '   f. Invalid Async Sub
-    Async Sub Foo7()
+    Async Sub Goo7()
     End Sub
 
     '   g. Without End Function
-    Async Function Foo3()
+    Async Function Goo3()
 
     '   h. With End Function On SameLine
-    Async Function Foo4(ByVal x As Integer) End Function
+    Async Function Goo4(ByVal x As Integer) End Function
 
 End Class|]";
 
             var expected = @"
 Interface I
-    Function Foo() As System.Threading.Tasks.Task
+    Function Goo() As System.Threading.Tasks.Task
 End Interface
 
 Class Test
     Implements I
 
     '   a. Basic
-    Async Function Foo1() As System.Threading.Tasks.Task
+    Async Function Goo1() As System.Threading.Tasks.Task
     End Function
 
     '   b. With Trailing trivia
-    Async Function Foo2() As System.Threading.Tasks.Task   ' Trailing
+    Async Function Goo2() As System.Threading.Tasks.Task   ' Trailing
     End Function
 
     '   c. Without Parenthesis
-    Async Function Foo4() As System.Threading.Tasks.Task
+    Async Function Goo4() As System.Threading.Tasks.Task
     End Function
 
     '   d. With Implements/Handles clause
-    Async Function Foo5() As System.Threading.Tasks.Task Implements I.Foo
+    Async Function Goo5() As System.Threading.Tasks.Task Implements I.Goo
     End Function
 
     '   e. With Implements/Handles clause with trivia
-    Async Function Foo6() As System.Threading.Tasks.Task Implements I.Foo  ' Trailing
+    Async Function Goo6() As System.Threading.Tasks.Task Implements I.Goo  ' Trailing
     End Function
 
     '   f. Invalid Async Sub
-    Async Sub Foo7()
+    Async Sub Goo7()
     End Sub
 
     '   g. Without End Function
-    Async Function Foo3() As System.Threading.Tasks.Task
+    Async Function Goo3() As System.Threading.Tasks.Task
 
     '   h. With End Function On SameLine
-    Async Function Foo4(ByVal x As Integer) As System.Threading.Tasks.Task End Function
+    Async Function Goo4(ByVal x As Integer) As System.Threading.Tasks.Task End Function
 
 End Class";
 
-            Verify(code, expected);
+            await VerifyAsync(code, expected);
         }
 
         [Fact]
-        [WorkItem(602932, "DevDiv")]
+        [WorkItem(602932, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/602932")]
         [Trait(Traits.Feature, Traits.Features.AddMissingTokens)]
-        public void TestAsyncFunctionWithoutAsClause_WithAddedImports()
+        public async Task TestAsyncFunctionWithoutAsClause_WithAddedImports()
         {
             var code = @"[|
 Imports System
 Imports System.Threading.Tasks
 
 Interface I
-    Function Foo() As Task
+    Function Goo() As Task
 End Interface
 
 Class Test
     Implements I
 
     '   a. Basic
-    Async Function Foo1()
+    Async Function Goo1()
     End Function
 
     '   b. With Trailing trivia
-    Async Function Foo2()   ' Trailing
+    Async Function Goo2()   ' Trailing
     End Function
 
     '   c. Without Parenthesis
-    Async Function Foo4
+    Async Function Goo4
     End Function
 
     '   d. With Implements/Handles clause
-    Async Function Foo5() Implements I.Foo
+    Async Function Goo5() Implements I.Goo
     End Function
 
     '   e. With Implements/Handles clause with trivia
-    Async Function Foo6()      Implements I.Foo  ' Trailing
+    Async Function Goo6()      Implements I.Goo  ' Trailing
     End Function
 
     '   f. Invalid Async Sub
-    Async Sub Foo7()
+    Async Sub Goo7()
     End Sub
 
     '   g. Without End Function
-    Async Function Foo3()
+    Async Function Goo3()
 
     '   h. With End Function On SameLine
-    Async Function Foo4(ByVal x As Integer) End Function
+    Async Function Goo4(ByVal x As Integer) End Function
 
 End Class|]";
 
@@ -1468,133 +1473,133 @@ Imports System
 Imports System.Threading.Tasks
 
 Interface I
-    Function Foo() As Task
+    Function Goo() As Task
 End Interface
 
 Class Test
     Implements I
 
     '   a. Basic
-    Async Function Foo1() As Task
+    Async Function Goo1() As Task
     End Function
 
     '   b. With Trailing trivia
-    Async Function Foo2() As Task   ' Trailing
+    Async Function Goo2() As Task   ' Trailing
     End Function
 
     '   c. Without Parenthesis
-    Async Function Foo4() As Task
+    Async Function Goo4() As Task
     End Function
 
     '   d. With Implements/Handles clause
-    Async Function Foo5() As Task Implements I.Foo
+    Async Function Goo5() As Task Implements I.Goo
     End Function
 
     '   e. With Implements/Handles clause with trivia
-    Async Function Foo6() As Task Implements I.Foo  ' Trailing
+    Async Function Goo6() As Task Implements I.Goo  ' Trailing
     End Function
 
     '   f. Invalid Async Sub
-    Async Sub Foo7()
+    Async Sub Goo7()
     End Sub
 
     '   g. Without End Function
-    Async Function Foo3() As Task
+    Async Function Goo3() As Task
 
     '   h. With End Function On SameLine
-    Async Function Foo4(ByVal x As Integer) As Task End Function
+    Async Function Goo4(ByVal x As Integer) As Task End Function
 
 End Class";
 
-            Verify(code, expected);
+            await VerifyAsync(code, expected);
         }
 
         [Fact]
-        [WorkItem(602932, "DevDiv")]
+        [WorkItem(602932, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/602932")]
         [Trait(Traits.Feature, Traits.Features.AddMissingTokens)]
-        public void TestIteratorFunctionWithoutAsClause()
+        public async Task TestIteratorFunctionWithoutAsClause()
         {
             var code = @"[|
 Interface I
-    Function Foo() As System.Collections.IEnumerable
+    Function Goo() As System.Collections.IEnumerable
 End Interface
 
 Class Test
     Implements I
 
     '   a. Basic
-    Iterator Function Foo1()
+    Iterator Function Goo1()
     End Function
 
     '   b. With Trailing trivia
-    Iterator Function Foo2()   ' Trailing
+    Iterator Function Goo2()   ' Trailing
     End Function
 
     '   c. Without Parenthesis
-    Iterator Function Foo4
+    Iterator Function Goo4
     End Function
 
     '   d. With Implements/Handles clause
-    Iterator Function Foo5() Implements I.Foo
+    Iterator Function Goo5() Implements I.Goo
     End Function
 
     '   e. With Implements/Handles clause with trivia
-    Iterator Function Foo6()      Implements I.Foo  ' Trailing
+    Iterator Function Goo6()      Implements I.Goo  ' Trailing
     End Function
 
     '   f. Invalid Iterator Sub
-    Iterator Sub Foo7()
+    Iterator Sub Goo7()
     End Sub
 
     '   g. Without End Function
-    Iterator Function Foo3()
+    Iterator Function Goo3()
 
 End Class|]";
 
             var expected = @"
 Interface I
-    Function Foo() As System.Collections.IEnumerable
+    Function Goo() As System.Collections.IEnumerable
 End Interface
 
 Class Test
     Implements I
 
     '   a. Basic
-    Iterator Function Foo1() As System.Collections.IEnumerable
+    Iterator Function Goo1() As System.Collections.IEnumerable
     End Function
 
     '   b. With Trailing trivia
-    Iterator Function Foo2() As System.Collections.IEnumerable   ' Trailing
+    Iterator Function Goo2() As System.Collections.IEnumerable   ' Trailing
     End Function
 
     '   c. Without Parenthesis
-    Iterator Function Foo4() As System.Collections.IEnumerable
+    Iterator Function Goo4() As System.Collections.IEnumerable
     End Function
 
     '   d. With Implements/Handles clause
-    Iterator Function Foo5() As System.Collections.IEnumerable Implements I.Foo
+    Iterator Function Goo5() As System.Collections.IEnumerable Implements I.Goo
     End Function
 
     '   e. With Implements/Handles clause with trivia
-    Iterator Function Foo6() As System.Collections.IEnumerable Implements I.Foo  ' Trailing
+    Iterator Function Goo6() As System.Collections.IEnumerable Implements I.Goo  ' Trailing
     End Function
 
     '   f. Invalid Iterator Sub
-    Iterator Sub Foo7()
+    Iterator Sub Goo7()
     End Sub
 
     '   g. Without End Function
-    Iterator Function Foo3() As System.Collections.IEnumerable
+    Iterator Function Goo3() As System.Collections.IEnumerable
 
 End Class";
 
-            Verify(code, expected);
+            await VerifyAsync(code, expected);
         }
 
         [Fact]
-        [WorkItem(602932, "DevDiv")]
+        [WorkItem(602932, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/602932")]
         [Trait(Traits.Feature, Traits.Features.AddMissingTokens)]
-        public void TestIteratorFunctionWithoutAsClause_WithAddedImports()
+        public async Task TestIteratorFunctionWithoutAsClause_WithAddedImports()
         {
             var code = @"[|
 Imports System
@@ -1602,38 +1607,38 @@ Imports System.Collections
 Imports System.Collections.Generic
 
 Interface I
-    Function Foo() As System.Collections.IEnumerable
+    Function Goo() As System.Collections.IEnumerable
 End Interface
 
 Class Test
     Implements I
 
     '   a. Basic
-    Iterator Function Foo1()
+    Iterator Function Goo1()
     End Function
 
     '   b. With Trailing trivia
-    Iterator Function Foo2()   ' Trailing
+    Iterator Function Goo2()   ' Trailing
     End Function
 
     '   c. Without Parenthesis
-    Iterator Function Foo4
+    Iterator Function Goo4
     End Function
 
     '   d. With Implements/Handles clause
-    Iterator Function Foo5() Implements I.Foo
+    Iterator Function Goo5() Implements I.Goo
     End Function
 
     '   e. With Implements/Handles clause with trivia
-    Iterator Function Foo6()      Implements I.Foo  ' Trailing
+    Iterator Function Goo6()      Implements I.Goo  ' Trailing
     End Function
 
     '   f. Invalid Iterator Sub
-    Iterator Sub Foo7()
+    Iterator Sub Goo7()
     End Sub
 
     '   g. Without End Function
-    Iterator Function Foo3()
+    Iterator Function Goo3()
 
 End Class|]";
 
@@ -1643,52 +1648,52 @@ Imports System.Collections
 Imports System.Collections.Generic
 
 Interface I
-    Function Foo() As System.Collections.IEnumerable
+    Function Goo() As System.Collections.IEnumerable
 End Interface
 
 Class Test
     Implements I
 
     '   a. Basic
-    Iterator Function Foo1() As IEnumerable
+    Iterator Function Goo1() As IEnumerable
     End Function
 
     '   b. With Trailing trivia
-    Iterator Function Foo2() As IEnumerable   ' Trailing
+    Iterator Function Goo2() As IEnumerable   ' Trailing
     End Function
 
     '   c. Without Parenthesis
-    Iterator Function Foo4() As IEnumerable
+    Iterator Function Goo4() As IEnumerable
     End Function
 
     '   d. With Implements/Handles clause
-    Iterator Function Foo5() As IEnumerable Implements I.Foo
+    Iterator Function Goo5() As IEnumerable Implements I.Goo
     End Function
 
     '   e. With Implements/Handles clause with trivia
-    Iterator Function Foo6() As IEnumerable Implements I.Foo  ' Trailing
+    Iterator Function Goo6() As IEnumerable Implements I.Goo  ' Trailing
     End Function
 
     '   f. Invalid Iterator Sub
-    Iterator Sub Foo7()
+    Iterator Sub Goo7()
     End Sub
 
     '   g. Without End Function
-    Iterator Function Foo3() As IEnumerable
+    Iterator Function Goo3() As IEnumerable
 
 End Class";
 
-            Verify(code, expected);
+            await VerifyAsync(code, expected);
         }
 
         [Fact]
-        [WorkItem(602932, "DevDiv")]
+        [WorkItem(602932, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/602932")]
         [Trait(Traits.Feature, Traits.Features.AddMissingTokens)]
-        public void TestAsyncFunctionWithAsClause()
+        public async Task TestAsyncFunctionWithAsClause()
         {
             var code = @"[|
 Interface I
-    Function Foo() As System.Threading.Tasks.Task
+    Function Goo() As System.Threading.Tasks.Task
 End Interface
 
 Class MyType
@@ -1707,69 +1712,69 @@ Class Test(Of T)
     Implements I
 
     '   a. Basic
-    Async Function Foo1() As Integer
+    Async Function Goo1() As Integer
     End Function
 
     '   b. With Trailing trivia
-    Async Function Foo2() As Integer   ' Trailing
+    Async Function Goo2() As Integer   ' Trailing
     End Function
 
     '   c. Without Parenthesis
-    Async Function Foo3 As Integer   ' Trailing
+    Async Function Goo3 As Integer   ' Trailing
     End Function
 
     '   d. With Implements/Handles clause
-    Async Function Foo4() As Integer Implements I.Foo
+    Async Function Goo4() As Integer Implements I.Goo
     End Function
 
     '   e. With Implements/Handles clause with trivia
-    Async Function Foo5() As Integer     Implements I.Foo  ' Trailing
+    Async Function Goo5() As Integer     Implements I.Goo  ' Trailing
     End Function
 
     '   f. Invalid Async Sub
-    Async Sub Foo6() As Integer
+    Async Sub Goo6() As Integer
     End Sub
 
     '   g. With valid Task return type
-    Async Function Foo7() As Task
+    Async Function Goo7() As Task
     End Function
 
     '   h. With valid Task(Of T) return type
-    Async Function Foo8() As Task(Of T)
+    Async Function Goo8() As Task(Of T)
     End Function
 
     '   i. With valid Task(Of Integer) return type
-    Async Function Foo9() As Task(Of Integer)
+    Async Function Goo9() As Task(Of Integer)
     End Function
 
     '   j. With invalid user defined Task return type
-    Async Function Foo10() As MyType.Task
+    Async Function Goo10() As MyType.Task
     End Function
 
     '   k. With error return type
-    Async Function Foo11() As ErrorType
+    Async Function Goo11() As ErrorType
     End Function
 
     '   l. Without a return type
-    Async Function Foo12() As  ' Trailing
+    Async Function Goo12() As  ' Trailing
     End Function
 
     '   m. With trivia within AsClause
-    Async Function Foo13()    As         Integer  ' Trailing
+    Async Function Goo13()    As         Integer  ' Trailing
     End Function
 
     '   n. With return type that inherits from Task
-    Async Function Foo14() As MyTask
+    Async Function Goo14() As MyTask
     End Function
 
     '   o. Without End Function
-    Async Function FooLast() As Integer
+    Async Function GooLast() As Integer
 
 End Class|]";
 
             var expected = @"
 Interface I
-    Function Foo() As System.Threading.Tasks.Task
+    Function Goo() As System.Threading.Tasks.Task
 End Interface
 
 Class MyType
@@ -1788,80 +1793,80 @@ Class Test(Of T)
     Implements I
 
     '   a. Basic
-    Async Function Foo1() As System.Threading.Tasks.Task(Of Integer)
+    Async Function Goo1() As System.Threading.Tasks.Task(Of Integer)
     End Function
 
     '   b. With Trailing trivia
-    Async Function Foo2() As System.Threading.Tasks.Task(Of Integer)   ' Trailing
+    Async Function Goo2() As System.Threading.Tasks.Task(Of Integer)   ' Trailing
     End Function
 
     '   c. Without Parenthesis
-    Async Function Foo3() As System.Threading.Tasks.Task(Of Integer)   ' Trailing
+    Async Function Goo3() As System.Threading.Tasks.Task(Of Integer)   ' Trailing
     End Function
 
     '   d. With Implements/Handles clause
-    Async Function Foo4() As System.Threading.Tasks.Task(Of Integer) Implements I.Foo
+    Async Function Goo4() As System.Threading.Tasks.Task(Of Integer) Implements I.Goo
     End Function
 
     '   e. With Implements/Handles clause with trivia
-    Async Function Foo5() As System.Threading.Tasks.Task(Of Integer) Implements I.Foo  ' Trailing
+    Async Function Goo5() As System.Threading.Tasks.Task(Of Integer) Implements I.Goo  ' Trailing
     End Function
 
     '   f. Invalid Async Sub
-    Async Sub Foo6() As Integer
+    Async Sub Goo6() As Integer
     End Sub
 
     '   g. With valid Task return type
-    Async Function Foo7() As Task
+    Async Function Goo7() As Task
     End Function
 
     '   h. With valid Task(Of T) return type
-    Async Function Foo8() As Task(Of T)
+    Async Function Goo8() As Task(Of T)
     End Function
 
     '   i. With valid Task(Of Integer) return type
-    Async Function Foo9() As Task(Of Integer)
+    Async Function Goo9() As Task(Of Integer)
     End Function
 
     '   j. With invalid user defined Task return type
-    Async Function Foo10() As System.Threading.Tasks.Task(Of MyType.Task)
+    Async Function Goo10() As System.Threading.Tasks.Task(Of MyType.Task)
     End Function
 
     '   k. With error return type
-    Async Function Foo11() As ErrorType
+    Async Function Goo11() As ErrorType
     End Function
 
     '   l. Without a return type
-    Async Function Foo12() As  ' Trailing
+    Async Function Goo12() As  ' Trailing
     End Function
 
     '   m. With trivia within AsClause
-    Async Function Foo13() As System.Threading.Tasks.Task(Of Integer)  ' Trailing
+    Async Function Goo13() As System.Threading.Tasks.Task(Of Integer)  ' Trailing
     End Function
 
     '   n. With return type that inherits from Task
-    Async Function Foo14() As System.Threading.Tasks.Task(Of MyTask)
+    Async Function Goo14() As System.Threading.Tasks.Task(Of MyTask)
     End Function
 
     '   o. Without End Function
-    Async Function FooLast() As System.Threading.Tasks.Task(Of Integer)
+    Async Function GooLast() As System.Threading.Tasks.Task(Of Integer)
 
 End Class";
 
-            Verify(code, expected);
+            await VerifyAsync(code, expected);
         }
 
         [Fact]
-        [WorkItem(602932, "DevDiv")]
+        [WorkItem(602932, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/602932")]
         [Trait(Traits.Feature, Traits.Features.AddMissingTokens)]
-        public void TestAsyncFunctionWithAsClause_WithAddedImports()
+        public async Task TestAsyncFunctionWithAsClause_WithAddedImports()
         {
             var code = @"[|
 Imports System
 Imports System.Threading.Tasks
 
 Interface I
-    Function Foo() As System.Threading.Tasks.Task
+    Function Goo() As System.Threading.Tasks.Task
 End Interface
 
 Class MyType
@@ -1880,63 +1885,63 @@ Class Test(Of T)
     Implements I
 
     '   a. Basic
-    Async Function Foo1() As Integer
+    Async Function Goo1() As Integer
     End Function
 
     '   b. With Trailing trivia
-    Async Function Foo2() As Integer   ' Trailing
+    Async Function Goo2() As Integer   ' Trailing
     End Function
 
     '   c. Without Parenthesis
-    Async Function Foo3 As Integer   ' Trailing
+    Async Function Goo3 As Integer   ' Trailing
     End Function
 
     '   d. With Implements/Handles clause
-    Async Function Foo4() As Integer Implements I.Foo
+    Async Function Goo4() As Integer Implements I.Goo
     End Function
 
     '   e. With Implements/Handles clause with trivia
-    Async Function Foo5() As Integer     Implements I.Foo  ' Trailing
+    Async Function Goo5() As Integer     Implements I.Goo  ' Trailing
     End Function
 
     '   f. Invalid Async Sub
-    Async Sub Foo6() As Integer
+    Async Sub Goo6() As Integer
     End Sub
 
     '   g. With valid Task return type
-    Async Function Foo7() As Task
+    Async Function Goo7() As Task
     End Function
 
     '   h. With valid Task(Of T) return type
-    Async Function Foo8() As Task(Of T)
+    Async Function Goo8() As Task(Of T)
     End Function
 
     '   i. With valid Task(Of Integer) return type
-    Async Function Foo9() As Task(Of Integer)
+    Async Function Goo9() As Task(Of Integer)
     End Function
 
     '   j. With invalid user defined Task return type
-    Async Function Foo10() As MyType.Task
+    Async Function Goo10() As MyType.Task
     End Function
 
     '   k. With error return type
-    Async Function Foo11() As ErrorType
+    Async Function Goo11() As ErrorType
     End Function
 
     '   l. Without a return type
-    Async Function Foo12() As  ' Trailing
+    Async Function Goo12() As  ' Trailing
     End Function
 
     '   m. With trivia within AsClause
-    Async Function Foo13()    As         Integer  ' Trailing
+    Async Function Goo13()    As         Integer  ' Trailing
     End Function
 
     '   n. With return type that inherits from Task
-    Async Function Foo14() As MyTask
+    Async Function Goo14() As MyTask
     End Function
 
     '   o. Without End Function
-    Async Function FooLast() As Integer
+    Async Function GooLast() As Integer
 
 End Class|]";
 
@@ -1945,7 +1950,7 @@ Imports System
 Imports System.Threading.Tasks
 
 Interface I
-    Function Foo() As System.Threading.Tasks.Task
+    Function Goo() As System.Threading.Tasks.Task
 End Interface
 
 Class MyType
@@ -1964,77 +1969,77 @@ Class Test(Of T)
     Implements I
 
     '   a. Basic
-    Async Function Foo1() As Task(Of Integer)
+    Async Function Goo1() As Task(Of Integer)
     End Function
 
     '   b. With Trailing trivia
-    Async Function Foo2() As Task(Of Integer)   ' Trailing
+    Async Function Goo2() As Task(Of Integer)   ' Trailing
     End Function
 
     '   c. Without Parenthesis
-    Async Function Foo3() As Task(Of Integer)   ' Trailing
+    Async Function Goo3() As Task(Of Integer)   ' Trailing
     End Function
 
     '   d. With Implements/Handles clause
-    Async Function Foo4() As Task(Of Integer) Implements I.Foo
+    Async Function Goo4() As Task(Of Integer) Implements I.Goo
     End Function
 
     '   e. With Implements/Handles clause with trivia
-    Async Function Foo5() As Task(Of Integer) Implements I.Foo  ' Trailing
+    Async Function Goo5() As Task(Of Integer) Implements I.Goo  ' Trailing
     End Function
 
     '   f. Invalid Async Sub
-    Async Sub Foo6() As Integer
+    Async Sub Goo6() As Integer
     End Sub
 
     '   g. With valid Task return type
-    Async Function Foo7() As Task
+    Async Function Goo7() As Task
     End Function
 
     '   h. With valid Task(Of T) return type
-    Async Function Foo8() As Task(Of T)
+    Async Function Goo8() As Task(Of T)
     End Function
 
     '   i. With valid Task(Of Integer) return type
-    Async Function Foo9() As Task(Of Integer)
+    Async Function Goo9() As Task(Of Integer)
     End Function
 
     '   j. With invalid user defined Task return type
-    Async Function Foo10() As Task(Of MyType.Task)
+    Async Function Goo10() As Task(Of MyType.Task)
     End Function
 
     '   k. With error return type
-    Async Function Foo11() As ErrorType
+    Async Function Goo11() As ErrorType
     End Function
 
     '   l. Without a return type
-    Async Function Foo12() As  ' Trailing
+    Async Function Goo12() As  ' Trailing
     End Function
 
     '   m. With trivia within AsClause
-    Async Function Foo13() As Task(Of Integer)  ' Trailing
+    Async Function Goo13() As Task(Of Integer)  ' Trailing
     End Function
 
     '   n. With return type that inherits from Task
-    Async Function Foo14() As Task(Of MyTask)
+    Async Function Goo14() As Task(Of MyTask)
     End Function
 
     '   o. Without End Function
-    Async Function FooLast() As Task(Of Integer)
+    Async Function GooLast() As Task(Of Integer)
 
 End Class";
 
-            Verify(code, expected);
+            await VerifyAsync(code, expected);
         }
 
         [Fact]
-        [WorkItem(602932, "DevDiv")]
+        [WorkItem(602932, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/602932")]
         [Trait(Traits.Feature, Traits.Features.AddMissingTokens)]
-        public void TestIteratorFunctionWithAsClause()
+        public async Task TestIteratorFunctionWithAsClause()
         {
             var code = @"[|
 Interface I
-    Function Foo() As System.Collections.IEnumerable
+    Function Goo() As System.Collections.IEnumerable
 End Interface
 
 Class MyType
@@ -2054,81 +2059,81 @@ Class Test(Of T)
     Implements I
 
     '   a. Basic
-    Iterator Function Foo1() As Integer
+    Iterator Function Goo1() As Integer
     End Function
 
     '   b. With Trailing trivia
-    Iterator Function Foo2() As Integer   ' Trailing
+    Iterator Function Goo2() As Integer   ' Trailing
     End Function
 
     '   c. Without Parenthesis
-    Iterator Function Foo3 As Integer   ' Trailing
+    Iterator Function Goo3 As Integer   ' Trailing
     End Function
 
     '   d. With Implements/Handles clause
-    Iterator Function Foo4() As Integer Implements I.Foo
+    Iterator Function Goo4() As Integer Implements I.Goo
     End Function
 
     '   e. With Implements/Handles clause with trivia
-    Iterator Function Foo5() As Integer     Implements I.Foo  ' Trailing
+    Iterator Function Goo5() As Integer     Implements I.Goo  ' Trailing
     End Function
 
     '   f. Invalid Iterator Sub
-    Iterator Sub Foo6() As Integer
+    Iterator Sub Goo6() As Integer
     End Sub
 
     '   g1. With valid IEnumerable return type
-    Iterator Function Foo7_1() As System.Collections.IEnumerable
+    Iterator Function Goo7_1() As System.Collections.IEnumerable
     End Function
 
     '   g2. With valid IEnumerator return type
-    Iterator Function Foo7_2() As System.Collections.IEnumerator
+    Iterator Function Goo7_2() As System.Collections.IEnumerator
     End Function
 
     '   h1. With valid IEnumerable(Of T) return type
-    Iterator Function Foo8_1() As System.Collections.Generic.IEnumerable(Of T)
+    Iterator Function Goo8_1() As System.Collections.Generic.IEnumerable(Of T)
     End Function
 
     '   h2. With valid IEnumerator(Of T) return type
-    Iterator Function Foo8_2() As System.Collections.Generic.IEnumerator(Of T)
+    Iterator Function Goo8_2() As System.Collections.Generic.IEnumerator(Of T)
     End Function
 
     '   i1. With valid IEnumerable(Of Integer) return type
-    Iterator Function Foo9_1() As System.Collections.Generic.IEnumerable(Of Integer)
+    Iterator Function Goo9_1() As System.Collections.Generic.IEnumerable(Of Integer)
     End Function
 
     '   i2. With valid IEnumerator(Of Integer) return type
-    Iterator Function Foo9_2() As System.Collections.Generic.IEnumerator(Of Integer)
+    Iterator Function Goo9_2() As System.Collections.Generic.IEnumerator(Of Integer)
     End Function
 
     '   j. With invalid user defined IEnumerable return type
-    Iterator Function Foo10() As MyType.IEnumerable
+    Iterator Function Goo10() As MyType.IEnumerable
     End Function
 
     '   k. With error return type
-    Iterator Function Foo11() As ErrorType
+    Iterator Function Goo11() As ErrorType
     End Function
 
     '   l. Without a return type
-    Iterator Function Foo12() As  ' Trailing
+    Iterator Function Goo12() As  ' Trailing
     End Function
 
     '   m. With trivia within AsClause
-    Iterator Function Foo13()    As         Integer  ' Trailing
+    Iterator Function Goo13()    As         Integer  ' Trailing
     End Function
 
     '   n. With return type that implements IEnumerable
-    Iterator Function Foo14() As MyIEnumerable
+    Iterator Function Goo14() As MyIEnumerable
     End Function
 
     '   o. Without End Function
-    Iterator Function FooLast() As Integer
+    Iterator Function GooLast() As Integer
 
 End Class|]";
 
             var expected = @"
 Interface I
-    Function Foo() As System.Collections.IEnumerable
+    Function Goo() As System.Collections.IEnumerable
 End Interface
 
 Class MyType
@@ -2148,92 +2153,92 @@ Class Test(Of T)
     Implements I
 
     '   a. Basic
-    Iterator Function Foo1() As System.Collections.Generic.IEnumerable(Of Integer)
+    Iterator Function Goo1() As System.Collections.Generic.IEnumerable(Of Integer)
     End Function
 
     '   b. With Trailing trivia
-    Iterator Function Foo2() As System.Collections.Generic.IEnumerable(Of Integer)   ' Trailing
+    Iterator Function Goo2() As System.Collections.Generic.IEnumerable(Of Integer)   ' Trailing
     End Function
 
     '   c. Without Parenthesis
-    Iterator Function Foo3() As System.Collections.Generic.IEnumerable(Of Integer)   ' Trailing
+    Iterator Function Goo3() As System.Collections.Generic.IEnumerable(Of Integer)   ' Trailing
     End Function
 
     '   d. With Implements/Handles clause
-    Iterator Function Foo4() As System.Collections.Generic.IEnumerable(Of Integer) Implements I.Foo
+    Iterator Function Goo4() As System.Collections.Generic.IEnumerable(Of Integer) Implements I.Goo
     End Function
 
     '   e. With Implements/Handles clause with trivia
-    Iterator Function Foo5() As System.Collections.Generic.IEnumerable(Of Integer) Implements I.Foo  ' Trailing
+    Iterator Function Goo5() As System.Collections.Generic.IEnumerable(Of Integer) Implements I.Goo  ' Trailing
     End Function
 
     '   f. Invalid Iterator Sub
-    Iterator Sub Foo6() As Integer
+    Iterator Sub Goo6() As Integer
     End Sub
 
     '   g1. With valid IEnumerable return type
-    Iterator Function Foo7_1() As System.Collections.IEnumerable
+    Iterator Function Goo7_1() As System.Collections.IEnumerable
     End Function
 
     '   g2. With valid IEnumerator return type
-    Iterator Function Foo7_2() As System.Collections.IEnumerator
+    Iterator Function Goo7_2() As System.Collections.IEnumerator
     End Function
 
     '   h1. With valid IEnumerable(Of T) return type
-    Iterator Function Foo8_1() As System.Collections.Generic.IEnumerable(Of T)
+    Iterator Function Goo8_1() As System.Collections.Generic.IEnumerable(Of T)
     End Function
 
     '   h2. With valid IEnumerator(Of T) return type
-    Iterator Function Foo8_2() As System.Collections.Generic.IEnumerator(Of T)
+    Iterator Function Goo8_2() As System.Collections.Generic.IEnumerator(Of T)
     End Function
 
     '   i1. With valid IEnumerable(Of Integer) return type
-    Iterator Function Foo9_1() As System.Collections.Generic.IEnumerable(Of Integer)
+    Iterator Function Goo9_1() As System.Collections.Generic.IEnumerable(Of Integer)
     End Function
 
     '   i2. With valid IEnumerator(Of Integer) return type
-    Iterator Function Foo9_2() As System.Collections.Generic.IEnumerator(Of Integer)
+    Iterator Function Goo9_2() As System.Collections.Generic.IEnumerator(Of Integer)
     End Function
 
     '   j. With invalid user defined IEnumerable return type
-    Iterator Function Foo10() As System.Collections.Generic.IEnumerable(Of MyType.IEnumerable)
+    Iterator Function Goo10() As System.Collections.Generic.IEnumerable(Of MyType.IEnumerable)
     End Function
 
     '   k. With error return type
-    Iterator Function Foo11() As ErrorType
+    Iterator Function Goo11() As ErrorType
     End Function
 
     '   l. Without a return type
-    Iterator Function Foo12() As  ' Trailing
+    Iterator Function Goo12() As  ' Trailing
     End Function
 
     '   m. With trivia within AsClause
-    Iterator Function Foo13() As System.Collections.Generic.IEnumerable(Of Integer)  ' Trailing
+    Iterator Function Goo13() As System.Collections.Generic.IEnumerable(Of Integer)  ' Trailing
     End Function
 
     '   n. With return type that implements IEnumerable
-    Iterator Function Foo14() As System.Collections.Generic.IEnumerable(Of MyIEnumerable)
+    Iterator Function Goo14() As System.Collections.Generic.IEnumerable(Of MyIEnumerable)
     End Function
 
     '   o. Without End Function
-    Iterator Function FooLast() As System.Collections.Generic.IEnumerable(Of Integer)
+    Iterator Function GooLast() As System.Collections.Generic.IEnumerable(Of Integer)
 
 End Class";
 
-            Verify(code, expected);
+            await VerifyAsync(code, expected);
         }
 
         [Fact]
-        [WorkItem(602932, "DevDiv")]
+        [WorkItem(602932, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/602932")]
         [Trait(Traits.Feature, Traits.Features.AddMissingTokens)]
-        public void TestIteratorFunctionWithAsClause_WithAddedImports()
+        public async Task TestIteratorFunctionWithAsClause_WithAddedImports()
         {
             var code = @"[|
 Imports System
 Imports System.Collections.Generic
 
 Interface I
-    Function Foo() As System.Collections.IEnumerable
+    Function Goo() As System.Collections.IEnumerable
 End Interface
 
 Class MyType
@@ -2253,75 +2258,75 @@ Class Test(Of T)
     Implements I
 
     '   a. Basic
-    Iterator Function Foo1() As Integer
+    Iterator Function Goo1() As Integer
     End Function
 
     '   b. With Trailing trivia
-    Iterator Function Foo2() As Integer   ' Trailing
+    Iterator Function Goo2() As Integer   ' Trailing
     End Function
 
     '   c. Without Parenthesis
-    Iterator Function Foo3 As Integer   ' Trailing
+    Iterator Function Goo3 As Integer   ' Trailing
     End Function
 
     '   d. With Implements/Handles clause
-    Iterator Function Foo4() As Integer Implements I.Foo
+    Iterator Function Goo4() As Integer Implements I.Goo
     End Function
 
     '   e. With Implements/Handles clause with trivia
-    Iterator Function Foo5() As Integer     Implements I.Foo  ' Trailing
+    Iterator Function Goo5() As Integer     Implements I.Goo  ' Trailing
     End Function
 
     '   f. Invalid Iterator Sub
-    Iterator Sub Foo6() As Integer
+    Iterator Sub Goo6() As Integer
     End Sub
 
     '   g1. With valid IEnumerable return type
-    Iterator Function Foo7_1() As System.Collections.IEnumerable
+    Iterator Function Goo7_1() As System.Collections.IEnumerable
     End Function
 
     '   g2. With valid IEnumerator return type
-    Iterator Function Foo7_2() As System.Collections.IEnumerator
+    Iterator Function Goo7_2() As System.Collections.IEnumerator
     End Function
 
     '   h1. With valid IEnumerable(Of T) return type
-    Iterator Function Foo8_1() As IEnumerable(Of T)
+    Iterator Function Goo8_1() As IEnumerable(Of T)
     End Function
 
     '   h2. With valid IEnumerator(Of T) return type
-    Iterator Function Foo8_2() As System.Collections.Generic.IEnumerator(Of T)
+    Iterator Function Goo8_2() As System.Collections.Generic.IEnumerator(Of T)
     End Function
 
     '   i1. With valid IEnumerable(Of Integer) return type
-    Iterator Function Foo9_1() As IEnumerable(Of Integer)
+    Iterator Function Goo9_1() As IEnumerable(Of Integer)
     End Function
 
     '   i2. With valid IEnumerator(Of Integer) return type
-    Iterator Function Foo9_2() As System.Collections.Generic.IEnumerator(Of Integer)
+    Iterator Function Goo9_2() As System.Collections.Generic.IEnumerator(Of Integer)
     End Function
 
     '   j. With invalid user defined IEnumerable return type
-    Iterator Function Foo10() As MyType.IEnumerable
+    Iterator Function Goo10() As MyType.IEnumerable
     End Function
 
     '   k. With error return type
-    Iterator Function Foo11() As ErrorType
+    Iterator Function Goo11() As ErrorType
     End Function
 
     '   l. Without a return type
-    Iterator Function Foo12() As  ' Trailing
+    Iterator Function Goo12() As  ' Trailing
     End Function
 
     '   m. With trivia within AsClause
-    Iterator Function Foo13()    As         Integer  ' Trailing
+    Iterator Function Goo13()    As         Integer  ' Trailing
     End Function
 
     '   n. With return type that implements IEnumerable
-    Iterator Function Foo14() As MyIEnumerable
+    Iterator Function Goo14() As MyIEnumerable
     End Function
 
     '   o. Without End Function
-    Iterator Function FooLast() As Integer
+    Iterator Function GooLast() As Integer
 
 End Class|]";
 
@@ -2330,7 +2335,7 @@ Imports System
 Imports System.Collections.Generic
 
 Interface I
-    Function Foo() As System.Collections.IEnumerable
+    Function Goo() As System.Collections.IEnumerable
 End Interface
 
 Class MyType
@@ -2350,85 +2355,85 @@ Class Test(Of T)
     Implements I
 
     '   a. Basic
-    Iterator Function Foo1() As IEnumerable(Of Integer)
+    Iterator Function Goo1() As IEnumerable(Of Integer)
     End Function
 
     '   b. With Trailing trivia
-    Iterator Function Foo2() As IEnumerable(Of Integer)   ' Trailing
+    Iterator Function Goo2() As IEnumerable(Of Integer)   ' Trailing
     End Function
 
     '   c. Without Parenthesis
-    Iterator Function Foo3() As IEnumerable(Of Integer)   ' Trailing
+    Iterator Function Goo3() As IEnumerable(Of Integer)   ' Trailing
     End Function
 
     '   d. With Implements/Handles clause
-    Iterator Function Foo4() As IEnumerable(Of Integer) Implements I.Foo
+    Iterator Function Goo4() As IEnumerable(Of Integer) Implements I.Goo
     End Function
 
     '   e. With Implements/Handles clause with trivia
-    Iterator Function Foo5() As IEnumerable(Of Integer) Implements I.Foo  ' Trailing
+    Iterator Function Goo5() As IEnumerable(Of Integer) Implements I.Goo  ' Trailing
     End Function
 
     '   f. Invalid Iterator Sub
-    Iterator Sub Foo6() As Integer
+    Iterator Sub Goo6() As Integer
     End Sub
 
     '   g1. With valid IEnumerable return type
-    Iterator Function Foo7_1() As System.Collections.IEnumerable
+    Iterator Function Goo7_1() As System.Collections.IEnumerable
     End Function
 
     '   g2. With valid IEnumerator return type
-    Iterator Function Foo7_2() As System.Collections.IEnumerator
+    Iterator Function Goo7_2() As System.Collections.IEnumerator
     End Function
 
     '   h1. With valid IEnumerable(Of T) return type
-    Iterator Function Foo8_1() As IEnumerable(Of T)
+    Iterator Function Goo8_1() As IEnumerable(Of T)
     End Function
 
     '   h2. With valid IEnumerator(Of T) return type
-    Iterator Function Foo8_2() As System.Collections.Generic.IEnumerator(Of T)
+    Iterator Function Goo8_2() As System.Collections.Generic.IEnumerator(Of T)
     End Function
 
     '   i1. With valid IEnumerable(Of Integer) return type
-    Iterator Function Foo9_1() As IEnumerable(Of Integer)
+    Iterator Function Goo9_1() As IEnumerable(Of Integer)
     End Function
 
     '   i2. With valid IEnumerator(Of Integer) return type
-    Iterator Function Foo9_2() As System.Collections.Generic.IEnumerator(Of Integer)
+    Iterator Function Goo9_2() As System.Collections.Generic.IEnumerator(Of Integer)
     End Function
 
     '   j. With invalid user defined IEnumerable return type
-    Iterator Function Foo10() As IEnumerable(Of MyType.IEnumerable)
+    Iterator Function Goo10() As IEnumerable(Of MyType.IEnumerable)
     End Function
 
     '   k. With error return type
-    Iterator Function Foo11() As ErrorType
+    Iterator Function Goo11() As ErrorType
     End Function
 
     '   l. Without a return type
-    Iterator Function Foo12() As  ' Trailing
+    Iterator Function Goo12() As  ' Trailing
     End Function
 
     '   m. With trivia within AsClause
-    Iterator Function Foo13() As IEnumerable(Of Integer)  ' Trailing
+    Iterator Function Goo13() As IEnumerable(Of Integer)  ' Trailing
     End Function
 
     '   n. With return type that implements IEnumerable
-    Iterator Function Foo14() As IEnumerable(Of MyIEnumerable)
+    Iterator Function Goo14() As IEnumerable(Of MyIEnumerable)
     End Function
 
     '   o. Without End Function
-    Iterator Function FooLast() As IEnumerable(Of Integer)
+    Iterator Function GooLast() As IEnumerable(Of Integer)
 
 End Class";
 
-            Verify(code, expected);
+            await VerifyAsync(code, expected);
         }
 
         [Fact]
-        [WorkItem(602932, "DevDiv")]
+        [WorkItem(602932, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/602932")]
         [Trait(Traits.Feature, Traits.Features.AddMissingTokens)]
-        public void TestAsyncFunctionWithAliasedReturnType()
+        public async Task TestAsyncFunctionWithAliasedReturnType()
         {
             var code = @"[|
 Imports System
@@ -2436,7 +2441,7 @@ Imports System.Threading.Tasks
 Imports X = System.Threading.Tasks.Task
 Imports Y = System.Threading
 Class Test
-    Async Function Foo() As X
+    Async Function Goo() As X
     End Function
     Async Function Bar() As Y.Tasks.Task
 End Class|]";
@@ -2447,18 +2452,18 @@ Imports System.Threading.Tasks
 Imports X = System.Threading.Tasks.Task
 Imports Y = System.Threading
 Class Test
-    Async Function Foo() As X
+    Async Function Goo() As X
     End Function
     Async Function Bar() As Y.Tasks.Task
 End Class";
 
-            Verify(code, expected);
+            await VerifyAsync(code, expected);
         }
 
         [Fact]
-        [WorkItem(602932, "DevDiv")]
+        [WorkItem(602932, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/602932")]
         [Trait(Traits.Feature, Traits.Features.AddMissingTokens)]
-        public void TestIteratorFunctionWithAliasedReturnType()
+        public async Task TestIteratorFunctionWithAliasedReturnType()
         {
             var code = @"[|
 Imports System
@@ -2466,7 +2471,7 @@ Imports System.Collections
 Imports X = System.Collections.IEnumerable
 Imports Y = System.Collections
 Class Test
-    Iterator Function Foo() As X
+    Iterator Function Goo() As X
     End Function
     Iterator Function Bar() As Y.IEnumerable
 End Class|]";
@@ -2477,18 +2482,18 @@ Imports System.Collections
 Imports X = System.Collections.IEnumerable
 Imports Y = System.Collections
 Class Test
-    Iterator Function Foo() As X
+    Iterator Function Goo() As X
     End Function
     Iterator Function Bar() As Y.IEnumerable
 End Class";
 
-            Verify(code, expected);
+            await VerifyAsync(code, expected);
         }
 
         [Fact]
-        [WorkItem(602932, "DevDiv")]
+        [WorkItem(602932, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/602932")]
         [Trait(Traits.Feature, Traits.Features.AddMissingTokens)]
-        public void TestAsyncFunctionWithAliasedReturnType_2()
+        public async Task TestAsyncFunctionWithAliasedReturnType_2()
         {
             var code = @"[|
 Imports System
@@ -2496,7 +2501,7 @@ Imports System.Threading.Tasks
 Imports Y = System.Int32
 
 Class Test
-    Async Function Foo() As Y      ' Trailing
+    Async Function Goo() As Y      ' Trailing
     End Function
 End Class|]";
 
@@ -2506,17 +2511,17 @@ Imports System.Threading.Tasks
 Imports Y = System.Int32
 
 Class Test
-    Async Function Foo() As Task(Of Y)      ' Trailing
+    Async Function Goo() As Task(Of Y)      ' Trailing
     End Function
 End Class";
 
-            Verify(code, expected);
+            await VerifyAsync(code, expected);
         }
 
         [Fact]
-        [WorkItem(602932, "DevDiv")]
+        [WorkItem(602932, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/602932")]
         [Trait(Traits.Feature, Traits.Features.AddMissingTokens)]
-        public void TestIteratorFunctionWithAliasedReturnType_2()
+        public async Task TestIteratorFunctionWithAliasedReturnType_2()
         {
             var code = @"[|
 Imports System
@@ -2524,7 +2529,7 @@ Imports System.Threading.Tasks
 Imports Y = System.Int32
 
 Class Test
-    Iterator Function Foo() As Y      ' Trailing
+    Iterator Function Goo() As Y      ' Trailing
     End Function
 End Class|]";
 
@@ -2534,24 +2539,24 @@ Imports System.Threading.Tasks
 Imports Y = System.Int32
 
 Class Test
-    Iterator Function Foo() As Collections.Generic.IEnumerable(Of Y)      ' Trailing
+    Iterator Function Goo() As Collections.Generic.IEnumerable(Of Y)      ' Trailing
     End Function
 End Class";
 
-            Verify(code, expected);
+            await VerifyAsync(code, expected);
         }
 
         [Fact]
-        [WorkItem(602932, "DevDiv")]
+        [WorkItem(602932, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/602932")]
         [Trait(Traits.Feature, Traits.Features.AddMissingTokens)]
-        public void TestAsyncFunctionWithQualifiedNameReturnType()
+        public async Task TestAsyncFunctionWithQualifiedNameReturnType()
         {
             var code = @"[|
 Imports System
 Imports System.Threading.Tasks
 
 Class Test
-    Async Function Foo() As System.Int32      ' Trailing
+    Async Function Goo() As System.Int32      ' Trailing
     End Function
 End Class|]";
 
@@ -2560,24 +2565,24 @@ Imports System
 Imports System.Threading.Tasks
 
 Class Test
-    Async Function Foo() As Task(Of System.Int32)      ' Trailing
+    Async Function Goo() As Task(Of System.Int32)      ' Trailing
     End Function
 End Class";
 
-            Verify(code, expected);
+            await VerifyAsync(code, expected);
         }
 
         [Fact]
-        [WorkItem(602932, "DevDiv")]
+        [WorkItem(602932, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/602932")]
         [Trait(Traits.Feature, Traits.Features.AddMissingTokens)]
-        public void TestIteratorFunctionWithQualifiedNameReturnType()
+        public async Task TestIteratorFunctionWithQualifiedNameReturnType()
         {
             var code = @"[|
 Imports System
 Imports System.Collections
 
 Class Test
-    Iterator Function Foo() As System.Int32      ' Trailing
+    Iterator Function Goo() As System.Int32      ' Trailing
     End Function
 End Class|]";
 
@@ -2586,24 +2591,24 @@ Imports System
 Imports System.Collections
 
 Class Test
-    Iterator Function Foo() As Generic.IEnumerable(Of System.Int32)      ' Trailing
+    Iterator Function Goo() As Generic.IEnumerable(Of System.Int32)      ' Trailing
     End Function
 End Class";
 
-            Verify(code, expected);
+            await VerifyAsync(code, expected);
         }
 
         [Fact]
-        [WorkItem(602932, "DevDiv")]
+        [WorkItem(602932, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/602932")]
         [Trait(Traits.Feature, Traits.Features.AddMissingTokens)]
-        public void TestAsyncLambdaFunction()
+        public async Task TestAsyncLambdaFunction()
         {
             var code = @"[|
 Imports System
 Imports System.Threading.Tasks
 
 Class Test
-    Async Function Foo() As Integer
+    Async Function Goo() As Integer
         ' Basic
         Dim a = Async Function() As Integer
                 End Function
@@ -2633,7 +2638,7 @@ Imports System
 Imports System.Threading.Tasks
 
 Class Test
-    Async Function Foo() As Task(Of Integer)
+    Async Function Goo() As Task(Of Integer)
         ' Basic
         Dim a = Async Function() As Task(Of Integer)
                 End Function
@@ -2655,23 +2660,23 @@ Class Test
 
         ' Without End Function
         Dim last = Async Function() As Task(Of Integer)    ' Trailing
-        End Function
+                   End Function
 End Class";
 
-            Verify(code, expected);
+            await VerifyAsync(code, expected);
         }
 
         [Fact]
-        [WorkItem(602932, "DevDiv")]
+        [WorkItem(602932, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/602932")]
         [Trait(Traits.Feature, Traits.Features.AddMissingTokens)]
-        public void TestIteratorLambdaFunction()
+        public async Task TestIteratorLambdaFunction()
         {
             var code = @"[|
 Imports System
 Imports System.Collections.Generic
 
 Class Test
-    Iterator Function Foo() As Integer
+    Iterator Function Goo() As Integer
         ' Basic
         Dim a = Iterator Function() As Integer
                 End Function
@@ -2701,7 +2706,7 @@ Imports System
 Imports System.Collections.Generic
 
 Class Test
-    Iterator Function Foo() As IEnumerable(Of Integer)
+    Iterator Function Goo() As IEnumerable(Of Integer)
         ' Basic
         Dim a = Iterator Function() As IEnumerable(Of Integer)
                 End Function
@@ -2723,31 +2728,31 @@ Class Test
 
         ' Without End Function
         Dim last = Iterator Function() As IEnumerable(Of Integer)    ' Trailing
-        End Function
+                   End Function
 End Class";
 
-            Verify(code, expected);
+            await VerifyAsync(code, expected);
         }
 
         [Fact]
         [Trait(Traits.Feature, Traits.Features.AddMissingTokens)]
-        public void TestNoParentheseForArgument()
+        public async Task TestNoParenthesesForArgument()
         {
             // making roslyn behavior same as dev12
             // also, this is one of most expensive one to check whether
-            // parenthese needs to be inserted or not.
+            // parentheses needs to be inserted or not.
 
             var code = @"[|
 Imports System
 Imports System.Collections.Generic
 
 Class Test
-    Private Function Foo() As Integer
+    Private Function Goo() As Integer
         Return 1
     End Function
 
     Private Sub Caller(i As Integer)
-        Caller(Foo)
+        Caller(Goo)
     End Sub
 End Class|]";
 
@@ -2756,21 +2761,21 @@ Imports System
 Imports System.Collections.Generic
 
 Class Test
-    Private Function Foo() As Integer
+    Private Function Goo() As Integer
         Return 1
     End Function
 
     Private Sub Caller(i As Integer)
-        Caller(Foo)
+        Caller(Goo)
     End Sub
 End Class";
 
-            Verify(code, expected);
+            await VerifyAsync(code, expected);
         }
 
         [Fact]
         [Trait(Traits.Feature, Traits.Features.AddMissingTokens)]
-        public void TestNoParenthesesForNameOf()
+        public async Task TestNoParenthesesForNameOf()
         {
             var code = @"[|
 Module M
@@ -2786,10 +2791,43 @@ Module M
     End Sub
 End Module";
 
-            Verify(code, expected);
+            await VerifyAsync(code, expected);
         }
 
-        private string CreateMethod(string body)
+        [Fact]
+        [Trait(Traits.Feature, Traits.Features.AddMissingTokens)]
+        public async Task OptionExplicitOn()
+        {
+            var code = @"[|Option Explicit|]";
+            var expected = @"Option Explicit On
+";
+
+            await VerifyAsync(code, expected);
+        }
+
+        [Fact]
+        [Trait(Traits.Feature, Traits.Features.AddMissingTokens)]
+        public async Task OptionInferOn()
+        {
+            var code = @"[|Option Infer|]";
+            var expected = @"Option Infer On
+";
+
+            await VerifyAsync(code, expected);
+        }
+
+        [Fact]
+        [Trait(Traits.Feature, Traits.Features.AddMissingTokens)]
+        public async Task OptionStrictOn()
+        {
+            var code = @"[|Option Strict|]";
+            var expected = @"Option Strict On
+";
+
+            await VerifyAsync(code, expected);
+        }
+
+        private static string CreateMethod(string body)
         {
             return @"Imports System
 Class C
@@ -2798,18 +2836,17 @@ Class C
 End Class";
         }
 
-        private void Verify(string codeWithMarker, string expectedResult)
+        private static async Task VerifyAsync(string codeWithMarker, string expectedResult)
         {
-            var codeWithoutMarker = default(string);
-            var textSpans = (IList<TextSpan>)new List<TextSpan>();
-            MarkupTestFile.GetSpans(codeWithMarker, out codeWithoutMarker, out textSpans);
+            MarkupTestFile.GetSpans(codeWithMarker,
+                out var codeWithoutMarker, out ImmutableArray<TextSpan> textSpans);
 
             var document = CreateDocument(codeWithoutMarker, LanguageNames.VisualBasic);
-            var codeCleanups = CodeCleaner.GetDefaultProviders(document).Where(p => p.Name == PredefinedCodeCleanupProviderNames.AddMissingTokens || p.Name == PredefinedCodeCleanupProviderNames.Format || p.Name == PredefinedCodeCleanupProviderNames.Simplification);
+            var codeCleanups = CodeCleaner.GetDefaultProviders(document).WhereAsArray(p => p.Name == PredefinedCodeCleanupProviderNames.AddMissingTokens || p.Name == PredefinedCodeCleanupProviderNames.Format || p.Name == PredefinedCodeCleanupProviderNames.Simplification);
 
-            var cleanDocument = CodeCleaner.CleanupAsync(document, textSpans[0], codeCleanups).Result;
+            var cleanDocument = await CodeCleaner.CleanupAsync(document, textSpans[0], codeCleanups);
 
-            Assert.Equal(expectedResult, cleanDocument.GetSyntaxRootAsync().Result.ToFullString());
+            Assert.Equal(expectedResult, (await cleanDocument.GetSyntaxRootAsync()).ToFullString());
         }
 
         private static Document CreateDocument(string code, string language)
@@ -2818,7 +2855,7 @@ End Class";
             var projectId = ProjectId.CreateNewId();
             var project = solution.AddProject(projectId, "Project", "Project.dll", language).GetProject(projectId);
 
-            return project.AddMetadataReference(TestReferences.NetFx.v4_0_30319.mscorlib)
+            return project.AddMetadataReference(TestMetadata.Net451.mscorlib)
                           .AddDocument("Document", SourceText.From(code));
         }
     }

@@ -1,4 +1,6 @@
-﻿' Copyright (c) Microsoft.  All Rights Reserved.  Licensed under the Apache License, Version 2.0.  See License.txt in the project root for license information.
+﻿' Licensed to the .NET Foundation under one or more agreements.
+' The .NET Foundation licenses this file to you under the MIT license.
+' See the LICENSE file in the project root for more information.
 
 Imports Roslyn.Test.Utilities
 
@@ -6,8 +8,8 @@ Namespace Microsoft.CodeAnalysis.VisualBasic.UnitTests
     Public Class CodeGenIterators_Dev11
         Inherits BasicTestBase
 
-        <Fact, WorkItem(651996, "DevDiv")>
-        Sub Dev11_ComprehensiveExitPoints()
+        <Fact, WorkItem(651996, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/651996")>
+        Public Sub Dev11_ComprehensiveExitPoints()
             Dim source =
 <compilation>
     <file name="a.vb"><![CDATA[
@@ -316,7 +318,7 @@ End Class
 Class NoVerifyErr
     Public Iterator Function GetIterator() As IEnumerable
         ' i.ToString() is a non-virt call to a base class
-        ' where tht this ptr is not the same as the callee's this
+        ' where the this ptr is not the same as the callee's this
         ' but compiler shouldn't warn about non-verifiability because
         ' value types are sealed
         For i As Integer = 0 To 7
@@ -17025,8 +17027,8 @@ Class2.excep.finally : 2
 ]]>)
         End Sub
 
-        <Fact, WorkItem(651996, "DevDiv")>
-        Sub Dev11_Finally()
+        <Fact, WorkItem(651996, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/651996")>
+        Public Sub Dev11_Finally()
             Dim source =
 <compilation>
     <file name="a.vb">
@@ -17120,8 +17122,8 @@ Dev11#61708 - it should only print 'finally' once
 finally]]>)
         End Sub
 
-        <Fact, WorkItem(651996, "DevDiv")>
-        Sub Dev11_Finally0()
+        <Fact, WorkItem(651996, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/651996")>
+        Public Sub Dev11_Finally0()
             Dim source =
 <compilation>
     <file name="a.vb">
@@ -17171,8 +17173,8 @@ End Module
 7]]>)
         End Sub
 
-        <Fact, WorkItem(651996, "DevDiv")>
-        Sub Dev11_Finally2()
+        <Fact, WorkItem(651996, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/651996")>
+        Public Sub Dev11_Finally2()
             Dim source =
 <compilation>
     <file name="a.vb">

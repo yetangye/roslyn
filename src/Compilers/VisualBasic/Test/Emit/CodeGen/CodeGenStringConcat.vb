@@ -1,4 +1,6 @@
-﻿' Copyright (c) Microsoft.  All Rights Reserved.  Licensed under the Apache License, Version 2.0.  See License.txt in the project root for license information.
+﻿' Licensed to the .NET Foundation under one or more agreements.
+' The .NET Foundation licenses this file to you under the MIT license.
+' See the LICENSE file in the project root for more information.
 
 Imports Microsoft.CodeAnalysis
 Imports Microsoft.CodeAnalysis.Test.Utilities
@@ -195,7 +197,7 @@ expectedOutput:="abcdefbye")
   IL_0005:  dup
   IL_0006:  ldstr      "bye"
   IL_000b:  stfld      "Module1._Closure$__0-0.$VB$Local_expr2 As String"
-  IL_0010:  ldftn      "Function Module1._Closure$__0-0._Lambda$__1() As String"
+  IL_0010:  ldftn      "Function Module1._Closure$__0-0._Lambda$__0() As String"
   IL_0016:  newobj     "Sub System.Func(Of String)..ctor(Object, System.IntPtr)"
   IL_001b:  callvirt   "Function System.Func(Of String).Invoke() As String"
   IL_0020:  call       "Sub System.Console.WriteLine(String)"
@@ -205,7 +207,7 @@ expectedOutput:="abcdefbye")
         End Sub
 
         <Fact>
-        <WorkItem(679120, "DevDiv")>
+        <WorkItem(679120, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/679120")>
         Public Sub ConcatEmptyArray()
             Dim result = CompileAndVerify(
 <compilation>
@@ -232,7 +234,7 @@ expectedOutput:=<![CDATA[Start
 A
 B
 End
-]]>.Value.Replace(vbLf, vbCrLf))
+]]>)
 
             result.VerifyIL("Program.Main", <![CDATA[
 {

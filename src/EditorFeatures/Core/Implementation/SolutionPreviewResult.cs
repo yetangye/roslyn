@@ -1,67 +1,112 @@
-// Copyright (c) Microsoft.  All Rights Reserved.  Licensed under the Apache License, Version 2.0.  See License.txt in the project root for license information.
+﻿// Licensed to the .NET Foundation under one or more agreements.
+// The .NET Foundation licenses this file to you under the MIT license.
+// See the LICENSE file in the project root for more information.
 
+#nullable disable
+
+using System;
 using System.Collections.Generic;
 using System.Linq;
+using System.Threading;
+using System.Threading.Tasks;
+using Microsoft.CodeAnalysis.Editor.Shared.Utilities;
+using Roslyn.Utilities;
 
 namespace Microsoft.CodeAnalysis.Editor
 {
-    internal class SolutionPreviewResult
+    internal class SolutionPreviewResult : ForegroundThreadAffinitizedObject
     {
-        private IList<SolutionPreviewItem> _previews = null;
+        private readonly IList<SolutionPreviewItem> _previews;
         public readonly SolutionChangeSummary ChangeSummary;
 
-        public SolutionPreviewResult(IList<SolutionPreviewItem> previews, SolutionChangeSummary changeSummary = null)
+        public SolutionPreviewResult(IThreadingContext threadingContext, SolutionPreviewItem preview, SolutionChangeSummary changeSummary = null)
+            : this(threadingContext, new List<SolutionPreviewItem> { preview }, changeSummary)
         {
-            _previews = previews;
+        }
+
+        public SolutionPreviewResult(IThreadingContext threadingContext, IList<SolutionPreviewItem> previews, SolutionChangeSummary changeSummary = null)
+            : base(threadingContext)
+        {
+            _previews = previews ?? SpecializedCollections.EmptyList<SolutionPreviewItem>();
             this.ChangeSummary = changeSummary;
         }
 
-        public bool IsEmpty
+        public bool IsEmpty => _previews.Count == 0;
+
+        public async Task<IReadOnlyList<object>> GetPreviewsAsync(DocumentId preferredDocumentId = null, ProjectId preferredProjectId = null, CancellationToken cancellationToken = default)
         {
-            get { return (_previews == null) || (_previews.Count == 0); }
+            AssertIsForeground();
+            cancellationToken.ThrowIfCancellationRequested();
+
+            var orderedPreviews = _previews.OrderBy((i1, i2) =>
+            {
+                return i1.DocumentId == preferredDocumentId && i2.DocumentId != preferredDocumentId ? -1 :
+                       i1.DocumentId != preferredDocumentId && i2.DocumentId == preferredDocumentId ? 1 :
+                       _previews.IndexOf(i1) - _previews.IndexOf(i2);
+            }).ThenBy((i1, i2) =>
+            {
+                return i1.ProjectId == preferredProjectId && i2.ProjectId != preferredProjectId ? -1 :
+                       i1.ProjectId != preferredProjectId && i2.ProjectId == preferredProjectId ? 1 :
+                       _previews.IndexOf(i1) - _previews.IndexOf(i2);
+            }).ThenBy((i1, i2) =>
+            {
+                return i1.Text == null && i2.Text != null ? -1 :
+                       i1.Text != null && i2.Text == null ? 1 :
+                       _previews.IndexOf(i1) - _previews.IndexOf(i2);
+            });
+
+            var result = new List<object>();
+            var gotRichPreview = false;
+
+            try
+            {
+                foreach (var previewItem in _previews)
+                {
+                    cancellationToken.ThrowIfCancellationRequested();
+                    if (previewItem.Text != null)
+                    {
+                        result.Add(previewItem.Text);
+                    }
+                    else if (!gotRichPreview)
+                    {
+                        var preview = await previewItem.LazyPreview(cancellationToken).ConfigureAwait(true);
+                        if (preview != null)
+                        {
+                            result.Add(preview);
+                            gotRichPreview = true;
+                        }
+                    }
+                }
+
+                return result.Count == 0 ? null : result;
+            }
+            catch (OperationCanceledException)
+            {
+                // make sure we dispose all disposable preview objects before
+                // we let control to exit this method
+                result.OfType<IDisposable>().Do(d => d.Dispose());
+                throw;
+            }
         }
 
-        /// <remarks>
-        /// Once a preview object is returned from this function, the ownership of this preview object is
-        /// transferred to the caller. It is the caller's responsibility to ensure that the preview object
-        /// will be properly disposed (i.e. that any contained IWpfTextViews will be properly closed).
-        ///
-        /// This function guarantees that it will not return the same preview object twice if called twice
-        /// (thereby reducing the possibility that a given preview object can end up with more than one owner).
-        /// </remarks>
-        public object TakeNextPreview(DocumentId preferredDocumentId = null, ProjectId preferredProjectId = null)
+        /// <summary>Merge two different previews into one final preview result.  The final preview will
+        /// have a concatenation of all the inidivual previews contained within each result.</summary>
+        internal static SolutionPreviewResult Merge(SolutionPreviewResult result1, SolutionPreviewResult result2)
         {
-            if (IsEmpty)
+            if (result1 == null)
             {
-                return null;
+                return result2;
             }
 
-            SolutionPreviewItem previewItem = null;
-
-            // Check if we have a preview for some change within the supplied preferred document.
-            if (preferredDocumentId != null)
+            if (result2 == null)
             {
-                previewItem = _previews.Where(p => p.DocumentId == preferredDocumentId).FirstOrDefault();
+                return result1;
             }
 
-            // Check if we have a preview for some change within the supplied preferred project.
-            if ((previewItem == null) && (preferredProjectId != null))
-            {
-                previewItem = _previews.Where(p => p.ProjectId == preferredProjectId).FirstOrDefault();
-            }
-
-            // We don't have a preview matching the preferred document or project. Return the first preview.
-            if (previewItem == null)
-            {
-                previewItem = _previews.FirstOrDefault();
-            }
-
-            // We should now remove this preview object from the list so that it can not be returned again
-            // if someone calls this function again (thereby reducing the possibility that a given preview
-            // object can end up with more than one owner - see <remarks> above).
-            _previews.Remove(previewItem);
-
-            return previewItem.Preview.Value;
+            return new SolutionPreviewResult(
+                result1.ThreadingContext,
+                result1._previews.Concat(result2._previews).ToList(),
+                result1.ChangeSummary ?? result2.ChangeSummary);
         }
     }
 }

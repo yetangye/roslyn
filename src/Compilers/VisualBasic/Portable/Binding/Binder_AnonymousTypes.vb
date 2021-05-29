@@ -1,10 +1,12 @@
-﻿' Copyright (c) Microsoft.  All Rights Reserved.  Licensed under the Apache License, Version 2.0.  See License.txt in the project root for license information.
+﻿' Licensed to the .NET Foundation under one or more agreements.
+' The .NET Foundation licenses this file to you under the MIT license.
+' See the LICENSE file in the project root for more information.
 
 Imports System.Collections.Immutable
 Imports System.Runtime.InteropServices
-Imports System.Text.RegularExpressions
 Imports Microsoft.CodeAnalysis.CodeGen
 Imports Microsoft.CodeAnalysis.Collections
+Imports Microsoft.CodeAnalysis.PooledObjects
 Imports Microsoft.CodeAnalysis.Text
 Imports Microsoft.CodeAnalysis.VisualBasic.Symbols
 Imports Microsoft.CodeAnalysis.VisualBasic.Syntax
@@ -16,14 +18,14 @@ Namespace Microsoft.CodeAnalysis.VisualBasic
 
     Partial Friend Class Binder
 
-        Private Function BindAnonymousObjectCreationExpression(node As AnonymousObjectCreationExpressionSyntax, diagnostics As DiagnosticBag) As BoundExpression
+        Private Function BindAnonymousObjectCreationExpression(node As AnonymousObjectCreationExpressionSyntax, diagnostics As BindingDiagnosticBag) As BoundExpression
             Return AnonymousTypeCreationBinder.BindAnonymousObjectInitializer(Me, node, node.Initializer, node.NewKeyword, diagnostics)
         End Function
 
         Private Function BindAnonymousObjectCreationExpression(node As VisualBasicSyntaxNode,
                                                                typeDescr As AnonymousTypeDescriptor,
                                                                initExpressions As ImmutableArray(Of BoundExpression),
-                                                               diagnostics As DiagnosticBag) As BoundExpression
+                                                               diagnostics As BindingDiagnosticBag) As BoundExpression
             '  Check for restricted types.
             For Each field As AnonymousTypeField In typeDescr.Fields
                 Dim restrictedType As TypeSymbol = Nothing
@@ -79,7 +81,7 @@ Namespace Microsoft.CodeAnalysis.VisualBasic
             Private ReadOnly _fieldName2index As Dictionary(Of String, Integer)
 
             ' field declaration bound node is created for fields with implicitly 
-            ' cpecified name to provide semantic info on those identifier;
+            ' specified name to provide semantic info on those identifier;
             ' the array builder is being created lazily if needed
             Private _fieldDeclarations As ArrayBuilder(Of BoundAnonymousTypePropertyAccess)
 
@@ -95,7 +97,7 @@ Namespace Microsoft.CodeAnalysis.VisualBasic
 
             ''' <summary>
             ''' If set, the state of the binder shouldn't be modified by subsequent binding operations,
-            ''' which could be performed by SemanicModel in context of this binder.
+            ''' which could be performed by SemanticModel in context of this binder.
             ''' </summary>
             Private _freeze As Boolean
 
@@ -103,13 +105,13 @@ Namespace Microsoft.CodeAnalysis.VisualBasic
                                                                   owningSyntax As VisualBasicSyntaxNode,
                                                                   initializerSyntax As ObjectMemberInitializerSyntax,
                                                                   typeLocationToken As SyntaxToken,
-                                                                  diagnostics As DiagnosticBag) As BoundExpression
+                                                                  diagnostics As BindingDiagnosticBag) As BoundExpression
 
                 Dim fieldsCount = initializerSyntax.Initializers.Count
 
                 If fieldsCount = 0 Then
                     ' ERR_AnonymousTypeNeedField must have been reported in Parser
-                    Return BadExpression(owningSyntax, ImmutableArray(Of BoundNode).Empty, ErrorTypeSymbol.UnknownResultType)
+                    Return BadExpression(owningSyntax, ImmutableArray(Of BoundExpression).Empty, ErrorTypeSymbol.UnknownResultType)
                 End If
 
                 Return New AnonymousTypeCreationBinder(containingBinder, initializerSyntax, diagnostics).
@@ -120,7 +122,7 @@ Namespace Microsoft.CodeAnalysis.VisualBasic
 
             Private Sub New(containingBinder As Binder,
                             initializerSyntax As ObjectMemberInitializerSyntax,
-                            diagnostics As DiagnosticBag)
+                            diagnostics As BindingDiagnosticBag)
                 MyBase.New(containingBinder)
 
                 Dim objectType As TypeSymbol = GetSpecialType(SpecialType.System_Object, initializerSyntax, diagnostics)
@@ -161,7 +163,7 @@ Namespace Microsoft.CodeAnalysis.VisualBasic
                             fieldIsKey = False
 
                         Else
-                            ' field name successfully infered
+                            ' field name successfully inferred
                             fieldName = fieldNameToken.ValueText
                             fieldNode = DirectCast(fieldNameToken.Parent, VisualBasicSyntaxNode)
                             fieldIsKey = inferredFieldInitializer.KeyKeyword.Kind = SyntaxKind.KeyKeyword
@@ -206,7 +208,7 @@ Namespace Microsoft.CodeAnalysis.VisualBasic
 
             Private Function BindInitializersAndCreateBoundNode(owningSyntax As VisualBasicSyntaxNode,
                                                                 initializerSyntax As ObjectMemberInitializerSyntax,
-                                                                diagnostics As DiagnosticBag,
+                                                                diagnostics As BindingDiagnosticBag,
                                                                 typeLocationToken As SyntaxToken) As BoundExpression
                 Dim fieldsCount As Integer = Me._fields.Length
 
@@ -217,7 +219,7 @@ Namespace Microsoft.CodeAnalysis.VisualBasic
                 ' WARNING: Note that SemanticModel.GetDeclaredSymbol for field initializer node relies on 
                 '          the fact that the order of properties in anonymous type template corresponds 
                 '          1-to-1 to the appropriate filed initializer syntax nodes; This means such 
-                '          correspondence must be preserved all the time including erroneos scenarios
+                '          correspondence must be preserved all the time including erroneous scenarios
 
                 ' NOTE: if one field initializer references another, the binder creates an 
                 '       BoundAnonymousTypePropertyAccess node to represent the value of the field, 
@@ -358,7 +360,7 @@ Namespace Microsoft.CodeAnalysis.VisualBasic
         '''     within initializers. This way we can be sure that result of binding performed by SemanticModel is consistent
         '''     with result of initial binding of the entire node.
         '''   - AnonymousTypeCreationBinder overrides CreateAnonymousObjectCreationExpression in such a way that it mutates
-        '''     its state. That overriden method shouldn't be called while we are binding each initializer (by queries, for example), 
+        '''     its state. That overridden method shouldn't be called while we are binding each initializer (by queries, for example), 
         '''     it should be called only by AnonymousTypeCreationBinder itself after all initializers are bound and we are producing 
         '''     the resulting node. So having an extra binder in between takes care of that.
         ''' </summary>
@@ -376,7 +378,7 @@ Namespace Microsoft.CodeAnalysis.VisualBasic
 #Region "Binding of member access with omitted left like '.fieldName'"
 
             Protected Friend Overrides Function TryBindOmittedLeftForMemberAccess(node As MemberAccessExpressionSyntax,
-                                                                                  diagnostics As DiagnosticBag,
+                                                                                  diagnostics As BindingDiagnosticBag,
                                                                                   accessingBinder As Binder,
                                                                                   <Out> ByRef wholeMemberAccessExpressionBound As Boolean) As BoundExpression
                 wholeMemberAccessExpressionBound = True
@@ -414,7 +416,7 @@ Namespace Microsoft.CodeAnalysis.VisualBasic
                         hasErrors = True
                     End If
 
-                    ' check if the field referenced is already processed, and is 'good', e.g. has type asigned
+                    ' check if the field referenced is already processed, and is 'good', e.g. has type assigned
                     If fieldIndex >= _initializerOrdinal Then
 
                         ' referencing a field which is not processed yet or has an error
@@ -430,6 +432,7 @@ Namespace Microsoft.CodeAnalysis.VisualBasic
 
                         If Me.ContainingMember IsNot accessingBinder.ContainingMember Then
                             ReportDiagnostic(diagnostics, node, ERRID.ERR_CannotLiftAnonymousType1, node.Name.Identifier.ValueText)
+                            hasErrors = True
                         End If
 
                         ' return bound anonymous type access
@@ -451,7 +454,7 @@ Namespace Microsoft.CodeAnalysis.VisualBasic
                     '       In Roslyn we disable this functionality which is a breaking change in a sense,
                     '       but really should only affect a very few customers.
 
-                    ' TODO: revice and maybe report a special error message
+                    ' TODO: revise and maybe report a special error message
                 End If
 
                 ' NOTE: since we don't have the symbol of the anonymous type, we use 
@@ -460,14 +463,14 @@ Namespace Microsoft.CodeAnalysis.VisualBasic
                 Return BadExpression(node, ErrorTypeSymbol.UnknownResultType)
             End Function
 
-            Protected Overrides Function TryBindOmittedLeftForDictionaryAccess(node As MemberAccessExpressionSyntax, accessingBinder As Binder, diagnostics As DiagnosticBag) As BoundExpression
+            Protected Overrides Function TryBindOmittedLeftForDictionaryAccess(node As MemberAccessExpressionSyntax, accessingBinder As Binder, diagnostics As BindingDiagnosticBag) As BoundExpression
                 ' NOTE: since we don't have the symbol of the anonymous type, we use 
                 '       "<anonymous type>" literal to be consistent with Dev10
                 ReportDiagnostic(diagnostics, node, ERRID.ERR_NoDefaultNotExtend1, StringConstants.AnonymousTypeName)
                 Return BadExpression(node, ErrorTypeSymbol.UnknownResultType)
             End Function
 
-            Protected Overrides Function TryBindOmittedLeftForConditionalAccess(node As ConditionalAccessExpressionSyntax, accessingBinder As Binder, diagnostics As DiagnosticBag) As BoundExpression
+            Protected Overrides Function TryBindOmittedLeftForConditionalAccess(node As ConditionalAccessExpressionSyntax, accessingBinder As Binder, diagnostics As BindingDiagnosticBag) As BoundExpression
                 Return Nothing
             End Function
 #End Region

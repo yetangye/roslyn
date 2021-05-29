@@ -1,4 +1,8 @@
-﻿// Copyright (c) Microsoft.  All Rights Reserved.  Licensed under the Apache License, Version 2.0.  See License.txt in the project root for license information.
+﻿// Licensed to the .NET Foundation under one or more agreements.
+// The .NET Foundation licenses this file to you under the MIT license.
+// See the LICENSE file in the project root for more information.
+
+#nullable disable
 
 using System.Diagnostics;
 using Microsoft.CodeAnalysis.CSharp.Symbols;
@@ -110,7 +114,7 @@ namespace Microsoft.CodeAnalysis.CSharp.Syntax.InternalSyntax
                 // Just try to get the first node directly.  This is faster than getting the list of
                 // child nodes and tokens (which forces all children to be enumerated for the sake
                 // of counting.  It should always be safe to index the 0th element of a node.  But
-                // just to make sure that this is not a problem, we verify that the slotcount of the
+                // just to make sure that this is not a problem, we verify that the slot count of the
                 // node is greater than 0.
                 var node = CurrentNodeOrToken.AsNode();
 

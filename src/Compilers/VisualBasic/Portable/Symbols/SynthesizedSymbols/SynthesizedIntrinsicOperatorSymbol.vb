@@ -1,4 +1,6 @@
-﻿' Copyright (c) Microsoft.  All Rights Reserved.  Licensed under the Apache License, Version 2.0.  See License.txt in the project root for license information.
+﻿' Licensed to the .NET Foundation under one or more agreements.
+' The .NET Foundation licenses this file to you under the MIT license.
+' See the LICENSE file in the project root for more information.
 
 Imports System.Collections.Immutable
 
@@ -6,45 +8,45 @@ Namespace Microsoft.CodeAnalysis.VisualBasic.Symbols
     Friend NotInheritable Class SynthesizedIntrinsicOperatorSymbol
         Inherits SynthesizedMethodBase
 
-        Private ReadOnly m_Name As String
-        Private ReadOnly m_Parameters As ImmutableArray(Of ParameterSymbol)
-        Private ReadOnly m_ReturnType As TypeSymbol
-        Private ReadOnly m_IsCheckedBuiltin As Boolean
+        Private ReadOnly _name As String
+        Private ReadOnly _parameters As ImmutableArray(Of ParameterSymbol)
+        Private ReadOnly _returnType As TypeSymbol
+        Private ReadOnly _isCheckedBuiltin As Boolean
 
         Public Sub New(container As NamedTypeSymbol, name As String, rightType As TypeSymbol, returnType As TypeSymbol, isCheckedBuiltin As Boolean)
             MyBase.New(container)
 
-            m_Name = name
-            m_ReturnType = returnType
-            m_Parameters = (New ParameterSymbol() {New SynthesizedOperatorParameterSymbol(Me, container, 0, "left"),
+            _name = name
+            _returnType = returnType
+            _parameters = (New ParameterSymbol() {New SynthesizedOperatorParameterSymbol(Me, container, 0, "left"),
                                                    New SynthesizedOperatorParameterSymbol(Me, rightType, 1, "right")}).AsImmutableOrNull()
-            m_IsCheckedBuiltin = isCheckedBuiltin
+            _isCheckedBuiltin = isCheckedBuiltin
         End Sub
 
         Public Sub New(container As NamedTypeSymbol, name As String, returnType As TypeSymbol, isCheckedBuiltin As Boolean)
             MyBase.New(container)
 
-            m_Name = name
-            m_ReturnType = returnType
-            m_Parameters = (New ParameterSymbol() {New SynthesizedOperatorParameterSymbol(Me, container, 0, "value")}).AsImmutableOrNull()
-            m_IsCheckedBuiltin = isCheckedBuiltin
+            _name = name
+            _returnType = returnType
+            _parameters = (New ParameterSymbol() {New SynthesizedOperatorParameterSymbol(Me, container, 0, "value")}).AsImmutableOrNull()
+            _isCheckedBuiltin = isCheckedBuiltin
         End Sub
 
         Public Overrides ReadOnly Property Name As String
             Get
-                Return m_Name
+                Return _name
             End Get
         End Property
 
         Public Overrides ReadOnly Property Parameters As ImmutableArray(Of ParameterSymbol)
             Get
-                Return m_Parameters
+                Return _parameters
             End Get
         End Property
 
         Public Overrides ReadOnly Property ReturnType As TypeSymbol
             Get
-                Return m_ReturnType
+                Return _returnType
             End Get
         End Property
 
@@ -59,14 +61,14 @@ Namespace Microsoft.CodeAnalysis.VisualBasic.Symbols
                 Return False
             End If
 
-            If m_IsCheckedBuiltin = other.m_IsCheckedBuiltin AndAlso
-               m_Parameters.Length = other.m_Parameters.Length AndAlso
-               String.Equals(m_Name, other.m_Name, StringComparison.Ordinal) AndAlso
-               m_containingType = other.m_containingType AndAlso
-               m_ReturnType = other.m_ReturnType Then
+            If _isCheckedBuiltin = other._isCheckedBuiltin AndAlso
+               _parameters.Length = other._parameters.Length AndAlso
+               String.Equals(_name, other._name, StringComparison.Ordinal) AndAlso
+               TypeSymbol.Equals(m_containingType, other.m_containingType, TypeCompareKind.ConsiderEverything) AndAlso
+               TypeSymbol.Equals(_returnType, other._returnType, TypeCompareKind.ConsiderEverything) Then
 
-                For i As Integer = 0 To m_Parameters.Length - 1
-                    If m_Parameters(i).Type <> other.m_Parameters(i).Type Then
+                For i As Integer = 0 To _parameters.Length - 1
+                    If Not TypeSymbol.Equals(_parameters(i).Type, other._parameters(i).Type, TypeCompareKind.ConsiderEverything) Then
                         Return False
                     End If
                 Next
@@ -78,7 +80,7 @@ Namespace Microsoft.CodeAnalysis.VisualBasic.Symbols
         End Function
 
         Public Overrides Function GetHashCode() As Integer
-            Return Hash.Combine(m_Name, Hash.Combine(m_containingType, m_Parameters.Length))
+            Return Hash.Combine(_name, Hash.Combine(m_containingType, _parameters.Length))
         End Function
 
         Public Overrides ReadOnly Property DeclaredAccessibility As Accessibility
@@ -149,7 +151,7 @@ Namespace Microsoft.CodeAnalysis.VisualBasic.Symbols
 
         Public Overrides ReadOnly Property IsCheckedBuiltin As Boolean
             Get
-                Return m_IsCheckedBuiltin
+                Return _isCheckedBuiltin
             End Get
         End Property
 

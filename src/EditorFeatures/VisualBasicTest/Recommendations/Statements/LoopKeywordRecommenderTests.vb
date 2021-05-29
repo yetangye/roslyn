@@ -1,23 +1,18 @@
-' Copyright (c) Microsoft.  All Rights Reserved.  Licensed under the Apache License, Version 2.0.  See License.txt in the project root for license information.
-
-Imports Microsoft.CodeAnalysis.Text
-Imports Microsoft.CodeAnalysis.VisualBasic
-Imports Microsoft.CodeAnalysis.VisualBasic.Symbols
-Imports Microsoft.CodeAnalysis.VisualBasic.Syntax
-Imports Roslyn.Test.Utilities
-Imports Xunit
+﻿' Licensed to the .NET Foundation under one or more agreements.
+' The .NET Foundation licenses this file to you under the MIT license.
+' See the LICENSE file in the project root for more information.
 
 Namespace Microsoft.CodeAnalysis.Editor.VisualBasic.UnitTests.Recommendations.Statements
     Public Class LoopKeywordRecommenderTests
         <Fact>
         <Trait(Traits.Feature, Traits.Features.KeywordRecommending)>
-        Public Sub LoopNotInMethodBody()
+        Public Sub LoopNotInMethodBodyTest()
             VerifyRecommendationsMissing(<MethodBody>|</MethodBody>, "Loop")
         End Sub
 
         <Fact>
         <Trait(Traits.Feature, Traits.Features.KeywordRecommending)>
-        Public Sub LoopNotInLambda()
+        Public Sub LoopNotInLambdaTest()
             VerifyRecommendationsMissing(<MethodBody>
 Dim x = Sub()
 |
@@ -26,7 +21,7 @@ Dim x = Sub()
 
         <Fact>
         <Trait(Traits.Feature, Traits.Features.KeywordRecommending)>
-        Public Sub LoopNotAfterStatement()
+        Public Sub LoopNotAfterStatementTest()
             VerifyRecommendationsMissing(<MethodBody>
 Dim x
 |</MethodBody>, "Loop")
@@ -34,7 +29,7 @@ Dim x
 
         <Fact>
         <Trait(Traits.Feature, Traits.Features.KeywordRecommending)>
-        Public Sub LoopAfterDoStatement()
+        Public Sub LoopAfterDoStatementTest()
             VerifyRecommendationsContain(<MethodBody>
 Do
 |</MethodBody>, "Loop", "Loop Until", "Loop While")
@@ -42,7 +37,7 @@ Do
 
         <Fact>
         <Trait(Traits.Feature, Traits.Features.KeywordRecommending)>
-        Public Sub LoopAfterDoUntilStatement()
+        Public Sub LoopAfterDoUntilStatementTest()
             VerifyRecommendationsContain(<MethodBody>
 Do Until True
 |</MethodBody>, "Loop")
@@ -50,7 +45,7 @@ Do Until True
 
         <Fact>
         <Trait(Traits.Feature, Traits.Features.KeywordRecommending)>
-        Public Sub LoopUntilNotAfterDoUntilStatement()
+        Public Sub LoopUntilNotAfterDoUntilStatementTest()
             VerifyRecommendationsMissing(<MethodBody>
 Do Until True
 |</MethodBody>, "Loop Until", "Loop While")
@@ -58,7 +53,7 @@ Do Until True
 
         <Fact>
         <Trait(Traits.Feature, Traits.Features.KeywordRecommending)>
-        Public Sub LoopNotInDoLoopUntilBlock()
+        Public Sub LoopNotInDoLoopUntilBlockTest()
             VerifyRecommendationsMissing(<MethodBody>
 Do
 |

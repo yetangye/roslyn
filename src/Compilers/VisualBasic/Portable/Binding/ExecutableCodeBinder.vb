@@ -1,10 +1,13 @@
-﻿' Copyright (c) Microsoft.  All Rights Reserved.  Licensed under the Apache License, Version 2.0.  See License.txt in the project root for license information.
+﻿' Licensed to the .NET Foundation under one or more agreements.
+' The .NET Foundation licenses this file to you under the MIT license.
+' See the LICENSE file in the project root for more information.
 
 Imports System.Collections.Concurrent
 Imports System.Collections.Generic
 Imports System.Collections.Immutable
 Imports System.Runtime.InteropServices
 Imports System.Threading
+Imports Microsoft.CodeAnalysis.PooledObjects
 Imports Microsoft.CodeAnalysis.RuntimeMembers
 Imports Microsoft.CodeAnalysis.Text
 Imports Microsoft.CodeAnalysis.VisualBasic.Symbols
@@ -21,12 +24,12 @@ Namespace Microsoft.CodeAnalysis.VisualBasic
     Friend MustInherit Class ExecutableCodeBinder
         Inherits Binder
 
-        Private ReadOnly _syntaxRoot As VisualBasicSyntaxNode
+        Private ReadOnly _syntaxRoot As SyntaxNode
         Private ReadOnly _descendantBinderFactory As DescendantBinderFactory
         Private _labelsMap As MultiDictionary(Of String, SourceLabelSymbol)
         Private _labels As ImmutableArray(Of SourceLabelSymbol) = Nothing
 
-        Public Sub New(root As VisualBasicSyntaxNode, containingBinder As Binder)
+        Public Sub New(root As SyntaxNode, containingBinder As Binder)
             MyBase.New(containingBinder)
 
             _syntaxRoot = root
@@ -79,7 +82,7 @@ Namespace Microsoft.CodeAnalysis.VisualBasic
             End Get
         End Property
 
-        Private Shared EmptyLabelMap As MultiDictionary(Of String, SourceLabelSymbol) = New MultiDictionary(Of String, SourceLabelSymbol)(0, IdentifierComparison.Comparer)
+        Private Shared ReadOnly s_emptyLabelMap As MultiDictionary(Of String, SourceLabelSymbol) = New MultiDictionary(Of String, SourceLabelSymbol)(0, IdentifierComparison.Comparer)
 
         Private Shared Function BuildLabelsMap(labels As ImmutableArray(Of SourceLabelSymbol)) As MultiDictionary(Of String, SourceLabelSymbol)
             If Not labels.IsEmpty Then
@@ -91,8 +94,8 @@ Namespace Microsoft.CodeAnalysis.VisualBasic
             Else
                 ' Return an empty map if there aren't any labels.
                 ' LookupLabelByNameToken and other methods assumes a non null map 
-                ' is returnd from the LabelMap property.
-                Return EmptyLabelMap
+                ' is returned from the LabelMap property.
+                Return s_emptyLabelMap
             End If
         End Function
 
@@ -113,7 +116,7 @@ Namespace Microsoft.CodeAnalysis.VisualBasic
                                                       arity As Integer,
                                                       options As LookupOptions,
                                                       originalBinder As Binder,
-                                                      <[In], Out> ByRef useSiteDiagnostics As HashSet(Of DiagnosticInfo))
+                                                      <[In], Out> ByRef useSiteInfo As CompoundUseSiteInfo(Of AssemblySymbol))
             Debug.Assert(lookupResult.IsClear)
 
             If (options And LookupOptions.LabelsOnly) = LookupOptions.LabelsOnly AndAlso LabelsMap IsNot Nothing Then
@@ -122,7 +125,7 @@ Namespace Microsoft.CodeAnalysis.VisualBasic
                 Select Case labels.Count
                     Case 0
                         ' Not found
-                    
+
                     Case 1
                         lookupResult.SetFrom(SingleLookupResult.Good(labels.Single()))
 
@@ -161,18 +164,18 @@ Namespace Microsoft.CodeAnalysis.VisualBasic
             Return _descendantBinderFactory.GetBinder(stmtList)
         End Function
 
-        Public Overrides Function GetBinder(node As VisualBasicSyntaxNode) As Binder
+        Public Overrides Function GetBinder(node As SyntaxNode) As Binder
             Return _descendantBinderFactory.GetBinder(node)
         End Function
 
-        Public ReadOnly Property Root As VisualBasicSyntaxNode
+        Public ReadOnly Property Root As SyntaxNode
             Get
                 Return _descendantBinderFactory.Root
             End Get
         End Property
 
         ' Get the map that maps from syntax nodes to binders.
-        Public ReadOnly Property NodeToBinderMap As ImmutableDictionary(Of VisualBasicSyntaxNode, BlockBaseBinder)
+        Public ReadOnly Property NodeToBinderMap As ImmutableDictionary(Of SyntaxNode, BlockBaseBinder)
             Get
                 Return _descendantBinderFactory.NodeToBinderMap
             End Get
@@ -241,21 +244,21 @@ Namespace Microsoft.CodeAnalysis.VisualBasic
         End Sub
 #End If
 
-        Class LabelVisitor
+        Public Class LabelVisitor
             Inherits StatementSyntaxWalker
 
-            Private ReadOnly labels As ArrayBuilder(Of SourceLabelSymbol)
-            Private ReadOnly containingMethod As MethodSymbol
-            Private ReadOnly binder As Binder
+            Private ReadOnly _labels As ArrayBuilder(Of SourceLabelSymbol)
+            Private ReadOnly _containingMethod As MethodSymbol
+            Private ReadOnly _binder As Binder
 
-            Sub New(labels As ArrayBuilder(Of SourceLabelSymbol), containingMethod As MethodSymbol, binder As Binder)
-                Me.labels = labels
-                Me.containingMethod = containingMethod
-                Me.binder = binder
+            Public Sub New(labels As ArrayBuilder(Of SourceLabelSymbol), containingMethod As MethodSymbol, binder As Binder)
+                Me._labels = labels
+                Me._containingMethod = containingMethod
+                Me._binder = binder
             End Sub
 
             Public Overrides Sub VisitLabelStatement(node As LabelStatementSyntax)
-                labels.Add(New SourceLabelSymbol(node.LabelToken, containingMethod, binder))
+                _labels.Add(New SourceLabelSymbol(node.LabelToken, _containingMethod, _binder))
             End Sub
         End Class
     End Class

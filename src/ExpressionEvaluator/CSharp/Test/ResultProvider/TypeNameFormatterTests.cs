@@ -1,11 +1,21 @@
-// Copyright (c) Microsoft.  All Rights Reserved.  Licensed under the Apache License, Version 2.0.  See License.txt in the project root for license information.
+﻿// Licensed to the .NET Foundation under one or more agreements.
+// The .NET Foundation licenses this file to you under the MIT license.
+// See the LICENSE file in the project root for more information.
+
+#nullable disable
 
 using System;
+using System.Collections.Immutable;
+using System.Collections.ObjectModel;
 using Microsoft.CodeAnalysis.CSharp.ExpressionEvaluator;
+using Microsoft.CodeAnalysis.CSharp.Test.Utilities;
+using Microsoft.CodeAnalysis.ExpressionEvaluator;
+using Microsoft.VisualStudio.Debugger.Clr;
+using Microsoft.VisualStudio.Debugger.Evaluation.ClrCompilation;
 using Roslyn.Test.Utilities;
 using Xunit;
 
-namespace Microsoft.CodeAnalysis.CSharp.UnitTests
+namespace Microsoft.CodeAnalysis.CSharp.ExpressionEvaluator.UnitTests
 {
     public class TypeNameFormatterTests : CSharpResultProviderTestBase
     {
@@ -29,7 +39,7 @@ namespace Microsoft.CodeAnalysis.CSharp.UnitTests
             Assert.Equal("string", typeof(string).GetTypeName());
         }
 
-        [Fact, WorkItem(1016796)]
+        [Fact, WorkItem(1016796, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/1016796")]
         public void NestedTypes()
         {
             var source = @"
@@ -290,6 +300,135 @@ namespace @return
             Assert.Equal("@return.@yield<@async>", yieldType.GetTypeName(escapeKeywordIdentifiers: true));
             Assert.Equal("@return.@yield<@return.@false.@null>", constructedYieldType.GetTypeName(escapeKeywordIdentifiers: true));
             Assert.Equal("@return.@yield<@return.@false.@null>.@await", constructedAwaitType.GetTypeName(escapeKeywordIdentifiers: true));
+        }
+
+        [WorkItem(1087216, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/1087216")]
+        [Fact]
+        public void DynamicAttribute_KeywordEscaping()
+        {
+            var attributes = new[] { true };
+            Assert.Equal("dynamic", typeof(object).GetTypeName(MakeCustomTypeInfo(attributes), escapeKeywordIdentifiers: false));
+            Assert.Equal("dynamic", typeof(object).GetTypeName(MakeCustomTypeInfo(attributes), escapeKeywordIdentifiers: true));
+        }
+
+        [WorkItem(1087216, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/1087216")]
+        [Fact]
+        public void DynamicAttribute_Locations()
+        {
+            // Standalone.
+            Assert.Equal("dynamic", typeof(object).GetTypeName(MakeCustomTypeInfo(true)));
+
+            // Array element type.
+            Assert.Equal("dynamic[]", typeof(object[]).GetTypeName(MakeCustomTypeInfo(false, true)));
+            Assert.Equal("dynamic[][]", typeof(object[][]).GetTypeName(MakeCustomTypeInfo(false, false, true)));
+
+            // Type argument of top-level type.
+            Assert.Equal("System.Func<dynamic>", typeof(Func<object>).GetTypeName(MakeCustomTypeInfo(false, true)));
+
+            var source = @"
+namespace N
+{
+    public struct A<T>
+    {
+        public struct B<U>
+        {
+        }
+    }
+
+    public struct C
+    {
+    }
+}
+";
+            var assembly = GetAssembly(source);
+            var typeA = assembly.GetType("N.A`1");
+            var typeB = typeA.GetNestedType("B`1");
+            var typeBConstructed = typeB.MakeGenericType(typeof(object), typeof(object));
+
+            // Type argument of nested type.
+            Assert.Equal("N.A<object>.B<dynamic>", typeBConstructed.GetTypeName(MakeCustomTypeInfo(false, false, true)));
+            Assert.Equal("N.A<dynamic>.B<object>", typeBConstructed.GetTypeName(MakeCustomTypeInfo(false, true, false)));
+            Assert.Equal("N.A<dynamic>.B<dynamic>[]", typeBConstructed.MakeArrayType().GetTypeName(MakeCustomTypeInfo(false, false, true, true)));
+        }
+
+        [WorkItem(1087216, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/1087216")]
+        [Fact]
+        public void DynamicAttribute_InvalidFlags()
+        {
+            // Invalid true.
+            Assert.Equal("int", typeof(int).GetTypeName(MakeCustomTypeInfo(true)));
+            Assert.Equal("dynamic[]", typeof(object[]).GetTypeName(MakeCustomTypeInfo(true, true)));
+
+            // Too many.
+            Assert.Equal("dynamic", typeof(object).GetTypeName(MakeCustomTypeInfo(true, true)));
+            Assert.Equal("object", typeof(object).GetTypeName(MakeCustomTypeInfo(false, true)));
+
+            // Too few.
+            Assert.Equal("object[]", typeof(object[]).GetTypeName(MakeCustomTypeInfo(true)));
+            Assert.Equal("object[]", typeof(object[]).GetTypeName(MakeCustomTypeInfo(false)));
+
+            // Type argument of top-level type.
+            Assert.Equal("System.Func<object>", typeof(Func<object>).GetTypeName(MakeCustomTypeInfo(true)));
+
+            var source = @"
+namespace N
+{
+    public struct A<T>
+    {
+        public struct B<U>
+        {
+        }
+    }
+
+    public struct C
+    {
+    }
+}
+";
+            var assembly = GetAssembly(source);
+            var typeA = assembly.GetType("N.A`1");
+            var typeB = typeA.GetNestedType("B`1");
+            var typeBConstructed = typeB.MakeGenericType(typeof(object), typeof(object));
+
+            // Type argument of nested type.
+            Assert.Equal("N.A<object>.B<object>", typeBConstructed.GetTypeName(MakeCustomTypeInfo(false)));
+            Assert.Equal("N.A<dynamic>.B<object>", typeBConstructed.GetTypeName(MakeCustomTypeInfo(false, true)));
+            Assert.Equal("N.A<dynamic>.B<object>[]", typeBConstructed.MakeArrayType().GetTypeName(MakeCustomTypeInfo(false, false, true)));
+        }
+
+        [WorkItem(1087216, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/1087216")]
+        [Fact]
+        public void DynamicAttribute_OtherGuid()
+        {
+            var typeInfo = DkmClrCustomTypeInfo.Create(Guid.NewGuid(), new ReadOnlyCollection<byte>(new byte[] { 1 }));
+            Assert.Equal("object", typeof(object).GetTypeName(typeInfo));
+            Assert.Equal("object[]", typeof(object[]).GetTypeName(typeInfo));
+        }
+
+        [Fact]
+        public void MangledTypeParameterName()
+        {
+            var il = @"
+.class public auto ansi beforefieldinit Type`1<'<>Mangled'>
+       extends [mscorlib]System.Object
+{
+  .method public hidebysig specialname rtspecialname 
+          instance void  .ctor() cil managed
+  {
+    ldarg.0
+    call       instance void [mscorlib]System.Object::.ctor()
+    ret
+  }
+}
+";
+
+            ImmutableArray<byte> assemblyBytes;
+            ImmutableArray<byte> pdbBytes;
+            CSharpTestBase.EmitILToArray(il, appendDefaultHeader: true, includePdb: false, assemblyBytes: out assemblyBytes, pdbBytes: out pdbBytes);
+            var assembly = ReflectionUtilities.Load(assemblyBytes);
+            var type = assembly.GetType("Type`1");
+            var typeName = type.GetTypeName();
+            Assert.Equal("Type<<>Mangled>", typeName);
         }
     }
 }

@@ -1,4 +1,6 @@
-﻿' Copyright (c) Microsoft.  All Rights Reserved.  Licensed under the Apache License, Version 2.0.  See License.txt in the project root for license information.
+﻿' Licensed to the .NET Foundation under one or more agreements.
+' The .NET Foundation licenses this file to you under the MIT license.
+' See the LICENSE file in the project root for more information.
 
 Imports Microsoft.CodeAnalysis
 Imports Microsoft.CodeAnalysis.VisualBasic
@@ -76,7 +78,7 @@ Class Program
         RaiseEvent E1()
     End Sub
 
-    Shared Sub foo() Handles MyClass.E1
+    Shared Sub goo() Handles MyClass.E1
         Console.WriteLine("handled")
     End Sub
 End Class
@@ -88,7 +90,7 @@ End Class
   // Code size       18 (0x12)
   .maxstack  2
   IL_0000:  ldnull
-  IL_0001:  ldftn      "Sub Program.foo()"
+  IL_0001:  ldftn      "Sub Program.goo()"
   IL_0007:  newobj     "Sub Program.E1EventHandler..ctor(Object, System.IntPtr)"
   IL_000c:  call       "Sub Program.add_E1(Program.E1EventHandler)"
   IL_0011:  ret
@@ -119,7 +121,7 @@ Class Program
         raiser
     End Sub
 
-    Shared Sub foo() Handles MyClass.E1
+    Shared Sub goo() Handles MyClass.E1
         Console.WriteLine("handled")
     End Sub
 End Class
@@ -131,7 +133,7 @@ End Class
   // Code size       18 (0x12)
   .maxstack  2
   IL_0000:  ldnull
-  IL_0001:  ldftn      "Sub Program.foo()"
+  IL_0001:  ldftn      "Sub Program.goo()"
   IL_0007:  newobj     "Sub Base.E1EventHandler..ctor(Object, System.IntPtr)"
   IL_000c:  call       "Sub Base.add_E1(Base.E1EventHandler)"
   IL_0011:  ret
@@ -158,7 +160,7 @@ Class Program
         RaiseEvent E1()
     End Sub
 
-    Shared Sub foo() Handles MyClass.e1
+    Shared Sub goo() Handles MyClass.e1
         Console.WriteLine("handled")
     End Sub
 End Class
@@ -173,7 +175,7 @@ End Class
   IL_0001:  call       "Sub Object..ctor()"
   IL_0006:  ldarg.0
   IL_0007:  ldnull
-  IL_0008:  ldftn      "Sub Program.foo()"
+  IL_0008:  ldftn      "Sub Program.goo()"
   IL_000e:  newobj     "Sub Program.E1EventHandler..ctor(Object, System.IntPtr)"
   IL_0013:  call       "Sub Program.add_E1(Program.E1EventHandler)"
   IL_0018:  ret
@@ -212,7 +214,7 @@ Class Program
         RaiseEvent E1(123)
     End Sub
 
-    Shared Sub foo() Handles MyClass.e1
+    Shared Sub goo() Handles MyClass.e1
         Console.WriteLine("handled")
     End Sub
 End Class
@@ -300,11 +302,11 @@ Class Program
         MyBase.Raiser()
     End Sub
 
-    Sub foo1() Handles MyClass.E1
+    Sub goo1() Handles MyClass.E1
         Console.WriteLine("handled1")
     End Sub
 
-    Shared Sub foo2() Handles MyClass.E2
+    Shared Sub goo2() Handles MyClass.E2
         Console.WriteLine("handled2")
     End Sub
 End Class
@@ -369,11 +371,11 @@ Class Program
         MyBase.Raiser()
     End Sub
 
-    Sub foo1() Handles MyClass.E1
+    Sub goo1() Handles MyClass.E1
         Console.WriteLine("handled1")
     End Sub
 
-    Shared Function foo2(arg As Long) As Integer Handles MyClass.E1
+    Shared Function goo2(arg As Long) As Integer Handles MyClass.E1
         Console.WriteLine("handled2")
         Return 123
     End Function
@@ -892,7 +894,7 @@ End Class
 Class c3
     Inherits c2
 
-    Sub foo() Handles MyBase.e
+    Sub goo() Handles MyBase.e
         gstrexpectedresult = "working!!"
     End Sub
 End Class
@@ -1086,9 +1088,10 @@ End Interface
 
         End Sub
 
-        <WorkItem(545182, "DevDiv")>
-        <WorkItem(545184, "DevDiv")>
-        <Fact()>
+        <WorkItem(6214, "https://github.com/dotnet/roslyn/issues/6214")>
+        <WorkItem(545182, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/545182")>
+        <WorkItem(545184, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/545184")>
+        <Fact>
         Public Sub TestHandlesForWithEventsFromBaseFromADifferentAssembly()
             Dim assembly1Compilation = CreateVisualBasicCompilation("TestHandlesForWithEventsFromBaseFromADifferentAssembly_Assembly1",
             <![CDATA[Public Class c1
@@ -1134,29 +1137,30 @@ End Module]]>,
             CompileAndVerify(assembly2Compilation, <![CDATA[True]]>).VerifyDiagnostics()
         End Sub
 
-        <WorkItem(545185, "DevDiv")>
-        <Fact()>
+        <WorkItem(6214, "https://github.com/dotnet/roslyn/issues/6214")>
+        <WorkItem(545185, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/545185")>
+        <Fact>
         Public Sub TestNameOfWithEventsSetterParameter()
             Dim comp = CreateVisualBasicCompilation("TestNameOfWithEventsSetterParameter",
             <![CDATA[Public Class c1
     Sub New()
-        foo = Me
+        goo = Me
     End Sub
-    Public WithEvents foo As c1
+    Public WithEvents goo As c1
 End Class]]>,
                 compilationOptions:=New VisualBasicCompilationOptions(OutputKind.DynamicallyLinkedLibrary))
 
             Dim verifier = CompileAndVerify(comp, expectedSignatures:=
             {
-                Signature("c1", "foo", ".property readwrite instance c1 foo"),
-                Signature("c1", "set_foo", ".method [System.Runtime.CompilerServices.CompilerGeneratedAttribute()] public newslot strict specialname virtual instance System.Void set_foo(c1 WithEventsValue) cil managed synchronized"),
-                Signature("c1", "get_foo", ".method [System.Runtime.CompilerServices.CompilerGeneratedAttribute()] public newslot strict specialname virtual instance c1 get_foo() cil managed")
+                Signature("c1", "goo", ".property readwrite instance c1 goo"),
+                Signature("c1", "set_goo", ".method [System.Runtime.CompilerServices.CompilerGeneratedAttribute()] public newslot strict specialname virtual instance System.Void set_goo(c1 WithEventsValue) cil managed synchronized"),
+                Signature("c1", "get_goo", ".method [System.Runtime.CompilerServices.CompilerGeneratedAttribute()] public newslot strict specialname virtual instance c1 get_goo() cil managed")
             })
 
             verifier.VerifyDiagnostics()
         End Sub
 
-        <WorkItem(529548, "DevDiv")>
+        <WorkItem(529548, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/529548")>
         <Fact()>
         Public Sub TestIssueWeFixedInNativeCompiler()
             Dim comp = CreateVisualBasicCompilation("TestIssueWeFixedInNativeCompiler",
@@ -1169,13 +1173,13 @@ End Interface
 Class C1(Of T As {Exception, I1(Of T)})
     Dim WithEvents x As T
 
-    'Native compiler used to report an incorrect error on the below line - "Method 'Public Sub foo(a As T)' cannot handle event 'Public Event E1(a As U)' because they do not have a compatible signature".
+    'Native compiler used to report an incorrect error on the below line - "Method 'Public Sub goo(a As T)' cannot handle event 'Public Event E1(a As U)' because they do not have a compatible signature".
     'This was a bug in the native compiler (see Bug: VSWhidbey/544224) that got fixed in Roslyn.
     'See Vladimir's comments in bug 13489  for more details.
-    Sub foo(ByVal a As T) Handles x.E1
+    Sub goo(ByVal a As T) Handles x.E1
     End Sub
     Sub bar()
-        AddHandler x.E1, AddressOf foo 'AddHandler should also work
+        AddHandler x.E1, AddressOf goo 'AddHandler should also work
     End Sub
 End Class]]>,
                 compilationOptions:=New VisualBasicCompilationOptions(OutputKind.DynamicallyLinkedLibrary))
@@ -1183,7 +1187,7 @@ End Class]]>,
             verifier.VerifyDiagnostics()
         End Sub
 
-        <WorkItem(545188, "DevDiv")>
+        <WorkItem(545188, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/545188")>
         <Fact>
         Public Sub Bug13470()
             Dim compilation1 = CompileAndVerify(
@@ -1194,21 +1198,21 @@ Imports System
 Class Program
     Shared Sub Main()
         Dim c1 = GetType(C1)
-        Dim _Foo = c1.GetField("_Foo", Reflection.BindingFlags.NonPublic Or Reflection.BindingFlags.Static Or Reflection.BindingFlags.Instance)
-        Dim obsolete = _Foo.GetCustomAttributes(GetType(ObsoleteAttribute), False)
+        Dim _Goo = c1.GetField("_Goo", Reflection.BindingFlags.NonPublic Or Reflection.BindingFlags.Static Or Reflection.BindingFlags.Instance)
+        Dim obsolete = _Goo.GetCustomAttributes(GetType(ObsoleteAttribute), False)
 
         System.Console.WriteLine(obsolete.Length = 1)
     End Sub
 End Class
 
 Class C1
-    <Obsolete> WithEvents Foo as C1
+    <Obsolete> WithEvents Goo as C1
 End Class
     ]]></file>
 </compilation>, expectedOutput:="True")
         End Sub
 
-        <WorkItem(545187, "DevDiv")>
+        <WorkItem(545187, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/545187")>
         <Fact>
         Public Sub Bug13469()
             'Note: Below IL is for the following VB code compiled with Dev11 (using /debug-) -
@@ -1407,7 +1411,7 @@ End Class
             CompileAndVerify(source)
         End Sub
 
-        <Fact(), WorkItem(545250, "DevDiv")>
+        <Fact(), WorkItem(545250, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/545250")>
         Public Sub HookupOrder()
             CompileAndVerify(
     <compilation>
@@ -1469,7 +1473,7 @@ Derived
 ]]>)
         End Sub
 
-        <Fact, WorkItem(529653, "DevDiv")>
+        <Fact, WorkItem(529653, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/529653")>
         Public Sub TestExecutionOrder1()
             Dim vbCompilation = CreateVisualBasicCompilation("TestExecutionOrder1",
             <![CDATA[Imports System, System.Collections.Generic
@@ -1504,12 +1508,12 @@ Public Class Base(Of T,
 
             Public Shadows WithEvents Base3 As Base(Of A, U, V, D, C, IList(Of IList(Of A))) = Me
 
-            Function Foo(x As HashSet(Of A), y As Dictionary(Of A, D)) As Integer Handles Base33.e
+            Function Goo(x As HashSet(Of A), y As Dictionary(Of A, D)) As Integer Handles Base33.e
                 Console.WriteLine("1")
                 Return 0
             End Function
 
-            Function Foo(x As List(Of A)) As Dictionary(Of T, A) Handles Base3.e
+            Function Goo(x As List(Of A)) As Dictionary(Of T, A) Handles Base3.e
                 Console.WriteLine("2")
                 Return New Dictionary(Of T, A)
             End Function
@@ -1537,16 +1541,16 @@ Public Class Derived(Of T As {Base(Of ArgumentException, String, S, ArgumentExce
         Dictionary(Of String, S), List(Of IList(Of ArgumentException))).
         Base2(Of ArgumentException, String, Dictionary(Of String, S), ArgumentNullException).
         Base3
-    Shadows Sub Foo(x As HashSet(Of ArgumentException), y As Dictionary(Of ArgumentException, ArgumentNullException)) Handles Base2.e
+    Shadows Sub Goo(x As HashSet(Of ArgumentException), y As Dictionary(Of ArgumentException, ArgumentNullException)) Handles Base2.e
         Console.WriteLine("3")
     End Sub
-    Shadows Sub Foo() Handles Base3.e
+    Shadows Sub Goo() Handles Base3.e
         Console.WriteLine("4")
     End Sub
-    Shadows Sub Foo(x As List(Of ArgumentException)) Handles w.e, Me.e, MyClass.e
+    Shadows Sub Goo(x As List(Of ArgumentException)) Handles w.e, Me.e, MyClass.e
         Console.WriteLine("5")
     End Sub
-    Overloads Function foo2$(x As HashSet(Of ArgumentException), y As Dictionary(Of ArgumentException, ArgumentNullException)) Handles w2.e
+    Overloads Function goo2$(x As HashSet(Of ArgumentException), y As Dictionary(Of ArgumentException, ArgumentNullException)) Handles w2.e
         Console.WriteLine("6")
         Return 1.0
     End Function
@@ -1589,7 +1593,7 @@ End Module]]>,
             vbVerifier.VerifyDiagnostics()
         End Sub
 
-        <Fact, WorkItem(529653, "DevDiv")>
+        <Fact, WorkItem(529653, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/529653")>
         Public Sub TestExecutionOrder2()
             Dim assembly1Compilation = CreateVisualBasicCompilation("TestExecutionOrder2",
             <![CDATA[Option Strict Off
@@ -1672,7 +1676,7 @@ Derived H2]]>)
             assembly2Verifier.VerifyDiagnostics()
         End Sub
 
-        <Fact(), WorkItem(545250, "DevDiv"), WorkItem(529653, "DevDiv")>
+        <Fact(), WorkItem(545250, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/545250"), WorkItem(529653, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/529653")>
         Public Sub TestCrossLanguageOptionalAndParamarray1()
             Dim csCompilation = CreateCSharpCompilation("TestCrossLanguageOptionalAndParamarray1_CS",
             <![CDATA[public class CSClass
@@ -1690,32 +1694,32 @@ Derived H2]]>)
             <![CDATA[Imports System
 Public Class VBClass : Inherits CSClass
     Public WithEvents w As CSClass = New CSClass
-    Function Foo(x As String) Handles w.ev, MyBase.ev, MyClass.ev
+    Function Goo(x As String) Handles w.ev, MyBase.ev, MyClass.ev
         Console.WriteLine(x)
         Console.WriteLine("DERIVED1")
         Return 0
     End Function
-    Function Foo(x As String, ParamArray y() As Integer) Handles w.ev, MyBase.ev, MyClass.ev
+    Function Goo(x As String, ParamArray y() As Integer) Handles w.ev, MyBase.ev, MyClass.ev
         Console.WriteLine(x)
         Console.WriteLine("DERIVED2")
         Return 0
     End Function
-    Function Foo2(Optional x As String = "") Handles w.ev, MyBase.ev, MyClass.ev
+    Function Goo2(Optional x As String = "") Handles w.ev, MyBase.ev, MyClass.ev
         Console.WriteLine(x)
         Console.WriteLine("DERIVED3")
         Return 0
     End Function
-    Function Foo2(ParamArray x() As String) Handles w.ev, MyBase.ev, MyClass.ev
+    Function Goo2(ParamArray x() As String) Handles w.ev, MyBase.ev, MyClass.ev
         Console.WriteLine(x)
         Console.WriteLine("DERIVED4")
         Return 0
     End Function
-    Function Foo2(x As String, Optional y As Integer = 0) Handles w.ev, MyBase.ev, MyClass.ev
+    Function Goo2(x As String, Optional y As Integer = 0) Handles w.ev, MyBase.ev, MyClass.ev
         Console.WriteLine(x)
         Console.WriteLine("DERIVED5")
         Return 0
     End Function
-    Function Foo3(Optional x As String = "", Optional y As Integer = 0) Handles w.ev, MyBase.ev, MyClass.ev
+    Function Goo3(Optional x As String = "", Optional y As Integer = 0) Handles w.ev, MyBase.ev, MyClass.ev
         Console.WriteLine(x)
         Console.WriteLine("DERIVED6")
         Return 0
@@ -1790,12 +1794,12 @@ DERIVED6]]>)
             <![CDATA[Imports System
 Public Class VBClass : Inherits CSClass
     Public WithEvents w As CSClass = New CSClass
-    Function Foo(x As Integer()) Handles w.ev, MyBase.ev, Me.ev
+    Function Goo(x As Integer()) Handles w.ev, MyBase.ev, Me.ev
         Console.WriteLine(x)
         Console.WriteLine("DERIVED1")
         Return 0
     End Function
-    Function Foo2(ParamArray x As Integer()) Handles w.ev, MyBase.ev, Me.ev
+    Function Goo2(ParamArray x As Integer()) Handles w.ev, MyBase.ev, Me.ev
         Console.WriteLine(x)
         Console.WriteLine("DERIVED2")
         Return 0
@@ -1844,12 +1848,12 @@ DERIVED2]]>)
             <![CDATA[Imports System
 Public Class VBClass : Inherits CSClass
     Public WithEvents w As CSClass = New CSClass
-    Function Foo2(x As Integer) Handles w.ev, MyBase.ev, Me.ev
+    Function Goo2(x As Integer) Handles w.ev, MyBase.ev, Me.ev
         Console.WriteLine(x)
         Console.WriteLine("DERIVED1")
         Return 0
     End Function
-    Function Foo2(x As Integer, Optional y As Integer = 1) Handles w.ev, MyBase.ev, Me.ev
+    Function Goo2(x As Integer, Optional y As Integer = 1) Handles w.ev, MyBase.ev, Me.ev
         Console.WriteLine(x)
         Console.WriteLine("DERIVED2")
         Return 0
@@ -1866,15 +1870,15 @@ End Module]]>,
                 referencedCompilations:={csCompilation})
 
             vbCompilation.VerifyDiagnostics(
-                Diagnostic(ERRID.ERR_EventHandlerSignatureIncompatible2, "ev").WithArguments("Foo2", "ev"),
-                Diagnostic(ERRID.ERR_EventHandlerSignatureIncompatible2, "ev").WithArguments("Foo2", "ev"),
-                Diagnostic(ERRID.ERR_EventHandlerSignatureIncompatible2, "ev").WithArguments("Foo2", "ev"),
-                Diagnostic(ERRID.ERR_EventHandlerSignatureIncompatible2, "ev").WithArguments("Foo2", "ev"),
-                Diagnostic(ERRID.ERR_EventHandlerSignatureIncompatible2, "ev").WithArguments("Foo2", "ev"),
-                Diagnostic(ERRID.ERR_EventHandlerSignatureIncompatible2, "ev").WithArguments("Foo2", "ev"))
+                Diagnostic(ERRID.ERR_EventHandlerSignatureIncompatible2, "ev").WithArguments("Goo2", "ev"),
+                Diagnostic(ERRID.ERR_EventHandlerSignatureIncompatible2, "ev").WithArguments("Goo2", "ev"),
+                Diagnostic(ERRID.ERR_EventHandlerSignatureIncompatible2, "ev").WithArguments("Goo2", "ev"),
+                Diagnostic(ERRID.ERR_EventHandlerSignatureIncompatible2, "ev").WithArguments("Goo2", "ev"),
+                Diagnostic(ERRID.ERR_EventHandlerSignatureIncompatible2, "ev").WithArguments("Goo2", "ev"),
+                Diagnostic(ERRID.ERR_EventHandlerSignatureIncompatible2, "ev").WithArguments("Goo2", "ev"))
         End Sub
 
-        <Fact, WorkItem(545257, "DevDiv")>
+        <Fact, WorkItem(545257, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/545257")>
         Public Sub TestCrossLanguageOptionalAndParamarray_Error2()
             Dim csCompilation = CreateCSharpCompilation("CS",
             <![CDATA[public class CSClass
@@ -1892,7 +1896,7 @@ End Module]]>,
             <![CDATA[Imports System
 Public Class VBClass : Inherits CSClass
     Public WithEvents w As CSClass = New CSClass
-    Function Foo(Optional x As Integer = 1) Handles w.ev, MyBase.ev, Me.ev
+    Function Goo(Optional x As Integer = 1) Handles w.ev, MyBase.ev, Me.ev
         Console.WriteLine(x)
         Console.WriteLine("PASS")
         Return 0
@@ -1908,9 +1912,9 @@ End Module]]>,
                 compilationOptions:=New VisualBasicCompilationOptions(OutputKind.ConsoleApplication),
                 referencedCompilations:={csCompilation})
             vbCompilation.VerifyDiagnostics(
-                Diagnostic(ERRID.ERR_EventHandlerSignatureIncompatible2, "ev").WithArguments("Foo", "ev"),
-                Diagnostic(ERRID.ERR_EventHandlerSignatureIncompatible2, "ev").WithArguments("Foo", "ev"),
-                Diagnostic(ERRID.ERR_EventHandlerSignatureIncompatible2, "ev").WithArguments("Foo", "ev"))
+                Diagnostic(ERRID.ERR_EventHandlerSignatureIncompatible2, "ev").WithArguments("Goo", "ev"),
+                Diagnostic(ERRID.ERR_EventHandlerSignatureIncompatible2, "ev").WithArguments("Goo", "ev"),
+                Diagnostic(ERRID.ERR_EventHandlerSignatureIncompatible2, "ev").WithArguments("Goo", "ev"))
         End Sub
 
         <Fact>
@@ -1998,5 +2002,126 @@ End Class
 
             CompileAndVerify(source)
         End Sub
+
+        <Fact, WorkItem(4544, "https://github.com/dotnet/roslyn/issues/4544")>
+        Public Sub MultipleInitializationsWithAsNew_01()
+            Dim source =
+<compilation>
+    <file name="a.vb">
+Class C1
+    Shared WithEvents a1, b1, c1 As New C2()
+    WithEvents a2, b2, c2 As New C2()
+    Shared a3, b3, c3 As New C2()
+    Dim a4, b4, c4 As New C2()
+
+    Shared Sub Main()
+        Check(a1, b1, c1)
+        Check(a3, b3, c3)
+        
+        Dim c as New C1()
+        Check(c.a2, c.b2, c.c2)
+        Check(c.a4, c.b4, c.c4)
+    End Sub
+
+    Private Shared Sub Check(a As Object, b As Object, c As Object)
+        System.Console.WriteLine(a Is Nothing)
+        System.Console.WriteLine(b Is Nothing)
+        System.Console.WriteLine(c Is Nothing)
+        System.Console.WriteLine(a Is b)
+        System.Console.WriteLine(a Is c)
+        System.Console.WriteLine(b Is c)
+    End Sub
+End Class
+
+Class C2
+End Class
+    </file>
+</compilation>
+
+            CompileAndVerify(source, expectedOutput:=
+            <![CDATA[
+False
+False
+False
+False
+False
+False
+False
+False
+False
+False
+False
+False
+False
+False
+False
+False
+False
+False
+False
+False
+False
+False
+False
+False
+]]>)
+        End Sub
+
+        <Fact, WorkItem(4544, "https://github.com/dotnet/roslyn/issues/4544")>
+        Public Sub MultipleInitializationsWithAsNew_02()
+            Dim source =
+<compilation>
+    <file name="a.vb">
+Class C1
+    Shared WithEvents a, b, c As New C1() With {.P1 = 2}
+
+    Shared Sub Main()
+        System.Console.WriteLine(a.P1)
+        System.Console.WriteLine(b.P1)
+        System.Console.WriteLine(c.P1)
+        System.Console.WriteLine(a Is b)
+        System.Console.WriteLine(a Is c)
+        System.Console.WriteLine(b Is c)
+    End Sub
+
+    Public P1 As Integer
+End Class
+    </file>
+</compilation>
+
+            CompileAndVerify(source, expectedOutput:=
+            <![CDATA[
+2
+2
+2
+False
+False
+False
+]]>).
+            VerifyIL("C1..cctor",
+            <![CDATA[
+{
+  // Code size       52 (0x34)
+  .maxstack  3
+  IL_0000:  newobj     "Sub C1..ctor()"
+  IL_0005:  dup
+  IL_0006:  ldc.i4.2
+  IL_0007:  stfld      "C1.P1 As Integer"
+  IL_000c:  call       "Sub C1.set_a(C1)"
+  IL_0011:  newobj     "Sub C1..ctor()"
+  IL_0016:  dup
+  IL_0017:  ldc.i4.2
+  IL_0018:  stfld      "C1.P1 As Integer"
+  IL_001d:  call       "Sub C1.set_b(C1)"
+  IL_0022:  newobj     "Sub C1..ctor()"
+  IL_0027:  dup
+  IL_0028:  ldc.i4.2
+  IL_0029:  stfld      "C1.P1 As Integer"
+  IL_002e:  call       "Sub C1.set_c(C1)"
+  IL_0033:  ret
+}
+]]>)
+        End Sub
+
     End Class
 End Namespace

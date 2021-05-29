@@ -1,5 +1,8 @@
-﻿' Copyright (c) Microsoft.  All Rights Reserved.  Licensed under the Apache License, Version 2.0.  See License.txt in the project root for license information.
+﻿' Licensed to the .NET Foundation under one or more agreements.
+' The .NET Foundation licenses this file to you under the MIT license.
+' See the LICENSE file in the project root for more information.
 
+Imports Microsoft.CodeAnalysis.Test.Utilities
 Imports Microsoft.CodeAnalysis.VisualBasic
 Imports Microsoft.CodeAnalysis.VisualBasic.Syntax
 
@@ -31,7 +34,7 @@ End Module
     </file>
 </compilation>
 
-            Dim compilation = CompilationUtils.CreateCompilationWithMscorlibAndVBRuntime(compilationDef)
+            Dim compilation = CompilationUtils.CreateCompilationWithMscorlib40AndVBRuntime(compilationDef)
 
             For Each optStrict In {OptionStrict.Off, OptionStrict.On, OptionStrict.Custom}
                 compilation = compilation.WithOptions(TestOptions.ReleaseExe.WithOptionStrict(optStrict))
@@ -63,15 +66,15 @@ End Module
   // Code size       67 (0x43)
   .maxstack  2
   .locals init (VB$AnonymousDelegate_0(Of System.Collections.Generic.IEnumerable(Of Integer)) V_0)
-  IL_0000:  ldsfld     "Program._Closure$__.$I0-1 As <generated method>"
+  IL_0000:  ldsfld     "Program._Closure$__.$I0-0 As <generated method>"
   IL_0005:  brfalse.s  IL_000e
-  IL_0007:  ldsfld     "Program._Closure$__.$I0-1 As <generated method>"
+  IL_0007:  ldsfld     "Program._Closure$__.$I0-0 As <generated method>"
   IL_000c:  br.s       IL_0024
   IL_000e:  ldsfld     "Program._Closure$__.$I As Program._Closure$__"
-  IL_0013:  ldftn      "Sub Program._Closure$__._Lambda$__0-1(System.Collections.Generic.IEnumerable(Of Integer))"
+  IL_0013:  ldftn      "Sub Program._Closure$__._Lambda$__0-0(System.Collections.Generic.IEnumerable(Of Integer))"
   IL_0019:  newobj     "Sub VB$AnonymousDelegate_0(Of System.Collections.Generic.IEnumerable(Of Integer))..ctor(Object, System.IntPtr)"
   IL_001e:  dup
-  IL_001f:  stsfld     "Program._Closure$__.$I0-1 As <generated method>"
+  IL_001f:  stsfld     "Program._Closure$__.$I0-0 As <generated method>"
   IL_0024:  stloc.0
   IL_0025:  ldloc.0
   IL_0026:  brfalse.s  IL_0036
@@ -87,7 +90,7 @@ End Module
 }
 ]]>)
 
-                verifier.VerifyIL("Program._Closure$__._Lambda$__0-1",
+                verifier.VerifyIL("Program._Closure$__._Lambda$__0-0",
                 <![CDATA[
 {
   // Code size        7 (0x7)
@@ -122,7 +125,7 @@ End Module
     </file>
 </compilation>
 
-            Dim compilation = CompilationUtils.CreateCompilationWithMscorlibAndVBRuntime(compilationDef)
+            Dim compilation = CompilationUtils.CreateCompilationWithMscorlib40AndVBRuntime(compilationDef)
 
             For Each optStrict In {OptionStrict.Off, OptionStrict.On, OptionStrict.Custom}
                 compilation = compilation.WithOptions(TestOptions.ReleaseExe.WithOptionStrict(optStrict))
@@ -179,7 +182,7 @@ End Module
     </file>
 </compilation>
 
-            Dim compilation = CompilationUtils.CreateCompilationWithMscorlibAndVBRuntime(compilationDef)
+            Dim compilation = CompilationUtils.CreateCompilationWithMscorlib40AndVBRuntime(compilationDef)
 
             For Each optStrict In {OptionStrict.Off, OptionStrict.On, OptionStrict.Custom}
                 compilation = compilation.WithOptions(TestOptions.ReleaseExe.WithOptionStrict(optStrict))
@@ -211,15 +214,15 @@ End Module
   // Code size       67 (0x43)
   .maxstack  2
   .locals init (VB$AnonymousDelegate_0(Of System.Collections.Generic.IEnumerable(Of Integer)) V_0)
-  IL_0000:  ldsfld     "Program._Closure$__.$I0-1 As <generated method>"
+  IL_0000:  ldsfld     "Program._Closure$__.$I0-0 As <generated method>"
   IL_0005:  brfalse.s  IL_000e
-  IL_0007:  ldsfld     "Program._Closure$__.$I0-1 As <generated method>"
+  IL_0007:  ldsfld     "Program._Closure$__.$I0-0 As <generated method>"
   IL_000c:  br.s       IL_0024
   IL_000e:  ldsfld     "Program._Closure$__.$I As Program._Closure$__"
-  IL_0013:  ldftn      "Sub Program._Closure$__._Lambda$__0-1(System.Collections.Generic.IEnumerable(Of Integer))"
+  IL_0013:  ldftn      "Sub Program._Closure$__._Lambda$__0-0(System.Collections.Generic.IEnumerable(Of Integer))"
   IL_0019:  newobj     "Sub VB$AnonymousDelegate_0(Of System.Collections.Generic.IEnumerable(Of Integer))..ctor(Object, System.IntPtr)"
   IL_001e:  dup
-  IL_001f:  stsfld     "Program._Closure$__.$I0-1 As <generated method>"
+  IL_001f:  stsfld     "Program._Closure$__.$I0-0 As <generated method>"
   IL_0024:  stloc.0
   IL_0025:  ldloc.0
   IL_0026:  brfalse.s  IL_0036
@@ -235,7 +238,7 @@ End Module
 }
 ]]>)
 
-                verifier.VerifyIL("Program._Closure$__._Lambda$__0-1",
+                verifier.VerifyIL("Program._Closure$__._Lambda$__0-0",
                 <![CDATA[
 {
   // Code size        7 (0x7)
@@ -267,7 +270,7 @@ End Module
     </file>
 </compilation>
 
-            Dim compilation = CompilationUtils.CreateCompilationWithMscorlibAndVBRuntime(compilationDef, TestOptions.ReleaseExe)
+            Dim compilation = CompilationUtils.CreateCompilationWithMscorlib40AndVBRuntime(compilationDef, TestOptions.ReleaseExe)
 
             Assert.Equal(OptionStrict.Off, compilation.Options.OptionStrict)
 
@@ -296,15 +299,15 @@ End Module
   // Code size       73 (0x49)
   .maxstack  3
   .locals init (VB$AnonymousDelegate_0(Of Object) V_0)
-  IL_0000:  ldsfld     "Program._Closure$__.$I0-1 As <generated method>"
+  IL_0000:  ldsfld     "Program._Closure$__.$I0-0 As <generated method>"
   IL_0005:  brfalse.s  IL_000e
-  IL_0007:  ldsfld     "Program._Closure$__.$I0-1 As <generated method>"
+  IL_0007:  ldsfld     "Program._Closure$__.$I0-0 As <generated method>"
   IL_000c:  br.s       IL_0024
   IL_000e:  ldsfld     "Program._Closure$__.$I As Program._Closure$__"
-  IL_0013:  ldftn      "Sub Program._Closure$__._Lambda$__0-1(Object)"
+  IL_0013:  ldftn      "Sub Program._Closure$__._Lambda$__0-0(Object)"
   IL_0019:  newobj     "Sub VB$AnonymousDelegate_0(Of Object)..ctor(Object, System.IntPtr)"
   IL_001e:  dup
-  IL_001f:  stsfld     "Program._Closure$__.$I0-1 As <generated method>"
+  IL_001f:  stsfld     "Program._Closure$__.$I0-0 As <generated method>"
   IL_0024:  stloc.0
   IL_0025:  ldloc.0
   IL_0026:  brfalse.s  IL_0041
@@ -322,7 +325,7 @@ End Module
 }
 ]]>)
 
-            verifier.VerifyIL("Program._Closure$__._Lambda$__0-1",
+            verifier.VerifyIL("Program._Closure$__._Lambda$__0-0",
             <![CDATA[
 {
   // Code size       12 (0xc)
@@ -416,7 +419,7 @@ End Module
     </file>
 </compilation>
 
-            Dim compilation = CompilationUtils.CreateCompilationWithMscorlibAndVBRuntime(compilationDef, TestOptions.ReleaseExe)
+            Dim compilation = CompilationUtils.CreateCompilationWithMscorlib40AndVBRuntime(compilationDef, TestOptions.ReleaseExe)
 
             Assert.Equal(OptionStrict.Off, compilation.Options.OptionStrict)
 
@@ -445,15 +448,15 @@ End Module
   // Code size       78 (0x4e)
   .maxstack  3
   .locals init (VB$AnonymousDelegate_0(Of Integer) V_0)
-  IL_0000:  ldsfld     "Program._Closure$__.$I0-1 As <generated method>"
+  IL_0000:  ldsfld     "Program._Closure$__.$I0-0 As <generated method>"
   IL_0005:  brfalse.s  IL_000e
-  IL_0007:  ldsfld     "Program._Closure$__.$I0-1 As <generated method>"
+  IL_0007:  ldsfld     "Program._Closure$__.$I0-0 As <generated method>"
   IL_000c:  br.s       IL_0024
   IL_000e:  ldsfld     "Program._Closure$__.$I As Program._Closure$__"
-  IL_0013:  ldftn      "Sub Program._Closure$__._Lambda$__0-1(Integer)"
+  IL_0013:  ldftn      "Sub Program._Closure$__._Lambda$__0-0(Integer)"
   IL_0019:  newobj     "Sub VB$AnonymousDelegate_0(Of Integer)..ctor(Object, System.IntPtr)"
   IL_001e:  dup
-  IL_001f:  stsfld     "Program._Closure$__.$I0-1 As <generated method>"
+  IL_001f:  stsfld     "Program._Closure$__.$I0-0 As <generated method>"
   IL_0024:  stloc.0
   IL_0025:  ldloc.0
   IL_0026:  brfalse.s  IL_0041
@@ -472,7 +475,7 @@ End Module
 }
 ]]>)
 
-            verifier.VerifyIL("Program._Closure$__._Lambda$__0-1",
+            verifier.VerifyIL("Program._Closure$__._Lambda$__0-0",
             <![CDATA[
 {
   // Code size        7 (0x7)
@@ -554,7 +557,7 @@ BC30512: Option Strict On disallows implicit conversions from 'Sub <generated me
 ]]></expected>)
         End Sub
 
-        <WorkItem(543114, "DevDiv")>
+        <WorkItem(543114, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/543114")>
         <Fact()>
         Public Sub ArgumentIsNarrowing2()
 
@@ -574,7 +577,7 @@ End Module
     </file>
 </compilation>
 
-            Dim compilation = CompilationUtils.CreateCompilationWithMscorlibAndVBRuntime(compilationDef, TestOptions.ReleaseExe)
+            Dim compilation = CompilationUtils.CreateCompilationWithMscorlib40AndVBRuntime(compilationDef, TestOptions.ReleaseExe)
 
             For Each optStrict In {OptionStrict.Off, OptionStrict.On, OptionStrict.Custom}
                 compilation = compilation.WithOptions(TestOptions.ReleaseExe.WithOptionStrict(optStrict))
@@ -591,15 +594,15 @@ End Module
   // Code size       78 (0x4e)
   .maxstack  3
   .locals init (VB$AnonymousDelegate_0(Of Integer) V_0)
-  IL_0000:  ldsfld     "Program._Closure$__.$I0-1 As <generated method>"
+  IL_0000:  ldsfld     "Program._Closure$__.$I0-0 As <generated method>"
   IL_0005:  brfalse.s  IL_000e
-  IL_0007:  ldsfld     "Program._Closure$__.$I0-1 As <generated method>"
+  IL_0007:  ldsfld     "Program._Closure$__.$I0-0 As <generated method>"
   IL_000c:  br.s       IL_0024
   IL_000e:  ldsfld     "Program._Closure$__.$I As Program._Closure$__"
-  IL_0013:  ldftn      "Sub Program._Closure$__._Lambda$__0-1(Integer)"
+  IL_0013:  ldftn      "Sub Program._Closure$__._Lambda$__0-0(Integer)"
   IL_0019:  newobj     "Sub VB$AnonymousDelegate_0(Of Integer)..ctor(Object, System.IntPtr)"
   IL_001e:  dup
-  IL_001f:  stsfld     "Program._Closure$__.$I0-1 As <generated method>"
+  IL_001f:  stsfld     "Program._Closure$__.$I0-0 As <generated method>"
   IL_0024:  stloc.0
   IL_0025:  ldloc.0
   IL_0026:  brfalse.s  IL_0041
@@ -618,7 +621,7 @@ End Module
 }
 ]]>)
 
-                verifier.VerifyIL("Program._Closure$__._Lambda$__0-1",
+                verifier.VerifyIL("Program._Closure$__._Lambda$__0-0",
                 <![CDATA[
 {
     // Code size        7 (0x7)
@@ -646,7 +649,7 @@ End Module
 
         End Sub
 
-        <WorkItem(543114, "DevDiv")>
+        <WorkItem(543114, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/543114")>
         <Fact()>
         Public Sub ArgumentIsNarrowing3()
 
@@ -666,7 +669,7 @@ End Module
     </file>
 </compilation>
 
-            Dim compilation = CompilationUtils.CreateCompilationWithMscorlibAndVBRuntime(compilationDef, TestOptions.ReleaseExe)
+            Dim compilation = CompilationUtils.CreateCompilationWithMscorlib40AndVBRuntime(compilationDef, TestOptions.ReleaseExe)
 
             For Each optStrict In {OptionStrict.Off, OptionStrict.On, OptionStrict.Custom}
                 compilation = compilation.WithOptions(TestOptions.ReleaseExe.WithOptionStrict(optStrict))
@@ -683,15 +686,15 @@ End Module
   // Code size       72 (0x48)
   .maxstack  3
   .locals init (VB$AnonymousDelegate_0(Of Integer) V_0) //d1
-  IL_0000:  ldsfld     "Program._Closure$__.$I0-1 As <generated method>"
+  IL_0000:  ldsfld     "Program._Closure$__.$I0-0 As <generated method>"
   IL_0005:  brfalse.s  IL_000e
-  IL_0007:  ldsfld     "Program._Closure$__.$I0-1 As <generated method>"
+  IL_0007:  ldsfld     "Program._Closure$__.$I0-0 As <generated method>"
   IL_000c:  br.s       IL_0024
   IL_000e:  ldsfld     "Program._Closure$__.$I As Program._Closure$__"
-  IL_0013:  ldftn      "Sub Program._Closure$__._Lambda$__0-1(Integer)"
+  IL_0013:  ldftn      "Sub Program._Closure$__._Lambda$__0-0(Integer)"
   IL_0019:  newobj     "Sub VB$AnonymousDelegate_0(Of Integer)..ctor(Object, System.IntPtr)"
   IL_001e:  dup
-  IL_001f:  stsfld     "Program._Closure$__.$I0-1 As <generated method>"
+  IL_001f:  stsfld     "Program._Closure$__.$I0-0 As <generated method>"
   IL_0024:  stloc.0
   IL_0025:  newobj     "Sub Program._Closure$__R0-0..ctor()"
   IL_002a:  dup
@@ -706,7 +709,7 @@ End Module
 }
 ]]>)
 
-                verifier.VerifyIL("Program._Closure$__._Lambda$__0-1",
+                verifier.VerifyIL("Program._Closure$__._Lambda$__0-0",
                 <![CDATA[
 {
     // Code size        7 (0x7)
@@ -734,7 +737,7 @@ End Module
 
         End Sub
 
-        <WorkItem(543114, "DevDiv")>
+        <WorkItem(543114, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/543114")>
         <Fact()>
         Public Sub ArgumentIsNarrowing3_2()
 
@@ -754,7 +757,7 @@ End Module
     </file>
 </compilation>
 
-            Dim compilation = CompilationUtils.CreateCompilationWithMscorlibAndVBRuntime(compilationDef, TestOptions.ReleaseExe)
+            Dim compilation = CompilationUtils.CreateCompilationWithMscorlib40AndVBRuntime(compilationDef, TestOptions.ReleaseExe)
 
             For Each optStrict In {OptionStrict.Off, OptionStrict.On, OptionStrict.Custom}
                 compilation = compilation.WithOptions(TestOptions.ReleaseExe.WithOptionStrict(optStrict))
@@ -771,15 +774,15 @@ End Module
   // Code size       72 (0x48)
   .maxstack  3
   .locals init (VB$AnonymousDelegate_0(Of Integer) V_0) //d1
-  IL_0000:  ldsfld     "Program._Closure$__.$I0-1 As <generated method>"
+  IL_0000:  ldsfld     "Program._Closure$__.$I0-0 As <generated method>"
   IL_0005:  brfalse.s  IL_000e
-  IL_0007:  ldsfld     "Program._Closure$__.$I0-1 As <generated method>"
+  IL_0007:  ldsfld     "Program._Closure$__.$I0-0 As <generated method>"
   IL_000c:  br.s       IL_0024
   IL_000e:  ldsfld     "Program._Closure$__.$I As Program._Closure$__"
-  IL_0013:  ldftn      "Sub Program._Closure$__._Lambda$__0-1(Integer)"
+  IL_0013:  ldftn      "Sub Program._Closure$__._Lambda$__0-0(Integer)"
   IL_0019:  newobj     "Sub VB$AnonymousDelegate_0(Of Integer)..ctor(Object, System.IntPtr)"
   IL_001e:  dup
-  IL_001f:  stsfld     "Program._Closure$__.$I0-1 As <generated method>"
+  IL_001f:  stsfld     "Program._Closure$__.$I0-0 As <generated method>"
   IL_0024:  stloc.0
   IL_0025:  newobj     "Sub Program._Closure$__R0-0..ctor()"
   IL_002a:  dup
@@ -794,7 +797,7 @@ End Module
 }
 ]]>)
 
-                verifier.VerifyIL("Program._Closure$__._Lambda$__0-1",
+                verifier.VerifyIL("Program._Closure$__._Lambda$__0-0",
                 <![CDATA[
 {
     // Code size        7 (0x7)
@@ -823,7 +826,7 @@ End Module
         End Sub
 
 
-        <WorkItem(543114, "DevDiv")>
+        <WorkItem(543114, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/543114")>
         <Fact()>
         Public Sub ArgumentIsNarrowing3_3()
 
@@ -843,7 +846,7 @@ End Module
     </file>
 </compilation>
 
-            Dim compilation = CompilationUtils.CreateCompilationWithMscorlibAndVBRuntime(compilationDef, TestOptions.ReleaseExe)
+            Dim compilation = CompilationUtils.CreateCompilationWithMscorlib40AndVBRuntime(compilationDef, TestOptions.ReleaseExe)
 
             For Each optStrict In {OptionStrict.Off, OptionStrict.On, OptionStrict.Custom}
                 compilation = compilation.WithOptions(TestOptions.ReleaseExe.WithOptionStrict(optStrict))
@@ -860,15 +863,15 @@ End Module
   // Code size       72 (0x48)
   .maxstack  3
   .locals init (VB$AnonymousDelegate_0(Of Integer) V_0) //d1
-  IL_0000:  ldsfld     "Program._Closure$__.$I0-1 As <generated method>"
+  IL_0000:  ldsfld     "Program._Closure$__.$I0-0 As <generated method>"
   IL_0005:  brfalse.s  IL_000e
-  IL_0007:  ldsfld     "Program._Closure$__.$I0-1 As <generated method>"
+  IL_0007:  ldsfld     "Program._Closure$__.$I0-0 As <generated method>"
   IL_000c:  br.s       IL_0024
   IL_000e:  ldsfld     "Program._Closure$__.$I As Program._Closure$__"
-  IL_0013:  ldftn      "Sub Program._Closure$__._Lambda$__0-1(Integer)"
+  IL_0013:  ldftn      "Sub Program._Closure$__._Lambda$__0-0(Integer)"
   IL_0019:  newobj     "Sub VB$AnonymousDelegate_0(Of Integer)..ctor(Object, System.IntPtr)"
   IL_001e:  dup
-  IL_001f:  stsfld     "Program._Closure$__.$I0-1 As <generated method>"
+  IL_001f:  stsfld     "Program._Closure$__.$I0-0 As <generated method>"
   IL_0024:  stloc.0
   IL_0025:  newobj     "Sub Program._Closure$__R0-0..ctor()"
   IL_002a:  dup
@@ -883,7 +886,7 @@ End Module
 }
 ]]>)
 
-                verifier.VerifyIL("Program._Closure$__._Lambda$__0-1",
+                verifier.VerifyIL("Program._Closure$__._Lambda$__0-0",
                 <![CDATA[
 {
     // Code size        7 (0x7)
@@ -932,7 +935,7 @@ End Module
     </file>
 </compilation>
 
-            Dim compilation = CompilationUtils.CreateCompilationWithMscorlibAndVBRuntime(compilationDef)
+            Dim compilation = CompilationUtils.CreateCompilationWithMscorlib40AndVBRuntime(compilationDef)
 
             For Each optStrict In {OptionStrict.Off, OptionStrict.On, OptionStrict.Custom}
                 compilation = compilation.WithOptions(TestOptions.ReleaseExe.WithOptionStrict(optStrict))
@@ -964,15 +967,15 @@ End Module
   // Code size       67 (0x43)
   .maxstack  2
   .locals init (VB$AnonymousDelegate_0(Of System.Collections.IEnumerable) V_0)
-  IL_0000:  ldsfld     "Program._Closure$__.$I0-1 As <generated method>"
+  IL_0000:  ldsfld     "Program._Closure$__.$I0-0 As <generated method>"
   IL_0005:  brfalse.s  IL_000e
-  IL_0007:  ldsfld     "Program._Closure$__.$I0-1 As <generated method>"
+  IL_0007:  ldsfld     "Program._Closure$__.$I0-0 As <generated method>"
   IL_000c:  br.s       IL_0024
   IL_000e:  ldsfld     "Program._Closure$__.$I As Program._Closure$__"
-  IL_0013:  ldftn      "Sub Program._Closure$__._Lambda$__0-1(System.Collections.IEnumerable)"
+  IL_0013:  ldftn      "Sub Program._Closure$__._Lambda$__0-0(System.Collections.IEnumerable)"
   IL_0019:  newobj     "Sub VB$AnonymousDelegate_0(Of System.Collections.IEnumerable)..ctor(Object, System.IntPtr)"
   IL_001e:  dup
-  IL_001f:  stsfld     "Program._Closure$__.$I0-1 As <generated method>"
+  IL_001f:  stsfld     "Program._Closure$__.$I0-0 As <generated method>"
   IL_0024:  stloc.0
   IL_0025:  ldloc.0
   IL_0026:  brfalse.s  IL_0036
@@ -988,7 +991,7 @@ End Module
 }
 ]]>)
 
-                verifier.VerifyIL("Program._Closure$__._Lambda$__0-1",
+                verifier.VerifyIL("Program._Closure$__._Lambda$__0-0",
                 <![CDATA[
 {
   // Code size        7 (0x7)
@@ -1019,7 +1022,7 @@ End Module
     </file>
 </compilation>
 
-            Dim compilation = CompilationUtils.CreateCompilationWithMscorlibAndVBRuntime(compilationDef)
+            Dim compilation = CompilationUtils.CreateCompilationWithMscorlib40AndVBRuntime(compilationDef)
 
             For Each optStrict In {OptionStrict.Off, OptionStrict.On, OptionStrict.Custom}
                 compilation = compilation.WithOptions(TestOptions.ReleaseExe.WithOptionStrict(optStrict))
@@ -1071,7 +1074,7 @@ End Module
     </file>
 </compilation>
 
-            Dim compilation = CompilationUtils.CreateCompilationWithMscorlibAndVBRuntime(compilationDef)
+            Dim compilation = CompilationUtils.CreateCompilationWithMscorlib40AndVBRuntime(compilationDef)
 
             For Each optStrict In {OptionStrict.Off, OptionStrict.On, OptionStrict.Custom}
                 compilation = compilation.WithOptions(TestOptions.ReleaseExe.WithOptionStrict(optStrict))
@@ -1103,15 +1106,15 @@ End Module
   // Code size       72 (0x48)
   .maxstack  3
   .locals init (VB$AnonymousDelegate_0(Of Integer) V_0)
-  IL_0000:  ldsfld     "Program._Closure$__.$I0-1 As <generated method>"
+  IL_0000:  ldsfld     "Program._Closure$__.$I0-0 As <generated method>"
   IL_0005:  brfalse.s  IL_000e
-  IL_0007:  ldsfld     "Program._Closure$__.$I0-1 As <generated method>"
+  IL_0007:  ldsfld     "Program._Closure$__.$I0-0 As <generated method>"
   IL_000c:  br.s       IL_0024
   IL_000e:  ldsfld     "Program._Closure$__.$I As Program._Closure$__"
-  IL_0013:  ldftn      "Function Program._Closure$__._Lambda$__0-1() As Integer"
+  IL_0013:  ldftn      "Function Program._Closure$__._Lambda$__0-0() As Integer"
   IL_0019:  newobj     "Sub VB$AnonymousDelegate_0(Of Integer)..ctor(Object, System.IntPtr)"
   IL_001e:  dup
-  IL_001f:  stsfld     "Program._Closure$__.$I0-1 As <generated method>"
+  IL_001f:  stsfld     "Program._Closure$__.$I0-0 As <generated method>"
   IL_0024:  stloc.0
   IL_0025:  ldloc.0
   IL_0026:  brfalse.s  IL_0041
@@ -1128,7 +1131,7 @@ End Module
 }
 ]]>)
 
-                verifier.VerifyIL("Program._Closure$__._Lambda$__0-1",
+                verifier.VerifyIL("Program._Closure$__._Lambda$__0-0",
                 <![CDATA[
 {
   // Code size       12 (0xc)
@@ -1174,7 +1177,7 @@ End Module
     </file>
 </compilation>
 
-            Dim compilation = CompilationUtils.CreateCompilationWithMscorlibAndVBRuntime(compilationDef)
+            Dim compilation = CompilationUtils.CreateCompilationWithMscorlib40AndVBRuntime(compilationDef)
 
             For Each optStrict In {OptionStrict.Off, OptionStrict.On, OptionStrict.Custom}
                 compilation = compilation.WithOptions(TestOptions.ReleaseExe.WithOptionStrict(optStrict))
@@ -1224,7 +1227,7 @@ End Module
     </file>
 </compilation>
 
-            Dim compilation = CompilationUtils.CreateCompilationWithMscorlibAndVBRuntime(compilationDef, TestOptions.ReleaseExe)
+            Dim compilation = CompilationUtils.CreateCompilationWithMscorlib40AndVBRuntime(compilationDef, TestOptions.ReleaseExe)
 
             Assert.Equal(OptionStrict.Off, compilation.Options.OptionStrict)
 
@@ -1253,15 +1256,15 @@ End Module
   // Code size       77 (0x4d)
   .maxstack  3
   .locals init (VB$AnonymousDelegate_0(Of Object) V_0)
-  IL_0000:  ldsfld     "Program._Closure$__.$I0-1 As <generated method>"
+  IL_0000:  ldsfld     "Program._Closure$__.$I0-0 As <generated method>"
   IL_0005:  brfalse.s  IL_000e
-  IL_0007:  ldsfld     "Program._Closure$__.$I0-1 As <generated method>"
+  IL_0007:  ldsfld     "Program._Closure$__.$I0-0 As <generated method>"
   IL_000c:  br.s       IL_0024
   IL_000e:  ldsfld     "Program._Closure$__.$I As Program._Closure$__"
-  IL_0013:  ldftn      "Function Program._Closure$__._Lambda$__0-1() As Object"
+  IL_0013:  ldftn      "Function Program._Closure$__._Lambda$__0-0() As Object"
   IL_0019:  newobj     "Sub VB$AnonymousDelegate_0(Of Object)..ctor(Object, System.IntPtr)"
   IL_001e:  dup
-  IL_001f:  stsfld     "Program._Closure$__.$I0-1 As <generated method>"
+  IL_001f:  stsfld     "Program._Closure$__.$I0-0 As <generated method>"
   IL_0024:  stloc.0
   IL_0025:  ldloc.0
   IL_0026:  brfalse.s  IL_0041
@@ -1279,7 +1282,7 @@ End Module
 }
 ]]>)
 
-            verifier.VerifyIL("Program._Closure$__._Lambda$__0-1",
+            verifier.VerifyIL("Program._Closure$__._Lambda$__0-0",
             <![CDATA[
 {
   // Code size        7 (0x7)
@@ -1383,7 +1386,7 @@ End Module
     </file>
 </compilation>
 
-            Dim compilation = CompilationUtils.CreateCompilationWithMscorlibAndVBRuntime(compilationDef)
+            Dim compilation = CompilationUtils.CreateCompilationWithMscorlib40AndVBRuntime(compilationDef)
 
             For Each optStrict In {OptionStrict.Off, OptionStrict.On, OptionStrict.Custom}
                 compilation = compilation.WithOptions(TestOptions.ReleaseExe.WithOptionStrict(optStrict))
@@ -1415,15 +1418,15 @@ End Module
   // Code size       82 (0x52)
   .maxstack  3
   .locals init (VB$AnonymousDelegate_0(Of Integer) V_0)
-  IL_0000:  ldsfld     "Program._Closure$__.$I0-1 As <generated method>"
+  IL_0000:  ldsfld     "Program._Closure$__.$I0-0 As <generated method>"
   IL_0005:  brfalse.s  IL_000e
-  IL_0007:  ldsfld     "Program._Closure$__.$I0-1 As <generated method>"
+  IL_0007:  ldsfld     "Program._Closure$__.$I0-0 As <generated method>"
   IL_000c:  br.s       IL_0024
   IL_000e:  ldsfld     "Program._Closure$__.$I As Program._Closure$__"
-  IL_0013:  ldftn      "Function Program._Closure$__._Lambda$__0-1() As Integer"
+  IL_0013:  ldftn      "Function Program._Closure$__._Lambda$__0-0() As Integer"
   IL_0019:  newobj     "Sub VB$AnonymousDelegate_0(Of Integer)..ctor(Object, System.IntPtr)"
   IL_001e:  dup
-  IL_001f:  stsfld     "Program._Closure$__.$I0-1 As <generated method>"
+  IL_001f:  stsfld     "Program._Closure$__.$I0-0 As <generated method>"
   IL_0024:  stloc.0
   IL_0025:  ldloc.0
   IL_0026:  brfalse.s  IL_0041
@@ -1442,7 +1445,7 @@ End Module
 }
 ]]>)
 
-                verifier.VerifyIL("Program._Closure$__._Lambda$__0-1",
+                verifier.VerifyIL("Program._Closure$__._Lambda$__0-0",
                 <![CDATA[
 {
   // Code size        2 (0x2)
@@ -1488,7 +1491,7 @@ End Module
     </file>
 </compilation>
 
-            Dim compilation = CompilationUtils.CreateCompilationWithMscorlibAndVBRuntime(compilationDef)
+            Dim compilation = CompilationUtils.CreateCompilationWithMscorlib40AndVBRuntime(compilationDef)
 
             For Each optStrict In {OptionStrict.Off, OptionStrict.On, OptionStrict.Custom}
                 compilation = compilation.WithOptions(TestOptions.ReleaseExe.WithOptionStrict(optStrict))
@@ -1519,15 +1522,15 @@ End Module
   // Code size       66 (0x42)
   .maxstack  2
   .locals init (VB$AnonymousDelegate_0(Of System.Collections.Generic.IEnumerable(Of Integer)) V_0)
-  IL_0000:  ldsfld     "Program._Closure$__.$I0-1 As <generated method>"
+  IL_0000:  ldsfld     "Program._Closure$__.$I0-0 As <generated method>"
   IL_0005:  brfalse.s  IL_000e
-  IL_0007:  ldsfld     "Program._Closure$__.$I0-1 As <generated method>"
+  IL_0007:  ldsfld     "Program._Closure$__.$I0-0 As <generated method>"
   IL_000c:  br.s       IL_0024
   IL_000e:  ldsfld     "Program._Closure$__.$I As Program._Closure$__"
-  IL_0013:  ldftn      "Function Program._Closure$__._Lambda$__0-1() As System.Collections.Generic.IEnumerable(Of Integer)"
+  IL_0013:  ldftn      "Function Program._Closure$__._Lambda$__0-0() As System.Collections.Generic.IEnumerable(Of Integer)"
   IL_0019:  newobj     "Sub VB$AnonymousDelegate_0(Of System.Collections.Generic.IEnumerable(Of Integer))..ctor(Object, System.IntPtr)"
   IL_001e:  dup
-  IL_001f:  stsfld     "Program._Closure$__.$I0-1 As <generated method>"
+  IL_001f:  stsfld     "Program._Closure$__.$I0-0 As <generated method>"
   IL_0024:  stloc.0
   IL_0025:  ldloc.0
   IL_0026:  brfalse.s  IL_0036
@@ -1542,7 +1545,7 @@ End Module
 }
 ]]>)
 
-                verifier.VerifyIL("Program._Closure$__._Lambda$__0-1",
+                verifier.VerifyIL("Program._Closure$__._Lambda$__0-0",
                 <![CDATA[
 {
   // Code size        7 (0x7)
@@ -1574,7 +1577,7 @@ End Module
     </file>
 </compilation>
 
-            Dim compilation = CompilationUtils.CreateCompilationWithMscorlibAndVBRuntime(compilationDef)
+            Dim compilation = CompilationUtils.CreateCompilationWithMscorlib40AndVBRuntime(compilationDef)
 
             For Each optStrict In {OptionStrict.Off, OptionStrict.On, OptionStrict.Custom}
                 compilation = compilation.WithOptions(TestOptions.ReleaseExe.WithOptionStrict(optStrict))
@@ -1624,7 +1627,7 @@ End Module
     </file>
 </compilation>
 
-            Dim compilation = CompilationUtils.CreateCompilationWithMscorlibAndVBRuntime(compilationDef, TestOptions.ReleaseExe)
+            Dim compilation = CompilationUtils.CreateCompilationWithMscorlib40AndVBRuntime(compilationDef, TestOptions.ReleaseExe)
 
             Assert.Equal(OptionStrict.Off, compilation.Options.OptionStrict)
 
@@ -1653,15 +1656,15 @@ End Module
   // Code size       79 (0x4f)
   .maxstack  3
   .locals init (VB$AnonymousDelegate_0(Of Integer) V_0)
-  IL_0000:  ldsfld     "Program._Closure$__.$I0-1 As <generated method>"
+  IL_0000:  ldsfld     "Program._Closure$__.$I0-0 As <generated method>"
   IL_0005:  brfalse.s  IL_000e
-  IL_0007:  ldsfld     "Program._Closure$__.$I0-1 As <generated method>"
+  IL_0007:  ldsfld     "Program._Closure$__.$I0-0 As <generated method>"
   IL_000c:  br.s       IL_0024
   IL_000e:  ldsfld     "Program._Closure$__.$I As Program._Closure$__"
-  IL_0013:  ldftn      "Function Program._Closure$__._Lambda$__0-1() As Integer"
+  IL_0013:  ldftn      "Function Program._Closure$__._Lambda$__0-0() As Integer"
   IL_0019:  newobj     "Sub VB$AnonymousDelegate_0(Of Integer)..ctor(Object, System.IntPtr)"
   IL_001e:  dup
-  IL_001f:  stsfld     "Program._Closure$__.$I0-1 As <generated method>"
+  IL_001f:  stsfld     "Program._Closure$__.$I0-0 As <generated method>"
   IL_0024:  stloc.0
   IL_0025:  ldloc.0
   IL_0026:  brfalse.s  IL_0041
@@ -1680,7 +1683,7 @@ End Module
 }
 ]]>)
 
-            verifier.VerifyIL("Program._Closure$__._Lambda$__0-1",
+            verifier.VerifyIL("Program._Closure$__._Lambda$__0-0",
             <![CDATA[
 {
   // Code size        2 (0x2)
@@ -1770,7 +1773,7 @@ End Module
     </file>
 </compilation>
 
-            Dim compilation = CompilationUtils.CreateCompilationWithMscorlibAndVBRuntime(compilationDef)
+            Dim compilation = CompilationUtils.CreateCompilationWithMscorlib40AndVBRuntime(compilationDef)
 
             For Each optStrict In {OptionStrict.Off, OptionStrict.On, OptionStrict.Custom}
                 compilation = compilation.WithOptions(TestOptions.ReleaseExe.WithOptionStrict(optStrict))
@@ -1818,7 +1821,7 @@ End Module
     </file>
 </compilation>
 
-            Dim compilation = CompilationUtils.CreateCompilationWithMscorlibAndVBRuntime(compilationDef)
+            Dim compilation = CompilationUtils.CreateCompilationWithMscorlib40AndVBRuntime(compilationDef)
 
             For Each optStrict In {OptionStrict.Off, OptionStrict.On, OptionStrict.Custom}
                 compilation = compilation.WithOptions(TestOptions.ReleaseExe.WithOptionStrict(optStrict))
@@ -1876,7 +1879,7 @@ End Module
     </file>
 </compilation>
 
-            Dim compilation = CompilationUtils.CreateCompilationWithMscorlibAndVBRuntime(compilationDef, TestOptions.ReleaseExe)
+            Dim compilation = CompilationUtils.CreateCompilationWithMscorlib40AndVBRuntime(compilationDef, TestOptions.ReleaseExe)
 
             Assert.Equal(OptionStrict.Off, compilation.Options.OptionStrict)
 
@@ -1895,7 +1898,7 @@ End Module
                 Assert.True(conv.Exists)
             End If
 
-            Dim verifier = CompileAndVerify(compilation, expectedOutput:="1" & vbCrLf & "2" & vbCrLf)
+            Dim verifier = CompileAndVerify(compilation, expectedOutput:="1" & Environment.NewLine & "2" & Environment.NewLine)
 
             CompilationUtils.AssertTheseDiagnostics(compilation, <expected></expected>)
 
@@ -1906,15 +1909,15 @@ End Module
   .maxstack  3
   .locals init (String V_0, //x2
                 VB$AnonymousDelegate_0(Of Object) V_1)
-  IL_0000:  ldsfld     "Program._Closure$__.$I0-1 As <generated method>"
+  IL_0000:  ldsfld     "Program._Closure$__.$I0-0 As <generated method>"
   IL_0005:  brfalse.s  IL_000e
-  IL_0007:  ldsfld     "Program._Closure$__.$I0-1 As <generated method>"
+  IL_0007:  ldsfld     "Program._Closure$__.$I0-0 As <generated method>"
   IL_000c:  br.s       IL_0024
   IL_000e:  ldsfld     "Program._Closure$__.$I As Program._Closure$__"
-  IL_0013:  ldftn      "Sub Program._Closure$__._Lambda$__0-1(ByRef Object)"
+  IL_0013:  ldftn      "Sub Program._Closure$__._Lambda$__0-0(ByRef Object)"
   IL_0019:  newobj     "Sub VB$AnonymousDelegate_0(Of Object)..ctor(Object, System.IntPtr)"
   IL_001e:  dup
-  IL_001f:  stsfld     "Program._Closure$__.$I0-1 As <generated method>"
+  IL_001f:  stsfld     "Program._Closure$__.$I0-0 As <generated method>"
   IL_0024:  stloc.1
   IL_0025:  ldloc.1
   IL_0026:  brfalse.s  IL_0041
@@ -1936,7 +1939,7 @@ End Module
 }
 ]]>)
 
-            verifier.VerifyIL("Program._Closure$__._Lambda$__0-1",
+            verifier.VerifyIL("Program._Closure$__._Lambda$__0-0",
             <![CDATA[
 {
   // Code size       20 (0x14)
@@ -1992,7 +1995,7 @@ End Module
                 Assert.True(conv.Exists)
             End If
 
-            CompileAndVerify(compilation, expectedOutput:="1" & vbCrLf & "2" & vbCrLf)
+            CompileAndVerify(compilation, expectedOutput:="1" & Environment.NewLine & "2" & Environment.NewLine)
 
             CompilationUtils.AssertTheseDiagnostics(compilation,
 <expected><![CDATA[
@@ -2071,7 +2074,7 @@ End Module
 </compilation>
 
 
-            Dim compilation = CompilationUtils.CreateCompilationWithMscorlibAndVBRuntime(compilationDef, TestOptions.ReleaseExe)
+            Dim compilation = CompilationUtils.CreateCompilationWithMscorlib40AndVBRuntime(compilationDef, TestOptions.ReleaseExe)
             CompilationUtils.AssertTheseDiagnostics(compilation,
 <expected>
 BC30521: Overload resolution failed because no accessible 'Test1' is most specific for these arguments:
@@ -2110,7 +2113,7 @@ End Module
 </compilation>
 
 
-            Dim compilation = CompilationUtils.CreateCompilationWithMscorlibAndVBRuntime(compilationDef, TestOptions.ReleaseExe)
+            Dim compilation = CompilationUtils.CreateCompilationWithMscorlib40AndVBRuntime(compilationDef, TestOptions.ReleaseExe)
 
             CompileAndVerify(compilation, <![CDATA[
 System.Func`2[System.Object,System.Int32]
@@ -2148,7 +2151,7 @@ End Module
 </compilation>
 
 
-            Dim compilation = CompilationUtils.CreateCompilationWithMscorlibAndVBRuntime(compilationDef, TestOptions.ReleaseExe)
+            Dim compilation = CompilationUtils.CreateCompilationWithMscorlib40AndVBRuntime(compilationDef, TestOptions.ReleaseExe)
 
             CompilationUtils.AssertTheseDiagnostics(compilation,
 <expected><![CDATA[
@@ -2207,7 +2210,7 @@ End Module
 </compilation>
 
 
-            Dim compilation = CompilationUtils.CreateCompilationWithMscorlibAndVBRuntime(compilationDef, TestOptions.ReleaseExe.WithOptionStrict(OptionStrict.Custom))
+            Dim compilation = CompilationUtils.CreateCompilationWithMscorlib40AndVBRuntime(compilationDef, TestOptions.ReleaseExe.WithOptionStrict(OptionStrict.Custom))
 
             CompilationUtils.AssertTheseDiagnostics(compilation,
 <expected><![CDATA[
@@ -2285,7 +2288,7 @@ End Module
 </compilation>
 
 
-            Dim compilation = CompilationUtils.CreateCompilationWithMscorlibAndVBRuntime(compilationDef, TestOptions.ReleaseExe.WithOptionStrict(OptionStrict.Custom))
+            Dim compilation = CompilationUtils.CreateCompilationWithMscorlib40AndVBRuntime(compilationDef, TestOptions.ReleaseExe.WithOptionStrict(OptionStrict.Custom))
 
             CompilationUtils.AssertTheseDiagnostics(compilation,
 <expected>
@@ -2327,7 +2330,7 @@ End Module
 </compilation>
 
 
-            Dim compilation = CompilationUtils.CreateCompilationWithMscorlibAndVBRuntime(compilationDef, TestOptions.ReleaseExe)
+            Dim compilation = CompilationUtils.CreateCompilationWithMscorlib40AndVBRuntime(compilationDef, TestOptions.ReleaseExe)
 
             For Each optStrict In {OptionStrict.Off, OptionStrict.On, OptionStrict.Custom}
                 compilation = compilation.WithOptions(TestOptions.ReleaseExe.WithOptionStrict(optStrict))
@@ -2371,7 +2374,7 @@ End Module
 </compilation>
 
 
-            Dim compilation = CompilationUtils.CreateCompilationWithMscorlibAndVBRuntime(compilationDef, TestOptions.ReleaseExe.WithOptionStrict(OptionStrict.Custom))
+            Dim compilation = CompilationUtils.CreateCompilationWithMscorlib40AndVBRuntime(compilationDef, TestOptions.ReleaseExe.WithOptionStrict(OptionStrict.Custom))
 
             CompilationUtils.AssertTheseDiagnostics(compilation, <expected></expected>)
 
@@ -2432,7 +2435,7 @@ End Module
 </compilation>
 
 
-            Dim compilation = CompilationUtils.CreateCompilationWithMscorlibAndVBRuntime(compilationDef, TestOptions.ReleaseExe.WithOptionStrict(OptionStrict.Custom))
+            Dim compilation = CompilationUtils.CreateCompilationWithMscorlib40AndVBRuntime(compilationDef, TestOptions.ReleaseExe.WithOptionStrict(OptionStrict.Custom))
 
             CompilationUtils.AssertTheseDiagnostics(compilation,
 <expected>
@@ -2488,7 +2491,7 @@ End Module
 </compilation>
 
 
-            Dim compilation = CompilationUtils.CreateCompilationWithMscorlibAndVBRuntime(compilationDef, TestOptions.ReleaseExe.WithOptionStrict(OptionStrict.Custom))
+            Dim compilation = CompilationUtils.CreateCompilationWithMscorlib40AndVBRuntime(compilationDef, TestOptions.ReleaseExe.WithOptionStrict(OptionStrict.Custom))
 
             CompilationUtils.AssertTheseDiagnostics(compilation,
 <expected>
@@ -2513,6 +2516,29 @@ BC30521: Overload resolution failed because no accessible 'Test1' is most specif
         Test1(Function() '2
         ~~~~~
 </expected>)
+        End Sub
+
+        <Fact(), WorkItem(377, "https://github.com/dotnet/roslyn/issues/377")>
+        Public Sub ConvertingNullDelegate()
+
+            Dim compilationDef =
+<compilation name="LambdaTests1">
+    <file name="a.vb">
+Imports System        
+
+Module Program
+    Sub Main()
+        Dim f As Func(Of Boolean) = (Function() If(True, Nothing, Function() True))()
+        System.Console.WriteLine(f Is Nothing)
+    End Sub
+End Module
+    </file>
+</compilation>
+
+            Dim compilation = CompilationUtils.CreateCompilationWithMscorlib40AndVBRuntime(compilationDef, TestOptions.DebugExe)
+
+            Dim verifier = CompileAndVerify(compilation, expectedOutput:="True")
+            verifier.VerifyDiagnostics()
         End Sub
 
     End Class

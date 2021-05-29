@@ -1,4 +1,6 @@
-﻿' Copyright (c) Microsoft.  All Rights Reserved.  Licensed under the Apache License, Version 2.0.  See License.txt in the project root for license information.
+﻿' Licensed to the .NET Foundation under one or more agreements.
+' The .NET Foundation licenses this file to you under the MIT license.
+' See the LICENSE file in the project root for more information.
 
 Imports System.Collections.Generic
 Imports System.Threading
@@ -67,7 +69,7 @@ Namespace Microsoft.CodeAnalysis.VisualBasic.Symbols
         ' A location not in source.
         Public Shared ReadOnly NotInSource As LexicalSortKey = New LexicalSortKey(SyntaxTreeKind.None, -1, 0)
 
-        ' A lexical sork key is not initialized yet
+        ' A lexical sort key is not initialized yet
         Public Shared ReadOnly NotInitialized As LexicalSortKey = New LexicalSortKey() With {._embeddedKind = SyntaxTreeKind.None, ._treeOrdinal = -1, ._position = -1}
 
         Private Sub New(embeddedKind As SyntaxTreeKind, treeOrdinal As Integer, location As Integer)
@@ -112,7 +114,7 @@ Namespace Microsoft.CodeAnalysis.VisualBasic.Symbols
             Else
                 Debug.Assert(location.PossiblyEmbeddedOrMySourceSpan.Start >= 0)
 
-                Dim tree = DirectCast(location.SourceTree, VisualBasicSyntaxTree)
+                Dim tree = DirectCast(location.PossiblyEmbeddedOrMySourceTree, VisualBasicSyntaxTree)
                 Debug.Assert(tree Is Nothing OrElse tree.GetEmbeddedKind = location.EmbeddedKind)
 
                 Dim treeKind As SyntaxTreeKind = GetEmbeddedKind(tree)
@@ -132,7 +134,7 @@ Namespace Microsoft.CodeAnalysis.VisualBasic.Symbols
         ''' <summary>
         ''' WARNING: Only use this if the node is obtainable without allocating it (even if cached later). E.g., only
         ''' if the node is stored in the constructor of the symbol. In particular, do not call this on the result of a GetSyntax()
-        ''' call on a SyntacReference.
+        ''' call on a SyntaxReference.
         ''' </summary>
         Public Sub New(node As VisualBasicSyntaxNode, compilation As VisualBasicCompilation)
             Me.New(node.SyntaxTree, node.SpanStart, compilation)
@@ -185,6 +187,19 @@ Namespace Microsoft.CodeAnalysis.VisualBasic.Symbols
             ' the compilation and an attempt of building the LexicalSortKey will simply assert and crash.
             If first.SourceTree IsNot Nothing AndAlso first.SourceTree Is second.SourceTree Then
                 Return first.PossiblyEmbeddedOrMySourceSpan.Start - second.PossiblyEmbeddedOrMySourceSpan.Start
+            End If
+
+            Dim firstKey = New LexicalSortKey(first, compilation)
+            Dim secondKey = New LexicalSortKey(second, compilation)
+            Return LexicalSortKey.Compare(firstKey, secondKey)
+        End Function
+
+        Public Shared Function Compare(first As SyntaxReference, second As SyntaxReference, compilation As VisualBasicCompilation) As Integer
+            ' This is a shortcut to avoid building complete keys for the case when both locations belong to the same tree.
+            ' Also saves us in some speculative SemanticModel scenarios when the tree we are dealing with doesn't belong to
+            ' the compilation and an attempt of building the LexicalSortKey will simply assert and crash.
+            If first.SyntaxTree IsNot Nothing AndAlso first.SyntaxTree Is second.SyntaxTree Then
+                Return first.Span.Start - second.Span.Start
             End If
 
             Dim firstKey = New LexicalSortKey(first, compilation)

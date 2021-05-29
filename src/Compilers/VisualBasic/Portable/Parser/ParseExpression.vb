@@ -1,14 +1,29 @@
-﻿' Copyright (c) Microsoft.  All Rights Reserved.  Licensed under the Apache License, Version 2.0.  See License.txt in the project root for license information.
+﻿' Licensed to the .NET Foundation under one or more agreements.
+' The .NET Foundation licenses this file to you under the MIT license.
+' See the LICENSE file in the project root for more information.
 
 '
 '============ Methods for parsing portions of executable statements ==
 '
 Imports System.Runtime.InteropServices
+Imports Microsoft.CodeAnalysis.Syntax.InternalSyntax
 Imports InternalSyntaxFactory = Microsoft.CodeAnalysis.VisualBasic.Syntax.InternalSyntax.SyntaxFactory
 
 Namespace Microsoft.CodeAnalysis.VisualBasic.Syntax.InternalSyntax
 
-    Partial Class Parser
+    Partial Friend Class Parser
+
+        Friend Function ParseExpression(
+            Optional pendingPrecedence As OperatorPrecedence = OperatorPrecedence.PrecedenceNone,
+            Optional bailIfFirstTokenRejected As Boolean = False
+        ) As ExpressionSyntax
+
+            Return ParseWithStackGuard(Of ExpressionSyntax)(
+                Function() ParseExpressionCore(pendingPrecedence, bailIfFirstTokenRejected),
+                Function() InternalSyntaxFactory.MissingExpression())
+
+        End Function
+
         ' /*********************************************************************
         ' *
         ' * Function:
@@ -29,18 +44,16 @@ Namespace Microsoft.CodeAnalysis.VisualBasic.Syntax.InternalSyntax
         '        //dig through a leading EOL token when it tries
         '        //to parse the expression.
         '
-        '    bool EatLeadingNewLine,         - we no longer support it in ParseExpression, please eat the new line yourself before calling
+        '    bool EatLeadingNewLine,         - we no longer support it in ParseExpressionCore, please eat the new line yourself before calling
         '    bool BailIfFirstTokenRejected                 // bail (return NULL) if the first token isn't a valid expression-starter, rather than reporting an error or setting ErrorInConstruct
-        Friend Function ParseExpression(
+        Private Function ParseExpressionCore(
             Optional pendingPrecedence As OperatorPrecedence = OperatorPrecedence.PrecedenceNone,
             Optional bailIfFirstTokenRejected As Boolean = False
         ) As ExpressionSyntax
 
             Try
                 _recursionDepth += 1
-                If _recursionDepth >= _maxUncheckedRecursionDepth Then
-                    EnsureSufficientExecutionStackLightUp.EnsureSufficientExecutionStack()
-                End If
+                StackGuard.EnsureSufficientExecutionStack(_recursionDepth)
 
                 '// Note: this function will only ever return NULL if the flag "BailIfFirstTokenIsRejected" is set,
                 '// and if the first token isn't a valid way to start an expression. In all other error scenarios
@@ -49,7 +62,7 @@ Namespace Microsoft.CodeAnalysis.VisualBasic.Syntax.InternalSyntax
                 Dim expression As ExpressionSyntax = Nothing
                 Dim startToken As SyntaxToken = CurrentToken
 
-                If m_EvaluatingConditionCompilationExpression AndAlso
+                If _evaluatingConditionCompilationExpression AndAlso
                Not StartsValidConditionalCompilationExpr(startToken) Then
 
                     If bailIfFirstTokenRejected Then
@@ -71,13 +84,13 @@ Namespace Microsoft.CodeAnalysis.VisualBasic.Syntax.InternalSyntax
                         ' "-" unary minus
                         GetNextToken()
 
-                        Dim Operand As ExpressionSyntax = ParseExpression(OperatorPrecedence.PrecedenceNegate)
+                        Dim Operand As ExpressionSyntax = ParseExpressionCore(OperatorPrecedence.PrecedenceNegate)
                         expression = SyntaxFactory.UnaryMinusExpression(startToken, Operand)
 
                     Case SyntaxKind.NotKeyword
                         ' NOT expr
                         GetNextToken()
-                        Dim Operand = ParseExpression(OperatorPrecedence.PrecedenceNot)
+                        Dim Operand = ParseExpressionCore(OperatorPrecedence.PrecedenceNot)
                         expression = SyntaxFactory.NotExpression(startToken, Operand)
 
                     Case SyntaxKind.PlusToken
@@ -86,13 +99,13 @@ Namespace Microsoft.CodeAnalysis.VisualBasic.Syntax.InternalSyntax
 
                         ' unary "+" has the same precedence as unary "-"
 
-                        Dim Operand = ParseExpression(OperatorPrecedence.PrecedenceNegate)
+                        Dim Operand = ParseExpressionCore(OperatorPrecedence.PrecedenceNegate)
                         expression = SyntaxFactory.UnaryPlusExpression(startToken, Operand)
 
                     Case SyntaxKind.AddressOfKeyword
                         GetNextToken()
 
-                        Dim Operand = ParseExpression(OperatorPrecedence.PrecedenceNegate)
+                        Dim Operand = ParseExpressionCore(OperatorPrecedence.PrecedenceNegate)
                         expression = SyntaxFactory.AddressOfExpression(startToken, Operand)
 
                     Case Else
@@ -122,7 +135,7 @@ Namespace Microsoft.CodeAnalysis.VisualBasic.Syntax.InternalSyntax
                             Exit Do
                         End If
 
-                        If m_EvaluatingConditionCompilationExpression AndAlso
+                        If _evaluatingConditionCompilationExpression AndAlso
                        Not IsValidOperatorForConditionalCompilationExpr(CurrentToken) Then
 
                             ' Should current token be consumed here?
@@ -146,7 +159,7 @@ Namespace Microsoft.CodeAnalysis.VisualBasic.Syntax.InternalSyntax
                         'Binary.Opcode = Opcode
 
                         'Binary.Left = Expr
-                        Dim rightOperand As ExpressionSyntax = ParseExpression(precedence)
+                        Dim rightOperand As ExpressionSyntax = ParseExpressionCore(precedence)
 
                         expression = SyntaxFactory.BinaryExpression(GetBinaryOperatorHelper([operator]), expression, [operator], rightOperand)
 
@@ -154,9 +167,6 @@ Namespace Microsoft.CodeAnalysis.VisualBasic.Syntax.InternalSyntax
                 End If
 
                 Return expression
-
-                ' TODO (DevDiv workitem 966425): Replace exception name test with a type test once the type 
-                ' Is available in the PCL
             Finally
                 _recursionDepth -= 1
             End Try
@@ -170,7 +180,7 @@ Namespace Microsoft.CodeAnalysis.VisualBasic.Syntax.InternalSyntax
             '// Note: this function will only ever return NULL if the flag "BailIfFirstTokenIsRejected" is set,
             '// and if the first token isn't a valid way to start an expression. In all other error scenarios
             '// it returns a "bad expression".
-            Debug.Assert(Not m_EvaluatingConditionCompilationExpression OrElse
+            Debug.Assert(Not _evaluatingConditionCompilationExpression OrElse
                 StartsValidConditionalCompilationExpr(CurrentToken), "Conditional compilation expression parsing confused!!!")
 
             Dim term As ExpressionSyntax = Nothing
@@ -262,7 +272,7 @@ Namespace Microsoft.CodeAnalysis.VisualBasic.Syntax.InternalSyntax
                     GetNextToken()
 
                 Case SyntaxKind.OpenParenToken
-                    term = ParseParenthesizedExpression()
+                    term = ParseParenthesizedExpressionOrTupleLiteral()
 
                 'XML
                 Case SyntaxKind.LessThanToken,
@@ -280,7 +290,7 @@ Namespace Microsoft.CodeAnalysis.VisualBasic.Syntax.InternalSyntax
                     ' 6. end element without begin </
                     ' 7. error case <>, element missing name
 
-                    ' /* Dev10_427764 : Allow an implicit line continuation for XML after '(', e.g. foo(
+                    ' /* Dev10_427764 : Allow an implicit line continuation for XML after '(', e.g. goo(
 
                     Dim tokenHasFullWidthChars As Boolean = TokenContainsFullWidthChars(start)
 
@@ -424,7 +434,7 @@ Namespace Microsoft.CodeAnalysis.VisualBasic.Syntax.InternalSyntax
 
             ' Complex expressions such as "." or "!" qualified, etc are not allowed cond comp expressions.
             '
-            If Not m_EvaluatingConditionCompilationExpression Then
+            If Not _evaluatingConditionCompilationExpression Then
                 ' Valid suffixes are ".", "!", and "(". Everything else is considered
                 ' to end the term.
 
@@ -585,7 +595,7 @@ Namespace Microsoft.CodeAnalysis.VisualBasic.Syntax.InternalSyntax
                         ' Wrong arg count
                         Debug.Assert(Args.Count > 3)
 
-                        Dim withSeparators As SyntaxList(Of VisualBasicSyntaxNode) = Args.GetWithSeparators()
+                        Dim withSeparators As CodeAnalysis.Syntax.InternalSyntax.SyntaxList(Of VisualBasicSyntaxNode) = Args.GetWithSeparators()
                         Const firstNotUsedIndex As Integer = 5
 
                         Debug.Assert(withSeparators.Count > firstNotUsedIndex)
@@ -604,7 +614,7 @@ Namespace Microsoft.CodeAnalysis.VisualBasic.Syntax.InternalSyntax
                             GetArgumentAsExpression(Args(1)),
                             DirectCast(withSeparators(3), PunctuationSyntax),
                             GetArgumentAsExpression(Args(2)),
-                            Arguments.CloseParenToken.AddLeadingSyntax(SyntaxList.List(ArrayElement(Of VisualBasicSyntaxNode).MakeElementArray(leading)), ERRID.ERR_IllegalOperandInIIFCount))
+                            Arguments.CloseParenToken.AddLeadingSyntax(SyntaxList.List(ArrayElement(Of GreenNode).MakeElementArray(leading)), ERRID.ERR_IllegalOperandInIIFCount))
                 End Select
 
             Else
@@ -667,7 +677,7 @@ Namespace Microsoft.CodeAnalysis.VisualBasic.Syntax.InternalSyntax
             Dim openParen As PunctuationSyntax = Nothing
             TryGetTokenAndEatNewLine(SyntaxKind.OpenParenToken, openParen, createIfMissing:=True)
 
-            Dim nameOfName = ValidateNameOfArgument(ParseExpression(), isTopLevel:=True)
+            Dim nameOfName = ValidateNameOfArgument(ParseExpressionCore(), isTopLevel:=True)
 
             Dim closeParen As PunctuationSyntax = Nothing
             TryEatNewLineAndGetToken(SyntaxKind.CloseParenToken, closeParen, createIfMissing:=True)
@@ -765,7 +775,7 @@ Namespace Microsoft.CodeAnalysis.VisualBasic.Syntax.InternalSyntax
             Dim openParen As PunctuationSyntax = Nothing
             TryGetTokenAndEatNewLine(SyntaxKind.OpenParenToken, openParen, createIfMissing:=True)
 
-            Dim Operand = ParseExpression()
+            Dim Operand = ParseExpressionCore()
 
             Dim closeParen As PunctuationSyntax = Nothing
             TryEatNewLineAndGetToken(SyntaxKind.CloseParenToken, closeParen, createIfMissing:=True)
@@ -818,8 +828,8 @@ Namespace Microsoft.CodeAnalysis.VisualBasic.Syntax.InternalSyntax
                 ' for Dev10 compat we will let it slip through.
 
                 Dim IsArrayCreationExpression = False
-                Dim arrayModifiers As SyntaxList(Of ArrayRankSpecifierSyntax) = Nothing
-                If CurrentToken.Kind = SyntaxKind.OpenParenToken Then
+                Dim arrayModifiers As CodeAnalysis.Syntax.InternalSyntax.SyntaxList(Of ArrayRankSpecifierSyntax) = Nothing
+                If Me.CurrentToken.Kind = Global.Microsoft.CodeAnalysis.VisualBasic.SyntaxKind.OpenParenToken Then
                     ' Parse array modifiers
 
                     arrayModifiers = ParseArrayRankSpecifiers(ERRID.ERR_NoConstituentArraySizes)
@@ -917,7 +927,7 @@ Namespace Microsoft.CodeAnalysis.VisualBasic.Syntax.InternalSyntax
             ' Consume 'TypeOf'.
             GetNextToken()
 
-            Dim exp As ExpressionSyntax = ParseExpression(OperatorPrecedence.PrecedenceRelational) 'Dev10 uses ParseVariable
+            Dim exp As ExpressionSyntax = ParseExpressionCore(OperatorPrecedence.PrecedenceRelational) 'Dev10 uses ParseVariable
 
             If exp.ContainsDiagnostics Then
                 exp = ResyncAt(exp, SyntaxKind.IsKeyword, SyntaxKind.IsNotKeyword)
@@ -932,12 +942,15 @@ Namespace Microsoft.CodeAnalysis.VisualBasic.Syntax.InternalSyntax
 
                 operatorToken = DirectCast(current, KeywordSyntax)
 
+                If operatorToken.Kind = SyntaxKind.IsNotKeyword Then
+                    operatorToken = CheckFeatureAvailability(Feature.TypeOfIsNot, operatorToken)
+                End If
+
                 GetNextToken()
 
                 TryEatNewLine(ScannerState.VB)
             Else
                 operatorToken = DirectCast(HandleUnexpectedToken(SyntaxKind.IsKeyword), KeywordSyntax)
-                ReportSyntaxError(operatorToken, ERRID.ERR_MissingIsInTypeOf)
             End If
 
             Dim typeName = ParseGeneralType()
@@ -961,7 +974,7 @@ Namespace Microsoft.CodeAnalysis.VisualBasic.Syntax.InternalSyntax
         ' Lines: 16191 - 16191
         ' Expression* .Parser::ParseVariable( [ _Inout_ bool& ErrorInConstruct ] )
         Private Function ParseVariable() As ExpressionSyntax
-            Return ParseExpression(OperatorPrecedence.PrecedenceRelational)
+            Return ParseExpressionCore(OperatorPrecedence.PrecedenceRelational)
         End Function
 
         ' /*********************************************************************
@@ -1131,9 +1144,9 @@ Namespace Microsoft.CodeAnalysis.VisualBasic.Syntax.InternalSyntax
         ''' </summary>
         Private Function TransitionFromXmlToVB(Of T As VisualBasicSyntaxNode)(node As T) As T
             node = LastTokenReplacer.Replace(node, Function(token)
-                                                       Dim trivia = New SyntaxList(Of VisualBasicSyntaxNode)(token.GetTrailingTrivia())
-                                                       Dim toRemove As SyntaxList(Of VisualBasicSyntaxNode) = Nothing
-                                                       Dim toAdd As SyntaxList(Of VisualBasicSyntaxNode) = Nothing
+                                                       Dim trivia = New CodeAnalysis.Syntax.InternalSyntax.SyntaxList(Of VisualBasicSyntaxNode)(token.GetTrailingTrivia())
+                                                       Dim toRemove As CodeAnalysis.Syntax.InternalSyntax.SyntaxList(Of VisualBasicSyntaxNode) = Nothing
+                                                       Dim toAdd As CodeAnalysis.Syntax.InternalSyntax.SyntaxList(Of VisualBasicSyntaxNode) = Nothing
                                                        _scanner.TransitionFromXmlToVB(trivia, toRemove, toAdd)
                                                        trivia = trivia.GetStartOfTrivia(trivia.Count - toRemove.Count)
                                                        token = DirectCast(token.WithTrailingTrivia(trivia.Node), SyntaxToken)
@@ -1146,9 +1159,9 @@ Namespace Microsoft.CodeAnalysis.VisualBasic.Syntax.InternalSyntax
 
         Private Function TransitionFromVBToXml(Of T As VisualBasicSyntaxNode)(state As ScannerState, node As T) As T
             node = LastTokenReplacer.Replace(node, Function(token)
-                                                       Dim trivia = New SyntaxList(Of VisualBasicSyntaxNode)(token.GetTrailingTrivia())
-                                                       Dim toRemove As SyntaxList(Of VisualBasicSyntaxNode) = Nothing
-                                                       Dim toAdd As SyntaxList(Of VisualBasicSyntaxNode) = Nothing
+                                                       Dim trivia = New CodeAnalysis.Syntax.InternalSyntax.SyntaxList(Of VisualBasicSyntaxNode)(token.GetTrailingTrivia())
+                                                       Dim toRemove As CodeAnalysis.Syntax.InternalSyntax.SyntaxList(Of VisualBasicSyntaxNode) = Nothing
+                                                       Dim toAdd As CodeAnalysis.Syntax.InternalSyntax.SyntaxList(Of VisualBasicSyntaxNode) = Nothing
                                                        _scanner.TransitionFromVBToXml(state, trivia, toRemove, toAdd)
                                                        trivia = trivia.GetStartOfTrivia(trivia.Count - toRemove.Count)
                                                        token = DirectCast(token.WithTrailingTrivia(trivia.Node), SyntaxToken)
@@ -1206,21 +1219,87 @@ Namespace Microsoft.CodeAnalysis.VisualBasic.Syntax.InternalSyntax
             Return ReportSyntaxError(SyntaxFactory.XmlName(Nothing, SyntaxFactory.XmlNameToken("", SyntaxKind.XmlNameToken, Nothing, Nothing)), ERRID.ERR_ExpectedXmlName)
         End Function
 
-        ' File: Parser.cpp
-        ' Lines: 1501 - 1501
-        ' Expression* .Parser::ParseParenthesizedExpression( [ _Inout_ bool& ErrorInConstruct ] )
-        Private Function ParseParenthesizedExpression() As ParenthesizedExpressionSyntax
+        Private Function ParseParenthesizedExpressionOrTupleLiteral() As ExpressionSyntax
             Debug.Assert(CurrentToken.Kind = SyntaxKind.OpenParenToken)
 
-            ' "(" expr ")"
+            ' "(" expr ")"              'parenthesized
+            ' "(" Name:= ....           'parse a tuple
+            ' "(" expr, ....            'parse a tuple
+
             Dim openParen As PunctuationSyntax = Nothing
             TryGetTokenAndEatNewLine(SyntaxKind.OpenParenToken, openParen)
-            Dim Operand = ParseExpression()
+
+            If (CurrentToken.Kind = SyntaxKind.IdentifierToken AndAlso
+                PeekToken(1).Kind = SyntaxKind.ColonEqualsToken) Then
+
+                Dim argumentName = ParseIdentifierNameAllowingKeyword()
+                Dim colonEquals As PunctuationSyntax = Nothing
+                TryGetTokenAndEatNewLine(SyntaxKind.ColonEqualsToken, colonEquals)
+
+                Dim nameColonEquals = SyntaxFactory.NameColonEquals(argumentName, colonEquals)
+                Dim firstArgument = SyntaxFactory.SimpleArgument(nameColonEquals, ParseExpressionCore())
+
+                Return ParseTheRestOfTupleLiteral(openParen, firstArgument)
+            End If
+
+            Dim operand = ParseExpressionCore()
+
+            If (CurrentToken.Kind = SyntaxKind.CommaToken) Then
+                Dim firstArgument = SyntaxFactory.SimpleArgument(nameColonEquals:=Nothing, expression:=operand)
+
+                Return ParseTheRestOfTupleLiteral(openParen, firstArgument)
+            End If
 
             Dim closeParen As PunctuationSyntax = Nothing
             TryEatNewLineAndGetToken(SyntaxKind.CloseParenToken, closeParen, createIfMissing:=True)
 
-            Return SyntaxFactory.ParenthesizedExpression(openParen, Operand, closeParen)
+            Return SyntaxFactory.ParenthesizedExpression(openParen, operand, closeParen)
+        End Function
+
+        Private Function ParseTheRestOfTupleLiteral(openParen As PunctuationSyntax, firstArgument As SimpleArgumentSyntax) As TupleExpressionSyntax
+
+            Dim argumentBuilder = _pool.AllocateSeparated(Of SimpleArgumentSyntax)()
+            argumentBuilder.Add(firstArgument)
+
+            While CurrentToken.Kind = SyntaxKind.CommaToken
+                Dim commaToken As PunctuationSyntax = Nothing
+                TryGetTokenAndEatNewLine(SyntaxKind.CommaToken, commaToken)
+
+                argumentBuilder.AddSeparator(commaToken)
+                Dim nameColonEquals As NameColonEqualsSyntax = Nothing
+
+                If (CurrentToken.Kind = SyntaxKind.IdentifierToken AndAlso
+                    PeekToken(1).Kind = SyntaxKind.ColonEqualsToken) Then
+
+                    Dim argumentName = ParseIdentifierNameAllowingKeyword()
+                    Dim colonEquals As PunctuationSyntax = Nothing
+                    TryGetTokenAndEatNewLine(SyntaxKind.ColonEqualsToken, colonEquals)
+
+                    nameColonEquals = SyntaxFactory.NameColonEquals(argumentName, colonEquals)
+                End If
+
+                Dim argument = SyntaxFactory.SimpleArgument(nameColonEquals, ParseExpressionCore())
+                argumentBuilder.Add(argument)
+            End While
+
+            Dim closeParen As PunctuationSyntax = Nothing
+            TryEatNewLineAndGetToken(SyntaxKind.CloseParenToken, closeParen, createIfMissing:=True)
+
+            If argumentBuilder.Count < 2 Then
+                argumentBuilder.AddSeparator(InternalSyntaxFactory.MissingToken(SyntaxKind.CommaToken))
+
+                Dim missing = SyntaxFactory.IdentifierName(InternalSyntaxFactory.MissingIdentifier())
+                missing = ReportSyntaxError(missing, ERRID.ERR_TupleTooFewElements)
+                argumentBuilder.Add(SyntaxFactory.SimpleArgument(nameColonEquals:=Nothing, expression:=missing))
+            End If
+
+            Dim arguments = argumentBuilder.ToList
+            _pool.Free(argumentBuilder)
+
+            Dim tupleExpression = SyntaxFactory.TupleExpression(openParen, arguments, closeParen)
+
+            tupleExpression = CheckFeatureAvailability(Feature.Tuples, tupleExpression)
+            Return tupleExpression
         End Function
 
         ' Parse an argument list enclosed in parentheses.
@@ -1228,18 +1307,18 @@ Namespace Microsoft.CodeAnalysis.VisualBasic.Syntax.InternalSyntax
         ' File: Parser.cpp
         ' Lines: 16304 - 16304
         ' ParenthesizedArgumentList .Parser::ParseParenthesizedArguments( [ _Inout_ bool& ErrorInConstruct ] )
-        Friend Function ParseParenthesizedArguments(Optional RedimOrNewParent As Boolean = False) As ArgumentListSyntax
+        Friend Function ParseParenthesizedArguments(Optional RedimOrNewParent As Boolean = False, Optional attributeListParent As Boolean = False) As ArgumentListSyntax
             Debug.Assert(CurrentToken.Kind = SyntaxKind.OpenParenToken, "should be at tkLParen.")
 
-            Dim arguments As SeparatedSyntaxList(Of ArgumentSyntax) = Nothing
+            Dim arguments As CodeAnalysis.Syntax.InternalSyntax.SeparatedSyntaxList(Of ArgumentSyntax) = Nothing
             Dim openParen As PunctuationSyntax = Nothing
             Dim closeParen As PunctuationSyntax = Nothing
 
             Debug.Assert(CurrentToken.Kind = SyntaxKind.OpenParenToken)
             TryGetTokenAndEatNewLine(SyntaxKind.OpenParenToken, openParen)
 
-            Dim unexpected As VisualBasicSyntaxNode = Nothing
-            arguments = ParseArguments(unexpected, RedimOrNewParent)
+            Dim unexpected As GreenNode = Nothing
+            arguments = ParseArguments(unexpected, RedimOrNewParent, attributeListParent)
 
             If Not TryEatNewLineAndGetToken(SyntaxKind.CloseParenToken, closeParen, createIfMissing:=False) Then
                 ' On error, peek for ")" with "(". If ")" seen before
@@ -1308,66 +1387,81 @@ Namespace Microsoft.CodeAnalysis.VisualBasic.Syntax.InternalSyntax
         ' Lines: 16425 - 16425
         ' .Parser::ParseArguments( [ _In_ ParseTree::ArgumentList** Target ] [ _Inout_ bool& ErrorInConstruct ] )
 
-        Private Function ParseArguments(ByRef unexpected As VisualBasicSyntaxNode, Optional RedimOrNewParent As Boolean = False) As SeparatedSyntaxList(Of ArgumentSyntax)
+        Private Function ParseArguments(ByRef unexpected As GreenNode, Optional RedimOrNewParent As Boolean = False, Optional attributeListParent As Boolean = False) As CodeAnalysis.Syntax.InternalSyntax.SeparatedSyntaxList(Of ArgumentSyntax)
             Dim arguments = _pool.AllocateSeparated(Of ArgumentSyntax)()
 
-            Do
-                ' Check for the first keyword argument.
+            Dim allowNonTrailingNamedArguments = _scanner.Options.LanguageVersion.AllowNonTrailingNamedArguments()
+            Dim seenNames As Boolean = False
 
+            Do
+                Dim isNamed As Boolean = False
                 If (CurrentToken.Kind = SyntaxKind.IdentifierToken OrElse CurrentToken.IsKeyword()) AndAlso
                     PeekToken(1).Kind = SyntaxKind.ColonEqualsToken Then
 
-                    ParseNamedArguments(arguments)
-                    Exit Do
-
+                    seenNames = True
+                    isNamed = True
                 End If
 
                 Dim comma As PunctuationSyntax = Nothing
+                If isNamed Then
 
-                Select Case CurrentToken.Kind
-                    Case SyntaxKind.CommaToken
-                        TryGetTokenAndEatNewLine(SyntaxKind.CommaToken, comma)
-                        arguments.Add(InternalSyntaxFactory.OmittedArgument())
-                        arguments.AddSeparator(comma)
-                        Continue Do
-
-                    Case SyntaxKind.CloseParenToken
-                        If arguments.Count > 0 Then
-                            arguments.Add(InternalSyntaxFactory.OmittedArgument())
-                        End If
+                    If attributeListParent Then
+                        ParseNamedArguments(arguments)
                         Exit Do
+                    End If
 
-                    Case Else
-                        Dim argument = ParseArgument(RedimOrNewParent)
+                    Dim argumentName As IdentifierNameSyntax = ParseIdentifierNameAllowingKeyword()
+                    Dim colonEquals As PunctuationSyntax = Nothing
+                    TryGetTokenAndEatNewLine(SyntaxKind.ColonEqualsToken, colonEquals)
+                    Dim namedArgument = SyntaxFactory.SimpleArgument(SyntaxFactory.NameColonEquals(argumentName, colonEquals), ParseExpressionCore())
+                    arguments.Add(namedArgument)
+
+                ElseIf CurrentToken.Kind = SyntaxKind.CommaToken Then
+                    TryGetTokenAndEatNewLine(SyntaxKind.CommaToken, comma)
+
+                    Dim argument = ReportNonTrailingNamedArgumentIfNeeded(InternalSyntaxFactory.OmittedArgument(), seenNames, allowNonTrailingNamedArguments)
+                    arguments.Add(argument)
+                    arguments.AddSeparator(comma)
+                    Continue Do
+
+                ElseIf CurrentToken.Kind = SyntaxKind.CloseParenToken Then
+                    If arguments.Count > 0 Then
+                        Dim argument = ReportNonTrailingNamedArgumentIfNeeded(InternalSyntaxFactory.OmittedArgument(), seenNames, allowNonTrailingNamedArguments)
                         arguments.Add(argument)
+                    End If
+                    Exit Do
 
-                        If TryGetTokenAndEatNewLine(SyntaxKind.CommaToken, comma) Then
-                            arguments.AddSeparator(comma)
-                            Continue Do
+                Else
+                    Dim argument = ParseArgument(RedimOrNewParent)
+                    argument = ReportNonTrailingNamedArgumentIfNeeded(argument, seenNames, allowNonTrailingNamedArguments)
+                    arguments.Add(argument)
+                End If
 
-                        ElseIf CurrentToken.Kind = SyntaxKind.CloseParenToken OrElse MustEndStatement(CurrentToken) Then
-                            Exit Do
+                If TryGetTokenAndEatNewLine(SyntaxKind.CommaToken, comma) Then
+                    arguments.AddSeparator(comma)
+                    Continue Do
 
-                        Else
-                            ' There is a syntax error of some kind.
+                ElseIf CurrentToken.Kind = SyntaxKind.CloseParenToken OrElse MustEndStatement(CurrentToken) Then
+                    Exit Do
 
-                            Dim skipped = ResyncAt({SyntaxKind.CommaToken, SyntaxKind.CloseParenToken}).Node
-                            If skipped IsNot Nothing Then
-                                skipped = ReportSyntaxError(skipped, ERRID.ERR_ArgumentSyntax)
-                            End If
+                Else
+                    ' There is a syntax error of some kind.
 
-                            If CurrentToken.Kind = SyntaxKind.CommaToken Then
-                                comma = DirectCast(CurrentToken, PunctuationSyntax)
-                                comma = comma.AddLeadingSyntax(skipped)
-                                arguments.AddSeparator(comma)
-                                GetNextToken()
-                            Else
-                                unexpected = skipped
-                                Exit Do
-                            End If
-                        End If
+                    Dim skipped = ResyncAt({SyntaxKind.CommaToken, SyntaxKind.CloseParenToken}).Node
+                    If skipped IsNot Nothing Then
+                        skipped = ReportSyntaxError(skipped, ERRID.ERR_ArgumentSyntax)
+                    End If
 
-                End Select
+                    If CurrentToken.Kind = SyntaxKind.CommaToken Then
+                        comma = DirectCast(CurrentToken, PunctuationSyntax)
+                        comma = comma.AddLeadingSyntax(skipped)
+                        arguments.AddSeparator(comma)
+                        GetNextToken()
+                    Else
+                        unexpected = skipped
+                        Exit Do
+                    End If
+                End If
 
             Loop
 
@@ -1375,6 +1469,16 @@ Namespace Microsoft.CodeAnalysis.VisualBasic.Syntax.InternalSyntax
             _pool.Free(arguments)
             Return result
 
+        End Function
+
+        ''' <summary>After VB15.5 it is possible to use named arguments in non-trailing position, except in attribute lists (where it remains disallowed)</summary>
+        Private Shared Function ReportNonTrailingNamedArgumentIfNeeded(argument As ArgumentSyntax, seenNames As Boolean, allowNonTrailingNamedArguments As Boolean) As ArgumentSyntax
+            If Not seenNames OrElse allowNonTrailingNamedArguments Then
+                Return argument
+            End If
+
+            Return ReportSyntaxError(argument, ERRID.ERR_ExpectedNamedArgument,
+                    New VisualBasicRequiredLanguageVersion(Feature.NonTrailingNamedArguments.GetLanguageVersion()))
         End Function
 
         ' Parse a list of comma-separated keyword arguments.
@@ -1395,7 +1499,7 @@ Namespace Microsoft.CodeAnalysis.VisualBasic.Syntax.InternalSyntax
                 If (CurrentToken.Kind = SyntaxKind.IdentifierToken OrElse CurrentToken.IsKeyword()) AndAlso
                     PeekToken(1).Kind = SyntaxKind.ColonEqualsToken Then
 
-                    argumentName = SyntaxFactory.IdentifierName(ParseIdentifierAllowingKeyword())
+                    argumentName = ParseIdentifierNameAllowingKeyword()
                     TryGetTokenAndEatNewLine(SyntaxKind.ColonEqualsToken, colonEquals)
                 Else
                     argumentName = SyntaxFactory.IdentifierName(InternalSyntaxFactory.MissingIdentifier())
@@ -1404,10 +1508,10 @@ Namespace Microsoft.CodeAnalysis.VisualBasic.Syntax.InternalSyntax
                 End If
 
                 If hasError Then
-                    argumentName = ReportSyntaxError(argumentName, ERRID.ERR_ExpectedNamedArgument)
+                    argumentName = ReportSyntaxError(argumentName, ERRID.ERR_ExpectedNamedArgumentInAttributeList)
                 End If
 
-                Dim namedArgument = SyntaxFactory.SimpleArgument(SyntaxFactory.NameColonEquals(argumentName, colonEquals), ParseExpression())
+                Dim namedArgument = SyntaxFactory.SimpleArgument(SyntaxFactory.NameColonEquals(argumentName, colonEquals), ParseExpressionCore())
 
                 If CurrentToken.Kind <> SyntaxKind.CommaToken Then
                     If CurrentToken.Kind = SyntaxKind.CloseParenToken OrElse MustEndStatement(CurrentToken) Then
@@ -1443,7 +1547,7 @@ Namespace Microsoft.CodeAnalysis.VisualBasic.Syntax.InternalSyntax
         Private Function ParseArgument(Optional RedimOrNewParent As Boolean = False) As ArgumentSyntax
             Dim argument As ArgumentSyntax
 
-            Dim value As ExpressionSyntax = ParseExpression(OperatorPrecedence.PrecedenceNone)
+            Dim value As ExpressionSyntax = ParseExpressionCore(OperatorPrecedence.PrecedenceNone)
 
             If value.ContainsDiagnostics Then
                 value = ResyncAt(value, SyntaxKind.CommaToken, SyntaxKind.CloseParenToken)
@@ -1454,7 +1558,7 @@ Namespace Microsoft.CodeAnalysis.VisualBasic.Syntax.InternalSyntax
                 Dim lowerBound As ExpressionSyntax = value
 
                 GetNextToken() ' consume tkTO
-                value = ParseExpression(OperatorPrecedence.PrecedenceNone)
+                value = ParseExpressionCore(OperatorPrecedence.PrecedenceNone)
 
                 ' Check that lower bound is equal to 0 moved to binder.
 
@@ -1492,7 +1596,7 @@ Namespace Microsoft.CodeAnalysis.VisualBasic.Syntax.InternalSyntax
 
             TryGetTokenAndEatNewLine(SyntaxKind.OpenParenToken, openParen, createIfMissing:=True)
 
-            Dim exp As ExpressionSyntax = ParseExpression(OperatorPrecedence.PrecedenceNone)
+            Dim exp As ExpressionSyntax = ParseExpressionCore(OperatorPrecedence.PrecedenceNone)
 
             If exp.ContainsDiagnostics Then
                 exp = ResyncAt(exp, SyntaxKind.CommaToken, SyntaxKind.CloseParenToken)
@@ -1530,7 +1634,7 @@ Namespace Microsoft.CodeAnalysis.VisualBasic.Syntax.InternalSyntax
 
         Private Function ParseFunctionOrSubLambdaHeader(<Out> ByRef isMultiLine As Boolean, Optional parseModifiers As Boolean = False) As LambdaHeaderSyntax
 
-            Dim modifiers As SyntaxList(Of KeywordSyntax)
+            Dim modifiers As CodeAnalysis.Syntax.InternalSyntax.SyntaxList(Of KeywordSyntax)
 
             Dim save_isInMethodDeclarationHeader As Boolean = _isInMethodDeclarationHeader
             _isInMethodDeclarationHeader = True
@@ -1562,7 +1666,7 @@ Namespace Microsoft.CodeAnalysis.VisualBasic.Syntax.InternalSyntax
 
             Dim genericParams As TypeParameterListSyntax = Nothing
             Dim openParen As PunctuationSyntax = Nothing
-            Dim params As SeparatedSyntaxList(Of ParameterSyntax) = Nothing
+            Dim params As CodeAnalysis.Syntax.InternalSyntax.SeparatedSyntaxList(Of ParameterSyntax) = Nothing
             Dim closeParen As PunctuationSyntax = Nothing
 
             isMultiLine = False
@@ -1586,12 +1690,12 @@ Namespace Microsoft.CodeAnalysis.VisualBasic.Syntax.InternalSyntax
             End If
 
             Dim asClause As SimpleAsClauseSyntax = Nothing
-            Dim returnTypeAttributes As SyntaxList(Of AttributeListSyntax) = Nothing
+            Dim returnTypeAttributes As CodeAnalysis.Syntax.InternalSyntax.SyntaxList(Of AttributeListSyntax) = Nothing
 
             Dim asKeyword As KeywordSyntax = Nothing
 
             ' Check the return type.
-            ' Parse the as clause if one exists even if this is a sub. This aids in error reocovery situations. Otherwise,
+            ' Parse the as clause if one exists even if this is a sub. This aids in error recovery situations. Otherwise,
             ' Sub () as integer 
             ' becomes a single line sub lambda.
             If CurrentToken.Kind = SyntaxKind.AsKeyword Then
@@ -1654,7 +1758,7 @@ Namespace Microsoft.CodeAnalysis.VisualBasic.Syntax.InternalSyntax
 
                 value = SyntaxFactory.SingleLineLambdaExpression(SyntaxKind.SingleLineFunctionLambdaExpression,
                                                           header,
-                                                          ParseExpression())
+                                                          ParseExpressionCore())
                 value = AdjustTriviaForMissingTokens(value)
                 If header.Modifiers.Any(SyntaxKind.IteratorKeyword) Then
                     value = Parser.ReportSyntaxError(value, ERRID.ERR_BadIteratorExpressionLambda)
@@ -1760,7 +1864,7 @@ Namespace Microsoft.CodeAnalysis.VisualBasic.Syntax.InternalSyntax
         ' Lines: 16738 - 16738
         ' ExpressionList* .Parser::ParseVariableList( [ _Inout_ bool& ErrorInConstruct ] )
 
-        Private Function ParseVariableList() As SeparatedSyntaxList(Of ExpressionSyntax)
+        Private Function ParseVariableList() As CodeAnalysis.Syntax.InternalSyntax.SeparatedSyntaxList(Of ExpressionSyntax)
 
             Dim variables As SeparatedSyntaxListBuilder(Of ExpressionSyntax) = Me._pool.AllocateSeparated(Of ExpressionSyntax)()
 

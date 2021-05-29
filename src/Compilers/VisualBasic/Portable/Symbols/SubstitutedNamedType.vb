@@ -1,10 +1,13 @@
-﻿' Copyright (c) Microsoft.  All Rights Reserved.  Licensed under the Apache License, Version 2.0.  See License.txt in the project root for license information.
+﻿' Licensed to the .NET Foundation under one or more agreements.
+' The .NET Foundation licenses this file to you under the MIT license.
+' See the LICENSE file in the project root for more information.
 
 Imports System.Collections.Generic
 Imports System.Collections.Immutable
 Imports System.Globalization
 Imports System.Runtime.InteropServices
 Imports System.Threading
+Imports Microsoft.CodeAnalysis.PooledObjects
 Imports Microsoft.CodeAnalysis.Text
 Imports Microsoft.CodeAnalysis.VisualBasic.Symbols
 Imports Microsoft.CodeAnalysis.VisualBasic.Syntax
@@ -26,7 +29,9 @@ Namespace Microsoft.CodeAnalysis.VisualBasic.Symbols
         Private ReadOnly _substitution As TypeSubstitution
 
         Private Sub New(substitution As TypeSubstitution)
-            Debug.Assert(substitution IsNot Nothing AndAlso substitution.TargetGenericDefinition.IsDefinition)
+            Debug.Assert(substitution IsNot Nothing)
+            Debug.Assert(substitution.TargetGenericDefinition.IsDefinition)
+            Debug.Assert(TypeOf substitution.TargetGenericDefinition Is InstanceTypeSymbol) ' Required to ensure symmetrical equality
             _substitution = substitution
         End Sub
 
@@ -60,7 +65,7 @@ Namespace Microsoft.CodeAnalysis.VisualBasic.Symbols
             End Get
         End Property
 
-        Friend NotOverridable Overrides ReadOnly Property IsSerializable As Boolean
+        Public NotOverridable Overrides ReadOnly Property IsSerializable As Boolean
             Get
                 Return OriginalDefinition.IsSerializable
             End Get
@@ -138,9 +143,15 @@ Namespace Microsoft.CodeAnalysis.VisualBasic.Symbols
             End Get
         End Property
 
-        Friend NotOverridable Overrides ReadOnly Property HasEmbeddedAttribute As Boolean
+        Friend NotOverridable Overrides ReadOnly Property HasCodeAnalysisEmbeddedAttribute As Boolean
             Get
-                Return OriginalDefinition.HasEmbeddedAttribute
+                Return OriginalDefinition.HasCodeAnalysisEmbeddedAttribute
+            End Get
+        End Property
+
+        Friend NotOverridable Overrides ReadOnly Property HasVisualBasicEmbeddedAttribute As Boolean
+            Get
+                Return OriginalDefinition.HasVisualBasicEmbeddedAttribute
             End Get
         End Property
 
@@ -232,11 +243,11 @@ Namespace Microsoft.CodeAnalysis.VisualBasic.Symbols
             End Get
         End Property
 
-        Friend NotOverridable Overrides Function MakeDeclaredBase(basesBeingResolved As ConsList(Of Symbol), diagnostics As DiagnosticBag) As NamedTypeSymbol
-            Return DirectCast(OriginalDefinition.GetDeclaredBase(basesBeingResolved).InternalSubstituteTypeParameters(_substitution), NamedTypeSymbol)
+        Friend NotOverridable Overrides Function MakeDeclaredBase(basesBeingResolved As BasesBeingResolved, diagnostics As BindingDiagnosticBag) As NamedTypeSymbol
+            Return DirectCast(OriginalDefinition.GetDeclaredBase(basesBeingResolved).InternalSubstituteTypeParameters(_substitution).AsTypeSymbolOnly(), NamedTypeSymbol)
         End Function
 
-        Friend NotOverridable Overrides Function MakeDeclaredInterfaces(basesBeingResolved As ConsList(Of Symbol), diagnostics As DiagnosticBag) As ImmutableArray(Of NamedTypeSymbol)
+        Friend NotOverridable Overrides Function MakeDeclaredInterfaces(basesBeingResolved As BasesBeingResolved, diagnostics As BindingDiagnosticBag) As ImmutableArray(Of NamedTypeSymbol)
             Dim instanceInterfaces = OriginalDefinition.GetDeclaredInterfacesNoUseSiteDiagnostics(basesBeingResolved)
 
             If instanceInterfaces.Length = 0 Then
@@ -246,7 +257,7 @@ Namespace Microsoft.CodeAnalysis.VisualBasic.Symbols
                 Dim substitutedInterfaces = New NamedTypeSymbol(instanceInterfaces.Length - 1) {}
 
                 For i As Integer = 0 To instanceInterfaces.Length - 1 Step 1
-                    substitutedInterfaces(i) = DirectCast(instanceInterfaces(i).InternalSubstituteTypeParameters(_substitution), NamedTypeSymbol)
+                    substitutedInterfaces(i) = DirectCast(instanceInterfaces(i).InternalSubstituteTypeParameters(_substitution).AsTypeSymbolOnly(), NamedTypeSymbol)
                 Next
 
                 Return substitutedInterfaces.AsImmutableOrNull
@@ -254,17 +265,17 @@ Namespace Microsoft.CodeAnalysis.VisualBasic.Symbols
 
         End Function
 
-        Friend NotOverridable Overrides Function MakeAcyclicBaseType(diagnostics As DiagnosticBag) As NamedTypeSymbol
+        Friend NotOverridable Overrides Function MakeAcyclicBaseType(diagnostics As BindingDiagnosticBag) As NamedTypeSymbol
             Dim fullBase = OriginalDefinition.BaseTypeNoUseSiteDiagnostics
 
             If fullBase IsNot Nothing Then
-                Return DirectCast(fullBase.InternalSubstituteTypeParameters(_substitution), NamedTypeSymbol)
+                Return DirectCast(fullBase.InternalSubstituteTypeParameters(_substitution).AsTypeSymbolOnly(), NamedTypeSymbol)
             End If
 
             Return Nothing
         End Function
 
-        Friend NotOverridable Overrides Function MakeAcyclicInterfaces(diagnostics As DiagnosticBag) As ImmutableArray(Of NamedTypeSymbol)
+        Friend NotOverridable Overrides Function MakeAcyclicInterfaces(diagnostics As BindingDiagnosticBag) As ImmutableArray(Of NamedTypeSymbol)
             Dim instanceInterfaces = OriginalDefinition.InterfacesNoUseSiteDiagnostics
 
             If instanceInterfaces.Length = 0 Then
@@ -274,7 +285,7 @@ Namespace Microsoft.CodeAnalysis.VisualBasic.Symbols
                 Dim substitutedInterfaces = New NamedTypeSymbol(instanceInterfaces.Length - 1) {}
 
                 For i As Integer = 0 To instanceInterfaces.Length - 1 Step 1
-                    substitutedInterfaces(i) = DirectCast(instanceInterfaces(i).InternalSubstituteTypeParameters(_substitution), NamedTypeSymbol)
+                    substitutedInterfaces(i) = DirectCast(instanceInterfaces(i).InternalSubstituteTypeParameters(_substitution).AsTypeSymbolOnly(), NamedTypeSymbol)
                 Next
 
                 Return substitutedInterfaces.AsImmutableOrNull()
@@ -423,7 +434,7 @@ Namespace Microsoft.CodeAnalysis.VisualBasic.Symbols
         ' Given a member from the original type of this type, substitute into it and get the corresponding member in this type.
         Friend Function GetMemberForDefinition(member As Symbol) As Symbol
             Debug.Assert(member.IsDefinition)
-            Debug.Assert(member.ContainingType = Me.OriginalDefinition)
+            Debug.Assert(TypeSymbol.Equals(member.ContainingType, Me.OriginalDefinition, TypeCompareKind.ConsiderEverything))
 
             Return SubstituteTypeParametersInMember(member)
         End Function
@@ -482,26 +493,42 @@ Namespace Microsoft.CodeAnalysis.VisualBasic.Symbols
             End Select
         End Function
 
-        Public Overrides Function GetHashCode() As Integer
-            Dim _hash As Integer = OriginalDefinition.GetHashCode()
-            _hash = Hash.Combine(ContainingType, _hash)
+        Public NotOverridable Overrides Function GetHashCode() As Integer
+            Dim hash As Integer = OriginalDefinition.GetHashCode()
+            If Me._substitution.WasConstructedForModifiers() Then
+                Return hash
+            End If
+
+            hash = Roslyn.Utilities.Hash.Combine(ContainingType, hash)
 
             ' There is a circularity problem here with alpha-renamed type parameters.
             ' Calculating GetHashCode for them calls back into container's GetHashCode.
-            ' Do not ask for hash code of type arguments here, derived classes 
-            ' override this function and do that when appropriate. 
-            Return _hash
+            If Me IsNot Me.ConstructedFrom Then
+                For Each typeArgument In TypeArgumentsNoUseSiteDiagnostics
+                    hash = Roslyn.Utilities.Hash.Combine(typeArgument, hash)
+                Next
+            End If
+
+            Return hash
         End Function
 
-        Public MustOverride Overrides Function Equals(obj As Object) As Boolean
-
-        ''' <summary>
-        ''' Compare SubstitutedNamedTypes with no regard to type arguments.
-        ''' </summary>
-        Private Function EqualsWithNoRegardToTypeArguments(Of T As SubstitutedNamedType)(other As T) As Boolean
+        Public NotOverridable Overrides Function Equals(other As TypeSymbol, comparison As TypeCompareKind) As Boolean
+            If other Is Me Then
+                Return True
+            End If
 
             If other Is Nothing Then
                 Return False
+            End If
+
+            If (comparison And TypeCompareKind.AllIgnoreOptionsForVB) = 0 AndAlso
+               Not Me.GetType().Equals(other.GetType()) Then
+                Return False
+            End If
+
+            Dim otherTuple = TryCast(other, TupleTypeSymbol)
+            If otherTuple IsNot Nothing Then
+                Return otherTuple.Equals(Me, comparison)
             End If
 
             If Not OriginalDefinition.Equals(other.OriginalDefinition) Then
@@ -511,22 +538,42 @@ Namespace Microsoft.CodeAnalysis.VisualBasic.Symbols
             Dim containingType = Me.ContainingType
 
             If containingType IsNot Nothing AndAlso
-                Not containingType.Equals(other.ContainingType) Then
+               Not containingType.Equals(other.ContainingType, comparison) Then
                 Return False
             End If
 
-            ' There is a circularity problem here with alpha-renamed type parameters.
-            ' Equals for them calls back into container's Equals.
-            ' Do not compare type arguments here, derived classes 
-            ' override Equals and do that when appropriate. 
+            Dim otherNamed = DirectCast(other, NamedTypeSymbol)
+
+            If Me Is Me.ConstructedFrom AndAlso otherNamed Is otherNamed.ConstructedFrom Then
+                ' No need to compare type arguments on those containers when they didn't add type arguments.
+                ' That would cause cycles because Equals for them calls back into container's Equals.
+                Return True
+            End If
+
+            Dim arguments = TypeArgumentsNoUseSiteDiagnostics
+            Dim otherArguments = otherNamed.TypeArgumentsNoUseSiteDiagnostics
+            Dim count As Integer = arguments.Length
+
+            For i As Integer = 0 To count - 1 Step 1
+                If Not arguments(i).Equals(otherArguments(i), comparison) Then
+                    Return False
+                End If
+            Next
+
+            If (comparison And TypeCompareKind.IgnoreCustomModifiersAndArraySizesAndLowerBounds) = 0 AndAlso
+               Not HasSameTypeArgumentCustomModifiers(Me, otherNamed) Then
+
+                Return False
+            End If
+
             Return True
         End Function
 
-        Friend Overrides Function GetDirectBaseTypeNoUseSiteDiagnostics(basesBeingResolved As ConsList(Of Symbol)) As NamedTypeSymbol
+        Friend Overrides Function GetDirectBaseTypeNoUseSiteDiagnostics(basesBeingResolved As BasesBeingResolved) As NamedTypeSymbol
             Dim fullBase = OriginalDefinition.GetDirectBaseTypeNoUseSiteDiagnostics(basesBeingResolved)
 
             If fullBase IsNot Nothing Then
-                Return DirectCast(fullBase.InternalSubstituteTypeParameters(_substitution), NamedTypeSymbol)
+                Return DirectCast(fullBase.InternalSubstituteTypeParameters(_substitution).AsTypeSymbolOnly(), NamedTypeSymbol)
             End If
 
             Return Nothing
@@ -534,6 +581,12 @@ Namespace Microsoft.CodeAnalysis.VisualBasic.Symbols
 
         Public Overrides Function GetDocumentationCommentXml(Optional preferredCulture As CultureInfo = Nothing, Optional expandIncludes As Boolean = False, Optional cancellationToken As CancellationToken = Nothing) As String
             Return OriginalDefinition.GetDocumentationCommentXml(preferredCulture, expandIncludes, cancellationToken)
+        End Function
+
+        Friend NotOverridable Overrides Iterator Function GetSynthesizedWithEventsOverrides() As IEnumerable(Of PropertySymbol)
+            For Each definition In OriginalDefinition.GetSynthesizedWithEventsOverrides()
+                Yield SubstituteTypeParametersForMemberProperty(definition)
+            Next
         End Function
 
         ''' <summary>
@@ -627,8 +680,7 @@ Namespace Microsoft.CodeAnalysis.VisualBasic.Symbols
                 ' alpha-renamed type parameters.
                 Debug.Assert(container.TypeSubstitution IsNot Nothing AndAlso
                              container.TypeSubstitution.TargetGenericDefinition Is fullInstanceType.ContainingSymbol)
-                Dim substitution = VisualBasic.Symbols.TypeSubstitution.CreateForAlphaRename(container.TypeSubstitution,
-                                                                         StaticCast(Of TypeParameterSymbol).From(newTypeParameters))
+                Dim substitution = VisualBasic.Symbols.TypeSubstitution.CreateForAlphaRename(container.TypeSubstitution, newTypeParameters)
                 Debug.Assert(substitution.TargetGenericDefinition Is fullInstanceType)
 
                 ' Now create the symbol.
@@ -660,6 +712,16 @@ Namespace Microsoft.CodeAnalysis.VisualBasic.Symbols
             Friend Overrides ReadOnly Property TypeArgumentsNoUseSiteDiagnostics As ImmutableArray(Of TypeSymbol)
                 Get
                     Return StaticCast(Of TypeSymbol).From(TypeParameters)
+                End Get
+            End Property
+
+            Public NotOverridable Overrides Function GetTypeArgumentCustomModifiers(ordinal As Integer) As ImmutableArray(Of CustomModifier)
+                Return GetEmptyTypeArgumentCustomModifiers(ordinal)
+            End Function
+
+            Friend NotOverridable Overrides ReadOnly Property HasTypeArgumentsCustomModifiers As Boolean
+                Get
+                    Return False
                 End Get
             End Property
 
@@ -713,7 +775,7 @@ Namespace Microsoft.CodeAnalysis.VisualBasic.Symbols
             ''' !!! Only code implementing construction of generic types is allowed to call this method !!!
             ''' !!! All other code should use Construct methods.                                        !!! 
             ''' </summary>
-            Friend Overrides Function InternalSubstituteTypeParameters(additionalSubstitution As TypeSubstitution) As TypeSymbol
+            Friend Overrides Function InternalSubstituteTypeParameters(additionalSubstitution As TypeSubstitution) As TypeWithModifiers
 
                 ' I do not believe it is ever valid to do this operation on an open generic type.
                 ' However, just in case later we discover that it is valid, I'll leave commented out 
@@ -740,7 +802,7 @@ Namespace Microsoft.CodeAnalysis.VisualBasic.Symbols
                 '        End If
 
                 '        ' My type parameters are substituted
-                '        Dim substitution As TypeSubstitution = additionalSubstitutionForMe.AddjustParent(Nothing)
+                '        Dim substitution As TypeSubstitution = additionalSubstitutionForMe.AdjustParent(Nothing)
 
                 '        Return New ConstructedInstanceType(_fullInstanceType, substitution)
                 '    End If
@@ -755,17 +817,9 @@ Namespace Microsoft.CodeAnalysis.VisualBasic.Symbols
                 '    Return constructFrom
                 'Else
                 '    ' My type parameters are substituted
-                '    Dim substitution As TypeSubstitution = additionalSubstitutionForMe.AddjustParent(newContainer.TypeSubstitution)
+                '    Dim substitution As TypeSubstitution = additionalSubstitutionForMe.AdjustParent(newContainer.TypeSubstitution)
                 '    Return New ConstructedSpecializedGenericType(constructFrom, substitution)
                 'End If
-            End Function
-
-            Public Overrides Function Equals(obj As Object) As Boolean
-                If Me Is obj Then
-                    Return True
-                End If
-
-                Return EqualsWithNoRegardToTypeArguments(TryCast(obj, SpecializedGenericType))
             End Function
 
         End Class
@@ -826,6 +880,16 @@ Namespace Microsoft.CodeAnalysis.VisualBasic.Symbols
                 End Get
             End Property
 
+            Public NotOverridable Overrides Function GetTypeArgumentCustomModifiers(ordinal As Integer) As ImmutableArray(Of CustomModifier)
+                Return GetEmptyTypeArgumentCustomModifiers(ordinal)
+            End Function
+
+            Friend NotOverridable Overrides ReadOnly Property HasTypeArgumentsCustomModifiers As Boolean
+                Get
+                    Return False
+                End Get
+            End Property
+
             Friend Overrides ReadOnly Property CanConstruct As Boolean
                 Get
                     Return False
@@ -842,15 +906,19 @@ Namespace Microsoft.CodeAnalysis.VisualBasic.Symbols
             ''' !!! Only code implementing construction of generic types is allowed to call this method !!!
             ''' !!! All other code should use Construct methods.                                        !!! 
             ''' </summary>
-            Friend Overrides Function InternalSubstituteTypeParameters(additionalSubstitution As TypeSubstitution) As TypeSymbol
+            Friend Overrides Function InternalSubstituteTypeParameters(additionalSubstitution As TypeSubstitution) As TypeWithModifiers
+                Return New TypeWithModifiers(InternalSubstituteTypeParametersInSpecializedNonGenericType(additionalSubstitution))
+            End Function
+
+            Private Overloads Function InternalSubstituteTypeParametersInSpecializedNonGenericType(additionalSubstitution As TypeSubstitution) As NamedTypeSymbol
                 If additionalSubstitution Is Nothing Then
                     Return Me
                 End If
 
-                Dim newContainer = DirectCast(_container.InternalSubstituteTypeParameters(additionalSubstitution), NamedTypeSymbol)
+                Dim newContainer = DirectCast(_container.InternalSubstituteTypeParameters(additionalSubstitution).AsTypeSymbolOnly(), NamedTypeSymbol)
 
                 If newContainer IsNot _container Then
-                    ' The constainer is affected.
+                    ' The container is affected.
 
                     Dim definition = Me.OriginalDefinition
 
@@ -867,14 +935,6 @@ Namespace Microsoft.CodeAnalysis.VisualBasic.Symbols
                 Return Me
             End Function
 
-            Public Overrides Function Equals(obj As Object) As Boolean
-                If Me Is obj Then
-                    Return True
-                End If
-
-                Return EqualsWithNoRegardToTypeArguments(TryCast(obj, SpecializedNonGenericType))
-            End Function
-
         End Class
 
         ''' <summary>
@@ -885,10 +945,11 @@ Namespace Microsoft.CodeAnalysis.VisualBasic.Symbols
             Inherits SubstitutedNamedType
 
             Private ReadOnly _typeArguments As ImmutableArray(Of TypeSymbol)
+            Private ReadOnly _hasTypeArgumentsCustomModifiers As Boolean
 
             Protected Sub New(substitution As TypeSubstitution)
                 MyBase.New(substitution)
-                _typeArguments = OriginalDefinition.TypeParameters.SelectAsArray(Function(tp, s) s.GetSubstitutionFor(tp), substitution)
+                _typeArguments = substitution.GetTypeArgumentsFor(OriginalDefinition, _hasTypeArgumentsCustomModifiers)
             End Sub
 
             Public NotOverridable Overrides ReadOnly Property ContainingSymbol As Symbol
@@ -915,6 +976,20 @@ Namespace Microsoft.CodeAnalysis.VisualBasic.Symbols
                 End Get
             End Property
 
+            Public NotOverridable Overrides Function GetTypeArgumentCustomModifiers(ordinal As Integer) As ImmutableArray(Of CustomModifier)
+                If _hasTypeArgumentsCustomModifiers Then
+                    Return _substitution.GetTypeArgumentsCustomModifiersFor(OriginalDefinition.TypeParameters(ordinal))
+                End If
+
+                Return GetEmptyTypeArgumentCustomModifiers(ordinal)
+            End Function
+
+            Friend NotOverridable Overrides ReadOnly Property HasTypeArgumentsCustomModifiers As Boolean
+                Get
+                    Return _hasTypeArgumentsCustomModifiers
+                End Get
+            End Property
+
             Friend Overrides ReadOnly Property CanConstruct As Boolean
                 Get
                     Return False
@@ -925,43 +1000,21 @@ Namespace Microsoft.CodeAnalysis.VisualBasic.Symbols
                 Throw New InvalidOperationException()
             End Function
 
-            Public Overrides Function GetHashCode() As Integer
-                Dim _hash As Integer = MyBase.GetHashCode()
-
-                For Each typeArgument In TypeArgumentsNoUseSiteDiagnostics
-                    _hash = Hash.Combine(typeArgument, _hash)
-                Next
-
-                Return _hash
-            End Function
-
-            Public Overrides Function Equals(obj As Object) As Boolean
-                If Me Is obj Then
-                    Return True
-                End If
-
-                Dim other = TryCast(obj, ConstructedType)
-
-                If Not EqualsWithNoRegardToTypeArguments(other) Then
-                    Return False
-                End If
-
-                Dim arguments = TypeArgumentsNoUseSiteDiagnostics
-                Dim otherArguments = other.TypeArgumentsNoUseSiteDiagnostics
-                Dim count As Integer = arguments.Length
-
-                For i As Integer = 0 To count - 1 Step 1
-                    If Not arguments(i).Equals(otherArguments(i)) Then
-                        Return False
-                    End If
-                Next
-
-                Return True
-            End Function
-
             Friend NotOverridable Overrides Function GetUnificationUseSiteDiagnosticRecursive(owner As Symbol, ByRef checkedTypes As HashSet(Of TypeSymbol)) As DiagnosticInfo
-                Return If(ConstructedFrom.GetUnificationUseSiteDiagnosticRecursive(owner, checkedTypes),
-                          GetUnificationUseSiteDiagnosticRecursive(_typeArguments, owner, checkedTypes))
+                Dim result As DiagnosticInfo = If(ConstructedFrom.GetUnificationUseSiteDiagnosticRecursive(owner, checkedTypes),
+                                                  GetUnificationUseSiteDiagnosticRecursive(_typeArguments, owner, checkedTypes))
+
+                If result Is Nothing AndAlso _hasTypeArgumentsCustomModifiers Then
+                    For i As Integer = 0 To Me.Arity - 1
+                        result = GetUnificationUseSiteDiagnosticRecursive(Me.GetTypeArgumentCustomModifiers(i), owner, checkedTypes)
+
+                        If result IsNot Nothing Then
+                            Exit For
+                        End If
+                    Next
+                End If
+
+                Return result
             End Function
 
         End Class
@@ -990,7 +1043,11 @@ Namespace Microsoft.CodeAnalysis.VisualBasic.Symbols
             ''' !!! Only code implementing construction of generic types is allowed to call this method !!!
             ''' !!! All other code should use Construct methods.                                        !!! 
             ''' </summary>
-            Friend Overrides Function InternalSubstituteTypeParameters(additionalSubstitution As TypeSubstitution) As TypeSymbol
+            Friend Overrides Function InternalSubstituteTypeParameters(additionalSubstitution As TypeSubstitution) As TypeWithModifiers
+                Return New TypeWithModifiers(InternalSubstituteTypeParametersInConstructedInstanceType(additionalSubstitution))
+            End Function
+
+            Private Overloads Function InternalSubstituteTypeParametersInConstructedInstanceType(additionalSubstitution As TypeSubstitution) As NamedTypeSymbol
                 If additionalSubstitution Is Nothing Then
                     Return Me
                 End If
@@ -1000,7 +1057,7 @@ Namespace Microsoft.CodeAnalysis.VisualBasic.Symbols
                 Dim newContainedType As NamedTypeSymbol
 
                 If containedType IsNot Nothing Then
-                    newContainedType = DirectCast(containedType.InternalSubstituteTypeParameters(additionalSubstitution), NamedTypeSymbol)
+                    newContainedType = DirectCast(containedType.InternalSubstituteTypeParameters(additionalSubstitution).AsTypeSymbolOnly, NamedTypeSymbol)
                 Else
                     newContainedType = Nothing
                 End If
@@ -1076,7 +1133,11 @@ Namespace Microsoft.CodeAnalysis.VisualBasic.Symbols
             ''' !!! Only code implementing construction of generic types is allowed to call this method !!!
             ''' !!! All other code should use Construct methods.                                        !!! 
             ''' </summary>
-            Friend Overrides Function InternalSubstituteTypeParameters(additionalSubstitution As TypeSubstitution) As TypeSymbol
+            Friend Overrides Function InternalSubstituteTypeParameters(additionalSubstitution As TypeSubstitution) As TypeWithModifiers
+                Return New TypeWithModifiers(InternalSubstituteTypeParametersInConstructedSpecializedGenericType(additionalSubstitution))
+            End Function
+
+            Private Overloads Function InternalSubstituteTypeParametersInConstructedSpecializedGenericType(additionalSubstitution As TypeSubstitution) As NamedTypeSymbol
                 If additionalSubstitution Is Nothing Then
                     Return Me
                 End If
@@ -1086,7 +1147,7 @@ Namespace Microsoft.CodeAnalysis.VisualBasic.Symbols
                 Dim container As NamedTypeSymbol = _constructedFrom.ContainingType
                 Debug.Assert(Not container.IsDefinition)
 
-                Dim newContainer = DirectCast(container.InternalSubstituteTypeParameters(additionalSubstitution), NamedTypeSymbol)
+                Dim newContainer = DirectCast(container.InternalSubstituteTypeParameters(additionalSubstitution).AsTypeSymbolOnly, NamedTypeSymbol)
                 Dim newSubstitution As TypeSubstitution = VisualBasic.Symbols.TypeSubstitution.AdjustForConstruct(newContainer.TypeSubstitution, _substitution, additionalSubstitution)
 
                 If newSubstitution Is Nothing Then
@@ -1116,7 +1177,6 @@ Namespace Microsoft.CodeAnalysis.VisualBasic.Symbols
                 ' No effect
                 Return Me
             End Function
-
 
         End Class
 

@@ -1,6 +1,11 @@
-﻿// Copyright (c) Microsoft.  All Rights Reserved.  Licensed under the Apache License, Version 2.0.  See License.txt in the project root for license information.
+﻿// Licensed to the .NET Foundation under one or more agreements.
+// The .NET Foundation licenses this file to you under the MIT license.
+// See the LICENSE file in the project root for more information.
+
+#nullable disable
 
 using System.IO;
+using Roslyn.Test.Utilities;
 using Xunit;
 
 namespace Microsoft.CodeAnalysis.UnitTests
@@ -66,7 +71,7 @@ namespace Microsoft.CodeAnalysis.UnitTests
             }
         }
 
-        [Fact]
+        [ConditionalFact(typeof(WindowsDesktopOnly), Reason = ConditionalSkipReason.TestExecutionNeedsFusion)]
         public void Mscorlib()
         {
             // mscorlib is special - all identities with simple name "mscorlib" are considered equivalent
@@ -124,350 +129,350 @@ namespace Microsoft.CodeAnalysis.UnitTests
                 partial: true);
         }
 
-        [Fact]
+        [ConditionalFact(typeof(WindowsDesktopOnly), Reason = ConditionalSkipReason.TestExecutionNeedsFusion)]
         public void SimpleName()
         {
             TestMatch(
-                "Foo",
-                "Foo, Version=1.0.0.0, Culture=neutral, PublicKeyToken=0123456789ABCDEF",
+                "Goo",
+                "Goo, Version=1.0.0.0, Culture=neutral, PublicKeyToken=0123456789ABCDEF",
                 AssemblyIdentityComparer.ComparisonResult.Equivalent,
                 partial: true);
 
             TestMatch(
-                "Foo2",
-                "Foo, Version=1.0.0.0, Culture=neutral, PublicKeyToken=0123456789ABCDEF",
+                "Goo2",
+                "Goo, Version=1.0.0.0, Culture=neutral, PublicKeyToken=0123456789ABCDEF",
                 AssemblyIdentityComparer.ComparisonResult.NotEquivalent,
                 partial: true);
 
             TestMatch(
-                "Foo1, Version=1.0.0.0, Culture=neutral, PublicKeyToken=0123456789ABCDEF",
-                "Foo2, Version=1.0.0.0, Culture=neutral, PublicKeyToken=0123456789ABCDEF",
+                "Goo1, Version=1.0.0.0, Culture=neutral, PublicKeyToken=0123456789ABCDEF",
+                "Goo2, Version=1.0.0.0, Culture=neutral, PublicKeyToken=0123456789ABCDEF",
                 AssemblyIdentityComparer.ComparisonResult.NotEquivalent,
                 partial: false);
         }
 
-        [Fact]
+        [ConditionalFact(typeof(WindowsDesktopOnly), Reason = ConditionalSkipReason.TestExecutionNeedsFusion)]
         public void Version_StrongDefinition()
         {
             TestMatch(
-                "Foo, Version=1.0",
-                "Foo, Version=1.0.0.0, Culture=neutral, PublicKeyToken=0123456789ABCDEF",
+                "Goo, Version=1.0",
+                "Goo, Version=1.0.0.0, Culture=neutral, PublicKeyToken=0123456789ABCDEF",
                 AssemblyIdentityComparer.ComparisonResult.NotEquivalent,
                 partial: true);
 
             TestMatch(
-                "Foo, Version=1.0.0",
-                "Foo, Version=1.0.0.0, Culture=neutral, PublicKeyToken=0123456789ABCDEF",
+                "Goo, Version=1.0.0",
+                "Goo, Version=1.0.0.0, Culture=neutral, PublicKeyToken=0123456789ABCDEF",
                 AssemblyIdentityComparer.ComparisonResult.NotEquivalent,
                 partial: true);
 
             TestMatch(
-                "Foo, Version=1.0",
-                "Foo, Version=1.0.65535.65535, Culture=neutral, PublicKeyToken=0123456789ABCDEF",
+                "Goo, Version=1.0",
+                "Goo, Version=1.0.65535.65535, Culture=neutral, PublicKeyToken=0123456789ABCDEF",
                 AssemblyIdentityComparer.ComparisonResult.NotEquivalent,
                 partial: true);
 
             TestMatch(
-                "Foo, Version=1.0.0",
-                "Foo, Version=1.0.0.65535, Culture=neutral, PublicKeyToken=0123456789ABCDEF",
+                "Goo, Version=1.0.0",
+                "Goo, Version=1.0.0.65535, Culture=neutral, PublicKeyToken=0123456789ABCDEF",
                 AssemblyIdentityComparer.ComparisonResult.NotEquivalent,
                 partial: true);
 
             TestMatch(
-                "Foo, Version=1.0.0.65535",
-                "Foo, Version=1.0.0.65535, Culture=neutral, PublicKeyToken=0123456789ABCDEF",
+                "Goo, Version=1.0.0.65535",
+                "Goo, Version=1.0.0.65535, Culture=neutral, PublicKeyToken=0123456789ABCDEF",
                 AssemblyIdentityComparer.ComparisonResult.Equivalent,
                 partial: true);
 
             TestMatch(
-                "Foo, Version=1.0.65535.65535",
-                "Foo, Version=1.0.65535.65535, Culture=neutral, PublicKeyToken=0123456789ABCDEF",
+                "Goo, Version=1.0.65535.65535",
+                "Goo, Version=1.0.65535.65535, Culture=neutral, PublicKeyToken=0123456789ABCDEF",
                 AssemblyIdentityComparer.ComparisonResult.Equivalent,
                 partial: true);
 
             TestMatch(
-                "Foo, PublicKeyToken=0123456789ABCDEF",
-                "Foo, Version=1.0.0.0, Culture=neutral, PublicKeyToken=0123456789ABCDEF",
+                "Goo, PublicKeyToken=0123456789ABCDEF",
+                "Goo, Version=1.0.0.0, Culture=neutral, PublicKeyToken=0123456789ABCDEF",
                 AssemblyIdentityComparer.ComparisonResult.Equivalent,
                 partial: true);
 
             TestMatch(
-                "Foo, Version=1.0.0.0, PublicKeyToken=0123456789ABCDEF",
-                "Foo, Version=1.0.0.1, Culture=neutral, PublicKeyToken=0123456789ABCDEF",
+                "Goo, Version=1.0.0.0, PublicKeyToken=0123456789ABCDEF",
+                "Goo, Version=1.0.0.1, Culture=neutral, PublicKeyToken=0123456789ABCDEF",
                 AssemblyIdentityComparer.ComparisonResult.NotEquivalent,
                 partial: true);
 
             TestMatch(
-                "Foo, Version=1.0.0.0, PublicKeyToken=0123456789ABCDEF",
-                "Foo, Version=1.0.0.0, Culture=neutral, PublicKeyToken=0123456789ABCDEF",
+                "Goo, Version=1.0.0.0, PublicKeyToken=0123456789ABCDEF",
+                "Goo, Version=1.0.0.0, Culture=neutral, PublicKeyToken=0123456789ABCDEF",
                 AssemblyIdentityComparer.ComparisonResult.Equivalent,
                 partial: true);
 
             TestMatch(
-                "Foo, Version=1.0.0.0, Culture=neutral, PublicKeyToken=0123456789ABCDEF",
-                "Foo, Version=1.0.0.0, Culture=neutral, PublicKeyToken=0123456789ABCDEF",
+                "Goo, Version=1.0.0.0, Culture=neutral, PublicKeyToken=0123456789ABCDEF",
+                "Goo, Version=1.0.0.0, Culture=neutral, PublicKeyToken=0123456789ABCDEF",
                 AssemblyIdentityComparer.ComparisonResult.Equivalent,
                 partial: false);
         }
 
-        [Fact]
+        [ConditionalFact(typeof(WindowsDesktopOnly), Reason = ConditionalSkipReason.TestExecutionNeedsFusion)]
         public void Version_WeakDefinition()
         {
             // if the reference is partial version is ignored
 
             TestMatch(
-                "Foo, Version=1.0",
-                "Foo, Version=1.0.0.0, Culture=neutral, PublicKeyToken=null",
+                "Goo, Version=1.0",
+                "Goo, Version=1.0.0.0, Culture=neutral, PublicKeyToken=null",
                 AssemblyIdentityComparer.ComparisonResult.Equivalent,
                 partial: true);
 
             TestMatch(
-                "Foo, Version=1.0",
-                "Foo, Version=2.0.0.0, Culture=neutral, PublicKeyToken=null",
+                "Goo, Version=1.0",
+                "Goo, Version=2.0.0.0, Culture=neutral, PublicKeyToken=null",
                 AssemblyIdentityComparer.ComparisonResult.Equivalent,
                 partial: true);
 
             TestMatch(
-                "Foo, Version=1.0.0",
-                "Foo, Version=1.0.0.0, Culture=neutral, PublicKeyToken=null",
+                "Goo, Version=1.0.0",
+                "Goo, Version=1.0.0.0, Culture=neutral, PublicKeyToken=null",
                 AssemblyIdentityComparer.ComparisonResult.Equivalent,
                 partial: true);
 
             TestMatch(
-                "Foo, Version=1.0.0.",
-                "Foo, Version=1.0.0.0, Culture=neutral, PublicKeyToken=null",
+                "Goo, Version=1.0.0.",
+                "Goo, Version=1.0.0.0, Culture=neutral, PublicKeyToken=null",
                 AssemblyIdentityComparer.ComparisonResult.Equivalent,
                 partial: true);
 
             TestMatch(
-                "Foo, Version=1.0..0",
-                "Foo, Version=1.0.0.0, Culture=neutral, PublicKeyToken=null",
+                "Goo, Version=1.0..0",
+                "Goo, Version=1.0.0.0, Culture=neutral, PublicKeyToken=null",
                 AssemblyIdentityComparer.ComparisonResult.Equivalent,
                 partial: true);
 
             TestMatch(
-                "Foo, Version=1.0..0",
-                "Foo, Version=2.0.0.0, Culture=neutral, PublicKeyToken=null",
+                "Goo, Version=1.0..0",
+                "Goo, Version=2.0.0.0, Culture=neutral, PublicKeyToken=null",
                 AssemblyIdentityComparer.ComparisonResult.Equivalent,
                 partial: true);
 
             TestMatch(
-                "Foo, Version=1.0",
-                "Foo, Version=1.0.65535.65535, Culture=neutral, PublicKeyToken=null",
+                "Goo, Version=1.0",
+                "Goo, Version=1.0.65535.65535, Culture=neutral, PublicKeyToken=null",
                 AssemblyIdentityComparer.ComparisonResult.Equivalent,
                 partial: true);
 
             TestMatch(
-                "Foo, Version=1.0.0",
-                "Foo, Version=1.0.0.65535, Culture=neutral, PublicKeyToken=null",
+                "Goo, Version=1.0.0",
+                "Goo, Version=1.0.0.65535, Culture=neutral, PublicKeyToken=null",
                 AssemblyIdentityComparer.ComparisonResult.Equivalent,
                 partial: true);
 
             TestMatch(
-                "Foo, Version=1.0.0.65535",
-                "Foo, Version=1.0.0.65535, Culture=neutral, PublicKeyToken=null",
+                "Goo, Version=1.0.0.65535",
+                "Goo, Version=1.0.0.65535, Culture=neutral, PublicKeyToken=null",
                 AssemblyIdentityComparer.ComparisonResult.Equivalent,
                 partial: true);
 
             TestMatch(
-                "Foo, Version=1.0.65535.65535",
-                "Foo, Version=1.0.65535.65535, Culture=neutral, PublicKeyToken=null",
+                "Goo, Version=1.0.65535.65535",
+                "Goo, Version=1.0.65535.65535, Culture=neutral, PublicKeyToken=null",
                 AssemblyIdentityComparer.ComparisonResult.Equivalent,
                 partial: true);
 
             TestMatch(
-                "Foo, PublicKeyToken=null",
-                "Foo, Version=1.0.0.0, Culture=neutral, PublicKeyToken=null",
+                "Goo, PublicKeyToken=null",
+                "Goo, Version=1.0.0.0, Culture=neutral, PublicKeyToken=null",
                 AssemblyIdentityComparer.ComparisonResult.Equivalent,
                 partial: true);
 
             TestMatch(
-                "Foo, Version=1.0.0.0, PublicKeyToken=null",
-                "Foo, Version=1.0.0.1, Culture=neutral, PublicKeyToken=null",
+                "Goo, Version=1.0.0.0, PublicKeyToken=null",
+                "Goo, Version=1.0.0.1, Culture=neutral, PublicKeyToken=null",
                 AssemblyIdentityComparer.ComparisonResult.Equivalent,
                 partial: true);
 
             TestMatch(
-                "Foo, Version=1.0.0.0, PublicKeyToken=null",
-                "Foo, Version=2.0.0.0, Culture=neutral, PublicKeyToken=null",
+                "Goo, Version=1.0.0.0, PublicKeyToken=null",
+                "Goo, Version=2.0.0.0, Culture=neutral, PublicKeyToken=null",
                 AssemblyIdentityComparer.ComparisonResult.Equivalent,
                 partial: true);
 
             TestMatch(
-                "Foo, Version=1.0, Culture=neutral, PublicKeyToken=null",
-                "Foo, Version=1.0.0.0, Culture=neutral, PublicKeyToken=null",
+                "Goo, Version=1.0, Culture=neutral, PublicKeyToken=null",
+                "Goo, Version=1.0.0.0, Culture=neutral, PublicKeyToken=null",
                 AssemblyIdentityComparer.ComparisonResult.Equivalent,
                 partial: true);
 
             TestMatch(
-                "Foo, Version=1.0.0, Culture=neutral, PublicKeyToken=null",
-                "Foo, Version=1.0.0.0, Culture=neutral, PublicKeyToken=null",
+                "Goo, Version=1.0.0, Culture=neutral, PublicKeyToken=null",
+                "Goo, Version=1.0.0.0, Culture=neutral, PublicKeyToken=null",
                 AssemblyIdentityComparer.ComparisonResult.Equivalent,
                 partial: true);
 
             TestMatch(
-                "Foo, Version=1.0.0.0, Culture=neutral, PublicKeyToken=null",
-                "Foo, Version=2.0.0.0, Culture=neutral, PublicKeyToken=null",
+                "Goo, Version=1.0.0.0, Culture=neutral, PublicKeyToken=null",
+                "Goo, Version=2.0.0.0, Culture=neutral, PublicKeyToken=null",
                 AssemblyIdentityComparer.ComparisonResult.Equivalent,
                 partial: false);
 
             TestMatch(
-                "Foo, Version=., Culture=neutral, PublicKeyToken=null",
-                "Foo, Version=1.0.0.0, Culture=neutral, PublicKeyToken=null",
+                "Goo, Version=., Culture=neutral, PublicKeyToken=null",
+                "Goo, Version=1.0.0.0, Culture=neutral, PublicKeyToken=null",
                 AssemblyIdentityComparer.ComparisonResult.Equivalent,
                 partial: true);
         }
 
-        [Fact]
+        [ConditionalFact(typeof(WindowsDesktopOnly), Reason = ConditionalSkipReason.TestExecutionNeedsFusion)]
         public void Culture_StrongDefinition()
         {
             TestMatch(
-                "Foo, Culture=en-US, PublicKeyToken=0123456789ABCDEF",
-                "Foo, Version=1.0.0.0, Culture=en-US, PublicKeyToken=0123456789ABCDEF",
+                "Goo, Culture=en-US, PublicKeyToken=0123456789ABCDEF",
+                "Goo, Version=1.0.0.0, Culture=en-US, PublicKeyToken=0123456789ABCDEF",
                 AssemblyIdentityComparer.ComparisonResult.Equivalent,
                 partial: true);
 
             TestMatch(
-                "Foo, Culture=en-US, PublicKeyToken=0123456789ABCDEF",
-                "Foo, Version=1.0.0.0, Culture=neutral, PublicKeyToken=0123456789ABCDEF",
+                "Goo, Culture=en-US, PublicKeyToken=0123456789ABCDEF",
+                "Goo, Version=1.0.0.0, Culture=neutral, PublicKeyToken=0123456789ABCDEF",
                 AssemblyIdentityComparer.ComparisonResult.NotEquivalent,
                 partial: true);
 
             TestMatch(
-                "Foo, Culture=neutral, PublicKeyToken=0123456789ABCDEF",
-                "Foo, Version=1.0.0.0, Culture=en-US, PublicKeyToken=0123456789ABCDEF",
+                "Goo, Culture=neutral, PublicKeyToken=0123456789ABCDEF",
+                "Goo, Version=1.0.0.0, Culture=en-US, PublicKeyToken=0123456789ABCDEF",
                 AssemblyIdentityComparer.ComparisonResult.NotEquivalent,
                 partial: true);
         }
 
-        [Fact]
+        [ConditionalFact(typeof(WindowsDesktopOnly), Reason = ConditionalSkipReason.TestExecutionNeedsFusion)]
         public void Culture_WeakDefinition()
         {
             TestMatch(
-                "Foo, Version=1.0.0.0, Culture=en-US, PublicKeyToken=null",
-                "Foo, Version=1.0.0.0, Culture=en-US, PublicKeyToken=null",
+                "Goo, Version=1.0.0.0, Culture=en-US, PublicKeyToken=null",
+                "Goo, Version=1.0.0.0, Culture=en-US, PublicKeyToken=null",
                 AssemblyIdentityComparer.ComparisonResult.Equivalent,
                 partial: false);
 
             TestMatch(
-                "Foo, Version=1.0.0.0, Culture=en-US, PublicKeyToken=null",
-                "Foo, Version=1.0.0.0, Culture=neutral, PublicKeyToken=null",
+                "Goo, Version=1.0.0.0, Culture=en-US, PublicKeyToken=null",
+                "Goo, Version=1.0.0.0, Culture=neutral, PublicKeyToken=null",
                 AssemblyIdentityComparer.ComparisonResult.NotEquivalent,
                 partial: false);
 
             TestMatch(
-                "Foo, Version=1.0.0.0, Culture=neutral, PublicKeyToken=null",
-                "Foo, Version=1.0.0.0, Culture=en-US, PublicKeyToken=null",
+                "Goo, Version=1.0.0.0, Culture=neutral, PublicKeyToken=null",
+                "Goo, Version=1.0.0.0, Culture=en-US, PublicKeyToken=null",
                 AssemblyIdentityComparer.ComparisonResult.NotEquivalent,
                 partial: false);
 
             TestMatch(
-                "Foo, Culture=en-US, PublicKeyToken=null",
-                "Foo, Version=1.0.0.0, Culture=en-US, PublicKeyToken=null",
+                "Goo, Culture=en-US, PublicKeyToken=null",
+                "Goo, Version=1.0.0.0, Culture=en-US, PublicKeyToken=null",
                 AssemblyIdentityComparer.ComparisonResult.Equivalent,
                 partial: true);
 
             TestMatch(
-                "Foo, Culture=en-US, PublicKeyToken=null",
-                "Foo, Version=1.0.0.0, Culture=neutral, PublicKeyToken=null",
+                "Goo, Culture=en-US, PublicKeyToken=null",
+                "Goo, Version=1.0.0.0, Culture=neutral, PublicKeyToken=null",
                 AssemblyIdentityComparer.ComparisonResult.NotEquivalent,
                 partial: true);
 
             TestMatch(
-                "Foo, Culture=neutral, PublicKeyToken=null",
-                "Foo, Version=1.0.0.0, Culture=en-US, PublicKeyToken=null",
+                "Goo, Culture=neutral, PublicKeyToken=null",
+                "Goo, Version=1.0.0.0, Culture=en-US, PublicKeyToken=null",
                 AssemblyIdentityComparer.ComparisonResult.NotEquivalent,
                 partial: true);
         }
 
-        [Fact]
+        [ConditionalFact(typeof(WindowsDesktopOnly), Reason = ConditionalSkipReason.TestExecutionNeedsFusion)]
         public void PublicKeyToken()
         {
             TestMatch(
-                "Foo",
-                "Foo, Version=1.0.0.0, Culture=neutral, PublicKeyToken=null",
+                "Goo",
+                "Goo, Version=1.0.0.0, Culture=neutral, PublicKeyToken=null",
                 AssemblyIdentityComparer.ComparisonResult.Equivalent,
                 partial: true);
 
             TestMatch(
-                "Foo",
-                "Foo, Version=1.0.0.0, Culture=neutral, PublicKeyToken=0123456789ABCDEF",
+                "Goo",
+                "Goo, Version=1.0.0.0, Culture=neutral, PublicKeyToken=0123456789ABCDEF",
                 AssemblyIdentityComparer.ComparisonResult.Equivalent,
                 partial: true);
 
             TestMatch(
-                "Foo, PublicKeyToken=0123456789ABCDEF",
-                "Foo, Version=1.0.0.0, Culture=neutral, PublicKeyToken=null",
+                "Goo, PublicKeyToken=0123456789ABCDEF",
+                "Goo, Version=1.0.0.0, Culture=neutral, PublicKeyToken=null",
                 AssemblyIdentityComparer.ComparisonResult.NotEquivalent,
                 partial: true);
 
             TestMatch(
-                "Foo, PublicKeyToken=null",
-                "Foo, Version=1.0.0.0, Culture=neutral, PublicKeyToken=0123456789ABCDEF",
+                "Goo, PublicKeyToken=null",
+                "Goo, Version=1.0.0.0, Culture=neutral, PublicKeyToken=0123456789ABCDEF",
                 AssemblyIdentityComparer.ComparisonResult.NotEquivalent,
                 partial: true);
 
             TestMatch(
-                "Foo, PublicKeyToken=1111111111111111",
-                "Foo, Version=1.0.0.0, Culture=neutral, PublicKeyToken=2222222222222222",
+                "Goo, PublicKeyToken=1111111111111111",
+                "Goo, Version=1.0.0.0, Culture=neutral, PublicKeyToken=2222222222222222",
                 AssemblyIdentityComparer.ComparisonResult.NotEquivalent,
                 partial: true);
 
             TestMatch(
-                "Foo, PublicKeyToken=null",
-                "Foo, Version=1.0.0.0, Culture=neutral, PublicKeyToken=null",
+                "Goo, PublicKeyToken=null",
+                "Goo, Version=1.0.0.0, Culture=neutral, PublicKeyToken=null",
                 AssemblyIdentityComparer.ComparisonResult.Equivalent,
                 partial: true);
 
             TestMatch(
-                "Foo, Version=1.0.0.0, Culture=neutral, PublicKeyToken=0123456789ABCDEF",
-                "Foo, Version=1.0.0.0, Culture=neutral, PublicKeyToken=null",
+                "Goo, Version=1.0.0.0, Culture=neutral, PublicKeyToken=0123456789ABCDEF",
+                "Goo, Version=1.0.0.0, Culture=neutral, PublicKeyToken=null",
                 AssemblyIdentityComparer.ComparisonResult.NotEquivalent,
                 partial: false);
 
             TestMatch(
-                "Foo, Version=1.0.0.0, Culture=neutral, PublicKeyToken=null",
-                "Foo, Version=1.0.0.0, Culture=neutral, PublicKeyToken=0123456789ABCDEF",
+                "Goo, Version=1.0.0.0, Culture=neutral, PublicKeyToken=null",
+                "Goo, Version=1.0.0.0, Culture=neutral, PublicKeyToken=0123456789ABCDEF",
                 AssemblyIdentityComparer.ComparisonResult.NotEquivalent,
                 partial: false);
 
             TestMatch(
-                "Foo, Version=1.0.0.0, Culture=neutral, PublicKeyToken=1111111111111111",
-                "Foo, Version=1.0.0.0, Culture=neutral, PublicKeyToken=2222222222222222",
+                "Goo, Version=1.0.0.0, Culture=neutral, PublicKeyToken=1111111111111111",
+                "Goo, Version=1.0.0.0, Culture=neutral, PublicKeyToken=2222222222222222",
                 AssemblyIdentityComparer.ComparisonResult.NotEquivalent,
                 partial: false);
 
             TestMatch(
-                "Foo, Version=1.0.0.0, Culture=neutral, PublicKeyToken=null",
-                "Foo, Version=1.0.0.0, Culture=neutral, PublicKeyToken=null",
+                "Goo, Version=1.0.0.0, Culture=neutral, PublicKeyToken=null",
+                "Goo, Version=1.0.0.0, Culture=neutral, PublicKeyToken=null",
                 AssemblyIdentityComparer.ComparisonResult.Equivalent,
                 partial: false);
         }
 
-        [Fact]
+        [ConditionalFact(typeof(WindowsDesktopOnly), Reason = ConditionalSkipReason.TestExecutionNeedsFusion)]
         public void IgnoreOrFwUnifyVersion()
         {
             TestMatch(
-                "Foo, Version=1.0.0.0, Culture=neutral, PublicKeyToken=0123456789ABCDEF",
-                "Foo, Version=2.0.0.0, Culture=neutral, PublicKeyToken=0123456789ABCDEF",
+                "Goo, Version=1.0.0.0, Culture=neutral, PublicKeyToken=0123456789ABCDEF",
+                "Goo, Version=2.0.0.0, Culture=neutral, PublicKeyToken=0123456789ABCDEF",
                 AssemblyIdentityComparer.ComparisonResult.EquivalentIgnoringVersion,
                 ignoreVersion: true);
 
             TestMatch(
-                "Foo, Version=1.0.0.0, Culture=neutral, PublicKeyToken=0123456789ABCDEF, ContentType=WindowsRuntime",
-                "Foo, Version=2.0.0.0, Culture=neutral, PublicKeyToken=0123456789ABCDEF, ContentType=WindowsRuntime",
+                "Goo, Version=1.0.0.0, Culture=neutral, PublicKeyToken=0123456789ABCDEF, ContentType=WindowsRuntime",
+                "Goo, Version=2.0.0.0, Culture=neutral, PublicKeyToken=0123456789ABCDEF, ContentType=WindowsRuntime",
                 AssemblyIdentityComparer.ComparisonResult.EquivalentIgnoringVersion,
                 ignoreVersion: true);
 
             TestMatch(
-                "Foo, Version=1.0.0.0, Culture=neutral, PublicKeyToken=null",
-                "Foo, Version=2.0.0.0, Culture=neutral, PublicKeyToken=null",
+                "Goo, Version=1.0.0.0, Culture=neutral, PublicKeyToken=null",
+                "Goo, Version=2.0.0.0, Culture=neutral, PublicKeyToken=null",
                 AssemblyIdentityComparer.ComparisonResult.Equivalent,
                 ignoreVersion: true);
 
             TestMatch(
-                "Foo, Version=1.0.0.0, Culture=neutral, PublicKeyToken=null, ContentType=WindowsRuntime",
-                "Foo, Version=2.0.0.0, Culture=neutral, PublicKeyToken=null, ContentType=WindowsRuntime",
+                "Goo, Version=1.0.0.0, Culture=neutral, PublicKeyToken=null, ContentType=WindowsRuntime",
+                "Goo, Version=2.0.0.0, Culture=neutral, PublicKeyToken=null, ContentType=WindowsRuntime",
                 AssemblyIdentityComparer.ComparisonResult.Equivalent,
                 ignoreVersion: true);
 
@@ -534,12 +539,11 @@ namespace Microsoft.CodeAnalysis.UnitTests
                 AssemblyIdentityComparer.ComparisonResult.Equivalent,
                 unificationApplied: true);
 
-            // TODO (bug 1090947):
-            //TestMatch(
-            //    "System.Numerics.Vectors, Version=2.0.0.0, Culture=neutral, PublicKeyToken=b03f5f7f11d50a3a",
-            //    "System.Numerics.Vectors, Version=3.5.0.0, Culture=neutral, PublicKeyToken=b03f5f7f11d50a3a",
-            //    AssemblyIdentityComparer.ComparisonResult.Equivalent,
-            //    unificationApplied: true);
+            TestMatch(
+                "System.Numerics.Vectors, Version=2.0.0.0, Culture=neutral, PublicKeyToken=b03f5f7f11d50a3a",
+                "System.Numerics.Vectors, Version=3.5.0.0, Culture=neutral, PublicKeyToken=b03f5f7f11d50a3a",
+                AssemblyIdentityComparer.ComparisonResult.Equivalent,
+                unificationApplied: true);
 
             // greater version than FW version (4.0)
             TestMatch(
@@ -552,11 +556,10 @@ namespace Microsoft.CodeAnalysis.UnitTests
                 "System.Runtime.Handles, Version=4.1.0.0, Culture=neutral, PublicKeyToken=b03f5f7f11d50a3a",
                 AssemblyIdentityComparer.ComparisonResult.NotEquivalent);
 
-            // TODO (bug 1090947):
-            //TestMatch(
-            //    "System.Numerics.Vectors, Version=2.0.0.0, Culture=neutral, PublicKeyToken=b03f5f7f11d50a3a",
-            //    "System.Numerics.Vectors, Version=4.1.0.0, Culture=neutral, PublicKeyToken=b03f5f7f11d50a3a",
-            //    AssemblyIdentityComparer.ComparisonResult.NotEquivalent);
+            TestMatch(
+                "System.Numerics.Vectors, Version=2.0.0.0, Culture=neutral, PublicKeyToken=b03f5f7f11d50a3a",
+                "System.Numerics.Vectors, Version=4.1.0.0, Culture=neutral, PublicKeyToken=b03f5f7f11d50a3a",
+                AssemblyIdentityComparer.ComparisonResult.NotEquivalent);
 
             // works correctly for names with CLR invalid characters:
             foreach (var c in AssemblyIdentityTests.ClrInvalidCharacters)
@@ -571,7 +574,29 @@ namespace Microsoft.CodeAnalysis.UnitTests
             }
         }
 
-        [Fact]
+        [ConditionalFact(typeof(WindowsDesktopOnly), Reason = ConditionalSkipReason.TestExecutionNeedsFusion)]
+        public void AsymmetricUnification()
+        {
+            // Note:
+            // System.Numerics.Vectors, Version=4.0 is an FX assembly
+            // System.Numerics.Vectors, Version=4.1+ is not an FX assembly
+            //
+            // It seems like a bug in fusion: it only determines whether the definition is an FX assembly 
+            // and calculates the result based upon that, regardless of whether the reference is an FX assembly or not.
+            // We do replicate that behavior.
+            TestMatch(
+                "System.Numerics.Vectors, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b03f5f7f11d50a3a",
+                "System.Numerics.Vectors, Version=4.1.1.0, Culture=neutral, PublicKeyToken=b03f5f7f11d50a3a",
+                AssemblyIdentityComparer.ComparisonResult.NotEquivalent);
+
+            TestMatch(
+                "System.Numerics.Vectors, Version=4.1.1.0, Culture=neutral, PublicKeyToken=b03f5f7f11d50a3a",
+                "System.Numerics.Vectors, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b03f5f7f11d50a3a",
+                AssemblyIdentityComparer.ComparisonResult.Equivalent,
+                unificationApplied: true);
+        }
+
+        [ConditionalFact(typeof(WindowsDesktopOnly), Reason = ConditionalSkipReason.TestExecutionNeedsFusion)]
         public void Portability()
         {
             TestMatch(
@@ -607,7 +632,7 @@ namespace Microsoft.CodeAnalysis.UnitTests
                 policyPath: appConfig.Path);
         }
 
-        [Fact]
+        [ConditionalFact(typeof(WindowsDesktopOnly), Reason = ConditionalSkipReason.TestExecutionNeedsFusion)]
         public void Retargetable_Reference()
         {
             TestMatch(
@@ -626,7 +651,7 @@ namespace Microsoft.CodeAnalysis.UnitTests
                 AssemblyIdentityComparer.ComparisonResult.NotEquivalent);
         }
 
-        [Fact]
+        [ConditionalFact(typeof(WindowsDesktopOnly), Reason = ConditionalSkipReason.TestExecutionNeedsFusion)]
         public void Retargetable_Reference_Partial()
         {
             TestMatch(
@@ -642,7 +667,7 @@ namespace Microsoft.CodeAnalysis.UnitTests
                 partial: true);
         }
 
-        [Fact]
+        [ConditionalFact(typeof(WindowsDesktopOnly), Reason = ConditionalSkipReason.TestExecutionNeedsFusion)]
         public void Retargetable_Reference_Portable()
         {
             TestMatch(
@@ -680,7 +705,7 @@ namespace Microsoft.CodeAnalysis.UnitTests
                 partial: true);
         }
 
-        [Fact]
+        [ConditionalFact(typeof(WindowsDesktopOnly), Reason = ConditionalSkipReason.TestExecutionNeedsFusion)]
         public void Retargetable_RefAndDef()
         {
             TestMatch(
@@ -690,68 +715,68 @@ namespace Microsoft.CodeAnalysis.UnitTests
                 unificationApplied: true);
         }
 
-        [Fact]
+        [ConditionalFact(typeof(WindowsDesktopOnly), Reason = ConditionalSkipReason.TestExecutionNeedsFusion)]
         public void WinRT_Basic()
         {
             TestMatch(
-                "Foo, ContentType=WindowsRuntime",
-                "Foo, Version=1.0.0.0, Culture=neutral, PublicKeyToken=0123456789ABCDEF, ContentType=WindowsRuntime",
+                "Goo, ContentType=WindowsRuntime",
+                "Goo, Version=1.0.0.0, Culture=neutral, PublicKeyToken=0123456789ABCDEF, ContentType=WindowsRuntime",
                 AssemblyIdentityComparer.ComparisonResult.Equivalent,
                 partial: true);
 
             TestMatch(
-                "Foo, ContentType=WindowsRuntime",
-                "Foo2, Version=1.0.0.0, Culture=neutral, PublicKeyToken=0123456789ABCDEF, ContentType=WindowsRuntime",
+                "Goo, ContentType=WindowsRuntime",
+                "Goo2, Version=1.0.0.0, Culture=neutral, PublicKeyToken=0123456789ABCDEF, ContentType=WindowsRuntime",
                 AssemblyIdentityComparer.ComparisonResult.NotEquivalent,
                 partial: true);
 
             TestMatch(
-                "Foo, PublicKeyToken=0123456789ABCDEF, ContentType=WindowsRuntime",
-                "Foo, Version=1.0.0.0, Culture=neutral, PublicKeyToken=0123456789ABCDEF, ContentType=WindowsRuntime",
+                "Goo, PublicKeyToken=0123456789ABCDEF, ContentType=WindowsRuntime",
+                "Goo, Version=1.0.0.0, Culture=neutral, PublicKeyToken=0123456789ABCDEF, ContentType=WindowsRuntime",
                 AssemblyIdentityComparer.ComparisonResult.Equivalent,
                 partial: true);
 
             TestMatch(
-                "Foo, Version=1.0.0.0, PublicKeyToken=0123456789ABCDEF, ContentType=WindowsRuntime",
-                "Foo, Version=1.0.0.0, Culture=neutral, PublicKeyToken=0123456789ABCDEF, ContentType=WindowsRuntime",
+                "Goo, Version=1.0.0.0, PublicKeyToken=0123456789ABCDEF, ContentType=WindowsRuntime",
+                "Goo, Version=1.0.0.0, Culture=neutral, PublicKeyToken=0123456789ABCDEF, ContentType=WindowsRuntime",
                 AssemblyIdentityComparer.ComparisonResult.Equivalent,
                 partial: true);
 
             TestMatch(
-                "Foo, Version=1.0.0.0, PublicKeyToken=1123456789ABCDEF, ContentType=WindowsRuntime",
-                "Foo, Version=1.0.0.0, Culture=neutral, PublicKeyToken=2123456789ABCDEF, ContentType=WindowsRuntime",
+                "Goo, Version=1.0.0.0, PublicKeyToken=1123456789ABCDEF, ContentType=WindowsRuntime",
+                "Goo, Version=1.0.0.0, Culture=neutral, PublicKeyToken=2123456789ABCDEF, ContentType=WindowsRuntime",
                 AssemblyIdentityComparer.ComparisonResult.NotEquivalent,
                 partial: true);
 
             TestMatch(
-                "Foo, Version=1.0.0.0, Culture=neutral, PublicKeyToken=0123456789ABCDEF, ContentType=WindowsRuntime",
-                "Foo, Version=1.0.0.0, Culture=neutral, PublicKeyToken=0123456789ABCDEF, ContentType=WindowsRuntime",
+                "Goo, Version=1.0.0.0, Culture=neutral, PublicKeyToken=0123456789ABCDEF, ContentType=WindowsRuntime",
+                "Goo, Version=1.0.0.0, Culture=neutral, PublicKeyToken=0123456789ABCDEF, ContentType=WindowsRuntime",
                 AssemblyIdentityComparer.ComparisonResult.Equivalent,
                 partial: false);
 
             TestMatch(
-                "Foo, Version=1.0.0.0, Culture=en-US, PublicKeyToken=0123456789ABCDEF, ContentType=WindowsRuntime",
-                "Foo, Version=1.0.0.0, Culture=neutral, PublicKeyToken=0123456789ABCDEF, ContentType=WindowsRuntime",
+                "Goo, Version=1.0.0.0, Culture=en-US, PublicKeyToken=0123456789ABCDEF, ContentType=WindowsRuntime",
+                "Goo, Version=1.0.0.0, Culture=neutral, PublicKeyToken=0123456789ABCDEF, ContentType=WindowsRuntime",
                 AssemblyIdentityComparer.ComparisonResult.NotEquivalent,
                 partial: false);
 
             TestMatch(
-                "Foo, Version=1.0.0.0, Culture=neutral, PublicKeyToken=0123456789ABCDEF, ContentType=WindowsRuntime",
-                "Foo, Version=2.0.0.0, Culture=neutral, PublicKeyToken=0123456789ABCDEF, ContentType=WindowsRuntime",
+                "Goo, Version=1.0.0.0, Culture=neutral, PublicKeyToken=0123456789ABCDEF, ContentType=WindowsRuntime",
+                "Goo, Version=2.0.0.0, Culture=neutral, PublicKeyToken=0123456789ABCDEF, ContentType=WindowsRuntime",
                 AssemblyIdentityComparer.ComparisonResult.NotEquivalent,
                 partial: false);
 
             // comparing WinRT with Default or vice versa:
             TestMatch(
-                "Foo",
-                "Foo, Version=1.0.0.0, Culture=neutral, PublicKeyToken=0123456789ABCDEF, ContentType=WindowsRuntime",
+                "Goo",
+                "Goo, Version=1.0.0.0, Culture=neutral, PublicKeyToken=0123456789ABCDEF, ContentType=WindowsRuntime",
                 AssemblyIdentityComparer.ComparisonResult.NotEquivalent,
                 fusionMatch: AssemblyIdentityComparer.ComparisonResult.Equivalent,
                 partial: true);
 
             TestMatch(
-                "Foo, Version=1.0.0.0, Culture=neutral, PublicKeyToken=0123456789ABCDEF, ContentType=WindowsRuntime",
-                "Foo, Version=1.0.0.0, Culture=neutral, PublicKeyToken=0123456789ABCDEF",
+                "Goo, Version=1.0.0.0, Culture=neutral, PublicKeyToken=0123456789ABCDEF, ContentType=WindowsRuntime",
+                "Goo, Version=1.0.0.0, Culture=neutral, PublicKeyToken=0123456789ABCDEF",
                 AssemblyIdentityComparer.ComparisonResult.NotEquivalent,
                 fusionMatch: AssemblyIdentityComparer.ComparisonResult.Equivalent);
 
@@ -799,3 +824,4 @@ namespace Microsoft.CodeAnalysis.UnitTests
         }
     }
 }
+

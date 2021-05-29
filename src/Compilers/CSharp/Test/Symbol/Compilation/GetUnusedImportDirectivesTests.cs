@@ -1,5 +1,10 @@
-﻿// Copyright (c) Microsoft.  All Rights Reserved.  Licensed under the Apache License, Version 2.0.  See License.txt in the project root for license information.
+﻿// Licensed to the .NET Foundation under one or more agreements.
+// The .NET Foundation licenses this file to you under the MIT license.
+// See the LICENSE file in the project root for more information.
 
+#nullable disable
+
+using System;
 using System.Collections.Immutable;
 using System.Linq;
 using Microsoft.CodeAnalysis.CSharp.Syntax;
@@ -20,12 +25,12 @@ using System;
 
 class C
 {
-    void Foo()
+    void Goo()
     {
     }
 }";
             var tree = Parse(text);
-            var comp = CreateCompilationWithMscorlib(tree);
+            var comp = CreateCompilation(tree);
 
             comp.VerifyDiagnostics(
                 // (2,1): info CS8019: Unnecessary using directive.
@@ -33,8 +38,7 @@ class C
                 Diagnostic(ErrorCode.HDN_UnusedUsingDirective, "using System;"));
         }
 
-
-        [WorkItem(865627, "DevDiv")]
+        [WorkItem(865627, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/865627")]
         [Fact]
         public void TestUnusedExtensionMarksImportsAsUsed()
         {
@@ -51,7 +55,7 @@ namespace ClassLibrary1
     }
 } 
 ";
-            var classLib1 = CreateCompilationWithMscorlib(text: class1Source, references: new[] { SystemRef }, assemblyName: "ClassLibrary1");
+            var classLib1 = CreateCompilation(source: class1Source, assemblyName: "ClassLibrary1");
 
             string class2Source = @"using System;
 using ClassLibrary1;
@@ -66,8 +70,7 @@ namespace ClassLibrary2
         }
     }
 }";
-            var classLib2 = CreateCompilationWithMscorlib(text: class2Source, assemblyName: "ClassLibrary2", references: new[] { SystemRef, SystemCoreRef, classLib1.ToMetadataReference() });
-
+            var classLib2 = CreateCompilation(source: class2Source, assemblyName: "ClassLibrary2", references: new[] { classLib1.ToMetadataReference() });
 
             string consoleApplicationSource = @"using ClassLibrary2;
 using ClassLibrary1;
@@ -84,14 +87,14 @@ namespace ConsoleApplication
     }
 }";
             var tree = Parse(consoleApplicationSource);
-            var comp = CreateCompilationWithMscorlib(tree, new[] { SystemRef, SystemCoreRef, classLib1.ToMetadataReference(), classLib2.ToMetadataReference() }, assemblyName: "ConsoleApplication");
+            var comp = CreateCompilation(tree, new[] { classLib1.ToMetadataReference(), classLib2.ToMetadataReference() }, assemblyName: "ConsoleApplication");
             var model = comp.GetSemanticModel(tree) as CSharpSemanticModel;
 
             var syntax = tree.GetRoot().DescendantNodes().OfType<InvocationExpressionSyntax>().Single().Expression;
 
             //This is the crux of the test.
             //Without this line, with or without the fix, the model never gets pushed to evaluate extension method candidates
-            //and therefor never marked ClassLibrary2 as a used import in consoleApplication.
+            //and therefore never marked ClassLibrary2 as a used import in consoleApplication.
             //Without the fix, this call used to result in ClassLibrary2 getting marked as used, after the fix, this call does not
             //result in changing ClassLibrary2's used status.
             model.GetMemberGroup(syntax);
@@ -116,9 +119,8 @@ class Program
         Enumerable.Repeat(1, 1);
     }
 }";
-            var tree = Parse(text);
-            var comp = CreateCompilationWithMscorlib(tree);
-            //all unused because system.core was not included and Eunmerable didn't bind
+            var comp = CreateEmptyCompilation(text, new[] { MscorlibRef });
+            //all unused because system.core was not included and Enumerable didn't bind
             comp.VerifyDiagnostics(
                 // (4,14): error CS0234: The type or namespace name 'Linq' does not exist in the namespace 'System' (are you missing an assembly reference?)
                 // using System.Linq;
@@ -139,7 +141,6 @@ class Program
                 // using System.Threading.Tasks;
                 Diagnostic(ErrorCode.HDN_UnusedUsingDirective, "using System.Threading.Tasks;")
                 );
-
 
             comp = comp.WithReferences(comp.References.Concat(SystemCoreRef));
             comp.VerifyDiagnostics(
@@ -163,13 +164,13 @@ using System;
 
 class C
 {
-    void Foo()
+    void Goo()
     {
         Console.WriteLine();
     }
 }";
             var tree = Parse(text);
-            var comp = CreateCompilationWithMscorlib(tree);
+            var comp = CreateCompilation(tree);
             comp.VerifyDiagnostics();
         }
 
@@ -181,16 +182,16 @@ using System;
 
 class C
 {
-    void Foo()
+    void Goo()
     {
         /*here*/
     }
 }";
             var tree = Parse(text);
-            var comp = CreateCompilationWithMscorlib(tree);
+            var comp = CreateCompilation(tree);
             var model = comp.GetSemanticModel(tree);
 
-            var position = text.IndexOf("/*here*/");
+            var position = text.IndexOf("/*here*/", StringComparison.Ordinal);
             var info = model.GetSpeculativeSymbolInfo(position, SyntaxFactory.IdentifierName("Console"), SpeculativeBindingOption.BindAsTypeOrNamespace);
             Assert.NotNull(info.Symbol);
             Assert.Equal(SymbolKind.NamedType, info.Symbol.Kind);
@@ -205,10 +206,10 @@ class C
                 );
         }
 
-        [Fact]
+        [ClrOnlyFact(ClrOnlyReason.Unknown)]
         public void AllAssemblyLevelAttributesMustBeBound()
         {
-            var snkPath = Temp.CreateFile().WriteAllBytes(TestResources.SymbolsTests.General.snKey).Path;
+            var snkPath = Temp.CreateFile().WriteAllBytes(TestResources.General.snKey).Path;
 
             var signing = Parse(@"
 using System.Reflection;
@@ -217,11 +218,10 @@ using System.Reflection;
 [assembly: AssemblyKeyFile(@""" + snkPath + @""")]
 ");
 
-            var ivtCompilation = CreateCompilationWithMscorlib(
+            var ivtCompilation = CreateCompilation(
                 assemblyName: "IVT",
                 options: TestOptions.ReleaseDll.WithStrongNameProvider(new DesktopStrongNameProvider()),
-                references: new[] { SystemCoreRef },
-                trees: new[]
+                source: new[]
                 {
                     Parse(@"
 using System.Runtime.CompilerServices;
@@ -232,18 +232,18 @@ namespace NamespaceContainingInternalsOnly
 {
     internal static class Extensions
     {
-        internal static void Foo(this int x) {}
+        internal static void Goo(this int x) {}
     }
 }
 "),
                     signing
                 });
 
-            var libCompilation = CreateCompilationWithMscorlib(
+            var libCompilation = CreateCompilation(
                 assemblyName: "Lib",
                 options: TestOptions.ReleaseDll.WithStrongNameProvider(new DesktopStrongNameProvider()),
                 references: new[] { ivtCompilation.ToMetadataReference() },
-                trees: new[]
+                source: new[]
                 {
                     Parse(@"
 using NamespaceContainingInternalsOnly;
@@ -252,7 +252,7 @@ public class C
 {
     internal static void F(int x)
     {
-        x.Foo();
+        x.Goo();
     }
 }
 "),
@@ -262,7 +262,7 @@ public class C
             libCompilation.VerifyDiagnostics();
         }
 
-        [WorkItem(747219, "DevDiv")]
+        [WorkItem(747219, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/747219")]
         [Fact]
         public void SemanticModelCallDoesNotCountsAsUse()
         {
@@ -278,7 +278,17 @@ class C
     }
 }";
 
-            var comp = CreateCompilationWithMscorlib(source);
+            var comp = CreateCompilation(source);
+            comp.VerifyDiagnostics(
+                // (2,1): info CS8019: Unnecessary using directive.
+                // using System.Collections;
+                Diagnostic(ErrorCode.HDN_UnusedUsingDirective, "using System.Collections;"),
+                // (3,1): info CS8019: Unnecessary using directive.
+                // using System.Collections.Generic;
+                Diagnostic(ErrorCode.HDN_UnusedUsingDirective, "using System.Collections.Generic;")
+                );
+
+            comp = CreateCompilation(source, options: TestOptions.ReleaseDll.WithWarningLevel(3));
             comp.VerifyDiagnostics(
                 // (2,1): info CS8019: Unnecessary using directive.
                 // using System.Collections;
@@ -289,7 +299,26 @@ class C
                 );
         }
 
-        [WorkItem(747219, "DevDiv")]
+        [Fact]
+        public void NoHiddenDiagnosticsForWarningLevel0()
+        {
+            var source = @"
+using System.Collections;
+using System.Collections.Generic;
+
+class C 
+{
+    void M()
+    {
+        return;
+    }
+}";
+
+            var comp = CreateCompilation(source, options: TestOptions.ReleaseDll.WithWarningLevel(0));
+            comp.VerifyDiagnostics();
+        }
+
+        [WorkItem(747219, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/747219")]
         [Fact]
         public void INF_UnusedUsingDirective()
         {
@@ -298,7 +327,7 @@ using System.Collections;
 using C = System.Console;
 ";
 
-            CreateCompilationWithMscorlib(source).VerifyDiagnostics(
+            CreateCompilation(source).VerifyDiagnostics(
                 // (2,1): info CS8019: Unnecessary using directive.
                 // using System.Collections;
                 Diagnostic(ErrorCode.HDN_UnusedUsingDirective, "using System.Collections;"),
@@ -307,15 +336,15 @@ using C = System.Console;
                 Diagnostic(ErrorCode.HDN_UnusedUsingDirective, "using C = System.Console;"));
         }
 
-        [WorkItem(747219, "DevDiv")]
+        [WorkItem(747219, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/747219")]
         [Fact]
         public void INF_UnusedExternAlias()
         {
             var source = @"
 extern alias A;
 ";
-            var lib = CreateCompilation("", assemblyName: "lib");
-            var comp = CreateCompilationWithMscorlib(source, new[] { new CSharpCompilationReference(lib, aliases: ImmutableArray.Create("A")) });
+            var lib = CreateEmptyCompilation("", assemblyName: "lib");
+            var comp = CreateCompilation(source, new[] { new CSharpCompilationReference(lib, aliases: ImmutableArray.Create("A")) });
 
             comp.VerifyDiagnostics(
                 // (2,1): info CS8020: Unused extern alias.
@@ -323,7 +352,7 @@ extern alias A;
                 Diagnostic(ErrorCode.HDN_UnusedExternAlias, "extern alias A;"));
         }
 
-        [WorkItem(747219, "DevDiv")]
+        [WorkItem(747219, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/747219")]
         [Fact]
         public void CrefCountsAsUse()
         {
@@ -333,29 +362,131 @@ using System;
 /// <see cref='Console'/>
 public class C { }
 ";
-
-            // Not binding doc comments.
-            CreateCompilationWithMscorlib(source).VerifyDiagnostics(
-                // (2,1): info CS8019: Unnecessary using directive.
-                // using System;
-                Diagnostic(ErrorCode.HDN_UnusedUsingDirective, "using System;"));
+            // Not reporting doc comment diagnostics. It is still a use.
+            CreateCompilation(source).VerifyDiagnostics();
 
             // Binding doc comments.
-            CreateCompilationWithMscorlibAndDocumentationComments(source).VerifyDiagnostics();
+            CreateCompilationWithMscorlib40AndDocumentationComments(source).VerifyDiagnostics();
         }
 
-        [WorkItem(770147, "DevDiv")]
+        [WorkItem(770147, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/770147")]
         [Fact]
         public void InfoAndWarnAsError()
         {
             var source = @"
 using System;
 ";
-            var comp = CreateCompilationWithMscorlib(source, options: TestOptions.ReleaseDll.WithGeneralDiagnosticOption(ReportDiagnostic.Error));
+            var comp = CreateCompilation(source, options: TestOptions.ReleaseDll.WithGeneralDiagnosticOption(ReportDiagnostic.Error));
             comp.VerifyEmitDiagnostics(
                 // (2,1): info CS8019: Unnecessary using directive.
                 // using System;
                 Diagnostic(ErrorCode.HDN_UnusedUsingDirective, "using System;").WithWarningAsError(false));
+        }
+
+        [Fact]
+        public void UnusedUsingInteractive()
+        {
+            var tree = Parse("using System;", options: TestOptions.Script);
+            var comp = CSharpCompilation.CreateScriptCompilation("sub1", tree, new[] { MscorlibRef_v4_0_30316_17626 });
+
+            comp.VerifyDiagnostics();
+        }
+
+        [Fact]
+        public void UnusedUsingScript()
+        {
+            var tree = Parse("using System;", options: TestOptions.Script);
+            var comp = CreateCompilationWithMscorlib45(new[] { tree });
+
+            comp.VerifyDiagnostics(
+                // (2,1): info CS8019: Unnecessary using directive.
+                // using System;
+                Diagnostic(ErrorCode.HDN_UnusedUsingDirective, "using System;"));
+        }
+
+        [Fact, WorkItem(18348, "https://github.com/dotnet/roslyn/issues/18348")]
+        public void IncorrectUnusedUsingWhenAttributeOnParameter_01()
+        {
+            var source1 =
+@"using System.Runtime.InteropServices;
+
+partial class Program
+{
+    partial void M([Out] [In] ref int x) { }
+}";
+            var source2 =
+@"partial class Program
+{
+    partial void M(ref int x);
+}";
+            var comp = CreateCompilation(new[] { source1, source2 });
+            var tree = comp.SyntaxTrees[0];
+            //comp.VerifyDiagnostics(); // doing this first hides the symptoms of the bug
+            var model = comp.GetSemanticModel(tree);
+
+            // There should be no diagnostics.
+            model.GetDiagnostics().Verify(
+                //// (1,1): hidden CS8019: Unnecessary using directive.
+                //// using System.Runtime.InteropServices;
+                //Diagnostic(ErrorCode.HDN_UnusedUsingDirective, "using System.Runtime.InteropServices;").WithLocation(1, 1)
+                );
+        }
+
+        [Fact, WorkItem(18348, "https://github.com/dotnet/roslyn/issues/18348")]
+        public void IncorrectUnusedUsingWhenAttributeOnParameter_02()
+        {
+            var source1 =
+@"using System.Runtime.InteropServices;
+
+partial class Program
+{
+    partial void M([Out] [In] ref int x);
+}";
+            var source2 =
+@"partial class Program
+{
+    partial void M(ref int x) { }
+}";
+            var comp = CreateCompilation(new[] { source1, source2 });
+            var tree = comp.SyntaxTrees[0];
+            //comp.VerifyDiagnostics(); // doing this first hides the symptoms of the bug
+            var model = comp.GetSemanticModel(tree);
+
+            // There should be no diagnostics.
+            model.GetDiagnostics().Verify(
+                //// (1,1): hidden CS8019: Unnecessary using directive.
+                //// using System.Runtime.InteropServices;
+                //Diagnostic(ErrorCode.HDN_UnusedUsingDirective, "using System.Runtime.InteropServices;").WithLocation(1, 1)
+                );
+        }
+
+        [Fact, WorkItem(2773, "https://github.com/dotnet/roslyn/issues/2773")]
+        public void UsageInDocComment()
+        {
+            var source = @"using X;
+
+/// <summary/>
+public class Program
+{
+    /// <summary>
+    /// <see cref=""Q""/>
+    /// </summary>
+    static void Main(string[] args)
+    {
+    }
+}
+
+namespace X
+{
+    /// <summary/>
+    public class Q { }
+}
+";
+            foreach (DocumentationMode documentationMode in Enum.GetValues(typeof(DocumentationMode)))
+            {
+                var compilation = CreateCompilation(source, parseOptions: TestOptions.Regular.WithDocumentationMode(documentationMode));
+                compilation.VerifyDiagnostics();
+            }
         }
     }
 }

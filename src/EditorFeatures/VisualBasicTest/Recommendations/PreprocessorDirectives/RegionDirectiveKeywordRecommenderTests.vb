@@ -1,45 +1,48 @@
-' Copyright (c) Microsoft.  All Rights Reserved.  Licensed under the Apache License, Version 2.0.  See License.txt in the project root for license information.
-
-Imports Microsoft.CodeAnalysis.Text
-Imports Microsoft.CodeAnalysis.VisualBasic
-Imports Microsoft.CodeAnalysis.VisualBasic.Symbols
-Imports Microsoft.CodeAnalysis.VisualBasic.Syntax
-Imports Roslyn.Test.Utilities
-Imports Xunit
+﻿' Licensed to the .NET Foundation under one or more agreements.
+' The .NET Foundation licenses this file to you under the MIT license.
+' See the LICENSE file in the project root for more information.
 
 Namespace Microsoft.CodeAnalysis.Editor.VisualBasic.UnitTests.Recommendations.PreprocessorDirectives
     Public Class RegionDirectiveKeywordRecommenderTests
-        <Fact>
-        <Trait(Traits.Feature, Traits.Features.KeywordRecommending)>
-        Public Sub HashRegionInFile()
+        <Fact, Trait(Traits.Feature, Traits.Features.KeywordRecommending)>
+        Public Sub HashRegionInFileTest()
             VerifyRecommendationsContain(<File>|</File>, "#Region")
         End Sub
 
-        <Fact>
-        <Trait(Traits.Feature, Traits.Features.KeywordRecommending)>
-        Public Sub HashRegionInLambda()
+        <Fact, Trait(Traits.Feature, Traits.Features.KeywordRecommending)>
+        Public Sub HashRegionInLambdaTest()
             VerifyRecommendationsContain(<ClassDeclaration>Dim x = Function()
 |
 End Function</ClassDeclaration>, "#Region")
         End Sub
 
-        <Fact>
-        <Trait(Traits.Feature, Traits.Features.KeywordRecommending)>
-        Public Sub NotInEnumBlockMemberDeclaration()
+        <Fact, Trait(Traits.Feature, Traits.Features.KeywordRecommending)>
+        Public Sub NotInEnumBlockMemberDeclarationTest()
             VerifyRecommendationsMissing(<File>
-                                             Enum foo
+                                             Enum goo
                                                 |
                                             End enum
                                          </File>, "#Region")
         End Sub
 
-        <Fact>
-        <Trait(Traits.Feature, Traits.Features.KeywordRecommending)>
-        Public Sub NotAfterHashEnd()
+        <Fact, Trait(Traits.Feature, Traits.Features.KeywordRecommending)>
+        Public Sub NotAfterHashEndTest()
             VerifyRecommendationsMissing(<File>
-#Region "foo"
+#Region "goo"
 
 #End |</File>, "#Region")
+        End Sub
+
+        <WorkItem(6389, "https://github.com/dotnet/roslyn/issues/6389")>
+        <Fact, Trait(Traits.Feature, Traits.Features.KeywordRecommending)>
+        Public Sub NotAfterHashRegionTest()
+            VerifyRecommendationsMissing(<File>
+                                         Class C
+
+                                             #Region |
+
+                                         End Class
+                                         </File>, "#Region")
         End Sub
     End Class
 End Namespace

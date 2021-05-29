@@ -1,10 +1,15 @@
-﻿// Copyright (c) Microsoft.  All Rights Reserved.  Licensed under the Apache License, Version 2.0.  See License.txt in the project root for license information.
+﻿// Licensed to the .NET Foundation under one or more agreements.
+// The .NET Foundation licenses this file to you under the MIT license.
+// See the LICENSE file in the project root for more information.
+
+#nullable disable
 
 using System;
 using Microsoft.CodeAnalysis.Classification.Classifiers;
 using Microsoft.CodeAnalysis.CodeRefactorings;
 using Microsoft.CodeAnalysis.Editor;
 using Microsoft.CodeAnalysis.Text;
+using Roslyn.Test.Utilities;
 using Xunit;
 
 namespace Microsoft.CodeAnalysis.Editor.UnitTests.Attributes
@@ -12,7 +17,7 @@ namespace Microsoft.CodeAnalysis.Editor.UnitTests.Attributes
     public class AttributeTests
     {
 #if false
-        [Fact]
+        [WpfFact]
         public void CreateExportSyntaxTokenCodeIssueProviderAttributeWithNullArg()
         {
             Assert.Throws<ArgumentNullException>(() =>
@@ -22,7 +27,7 @@ namespace Microsoft.CodeAnalysis.Editor.UnitTests.Attributes
             new ExportSyntaxTokenCodeIssueProviderAttribute("name", "language");
         }
 
-        [Fact]
+        [WpfFact]
         public void CreateExportSyntaxTriviaCodeIssueProviderAttributeWithNullArg()
         {
             Assert.Throws<ArgumentNullException>(() =>
@@ -44,9 +49,9 @@ namespace Microsoft.CodeAnalysis.Editor.UnitTests.Attributes
         public void CreateExportCompletionProviderAttributeWithNullArg()
         {
             Assert.Throws<ArgumentNullException>(() =>
-                new ExportCompletionProviderAttribute("name", null));
+                new ExportCompletionProviderMef1Attribute("name", null));
             Assert.Throws<ArgumentNullException>(() =>
-                new ExportCompletionProviderAttribute(null, "language"));
+                new ExportCompletionProviderMef1Attribute(null, "language"));
         }
     }
 }

@@ -1,4 +1,6 @@
-﻿' Copyright (c) Microsoft.  All Rights Reserved.  Licensed under the Apache License, Version 2.0.  See License.txt in the project root for license information.
+﻿' Licensed to the .NET Foundation under one or more agreements.
+' The .NET Foundation licenses this file to you under the MIT license.
+' See the LICENSE file in the project root for more information.
 
 Imports System.Collections.Generic
 Imports Microsoft.CodeAnalysis.Text
@@ -25,16 +27,16 @@ Namespace Microsoft.CodeAnalysis.VisualBasic
         ' forward local. However, just to make sure, we also keep track of every
         ' local whose type we are attempting to infer. (This might be necessary for
         ' "script class" scenarios where local vars are actually fields.)
-        Private symbols As ConsList(Of LocalSymbol)
+        Private ReadOnly _symbols As ConsList(Of LocalSymbol)
 
         Public Sub New(containingBinder As Binder, symbol As LocalSymbol)
             MyBase.New(containingBinder)
-            Me.symbols = New ConsList(Of LocalSymbol)(symbol, containingBinder.ImplicitlyTypedLocalsBeingBound)
+            Me._symbols = New ConsList(Of LocalSymbol)(symbol, containingBinder.ImplicitlyTypedLocalsBeingBound)
         End Sub
 
         Public Overrides ReadOnly Property ImplicitlyTypedLocalsBeingBound As ConsList(Of LocalSymbol)
             Get
-                Return Me.symbols
+                Return Me._symbols
             End Get
 
         End Property

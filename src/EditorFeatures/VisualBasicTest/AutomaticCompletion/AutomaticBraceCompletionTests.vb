@@ -1,24 +1,27 @@
-' Copyright (c) Microsoft.  All Rights Reserved.  Licensed under the Apache License, Version 2.0.  See License.txt in the project root for license information.
+﻿' Licensed to the .NET Foundation under one or more agreements.
+' The .NET Foundation licenses this file to you under the MIT license.
+' See the LICENSE file in the project root for more information.
 
 Imports System.Xml.Linq
 Imports Microsoft.CodeAnalysis.Editor.UnitTests.AutomaticCompletion
 Imports Microsoft.CodeAnalysis.Editor.UnitTests.Extensions
 Imports Microsoft.CodeAnalysis.Editor.UnitTests.Workspaces
 Imports Microsoft.CodeAnalysis.Editor.Implementation.AutomaticCompletion
+Imports Microsoft.CodeAnalysis.BraceCompletion.AbstractBraceCompletionService
 
 Namespace Microsoft.CodeAnalysis.Editor.VisualBasic.UnitTests.AutomaticCompletion
     Public Class AutomaticBraceCompletionTests
         Inherits AbstractAutomaticBraceCompletionTests
 
-        <Fact, Trait(Traits.Feature, Traits.Features.AutomaticCompletion)>
-        Public Sub Creation()
-            Using session = CreateSession("$$")
+        <WpfFact, Trait(Traits.Feature, Traits.Features.AutomaticCompletion)>
+        Public Sub TestCreation()
+            Using session = CreateSessionASync("$$")
                 Assert.NotNull(session)
             End Using
         End Sub
 
-        <Fact, Trait(Traits.Feature, Traits.Features.AutomaticCompletion)>
-        Public Sub InvalidLocation_String()
+        <WpfFact, Trait(Traits.Feature, Traits.Features.AutomaticCompletion)>
+        Public Sub TestInvalidLocation_String()
             Dim code = <code>Class C
     Dim s As String = "$$
 End Class</code>
@@ -28,8 +31,8 @@ End Class</code>
             End Using
         End Sub
 
-        <Fact, Trait(Traits.Feature, Traits.Features.AutomaticCompletion)>
-        Public Sub InvalidLocation_Comment()
+        <WpfFact, Trait(Traits.Feature, Traits.Features.AutomaticCompletion)>
+        Public Sub TestInvalidLocation_Comment()
             Dim code = <code>Class C
     ' $$
 End Class</code>
@@ -39,8 +42,8 @@ End Class</code>
             End Using
         End Sub
 
-        <Fact, Trait(Traits.Feature, Traits.Features.AutomaticCompletion)>
-        Public Sub InvalidLocation_DocComment()
+        <WpfFact, Trait(Traits.Feature, Traits.Features.AutomaticCompletion)>
+        Public Sub TestInvalidLocation_DocComment()
             Dim code = <code>Class C
     ''' $$
 End Class</code>
@@ -50,8 +53,8 @@ End Class</code>
             End Using
         End Sub
 
-        <Fact, Trait(Traits.Feature, Traits.Features.AutomaticCompletion)>
-        Public Sub TypeParameterMultipleConstraint()
+        <WpfFact, Trait(Traits.Feature, Traits.Features.AutomaticCompletion)>
+        Public Sub TestTypeParameterMultipleConstraint()
             Dim code = <code>Class C
     Sub Method(Of t As $$
 End Class</code>
@@ -62,8 +65,8 @@ End Class</code>
             End Using
         End Sub
 
-        <Fact, Trait(Traits.Feature, Traits.Features.AutomaticCompletion)>
-        Public Sub ObjectMemberInitializerSyntax()
+        <WpfFact, Trait(Traits.Feature, Traits.Features.AutomaticCompletion)>
+        Public Sub TestObjectMemberInitializerSyntax()
             Dim code = <code>Class C
     Sub Method()
         Dim a = New With $$
@@ -76,8 +79,8 @@ End Class</code>
             End Using
         End Sub
 
-        <Fact, Trait(Traits.Feature, Traits.Features.AutomaticCompletion)>
-        Public Sub CollectionInitializerSyntax()
+        <WpfFact, Trait(Traits.Feature, Traits.Features.AutomaticCompletion)>
+        Public Sub TestCollectionInitializerSyntax()
             Dim code = <code>Class C
     Sub Method()
         Dim a = New List(Of Integer) From $$
@@ -90,14 +93,14 @@ End Class</code>
             End Using
         End Sub
 
-        Friend Overloads Function CreateSession(code As XElement) As Holder
-            Return CreateSession(code.NormalizedValue())
+        Friend Overloads Shared Function CreateSession(code As XElement) As Holder
+            Return CreateSessionASync(code.NormalizedValue())
         End Function
 
-        Friend Overloads Function CreateSession(code As String) As Holder
-            Return CreateSession(
-                VisualBasicWorkspaceFactory.CreateWorkspaceFromFile(code),
-                BraceCompletionSessionProvider.CurlyBrace.OpenCharacter, BraceCompletionSessionProvider.CurlyBrace.CloseCharacter)
+        Friend Overloads Shared Function CreateSessionASync(code As String) As Holder
+            Return AbstractAutomaticBraceCompletionTests.CreateSession(
+                TestWorkspace.CreateVisualBasic(code),
+                CurlyBrace.OpenCharacter, CurlyBrace.CloseCharacter)
         End Function
     End Class
 End Namespace

@@ -1,14 +1,16 @@
-﻿// Copyright (c) Microsoft.  All Rights Reserved.  Licensed under the Apache License, Version 2.0.  See License.txt in the project root for license information.
+﻿// Licensed to the .NET Foundation under one or more agreements.
+// The .NET Foundation licenses this file to you under the MIT license.
+// See the LICENSE file in the project root for more information.
+
+#nullable disable
 
 using System;
-using System.Collections.Generic;
 using System.Collections.Immutable;
 using System.Diagnostics;
 using System.Linq;
-using Microsoft.CodeAnalysis.CodeGen;
+using System.Reflection.Metadata;
 using Microsoft.CodeAnalysis.CSharp.Symbols;
-using Microsoft.CodeAnalysis.CSharp.Syntax;
-using Microsoft.CodeAnalysis.Text;
+using Microsoft.CodeAnalysis.PooledObjects;
 
 namespace Microsoft.CodeAnalysis.CSharp.CodeGen
 {
@@ -24,7 +26,7 @@ namespace Microsoft.CodeAnalysis.CSharp.CodeGen
 
             // Mixed case where there are some initializers that are constants and
             // there is enough of them so that it makes sense to use block initialization
-            // followed by individual initialization of nonconstant elements
+            // followed by individual initialization of non-constant elements
             Mixed,
         }
 
@@ -33,7 +35,7 @@ namespace Microsoft.CodeAnalysis.CSharp.CodeGen
         /// Assumes that we have newly created array on the stack.
         /// 
         /// inits could be an array of values for a single dimensional array
-        /// or an   array (of array)+  of values for a multidimensional case
+        /// or an array (of array)+ of values for a multidimensional case
         /// 
         /// in either case it is expected that number of leaf values will match number 
         /// of elements in the array and nesting level should match the rank of the array.
@@ -217,8 +219,26 @@ namespace Microsoft.CodeAnalysis.CSharp.CodeGen
                 return initConstantValueOpt;
             }
 
-            TypeSymbol type = init.Type.EnumUnderlyingType();
+            TypeSymbol type = init.Type.EnumUnderlyingTypeOrSelf();
             return ConstantValue.Default(type.SpecialType);
+        }
+
+        /// <summary>
+        /// Determine if enum arrays can be initialized using block initialization.
+        /// </summary>
+        /// <returns>True if it's safe to use block initialization for enum arrays.</returns>
+        /// <remarks>
+        /// In NetFx 4.0, block array initializers do not work on all combinations of {32/64 X Debug/Retail} when array elements are enums.
+        /// This is fixed in 4.5 thus enabling block array initialization for a very common case.
+        /// We look for the presence of <see cref="System.Runtime.GCLatencyMode.SustainedLowLatency"/> which was introduced in .NET Framework 4.5
+        /// </remarks>
+        private bool EnableEnumArrayBlockInitialization
+        {
+            get
+            {
+                var sustainedLowLatency = _module.Compilation.GetWellKnownTypeMember(WellKnownMember.System_Runtime_GCLatencyMode__SustainedLowLatency);
+                return sustainedLowLatency != null && sustainedLowLatency.ContainingAssembly == _module.Compilation.Assembly.CorLibrary;
+            }
         }
 
         private ArrayInitializerStyle ShouldEmitBlockInitializer(TypeSymbol elementType, ImmutableArray<BoundExpression> inits)
@@ -230,11 +250,11 @@ namespace Microsoft.CodeAnalysis.CSharp.CodeGen
 
             if (elementType.IsEnumType())
             {
-                if (!_module.Compilation.EnableEnumArrayBlockInitialization)
+                if (!EnableEnumArrayBlockInitialization)
                 {
                     return ArrayInitializerStyle.Element;
                 }
-                elementType = elementType.EnumUnderlyingType();
+                elementType = elementType.EnumUnderlyingTypeOrSelf();
             }
 
             if (elementType.SpecialType.IsBlittable())
@@ -288,7 +308,7 @@ namespace Microsoft.CodeAnalysis.CSharp.CodeGen
                 else
                 {
                     // NOTE: default values do not need to be initialized. 
-                    //       .Net arrays are always zero-inited.
+                    //       .NET arrays are always zero-inited.
                     if (!init.IsDefaultValue())
                     {
                         initCount += 1;
@@ -303,22 +323,21 @@ namespace Microsoft.CodeAnalysis.CSharp.CodeGen
 
         /// <summary>
         /// Produces a serialized blob of all constant initializers.
-        /// Nonconstat initializers are matched with a zero of corresponding size.
+        /// Non-constant initializers are matched with a zero of corresponding size.
         /// </summary>
         private ImmutableArray<byte> GetRawData(ImmutableArray<BoundExpression> initializers)
         {
             // the initial size is a guess.
             // there is no point to be precise here as MemoryStream always has N + 1 storage 
             // and will need to be trimmed regardless
-            var stream = new Cci.MemoryStream((uint)(initializers.Length * 4));
-            var writer = new Cci.BinaryWriter(stream);
+            var writer = new BlobBuilder(initializers.Length * 4);
 
             SerializeArrayRecursive(writer, initializers);
 
-            return ImmutableArray.Create(stream.Buffer, 0, (int)stream.Position);
+            return writer.ToImmutableArray();
         }
 
-        private void SerializeArrayRecursive(Microsoft.Cci.BinaryWriter bw, ImmutableArray<BoundExpression> inits)
+        private void SerializeArrayRecursive(BlobBuilder bw, ImmutableArray<BoundExpression> inits)
         {
             if (inits.Length != 0)
             {
@@ -349,6 +368,128 @@ namespace Microsoft.CodeAnalysis.CSharp.CodeGen
                          "all or none should be nested");
 
             return inits.Length != 0 && inits[0].Kind == BoundKind.ArrayInitialization;
+        }
+
+        private bool TryEmitReadonlySpanAsBlobWrapper(NamedTypeSymbol spanType, BoundExpression wrappedExpression, bool used, bool inPlace)
+        {
+            ImmutableArray<byte> data = default;
+            int elementCount = -1;
+            TypeSymbol elementType = null;
+
+            if (!_module.SupportsPrivateImplClass)
+            {
+                return false;
+            }
+
+            var ctor = ((MethodSymbol)this._module.Compilation.GetWellKnownTypeMember(WellKnownMember.System_ReadOnlySpan_T__ctor));
+            if (ctor == null)
+            {
+                return false;
+            }
+
+            if (wrappedExpression is BoundArrayCreation ac)
+            {
+                var arrayType = (ArrayTypeSymbol)ac.Type;
+                elementType = arrayType.ElementType.EnumUnderlyingTypeOrSelf();
+
+                // NB: we cannot use this approach for element types larger than one byte
+                //     the issue is that metadata stores blobs in little-endian format
+                //     so anything that is larger than one byte will be incorrect on a big-endian machine
+                //     With additional runtime support it might be possible, but not yet.
+                //     See: https://github.com/dotnet/corefx/issues/26948 for more details
+                if (elementType.SpecialType.SizeInBytes() != 1)
+                {
+                    return false;
+                }
+
+                elementCount = TryGetRawDataForArrayInit(ac.InitializerOpt, out data);
+            }
+
+            if (elementCount < 0)
+            {
+                return false;
+            }
+
+            if (!inPlace && !used)
+            {
+                // emitting a value that no one will see
+                return true;
+            }
+
+            if (elementCount == 0)
+            {
+                if (inPlace)
+                {
+                    _builder.EmitOpCode(ILOpCode.Initobj);
+                    EmitSymbolToken(spanType, wrappedExpression.Syntax);
+                }
+                else
+                {
+                    EmitDefaultValue(spanType, used, wrappedExpression.Syntax);
+                }
+            }
+            else
+            {
+                if (IsPeVerifyCompatEnabled())
+                {
+                    return false;
+                }
+
+                _builder.EmitArrayBlockFieldRef(data, wrappedExpression.Syntax, _diagnostics);
+                _builder.EmitIntConstant(elementCount);
+
+                if (inPlace)
+                {
+                    // consumes target ref, data ptr and size, pushes nothing
+                    _builder.EmitOpCode(ILOpCode.Call, stackAdjustment: -3);
+                }
+                else
+                {
+                    // consumes data ptr and size, pushes the instance
+                    _builder.EmitOpCode(ILOpCode.Newobj, stackAdjustment: -1);
+                }
+
+                EmitSymbolToken(ctor.AsMember(spanType), wrappedExpression.Syntax, optArgList: null);
+            }
+
+            return true;
+        }
+
+        /// <summary>
+        ///  Returns a byte blob that matches serialized content of single array initializer.    
+        ///  returns -1 if the initializer is null or not an array of literals
+        /// </summary>
+        private int TryGetRawDataForArrayInit(BoundArrayInitialization initializer, out ImmutableArray<byte> data)
+        {
+            data = default;
+
+            if (initializer == null)
+            {
+                return -1;
+            }
+
+            var initializers = initializer.Initializers;
+            if (initializers.Any(init => init.ConstantValue == null))
+            {
+                return -1;
+            }
+
+            var elementCount = initializers.Length;
+            if (elementCount == 0)
+            {
+                data = ImmutableArray<byte>.Empty;
+                return 0;
+            }
+
+            var writer = new BlobBuilder(initializers.Length * 4);
+
+            foreach (var init in initializer.Initializers)
+            {
+                init.ConstantValue.Serialize(writer);
+            }
+
+            data = writer.ToImmutableArray();
+            return elementCount;
         }
     }
 }

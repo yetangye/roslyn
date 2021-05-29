@@ -1,36 +1,53 @@
-﻿' Copyright (c) Microsoft.  All Rights Reserved.  Licensed under the Apache License, Version 2.0.  See License.txt in the project root for license information.
+﻿' Licensed to the .NET Foundation under one or more agreements.
+' The .NET Foundation licenses this file to you under the MIT license.
+' See the LICENSE file in the project root for more information.
 
+Imports System.Collections.Immutable
+Imports System.FormattableString
 Imports System.IO
 Imports System.Text
-Imports System.Threading
+Imports Microsoft.CodeAnalysis
+Imports Microsoft.CodeAnalysis.CSharp
 Imports Microsoft.CodeAnalysis.Test.Utilities
 Imports Microsoft.VisualStudio.LanguageServices.Implementation
+Imports Microsoft.Win32
 Imports Roslyn.Test.Utilities
+Imports Roslyn.Utilities
 
 Namespace Microsoft.VisualStudio.LanguageServices.UnitTests
+    <[UseExportProvider]>
     Public Class AnalyzerDependencyCheckerTests
         Inherits TestBase
 
-        Shared CSharpCompilerExecutable As String = Path.Combine(Path.GetDirectoryName(GetType(AnalyzerDependencyCheckerTests).Assembly.Location), "csc.exe")
+        Private Shared ReadOnly s_mscorlibDisplayName As String = "mscorlib, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b77a5c561934e089"
 
-        <Fact, WorkItem(1064914)>
-        Public Sub Test1()
+        Private Shared Function GetIgnorableAssemblyLists() As IEnumerable(Of IIgnorableAssemblyList)
+            Dim mscorlib As AssemblyIdentity = Nothing
+            AssemblyIdentity.TryParseDisplayName(s_mscorlibDisplayName, mscorlib)
+
+            Return SpecializedCollections.SingletonEnumerable(
+                New IgnorableAssemblyIdentityList(SpecializedCollections.SingletonEnumerable(mscorlib)))
+        End Function
+
+        <Fact>
+        <WorkItem(1064914, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/1064914")>
+        Public Sub ConflictsTest1()
             ' Dependency Graph:
             '   A
 
             Using directory = New DisposableDirectory(Temp)
                 Dim library = BuildLibrary(directory, "public class A { }", "A")
 
-                Dim dependencyChecker = New AnalyzerDependencyChecker({library})
-                Dim results = dependencyChecker.Run()
+                Dim results = AnalyzerDependencyChecker.ComputeDependencyConflicts({library}, GetIgnorableAssemblyLists())
 
-                Assert.Empty(results)
+                Assert.Empty(results.Conflicts)
             End Using
 
         End Sub
 
-        <Fact, WorkItem(1064914)>
-        Public Sub Test2()
+        <Fact>
+        <WorkItem(1064914, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/1064914")>
+        Public Sub ConflictsTest2()
             ' Dependency graph:
             '   A --> B
 
@@ -49,15 +66,15 @@ public class A
                 Dim libraryB = BuildLibrary(directory, sourceB, "B")
                 Dim libraryA = BuildLibrary(directory, sourceA, "A", "B")
 
-                Dim dependencyChecker = New AnalyzerDependencyChecker({libraryA})
-                Dim results = dependencyChecker.Run()
+                Dim results = AnalyzerDependencyChecker.ComputeDependencyConflicts({libraryA, libraryB}, GetIgnorableAssemblyLists())
 
-                Assert.Empty(results)
+                Assert.Empty(results.Conflicts)
             End Using
         End Sub
 
-        <Fact, WorkItem(1064914)>
-        Public Sub Test3()
+        <Fact>
+        <WorkItem(1064914, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/1064914")>
+        Public Sub ConflictsTest3()
             ' Dependency graph:
             '   A --> B
             '     \
@@ -81,16 +98,17 @@ public class A
                 Dim libraryB = BuildLibrary(directory, sourceB, "B")
                 Dim libraryA = BuildLibrary(directory, sourceA, "A", "B", "C")
 
-                Dim dependencyChecker = New AnalyzerDependencyChecker({libraryA})
-                Dim results = dependencyChecker.Run()
+                Dim results = AnalyzerDependencyChecker.ComputeDependencyConflicts({libraryA, libraryB, libraryC}, GetIgnorableAssemblyLists())
 
-                Assert.Empty(results)
+                Assert.Empty(results.Conflicts)
+                Assert.Empty(results.MissingDependencies)
             End Using
 
         End Sub
 
-        <Fact, WorkItem(1064914)>
-        Public Sub Test4()
+        <Fact>
+        <WorkItem(1064914, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/1064914")>
+        Public Sub ConflictsTest4()
             ' Dependency graph:
             '   A --> B
             '   C --> D
@@ -121,15 +139,16 @@ public class C
                 Dim libraryD = BuildLibrary(directory, sourceD, "D")
                 Dim libraryC = BuildLibrary(directory, sourceC, "C", "D")
 
-                Dim dependencyChecker = New AnalyzerDependencyChecker({libraryA, libraryC})
-                Dim results = dependencyChecker.Run()
+                Dim results = AnalyzerDependencyChecker.ComputeDependencyConflicts({libraryA, libraryB, libraryC, libraryD}, GetIgnorableAssemblyLists())
 
-                Assert.Empty(results)
+                Assert.Empty(results.Conflicts)
+                Assert.Empty(results.MissingDependencies)
             End Using
         End Sub
 
-        <Fact, WorkItem(1064914)>
-        Public Sub Test5()
+        <Fact>
+        <WorkItem(1064914, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/1064914")>
+        Public Sub ConflictsTest5()
             ' Dependency graph:
             '   Directory 1:
             '     A --> B
@@ -162,15 +181,16 @@ public class C
                 Dim libraryD = BuildLibrary(directory2, sourceD, "D")
                 Dim libraryC = BuildLibrary(directory2, sourceC, "C", "D")
 
-                Dim dependencyChecker = New AnalyzerDependencyChecker({libraryA, libraryC})
-                Dim results = dependencyChecker.Run()
+                Dim results = AnalyzerDependencyChecker.ComputeDependencyConflicts({libraryA, libraryB, libraryC, libraryD}, GetIgnorableAssemblyLists())
 
-                Assert.Empty(results)
+                Assert.Empty(results.Conflicts)
+                Assert.Empty(results.MissingDependencies)
             End Using
         End Sub
 
-        <Fact, WorkItem(1064914)>
-        Public Sub Test6()
+        <Fact>
+        <WorkItem(1064914, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/1064914")>
+        Public Sub ConflictsTest6()
             ' Dependency graph:
             ' A -
             '    \
@@ -202,15 +222,16 @@ public class B
                 Dim libraryA = BuildLibrary(directory, sourceA, "A", "C")
                 Dim libraryB = BuildLibrary(directory, sourceB, "B", "C")
 
-                Dim dependencyChecker = New AnalyzerDependencyChecker({libraryA, libraryB})
-                Dim results = dependencyChecker.Run()
+                Dim results = AnalyzerDependencyChecker.ComputeDependencyConflicts({libraryA, libraryB, libraryC}, GetIgnorableAssemblyLists())
 
-                Assert.Empty(results)
+                Assert.Empty(results.Conflicts)
+                Assert.Empty(results.MissingDependencies)
             End Using
         End Sub
 
-        <Fact, WorkItem(1064914)>
-        Public Sub Test7()
+        <Fact>
+        <WorkItem(1064914, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/1064914")>
+        Public Sub ConflictsTest7()
             ' Dependency graph:
             '   Directory 1:
             '     A --> C
@@ -239,18 +260,19 @@ public class B
             Using directory1 = New DisposableDirectory(Temp), directory2 = New DisposableDirectory(Temp)
                 Dim libraryC1 = BuildLibrary(directory1, sourceC, "C")
                 Dim libraryA = BuildLibrary(directory1, sourceA, "A", "C")
-                Dim libraryC2 = directory2.CreateFile("C.dll").CopyContentFrom(libraryC1)
+                Dim libraryC2 = directory2.CreateFile("C.dll").CopyContentFrom(libraryC1).Path
                 Dim libraryB = BuildLibrary(directory2, sourceB, "B", "C")
 
-                Dim dependencyChecker = New AnalyzerDependencyChecker({libraryA, libraryB})
-                Dim results = dependencyChecker.Run()
+                Dim results = AnalyzerDependencyChecker.ComputeDependencyConflicts({libraryA, libraryB, libraryC1, libraryC2}, GetIgnorableAssemblyLists())
 
-                Assert.Empty(results)
+                Assert.Empty(results.Conflicts)
+                Assert.Empty(results.MissingDependencies)
             End Using
         End Sub
 
-        <Fact, WorkItem(1064914)>
-        Public Sub Test8()
+        <Fact>
+        <WorkItem(1064914, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/1064914")>
+        Public Sub ConflictsTest8()
             ' Dependency graph:
             '   Directory 1:
             '     A --> C
@@ -293,26 +315,24 @@ public class C
                 Dim libraryCPrime = BuildLibrary(directory2, sourceCPrime, "C")
                 Dim libraryB = BuildLibrary(directory2, sourceB, "B", "C")
 
-                Dim dependencyChecker = New AnalyzerDependencyChecker({libraryA, libraryB})
-                Dim results = dependencyChecker.Run()
+                Dim results = AnalyzerDependencyChecker.ComputeDependencyConflicts({libraryA, libraryB, libraryC, libraryCPrime}, GetIgnorableAssemblyLists())
 
-                Assert.Equal(expected:=1, actual:=results.Length)
+                Dim conflicts = results.Conflicts
 
-                Dim analyzer1FileName As String = Path.GetFileName(results(0).AnalyzerFilePath1)
-                Dim analyzer2FileName As String = Path.GetFileName(results(0).AnalyzerFilePath2)
-                Dim dependency1FileName As String = Path.GetFileName(results(0).DependencyFilePath1)
-                Dim dependency2FileName As String = Path.GetFileName(results(0).DependencyFilePath2)
+                Assert.Equal(expected:=1, actual:=conflicts.Length)
 
-                Assert.True((analyzer1FileName = "A.dll" AndAlso analyzer2FileName = "B.dll") OrElse
-                            (analyzer1FileName = "B.dll" AndAlso analyzer2FileName = "A.dll"))
-                Assert.Equal(expected:="C.dll", actual:=dependency1FileName)
-                Assert.Equal(expected:="C.dll", actual:=dependency2FileName)
+                Dim analyzer1FileName As String = Path.GetFileName(conflicts(0).AnalyzerFilePath1)
+                Dim analyzer2FileName As String = Path.GetFileName(conflicts(0).AnalyzerFilePath2)
 
+                Assert.Equal(expected:="C.dll", actual:=analyzer1FileName)
+                Assert.Equal(expected:="C.dll", actual:=analyzer2FileName)
+                Assert.Equal(expected:=New AssemblyIdentity("C"), actual:=conflicts(0).Identity)
             End Using
         End Sub
 
-        <Fact, WorkItem(1064914)>
-        Public Sub Test9()
+        <Fact>
+        <WorkItem(1064914, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/1064914")>
+        Public Sub ConflictsTest9()
             ' Dependency graph:
             '   Directory 1:
             '     A --> C --> D
@@ -362,29 +382,27 @@ public class D
                 Dim libraryD = BuildLibrary(directory1, sourceD, "D")
                 Dim libraryDPrime = BuildLibrary(directory2, sourceDPrime, "D")
                 Dim libraryC1 = BuildLibrary(directory1, sourceC, "C", "D")
-                Dim libraryC2 = directory2.CreateFile("C.dll").CopyContentFrom(libraryC1)
+                Dim libraryC2 = directory2.CreateFile("C.dll").CopyContentFrom(libraryC1).Path
                 Dim libraryA = BuildLibrary(directory1, sourceA, "A", "C")
                 Dim libraryB = BuildLibrary(directory2, sourceB, "B", "C")
 
-                Dim dependencyChecker = New AnalyzerDependencyChecker({libraryA, libraryB})
-                Dim results = dependencyChecker.Run()
+                Dim results = AnalyzerDependencyChecker.ComputeDependencyConflicts({libraryA, libraryB, libraryC1, libraryC2, libraryD, libraryDPrime}, GetIgnorableAssemblyLists())
 
-                Assert.Equal(expected:=1, actual:=results.Length)
+                Dim conflicts = results.Conflicts
+                Assert.Equal(expected:=1, actual:=conflicts.Length)
 
-                Dim analyzer1FileName As String = Path.GetFileName(results(0).AnalyzerFilePath1)
-                Dim analyzer2FileName As String = Path.GetFileName(results(0).AnalyzerFilePath2)
-                Dim dependency1FileName As String = Path.GetFileName(results(0).DependencyFilePath1)
-                Dim dependency2FileName As String = Path.GetFileName(results(0).DependencyFilePath2)
+                Dim analyzer1FileName As String = Path.GetFileName(conflicts(0).AnalyzerFilePath1)
+                Dim analyzer2FileName As String = Path.GetFileName(conflicts(0).AnalyzerFilePath2)
 
-                Assert.True((analyzer1FileName = "A.dll" AndAlso analyzer2FileName = "B.dll") OrElse
-                            (analyzer1FileName = "B.dll" AndAlso analyzer2FileName = "A.dll"))
-                Assert.Equal(expected:="D.dll", actual:=dependency1FileName)
-                Assert.Equal(expected:="D.dll", actual:=dependency2FileName)
+                Assert.Equal(expected:="D.dll", actual:=analyzer1FileName)
+                Assert.Equal(expected:="D.dll", actual:=analyzer2FileName)
+                Assert.Equal(expected:=New AssemblyIdentity("D"), actual:=conflicts(0).Identity)
             End Using
         End Sub
 
-        <Fact, WorkItem(1064914)>
-        Public Sub Test10()
+        <Fact>
+        <WorkItem(1064914, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/1064914")>
+        Public Sub ConflictsTest10()
             ' Dependency graph:
             '   Directory 1:
             '     A --> C --> E
@@ -447,25 +465,23 @@ public class E
                 Dim libraryA = BuildLibrary(directory1, sourceA, "A", "C")
                 Dim libraryB = BuildLibrary(directory2, sourceB, "B", "D")
 
-                Dim dependencyChecker = New AnalyzerDependencyChecker({libraryA, libraryB})
-                Dim results = dependencyChecker.Run()
+                Dim results = AnalyzerDependencyChecker.ComputeDependencyConflicts({libraryA, libraryB, libraryC, libraryD, libraryE, libraryEPrime}, GetIgnorableAssemblyLists())
+                Dim conflicts = results.Conflicts
 
-                Assert.Equal(expected:=1, actual:=results.Length)
+                Assert.Equal(expected:=1, actual:=conflicts.Length)
 
-                Dim analyzer1FileName As String = Path.GetFileName(results(0).AnalyzerFilePath1)
-                Dim analyzer2FileName As String = Path.GetFileName(results(0).AnalyzerFilePath2)
-                Dim dependency1FileName As String = Path.GetFileName(results(0).DependencyFilePath1)
-                Dim dependency2FileName As String = Path.GetFileName(results(0).DependencyFilePath2)
+                Dim analyzer1FileName As String = Path.GetFileName(conflicts(0).AnalyzerFilePath1)
+                Dim analyzer2FileName As String = Path.GetFileName(conflicts(0).AnalyzerFilePath2)
 
-                Assert.True((analyzer1FileName = "A.dll" AndAlso analyzer2FileName = "B.dll") OrElse
-                            (analyzer1FileName = "B.dll" AndAlso analyzer2FileName = "A.dll"))
-                Assert.Equal(expected:="E.dll", actual:=dependency1FileName)
-                Assert.Equal(expected:="E.dll", actual:=dependency2FileName)
+                Assert.Equal(expected:="E.dll", actual:=analyzer1FileName)
+                Assert.Equal(expected:="E.dll", actual:=analyzer2FileName)
+                Assert.Equal(expected:=New AssemblyIdentity("E"), actual:=conflicts(0).Identity)
             End Using
         End Sub
 
-        <Fact, WorkItem(1064914)>
-        Public Sub Test11()
+        <Fact>
+        <WorkItem(1064914, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/1064914")>
+        Public Sub ConflictsTest11()
             ' Dependency graph:
             '   Directory 1:
             '     A --> B
@@ -500,25 +516,23 @@ public class B
                 Dim libraryBPrime = BuildLibrary(directory2, sourceBPrime, "B")
                 Dim libraryA2 = directory2.CreateFile("A.dll").CopyContentFrom(libraryA1).Path
 
-                Dim dependencyChecker = New AnalyzerDependencyChecker({libraryA1, libraryA2})
-                Dim results = dependencyChecker.Run()
+                Dim results = AnalyzerDependencyChecker.ComputeDependencyConflicts({libraryA1, libraryA2, libraryB, libraryBPrime}, GetIgnorableAssemblyLists())
+                Dim conflicts = results.Conflicts
 
-                Assert.Equal(expected:=1, actual:=results.Length)
+                Assert.Equal(expected:=1, actual:=conflicts.Length)
 
-                Dim analyzer1FileName As String = Path.GetFileName(results(0).AnalyzerFilePath1)
-                Dim analyzer2FileName As String = Path.GetFileName(results(0).AnalyzerFilePath2)
-                Dim dependency1FileName As String = Path.GetFileName(results(0).DependencyFilePath1)
-                Dim dependency2FileName As String = Path.GetFileName(results(0).DependencyFilePath2)
+                Dim analyzer1FileName As String = Path.GetFileName(conflicts(0).AnalyzerFilePath1)
+                Dim analyzer2FileName As String = Path.GetFileName(conflicts(0).AnalyzerFilePath2)
 
-                Assert.Equal(expected:="A.dll", actual:=analyzer1FileName)
-                Assert.Equal(expected:="A.dll", actual:=analyzer2FileName)
-                Assert.Equal(expected:="B.dll", actual:=dependency1FileName)
-                Assert.Equal(expected:="B.dll", actual:=dependency2FileName)
+                Assert.Equal(expected:="B.dll", actual:=analyzer1FileName)
+                Assert.Equal(expected:="B.dll", actual:=analyzer2FileName)
+                Assert.Equal(expected:=New AssemblyIdentity("B"), actual:=conflicts(0).Identity)
             End Using
         End Sub
 
-        <Fact, WorkItem(1064914)>
-        Public Sub Test12()
+        <Fact>
+        <WorkItem(1064914, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/1064914")>
+        Public Sub ConflictsTest12()
             ' Dependency graph:
             '   Directory 1:
             '     A --> B
@@ -566,25 +580,16 @@ public class B
                 Dim libraryBPrime = BuildLibrary(directory2, sourceBPrime, "B")
                 Dim libraryAPrime = BuildLibrary(directory2, sourceAPrime, "A", "B")
 
-                Dim dependencyChecker = New AnalyzerDependencyChecker({libraryA, libraryAPrime})
-                Dim results = dependencyChecker.Run()
+                Dim results = AnalyzerDependencyChecker.ComputeDependencyConflicts({libraryA, libraryAPrime, libraryB, libraryBPrime}, GetIgnorableAssemblyLists())
+                Dim conflicts = results.Conflicts
 
-                Assert.Equal(expected:=1, actual:=results.Length)
-
-                Dim analyzer1FileName As String = Path.GetFileName(results(0).AnalyzerFilePath1)
-                Dim analyzer2FileName As String = Path.GetFileName(results(0).AnalyzerFilePath2)
-                Dim dependency1FileName As String = Path.GetFileName(results(0).DependencyFilePath1)
-                Dim dependency2FileName As String = Path.GetFileName(results(0).DependencyFilePath2)
-
-                Assert.Equal(expected:="A.dll", actual:=analyzer1FileName)
-                Assert.Equal(expected:="A.dll", actual:=analyzer2FileName)
-                Assert.Equal(expected:="B.dll", actual:=dependency1FileName)
-                Assert.Equal(expected:="B.dll", actual:=dependency2FileName)
+                Assert.Equal(expected:=2, actual:=conflicts.Length)
             End Using
         End Sub
 
-        <Fact, WorkItem(1064914)>
-        Public Sub Test13()
+        <Fact>
+        <WorkItem(1064914, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/1064914")>
+        Public Sub ConflictsTest13()
             ' Dependency graph:
             '   Directory 1:
             '     A  --> B
@@ -626,15 +631,23 @@ public class B
                 Dim libraryB2 = directory2.CreateFile("B.dll").CopyContentFrom(libraryB1).Path
                 Dim libraryAPrime = BuildLibrary(directory2, sourceAPrime, "A", "B")
 
-                Dim dependencyChecker = New AnalyzerDependencyChecker({libraryA, libraryAPrime})
-                Dim results = dependencyChecker.Run()
+                Dim results = AnalyzerDependencyChecker.ComputeDependencyConflicts({libraryA, libraryAPrime, libraryB1, libraryB2}, GetIgnorableAssemblyLists())
+                Dim conflicts = results.Conflicts
 
-                Assert.Equal(expected:=0, actual:=results.Length)
+                Assert.Equal(expected:=1, actual:=conflicts.Length)
+
+                Dim analyzer1FileName As String = Path.GetFileName(conflicts(0).AnalyzerFilePath1)
+                Dim analyzer2FileName As String = Path.GetFileName(conflicts(0).AnalyzerFilePath2)
+
+                Assert.Equal(expected:="A.dll", actual:=analyzer1FileName)
+                Assert.Equal(expected:="A.dll", actual:=analyzer2FileName)
+                Assert.Equal(expected:=New AssemblyIdentity("A"), actual:=conflicts(0).Identity)
             End Using
         End Sub
 
-        <Fact, WorkItem(1064914)>
-        Public Sub Test14()
+        <Fact>
+        <WorkItem(1064914, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/1064914")>
+        Public Sub ConflictsTest14()
             ' Dependency graph:
             '   Directory 1:
             '     A --> D
@@ -698,11 +711,154 @@ public class D
                 Dim libraryDPrimePrime = BuildLibrary(directory3, sourceDPrimePrime, "D")
                 Dim libraryC = BuildLibrary(directory3, sourceC, "C", "D")
 
-                Dim dependencyChecker = New AnalyzerDependencyChecker({libraryA, libraryB, libraryC})
-                Dim results = dependencyChecker.Run()
+                Dim results = AnalyzerDependencyChecker.ComputeDependencyConflicts({libraryA, libraryB, libraryC, libraryD, libraryDPrime, libraryDPrimePrime}, GetIgnorableAssemblyLists())
 
-                Assert.Equal(expected:=3, actual:=results.Length)
+                Assert.Equal(expected:=3, actual:=results.Conflicts.Length)
             End Using
+        End Sub
+
+        <Fact>
+        Public Sub MissingTest1()
+            ' Dependency Graph:
+            '   A
+
+            Using directory = New DisposableDirectory(Temp)
+                Dim library = BuildLibrary(directory, "public class A { }", "A")
+
+                Dim results = AnalyzerDependencyChecker.ComputeDependencyConflicts({library}, GetIgnorableAssemblyLists())
+
+                Assert.Empty(results.MissingDependencies)
+            End Using
+        End Sub
+
+        <Fact>
+        Public Sub MissingTest2()
+            ' Dependency graph:
+            '   A --> B*
+
+            Dim sourceA = "
+public class A
+{
+    void M()
+    {
+        B b = new B();
+    }
+}"
+
+            Dim sourceB = "public class B { }"
+
+            Using directory = New DisposableDirectory(Temp)
+                Dim libraryB = BuildLibrary(directory, sourceB, "B")
+                Dim libraryA = BuildLibrary(directory, sourceA, "A", "B")
+
+                Dim results = AnalyzerDependencyChecker.ComputeDependencyConflicts({libraryA}, GetIgnorableAssemblyLists())
+                Dim missingDependencies = results.MissingDependencies
+
+                Assert.Equal(expected:=1, actual:=missingDependencies.Count)
+
+                Dim analyzerFileName As String = Path.GetFileName(missingDependencies(0).AnalyzerPath)
+                Assert.Equal(expected:="A.dll", actual:=analyzerFileName)
+                Assert.Equal(expected:=New AssemblyIdentity("B"), actual:=missingDependencies(0).DependencyIdentity)
+            End Using
+        End Sub
+
+        <Fact, WorkItem(3020, "https://github.com/dotnet/roslyn/issues/3020")>
+        Public Sub IgnorableAssemblyIdentityList_IncludesItem()
+            Dim mscorlib1 As AssemblyIdentity = Nothing
+            AssemblyIdentity.TryParseDisplayName(s_mscorlibDisplayName, mscorlib1)
+
+            Dim ignorableAssemblyList = New IgnorableAssemblyIdentityList({mscorlib1})
+
+            Dim mscorlib2 As AssemblyIdentity = Nothing
+            AssemblyIdentity.TryParseDisplayName(s_mscorlibDisplayName, mscorlib2)
+
+            Assert.True(ignorableAssemblyList.Includes(mscorlib2))
+        End Sub
+
+        <Fact, WorkItem(3020, "https://github.com/dotnet/roslyn/issues/3020")>
+        Public Sub IgnorableAssemblyIdentityList_DoesNotIncludeItem()
+            Dim mscorlib As AssemblyIdentity = Nothing
+            AssemblyIdentity.TryParseDisplayName(s_mscorlibDisplayName, mscorlib)
+
+            Dim ignorableAssemblyList = New IgnorableAssemblyIdentityList({mscorlib})
+
+            Dim alpha As AssemblyIdentity = Nothing
+            AssemblyIdentity.TryParseDisplayName("Alpha, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b77a5c561934e089", alpha)
+
+            Assert.False(ignorableAssemblyList.Includes(alpha))
+        End Sub
+
+        <Fact, WorkItem(3020, "https://github.com/dotnet/roslyn/issues/3020")>
+        Public Sub IgnorableAssemblyNamePrefixList_IncludesItem_Prefix()
+            Dim ignorableAssemblyList = New IgnorableAssemblyNamePrefixList("Alpha")
+
+            Dim alphaBeta As AssemblyIdentity = Nothing
+            AssemblyIdentity.TryParseDisplayName("Alpha.Beta, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b77a5c561934e089", alphaBeta)
+
+            Assert.True(ignorableAssemblyList.Includes(alphaBeta))
+        End Sub
+
+        <Fact, WorkItem(3020, "https://github.com/dotnet/roslyn/issues/3020")>
+        Public Sub IgnorableAssemblyNamePrefixList_IncludesItem_WholeName()
+            Dim ignorableAssemblyList = New IgnorableAssemblyNamePrefixList("Alpha")
+
+            Dim alpha As AssemblyIdentity = Nothing
+            AssemblyIdentity.TryParseDisplayName("Alpha, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b77a5c561934e089", alpha)
+
+            Assert.True(ignorableAssemblyList.Includes(alpha))
+        End Sub
+
+        <Fact, WorkItem(3020, "https://github.com/dotnet/roslyn/issues/3020")>
+        Public Sub IgnorableAssemblyNamePrefixList_DoesNotIncludeItem()
+            Dim ignorableAssemblyList = New IgnorableAssemblyNamePrefixList("Beta")
+
+            Dim alpha As AssemblyIdentity = Nothing
+            AssemblyIdentity.TryParseDisplayName("Alpha, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b77a5c561934e089", alpha)
+
+            Assert.False(ignorableAssemblyList.Includes(alpha))
+        End Sub
+
+        <Fact, WorkItem(3020, "https://github.com/dotnet/roslyn/issues/3020")>
+        Public Sub IgnorableAssemblyNameList_IncludesItem_Prefix()
+            Dim ignorableAssemblyList = New IgnorableAssemblyNameList(ImmutableHashSet.Create("Alpha"))
+
+            Dim alphaBeta As AssemblyIdentity = Nothing
+            AssemblyIdentity.TryParseDisplayName("Alpha.Beta, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b77a5c561934e089", alphaBeta)
+
+            Assert.False(ignorableAssemblyList.Includes(alphaBeta))
+        End Sub
+
+        <Fact, WorkItem(3020, "https://github.com/dotnet/roslyn/issues/3020")>
+        Public Sub IgnorableAssemblyNameList_IncludesItem_WholeName()
+            Dim ignorableAssemblyList = New IgnorableAssemblyNameList(ImmutableHashSet.Create("Alpha"))
+
+            ' No version
+            Dim alpha As AssemblyIdentity = Nothing
+            AssemblyIdentity.TryParseDisplayName("Alpha", alpha)
+
+            Assert.True(ignorableAssemblyList.Includes(alpha))
+
+            ' With a version.
+            alpha = Nothing
+            AssemblyIdentity.TryParseDisplayName("Alpha, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b77a5c561934e089", alpha)
+
+            Assert.True(ignorableAssemblyList.Includes(alpha))
+
+            ' Version doesn't matter.
+            alpha = Nothing
+            AssemblyIdentity.TryParseDisplayName("Alpha, Version=5.0.0.0, Culture=neutral, PublicKeyToken=b77a5c561934e089", alpha)
+
+            Assert.True(ignorableAssemblyList.Includes(alpha))
+        End Sub
+
+        <Fact, WorkItem(3020, "https://github.com/dotnet/roslyn/issues/3020")>
+        Public Sub IgnorableAssemblyNameList_DoesNotIncludeItem()
+            Dim ignorableAssemblyList = New IgnorableAssemblyNameList(ImmutableHashSet.Create("Beta"))
+
+            Dim alpha As AssemblyIdentity = Nothing
+            AssemblyIdentity.TryParseDisplayName("Alpha, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b77a5c561934e089", alpha)
+
+            Assert.False(ignorableAssemblyList.Includes(alpha))
         End Sub
 
         Private Function BuildLibrary(directory As DisposableDirectory, fileContents As String, libraryName As String, ParamArray referenceNames As String()) As String
@@ -710,17 +866,20 @@ public class D
             Dim tempOut = Path.Combine(directory.Path, libraryName + ".out")
             Dim libraryOut = Path.Combine(directory.Path, libraryName + ".dll")
 
-            Dim sb = New StringBuilder
-            For Each name In referenceNames
-                sb.Append(" /r:")
-                sb.Append(Path.Combine(directory.Path, name + ".dll"))
+            Dim syntaxTrees = {CSharpSyntaxTree.ParseText(fileContents, path:=sourceFile)}
+
+            Dim references = New List(Of PortableExecutableReference)
+            For Each referenceName In referenceNames
+                references.Add(PortableExecutableReference.CreateFromFile(Path.Combine(directory.Path, referenceName + ".dll")))
             Next
 
-            Dim references = sb.ToString()
+            references.Add(TestMetadata.Net451.mscorlib)
 
-            Dim arguments = $"/C ""{CSharpCompilerExecutable}"" /nologo /t:library /out:{libraryOut} {references} {sourceFile} > {tempOut}"
+            Dim compilation = CSharpCompilation.Create(libraryName, syntaxTrees, references, New CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary))
+            Dim emitResult = compilation.Emit(libraryOut)
 
-            Dim output = RunAndGetOutput("cmd", arguments, expectedRetCode:=0)
+            Assert.Empty(emitResult.Diagnostics)
+            Assert.True(emitResult.Success)
 
             Return libraryOut
         End Function

@@ -1,4 +1,6 @@
-' Copyright (c) Microsoft.  All Rights Reserved.  Licensed under the Apache License, Version 2.0.  See License.txt in the project root for license information.
+﻿' Licensed to the .NET Foundation under one or more agreements.
+' The .NET Foundation licenses this file to you under the MIT license.
+' See the LICENSE file in the project root for more information.
 
 Imports Microsoft.CodeAnalysis.Editor.VisualBasic.KeywordHighlighting
 
@@ -6,22 +8,22 @@ Namespace Microsoft.CodeAnalysis.Editor.VisualBasic.UnitTests.KeywordHighlightin
     Public Class NamespaceBlockHighlighterTests
         Inherits AbstractVisualBasicKeywordHighlighterTests
 
-        Friend Overrides Function CreateHighlighter() As IHighlighter
-            Return New NamespaceBlockHighlighter()
+        Friend Overrides Function GetHighlighterType() As Type
+            Return GetType(NamespaceBlockHighlighter)
         End Function
 
         <Fact, Trait(Traits.Feature, Traits.Features.KeywordHighlighting)>
-        Public Sub TestNamespace1()
-            Test(<Text>
+        Public Async Function TestNamespace1() As Task
+            Await TestAsync(<Text>
 {|Cursor:[|Namespace|]|} N1
 [|End Namespace|]</Text>)
-        End Sub
+        End Function
 
         <Fact, Trait(Traits.Feature, Traits.Features.KeywordHighlighting)>
-        Public Sub TestNamespace2()
-            Test(<Text>
+        Public Async Function TestNamespace2() As Task
+            Await TestAsync(<Text>
 [|Namespace|] N1
 {|Cursor:[|End Namespace|]|}</Text>)
-        End Sub
+        End Function
     End Class
 End Namespace

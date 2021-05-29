@@ -1,11 +1,16 @@
-﻿// Copyright (c) Microsoft.  All Rights Reserved.  Licensed under the Apache License, Version 2.0.  See License.txt in the project root for license information.
+﻿// Licensed to the .NET Foundation under one or more agreements.
+// The .NET Foundation licenses this file to you under the MIT license.
+// See the LICENSE file in the project root for more information.
 
 using System;
 using System.Collections.Generic;
 using System.Collections.Immutable;
 using System.Diagnostics;
+using System.IO;
+using System.Linq;
 using System.Reflection.Metadata;
 using System.Reflection.Metadata.Ecma335;
+using Microsoft.CodeAnalysis.Symbols;
 using Roslyn.Utilities;
 
 namespace Microsoft.CodeAnalysis.Emit
@@ -20,7 +25,7 @@ namespace Microsoft.CodeAnalysis.Emit
     // sufficient to track a pair of implementing method and index.
     internal struct MethodImplKey : IEquatable<MethodImplKey>
     {
-        internal MethodImplKey(uint implementingMethod, int index)
+        internal MethodImplKey(int implementingMethod, int index)
         {
             Debug.Assert(implementingMethod > 0);
             Debug.Assert(index > 0);
@@ -28,10 +33,10 @@ namespace Microsoft.CodeAnalysis.Emit
             this.Index = index;
         }
 
-        internal readonly uint ImplementingMethod;
+        internal readonly int ImplementingMethod;
         internal readonly int Index;
 
-        public override bool Equals(object obj)
+        public override bool Equals(object? obj)
         {
             return obj is MethodImplKey && Equals((MethodImplKey)obj);
         }
@@ -44,7 +49,7 @@ namespace Microsoft.CodeAnalysis.Emit
 
         public override int GetHashCode()
         {
-            return Hash.Combine((int)this.ImplementingMethod, this.Index);
+            return Hash.Combine(this.ImplementingMethod, this.Index);
         }
     }
 
@@ -56,6 +61,30 @@ namespace Microsoft.CodeAnalysis.Emit
     {
         private static readonly ImmutableArray<int> s_emptyTableSizes = ImmutableArray.Create(new int[MetadataTokens.TableCount]);
 
+        internal sealed class MetadataSymbols
+        {
+            public readonly IReadOnlyDictionary<AnonymousTypeKey, AnonymousTypeValue> AnonymousTypes;
+
+            /// <summary>
+            /// A map of the assembly identities of the baseline compilation to the identities of the original metadata AssemblyRefs.
+            /// Only includes identities that differ between these two.
+            /// </summary>
+            public readonly ImmutableDictionary<AssemblyIdentity, AssemblyIdentity> AssemblyReferenceIdentityMap;
+
+            public readonly object MetadataDecoder;
+
+            public MetadataSymbols(IReadOnlyDictionary<AnonymousTypeKey, AnonymousTypeValue> anonymousTypes, object metadataDecoder, ImmutableDictionary<AssemblyIdentity, AssemblyIdentity> assemblyReferenceIdentityMap)
+            {
+                Debug.Assert(anonymousTypes != null);
+                Debug.Assert(metadataDecoder != null);
+                Debug.Assert(assemblyReferenceIdentityMap != null);
+
+                this.AnonymousTypes = anonymousTypes;
+                this.MetadataDecoder = metadataDecoder;
+                this.AssemblyReferenceIdentityMap = assemblyReferenceIdentityMap;
+            }
+        }
+
         /// <summary>
         /// Creates an <see cref="EmitBaseline"/> from the metadata of the module before editing
         /// and from a function that maps from a method to an array of local names. 
@@ -63,6 +92,62 @@ namespace Microsoft.CodeAnalysis.Emit
         /// <param name="module">The metadata of the module before editing.</param>
         /// <param name="debugInformationProvider">
         /// A function that for a method handle returns Edit and Continue debug information emitted by the compiler into the PDB.
+        /// The function shall throw <see cref="InvalidDataException"/> if the debug information can't be read for the specified method.
+        /// This exception and <see cref="IOException"/> are caught and converted to an emit diagnostic. Other exceptions are passed through.
+        /// </param>
+        /// <returns>An <see cref="EmitBaseline"/> for the module.</returns>
+        /// <exception cref="ArgumentException"><paramref name="module"/> is not a PE image.</exception>
+        /// <exception cref="ArgumentNullException"><paramref name="module"/> is null.</exception>
+        /// <exception cref="ArgumentNullException"><paramref name="debugInformationProvider"/> is null.</exception>
+        /// <exception cref="IOException">Error reading module metadata.</exception>
+        /// <exception cref="BadImageFormatException">Module metadata is invalid.</exception>
+        /// <exception cref="ObjectDisposedException">Module has been disposed.</exception>
+        public static EmitBaseline CreateInitialBaseline(ModuleMetadata module, Func<MethodDefinitionHandle, EditAndContinueMethodDebugInformation> debugInformationProvider)
+        {
+            if (module == null)
+            {
+                throw new ArgumentNullException(nameof(module));
+            }
+
+            if (!module.Module.HasIL)
+            {
+                throw new ArgumentException(CodeAnalysisResources.PEImageNotAvailable, nameof(module));
+            }
+
+            var hasPortablePdb = module.Module.PEReaderOpt.ReadDebugDirectory().Any(entry => entry.IsPortableCodeView);
+
+            var localSigProvider = new Func<MethodDefinitionHandle, StandaloneSignatureHandle>(methodHandle =>
+            {
+                try
+                {
+                    return module.Module.GetMethodBodyOrThrow(methodHandle)?.LocalSignature ?? default;
+                }
+                catch (Exception e) when (e is BadImageFormatException || e is IOException)
+                {
+                    throw new InvalidDataException(e.Message, e);
+                }
+            });
+
+            return CreateInitialBaseline(module, debugInformationProvider, localSigProvider, hasPortablePdb);
+        }
+
+        /// <summary>
+        /// Creates an <see cref="EmitBaseline"/> from the metadata of the module before editing
+        /// and from a function that maps from a method to an array of local names. 
+        /// </summary>
+        /// <param name="module">The metadata of the module before editing.</param>
+        /// <param name="debugInformationProvider">
+        /// A function that for a method handle returns Edit and Continue debug information emitted by the compiler into the PDB.
+        /// The function shall throw <see cref="InvalidDataException"/> if the debug information can't be read for the specified method.
+        /// This exception and <see cref="IOException"/> are caught and converted to an emit diagnostic. Other exceptions are passed through.
+        /// </param>
+        /// <param name="localSignatureProvider">
+        /// A function that for a method handle returns the signature of its local variables.
+        /// The function shall throw <see cref="InvalidDataException"/> if the information can't be read for the specified method.
+        /// This exception and <see cref="IOException"/> are caught and converted to an emit diagnostic. Other exceptions are passed through.
+        /// </param>
+        /// <param name="hasPortableDebugInformation">
+        /// True if the baseline PDB is portable.
         /// </param>
         /// <returns>An <see cref="EmitBaseline"/> for the module.</returns>
         /// <remarks>
@@ -81,16 +166,21 @@ namespace Microsoft.CodeAnalysis.Emit
         /// The slot ordering thus no longer matches the syntax ordering. It is therefore necessary to pass <see cref="EmitDifferenceResult.Baseline"/>
         /// to the next generation (rather than e.g. create new <see cref="EmitBaseline"/>s from scratch based on metadata produced by subsequent compilations).
         /// </remarks>
-        public static EmitBaseline CreateInitialBaseline(ModuleMetadata module, Func<MethodDefinitionHandle, EditAndContinueMethodDebugInformation> debugInformationProvider)
+        /// <exception cref="ArgumentNullException"><paramref name="module"/> is null.</exception>
+        /// <exception cref="ArgumentNullException"><paramref name="debugInformationProvider"/> is null.</exception>
+        /// <exception cref="ArgumentNullException"><paramref name="localSignatureProvider"/> is null.</exception>
+        /// <exception cref="IOException">Error reading module metadata.</exception>
+        /// <exception cref="BadImageFormatException">Module metadata is invalid.</exception>
+        /// <exception cref="ObjectDisposedException">Module has been disposed.</exception>
+        public static EmitBaseline CreateInitialBaseline(
+            ModuleMetadata module,
+            Func<MethodDefinitionHandle, EditAndContinueMethodDebugInformation> debugInformationProvider,
+            Func<MethodDefinitionHandle, StandaloneSignatureHandle> localSignatureProvider,
+            bool hasPortableDebugInformation)
         {
             if (module == null)
             {
                 throw new ArgumentNullException(nameof(module));
-            }
-
-            if (!module.Module.HasIL)
-            {
-                throw new ArgumentException(CodeAnalysisResources.PEImageNotAvailable, nameof(module));
             }
 
             if (debugInformationProvider == null)
@@ -98,46 +188,59 @@ namespace Microsoft.CodeAnalysis.Emit
                 throw new ArgumentNullException(nameof(debugInformationProvider));
             }
 
+            if (localSignatureProvider == null)
+            {
+                throw new ArgumentNullException(nameof(localSignatureProvider));
+            }
+
             var reader = module.MetadataReader;
-            var moduleVersionId = module.GetModuleVersionId();
 
             return new EmitBaseline(
+                null,
                 module,
                 compilation: null,
                 moduleBuilder: null,
-                moduleVersionId: moduleVersionId,
+                moduleVersionId: module.GetModuleVersionId(),
                 ordinal: 0,
-                encId: default(Guid),
-                typesAdded: new Dictionary<Cci.ITypeDefinition, uint>(),
-                eventsAdded: new Dictionary<Cci.IEventDefinition, uint>(),
-                fieldsAdded: new Dictionary<Cci.IFieldDefinition, uint>(),
-                methodsAdded: new Dictionary<Cci.IMethodDefinition, uint>(),
-                propertiesAdded: new Dictionary<Cci.IPropertyDefinition, uint>(),
-                eventMapAdded: new Dictionary<uint, uint>(),
-                propertyMapAdded: new Dictionary<uint, uint>(),
-                methodImplsAdded: new Dictionary<MethodImplKey, uint>(),
+                encId: default,
+                hasPortablePdb: hasPortableDebugInformation,
+                typesAdded: new Dictionary<Cci.ITypeDefinition, int>(),
+                eventsAdded: new Dictionary<Cci.IEventDefinition, int>(),
+                fieldsAdded: new Dictionary<Cci.IFieldDefinition, int>(),
+                methodsAdded: new Dictionary<Cci.IMethodDefinition, int>(),
+                propertiesAdded: new Dictionary<Cci.IPropertyDefinition, int>(),
+                eventMapAdded: new Dictionary<int, int>(),
+                propertyMapAdded: new Dictionary<int, int>(),
+                methodImplsAdded: new Dictionary<MethodImplKey, int>(),
                 tableEntriesAdded: s_emptyTableSizes,
                 blobStreamLengthAdded: 0,
                 stringStreamLengthAdded: 0,
                 userStringStreamLengthAdded: 0,
                 guidStreamLengthAdded: 0,
                 anonymousTypeMap: null, // Unset for initial metadata
-                synthesizedMembers: ImmutableDictionary<Cci.ITypeDefinition, ImmutableArray<Cci.ITypeDefinitionMember>>.Empty,
-                methodsAddedOrChanged: new Dictionary<uint, AddedOrChangedMethodInfo>(),
+                synthesizedMembers: ImmutableDictionary<ISymbolInternal, ImmutableArray<ISymbolInternal>>.Empty,
+                methodsAddedOrChanged: new Dictionary<int, AddedOrChangedMethodInfo>(),
                 debugInformationProvider: debugInformationProvider,
+                localSignatureProvider: localSignatureProvider,
                 typeToEventMap: CalculateTypeEventMap(reader),
                 typeToPropertyMap: CalculateTypePropertyMap(reader),
                 methodImpls: CalculateMethodImpls(reader));
         }
 
+        internal EmitBaseline InitialBaseline { get; }
+
         /// <summary>
         /// The original metadata of the module.
         /// </summary>
-        public readonly ModuleMetadata OriginalMetadata;
+        public ModuleMetadata OriginalMetadata { get; }
 
-        internal readonly Compilation Compilation;
-        internal readonly CommonPEModuleBuilder PEModuleBuilder;
+        // Symbols hydrated from the original metadata. Lazy since we don't know the language at the time the baseline is constructed.
+        internal MetadataSymbols? LazyMetadataSymbols;
+
+        internal readonly Compilation? Compilation;
+        internal readonly CommonPEModuleBuilder? PEModuleBuilder;
         internal readonly Guid ModuleVersionId;
+        internal readonly bool HasPortablePdb;
 
         /// <summary>
         /// Metadata generation ordinal. Zero for
@@ -151,14 +254,14 @@ namespace Microsoft.CodeAnalysis.Emit
         /// </summary>
         internal readonly Guid EncId;
 
-        internal readonly IReadOnlyDictionary<Cci.ITypeDefinition, uint> TypesAdded;
-        internal readonly IReadOnlyDictionary<Cci.IEventDefinition, uint> EventsAdded;
-        internal readonly IReadOnlyDictionary<Cci.IFieldDefinition, uint> FieldsAdded;
-        internal readonly IReadOnlyDictionary<Cci.IMethodDefinition, uint> MethodsAdded;
-        internal readonly IReadOnlyDictionary<Cci.IPropertyDefinition, uint> PropertiesAdded;
-        internal readonly IReadOnlyDictionary<uint, uint> EventMapAdded;
-        internal readonly IReadOnlyDictionary<uint, uint> PropertyMapAdded;
-        internal readonly IReadOnlyDictionary<MethodImplKey, uint> MethodImplsAdded;
+        internal readonly IReadOnlyDictionary<Cci.ITypeDefinition, int> TypesAdded;
+        internal readonly IReadOnlyDictionary<Cci.IEventDefinition, int> EventsAdded;
+        internal readonly IReadOnlyDictionary<Cci.IFieldDefinition, int> FieldsAdded;
+        internal readonly IReadOnlyDictionary<Cci.IMethodDefinition, int> MethodsAdded;
+        internal readonly IReadOnlyDictionary<Cci.IPropertyDefinition, int> PropertiesAdded;
+        internal readonly IReadOnlyDictionary<int, int> EventMapAdded;
+        internal readonly IReadOnlyDictionary<int, int> PropertyMapAdded;
+        internal readonly IReadOnlyDictionary<MethodImplKey, int> MethodImplsAdded;
 
         internal readonly ImmutableArray<int> TableEntriesAdded;
 
@@ -170,56 +273,74 @@ namespace Microsoft.CodeAnalysis.Emit
         /// <summary>
         /// EnC metadata for methods added or updated since the initial generation, indexed by method row id.
         /// </summary>
-        internal readonly IReadOnlyDictionary<uint, AddedOrChangedMethodInfo> AddedOrChangedMethods;
+        internal readonly IReadOnlyDictionary<int, AddedOrChangedMethodInfo> AddedOrChangedMethods;
 
         /// <summary>
-        /// Local variable names for methods from metadata,
-        /// indexed by method row.
+        /// Reads EnC debug information of a method from the initial baseline PDB.
+        /// The function shall throw <see cref="InvalidDataException"/> if the debug information can't be read for the specified method.
+        /// This exception and <see cref="IOException"/> are caught and converted to an emit diagnostic. Other exceptions are passed through.
+        /// The function shall return an empty <see cref="EditAndContinueMethodDebugInformation"/> if the method that corresponds to the specified handle
+        /// has no debug information.
         /// </summary>
         internal readonly Func<MethodDefinitionHandle, EditAndContinueMethodDebugInformation> DebugInformationProvider;
 
+        /// <summary>
+        /// A function that for a method handle returns the signature of its local variables.
+        /// The function shall throw <see cref="InvalidDataException"/> if the information can't be read for the specified method.
+        /// This exception and <see cref="IOException"/> are caught and converted to an emit diagnostic. Other exceptions are passed through.
+        /// The function shall return a nil <see cref="StandaloneSignatureHandle"/> if the method that corresponds to the specified handle
+        /// has no local variables.
+        /// </summary>
+        internal readonly Func<MethodDefinitionHandle, StandaloneSignatureHandle> LocalSignatureProvider;
+
         internal readonly ImmutableArray<int> TableSizes;
-        internal readonly IReadOnlyDictionary<uint, uint> TypeToEventMap;
-        internal readonly IReadOnlyDictionary<uint, uint> TypeToPropertyMap;
-        internal readonly IReadOnlyDictionary<MethodImplKey, uint> MethodImpls;
-        internal readonly IReadOnlyDictionary<AnonymousTypeKey, AnonymousTypeValue> AnonymousTypeMap;
-        internal readonly ImmutableDictionary<Cci.ITypeDefinition, ImmutableArray<Cci.ITypeDefinitionMember>> SynthesizedMembers;
+        internal readonly IReadOnlyDictionary<int, int> TypeToEventMap;
+        internal readonly IReadOnlyDictionary<int, int> TypeToPropertyMap;
+        internal readonly IReadOnlyDictionary<MethodImplKey, int> MethodImpls;
+        private readonly IReadOnlyDictionary<AnonymousTypeKey, AnonymousTypeValue>? _anonymousTypeMap;
+        internal readonly ImmutableDictionary<ISymbolInternal, ImmutableArray<ISymbolInternal>> SynthesizedMembers;
 
         private EmitBaseline(
+            EmitBaseline? initialBaseline,
             ModuleMetadata module,
-            Compilation compilation,
-            CommonPEModuleBuilder moduleBuilder,
+            Compilation? compilation,
+            CommonPEModuleBuilder? moduleBuilder,
             Guid moduleVersionId,
             int ordinal,
             Guid encId,
-            IReadOnlyDictionary<Cci.ITypeDefinition, uint> typesAdded,
-            IReadOnlyDictionary<Cci.IEventDefinition, uint> eventsAdded,
-            IReadOnlyDictionary<Cci.IFieldDefinition, uint> fieldsAdded,
-            IReadOnlyDictionary<Cci.IMethodDefinition, uint> methodsAdded,
-            IReadOnlyDictionary<Cci.IPropertyDefinition, uint> propertiesAdded,
-            IReadOnlyDictionary<uint, uint> eventMapAdded,
-            IReadOnlyDictionary<uint, uint> propertyMapAdded,
-            IReadOnlyDictionary<MethodImplKey, uint> methodImplsAdded,
+            bool hasPortablePdb,
+            IReadOnlyDictionary<Cci.ITypeDefinition, int> typesAdded,
+            IReadOnlyDictionary<Cci.IEventDefinition, int> eventsAdded,
+            IReadOnlyDictionary<Cci.IFieldDefinition, int> fieldsAdded,
+            IReadOnlyDictionary<Cci.IMethodDefinition, int> methodsAdded,
+            IReadOnlyDictionary<Cci.IPropertyDefinition, int> propertiesAdded,
+            IReadOnlyDictionary<int, int> eventMapAdded,
+            IReadOnlyDictionary<int, int> propertyMapAdded,
+            IReadOnlyDictionary<MethodImplKey, int> methodImplsAdded,
             ImmutableArray<int> tableEntriesAdded,
             int blobStreamLengthAdded,
             int stringStreamLengthAdded,
             int userStringStreamLengthAdded,
             int guidStreamLengthAdded,
-            IReadOnlyDictionary<AnonymousTypeKey, AnonymousTypeValue> anonymousTypeMap,
-            ImmutableDictionary<Cci.ITypeDefinition, ImmutableArray<Cci.ITypeDefinitionMember>> synthesizedMembers,
-            IReadOnlyDictionary<uint, AddedOrChangedMethodInfo> methodsAddedOrChanged,
+            IReadOnlyDictionary<AnonymousTypeKey, AnonymousTypeValue>? anonymousTypeMap,
+            ImmutableDictionary<ISymbolInternal, ImmutableArray<ISymbolInternal>> synthesizedMembers,
+            IReadOnlyDictionary<int, AddedOrChangedMethodInfo> methodsAddedOrChanged,
             Func<MethodDefinitionHandle, EditAndContinueMethodDebugInformation> debugInformationProvider,
-            IReadOnlyDictionary<uint, uint> typeToEventMap,
-            IReadOnlyDictionary<uint, uint> typeToPropertyMap,
-            IReadOnlyDictionary<MethodImplKey, uint> methodImpls)
+            Func<MethodDefinitionHandle, StandaloneSignatureHandle> localSignatureProvider,
+            IReadOnlyDictionary<int, int> typeToEventMap,
+            IReadOnlyDictionary<int, int> typeToPropertyMap,
+            IReadOnlyDictionary<MethodImplKey, int> methodImpls)
         {
             Debug.Assert(module != null);
-            Debug.Assert((ordinal == 0) == (encId == default(Guid)));
+            Debug.Assert((ordinal == 0) == (encId == default));
+            Debug.Assert((ordinal == 0) == (initialBaseline == null));
+            Debug.Assert((ordinal == 0) == (anonymousTypeMap == null));
             Debug.Assert(encId != module.GetModuleVersionId());
             Debug.Assert(debugInformationProvider != null);
+            Debug.Assert(localSignatureProvider != null);
             Debug.Assert(typeToEventMap != null);
             Debug.Assert(typeToPropertyMap != null);
-            Debug.Assert(moduleVersionId != default(Guid));
+            Debug.Assert(moduleVersionId != default);
             Debug.Assert(moduleVersionId == module.GetModuleVersionId());
             Debug.Assert(synthesizedMembers != null);
 
@@ -239,35 +360,38 @@ namespace Microsoft.CodeAnalysis.Emit
 
             var reader = module.Module.MetadataReader;
 
-            this.OriginalMetadata = module;
-            this.Compilation = compilation;
-            this.PEModuleBuilder = moduleBuilder;
-            this.ModuleVersionId = moduleVersionId;
-            this.Ordinal = ordinal;
-            this.EncId = encId;
+            InitialBaseline = initialBaseline ?? this;
+            OriginalMetadata = module;
+            Compilation = compilation;
+            PEModuleBuilder = moduleBuilder;
+            ModuleVersionId = moduleVersionId;
+            Ordinal = ordinal;
+            EncId = encId;
+            HasPortablePdb = hasPortablePdb;
 
-            this.TypesAdded = typesAdded;
-            this.EventsAdded = eventsAdded;
-            this.FieldsAdded = fieldsAdded;
-            this.MethodsAdded = methodsAdded;
-            this.PropertiesAdded = propertiesAdded;
-            this.EventMapAdded = eventMapAdded;
-            this.PropertyMapAdded = propertyMapAdded;
-            this.MethodImplsAdded = methodImplsAdded;
-            this.TableEntriesAdded = tableEntriesAdded;
-            this.BlobStreamLengthAdded = blobStreamLengthAdded;
-            this.StringStreamLengthAdded = stringStreamLengthAdded;
-            this.UserStringStreamLengthAdded = userStringStreamLengthAdded;
-            this.GuidStreamLengthAdded = guidStreamLengthAdded;
-            this.AnonymousTypeMap = anonymousTypeMap;
-            this.SynthesizedMembers = synthesizedMembers;
-            this.AddedOrChangedMethods = methodsAddedOrChanged;
+            TypesAdded = typesAdded;
+            EventsAdded = eventsAdded;
+            FieldsAdded = fieldsAdded;
+            MethodsAdded = methodsAdded;
+            PropertiesAdded = propertiesAdded;
+            EventMapAdded = eventMapAdded;
+            PropertyMapAdded = propertyMapAdded;
+            MethodImplsAdded = methodImplsAdded;
+            TableEntriesAdded = tableEntriesAdded;
+            BlobStreamLengthAdded = blobStreamLengthAdded;
+            StringStreamLengthAdded = stringStreamLengthAdded;
+            UserStringStreamLengthAdded = userStringStreamLengthAdded;
+            GuidStreamLengthAdded = guidStreamLengthAdded;
+            _anonymousTypeMap = anonymousTypeMap;
+            SynthesizedMembers = synthesizedMembers;
+            AddedOrChangedMethods = methodsAddedOrChanged;
 
-            this.DebugInformationProvider = debugInformationProvider;
-            this.TableSizes = CalculateTableSizes(reader, this.TableEntriesAdded);
-            this.TypeToEventMap = typeToEventMap;
-            this.TypeToPropertyMap = typeToPropertyMap;
-            this.MethodImpls = methodImpls;
+            DebugInformationProvider = debugInformationProvider;
+            LocalSignatureProvider = localSignatureProvider;
+            TableSizes = CalculateTableSizes(reader, TableEntriesAdded);
+            TypeToEventMap = typeToEventMap;
+            TypeToPropertyMap = typeToPropertyMap;
+            MethodImpls = methodImpls;
         }
 
         internal EmitBaseline With(
@@ -275,34 +399,37 @@ namespace Microsoft.CodeAnalysis.Emit
             CommonPEModuleBuilder moduleBuilder,
             int ordinal,
             Guid encId,
-            IReadOnlyDictionary<Cci.ITypeDefinition, uint> typesAdded,
-            IReadOnlyDictionary<Cci.IEventDefinition, uint> eventsAdded,
-            IReadOnlyDictionary<Cci.IFieldDefinition, uint> fieldsAdded,
-            IReadOnlyDictionary<Cci.IMethodDefinition, uint> methodsAdded,
-            IReadOnlyDictionary<Cci.IPropertyDefinition, uint> propertiesAdded,
-            IReadOnlyDictionary<uint, uint> eventMapAdded,
-            IReadOnlyDictionary<uint, uint> propertyMapAdded,
-            IReadOnlyDictionary<MethodImplKey, uint> methodImplsAdded,
+            IReadOnlyDictionary<Cci.ITypeDefinition, int> typesAdded,
+            IReadOnlyDictionary<Cci.IEventDefinition, int> eventsAdded,
+            IReadOnlyDictionary<Cci.IFieldDefinition, int> fieldsAdded,
+            IReadOnlyDictionary<Cci.IMethodDefinition, int> methodsAdded,
+            IReadOnlyDictionary<Cci.IPropertyDefinition, int> propertiesAdded,
+            IReadOnlyDictionary<int, int> eventMapAdded,
+            IReadOnlyDictionary<int, int> propertyMapAdded,
+            IReadOnlyDictionary<MethodImplKey, int> methodImplsAdded,
             ImmutableArray<int> tableEntriesAdded,
             int blobStreamLengthAdded,
             int stringStreamLengthAdded,
             int userStringStreamLengthAdded,
             int guidStreamLengthAdded,
             IReadOnlyDictionary<AnonymousTypeKey, AnonymousTypeValue> anonymousTypeMap,
-            ImmutableDictionary<Cci.ITypeDefinition, ImmutableArray<Cci.ITypeDefinitionMember>> synthesizedMembers,
-            IReadOnlyDictionary<uint, AddedOrChangedMethodInfo> addedOrChangedMethods,
-            Func<MethodDefinitionHandle, EditAndContinueMethodDebugInformation> debugInformationProvider)
+            ImmutableDictionary<ISymbolInternal, ImmutableArray<ISymbolInternal>> synthesizedMembers,
+            IReadOnlyDictionary<int, AddedOrChangedMethodInfo> addedOrChangedMethods,
+            Func<MethodDefinitionHandle, EditAndContinueMethodDebugInformation> debugInformationProvider,
+            Func<MethodDefinitionHandle, StandaloneSignatureHandle> localSignatureProvider)
         {
-            Debug.Assert((this.AnonymousTypeMap == null) || (anonymousTypeMap != null));
-            Debug.Assert((this.AnonymousTypeMap == null) || (anonymousTypeMap.Count >= this.AnonymousTypeMap.Count));
+            Debug.Assert(_anonymousTypeMap == null || anonymousTypeMap != null);
+            Debug.Assert(_anonymousTypeMap == null || anonymousTypeMap.Count >= _anonymousTypeMap.Count);
 
             return new EmitBaseline(
-                this.OriginalMetadata,
+                InitialBaseline,
+                OriginalMetadata,
                 compilation,
                 moduleBuilder,
-                this.ModuleVersionId,
+                ModuleVersionId,
                 ordinal,
                 encId,
+                HasPortablePdb,
                 typesAdded,
                 eventsAdded,
                 fieldsAdded,
@@ -320,40 +447,25 @@ namespace Microsoft.CodeAnalysis.Emit
                 synthesizedMembers: synthesizedMembers,
                 methodsAddedOrChanged: addedOrChangedMethods,
                 debugInformationProvider: debugInformationProvider,
-                typeToEventMap: this.TypeToEventMap,
-                typeToPropertyMap: this.TypeToPropertyMap,
-                methodImpls: this.MethodImpls);
+                localSignatureProvider: localSignatureProvider,
+                typeToEventMap: TypeToEventMap,
+                typeToPropertyMap: TypeToPropertyMap,
+                methodImpls: MethodImpls);
         }
 
-        internal EmitBaseline WithAnonymousTypeMap(IReadOnlyDictionary<AnonymousTypeKey, AnonymousTypeValue> anonymousTypeMap)
+        internal IReadOnlyDictionary<AnonymousTypeKey, AnonymousTypeValue> AnonymousTypeMap
         {
-            return new EmitBaseline(
-                this.OriginalMetadata,
-                this.Compilation,
-                this.PEModuleBuilder,
-                this.ModuleVersionId,
-                this.Ordinal,
-                this.EncId,
-                this.TypesAdded,
-                this.EventsAdded,
-                this.FieldsAdded,
-                this.MethodsAdded,
-                this.PropertiesAdded,
-                this.EventMapAdded,
-                this.PropertyMapAdded,
-                this.MethodImplsAdded,
-                this.TableEntriesAdded,
-                this.BlobStreamLengthAdded,
-                this.StringStreamLengthAdded,
-                this.UserStringStreamLengthAdded,
-                this.GuidStreamLengthAdded,
-                anonymousTypeMap,
-                this.SynthesizedMembers,
-                this.AddedOrChangedMethods,
-                this.DebugInformationProvider,
-                this.TypeToEventMap,
-                this.TypeToPropertyMap,
-                this.MethodImpls);
+            get
+            {
+                if (Ordinal > 0)
+                {
+                    Debug.Assert(_anonymousTypeMap is object);
+                    return _anonymousTypeMap;
+                }
+
+                Debug.Assert(LazyMetadataSymbols != null);
+                return LazyMetadataSymbols.AnonymousTypes;
+            }
         }
 
         internal MetadataReader MetadataReader
@@ -393,39 +505,39 @@ namespace Microsoft.CodeAnalysis.Emit
             return ImmutableArray.Create(sizes);
         }
 
-        private static Dictionary<uint, uint> CalculateTypePropertyMap(MetadataReader reader)
+        private static Dictionary<int, int> CalculateTypePropertyMap(MetadataReader reader)
         {
-            var result = new Dictionary<uint, uint>();
+            var result = new Dictionary<int, int>();
 
-            uint rowId = 1;
+            int rowId = 1;
             foreach (var parentType in reader.GetTypesWithProperties())
             {
                 Debug.Assert(!parentType.IsNil);
-                result.Add((uint)reader.GetRowNumber(parentType), rowId);
+                result.Add(reader.GetRowNumber(parentType), rowId);
                 rowId++;
             }
 
             return result;
         }
 
-        private static Dictionary<uint, uint> CalculateTypeEventMap(MetadataReader reader)
+        private static Dictionary<int, int> CalculateTypeEventMap(MetadataReader reader)
         {
-            var result = new Dictionary<uint, uint>();
+            var result = new Dictionary<int, int>();
 
-            uint rowId = 1;
+            int rowId = 1;
             foreach (var parentType in reader.GetTypesWithEvents())
             {
                 Debug.Assert(!parentType.IsNil);
-                result.Add((uint)reader.GetRowNumber(parentType), rowId);
+                result.Add(reader.GetRowNumber(parentType), rowId);
                 rowId++;
             }
 
             return result;
         }
 
-        private static Dictionary<MethodImplKey, uint> CalculateMethodImpls(MetadataReader reader)
+        private static Dictionary<MethodImplKey, int> CalculateMethodImpls(MetadataReader reader)
         {
-            var result = new Dictionary<MethodImplKey, uint>();
+            var result = new Dictionary<MethodImplKey, int>();
             int n = reader.GetTableRowCount(TableIndex.MethodImpl);
             for (int row = 1; row <= n; row++)
             {
@@ -435,14 +547,14 @@ namespace Microsoft.CodeAnalysis.Emit
                 // member refs currently, and since we don't allow changes to
                 // the set of methods a method def implements, the actual
                 // tokens of the implemented methods are not needed.)
-                var methodDefRow = (uint)MetadataTokens.GetRowNumber(methodImpl.MethodBody);
+                int methodDefRow = MetadataTokens.GetRowNumber(methodImpl.MethodBody);
                 int index = 1;
                 while (true)
                 {
                     var key = new MethodImplKey(methodDefRow, index);
                     if (!result.ContainsKey(key))
                     {
-                        result.Add(key, (uint)row);
+                        result.Add(key, row);
                         break;
                     }
                     index++;

@@ -1,4 +1,6 @@
-﻿' Copyright (c) Microsoft.  All Rights Reserved.  Licensed under the Apache License, Version 2.0.  See License.txt in the project root for license information.
+﻿' Licensed to the .NET Foundation under one or more agreements.
+' The .NET Foundation licenses this file to you under the MIT license.
+' See the LICENSE file in the project root for more information.
 
 Imports Microsoft.CodeAnalysis
 Imports Microsoft.CodeAnalysis.CodeGeneration
@@ -44,7 +46,7 @@ Namespace Microsoft.CodeAnalysis.VisualBasic.CodeGeneration
             Dim member = SyntaxFactory.EnumMemberDeclaration(enumMember.Name.ToIdentifierToken()) _
                                .WithInitializer(If(value Is Nothing, Nothing, SyntaxFactory.EqualsValue(value:=value)))
 
-            Return AddCleanupAnnotationsTo(ConditionallyAddDocumentationCommentTo(member, enumMember, options))
+            Return AddFormatterAndCodeGeneratorAnnotationsTo(ConditionallyAddDocumentationCommentTo(member, enumMember, options))
         End Function
 
         Private Function CreateEnumMemberValue(destinationOpt As EnumBlockSyntax, enumMember As IFieldSymbol) As ExpressionSyntax
@@ -91,8 +93,10 @@ Namespace Microsoft.CodeAnalysis.VisualBasic.CodeGeneration
                                 If numericLiteral.Token.ValueText = "1" Then
                                     ' The user is left shifting ones, stick with that pattern
                                     Dim shiftValue = IntegerUtilities.LogBase2(value)
+
+                                    ' Using the numericLiteral text will ensure the correct type character, ignoring the None that is passed in below
                                     Return SyntaxFactory.LeftShiftExpression(
-                                    left:=SyntaxFactory.NumericLiteralExpression(SyntaxFactory.IntegerLiteralToken("1", LiteralBase.Decimal, TypeCharacter.None, 1)),
+                                    left:=SyntaxFactory.NumericLiteralExpression(SyntaxFactory.IntegerLiteralToken(numericLiteral.Token.Text, LiteralBase.Decimal, TypeCharacter.None, 1)),
                                     right:=SyntaxFactory.NumericLiteralExpression(SyntaxFactory.IntegerLiteralToken(shiftValue.ToString(), LiteralBase.Decimal, TypeCharacter.None, IntegerUtilities.ToUnsigned(shiftValue))))
                                 End If
                             End If
@@ -100,18 +104,17 @@ Namespace Microsoft.CodeAnalysis.VisualBasic.CodeGeneration
                             Dim numericLiteral = DirectCast(lastExpression, LiteralExpressionSyntax)
                             Dim numericToken = numericLiteral.Token
                             Dim numericText = numericToken.ToString()
-                            If numericText.StartsWith("&h") OrElse numericText.StartsWith("&H") Then
+                            If numericText.StartsWith("&H", StringComparison.OrdinalIgnoreCase) Then
                                 Dim firstTwoChars = numericText.Substring(0, 2)
 
-                                If (numericText.EndsWith("US") OrElse numericText.EndsWith("us") OrElse
-                                numericText.EndsWith("uS") OrElse numericText.EndsWith("Us")) AndAlso
+                                If numericText.EndsWith("US", StringComparison.OrdinalIgnoreCase) AndAlso
                                value >= UShort.MinValue AndAlso value <= UShort.MaxValue Then
                                     Dim ushortValue = CUShort(value)
 
                                     Dim lastTwoChars = numericText.Substring(numericText.Length - 2, 2)
                                     Return SyntaxFactory.NumericLiteralExpression(
                                     SyntaxFactory.IntegerLiteralToken(firstTwoChars + ushortValue.ToString("X") + lastTwoChars, LiteralBase.Hexadecimal, TypeCharacter.UShortLiteral, IntegerUtilities.ToUnsigned(ushortValue)))
-                                ElseIf (numericText.EndsWith("S") OrElse numericText.EndsWith("s")) AndAlso
+                                ElseIf numericText.EndsWith("S", StringComparison.OrdinalIgnoreCase) AndAlso
                                    value >= Short.MinValue AndAlso value <= Short.MaxValue Then
                                     Dim shortValue = CShort(value)
                                     Return SyntaxFactory.NumericLiteralExpression(
@@ -120,8 +123,10 @@ Namespace Microsoft.CodeAnalysis.VisualBasic.CodeGeneration
                                     Return SyntaxFactory.NumericLiteralExpression(
                                     SyntaxFactory.IntegerLiteralToken(firstTwoChars + value.ToString("X"), LiteralBase.Hexadecimal, TypeCharacter.None, IntegerUtilities.ToUnsigned(value)))
                                 End If
-                            ElseIf numericText.StartsWith("&o") OrElse numericText.StartsWith("&O") Then
+                            ElseIf numericText.StartsWith("&O", StringComparison.OrdinalIgnoreCase) Then
                                 Return SyntaxFactory.NumericLiteralExpression(SyntaxFactory.IntegerLiteralToken(numericText.Substring(0, 2) + Convert.ToString(value, 8), LiteralBase.Octal, TypeCharacter.None, IntegerUtilities.ToUnsigned(value)))
+                            ElseIf numericText.StartsWith("&B", StringComparison.OrdinalIgnoreCase) Then
+                                Return SyntaxFactory.NumericLiteralExpression(SyntaxFactory.IntegerLiteralToken(numericText.Substring(0, 2) + Convert.ToString(value, 2), LiteralBase.Binary, TypeCharacter.None, IntegerUtilities.ToUnsigned(value)))
                             End If
                         End If
                     End If

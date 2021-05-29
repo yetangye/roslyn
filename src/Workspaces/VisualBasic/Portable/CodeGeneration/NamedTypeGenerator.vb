@@ -1,4 +1,6 @@
-﻿' Copyright (c) Microsoft.  All Rights Reserved.  Licensed under the Apache License, Version 2.0.  See License.txt in the project root for license information.
+﻿' Licensed to the .NET Foundation under one or more agreements.
+' The .NET Foundation licenses this file to you under the MIT license.
+' See the LICENSE file in the project root for more information.
 
 Imports System.Threading
 Imports Microsoft.CodeAnalysis.CodeGeneration
@@ -13,8 +15,9 @@ Namespace Microsoft.CodeAnalysis.VisualBasic.CodeGeneration
                                     destination As TypeBlockSyntax,
                                     namedType As INamedTypeSymbol,
                                     options As CodeGenerationOptions,
-                                    availableIndices As IList(Of Boolean)) As TypeBlockSyntax
-            Dim declaration = GenerateNamedTypeDeclaration(service, namedType, options)
+                                    availableIndices As IList(Of Boolean),
+                                    cancellationToken As CancellationToken) As TypeBlockSyntax
+            Dim declaration = GenerateNamedTypeDeclaration(service, namedType, options, cancellationToken)
             Dim members = Insert(destination.Members, declaration, options, availableIndices)
             Return FixTerminators(destination.WithMembers(members))
         End Function
@@ -23,8 +26,9 @@ Namespace Microsoft.CodeAnalysis.VisualBasic.CodeGeneration
                                     destination As NamespaceBlockSyntax,
                                     namedType As INamedTypeSymbol,
                                     options As CodeGenerationOptions,
-                                    availableIndices As IList(Of Boolean)) As NamespaceBlockSyntax
-            Dim declaration = GenerateNamedTypeDeclaration(service, namedType, options)
+                                    availableIndices As IList(Of Boolean),
+                                       cancellationToken As CancellationToken) As NamespaceBlockSyntax
+            Dim declaration = GenerateNamedTypeDeclaration(service, namedType, options, cancellationToken)
             Dim members = Insert(destination.Members, declaration, options, availableIndices)
             Return destination.WithMembers(members)
         End Function
@@ -33,24 +37,26 @@ Namespace Microsoft.CodeAnalysis.VisualBasic.CodeGeneration
                                     destination As CompilationUnitSyntax,
                                     namedType As INamedTypeSymbol,
                                     options As CodeGenerationOptions,
-                                    availableIndices As IList(Of Boolean)) As CompilationUnitSyntax
-            Dim declaration = GenerateNamedTypeDeclaration(service, namedType, options)
+                                    availableIndices As IList(Of Boolean),
+                                       cancellationToken As CancellationToken) As CompilationUnitSyntax
+            Dim declaration = GenerateNamedTypeDeclaration(service, namedType, options, cancellationToken)
             Dim members = Insert(destination.Members, declaration, options, availableIndices)
             Return destination.WithMembers(members)
         End Function
 
         Public Function GenerateNamedTypeDeclaration(service As ICodeGenerationService,
                                     namedType As INamedTypeSymbol,
-                                    options As CodeGenerationOptions) As StatementSyntax
+                                    options As CodeGenerationOptions,
+                                    cancellationToken As CancellationToken) As StatementSyntax
             options = If(options, CodeGenerationOptions.Default)
 
             Dim declaration = GetDeclarationSyntaxWithoutMembers(namedType, options)
 
             declaration = If(options.GenerateMembers AndAlso namedType.TypeKind <> TypeKind.Delegate,
-                service.AddMembers(declaration, GetMembers(namedType), options),
+                service.AddMembers(declaration, GetMembers(namedType), options, cancellationToken),
                 declaration)
 
-            Return AddCleanupAnnotationsTo(ConditionallyAddDocumentationCommentTo(declaration, namedType, options))
+            Return AddFormatterAndCodeGeneratorAnnotationsTo(ConditionallyAddDocumentationCommentTo(declaration, namedType, options))
         End Function
 
         Public Function UpdateNamedTypeDeclaration(service As ICodeGenerationService,
@@ -60,7 +66,7 @@ Namespace Microsoft.CodeAnalysis.VisualBasic.CodeGeneration
                                                           cancellationToken As CancellationToken) As StatementSyntax
             declaration = RemoveAllMembers(declaration)
             declaration = service.AddMembers(declaration, newMembers, options, cancellationToken)
-            Return AddCleanupAnnotationsTo(declaration)
+            Return AddFormatterAndCodeGeneratorAnnotationsTo(declaration)
         End Function
 
         Private Function GetDeclarationSyntaxWithoutMembers(namedType As INamedTypeSymbol, options As CodeGenerationOptions) As StatementSyntax
@@ -167,8 +173,11 @@ Namespace Microsoft.CodeAnalysis.VisualBasic.CodeGeneration
                     tokens.Add(SyntaxFactory.Token(SyntaxKind.ProtectedKeyword))
                 Case Accessibility.Private
                     tokens.Add(SyntaxFactory.Token(SyntaxKind.PrivateKeyword))
-                Case Accessibility.ProtectedAndInternal, Accessibility.Internal
+                Case Accessibility.Internal
                     tokens.Add(SyntaxFactory.Token(SyntaxKind.FriendKeyword))
+                Case Accessibility.ProtectedAndInternal
+                    tokens.Add(SyntaxFactory.Token(SyntaxKind.PrivateKeyword))
+                    tokens.Add(SyntaxFactory.Token(SyntaxKind.ProtectedKeyword))
                 Case Accessibility.ProtectedOrInternal
                     tokens.Add(SyntaxFactory.Token(SyntaxKind.ProtectedKeyword))
                     tokens.Add(SyntaxFactory.Token(SyntaxKind.FriendKeyword))

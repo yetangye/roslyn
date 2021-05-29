@@ -1,50 +1,45 @@
-' Copyright (c) Microsoft.  All Rights Reserved.  Licensed under the Apache License, Version 2.0.  See License.txt in the project root for license information.
-
-Imports Microsoft.CodeAnalysis.Text
-Imports Microsoft.CodeAnalysis.VisualBasic
-Imports Microsoft.CodeAnalysis.VisualBasic.Symbols
-Imports Microsoft.CodeAnalysis.VisualBasic.Syntax
-Imports Roslyn.Test.Utilities
-Imports Xunit
+﻿' Licensed to the .NET Foundation under one or more agreements.
+' The .NET Foundation licenses this file to you under the MIT license.
+' See the LICENSE file in the project root for more information.
 
 Namespace Microsoft.CodeAnalysis.Editor.VisualBasic.UnitTests.Recommendations.Declarations
     Public Class EndBlockKeywordRecommenderTests
         <Fact>
         <Trait(Traits.Feature, Traits.Features.KeywordRecommending)>
-        Public Sub EndSubInBrokenMethodBody()
-            VerifyRecommendationsContain(<ClassDeclaration>Sub Foo()
+        Public Sub EndSubInBrokenMethodBodyTest()
+            VerifyRecommendationsContain(<ClassDeclaration>Sub Goo()
 |</ClassDeclaration>, "End Sub")
         End Sub
 
         <Fact>
         <Trait(Traits.Feature, Traits.Features.KeywordRecommending)>
-        Public Sub NotAfterCompletedMethodBody()
+        Public Sub NotAfterCompletedMethodBodyTest()
             VerifyRecommendationsMissing(<ClassDeclaration>
-Sub Foo()
+Sub Goo()
 End Sub
 |</ClassDeclaration>, "End")
         End Sub
 
         <Fact>
         <Trait(Traits.Feature, Traits.Features.KeywordRecommending)>
-        Public Sub NotAfterMustOverrideMethodDeclaration1()
+        Public Sub NotAfterMustOverrideMethodDeclaration1Test()
             VerifyRecommendationsMissing(<ClassDeclaration>
-MustOverride Sub Foo()
+MustOverride Sub Goo()
 |</ClassDeclaration>, "End")
         End Sub
 
         <Fact>
         <Trait(Traits.Feature, Traits.Features.KeywordRecommending)>
-        Public Sub NotAfterMustOverrideMethodDeclaration2()
+        Public Sub NotAfterMustOverrideMethodDeclaration2Test()
             VerifyRecommendationsMissing(<ClassDeclaration>
-MustOverride Sub Foo()
+MustOverride Sub Goo()
 |</ClassDeclaration>, "End Sub")
         End Sub
 
         <Fact>
         <Trait(Traits.Feature, Traits.Features.KeywordRecommending)>
-        Public Sub EndPropertyAfterIncompleteProperty1()
-            VerifyRecommendationsContain(<ClassDeclaration>Property foo As Integer
+        Public Sub EndPropertyAfterIncompleteProperty1Test()
+            VerifyRecommendationsContain(<ClassDeclaration>Property goo As Integer
 Get
 End Get
 Set(value As Integer)
@@ -54,8 +49,8 @@ End Set
 
         <Fact>
         <Trait(Traits.Feature, Traits.Features.KeywordRecommending)>
-        Public Sub EndPropertyAfterIncompleteProperty2()
-            VerifyRecommendationsContain(<ClassDeclaration>Property foo As Integer
+        Public Sub EndPropertyAfterIncompleteProperty2Test()
+            VerifyRecommendationsContain(<ClassDeclaration>Property goo As Integer
 Get
 End Get
 Set(value As Integer)
@@ -65,58 +60,58 @@ End |</ClassDeclaration>, "Property")
 
         <Fact>
         <Trait(Traits.Feature, Traits.Features.KeywordRecommending)>
-        Public Sub EndSubInLambda()
-            VerifyRecommendationsContain(<MethodBody>Dim foo = Sub()
+        Public Sub EndSubInLambdaTest()
+            VerifyRecommendationsContain(<MethodBody>Dim goo = Sub()
 |</MethodBody>, "End Sub")
         End Sub
 
         <Fact>
         <Trait(Traits.Feature, Traits.Features.KeywordRecommending)>
-        Public Sub EndIfInMethodBody1()
+        Public Sub EndIfInMethodBody1Test()
             VerifyRecommendationsContain(<MethodBody>If True Then
 |</MethodBody>, "End", "End If")
         End Sub
 
         <Fact>
         <Trait(Traits.Feature, Traits.Features.KeywordRecommending)>
-        Public Sub EndIfInMethodBody2()
+        Public Sub EndIfInMethodBody2Test()
             VerifyRecommendationsContain(<MethodBody>If True Then
 End |</MethodBody>, "If")
         End Sub
 
         <Fact>
         <Trait(Traits.Feature, Traits.Features.KeywordRecommending)>
-        Public Sub EndWithInMethodBody()
-            VerifyRecommendationsContain(<MethodBody>With foo
+        Public Sub EndWithInMethodBodyTest()
+            VerifyRecommendationsContain(<MethodBody>With goo
 |</MethodBody>, "End With")
         End Sub
 
         <Fact>
         <Trait(Traits.Feature, Traits.Features.KeywordRecommending)>
-        Public Sub EndWhileInMethodBody()
-            VerifyRecommendationsContain(<MethodBody>While foo
+        Public Sub EndWhileInMethodBodyTest()
+            VerifyRecommendationsContain(<MethodBody>While goo
 |</MethodBody>, "End While")
         End Sub
 
         <Fact>
         <Trait(Traits.Feature, Traits.Features.KeywordRecommending)>
-        Public Sub EndSelectInMethodBody1()
-            VerifyRecommendationsContain(<MethodBody>Select foo
+        Public Sub EndSelectInMethodBody1Test()
+            VerifyRecommendationsContain(<MethodBody>Select goo
 |</MethodBody>, "End Select")
         End Sub
 
         <Fact>
         <Trait(Traits.Feature, Traits.Features.KeywordRecommending)>
-        Public Sub EndSelectInMethodBody2()
-            VerifyRecommendationsContain(<MethodBody>Select foo
+        Public Sub EndSelectInMethodBody2Test()
+            VerifyRecommendationsContain(<MethodBody>Select goo
 Case 1
 |</MethodBody>, "End Select")
         End Sub
 
         <Fact>
         <Trait(Traits.Feature, Traits.Features.KeywordRecommending)>
-        Public Sub EndSelectInMethodBody3()
-            VerifyRecommendationsContain(<MethodBody>Select foo
+        Public Sub EndSelectInMethodBody3Test()
+            VerifyRecommendationsContain(<MethodBody>Select goo
 Case 1
 Case Else
 |</MethodBody>, "End Select")
@@ -124,156 +119,156 @@ Case Else
 
         <Fact>
         <Trait(Traits.Feature, Traits.Features.KeywordRecommending)>
-        Public Sub EndSyncLockInMethodBody()
-            VerifyRecommendationsContain(<MethodBody>SyncLock foo
+        Public Sub EndSyncLockInMethodBodyTest()
+            VerifyRecommendationsContain(<MethodBody>SyncLock goo
 |</MethodBody>, "End SyncLock")
         End Sub
 
         <Fact>
         <Trait(Traits.Feature, Traits.Features.KeywordRecommending)>
-        Public Sub EndModuleInFile1()
-            VerifyRecommendationsContain(<File>Module Foo
+        Public Sub EndModuleInFile1Test()
+            VerifyRecommendationsContain(<File>Module Goo
 |</File>, {"End Module"})
         End Sub
 
         <Fact>
         <Trait(Traits.Feature, Traits.Features.KeywordRecommending)>
-        Public Sub EndModuleInFile2()
+        Public Sub EndModuleInFile2Test()
             VerifyRecommendationsContain(<File>
-Module Foo
+Module Goo
 End |</File>, "Module")
         End Sub
 
         <Fact>
         <Trait(Traits.Feature, Traits.Features.KeywordRecommending)>
-        Public Sub EndInterfaceInFile1()
-            VerifyRecommendationsContain(<File>Interface IFoo
+        Public Sub EndInterfaceInFile1Test()
+            VerifyRecommendationsContain(<File>Interface IGoo
 |</File>, {"End Interface"})
         End Sub
 
         <Fact>
         <Trait(Traits.Feature, Traits.Features.KeywordRecommending)>
-        Public Sub EndInterfaceInFile2()
+        Public Sub EndInterfaceInFile2Test()
             VerifyRecommendationsContain(<File>
-Interface IFoo
+Interface IGoo
 End |</File>, "Interface")
         End Sub
 
         <Fact>
         <Trait(Traits.Feature, Traits.Features.KeywordRecommending)>
-        Public Sub EndClassInFile1()
-            VerifyRecommendationsContain(<File>Class Foo
+        Public Sub EndClassInFile1Test()
+            VerifyRecommendationsContain(<File>Class Goo
 |</File>, {"End Class"})
         End Sub
 
         <Fact>
         <Trait(Traits.Feature, Traits.Features.KeywordRecommending)>
-        Public Sub EndClassInFile2()
+        Public Sub EndClassInFile2Test()
             VerifyRecommendationsContain(<File>
-Class Foo
+Class Goo
 End |</File>, "Class")
         End Sub
 
         <Fact>
         <Trait(Traits.Feature, Traits.Features.KeywordRecommending)>
-        Public Sub EndStructureInFile1()
-            VerifyRecommendationsContain(<File>Structure Foo
+        Public Sub EndStructureInFile1Test()
+            VerifyRecommendationsContain(<File>Structure Goo
 |</File>, {"End Structure"})
         End Sub
 
         <Fact>
         <Trait(Traits.Feature, Traits.Features.KeywordRecommending)>
-        Public Sub EndStructureInFile2()
+        Public Sub EndStructureInFile2Test()
             VerifyRecommendationsContain(<File>
-Structure Foo
+Structure Goo
 End |</File>, "Structure")
         End Sub
 
         <Fact>
         <Trait(Traits.Feature, Traits.Features.KeywordRecommending)>
-        Public Sub EndEnumInFile1()
-            VerifyRecommendationsContain(<File>Enum Foo
+        Public Sub EndEnumInFile1Test()
+            VerifyRecommendationsContain(<File>Enum Goo
 |</File>, {"End Enum"})
         End Sub
 
         <Fact>
         <Trait(Traits.Feature, Traits.Features.KeywordRecommending)>
-        Public Sub EndEnumInFile2()
+        Public Sub EndEnumInFile2Test()
             VerifyRecommendationsContain(<File>
-Enum Foo
+Enum Goo
 End |</File>, "Enum")
         End Sub
 
-        <WorkItem(539311)>
+        <WorkItem(539311, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/539311")>
         <Fact>
         <Trait(Traits.Feature, Traits.Features.KeywordRecommending)>
-        Public Sub EndBlockMissingInPreprocessor()
+        Public Sub EndBlockMissingInPreprocessorTest()
             VerifyRecommendationsMissing(
 <ClassDeclaration>
 Module M
-    Sub Foo()
+    Sub Goo()
         #If t|
     End Sub
 End Module
 </ClassDeclaration>, {"End Module", "End Sub"})
         End Sub
 
-        <WorkItem(540069)>
+        <WorkItem(540069, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/540069")>
         <Fact>
         <Trait(Traits.Feature, Traits.Features.KeywordRecommending)>
-        Public Sub EndSubSuggestFunction()
-            VerifyRecommendationsContain(<ClassDeclaration>Sub Foo()
+        Public Sub EndSubSuggestFunctionTest()
+            VerifyRecommendationsContain(<ClassDeclaration>Sub Goo()
 End |</ClassDeclaration>, "Function", "Sub")
         End Sub
 
-        <WorkItem(540069)>
-        <WorkItem(530599)>
+        <WorkItem(540069, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/540069")>
+        <WorkItem(530599, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/530599")>
         <Trait(Traits.Feature, Traits.Features.KeywordRecommending)>
-        Public Sub EndFunctionDoesNotSuggestEndSub()
-            VerifyRecommendationsMissing(<ClassDeclaration>Function Foo()
+        <Fact>
+        Public Sub EndFunctionDoesNotSuggestEndSubTest()
+            VerifyRecommendationsMissing(<ClassDeclaration>Function Goo()
 |</ClassDeclaration>, "End Sub")
         End Sub
 
-        <WorkItem(540069)>
+        <WorkItem(540069, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/540069")>
         <Fact>
         <Trait(Traits.Feature, Traits.Features.KeywordRecommending)>
-        Public Sub EndFunctionSuggestSub()
-            VerifyRecommendationsContain(<ClassDeclaration>Function Foo()
+        Public Sub EndFunctionSuggestSubTest()
+            VerifyRecommendationsContain(<ClassDeclaration>Function Goo()
 End |</ClassDeclaration>, "Function", "Sub")
         End Sub
 
-        <WorkItem(540069)>
+        <WorkItem(540069, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/540069")>
         <Fact>
         <Trait(Traits.Feature, Traits.Features.KeywordRecommending)>
-        Public Sub EndSubNotClassSuggested()
-            VerifyRecommendationsMissing(<ClassDeclaration>Sub Foo()
+        Public Sub EndSubNotClassSuggestedTest()
+            VerifyRecommendationsMissing(<ClassDeclaration>Sub Goo()
 |</ClassDeclaration>, "End Class", "End Module", "End Structure", "End Interface")
         End Sub
 
-        <WorkItem(969097)>
+        <WorkItem(969097, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/969097")>
         <Fact>
         <Trait(Traits.Feature, Traits.Features.KeywordRecommending)>
-        Public Sub EndClassPairings()
-            VerifyRecommendationsMissing(<File>Class Foo()
+        Public Sub EndClassPairingsTest()
+            VerifyRecommendationsMissing(<File>Class Goo()
 End |</File>, "Module", "Interface", "Structure")
         End Sub
 
-        <WorkItem(969097)>
+        <WorkItem(969097, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/969097")>
         <Fact>
         <Trait(Traits.Feature, Traits.Features.KeywordRecommending)>
-        Public Sub EndModulePairings()
-            VerifyRecommendationsMissing(<File>Module Foo()
+        Public Sub EndModulePairingsTest()
+            VerifyRecommendationsMissing(<File>Module Goo()
 End |</File>, "Class", "Interface", "Structure")
         End Sub
 
-        <WorkItem(540069)>
+        <WorkItem(540069, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/540069")>
         <Fact>
         <Trait(Traits.Feature, Traits.Features.KeywordRecommending)>
-        Public Sub EndModuleNotSubSuggested()
-            VerifyRecommendationsMissing(<File>Module Foo()
+        Public Sub EndModuleNotSubSuggestedTest()
+            VerifyRecommendationsMissing(<File>Module Goo()
 |</File>, "End Sub", "End Function")
         End Sub
-
     End Class
 End Namespace
 

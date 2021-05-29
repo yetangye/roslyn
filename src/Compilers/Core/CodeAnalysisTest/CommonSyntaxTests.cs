@@ -1,4 +1,8 @@
-﻿// Copyright (c) Microsoft.  All Rights Reserved.  Licensed under the Apache License, Version 2.0.  See License.txt in the project root for license information.
+﻿// Licensed to the .NET Foundation under one or more agreements.
+// The .NET Foundation licenses this file to you under the MIT license.
+// See the LICENSE file in the project root for more information.
+
+#nullable disable
 
 using System;
 using System.Linq;
@@ -58,10 +62,8 @@ namespace Microsoft.CodeAnalysis.UnitTests
         {
             var d = (SyntaxNodeOrToken)((SyntaxNode)null);
 
-            Assert.False(d.IsToken);
-            Assert.True(d.IsNode);
-
-            Assert.False(d.IsEquivalentTo(default(SyntaxNodeOrToken)));
+            Assert.True(d.IsToken);
+            Assert.False(d.IsNode);
 
             Assert.Equal(0, d.RawKind);
             Assert.Equal("", d.Language);
@@ -178,7 +180,7 @@ namespace Microsoft.CodeAnalysis.UnitTests
             Assert.Equal(correctSpan, vbTrivia3.Span);
         }
 
-        [Fact, WorkItem(824695, "DevDiv")]
+        [Fact, WorkItem(824695, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/824695")]
         public void CSharpSyntax_VisualBasicKind()
         {
             var node = CSharp.SyntaxFactory.Identifier("a");
@@ -189,7 +191,7 @@ namespace Microsoft.CodeAnalysis.UnitTests
             Assert.Equal(VB.SyntaxKind.None, VisualBasic.VisualBasicExtensions.Kind(trivia));
         }
 
-        [Fact, WorkItem(824695, "DevDiv")]
+        [Fact, WorkItem(824695, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/824695")]
         public void VisualBasicSyntax_CSharpKind()
         {
             var node = VisualBasic.SyntaxFactory.Identifier("a");

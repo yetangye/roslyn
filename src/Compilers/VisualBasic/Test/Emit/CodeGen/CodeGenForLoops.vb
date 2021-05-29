@@ -1,4 +1,6 @@
-﻿' Copyright (c) Microsoft.  All Rights Reserved.  Licensed under the Apache License, Version 2.0.  See License.txt in the project root for license information.
+﻿' Licensed to the .NET Foundation under one or more agreements.
+' The .NET Foundation licenses this file to you under the MIT license.
+' See the LICENSE file in the project root for more information.
 
 Imports Roslyn.Test.Utilities
 
@@ -6,7 +8,7 @@ Namespace Microsoft.CodeAnalysis.VisualBasic.UnitTests
     Public Class CodeGenForLoops
         Inherits BasicTestBase
 
-        <WorkItem(541539, "DevDiv")>
+        <WorkItem(541539, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/541539")>
         <Fact>
         Public Sub SimpleForLoopsTest()
             CompileAndVerify(
@@ -326,7 +328,8 @@ End Class
 
         End Sub
 
-        <Fact>
+        <Fact()>
+        <WorkItem(33564, "https://github.com/dotnet/roslyn/issues/33564")>
         Public Sub ForLoopStepIsFloatNegativeVar()
             Dim TEMP = CompileAndVerify(
 <compilation>
@@ -337,7 +340,7 @@ Public Class MyClass1
         Dim s As Double = -1.1
 
         For i As Double = 2 To 0 Step s
-            System.Console.WriteLine(i.ToString(System.Globalization.CultureInfo.InvariantCulture))
+            System.Console.WriteLine(i.ToString("G15", System.Globalization.CultureInfo.InvariantCulture))
         Next
 
     End Sub
@@ -348,11 +351,11 @@ End Class
 0.9
 ]]>).VerifyIL("MyClass1.Main", <![CDATA[
 {
-  // Code size       97 (0x61)
-  .maxstack  2
+  // Code size      102 (0x66)
+  .maxstack  3
   .locals init (Double V_0,
-  Boolean V_1,
-  Double V_2) //i
+                Boolean V_1,
+                Double V_2) //i
   IL_0000:  ldc.r8     -1.1
   IL_0009:  stloc.0
   IL_000a:  ldloc.0
@@ -363,30 +366,31 @@ End Class
   IL_0019:  stloc.1
   IL_001a:  ldc.r8     2
   IL_0023:  stloc.2
-  IL_0024:  br.s       IL_003b
+  IL_0024:  br.s       IL_0040
   IL_0026:  ldloca.s   V_2
-  IL_0028:  call       "Function System.Globalization.CultureInfo.get_InvariantCulture() As System.Globalization.CultureInfo"
-  IL_002d:  call       "Function Double.ToString(System.IFormatProvider) As String"
-  IL_0032:  call       "Sub System.Console.WriteLine(String)"
-  IL_0037:  ldloc.2
-  IL_0038:  ldloc.0
-  IL_0039:  add
-  IL_003a:  stloc.2
-  IL_003b:  ldloc.1
-  IL_003c:  brtrue.s   IL_004f
-  IL_003e:  ldloc.2
-  IL_003f:  ldc.r8     0
-  IL_0048:  clt.un
-  IL_004a:  ldc.i4.0
-  IL_004b:  ceq
-  IL_004d:  br.s       IL_005e
-  IL_004f:  ldloc.2
-  IL_0050:  ldc.r8     0
-  IL_0059:  cgt.un
-  IL_005b:  ldc.i4.0
-  IL_005c:  ceq
-  IL_005e:  brtrue.s   IL_0026
-  IL_0060:  ret
+  IL_0028:  ldstr      "G15"
+  IL_002d:  call       "Function System.Globalization.CultureInfo.get_InvariantCulture() As System.Globalization.CultureInfo"
+  IL_0032:  call       "Function Double.ToString(String, System.IFormatProvider) As String"
+  IL_0037:  call       "Sub System.Console.WriteLine(String)"
+  IL_003c:  ldloc.2
+  IL_003d:  ldloc.0
+  IL_003e:  add
+  IL_003f:  stloc.2
+  IL_0040:  ldloc.1
+  IL_0041:  brtrue.s   IL_0054
+  IL_0043:  ldloc.2
+  IL_0044:  ldc.r8     0
+  IL_004d:  clt.un
+  IL_004f:  ldc.i4.0
+  IL_0050:  ceq
+  IL_0052:  br.s       IL_0063
+  IL_0054:  ldloc.2
+  IL_0055:  ldc.r8     0
+  IL_005e:  cgt.un
+  IL_0060:  ldc.i4.0
+  IL_0061:  ceq
+  IL_0063:  brtrue.s   IL_0026
+  IL_0065:  ret
 }
 ]]>)
 
@@ -394,7 +398,7 @@ End Class
 
         <Fact>
         Public Sub ForLoopObject()
-            Dim TEMP = CompileAndVerify(
+            Dim v = CompileAndVerify(
 <compilation>
     <file name="a.vb">
 Option Strict On
@@ -417,25 +421,26 @@ End Class
 0
 1
 2
-]]>).VerifyIL("MyClass1.Main", <![CDATA[
+]]>)
+            v.VerifyIL("MyClass1.Main", <![CDATA[
 {
   // Code size       60 (0x3c)
   .maxstack  6
   .locals init (Object V_0, //ctrlVar
-  Object V_1, //initValue
-  Object V_2, //limit
-  Object V_3, //stp
-  Object V_4)
-  IL_0000:  ldc.i4.0
+                Object V_1, //initValue
+                Object V_2, //limit
+                Object V_3, //stp
+                Object V_4)
+ -IL_0000:  ldc.i4.0
   IL_0001:  box        "Integer"
   IL_0006:  stloc.1
-  IL_0007:  ldc.i4.2
+ -IL_0007:  ldc.i4.2
   IL_0008:  box        "Integer"
   IL_000d:  stloc.2
-  IL_000e:  ldc.i4.1
+ -IL_000e:  ldc.i4.1
   IL_000f:  box        "Integer"
   IL_0014:  stloc.3
-  IL_0015:  ldloc.0
+ -IL_0015:  ldloc.0
   IL_0016:  ldloc.1
   IL_0017:  ldloc.2
   IL_0018:  ldloc.3
@@ -443,22 +448,22 @@ End Class
   IL_001b:  ldloca.s   V_0
   IL_001d:  call       "Function Microsoft.VisualBasic.CompilerServices.ObjectFlowControl.ForLoopControl.ForLoopInitObj(Object, Object, Object, Object, ByRef Object, ByRef Object) As Boolean"
   IL_0022:  brfalse.s  IL_003b
-  IL_0024:  ldloc.0
+ -IL_0024:  ldloc.0
   IL_0025:  call       "Function System.Runtime.CompilerServices.RuntimeHelpers.GetObjectValue(Object) As Object"
   IL_002a:  call       "Sub System.Console.WriteLine(Object)"
-  IL_002f:  ldloc.0
+ -IL_002f:  ldloc.0
   IL_0030:  ldloc.s    V_4
   IL_0032:  ldloca.s   V_0
   IL_0034:  call       "Function Microsoft.VisualBasic.CompilerServices.ObjectFlowControl.ForLoopControl.ForNextCheckObj(Object, Object, ByRef Object) As Boolean"
   IL_0039:  brtrue.s   IL_0024
-  IL_003b:  ret
+ -IL_003b:  ret
 }
-]]>)
+]]>, sequencePoints:="MyClass1.Main")
 
         End Sub
 
         ' Step past the end value
-        <WorkItem(542032, "DevDiv")>
+        <WorkItem(542032, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/542032")>
         <Fact>
         Public Sub ForLoopStepPassedEnd()
             Dim TEMP = CompileAndVerify(
@@ -498,7 +503,7 @@ End Class
         End Sub
 
         ' Step past the end value
-        <WorkItem(542032, "DevDiv")>
+        <WorkItem(542032, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/542032")>
         <Fact>
         Public Sub ForLoopStepPassedEndStepNegative()
             Dim TEMP = CompileAndVerify(
@@ -538,7 +543,7 @@ End Class
         End Sub
 
         ' Use a FOR/NEXT with Decimal type and a positive STEP where start
-        <WorkItem(542032, "DevDiv")>
+        <WorkItem(542032, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/542032")>
         <Fact>
         Public Sub ForLoopStepIsDecimalVar3()
             Dim TEMP = CompileAndVerify(
@@ -571,7 +576,7 @@ End Class
         End Sub
 
         ' FOR/NEXT loops can be nested
-        <WorkItem(542032, "DevDiv")>
+        <WorkItem(542032, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/542032")>
         <Fact>
         Public Sub ForLoopNested()
             Dim TEMP = CompileAndVerify(
@@ -640,7 +645,7 @@ End Class
         End Sub
 
         ' When NEXT is used without a variable, the current loop is incremented
-        <WorkItem(542032, "DevDiv")>
+        <WorkItem(542032, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/542032")>
         <Fact>
         Public Sub ForLoopNextWithoutVariable()
             CompileAndVerify(
@@ -686,7 +691,7 @@ End Class
         End Sub
 
         ' Change outer variable in inner for Loops 
-        <WorkItem(542032, "DevDiv")>
+        <WorkItem(542032, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/542032")>
         <Fact>
         Public Sub ChangeOuterVarInInnerFor()
             Dim TEMP = CompileAndVerify(
@@ -741,7 +746,7 @@ End Class
         End Sub
 
         ' Inner for loop referencing the outer for loop iteration variable
-        <WorkItem(542032, "DevDiv")>
+        <WorkItem(542032, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/542032")>
         <Fact>
         Public Sub InnerForRefOuterForVar()
             Dim TEMP = CompileAndVerify(
@@ -795,7 +800,7 @@ End Class
         End Sub
 
         ' Exit for nested for loops
-        <WorkItem(542032, "DevDiv")>
+        <WorkItem(542032, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/542032")>
         <Fact>
         Public Sub ExitNestedFor()
             Dim TEMP = CompileAndVerify(
@@ -841,7 +846,7 @@ End Class
         End Sub
 
         ' Continue for nested for loops
-        <WorkItem(542032, "DevDiv")>
+        <WorkItem(542032, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/542032")>
         <Fact>
         Public Sub ContinueNestedFor()
             Dim TEMP = CompileAndVerify(
@@ -896,7 +901,7 @@ End Class
         End Sub
 
         ' Use nothing as the start value
-        <WorkItem(542033, "DevDiv")>
+        <WorkItem(542033, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/542033")>
         <Fact>
         Public Sub NothingAsStart()
             Dim TEMP = CompileAndVerify(
@@ -950,7 +955,7 @@ End Class
         End Sub
 
         ' Use nothing as the end value
-        <WorkItem(542033, "DevDiv")>
+        <WorkItem(542033, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/542033")>
         <Fact>
         Public Sub NothingAsEnd()
             Dim TEMP = CompileAndVerify(
@@ -1001,7 +1006,7 @@ End Class
         End Sub
 
         ' Use nothing as the step value
-        <WorkItem(542033, "DevDiv")>
+        <WorkItem(542033, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/542033")>
         <Fact>
         Public Sub NothingAsStep()
             Dim TEMP = CompileAndVerify(
@@ -1048,7 +1053,7 @@ End Class
         End Sub
 
         ' Use a function as the start and end value
-        <WorkItem(542036, "DevDiv")>
+        <WorkItem(542036, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/542036")>
         <Fact>
         Public Sub FunctionCallAsStart()
             Dim TEMP = CompileAndVerify(
@@ -1105,7 +1110,7 @@ End Class
         End Sub
 
         ' Overflow check while increase by steps
-        <WorkItem(542041, "DevDiv")>
+        <WorkItem(542041, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/542041")>
         <Fact>
         Public Sub OverflowCheck()
             Dim TEMP = CompileAndVerify(
@@ -1139,7 +1144,7 @@ End Class
         End Sub
 
         ' For With Object
-        <WorkItem(542042, "DevDiv")>
+        <WorkItem(542042, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/542042")>
         <Fact>
         Public Sub ObjectAsStart()
             Dim TEMP = CompileAndVerify(
@@ -1194,7 +1199,7 @@ End Class
 
         End Sub
 
-        <WorkItem(542045, "DevDiv")>
+        <WorkItem(542045, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/542045")>
         <Fact>
         Public Sub EnumAsStart()
             Dim TEMP = CompileAndVerify(
@@ -1234,7 +1239,7 @@ End Enum
         End Sub
 
         ' Declare a loop variable and initialize it with a property using the variable as argument
-        <WorkItem(542046, "DevDiv")>
+        <WorkItem(542046, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/542046")>
         <Fact>
         Public Sub PropertyAsStart()
             Dim TEMP = CompileAndVerify(
@@ -1252,13 +1257,13 @@ Public Class MyClass1
     End Property
     Public Shared Sub Main()
     End Sub
-    Public Sub Foo()
+    Public Sub Goo()
         For i As Integer = P1(30 + i) To 30
         Next
     End Sub
 End Class
     </file>
-</compilation>, expectedOutput:="").VerifyIL("MyClass1.Foo", <![CDATA[
+</compilation>, expectedOutput:="").VerifyIL("MyClass1.Goo", <![CDATA[
 {
   // Code size       24 (0x18)
   .maxstack  3
@@ -1321,7 +1326,7 @@ End Class
         End Sub
 
         ' Use a Field variable x that has the same name as the variable we are initializing
-        <WorkItem(542032, "DevDiv")>
+        <WorkItem(542032, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/542032")>
         <Fact>
         Public Sub FieldNameAsIteration_1()
             Dim TEMP = CompileAndVerify(
@@ -1333,17 +1338,17 @@ Public Class MyClass1
     Public y As Integer
     Public Shared Sub Main()
     End Sub
-    Function Foo()
+    Function Goo()
         For Me.y = 1 To 10
         Next
     End Function
 End Class
     </file>
-</compilation>, expectedOutput:="").VerifyIL("MyClass1.Foo", <![CDATA[
+</compilation>, expectedOutput:="").VerifyIL("MyClass1.Goo", <![CDATA[
 {
   // Code size       33 (0x21)
   .maxstack  3
-  .locals init (Object V_0) //Foo
+  .locals init (Object V_0) //Goo
   IL_0000:  ldarg.0
   IL_0001:  ldc.i4.1
   IL_0002:  stfld      "MyClass1.y As Integer"
@@ -1365,8 +1370,8 @@ End Class
 
         ' Use a global variable x that has the same name as the variable we are initializing via a
         ' function
-        <WorkItem(542126, "DevDiv")>
-        <WorkItem(528679, "DevDiv")>
+        <WorkItem(542126, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/542126")>
+        <WorkItem(528679, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/528679")>
         <Fact>
         Public Sub GlobalNameAsIteration()
             Dim TEMP = CompileAndVerify(
@@ -1378,24 +1383,24 @@ Public Class MyClass1
     Const global_y As Long = 20
     Public Shared Sub Main()
     End Sub
-    Function foo(ByRef x As Integer) As Integer
+    Function goo(ByRef x As Integer) As Integer
         x = x + 10
         Return x + 10
     End Function
-    sub Foo1()
-        For global_y As Integer = foo(global_y) To 30
+    sub Goo1()
+        For global_y As Integer = goo(global_y) To 30
         Next
     End sub
 End Class
     </file>
-</compilation>, expectedOutput:="").VerifyIL("MyClass1.Foo1", <![CDATA[
+</compilation>, expectedOutput:="").VerifyIL("MyClass1.Goo1", <![CDATA[
 {
   // Code size       21 (0x15)
   .maxstack  2
   .locals init (Integer V_0) //global_y
   IL_0000:  ldarg.0
   IL_0001:  ldloca.s   V_0
-  IL_0003:  call       "Function MyClass1.foo(ByRef Integer) As Integer"
+  IL_0003:  call       "Function MyClass1.goo(ByRef Integer) As Integer"
   IL_0008:  stloc.0
   IL_0009:  br.s       IL_000f
   IL_000b:  ldloc.0
@@ -1411,7 +1416,7 @@ End Class
         End Sub
 
         ' Use the declared variable to initialize limit and step
-        <WorkItem(542032, "DevDiv")>
+        <WorkItem(542032, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/542032")>
         <Fact>
         Public Sub UseDeclaredVarToLInitLimit()
             Dim TEMP = CompileAndVerify(
@@ -1474,7 +1479,7 @@ End Class
         End Sub
 
         ' Iteration variable is a variable declared outside the loop
-        <WorkItem(542032, "DevDiv")>
+        <WorkItem(542032, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/542032")>
         <Fact>
         Public Sub VarDeclaredOutOfLoop()
             CompileAndVerify(
@@ -1508,7 +1513,7 @@ End Class
         End Sub
 
         ' Change limit value in for loop
-        <WorkItem(542032, "DevDiv")>
+        <WorkItem(542032, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/542032")>
         <Fact>
         Public Sub ChangeLimitInloop()
             Dim TEMP = CompileAndVerify(
@@ -1565,7 +1570,7 @@ End Class
         End Sub
 
         ' Whole For loop on the same line
-        <WorkItem(542032, "DevDiv")>
+        <WorkItem(542032, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/542032")>
         <Fact>
         Public Sub SingleLine()
             CompileAndVerify(
@@ -1597,7 +1602,7 @@ End Class
         End Sub
 
         ' For statement is split in every possible place
-        <WorkItem(542032, "DevDiv")>
+        <WorkItem(542032, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/542032")>
         <Fact>
         Public Sub SplitForLoop()
             CompileAndVerify(
@@ -1637,7 +1642,7 @@ End Class
         End Sub
 
         ' Infinite loop
-        <WorkItem(542032, "DevDiv")>
+        <WorkItem(542032, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/542032")>
         <Fact>
         Public Sub InfiniteLoop()
             Dim TEMP = CompileAndVerify(
@@ -1672,7 +1677,7 @@ End Module
         End Sub
 
         ' Infinite loop
-        <WorkItem(542032, "DevDiv")>
+        <WorkItem(542032, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/542032")>
         <Fact>
         Public Sub InfiniteLoop_1()
             Dim TEMP = CompileAndVerify(
@@ -1870,12 +1875,12 @@ Module Program
     End Enum
 
     Sub main()
-        For i As e1 = e1.a To e1.c Step foo()
+        For i As e1 = e1.a To e1.c Step goo()
             Console.WriteLine(i)
         Next
     End Sub
 
-    Function foo() As e1
+    Function goo() As e1
         Return 1
     End Function
 End Module
@@ -1892,7 +1897,7 @@ End Module
   .maxstack  3
   .locals init (Program.e1 V_0,
   Program.e1 V_1) //i
-  IL_0000:  call       "Function Program.foo() As Program.e1"
+  IL_0000:  call       "Function Program.goo() As Program.e1"
   IL_0005:  stloc.0
   IL_0006:  ldc.i4.0
   IL_0007:  stloc.1
@@ -1935,12 +1940,12 @@ Module Program
     End Enum
 
     Sub main()
-        For i As e1 = e1.a To e1.c Step foo()
+        For i As e1 = e1.a To e1.c Step goo()
             Console.WriteLine(i)
         Next
     End Sub
 
-    Function foo() As e1
+    Function goo() As e1
         Return 1
     End Function
 End Module
@@ -1957,7 +1962,7 @@ End Module
   .maxstack  2
   .locals init (Program.e1 V_0,
   Program.e1 V_1) //i
-  IL_0000:  call       "Function Program.foo() As Program.e1"
+  IL_0000:  call       "Function Program.goo() As Program.e1"
   IL_0005:  stloc.0
   IL_0006:  ldc.i4.0
   IL_0007:  stloc.1

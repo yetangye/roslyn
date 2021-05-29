@@ -1,4 +1,6 @@
-﻿' Copyright (c) Microsoft.  All Rights Reserved.  Licensed under the Apache License, Version 2.0.  See License.txt in the project root for license information.
+﻿' Licensed to the .NET Foundation under one or more agreements.
+' The .NET Foundation licenses this file to you under the MIT license.
+' See the LICENSE file in the project root for more information.
 
 Imports Microsoft.CodeAnalysis.VisualBasic
 Imports Microsoft.CodeAnalysis.VisualBasic.Symbols
@@ -27,16 +29,16 @@ Namespace Microsoft.CodeAnalysis.VisualBasic.Symbols
                                         PropertySignatureComparer.WinRTConflictComparer,
                                         EventSignatureComparer.WinRTConflictComparer)
 
-        Private methodComparer As MethodSignatureComparer
-        Private propertyComparer As PropertySignatureComparer
-        Private eventComparer As EventSignatureComparer
+        Private ReadOnly _methodComparer As MethodSignatureComparer
+        Private ReadOnly _propertyComparer As PropertySignatureComparer
+        Private ReadOnly _eventComparer As EventSignatureComparer
 
         Private Sub New(methodComparer As MethodSignatureComparer,
                         propertyComparer As PropertySignatureComparer,
                         eventComparer As EventSignatureComparer)
-            Me.methodComparer = methodComparer
-            Me.propertyComparer = propertyComparer
-            Me.eventComparer = eventComparer
+            Me._methodComparer = methodComparer
+            Me._propertyComparer = propertyComparer
+            Me._eventComparer = eventComparer
         End Sub
 
         Public Overloads Function Equals(sym1 As Symbol, sym2 As Symbol) As Boolean _
@@ -51,11 +53,11 @@ Namespace Microsoft.CodeAnalysis.VisualBasic.Symbols
 
             Select Case sym1.Kind
                 Case SymbolKind.Method
-                    Return methodComparer.Equals(DirectCast(sym1, MethodSymbol), DirectCast(sym2, MethodSymbol))
+                    Return _methodComparer.Equals(DirectCast(sym1, MethodSymbol), DirectCast(sym2, MethodSymbol))
                 Case SymbolKind.Property
-                    Return propertyComparer.Equals(DirectCast(sym1, PropertySymbol), DirectCast(sym2, PropertySymbol))
+                    Return _propertyComparer.Equals(DirectCast(sym1, PropertySymbol), DirectCast(sym2, PropertySymbol))
                 Case SymbolKind.Event
-                    Return eventComparer.Equals(DirectCast(sym1, EventSymbol), DirectCast(sym2, EventSymbol))
+                    Return _eventComparer.Equals(DirectCast(sym1, EventSymbol), DirectCast(sym2, EventSymbol))
 
                 Case Else
                     ' To prevent warning
@@ -68,11 +70,11 @@ Namespace Microsoft.CodeAnalysis.VisualBasic.Symbols
 
             Select Case sym.Kind
                 Case SymbolKind.Method
-                    Return methodComparer.GetHashCode(DirectCast(sym, MethodSymbol))
+                    Return _methodComparer.GetHashCode(DirectCast(sym, MethodSymbol))
                 Case SymbolKind.Property
-                    Return propertyComparer.GetHashCode(DirectCast(sym, PropertySymbol))
+                    Return _propertyComparer.GetHashCode(DirectCast(sym, PropertySymbol))
                 Case SymbolKind.Event
-                    Return eventComparer.GetHashCode(DirectCast(sym, EventSymbol))
+                    Return _eventComparer.GetHashCode(DirectCast(sym, EventSymbol))
 
                 Case Else
                     Throw ExceptionUtilities.UnexpectedValue(sym.Kind)

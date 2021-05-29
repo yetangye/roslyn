@@ -1,23 +1,33 @@
+﻿' Licensed to the .NET Foundation under one or more agreements.
+' The .NET Foundation licenses this file to you under the MIT license.
+' See the LICENSE file in the project root for more information.
+
 Imports System.Collections.Immutable
 Imports System.Reflection
 Imports Microsoft.CodeAnalysis.ExpressionEvaluator
 Imports Microsoft.CodeAnalysis.Test.Utilities
 Imports Microsoft.CodeAnalysis.VisualBasic.UnitTests
+Imports Microsoft.VisualStudio.Debugger.ComponentInterfaces
 Imports Microsoft.VisualStudio.Debugger.Evaluation
 
-Namespace Microsoft.CodeAnalysis.VisualBasic.ExpressionEvaluator
+Namespace Microsoft.CodeAnalysis.VisualBasic.ExpressionEvaluator.UnitTests
 
-    Public Class VisualBasicResultProviderTestBase : Inherits ResultProviderTestBase
-
-        Private Shared ReadOnly resultProvider As ResultProvider = New VisualBasicResultProvider()
-        Private Shared ReadOnly inspectionContext As DkmInspectionContext = CreateDkmInspectionContext(resultProvider.Formatter, DkmEvaluationFlags.None, radix:=10)
+    Public MustInherit Class VisualBasicResultProviderTestBase : Inherits ResultProviderTestBase
 
         Public Sub New()
-            MyBase.New(resultProvider, inspectionContext)
+            MyClass.New(New VisualBasicFormatter())
+        End Sub
+
+        Private Sub New(formatter As VisualBasicFormatter)
+            MyClass.New(New DkmInspectionSession(ImmutableArray.Create(Of IDkmClrFormatter)(formatter), ImmutableArray.Create(Of IDkmClrResultProvider)(New VisualBasicResultProvider(formatter, formatter))))
+        End Sub
+
+        Private Sub New(inspectionSession As DkmInspectionSession)
+            MyBase.New(inspectionSession, CreateDkmInspectionContext(inspectionSession, DkmEvaluationFlags.None, radix:=10))
         End Sub
 
         Protected Shared Function GetAssembly(source As String) As Assembly
-            Dim comp = CompilationUtils.CreateCompilationWithMscorlib({source}, compOptions:=TestOptions.ReleaseDll)
+            Dim comp = CompilationUtils.CreateCompilationWithMscorlib40({source}, options:=TestOptions.ReleaseDll)
             Return ReflectionUtilities.Load(comp.EmitToArray())
         End Function
 

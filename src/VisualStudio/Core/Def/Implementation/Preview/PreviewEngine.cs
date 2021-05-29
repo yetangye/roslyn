@@ -1,5 +1,10 @@
-﻿// Copyright (c) Microsoft.  All Rights Reserved.  Licensed under the Apache License, Version 2.0.  See License.txt in the project root for license information.
+﻿// Licensed to the .NET Foundation under one or more agreements.
+// The .NET Foundation licenses this file to you under the MIT license.
+// See the LICENSE file in the project root for more information.
 
+#nullable disable
+
+using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Runtime.InteropServices;
@@ -7,10 +12,12 @@ using System.Threading;
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.Editor;
 using Microsoft.CodeAnalysis.Editor.Shared.Utilities;
+using Microsoft.CodeAnalysis.PooledObjects;
+using Microsoft.CodeAnalysis.Shared.Extensions;
 using Microsoft.VisualStudio.ComponentModelHost;
 using Microsoft.VisualStudio.Editor;
+using Microsoft.VisualStudio.Language.Intellisense;
 using Microsoft.VisualStudio.Shell.Interop;
-using Microsoft.VisualStudio.Text.Differencing;
 using Microsoft.VisualStudio.Text.Editor;
 using Microsoft.VisualStudio.TextManager.Interop;
 using Roslyn.Utilities;
@@ -19,7 +26,6 @@ namespace Microsoft.VisualStudio.LanguageServices.Implementation.Preview
 {
     internal class PreviewEngine : ForegroundThreadAffinitizedObject, IVsPreviewChangesEngine
     {
-        private readonly ITextDifferencingSelectorService _diffSelector;
         private readonly IVsEditorAdaptersFactoryService _editorFactory;
         private readonly Solution _newSolution;
         private readonly Solution _oldSolution;
@@ -35,14 +41,15 @@ namespace Microsoft.VisualStudio.LanguageServices.Implementation.Preview
         private PreviewUpdater _updater;
 
         public Solution FinalSolution { get; private set; }
-        public readonly bool ShowCheckBoxes;
+        public bool ShowCheckBoxes { get; private set; }
 
-        public PreviewEngine(string title, string helpString, string description, string topLevelItemName, Glyph topLevelGlyph, Solution newSolution, Solution oldSolution, IComponentModel componentModel, bool showCheckBoxes = true) :
-            this(title, helpString, description, topLevelItemName, topLevelGlyph, newSolution, oldSolution, componentModel, null, showCheckBoxes)
+        public PreviewEngine(IThreadingContext threadingContext, string title, string helpString, string description, string topLevelItemName, Glyph topLevelGlyph, Solution newSolution, Solution oldSolution, IComponentModel componentModel, bool showCheckBoxes = true)
+            : this(threadingContext, title, helpString, description, topLevelItemName, topLevelGlyph, newSolution, oldSolution, componentModel, null, showCheckBoxes)
         {
         }
 
         public PreviewEngine(
+            IThreadingContext threadingContext,
             string title,
             string helpString,
             string description,
@@ -53,15 +60,15 @@ namespace Microsoft.VisualStudio.LanguageServices.Implementation.Preview
             IComponentModel componentModel,
             IVsImageService2 imageService,
             bool showCheckBoxes = true)
+            : base(threadingContext)
         {
             _topLevelName = topLevelItemName;
             _topLevelGlyph = topLevelGlyph;
-            _title = title;
-            _helpString = helpString;
-            _description = description;
+            _title = title ?? throw new ArgumentNullException(nameof(title));
+            _helpString = helpString ?? throw new ArgumentNullException(nameof(helpString));
+            _description = description ?? throw new ArgumentNullException(nameof(description));
             _newSolution = newSolution.WithMergedLinkedFileChangesAsync(oldSolution, cancellationToken: CancellationToken.None).Result;
             _oldSolution = oldSolution;
-            _diffSelector = componentModel.GetService<ITextDifferencingSelectorService>();
             _editorFactory = componentModel.GetService<IVsEditorAdaptersFactoryService>();
             _componentModel = componentModel;
             this.ShowCheckBoxes = showCheckBoxes;
@@ -84,7 +91,7 @@ namespace Microsoft.VisualStudio.LanguageServices.Implementation.Preview
 
         public int GetConfirmation(out string pbstrConfirmation)
         {
-            pbstrConfirmation = EditorFeaturesResources.Apply;
+            pbstrConfirmation = EditorFeaturesResources.Apply2;
             return VSConstants.S_OK;
         }
 
@@ -105,12 +112,13 @@ namespace Microsoft.VisualStudio.LanguageServices.Implementation.Preview
             var changes = _newSolution.GetChanges(_oldSolution);
             var projectChanges = changes.GetProjectChanges();
 
-            _topLevelChange = new TopLevelChange(_topLevelName, _topLevelGlyph, _newSolution, _oldSolution, _componentModel, this);
+            _topLevelChange = new TopLevelChange(_topLevelName, _topLevelGlyph, _newSolution, this);
 
             var builder = ArrayBuilder<AbstractChange>.GetInstance();
 
             // Documents
-            var changedDocuments = projectChanges.SelectMany(p => p.GetChangedDocuments());
+            // (exclude unchangeable ones if they will be ignored when applied to workspace.)
+            var changedDocuments = projectChanges.SelectMany(p => p.GetChangedDocuments(onlyGetDocumentsWithTextChanges: true, _oldSolution.Workspace.IgnoreUnchangeableDocumentsWhenApplyingChanges));
             var addedDocuments = projectChanges.SelectMany(p => p.GetAddedDocuments());
             var removedDocuments = projectChanges.SelectMany(p => p.GetRemovedDocuments());
 
@@ -128,13 +136,28 @@ namespace Microsoft.VisualStudio.LanguageServices.Implementation.Preview
             allDocumentsWithChanges.AddRange(addedAdditionalDocuments);
             allDocumentsWithChanges.AddRange(removedAdditionalDocuments);
 
+            // AnalyzerConfig Documents
+            var changedAnalyzerConfigDocuments = projectChanges.SelectMany(p => p.GetChangedAnalyzerConfigDocuments());
+            var addedAnalyzerConfigDocuments = projectChanges.SelectMany(p => p.GetAddedAnalyzerConfigDocuments());
+            var removedAnalyzerConfigDocuments = projectChanges.SelectMany(p => p.GetRemovedAnalyzerConfigDocuments());
+
+            allDocumentsWithChanges.AddRange(changedAnalyzerConfigDocuments);
+            allDocumentsWithChanges.AddRange(addedAnalyzerConfigDocuments);
+            allDocumentsWithChanges.AddRange(removedAnalyzerConfigDocuments);
+
             AppendFileChanges(allDocumentsWithChanges, builder);
 
             // References (metadata/project/analyzer)
             ReferenceChange.AppendReferenceChanges(projectChanges, this, builder);
 
-            _topLevelChange.Children = new ChangeList(builder.ToArray());
-            ppIUnknownPreviewChangesList = new ChangeList(new[] { _topLevelChange });
+            _topLevelChange.Children = builder.Count == 0 ? ChangeList.Empty : new ChangeList(builder.ToArray());
+            ppIUnknownPreviewChangesList = _topLevelChange.Children.Changes.Length == 0 ? new ChangeList(new[] { new NoChange(this) }) : new ChangeList(new[] { _topLevelChange });
+
+            if (_topLevelChange.Children.Changes.Length == 0)
+            {
+                this.ShowCheckBoxes = false;
+            }
+
             return VSConstants.S_OK;
         }
 
@@ -152,29 +175,30 @@ namespace Microsoft.VisualStudio.LanguageServices.Implementation.Preview
                     continue;
                 }
 
-                var left = _oldSolution.GetDocument(documentId) ?? _oldSolution.GetAdditionalDocument(documentId);
-                var right = _newSolution.GetDocument(documentId) ?? _newSolution.GetAdditionalDocument(documentId);
+                var left = _oldSolution.GetTextDocument(documentId);
+                var right = _newSolution.GetTextDocument(documentId);
 
-                var leftDocument = left as Document;
-                var rightDocument = right as Document;
-
-                if (leftDocument != null)
+                if (left is Document leftDocument)
                 {
                     linkedDocumentIds.AddRange(leftDocument.GetLinkedDocumentIds());
                 }
-                else if (rightDocument != null)
+                else if (right is Document rightDocument)
                 {
                     // Added document.
                     linkedDocumentIds.AddRange(rightDocument.GetLinkedDocumentIds());
                 }
 
-                builder.Add(new FileChange(left, right, _componentModel, _topLevelChange, this, _imageService));
+                var fileChange = new FileChange(left, right, _componentModel, _topLevelChange, this, _imageService);
+                if (fileChange.Children.Changes.Length > 0)
+                {
+                    builder.Add(fileChange);
+                }
             }
         }
 
         public int GetTextViewDescription(out string pbstrTextViewDescription)
         {
-            pbstrTextViewDescription = EditorFeaturesResources.PreviewCodeChanges;
+            pbstrTextViewDescription = EditorFeaturesResources.Preview_Code_Changes_colon;
             return VSConstants.S_OK;
         }
 
@@ -194,7 +218,7 @@ namespace Microsoft.VisualStudio.LanguageServices.Implementation.Preview
         public void UpdatePreview(DocumentId documentId, SpanChange spanSource)
         {
             var updatedSolution = _topLevelChange.GetUpdatedSolution(applyingChanges: false);
-            var document = updatedSolution.GetDocument(documentId);
+            var document = updatedSolution.GetTextDocument(documentId);
             if (document != null)
             {
                 _updater.UpdateView(document, spanSource);
@@ -207,7 +231,7 @@ namespace Microsoft.VisualStudio.LanguageServices.Implementation.Preview
         {
             if (_updater == null)
             {
-                _updater = new PreviewUpdater(EnsureTextViewIsInitialized(textView));
+                _updater = new PreviewUpdater(ThreadingContext, EnsureTextViewIsInitialized(textView));
             }
         }
 
@@ -245,20 +269,56 @@ namespace Microsoft.VisualStudio.LanguageServices.Implementation.Preview
             var newText = "";
             var newTextPtr = Marshal.StringToHGlobalAuto(newText);
 
-            IVsTextLines lines;
-            Marshal.ThrowExceptionForHR(adapter.GetBuffer(out lines));
+            try
+            {
+                Marshal.ThrowExceptionForHR(adapter.GetBuffer(out var lines));
+                Marshal.ThrowExceptionForHR(lines.GetLastLineIndex(out _, out var piLineIndex));
+                Marshal.ThrowExceptionForHR(lines.GetLengthOfLine(piLineIndex, out var piLineLength));
 
-            int piLIne, piLineIndex;
-            Marshal.ThrowExceptionForHR(lines.GetLastLineIndex(out piLIne, out piLineIndex));
+                Microsoft.VisualStudio.TextManager.Interop.TextSpan[] changes = null;
 
-            int piLineLength;
-            Marshal.ThrowExceptionForHR(lines.GetLengthOfLine(piLineIndex, out piLineLength));
+                piLineLength = piLineLength > 0 ? piLineLength - 1 : 0;
 
-            Microsoft.VisualStudio.TextManager.Interop.TextSpan[] changes = default(Microsoft.VisualStudio.TextManager.Interop.TextSpan[]);
+                Marshal.ThrowExceptionForHR(lines.ReplaceLines(0, 0, piLineIndex, piLineLength, newTextPtr, newText.Length, changes));
+            }
+            finally
+            {
+                Marshal.FreeHGlobal(newTextPtr);
+            }
+        }
 
-            piLineLength = piLineLength > 0 ? piLineLength - 1 : 0;
+        private class NoChange : AbstractChange
+        {
+            public NoChange(PreviewEngine engine) : base(engine)
+            {
+            }
 
-            Marshal.ThrowExceptionForHR(lines.ReplaceLines(0, 0, piLineIndex, piLineLength, newTextPtr, newText.Length, changes));
+            public override int GetText(out VSTREETEXTOPTIONS tto, out string ppszText)
+            {
+                tto = VSTREETEXTOPTIONS.TTO_DEFAULT;
+                ppszText = ServicesVSResources.No_Changes;
+                return VSConstants.S_OK;
+            }
+
+            public override int GetTipText(out VSTREETOOLTIPTYPE eTipType, out string ppszText)
+            {
+                eTipType = VSTREETOOLTIPTYPE.TIPTYPE_DEFAULT;
+                ppszText = null;
+                return VSConstants.E_FAIL;
+            }
+
+            public override int CanRecurse => 0;
+            public override int IsExpandable => 0;
+
+            internal override void GetDisplayData(VSTREEDISPLAYDATA[] pData)
+                => pData[0].Image = pData[0].SelectedImage = (ushort)StandardGlyphGroup.GlyphInformation;
+
+            public override int OnRequestSource(object pIUnknownTextView)
+                => VSConstants.S_OK;
+
+            public override void UpdatePreview()
+            {
+            }
         }
     }
 }

@@ -1,6 +1,10 @@
-' Copyright (c) Microsoft.  All Rights Reserved.  Licensed under the Apache License, Version 2.0.  See License.txt in the project root for license information.
+﻿' Licensed to the .NET Foundation under one or more agreements.
+' The .NET Foundation licenses this file to you under the MIT license.
+' See the LICENSE file in the project root for more information.
 
+Imports System.Threading.Tasks
 Imports Microsoft.CodeAnalysis
+Imports Microsoft.CodeAnalysis.Test.Utilities
 Imports Roslyn.Test.Utilities
 
 Namespace Microsoft.VisualStudio.LanguageServices.UnitTests.CodeModel.CSharp
@@ -9,11 +13,11 @@ Namespace Microsoft.VisualStudio.LanguageServices.UnitTests.CodeModel.CSharp
 
 #Region "GetStartPoint() tests"
 
-        <ConditionalFact(GetType(x86)), Trait(Traits.Feature, Traits.Features.CodeModel)>
-        Public Sub GetStartPoint1()
+        <WpfFact, Trait(Traits.Feature, Traits.Features.CodeModel)>
+        Public Sub TestGetStartPoint1()
             Dim code =
 <Code>
-delegate void $$Foo(int i);
+delegate void $$Goo(int i);
 </Code>
 
             TestGetStartPoint(code,
@@ -39,12 +43,12 @@ delegate void $$Foo(int i);
                      TextPoint(line:=1, lineOffset:=1, absoluteOffset:=1, lineLength:=25)))
         End Sub
 
-        <ConditionalFact(GetType(x86)), Trait(Traits.Feature, Traits.Features.CodeModel)>
-        Public Sub GetStartPoint2()
+        <WpfFact, Trait(Traits.Feature, Traits.Features.CodeModel)>
+        Public Sub TestGetStartPoint2()
             Dim code =
 <Code>
 [System.CLSCompliant(true)]
-delegate void $$Foo(int i);
+delegate void $$Goo(int i);
 </Code>
 
             TestGetStartPoint(code,
@@ -74,11 +78,11 @@ delegate void $$Foo(int i);
 
 #Region "GetEndPoint() tests"
 
-        <ConditionalFact(GetType(x86)), Trait(Traits.Feature, Traits.Features.CodeModel)>
-        Public Sub GetEndPoint1()
+        <WpfFact, Trait(Traits.Feature, Traits.Features.CodeModel)>
+        Public Sub TestGetEndPoint1()
             Dim code =
 <Code>
-delegate void $$Foo(int i);
+delegate void $$Goo(int i);
 </Code>
 
             TestGetEndPoint(code,
@@ -104,12 +108,12 @@ delegate void $$Foo(int i);
                      TextPoint(line:=1, lineOffset:=26, absoluteOffset:=26, lineLength:=25)))
         End Sub
 
-        <ConditionalFact(GetType(x86)), Trait(Traits.Feature, Traits.Features.CodeModel)>
-        Public Sub GetEndPoint2()
+        <WpfFact, Trait(Traits.Feature, Traits.Features.CodeModel)>
+        Public Sub TestGetEndPoint2()
             Dim code =
 <Code>
 [System.CLSCompliant(true)]
-delegate void $$Foo(int i);
+delegate void $$Goo(int i);
 </Code>
 
             TestGetEndPoint(code,
@@ -139,8 +143,8 @@ delegate void $$Foo(int i);
 
 #Region "BaseClass tests"
 
-        <ConditionalFact(GetType(x86)), Trait(Traits.Feature, Traits.Features.CodeModel)>
-        Public Sub BaseClass()
+        <WpfFact, Trait(Traits.Feature, Traits.Features.CodeModel)>
+        Public Sub TestBaseClass1()
             Dim code =
 <Code>
 delegate void $$D();
@@ -153,8 +157,8 @@ delegate void $$D();
 
 #Region "Prototype tests"
 
-        <ConditionalFact(GetType(x86)), Trait(Traits.Feature, Traits.Features.CodeModel)>
-        Public Sub Prototype_UniqueSignature()
+        <WpfFact, Trait(Traits.Feature, Traits.Features.CodeModel)>
+        Public Sub TestPrototype_UniqueSignature()
             Dim code =
 <Code>
 namespace N
@@ -166,8 +170,8 @@ namespace N
             TestPrototype(code, EnvDTE.vsCMPrototype.vsCMPrototypeUniqueSignature, "N.D")
         End Sub
 
-        <ConditionalFact(GetType(x86)), Trait(Traits.Feature, Traits.Features.CodeModel)>
-        Public Sub Prototype_ClassName()
+        <WpfFact, Trait(Traits.Feature, Traits.Features.CodeModel)>
+        Public Sub TestPrototype_ClassName()
             Dim code =
 <Code>
 namespace N
@@ -179,8 +183,8 @@ namespace N
             TestPrototype(code, EnvDTE.vsCMPrototype.vsCMPrototypeClassName, "delegate N.D")
         End Sub
 
-        <ConditionalFact(GetType(x86)), Trait(Traits.Feature, Traits.Features.CodeModel)>
-        Public Sub Prototype_FullName()
+        <WpfFact, Trait(Traits.Feature, Traits.Features.CodeModel)>
+        Public Sub TestPrototype_FullName()
             Dim code =
 <Code>
 namespace N
@@ -192,8 +196,8 @@ namespace N
             TestPrototype(code, EnvDTE.vsCMPrototype.vsCMPrototypeFullname, "delegate N.D")
         End Sub
 
-        <ConditionalFact(GetType(x86)), Trait(Traits.Feature, Traits.Features.CodeModel)>
-        Public Sub Prototype_Type()
+        <WpfFact, Trait(Traits.Feature, Traits.Features.CodeModel)>
+        Public Sub TestPrototype_Type()
             Dim code =
 <Code>
 namespace N
@@ -209,8 +213,8 @@ namespace N
 
 #Region "Type tests"
 
-        <ConditionalFact(GetType(x86)), Trait(Traits.Feature, Traits.Features.CodeModel)>
-        Public Sub Type_Void()
+        <WpfFact, Trait(Traits.Feature, Traits.Features.CodeModel)>
+        Public Sub TestType_Void()
             Dim code =
 <Code>
 delegate void $$D();
@@ -219,8 +223,8 @@ delegate void $$D();
             TestTypeProp(code, New CodeTypeRefData With {.CodeTypeFullName = "System.Void", .TypeKind = EnvDTE.vsCMTypeRef.vsCMTypeRefVoid})
         End Sub
 
-        <ConditionalFact(GetType(x86)), Trait(Traits.Feature, Traits.Features.CodeModel)>
-        Public Sub Type_Int()
+        <WpfFact, Trait(Traits.Feature, Traits.Features.CodeModel)>
+        Public Sub TestType_Int()
             Dim code =
 <Code>
 delegate int $$D();
@@ -229,8 +233,8 @@ delegate int $$D();
             TestTypeProp(code, New CodeTypeRefData With {.CodeTypeFullName = "System.Int32", .TypeKind = EnvDTE.vsCMTypeRef.vsCMTypeRefInt})
         End Sub
 
-        <ConditionalFact(GetType(x86)), Trait(Traits.Feature, Traits.Features.CodeModel)>
-        Public Sub Type_SourceClass()
+        <WpfFact, Trait(Traits.Feature, Traits.Features.CodeModel)>
+        Public Sub TestType_SourceClass()
             Dim code =
 <Code>
 class C { }
@@ -244,8 +248,8 @@ delegate C $$D();
 
 #Region "Set Type tests"
 
-        <ConditionalFact(GetType(x86)), Trait(Traits.Feature, Traits.Features.CodeModel)>
-        Public Sub SetType1()
+        <WpfFact, Trait(Traits.Feature, Traits.Features.CodeModel)>
+        Public Async Function TestSetType1() As Task
             Dim code =
 <Code>
 public delegate int $$D();
@@ -256,11 +260,11 @@ public delegate int $$D();
 public delegate void D();
 </Code>
 
-            TestSetTypeProp(code, expected, "void")
-        End Sub
+            Await TestSetTypeProp(code, expected, "void")
+        End Function
 
-        <ConditionalFact(GetType(x86)), Trait(Traits.Feature, Traits.Features.CodeModel)>
-        Public Sub SetType2()
+        <WpfFact, Trait(Traits.Feature, Traits.Features.CodeModel)>
+        Public Async Function TestSetType2() As Task
             Dim code =
 <Code>
 public delegate string $$D();
@@ -271,10 +275,111 @@ public delegate string $$D();
 public delegate int? D();
 </Code>
 
-            TestSetTypeProp(code, expected, "System.Nullable<System.Int32>")
+            Await TestSetTypeProp(code, expected, "System.Nullable<System.Int32>")
+        End Function
+
+#End Region
+
+#Region "Parameter name tests"
+
+        <WorkItem(1147885, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/1147885")>
+        <WpfFact, Trait(Traits.Feature, Traits.Features.CodeModel)>
+        Public Sub TestParameterNameWithEscapeCharacters()
+            Dim code =
+<Code>
+public delegate int $$M(int @int);
+</Code>
+
+            TestAllParameterNames(code, "@int")
+        End Sub
+
+        <WorkItem(1147885, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/1147885")>
+        <WpfFact, Trait(Traits.Feature, Traits.Features.CodeModel)>
+        Public Sub TestParameterNameWithEscapeCharacters_2()
+            Dim code =
+<Code>
+public delegate int $$M(int @int, string @string);
+</Code>
+
+            TestAllParameterNames(code, "@int", "@string")
         End Sub
 
 #End Region
+
+#Region "AddAttribute tests"
+        <WpfFact, Trait(Traits.Feature, Traits.Features.CodeModel)>
+        Public Async Function TestAddAttribute1() As Task
+            Dim code =
+<Code>
+using System;
+
+delegate void $$D();
+</Code>
+
+            Dim expected =
+<Code>
+using System;
+
+[Serializable()]
+delegate void D();
+</Code>
+            Await TestAddAttribute(code, expected, New AttributeData With {.Name = "Serializable"})
+        End Function
+
+        <WpfFact, Trait(Traits.Feature, Traits.Features.CodeModel)>
+        Public Async Function TestAddAttribute2() As Task
+            Dim code =
+<Code>
+using System;
+
+[Serializable]
+delegate void $$D();
+</Code>
+
+            Dim expected =
+<Code>
+using System;
+
+[Serializable]
+[CLSCompliant(true)]
+delegate void D();
+</Code>
+            Await TestAddAttribute(code, expected, New AttributeData With {.Name = "CLSCompliant", .Value = "true", .Position = 1})
+        End Function
+
+        <WorkItem(2825, "https://github.com/dotnet/roslyn/issues/2825")>
+        <WpfFact, Trait(Traits.Feature, Traits.Features.CodeModel)>
+        Public Async Function TestAddAttribute_BelowDocComment() As Task
+            Dim code =
+<Code>
+using System;
+
+/// &lt;summary&gt;&lt;/summary&gt;
+delegate void $$D();
+</Code>
+
+            Dim expected =
+<Code>
+using System;
+
+/// &lt;summary&gt;&lt;/summary&gt;
+[CLSCompliant(true)]
+delegate void D();
+</Code>
+            Await TestAddAttribute(code, expected, New AttributeData With {.Name = "CLSCompliant", .Value = "true"})
+        End Function
+
+#End Region
+
+        <WpfFact, Trait(Traits.Feature, Traits.Features.CodeModel)>
+        Public Sub TestTypeDescriptor_GetProperties()
+            Dim code =
+<Code>
+delegate void $$D();
+</Code>
+
+            TestPropertyDescriptors(Of EnvDTE80.CodeDelegate2)(code)
+        End Sub
 
         Protected Overrides ReadOnly Property LanguageName As String
             Get

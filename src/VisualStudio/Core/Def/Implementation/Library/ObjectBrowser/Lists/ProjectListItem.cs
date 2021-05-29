@@ -1,4 +1,8 @@
-﻿// Copyright (c) Microsoft.  All Rights Reserved.  Licensed under the Apache License, Version 2.0.  See License.txt in the project root for license information.
+﻿// Licensed to the .NET Foundation under one or more agreements.
+// The .NET Foundation licenses this file to you under the MIT license.
+// See the LICENSE file in the project root for more information.
+
+#nullable disable
 
 using System;
 using Microsoft.CodeAnalysis;
@@ -11,12 +15,12 @@ namespace Microsoft.VisualStudio.LanguageServices.Implementation.Library.ObjectB
         private readonly string _displayText;
 
         public ProjectListItem(Project project)
-            : base(project.Id, GetProjectGlpyh(project))
+            : base(project.Id, GetProjectGlyph(project))
         {
             _displayText = project.GetProjectDisplayName();
         }
 
-        private static StandardGlyphGroup GetProjectGlpyh(Project project)
+        private static StandardGlyphGroup GetProjectGlyph(Project project)
         {
             switch (project.Language)
             {

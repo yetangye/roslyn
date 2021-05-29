@@ -1,14 +1,10 @@
-﻿' Copyright (c) Microsoft.  All Rights Reserved.  Licensed under the Apache License, Version 2.0.  See License.txt in the project root for license information.
+﻿' Licensed to the .NET Foundation under one or more agreements.
+' The .NET Foundation licenses this file to you under the MIT license.
+' See the LICENSE file in the project root for more information.
 
-Imports System.Globalization
-Imports System.Text
-Imports System.Xml.Linq
+Imports Microsoft.CodeAnalysis.PooledObjects
 Imports Microsoft.CodeAnalysis.Test.Utilities
-Imports Microsoft.CodeAnalysis.Text
-Imports Microsoft.CodeAnalysis.VisualBasic.Symbols.Metadata.PE
 Imports Microsoft.CodeAnalysis.VisualBasic.Symbols
-Imports Microsoft.CodeAnalysis.VisualBasic.Syntax
-Imports Microsoft.CodeAnalysis.VisualBasic.UnitTests.Symbols.Metadata
 Imports Roslyn.Test.Utilities
 
 Namespace Microsoft.CodeAnalysis.VisualBasic.UnitTests
@@ -34,7 +30,7 @@ End Class
                 </compilation>
 
             ' In C#, an assembly-level attribute is required.  In VB, that is not the case.
-            CreateCompilationWithMscorlib(source).AssertNoDiagnostics()
+            CreateCompilationWithMscorlib40(source).AssertNoDiagnostics()
         End Sub
 
         <Fact>
@@ -59,7 +55,7 @@ End Class
                     </file>
                 </compilation>
 
-            CreateCompilationWithMscorlib(source).AssertNoDiagnostics()
+            CreateCompilationWithMscorlib40(source).AssertNoDiagnostics()
         End Sub
 
         <Fact>
@@ -98,7 +94,7 @@ End Class
 
             ' C# warns about putting the attribute on members not visible outside the assembly.
             ' VB does not.
-            CreateCompilationWithMscorlib(source).AssertNoDiagnostics()
+            CreateCompilationWithMscorlib40(source).AssertNoDiagnostics()
         End Sub
 
         <Fact>
@@ -129,7 +125,7 @@ End Class
             ' C# warns about putting the attribute on parameters.  VB does not.
             ' C# also warns about putting the attribute on return types, but VB
             ' does not support the "return" attribute target.
-            CreateCompilationWithMscorlib(source).AssertNoDiagnostics()
+            CreateCompilationWithMscorlib40(source).AssertNoDiagnostics()
         End Sub
 
         <Fact>
@@ -176,7 +172,7 @@ End Class
                     </file>
                 </compilation>
 
-            CreateCompilationWithMscorlib(source).AssertTheseDiagnostics(<errors><![CDATA[
+            CreateCompilationWithMscorlib40(source).AssertTheseDiagnostics(<errors><![CDATA[
 BC40030: sub 'Public Sub M()' cannot be marked CLS-compliant because its containing type 'Kinds' is not CLS-compliant.
     Public Sub M()
                ~
@@ -249,7 +245,7 @@ End Class
                     </file>
                 </compilation>
 
-            CreateCompilationWithMscorlib(source).AssertTheseDiagnostics(<errors><![CDATA[
+            CreateCompilationWithMscorlib40(source).AssertTheseDiagnostics(<errors><![CDATA[
 BC40030: sub 'Public Sub M()' cannot be marked CLS-compliant because its containing type 'Kinds' is not CLS-compliant.
     Public Sub M()
                ~
@@ -305,7 +301,7 @@ End Class
                     </file>
                 </compilation>
 
-            CreateCompilationWithMscorlib(source).AssertTheseDiagnostics(<errors><![CDATA[
+            CreateCompilationWithMscorlib40(source).AssertTheseDiagnostics(<errors><![CDATA[
 BC40030: class 'A.B.C' cannot be marked CLS-compliant because its containing type 'A.B' is not CLS-compliant.
         Public Class C
                      ~
@@ -336,7 +332,7 @@ End Class
                     </file>
                 </compilation>
 
-            CreateCompilationWithMscorlib(source).AssertTheseDiagnostics(<errors><![CDATA[
+            CreateCompilationWithMscorlib40(source).AssertTheseDiagnostics(<errors><![CDATA[
 BC40026: 'A' is not CLS-compliant because it derives from 'Bad', which is not CLS-compliant.
 Public Class A
              ~
@@ -408,11 +404,11 @@ End Class
                     </file>
                 </compilation>
 
-            Dim lib1Ref = CreateCompilationWithMscorlib(lib1Source).EmitToImageReference()
-            Dim lib2Ref = CreateCompilationWithMscorlib(lib2Source).EmitToImageReference()
-            Dim lib3Ref = CreateCompilationWithMscorlib(lib3Source).EmitToImageReference()
+            Dim lib1Ref = CreateCompilationWithMscorlib40(lib1Source).EmitToImageReference()
+            Dim lib2Ref = CreateCompilationWithMscorlib40(lib2Source).EmitToImageReference()
+            Dim lib3Ref = CreateCompilationWithMscorlib40(lib3Source).EmitToImageReference()
 
-            CreateCompilationWithMscorlibAndReferences(source, {lib1Ref, lib2Ref, lib3Ref}).AssertTheseDiagnostics(<errors><![CDATA[
+            CreateCompilationWithMscorlib40AndReferences(source, {lib1Ref, lib2Ref, lib3Ref}).AssertTheseDiagnostics(<errors><![CDATA[
 BC40026: 'A1' is not CLS-compliant because it derives from 'Bad1', which is not CLS-compliant.
 Public Class A1
              ~~
@@ -459,7 +455,7 @@ End Interface
                     </file>
                 </compilation>
 
-            CreateCompilationWithMscorlib(source).AssertTheseDiagnostics(<errors><![CDATA[
+            CreateCompilationWithMscorlib40(source).AssertTheseDiagnostics(<errors><![CDATA[
 BC40029: 'A' is not CLS-compliant because the interface 'Bad' it inherits from is not CLS-compliant.
 Public Interface A
                  ~
@@ -507,7 +503,7 @@ End Interface
                 </compilation>
 
             ' Implemented interfaces are not required to be compliant - only inherited ones.
-            CreateCompilationWithMscorlib(source).AssertNoDiagnostics()
+            CreateCompilationWithMscorlib40(source).AssertNoDiagnostics()
         End Sub
 
         <Fact>
@@ -545,7 +541,7 @@ End Class
                     </file>
                 </compilation>
 
-            CreateCompilationWithMscorlib(source).AssertTheseDiagnostics(<errors><![CDATA[
+            CreateCompilationWithMscorlib40(source).AssertTheseDiagnostics(<errors><![CDATA[
 BC40027: Return type of function 'M1' is not CLS-compliant.
     Function M1() As Bad
              ~~
@@ -601,7 +597,7 @@ End Class
                     </file>
                 </compilation>
 
-            CreateCompilationWithMscorlib(source).AssertTheseDiagnostics(<errors><![CDATA[
+            CreateCompilationWithMscorlib40(source).AssertTheseDiagnostics(<errors><![CDATA[
 BC40027: Return type of function 'M1' is not CLS-compliant.
     Public MustOverride Function M1() As Bad
                                  ~~
@@ -642,7 +638,7 @@ End Class
                     </file>
                 </compilation>
 
-            CreateCompilationWithMscorlib(source).AssertTheseDiagnostics(<errors><![CDATA[
+            CreateCompilationWithMscorlib40(source).AssertTheseDiagnostics(<errors><![CDATA[
 BC40033: Non CLS-compliant 'Property Prop1 As Long' is not allowed in a CLS-compliant interface.
     <CLSCompliant(False)> Property Prop1() As Long
                                    ~~~~~
@@ -710,7 +706,7 @@ End Interface
                 </compilation>
 
             ' NOTE: Dev11 squiggles the problematic constraint, but we don't have enough info.
-            CreateCompilationWithMscorlib(source).AssertTheseDiagnostics(<errors><![CDATA[
+            CreateCompilationWithMscorlib40(source).AssertTheseDiagnostics(<errors><![CDATA[
 BC40040: Generic parameter constraint type 'Bad' is not CLS-compliant.
 Public Class C1(Of t As {Good, Bad}, u As {Bad, Good})
                    ~
@@ -760,7 +756,7 @@ End Interface
                     </file>
                 </compilation>
 
-            CreateCompilationWithMscorlib(source).AssertTheseDiagnostics(<errors><![CDATA[
+            CreateCompilationWithMscorlib40(source).AssertTheseDiagnostics(<errors><![CDATA[
 BC40025: Type of member 'F1' is not CLS-compliant.
     Public F1 As Bad
            ~~
@@ -840,7 +836,7 @@ End Interface
                     </file>
                 </compilation>
 
-            CreateCompilationWithMscorlib(source).AssertTheseDiagnostics(<errors><![CDATA[
+            CreateCompilationWithMscorlib40(source).AssertTheseDiagnostics(<errors><![CDATA[
 BC40027: Return type of function 'M1' is not CLS-compliant.
     Public Function M1() As Bad
                     ~~
@@ -901,7 +897,7 @@ End Interface
                     </file>
                 </compilation>
 
-            CreateCompilationWithMscorlib(source).AssertTheseDiagnostics(<errors><![CDATA[
+            CreateCompilationWithMscorlib40(source).AssertTheseDiagnostics(<errors><![CDATA[
 BC40027: Return type of function 'P1' is not CLS-compliant.
     Public Property P1() As Bad
                     ~~
@@ -962,7 +958,7 @@ End Interface
                     </file>
                 </compilation>
 
-            CreateCompilationWithMscorlib(source).AssertTheseDiagnostics(<errors><![CDATA[
+            CreateCompilationWithMscorlib40(source).AssertTheseDiagnostics(<errors><![CDATA[
 BC40027: Return type of function 'Invoke' is not CLS-compliant.
     Public Delegate Function M1() As Bad
                              ~~
@@ -1057,7 +1053,7 @@ End Interface
                     </file>
                 </compilation>
 
-            CreateCompilationWithMscorlib(source).AssertTheseDiagnostics(<errors><![CDATA[
+            CreateCompilationWithMscorlib40(source).AssertTheseDiagnostics(<errors><![CDATA[
 BC40028: Type of parameter 'p' is not CLS-compliant.
     Public Function M1(p As Bad)
                        ~
@@ -1109,7 +1105,7 @@ End Interface
                     </file>
                 </compilation>
 
-            CreateCompilationWithMscorlib(source).AssertTheseDiagnostics(<errors><![CDATA[
+            CreateCompilationWithMscorlib40(source).AssertTheseDiagnostics(<errors><![CDATA[
 BC40028: Type of parameter 'x' is not CLS-compliant.
     Sub M(x As Bad)
           ~
@@ -1170,7 +1166,7 @@ End Class
             ' Dev11 produces error BC30508 for M1 and M3
             ' Dev11 produces error BC30389 for M4 and M5
             ' Roslyn dropped these errors (since they weren't helpful) and, instead, reports CLS warnings.
-            CreateCompilationWithMscorlib(source).AssertNoDiagnostics()
+            CreateCompilationWithMscorlib40(source).AssertNoDiagnostics()
         End Sub
 
         <Fact>
@@ -1197,7 +1193,7 @@ End Class
                     </file>
                 </compilation>
 
-            CreateCompilationWithMscorlib(source).AssertNoDiagnostics()
+            CreateCompilationWithMscorlib40(source).AssertNoDiagnostics()
         End Sub
 
         <Fact>
@@ -1263,7 +1259,7 @@ End Class
 
             ' NOTE: C# requires that compliant attributes have at least one
             ' accessible constructor with no attribute parameters.
-            CreateCompilationWithMscorlib(source).AssertNoDiagnostics()
+            CreateCompilationWithMscorlib40(source).AssertNoDiagnostics()
         End Sub
 
         <Fact>
@@ -1288,7 +1284,7 @@ End Class
 
             ' CLS only allows System.Type, string, char, bool, byte, short, int, long, float, double, and enums,
             ' but dev11 does not enforce this.
-            CreateCompilationWithMscorlib(source).AssertNoDiagnostics()
+            CreateCompilationWithMscorlib40(source).AssertNoDiagnostics()
         End Sub
 
         <Fact>
@@ -1349,7 +1345,7 @@ End Class
 
             ' CLS only allows System.Type, string, char, bool, byte, short, int, long, float, double, and enums,
             ' but dev11 does not enforce this.
-            CreateCompilationWithMscorlib(source).AssertNoDiagnostics()
+            CreateCompilationWithMscorlib40(source).AssertNoDiagnostics()
         End Sub
 
         <Fact>
@@ -1371,7 +1367,7 @@ End Class
                     </file>
                 </compilation>
 
-            CreateCompilationWithMscorlib(source).AssertTheseDiagnostics(<errors><![CDATA[
+            CreateCompilationWithMscorlib40(source).AssertTheseDiagnostics(<errors><![CDATA[
 BC40031: Name '_A' is not CLS-compliant.
 Public Class _A
              ~~
@@ -1426,7 +1422,7 @@ End Namespace
                     </file>
                 </compilation>
 
-            CreateCompilationWithMscorlib(source).AssertTheseDiagnostics(<errors><![CDATA[
+            CreateCompilationWithMscorlib40(source).AssertTheseDiagnostics(<errors><![CDATA[
 BC40031: Name '_M' is not CLS-compliant.
     Public Sub _M()
                ~~
@@ -1486,7 +1482,7 @@ End Class
                 </compilation>
 
             ' NOTE: C# doesn't report this warning on overrides.
-            CreateCompilationWithMscorlib(source).AssertTheseDiagnostics(<errors><![CDATA[
+            CreateCompilationWithMscorlib40(source).AssertTheseDiagnostics(<errors><![CDATA[
 BC40031: Name '_M' is not CLS-compliant.
     Public Overridable Sub _M()
                            ~~
@@ -1548,7 +1544,7 @@ End Class
             comp.AssertNoDiagnostics()
 
             Dim accessor = comp.GlobalNamespace.GetMember(Of NamedTypeSymbol)("C").GetMember(Of PropertySymbol)("P").GetMethod
-            Assert.True(accessor.MetadataName.StartsWith("_"))
+            Assert.True(accessor.MetadataName.StartsWith("_", StringComparison.Ordinal))
         End Sub
 
         <Fact>
@@ -1569,7 +1565,7 @@ End Class
                     </file>
                 </compilation>
 
-            CreateCompilationWithMscorlib(source).AssertNoDiagnostics()
+            CreateCompilationWithMscorlib40(source).AssertNoDiagnostics()
         End Sub
 
         <Fact>
@@ -1586,7 +1582,7 @@ Imports System
                 </compilation>
 
             ' C# warns.
-            CreateCompilationWithMscorlib(source).AssertNoDiagnostics()
+            CreateCompilationWithMscorlib40(source).AssertNoDiagnostics()
 
             source =
                 <compilation>
@@ -1600,7 +1596,7 @@ Imports System
                 </compilation>
 
             ' C# warns.
-            CreateCompilationWithMscorlib(source).AssertNoDiagnostics()
+            CreateCompilationWithMscorlib40(source).AssertNoDiagnostics()
         End Sub
 
         <Fact>
@@ -1618,7 +1614,7 @@ Imports System
                 </compilation>
 
             ' C# warns.
-            CreateCompilationWithMscorlib(source).AssertNoDiagnostics()
+            CreateCompilationWithMscorlib40(source).AssertNoDiagnostics()
 
             source =
                 <compilation>
@@ -1633,7 +1629,7 @@ Imports System
                 </compilation>
 
             ' C# warns.
-            CreateCompilationWithMscorlib(source).AssertNoDiagnostics()
+            CreateCompilationWithMscorlib40(source).AssertNoDiagnostics()
         End Sub
 
         <Fact>
@@ -1667,7 +1663,7 @@ Imports System
                                 End Sub
 
             CompileAndVerify(source, options:=TestOptions.ReleaseDll, sourceSymbolValidator:=validator(True, True), symbolValidator:=validator(True, False))
-            CompileAndVerify(source, options:=TestOptions.ReleaseModule, sourceSymbolValidator:=validator(True, True), symbolValidator:=validator(False, True), verify:=False) ' PEVerify doesn't like netmodules
+            CompileAndVerify(source, options:=TestOptions.ReleaseModule, sourceSymbolValidator:=validator(True, True), symbolValidator:=validator(False, True), verify:=Verification.Fails) ' PEVerify doesn't like netmodules
         End Sub
 
         <Fact>
@@ -1684,7 +1680,7 @@ Imports System
             Dim moduleComp = CreateCSharpCompilation("[assembly:System.CLSCompliant(true)]", compilationOptions:=New CSharp.CSharpCompilationOptions(OutputKind.NetModule), assemblyName:="A")
             Dim moduleRef = moduleComp.EmitToImageReference()
 
-            CreateCompilationWithMscorlibAndReferences(source, {moduleRef}).AssertTheseDiagnostics(<errors><![CDATA[
+            CreateCompilationWithMscorlib40AndReferences(source, {moduleRef}).AssertTheseDiagnostics(<errors><![CDATA[
 BC36978: Attribute 'CLSCompliantAttribute' in 'A.netmodule' cannot be applied multiple times.
 ]]></errors>)
 
@@ -1704,7 +1700,7 @@ BC36978: Attribute 'CLSCompliantAttribute' in 'A.netmodule' cannot be applied mu
             Dim moduleComp2 = CreateCSharpCompilation("[assembly:System.CLSCompliant(false)]", compilationOptions:=New CSharp.CSharpCompilationOptions(OutputKind.NetModule), assemblyName:="B")
             Dim moduleRef2 = moduleComp2.EmitToImageReference()
 
-            CreateCompilationWithMscorlibAndReferences(source, {moduleRef1, moduleRef2}).AssertTheseDiagnostics(<errors><![CDATA[
+            CreateCompilationWithMscorlib40AndReferences(source, {moduleRef1, moduleRef2}).AssertTheseDiagnostics(<errors><![CDATA[
 BC36978: Attribute 'CLSCompliantAttribute' in 'A.netmodule' cannot be applied multiple times.
 ]]></errors>)
 
@@ -1732,7 +1728,7 @@ End Class
                     </file>
                 </compilation>
 
-            CreateCompilationWithMscorlib(source).AssertTheseDiagnostics(<errors><![CDATA[
+            CreateCompilationWithMscorlib40(source).AssertTheseDiagnostics(<errors><![CDATA[
 BC40026: 'Test' is not CLS-compliant because it derives from 'Bad', which is not CLS-compliant.
 Public Class Test
              ~~~~
@@ -1762,7 +1758,7 @@ End Class
                     </file>
                 </compilation>
 
-            CreateCompilationWithMscorlib(source, OutputKind.NetModule).AssertTheseDiagnostics(<errors><![CDATA[
+            CreateCompilationWithMscorlib40(source, OutputKind.NetModule).AssertTheseDiagnostics(<errors><![CDATA[
 BC40026: 'Test' is not CLS-compliant because it derives from 'Bad', which is not CLS-compliant.
 Public Class Test
              ~~~~
@@ -1797,10 +1793,10 @@ public class Bad { }
             Dim moduleLevelLibRef = CreateCSharpCompilation(moduleLevelLibSource).EmitToImageReference(Nothing) ' suppress warning
 
             ' Attribute respected.
-            CreateCompilationWithMscorlibAndReferences(source, {assemblyLevelLibRef}).AssertNoDiagnostics()
+            CreateCompilationWithMscorlib40AndReferences(source, {assemblyLevelLibRef}).AssertNoDiagnostics()
 
             ' Attribute not respected.
-            CreateCompilationWithMscorlibAndReferences(source, {moduleLevelLibRef}).AssertTheseDiagnostics(<errors><![CDATA[
+            CreateCompilationWithMscorlib40AndReferences(source, {moduleLevelLibRef}).AssertTheseDiagnostics(<errors><![CDATA[
 BC40026: 'Test' is not CLS-compliant because it derives from 'Bad', which is not CLS-compliant.
 Public Class Test
              ~~~~
@@ -1834,7 +1830,7 @@ End Enum
                     </file>
                 </compilation>
 
-            CreateCompilationWithMscorlib(source).AssertTheseDiagnostics(<errors><![CDATA[
+            CreateCompilationWithMscorlib40(source).AssertTheseDiagnostics(<errors><![CDATA[
 BC40032: Underlying type 'UInteger' of Enum is not CLS-compliant.
 Public Enum E1 As UInteger
             ~~
@@ -1890,7 +1886,7 @@ End Class
                     </file>
                 </compilation>
 
-            CreateCompilationWithMscorlib(source).AssertTheseDiagnostics(<errors><![CDATA[
+            CreateCompilationWithMscorlib40(source).AssertTheseDiagnostics(<errors><![CDATA[
 BC40041: Type 'Bad1' is not CLS-compliant.
     Public x2 As GoodGeneric(Of Good, Bad1)
            ~~
@@ -1962,7 +1958,7 @@ Imports System
                 </compilation>
 
             ' Nothing reported since the namespace inherits CLSCompliant(False) from the assembly.
-            CreateCompilationWithMscorlib(source1, options:=TestOptions.ReleaseDll.WithRootNamespace("_A")).AssertNoDiagnostics()
+            CreateCompilationWithMscorlib40(source1, options:=TestOptions.ReleaseDll.WithRootNamespace("_A")).AssertNoDiagnostics()
 
 
             Dim source2 =
@@ -1976,7 +1972,7 @@ Imports System
                     </file>
                 </compilation>
 
-            CreateCompilationWithMscorlib(source2, options:=TestOptions.ReleaseDll.WithRootNamespace("_A")).AssertTheseDiagnostics(<errors><![CDATA[
+            CreateCompilationWithMscorlib40(source2, options:=TestOptions.ReleaseDll.WithRootNamespace("_A")).AssertTheseDiagnostics(<errors><![CDATA[
   BC40038: Root namespace '_A' is not CLS-compliant.
 ]]></errors>)
 
@@ -1990,9 +1986,9 @@ End Class
                     </file>
                 </compilation>
 
-            Dim moduleRef = CreateCompilationWithMscorlib(source3, options:=TestOptions.ReleaseModule).EmitToImageReference()
+            Dim moduleRef = CreateCompilationWithMscorlib40(source3, options:=TestOptions.ReleaseModule).EmitToImageReference()
 
-            CreateCompilationWithMscorlibAndReferences(source2, {moduleRef}, options:=TestOptions.ReleaseDll.WithRootNamespace("_A").WithConcurrentBuild(False)).AssertTheseDiagnostics(<errors><![CDATA[
+            CreateCompilationWithMscorlib40AndReferences(source2, {moduleRef}, options:=TestOptions.ReleaseDll.WithRootNamespace("_A").WithConcurrentBuild(False)).AssertTheseDiagnostics(<errors><![CDATA[
   BC40038: Root namespace '_A' is not CLS-compliant.
 ]]></errors>)
 
@@ -2006,11 +2002,11 @@ Imports System
                     </file>
                 </compilation>
 
-            CreateCompilationWithMscorlibAndReferences(source4, {moduleRef}, options:=TestOptions.ReleaseModule.WithRootNamespace("_A").WithConcurrentBuild(True)).AssertTheseDiagnostics(<errors><![CDATA[
+            CreateCompilationWithMscorlib40AndReferences(source4, {moduleRef}, options:=TestOptions.ReleaseModule.WithRootNamespace("_A").WithConcurrentBuild(True)).AssertTheseDiagnostics(<errors><![CDATA[
   BC40038: Root namespace '_A' is not CLS-compliant.
 ]]></errors>)
 
-            CreateCompilationWithMscorlibAndReferences(source2, {moduleRef}, options:=TestOptions.ReleaseModule.WithRootNamespace("_A")).AssertTheseDiagnostics()
+            CreateCompilationWithMscorlib40AndReferences(source2, {moduleRef}, options:=TestOptions.ReleaseModule.WithRootNamespace("_A")).AssertTheseDiagnostics()
         End Sub
 
         <Fact>
@@ -2023,22 +2019,22 @@ Imports System
 
 <Assembly: CLSCompliant(True)>
                         ]]>
-                                                                                                                                               </file>
+                    </file>
                 </compilation>
 
-            CreateCompilationWithMscorlib(source, options:=TestOptions.ReleaseDll.WithRootNamespace("_A.B.C")).AssertTheseDiagnostics(<errors><![CDATA[
+            CreateCompilationWithMscorlib40(source, options:=TestOptions.ReleaseDll.WithRootNamespace("_A.B.C")).AssertTheseDiagnostics(<errors><![CDATA[
 BC40039: Name '_A' in the root namespace '_A.B.C' is not CLS-compliant.
 ]]></errors>)
 
-            CreateCompilationWithMscorlib(source, options:=TestOptions.ReleaseDll.WithRootNamespace("A._B.C")).AssertTheseDiagnostics(<errors><![CDATA[
+            CreateCompilationWithMscorlib40(source, options:=TestOptions.ReleaseDll.WithRootNamespace("A._B.C")).AssertTheseDiagnostics(<errors><![CDATA[
 BC40039: Name '_B' in the root namespace 'A._B.C' is not CLS-compliant.
 ]]></errors>)
 
-            CreateCompilationWithMscorlib(source, options:=TestOptions.ReleaseDll.WithRootNamespace("A.B._C")).AssertTheseDiagnostics(<errors><![CDATA[
+            CreateCompilationWithMscorlib40(source, options:=TestOptions.ReleaseDll.WithRootNamespace("A.B._C")).AssertTheseDiagnostics(<errors><![CDATA[
 BC40039: Name '_C' in the root namespace 'A.B._C' is not CLS-compliant.
 ]]></errors>)
 
-            CreateCompilationWithMscorlib(source, options:=TestOptions.ReleaseDll.WithRootNamespace("_A.B._C")).AssertTheseDiagnostics(<errors><![CDATA[
+            CreateCompilationWithMscorlib40(source, options:=TestOptions.ReleaseDll.WithRootNamespace("_A.B._C")).AssertTheseDiagnostics(<errors><![CDATA[
 BC40039: Name '_A' in the root namespace '_A.B._C' is not CLS-compliant.
 BC40039: Name '_C' in the root namespace '_A.B._C' is not CLS-compliant.
 ]]></errors>)
@@ -2078,7 +2074,7 @@ End Class
                 </compilation>
 
             ' As in dev11, this only applies to int8, uint16, uint32, and uint64
-            CreateCompilationWithMscorlib(source).AssertTheseDiagnostics(<errors><![CDATA[
+            CreateCompilationWithMscorlib40(source).AssertTheseDiagnostics(<errors><![CDATA[
 BC40042: Type of optional value for optional parameter 'x00' is not CLS-compliant.
     Public Sub M(Optional x00 As Object = SByte.MaxValue,
                           ~~~
@@ -2095,7 +2091,7 @@ BC40042: Type of optional value for optional parameter 'x07' is not CLS-complian
         End Sub
 
         <Fact>
-        Public Sub WRN_OptionalValueNotCLSCompliant1_ParamterTypeNonCompliant()
+        Public Sub WRN_OptionalValueNotCLSCompliant1_ParameterTypeNonCompliant()
             Dim source =
                 <compilation>
                     <file name="a.vb">
@@ -2113,7 +2109,7 @@ End Class
                     </file>
                 </compilation>
 
-            CreateCompilationWithMscorlib(source).AssertTheseDiagnostics(<errors><![CDATA[
+            CreateCompilationWithMscorlib40(source).AssertTheseDiagnostics(<errors><![CDATA[
 BC40028: Type of parameter 'x00' is not CLS-compliant.
     Public Sub M(Optional x00 As SByte = SByte.MaxValue)
                           ~~~
@@ -2161,7 +2157,7 @@ End Class
                 </compilation>
 
             ' NOTE: No warnings about non-compliant type UInteger.
-            CreateCompilationWithMscorlib(source).AssertTheseDiagnostics(<errors><![CDATA[
+            CreateCompilationWithMscorlib40(source).AssertTheseDiagnostics(<errors><![CDATA[
 BC40043: System.CLSCompliantAttribute cannot be applied to property 'Get' or 'Set'.
         <CLSCompliant(True)>
          ~~~~~~~~~~~~~~~~~~
@@ -2218,7 +2214,7 @@ End Class
                 </compilation>
 
             ' NOTE: See warnings about non-compliant type UInteger.
-            CreateCompilationWithMscorlib(source).AssertTheseDiagnostics(<errors><![CDATA[
+            CreateCompilationWithMscorlib40(source).AssertTheseDiagnostics(<errors><![CDATA[
 BC40027: Return type of function 'P1' is not CLS-compliant.
     Public Property P1 As UInteger
                     ~~
@@ -2290,7 +2286,7 @@ End Class
             ' NOTE: No warnings about non-compliant type UInteger.
             ' NOTE: No warnings about RaiseEvent accessors.
             ' NOTE: CLSCompliant(False) on event doesn't suppress warnings.
-            CreateCompilationWithMscorlib(source).AssertTheseDiagnostics(<errors><![CDATA[
+            CreateCompilationWithMscorlib40(source).AssertTheseDiagnostics(<errors><![CDATA[
 BC40053: 'AddHandler' method for event 'E1' cannot be marked CLS compliant because its containing type 'C' is not CLS compliant.
         <CLSCompliant(True)>
          ~~~~~~~~~~~~~~~~~~
@@ -2353,7 +2349,7 @@ End Class
 
             ' NOTE: As in dev11, we do not warn that we are ignoring CLSCompliantAttribute on event accessors.
             ' NOTE: See warning about non-compliant type UInteger only for E2.
-            CreateCompilationWithMscorlib(source).AssertTheseDiagnostics(<errors><![CDATA[
+            CreateCompilationWithMscorlib40(source).AssertTheseDiagnostics(<errors><![CDATA[
 BC40041: Type 'UInteger' is not CLS-compliant.
     Public Custom Event E2 As Action(Of UInteger)
                         ~~
@@ -2412,7 +2408,7 @@ End Class
                     </file>
                 </compilation>
 
-            CreateCompilationWithMscorlib(source).AssertTheseDiagnostics(<errors><![CDATA[
+            CreateCompilationWithMscorlib40(source).AssertTheseDiagnostics(<errors><![CDATA[
 BC40050: Delegate type 'Bad' of event 'E1' is not CLS-compliant.
     Public Custom Event E1 As Q.Bad
                         ~~
@@ -2439,7 +2435,7 @@ End Sub
                     </file>
                 </compilation>
 
-            CreateCompilationWithMscorlib(source).AssertTheseDiagnostics(<errors><![CDATA[
+            CreateCompilationWithMscorlib40(source).AssertTheseDiagnostics(<errors><![CDATA[
 BC30001: Statement is not valid in a namespace.
 Public Sub M()
 ~~~~~~~~~~~~~~
@@ -2462,7 +2458,7 @@ End Sub
                     </file>
                 </compilation>
 
-            CreateCompilationWithMscorlib(source).AssertTheseDiagnostics(<errors><![CDATA[
+            CreateCompilationWithMscorlib40(source).AssertTheseDiagnostics(<errors><![CDATA[
 BC30001: Statement is not valid in a namespace.
 Public Sub M()
 ~~~~~~~~~~~~~~
@@ -2485,7 +2481,7 @@ End Sub
                     </file>
                 </compilation>
 
-            CreateCompilationWithMscorlib(source).AssertTheseDiagnostics(<errors><![CDATA[
+            CreateCompilationWithMscorlib40(source).AssertTheseDiagnostics(<errors><![CDATA[
 BC30001: Statement is not valid in a namespace.
 Public Sub M()
 ~~~~~~~~~~~~~~
@@ -2523,7 +2519,7 @@ End Class
                     </file>
                 </compilation>
 
-            CreateCompilationWithMscorlib(source).AssertNoDiagnostics()
+            CreateCompilationWithMscorlib40(source).AssertNoDiagnostics()
         End Sub
 
         <Fact>
@@ -2544,7 +2540,7 @@ End Class
                     </file>
                 </compilation>
 
-            CreateCompilationWithMscorlib(source).AssertNoDiagnostics()
+            CreateCompilationWithMscorlib40(source).AssertNoDiagnostics()
         End Sub
 
         <Fact>
@@ -2561,7 +2557,7 @@ Public Class C
 End Class
 ]]>.Value.Replace(vbCr, vbCrLf)
 
-            Dim helper = CreateCompilationWithMscorlib({""}, Nothing)
+            Dim helper = CreateCompilationWithMscorlib40({""}, Nothing)
             Dim integerType = helper.GetSpecialType(SpecialType.System_Int32)
 
             For Each st As SpecialType In [Enum].GetValues(GetType(SpecialType))
@@ -2577,7 +2573,7 @@ End Class
                 Dim qualifiedName = type.ToTestDisplayString()
 
                 Dim source = String.Format(sourceTemplate, qualifiedName)
-                Dim comp = CreateCompilationWithMscorlib({source}, Nothing)
+                Dim comp = CreateCompilationWithMscorlib40({source}, Nothing)
 
                 Select Case (st)
                     Case SpecialType.System_SByte, SpecialType.System_UInt16, SpecialType.System_UInt32, SpecialType.System_UInt64, SpecialType.System_UIntPtr, SpecialType.System_TypedReference
@@ -2586,7 +2582,7 @@ End Class
             Next
         End Sub
 
-        <WorkItem(697178, "DevDiv")>
+        <WorkItem(697178, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/697178")>
         <Fact>
         Public Sub ConstructedSpecialTypes()
             Dim source =
@@ -2607,7 +2603,7 @@ End Class
                 </compilation>
 
             ' Native C# misses this diagnostic
-            CreateCompilationWithMscorlib(source).AssertTheseDiagnostics(<errors><![CDATA[
+            CreateCompilationWithMscorlib40(source).AssertTheseDiagnostics(<errors><![CDATA[
 BC40041: Type 'UInteger' is not CLS-compliant.
     Public Sub M(p As IEnumerable(Of UInteger))
                  ~
@@ -2631,14 +2627,14 @@ End Class
                     </file>
                 </compilation>
 
-            CreateCompilationWithMscorlib(source).AssertTheseDiagnostics(<errors><![CDATA[
+            CreateCompilationWithMscorlib40(source).AssertTheseDiagnostics(<errors><![CDATA[
 BC30002: Type 'Missing' is not defined.
 <Missing>
  ~~~~~~~
 ]]></errors>)
         End Sub
 
-        <WorkItem(709317, "DevDiv")>
+        <WorkItem(709317, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/709317")>
         <Fact>
         Public Sub Repro709317()
             Dim libSource =
@@ -2672,13 +2668,13 @@ End Class
                     </file>
                 </compilation>
 
-            Dim libRef = CreateCompilationWithMscorlib(libSource).EmitToImageReference()
-            Dim comp = CreateCompilationWithMscorlibAndReferences(source, {libRef})
+            Dim libRef = CreateCompilationWithMscorlib40(libSource).EmitToImageReference()
+            Dim comp = CreateCompilationWithMscorlib40AndReferences(source, {libRef})
             Dim tree = comp.SyntaxTrees.Single()
-            comp.GetDiagnosticsForTree(CompilationStage.Declare, tree, filterSpanWithinTree:=Nothing, includeEarlierStages:=True)
+            comp.GetDiagnosticsForSyntaxTree(CompilationStage.Declare, tree)
         End Sub
 
-        <WorkItem(709317, "DevDiv")>
+        <WorkItem(709317, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/709317")>
         <Fact>
         Public Sub FilterTree()
             Dim sourceTemplate = <![CDATA[
@@ -2713,7 +2709,7 @@ End Namespace
 
             Dim tree1 = VisualBasicSyntaxTree.ParseText(String.Format(sourceTemplate, 1), path:="a.vb")
             Dim tree2 = VisualBasicSyntaxTree.ParseText(String.Format(sourceTemplate, 2), path:="b.vb")
-            Dim comp = CreateCompilationWithMscorlib({tree1, tree2}, TestOptions.ReleaseDll)
+            Dim comp = CreateCompilationWithMscorlib40({tree1, tree2}, options:=TestOptions.ReleaseDll)
 
             ' Two copies of each diagnostic - one from each file.
             comp.AssertTheseDiagnostics(<errors><![CDATA[
@@ -2749,7 +2745,7 @@ BC40027: Return type of function 'P' is not CLS-compliant.
                         ~
 ]]></errors>)
 
-            CompilationUtils.AssertTheseDiagnostics(comp.GetDiagnosticsForTree(CompilationStage.Declare, tree1, filterSpanWithinTree:=Nothing, includeEarlierStages:=False),
+            CompilationUtils.AssertTheseDiagnostics(comp.GetDiagnosticsForSyntaxTree(CompilationStage.Declare, tree1, filterSpanWithinTree:=Nothing, includeEarlierStages:=False),
                                                <errors><![CDATA[
 BC40026: 'Compliant' is not CLS-compliant because it derives from 'NonCompliant', which is not CLS-compliant.
     Public Class Compliant
@@ -2769,7 +2765,7 @@ BC40027: Return type of function 'P' is not CLS-compliant.
 ]]></errors>)
         End Sub
 
-        <WorkItem(718503, "DevDiv")>
+        <WorkItem(718503, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/718503")>
         <Fact>
         Public Sub ErrorTypeAccessibility()
             Dim source =
@@ -2787,7 +2783,7 @@ End Class
                     </file>
                 </compilation>
 
-            CreateCompilationWithMscorlib(source).AssertTheseDiagnostics(<errors><![CDATA[
+            CreateCompilationWithMscorlib40(source).AssertTheseDiagnostics(<errors><![CDATA[
 BC30002: Type 'IError' is not defined.
     Implements IError
                ~~~~~~
@@ -2813,7 +2809,7 @@ End Class
                     </file>
                 </compilation>
 
-            CreateCompilationWithMscorlib(source).AssertTheseDiagnostics(<errors><![CDATA[
+            CreateCompilationWithMscorlib40(source).AssertTheseDiagnostics(<errors><![CDATA[
 BC31047: Protected types can only be declared inside of a class.
 Protected Class C
                 ~
@@ -2838,7 +2834,7 @@ End Class
                     </file>
                 </compilation>
 
-            CreateCompilationWithMscorlib(source).AssertNoDiagnostics()
+            CreateCompilationWithMscorlib40(source).AssertNoDiagnostics()
         End Sub
 
         <Fact>
@@ -2880,8 +2876,8 @@ End Class
                 </compilation>
 
             ' NOTE: As in dev11, we ignore the fact that Derived inherits CLSCompliant(True) from Base.
-            Dim libRef = CreateCompilationWithMscorlib(libSource).EmitToImageReference()
-            CreateCompilationWithMscorlibAndReferences(source, {libRef}).AssertTheseDiagnostics(<errors><![CDATA[
+            Dim libRef = CreateCompilationWithMscorlib40(libSource).EmitToImageReference()
+            CreateCompilationWithMscorlib40AndReferences(source, {libRef}).AssertTheseDiagnostics(<errors><![CDATA[
 BC40025: Type of member 'D' is not CLS-compliant.
     Public D as Derived
            ~
@@ -2947,8 +2943,8 @@ End Class
 
             ' NOTE: As in dev11, we consider the fact that Derived inherits CLSCompliant(False) from Base
             ' (since it is not from the current assembly).
-            Dim libRef = CompileIL(il.Value, appendDefaultHeader:=False)
-            CreateCompilationWithMscorlibAndReferences(source, {libRef}).AssertTheseDiagnostics(<errors><![CDATA[
+            Dim libRef = CompileIL(il.Value, prependDefaultHeader:=False)
+            CreateCompilationWithMscorlib40AndReferences(source, {libRef}).AssertTheseDiagnostics(<errors><![CDATA[
 BC40025: Type of member 'B' is not CLS-compliant.
     Public B as Base
            ~
@@ -2980,7 +2976,7 @@ End Class
                 </compilation>
 
             ' C# would warn.
-            CreateCompilationWithMscorlib(source).AssertNoDiagnostics()
+            CreateCompilationWithMscorlib40(source).AssertNoDiagnostics()
         End Sub
 
         <Fact>
@@ -3025,11 +3021,11 @@ End Class
                 </compilation>
 
             ' C# would warn.
-            CreateCompilationWithMscorlib(source).AssertNoDiagnostics()
+            CreateCompilationWithMscorlib40(source).AssertNoDiagnostics()
         End Sub
 
         <Fact>
-        Public Sub ApplyAttributeWithNonCompliantyArgument()
+        Public Sub ApplyAttributeWithNonCompliantArgument()
 
             Dim source =
                 <compilation>
@@ -3054,7 +3050,7 @@ End Class
                 </compilation>
 
             ' C# would warn.
-            CreateCompilationWithMscorlib(source).AssertNoDiagnostics()
+            CreateCompilationWithMscorlib40(source).AssertNoDiagnostics()
         End Sub
 
         <Fact>
@@ -3108,7 +3104,7 @@ End Class
         </file>
     </compilation>
 
-            CreateCompilationWithMscorlib(source).AssertTheseDiagnostics(<errors><![CDATA[
+            CreateCompilationWithMscorlib40(source).AssertTheseDiagnostics(<errors><![CDATA[
 BC40035: 'Public Sub M1(x As Integer(*,*))' is not CLS-compliant because it overloads 'Public Sub M1(x As Integer())' which differs from it only by array of array parameter types or by the rank of the array parameter types.
     Public Sub M1(x As Integer(,)) 'BC40035
                ~~
@@ -3139,7 +3135,7 @@ End Class
     </compilation>
 
             ' NOTE: Illegal, even without compliance checking.
-            CreateCompilationWithMscorlib(source).AssertTheseDiagnostics(<errors><![CDATA[
+            CreateCompilationWithMscorlib40(source).AssertTheseDiagnostics(<errors><![CDATA[
 BC30345: 'Public Sub M1(x As Integer())' and 'Public Sub M1(ByRef x As Integer())' cannot overload each other because they differ only by parameters declared 'ByRef' or 'ByVal'.
     Public Sub M1(x As Integer())
                ~~
@@ -3212,7 +3208,7 @@ End Class
         </file>
     </compilation>
 
-            CreateCompilationWithMscorlib(source).AssertTheseDiagnostics(<errors><![CDATA[
+            CreateCompilationWithMscorlib40(source).AssertTheseDiagnostics(<errors><![CDATA[
 
 BC40035: 'Public Sub M1(x As Char()())' is not CLS-compliant because it overloads 'Public Sub M1(x As Long()())' which differs from it only by array of array parameter types or by the rank of the array parameter types.
     Public Sub M1(x As Char()()) 'BC40035
@@ -3274,7 +3270,7 @@ End Class
         </file>
     </compilation>
 
-            CreateCompilationWithMscorlib(source).AssertTheseDiagnostics(<errors><![CDATA[
+            CreateCompilationWithMscorlib40(source).AssertTheseDiagnostics(<errors><![CDATA[
 BC40035: 'Public Property P1(x As Char()()) As Integer' is not CLS-compliant because it overloads 'Public Property P1(x As Long()()) As Integer' which differs from it only by array of array parameter types or by the rank of the array parameter types.
     Public Property P1(x As Char()()) As Integer
                     ~~
@@ -3323,7 +3319,7 @@ End Class
     </compilation>
 
             ' BREAK : Dev11 doesn't report BC40035 for operators.
-            CreateCompilationWithMscorlib(source).AssertTheseDiagnostics(<errors><![CDATA[
+            CreateCompilationWithMscorlib40(source).AssertTheseDiagnostics(<errors><![CDATA[
 BC40035: 'Public Sub New(p As Char()())' is not CLS-compliant because it overloads 'Public Sub New(p As Long()())' which differs from it only by array of array parameter types or by the rank of the array parameter types.
     Public Sub New(p As Char()())
                ~~~
@@ -3358,7 +3354,7 @@ End Class
         </file>
     </compilation>
 
-            CreateCompilationWithMscorlib(source).AssertNoDiagnostics()
+            CreateCompilationWithMscorlib40(source).AssertNoDiagnostics()
         End Sub
 
         <Fact>
@@ -3386,7 +3382,7 @@ End Class
         </file>
     </compilation>
 
-            CreateCompilationWithMscorlib(source).AssertNoDiagnostics()
+            CreateCompilationWithMscorlib40(source).AssertNoDiagnostics()
         End Sub
 
         <Fact>
@@ -3449,7 +3445,7 @@ End Class
     </compilation>
 
             ' BREAK : Dev11 doesn't report BC40035 for interface members.
-            CreateCompilationWithMscorlib(source).AssertTheseDiagnostics(<errors><![CDATA[
+            CreateCompilationWithMscorlib40(source).AssertTheseDiagnostics(<errors><![CDATA[
 BC40035: 'Public Sub M(p As Char()())' is not CLS-compliant because it overloads 'Public Sub M(p As Long()())' which differs from it only by array of array parameter types or by the rank of the array parameter types.
     Public Sub M(p()() As Char) 'BC40035 (twice, in roslyn)
                ~
@@ -3541,7 +3537,7 @@ End Class
     </compilation>
 
             ' BREAK : Dev11 doesn't report BC40035 for base type members.
-            CreateCompilationWithMscorlib(source).AssertTheseDiagnostics(<errors><![CDATA[
+            CreateCompilationWithMscorlib40(source).AssertTheseDiagnostics(<errors><![CDATA[
 BC40035: 'Public Overloads Sub M(p As Char()())' is not CLS-compliant because it overloads 'Public Overridable Sub M(p As Long()())' which differs from it only by array of array parameter types or by the rank of the array parameter types.
     Public Overloads Sub M(p As Char()())
                          ~
@@ -3579,14 +3575,14 @@ End Class
     </compilation>
 
             ' Make sure we don't produce a bunch of spurious warnings for synthesized members.
-            CreateCompilationWithMscorlib(source).AssertTheseDiagnostics(<errors><![CDATA[
+            CreateCompilationWithMscorlib40(source).AssertTheseDiagnostics(<errors><![CDATA[
 BC40027: Return type of function 'F' is not CLS-compliant.
     Public WithEvents F As Bad
                       ~
             ]]></errors>)
         End Sub
 
-        <WorkItem(749432, "DevDiv")>
+        <WorkItem(749432, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/749432")>
         <Fact>
         Public Sub InvalidAttributeArgument()
             Dim source =
@@ -3608,7 +3604,7 @@ End Module
         </file>
     </compilation>
 
-            CreateCompilationWithMscorlibAndVBRuntime(source).AssertTheseDiagnostics(<errors><![CDATA[
+            CreateCompilationWithMscorlib40AndVBRuntime(source).AssertTheseDiagnostics(<errors><![CDATA[
 BC30059: Constant expression is required.
     <CLSCompliant((New With {.anonymousField = False}).anonymousField)>
                   ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -3618,7 +3614,7 @@ BC30059: Constant expression is required.
             ]]></errors>)
         End Sub
 
-        <WorkItem(749352, "DevDiv")>
+        <WorkItem(749352, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/749352")>
         <Fact>
         Public Sub Repro749352()
             Dim source =
@@ -3642,14 +3638,14 @@ End Namespace
         </file>
     </compilation>
 
-            CreateCompilationWithMscorlib(source).AssertTheseDiagnostics(<errors><![CDATA[
+            CreateCompilationWithMscorlib40(source).AssertTheseDiagnostics(<errors><![CDATA[
 BC40030: event 'Public Event Scen6(x As Integer)' cannot be marked CLS-compliant because its containing type 'ContainerClass' is not CLS-compliant.
         Public Event Scen6(ByVal x As Integer)
                      ~~~~~
             ]]></errors>)
         End Sub
 
-        <Fact, WorkItem(1026453, "DevDiv")>
+        <Fact, WorkItem(1026453, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/1026453")>
         Public Sub Bug1026453()
             Dim source1 =
                 <compilation>
@@ -3663,7 +3659,7 @@ End Namespace
                     </file>
                 </compilation>
 
-            Dim comp1 = CreateCompilationWithMscorlib(source1, TestOptions.ReleaseModule)
+            Dim comp1 = CreateCompilationWithMscorlib40(source1, options:=TestOptions.ReleaseModule)
 
             Dim source2 =
                 <compilation>
@@ -3682,13 +3678,112 @@ End Namespace
                     </file>
                 </compilation>
 
-            Dim comp2 = CreateCompilationWithMscorlibAndReferences(source2, {comp1.EmitToImageReference()}, TestOptions.ReleaseDll.WithConcurrentBuild(False))
+            Dim comp2 = CreateCompilationWithMscorlib40AndReferences(source2, {comp1.EmitToImageReference()}, TestOptions.ReleaseDll.WithConcurrentBuild(False))
             comp2.AssertNoDiagnostics()
             comp2.WithOptions(TestOptions.ReleaseDll.WithConcurrentBuild(True)).AssertNoDiagnostics()
 
             Dim comp3 = comp2.WithOptions(TestOptions.ReleaseModule.WithConcurrentBuild(False))
             comp3.AssertNoDiagnostics()
             comp3.WithOptions(TestOptions.ReleaseModule.WithConcurrentBuild(True)).AssertNoDiagnostics()
+        End Sub
+
+        <Fact, WorkItem(9719, "https://github.com/dotnet/roslyn/issues/9719")>
+        Public Sub Bug9719()
+            ' repro was simpler than what's on the github issue - before any fixes, the below snippit triggered the crash
+            Dim source =
+                <compilation>
+                    <file name="a.vb">
+                        <![CDATA[
+Imports System
+
+<Assembly: CLSCompliant(True)>
+
+Public Class C
+    Public Sub Problem(item As DummyModule)
+    End Sub
+End Class
+
+Public Module DummyModule
+
+End Module
+                        ]]>
+                    </file>
+                </compilation>
+
+            CreateCompilationWithMscorlib45AndVBRuntime(source).AssertTheseDiagnostics(<errors><![CDATA[
+BC30371: Module 'DummyModule' cannot be used as a type.
+    Public Sub Problem(item As DummyModule)
+                               ~~~~~~~~~~~
+]]></errors>)
+        End Sub
+
+        <Fact>
+        Public Sub TupleDefersClsComplianceToUnderlyingType()
+            Dim libCompliant_vb = "
+Namespace System
+    <CLSCompliant(True)>
+    Public Structure ValueTuple(Of T1, T2)
+        Public Sub New(item1 As T1, item2 As T2)
+        End Sub
+    End Structure
+End Namespace
+"
+
+            Dim libNotCompliant_vb = "
+Namespace System
+    <CLSCompliant(False)>
+    Public Structure ValueTuple(Of T1, T2)
+        Public Sub New(item1 As T1, item2 As T2)
+        End Sub
+    End Structure
+End Namespace
+"
+            Dim source = "
+Imports System
+
+<assembly:CLSCompliant(true)>
+Public Class C
+    Public Function Method() As (Integer, Integer)
+        Throw New Exception()
+    End Function
+    Public Function Method2() As (Bad, Bad)
+        Throw New Exception()
+    End Function
+End Class
+
+<CLSCompliant(false)>
+Public Class Bad
+End Class
+"
+            Dim libCompliant = CreateCompilationWithMscorlib40({libCompliant_vb}, options:=TestOptions.ReleaseDll).EmitToImageReference()
+            Dim compCompliant = CreateCompilationWithMscorlib40({source}, {libCompliant}, TestOptions.ReleaseDll)
+            compCompliant.AssertTheseDiagnostics(
+                <errors>
+BC40041: Type 'Bad' is not CLS-compliant.
+    Public Function Method2() As (Bad, Bad)
+                    ~~~~~~~
+BC40041: Type 'Bad' is not CLS-compliant.
+    Public Function Method2() As (Bad, Bad)
+                    ~~~~~~~
+                </errors>)
+
+            Dim libNotCompliant = CreateCompilationWithMscorlib40({libNotCompliant_vb}, options:=TestOptions.ReleaseDll).EmitToImageReference()
+            Dim compNotCompliant = CreateCompilationWithMscorlib40({source}, {libNotCompliant}, TestOptions.ReleaseDll)
+            compNotCompliant.AssertTheseDiagnostics(
+                <errors>
+BC40027: Return type of function 'Method' is not CLS-compliant.
+    Public Function Method() As (Integer, Integer)
+                    ~~~~~~
+BC40027: Return type of function 'Method2' is not CLS-compliant.
+    Public Function Method2() As (Bad, Bad)
+                    ~~~~~~~
+BC40041: Type 'Bad' is not CLS-compliant.
+    Public Function Method2() As (Bad, Bad)
+                    ~~~~~~~
+BC40041: Type 'Bad' is not CLS-compliant.
+    Public Function Method2() As (Bad, Bad)
+                    ~~~~~~~
+                </errors>)
         End Sub
 
     End Class

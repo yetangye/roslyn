@@ -1,62 +1,57 @@
-' Copyright (c) Microsoft.  All Rights Reserved.  Licensed under the Apache License, Version 2.0.  See License.txt in the project root for license information.
-
-Imports Microsoft.CodeAnalysis.Text
-Imports Microsoft.CodeAnalysis.VisualBasic
-Imports Microsoft.CodeAnalysis.VisualBasic.Symbols
-Imports Microsoft.CodeAnalysis.VisualBasic.Syntax
-Imports Roslyn.Test.Utilities
-Imports Xunit
+﻿' Licensed to the .NET Foundation under one or more agreements.
+' The .NET Foundation licenses this file to you under the MIT license.
+' See the LICENSE file in the project root for more information.
 
 Namespace Microsoft.CodeAnalysis.Editor.VisualBasic.UnitTests.Recommendations.Declarations
     Public Class InheritsKeywordRecommenderTests
         <Fact, Trait(Traits.Feature, Traits.Features.KeywordRecommending)>
-        Public Sub InheritsAfterClassDeclaration()
+        Public Sub InheritsAfterClassDeclarationTest()
             VerifyRecommendationsContain(<File>
-Class Foo
+Class Goo
 |</File>, "Inherits")
         End Sub
 
         <Fact, Trait(Traits.Feature, Traits.Features.KeywordRecommending)>
-        Public Sub InheritsAfterInterfaceDeclaration()
+        Public Sub InheritsAfterInterfaceDeclarationTest()
             VerifyRecommendationsContain(<File>
-Interface Foo
+Interface Goo
 |</File>, "Inherits")
         End Sub
 
         <Fact, Trait(Traits.Feature, Traits.Features.KeywordRecommending)>
-        Public Sub InheritsAfterClassDeclarationAndBlankLine()
+        Public Sub InheritsAfterClassDeclarationAndBlankLineTest()
             VerifyRecommendationsContain(<File>
-Class Foo
-
-|</File>, "Inherits")
-        End Sub
-
-        <Fact, Trait(Traits.Feature, Traits.Features.KeywordRecommending)>
-        Public Sub InheritsAfterInterfaceDeclarationAndBlankLine()
-            VerifyRecommendationsContain(<File>
-Interface Foo
+Class Goo
 
 |</File>, "Inherits")
         End Sub
 
         <Fact, Trait(Traits.Feature, Traits.Features.KeywordRecommending)>
-        Public Sub InheritsNotAfterImplements()
+        Public Sub InheritsAfterInterfaceDeclarationAndBlankLineTest()
+            VerifyRecommendationsContain(<File>
+Interface Goo
+
+|</File>, "Inherits")
+        End Sub
+
+        <Fact, Trait(Traits.Feature, Traits.Features.KeywordRecommending)>
+        Public Sub InheritsNotAfterImplementsTest()
             VerifyRecommendationsMissing(<File>
-Class Foo
-Implements IFooable
+Class Goo
+Implements IGooable
 |</File>, "Inherits")
         End Sub
 
         <Fact, Trait(Traits.Feature, Traits.Features.KeywordRecommending)>
-        Public Sub InheritsNotInStructure()
+        Public Sub InheritsNotInStructureTest()
             VerifyRecommendationsMissing(<File>
-Structure Foo
+Structure Goo
 |</File>, "Inherits")
         End Sub
 
-        <WorkItem(531257)>
+        <WorkItem(531257, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/531257")>
         <Fact, Trait(Traits.Feature, Traits.Features.KeywordRecommending)>
-        Public Sub InheritsAfterInheritsInInterface()
+        Public Sub InheritsAfterInheritsInInterfaceTest()
             VerifyRecommendationsContain(<File>
 Public Interface ITest1
 End Interface
@@ -66,19 +61,19 @@ Public Interface ITest2
 </File>, "Inherits")
         End Sub
 
-        <WorkItem(531257)>
+        <WorkItem(531257, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/531257")>
         <Fact, Trait(Traits.Feature, Traits.Features.KeywordRecommending)>
-        Public Sub InheritsNotAfterInheritsInClass()
+        Public Sub InheritsNotAfterInheritsInClassTest()
             VerifyRecommendationsMissing(<File>
-Public Class Foo
+Public Class Goo
     Inherits Bar
     |
 </File>, "Inherits")
         End Sub
 
-        <WorkItem(674791)>
+        <WorkItem(674791, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/674791")>
         <Fact, Trait(Traits.Feature, Traits.Features.KeywordRecommending)>
-        Public Sub NotAfterHash()
+        Public Sub NotAfterHashTest()
             VerifyRecommendationsMissing(<File>
 Imports System
 

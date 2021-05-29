@@ -1,8 +1,10 @@
-' Copyright (c) Microsoft.  All Rights Reserved.  Licensed under the Apache License, Version 2.0.  See License.txt in the project root for license information.
+﻿' Licensed to the .NET Foundation under one or more agreements.
+' The .NET Foundation licenses this file to you under the MIT license.
+' See the LICENSE file in the project root for more information.
 
 Imports System.Runtime.InteropServices
 Imports Microsoft.CodeAnalysis
-Imports Microsoft.CodeAnalysis.Text
+Imports Microsoft.CodeAnalysis.Test.Utilities
 Imports Roslyn.Test.Utilities
 
 Namespace Microsoft.VisualStudio.LanguageServices.UnitTests.CodeModel.CSharp
@@ -11,16 +13,16 @@ Namespace Microsoft.VisualStudio.LanguageServices.UnitTests.CodeModel.CSharp
 
 #Region "FullName tests"
 
-        <ConditionalFact(GetType(x86)), Trait(Traits.Feature, Traits.Features.CodeModel)>
-        Sub FullName1()
+        <WpfFact, Trait(Traits.Feature, Traits.Features.CodeModel)>
+        Public Sub TestFullName1()
             Dim code =
 <Code>
-using $$Foo;
+using $$Goo;
 </Code>
 
             Dim ex = Assert.Throws(Of COMException)(
                 Sub()
-                    TestName(code, "Foo")
+                    TestName(code, "Goo")
                 End Sub)
 
             Assert.Equal(E_FAIL, ex.ErrorCode)
@@ -30,16 +32,16 @@ using $$Foo;
 
 #Region "Name tests"
 
-        <ConditionalFact(GetType(x86)), Trait(Traits.Feature, Traits.Features.CodeModel)>
-        Sub Name1()
+        <WpfFact, Trait(Traits.Feature, Traits.Features.CodeModel)>
+        Public Sub TestName1()
             Dim code =
 <Code>
-using $$Foo;
+using $$Goo;
 </Code>
 
             Dim ex = Assert.Throws(Of COMException)(
                 Sub()
-                    TestName(code, "Foo")
+                    TestName(code, "Goo")
                 End Sub)
 
             Assert.Equal(E_FAIL, ex.ErrorCode)
@@ -49,30 +51,40 @@ using $$Foo;
 
 #Region "Namespace tests"
 
-        <ConditionalFact(GetType(x86)), Trait(Traits.Feature, Traits.Features.CodeModel)>
-        Sub Namespace1()
+        <WpfFact, Trait(Traits.Feature, Traits.Features.CodeModel)>
+        Public Sub TestNamespace1()
             Dim code =
 <Code>
-using $$Foo;
+using $$Goo;
 </Code>
 
-            TestNamespace(code, "Foo")
+            TestNamespace(code, "Goo")
         End Sub
 
-        <ConditionalFact(GetType(x86)), Trait(Traits.Feature, Traits.Features.CodeModel)>
-        Sub Namespace2()
+        <WpfFact, Trait(Traits.Feature, Traits.Features.CodeModel)>
+        Public Sub TestNamespace2()
             Dim code =
 <Code>
 namespace Bar
 {
-    using $$Foo;
+    using $$Goo;
 }
 </Code>
 
-            TestNamespace(code, "Foo")
+            TestNamespace(code, "Goo")
         End Sub
 
 #End Region
+
+        <WpfFact, Trait(Traits.Feature, Traits.Features.CodeModel)>
+        Public Sub TestTypeDescriptor_GetProperties()
+            Dim code =
+<Code>
+using $$System;
+</Code>
+
+            TestPropertyDescriptors(Of EnvDTE80.CodeImport)(code)
+        End Sub
 
         Protected Overrides ReadOnly Property LanguageName As String
             Get

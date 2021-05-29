@@ -1,8 +1,11 @@
-﻿' Copyright (c) Microsoft.  All Rights Reserved.  Licensed under the Apache License, Version 2.0.  See License.txt in the project root for license information.
+﻿' Licensed to the .NET Foundation under one or more agreements.
+' The .NET Foundation licenses this file to you under the MIT license.
+' See the LICENSE file in the project root for more information.
 
 Imports System.Collections.Immutable
 Imports System.Diagnostics
 Imports System.Runtime.InteropServices
+Imports Microsoft.CodeAnalysis.PooledObjects
 Imports Microsoft.CodeAnalysis.Text
 Imports Microsoft.CodeAnalysis.VisualBasic.Symbols
 Imports Microsoft.CodeAnalysis.VisualBasic.Syntax
@@ -10,39 +13,59 @@ Imports TypeKind = Microsoft.CodeAnalysis.TypeKind
 
 Namespace Microsoft.CodeAnalysis.VisualBasic
 
-    Partial Class LocalRewriter
+    Partial Friend Class LocalRewriter
         Public Overrides Function VisitNullableIsTrueOperator(node As BoundNullableIsTrueOperator) As BoundNode
             Debug.Assert(node.Operand.Type.IsNullableOfBoolean())
 
-            If inExpressionLambda Then
-                Return node.Update(VisitExpression(node.Operand), node.Type)
+            Dim optimizableForConditionalBranch As Boolean = False
+            Dim operand = VisitExpression(AdjustIfOptimizableForConditionalBranch(node.Operand, optimizableForConditionalBranch))
+
+            If optimizableForConditionalBranch AndAlso HasValue(operand) Then
+                Return NullableValueOrDefault(operand)
             End If
 
-            Dim operand = VisitExpressionNode(node.Operand)
+            If _inExpressionLambda Then
+                Return node.Update(operand, node.Type)
+            End If
 
             If HasNoValue(operand) Then
                 Return New BoundLiteral(node.Syntax, ConstantValue.False, node.Type)
             End If
 
-            If operand.Kind = BoundKind.LoweredConditionalAccess Then
-                Dim conditional = DirectCast(operand, BoundLoweredConditionalAccess)
-
-                If HasNoValue(conditional.WhenNullOpt) Then
-                    Debug.Assert(Not HasNoValue(conditional.WhenNotNull))
-                    Return conditional.Update(conditional.ReceiverOrCondition,
-                                              conditional.CaptureReceiver,
-                                              conditional.PlaceholderId,
-                                              NullableValueOrDefault(conditional.WhenNotNull),
-                                              New BoundLiteral(node.Syntax, ConstantValue.False, node.Type),
-                                              node.Type)
-                End If
-            End If
-
             Return NullableValueOrDefault(operand)
         End Function
 
+        Private Shared Function AdjustIfOptimizableForConditionalBranch(operand As BoundExpression, <Out> ByRef optimizableForConditionalBranch As Boolean) As BoundExpression
+            optimizableForConditionalBranch = False
+
+            Dim current As BoundExpression = operand
+            Do
+                Select Case current.Kind
+                    Case BoundKind.BinaryOperator
+                        Dim binary = DirectCast(current, BoundBinaryOperator)
+                        If (binary.OperatorKind And BinaryOperatorKind.IsOperandOfConditionalBranch) <> 0 Then
+                            Select Case (binary.OperatorKind And BinaryOperatorKind.OpMask)
+                                Case BinaryOperatorKind.AndAlso, BinaryOperatorKind.OrElse
+                                    Debug.Assert((binary.OperatorKind And BinaryOperatorKind.Lifted) <> 0)
+                                    optimizableForConditionalBranch = True
+                                    Return binary.Update(binary.OperatorKind Or BinaryOperatorKind.OptimizableForConditionalBranch,
+                                                         binary.Left, binary.Right, binary.Checked, binary.ConstantValueOpt, binary.Type)
+                            End Select
+                        End If
+
+                        Return operand
+
+                    Case BoundKind.Parenthesized
+                        current = DirectCast(current, BoundParenthesized).Expression
+                    Case Else
+                        Return operand
+                End Select
+            Loop
+
+        End Function
+
         Public Overrides Function VisitUserDefinedUnaryOperator(node As BoundUserDefinedUnaryOperator) As BoundNode
-            If inExpressionLambda Then
+            If _inExpressionLambda Then
                 Return node.Update(node.OperatorKind, VisitExpression(node.UnderlyingExpression), node.Type)
             End If
 
@@ -54,7 +77,7 @@ Namespace Microsoft.CodeAnalysis.VisualBasic
         End Function
 
         Public Overrides Function VisitUnaryOperator(node As BoundUnaryOperator) As BoundNode
-            If (node.OperatorKind And UnaryOperatorKind.Lifted) = 0 OrElse inExpressionLambda Then
+            If (node.OperatorKind And UnaryOperatorKind.Lifted) = 0 OrElse _inExpressionLambda Then
                 Dim result As BoundNode = MyBase.VisitUnaryOperator(node)
                 If result.Kind = BoundKind.UnaryOperator Then
 
@@ -71,7 +94,7 @@ Namespace Microsoft.CodeAnalysis.VisualBasic
             Dim result As BoundExpression = node
             Dim kind As UnaryOperatorKind = node.OperatorKind
 
-            If Not node.HasErrors AndAlso ((kind And UnaryOperatorKind.Lifted) = 0) AndAlso (kind <> UnaryOperatorKind.Error) AndAlso Not inExpressionLambda Then
+            If Not node.HasErrors AndAlso ((kind And UnaryOperatorKind.Lifted) = 0) AndAlso (kind <> UnaryOperatorKind.Error) AndAlso Not _inExpressionLambda Then
                 Dim opType As TypeSymbol = node.Type
 
                 If opType.IsObjectType() Then
@@ -199,10 +222,10 @@ Namespace Microsoft.CodeAnalysis.VisualBasic
             '                    |                   |
             '                OPERAND
             '
-            ' Implicit unwraping conversion if present is always O? -> O 
+            ' Implicit unwrapping conversion if present is always O? -> O 
             ' It is encoded as a disparity between CALL argument type and parameter type of the call symbol.
             '
-            ' Implicit wrapping conversion of the resilt, if present, is always T -> T?
+            ' Implicit wrapping conversion of the result, if present, is always T -> T?
             '
             ' The rewrite is:
             '   If (OPERAND.HasValue, CALL(OPERAND), Null)
@@ -240,22 +263,24 @@ Namespace Microsoft.CodeAnalysis.VisualBasic
                 callInput = ProcessNullableOperand(operand, operandHasValueExpression, temps, inits, doNotCaptureLocals:=True)
             End If
 
-            Debug.Assert(callInput.Type.IsSameTypeIgnoringCustomModifiers(operatorCall.Method.Parameters(0).Type),
+            Debug.Assert(callInput.Type.IsSameTypeIgnoringAll(operatorCall.Method.Parameters(0).Type),
                          "operator must take unwrapped value of the operand")
 
             Dim whenHasValue As BoundExpression = operatorCall.Update(operatorCall.Method,
                                                                        Nothing,
                                                                        operatorCall.ReceiverOpt,
                                                                        ImmutableArray.Create(Of BoundExpression)(callInput),
+                                                                       Nothing,
                                                                        operatorCall.ConstantValueOpt,
-                                                                       operatorCall.SuppressObjectClone,
-                                                                       operatorCall.Method.ReturnType)
+                                                                       isLValue:=operatorCall.IsLValue,
+                                                                       suppressObjectClone:=operatorCall.SuppressObjectClone,
+                                                                       type:=operatorCall.Method.ReturnType)
 
-            If Not whenHasValue.Type.IsSameTypeIgnoringCustomModifiers(resultType) Then
+            If Not whenHasValue.Type.IsSameTypeIgnoringAll(resultType) Then
                 whenHasValue = WrapInNullable(whenHasValue, resultType)
             End If
 
-            Debug.Assert(whenHasValue.Type.IsSameTypeIgnoringCustomModifiers(resultType), "result type must be same as resultType")
+            Debug.Assert(whenHasValue.Type.IsSameTypeIgnoringAll(resultType), "result type must be same as resultType")
 
             ' RESULT
 

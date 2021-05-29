@@ -1,8 +1,11 @@
-﻿' Copyright (c) Microsoft.  All Rights Reserved.  Licensed under the Apache License, Version 2.0.  See License.txt in the project root for license information.
+﻿' Licensed to the .NET Foundation under one or more agreements.
+' The .NET Foundation licenses this file to you under the MIT license.
+' See the LICENSE file in the project root for more information.
 
 Imports System.Collections.Immutable
 Imports System.Diagnostics
 Imports System.Runtime.InteropServices
+Imports Microsoft.CodeAnalysis.PooledObjects
 Imports Microsoft.CodeAnalysis.Text
 Imports Microsoft.CodeAnalysis.VisualBasic.Symbols
 Imports Microsoft.CodeAnalysis.VisualBasic.Syntax
@@ -85,14 +88,17 @@ Namespace Microsoft.CodeAnalysis.VisualBasic
                                Nothing,
                                receiver,
                                RewriteCallArguments(arguments, method.Parameters, temporaries, copyBack, suppressObjectClone),
+                               node.DefaultArguments,
                                Nothing,
-                               True,
-                               node.Type)
+                               isLValue:=node.IsLValue,
+                               suppressObjectClone:=True,
+                               type:=node.Type)
 
             If Not copyBack.IsDefault Then
-                Return GenerateSequenceValueSideEffects(node, StaticCast(Of LocalSymbol).From(temporaries), copyBack)
+                Return GenerateSequenceValueSideEffects(_currentMethodOrLambda, node, StaticCast(Of LocalSymbol).From(temporaries), copyBack)
+            End If
 
-            ElseIf Not temporaries.IsDefault Then
+            If Not temporaries.IsDefault Then
                 If method.IsSub Then
                     Return New BoundSequence(node.Syntax,
                                              StaticCast(Of LocalSymbol).From(temporaries),
@@ -173,7 +179,7 @@ Namespace Microsoft.CodeAnalysis.VisualBasic
                 Else
                     rewritten = VisitExpressionNode(argument)
 
-                    If parameters(paramIdx).IsByRef AndAlso Not argument.IsLValue AndAlso Not inExpressionLambda Then
+                    If parameters(paramIdx).IsByRef AndAlso Not argument.IsLValue AndAlso Not _inExpressionLambda Then
                         rewritten = PassArgAsTempClone(argument, rewritten, tempsArray)
                     End If
 
@@ -227,7 +233,7 @@ Namespace Microsoft.CodeAnalysis.VisualBasic
                 tempsArray = ArrayBuilder(Of SynthesizedLocal).GetInstance()
             End If
 
-            Dim temp = New SynthesizedLocal(Me.currentMethodOrLambda, rewrittenArgument.Type, SynthesizedLocalKind.LoweringTemp)
+            Dim temp = New SynthesizedLocal(Me._currentMethodOrLambda, rewrittenArgument.Type, SynthesizedLocalKind.LoweringTemp)
             tempsArray.Add(temp)
 
             Dim boundTemp = New BoundLocal(rewrittenArgument.Syntax, temp, temp.Type)
@@ -253,14 +259,17 @@ Namespace Microsoft.CodeAnalysis.VisualBasic
             Dim originalArgument As BoundExpression = argument.OriginalArgument
 
             If originalArgument.IsPropertyOrXmlPropertyAccess Then
-                Debug.Assert(originalArgument.GetAccessKind() = (PropertyAccessKind.Get Or PropertyAccessKind.Set))
+                Debug.Assert(originalArgument.GetAccessKind() = If(
+                             originalArgument.IsPropertyReturnsByRef(),
+                             PropertyAccessKind.Get,
+                             PropertyAccessKind.Get Or PropertyAccessKind.Set))
                 originalArgument = originalArgument.SetAccessKind(PropertyAccessKind.Unknown)
             ElseIf originalArgument.IsLateBound() Then
                 Debug.Assert(originalArgument.GetLateBoundAccessKind() = (LateBoundAccessKind.Get Or LateBoundAccessKind.Set))
                 originalArgument = originalArgument.SetLateBoundAccessKind(LateBoundAccessKind.Unknown)
             End If
 
-            If inExpressionLambda Then
+            If _inExpressionLambda Then
                 If originalArgument.IsPropertyOrXmlPropertyAccess Then
                     Debug.Assert(originalArgument.GetAccessKind() = PropertyAccessKind.Unknown)
                     originalArgument = originalArgument.SetAccessKind(PropertyAccessKind.Get)
@@ -291,11 +300,11 @@ Namespace Microsoft.CodeAnalysis.VisualBasic
             Dim firstUse As BoundExpression
             Dim secondUse As BoundExpression
 
-            Dim useTwice As UseTwiceRewriter.Result = UseTwiceRewriter.UseTwice(Me.currentMethodOrLambda, originalArgument, tempsArray)
+            Dim useTwice As UseTwiceRewriter.Result = UseTwiceRewriter.UseTwice(Me._currentMethodOrLambda, originalArgument, tempsArray)
 
             If originalArgument.IsPropertyOrXmlPropertyAccess Then
-                firstUse = useTwice.First.SetAccessKind(PropertyAccessKind.Get)
-                secondUse = useTwice.Second.SetAccessKind(PropertyAccessKind.Set)
+                firstUse = useTwice.First.SetAccessKind(PropertyAccessKind.Get).MakeRValue()
+                secondUse = useTwice.Second.SetAccessKind(If(originalArgument.IsPropertyReturnsByRef(), PropertyAccessKind.Get, PropertyAccessKind.Set))
 
             ElseIf originalArgument.IsLateBound() Then
                 firstUse = useTwice.First.SetLateBoundAccessKind(LateBoundAccessKind.Get)
@@ -311,7 +320,7 @@ Namespace Microsoft.CodeAnalysis.VisualBasic
             Dim inputValue As BoundExpression = VisitAndGenerateObjectCloneIfNeeded(argument.InConversion)
             RemovePlaceholderReplacement(argument.InPlaceholder)
 
-            Dim temp = New SynthesizedLocal(Me.currentMethodOrLambda, argument.Type, SynthesizedLocalKind.LoweringTemp)
+            Dim temp = New SynthesizedLocal(Me._currentMethodOrLambda, argument.Type, SynthesizedLocalKind.LoweringTemp)
             tempsArray.Add(temp)
 
             Dim boundTemp = New BoundLocal(argument.Syntax, temp, temp.Type)
@@ -332,7 +341,7 @@ Namespace Microsoft.CodeAnalysis.VisualBasic
                 RemovePlaceholderReplacement(argument.OutPlaceholder)
 
                 If secondUse.Kind = BoundKind.LateMemberAccess Then
-                    ' Method(ref objExpr.foo)
+                    ' Method(ref objExpr.goo)
 
                     copyBack = LateSet(secondUse.Syntax,
                                        DirectCast(MyBase.VisitLateMemberAccess(DirectCast(secondUse, BoundLateMemberAccess)), BoundLateMemberAccess),
@@ -344,7 +353,7 @@ Namespace Microsoft.CodeAnalysis.VisualBasic
                     Dim invocation = DirectCast(secondUse, BoundLateInvocation)
 
                     If invocation.Member.Kind = BoundKind.LateMemberAccess Then
-                        ' Method(ref objExpr.foo(args))
+                        ' Method(ref objExpr.goo(args))
                         copyBack = LateSet(invocation.Syntax,
                                            DirectCast(MyBase.VisitLateMemberAccess(DirectCast(invocation.Member, BoundLateMemberAccess)), BoundLateMemberAccess),
                                            copyBackValue,

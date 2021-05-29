@@ -1,4 +1,6 @@
-﻿' Copyright (c) Microsoft.  All Rights Reserved.  Licensed under the Apache License, Version 2.0.  See License.txt in the project root for license information.
+﻿' Licensed to the .NET Foundation under one or more agreements.
+' The .NET Foundation licenses this file to you under the MIT license.
+' See the LICENSE file in the project root for more information.
 
 Imports System.Collections.Concurrent
 Imports Microsoft.CodeAnalysis.Text
@@ -10,10 +12,12 @@ Namespace Microsoft.CodeAnalysis.VisualBasic
     ''' <summary>
     ''' The visitor which searches for a bound node inside a bound subtree
     ''' </summary>
-    Friend Class BoundNodeFinder
-        Inherits BoundTreeWalker
+    Friend NotInheritable Class BoundNodeFinder
+        Inherits BoundTreeWalkerWithStackGuardWithoutRecursionOnTheLeftOfBinaryOperator
 
-        Public Shared Function ContainsNode(findWhere As BoundNode, findWhat As BoundNode) As Boolean
+        Private ReadOnly _convertInsufficientExecutionStackExceptionToCancelledByStackGuardException As Boolean
+
+        Public Shared Function ContainsNode(findWhere As BoundNode, findWhat As BoundNode, recursionDepth As Integer, convertInsufficientExecutionStackExceptionToCancelledByStackGuardException As Boolean) As Boolean
             Debug.Assert(findWhere IsNot Nothing)
             Debug.Assert(findWhat IsNot Nothing)
 
@@ -21,13 +25,15 @@ Namespace Microsoft.CodeAnalysis.VisualBasic
                 Return True
             End If
 
-            Dim walker As New BoundNodeFinder(findWhat)
+            Dim walker As New BoundNodeFinder(findWhat, recursionDepth, convertInsufficientExecutionStackExceptionToCancelledByStackGuardException)
             walker.Visit(findWhere)
             Return walker._nodeToFind Is Nothing
         End Function
 
-        Private Sub New(_nodeToFind As BoundNode)
+        Private Sub New(_nodeToFind As BoundNode, recursionDepth As Integer, convertInsufficientExecutionStackExceptionToCancelledByStackGuardException As Boolean)
+            MyBase.New(recursionDepth)
             Me._nodeToFind = _nodeToFind
+            Me._convertInsufficientExecutionStackExceptionToCancelledByStackGuardException = convertInsufficientExecutionStackExceptionToCancelledByStackGuardException
         End Sub
 
         ''' <summary> Note: Nothing if node is found </summary>
@@ -42,6 +48,10 @@ Namespace Microsoft.CodeAnalysis.VisualBasic
                 End If
             End If
             Return Nothing
+        End Function
+
+        Protected Overrides Function ConvertInsufficientExecutionStackExceptionToCancelledByStackGuardException() As Boolean
+            Return _convertInsufficientExecutionStackExceptionToCancelledByStackGuardException
         End Function
 
         Public Overrides Function VisitUnboundLambda(node As UnboundLambda) As BoundNode

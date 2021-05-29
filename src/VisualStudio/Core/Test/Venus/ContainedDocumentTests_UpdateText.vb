@@ -1,4 +1,6 @@
-' Copyright (c) Microsoft.  All Rights Reserved.  Licensed under the Apache License, Version 2.0.  See License.txt in the project root for license information.
+﻿' Licensed to the .NET Foundation under one or more agreements.
+' The .NET Foundation licenses this file to you under the MIT license.
+' See the LICENSE file in the project root for more information.
 
 #If False Then
 Imports Microsoft.CodeAnalysis.Editor.UnitTests
@@ -21,7 +23,7 @@ Namespace Microsoft.VisualStudio.LanguageServices.UnitTests.Venus
         ''' <summary>
         ''' Change starts and ends before visible span
         ''' </summary>
-        <Fact, Trait(Traits.Feature, Traits.Features.Venus)>
+        <WpfFact, Trait(Traits.Feature, Traits.Features.Venus)>
         Public Sub ChangeBeforeVisibleSpan()
             Dim edits = {New TextChange(TextSpan.FromBounds(1, 2), "ab")}
             AssertEditsApplied("012[|34|]56789", edits, edits)
@@ -30,7 +32,7 @@ Namespace Microsoft.VisualStudio.LanguageServices.UnitTests.Venus
         ''' <summary>
         ''' Multiple Edits start and end before visible span
         ''' </summary>
-        <Fact, Trait(Traits.Feature, Traits.Features.Venus)>
+        <WpfFact, Trait(Traits.Feature, Traits.Features.Venus)>
         Public Sub MultipleEditsBeforeVisibleSpan()
             Dim edits = {
                 New TextChange(TextSpan.FromBounds(1, 2), "a"),
@@ -43,7 +45,7 @@ Namespace Microsoft.VisualStudio.LanguageServices.UnitTests.Venus
         ''' <summary>
         ''' Multiple conflicting edits start and end before visible span
         ''' </summary>
-        <Fact, Trait(Traits.Feature, Traits.Features.Venus)>
+        <WpfFact, Trait(Traits.Feature, Traits.Features.Venus)>
         Public Sub MultipleConflictingEditsBeforeVisibleSpan()
             Dim edits = {
                 New TextChange(TextSpan.FromBounds(1, 2), "a"),
@@ -56,7 +58,7 @@ Namespace Microsoft.VisualStudio.LanguageServices.UnitTests.Venus
         ''' <summary>
         ''' Change starts before and ends at start of visible span
         ''' </summary>
-        <Fact, Trait(Traits.Feature, Traits.Features.Venus)>
+        <WpfFact, Trait(Traits.Feature, Traits.Features.Venus)>
         Public Sub ChangeEndsAtStartOfVisibleSpan()
             Dim edits = {New TextChange(TextSpan.FromBounds(2, 3), "ab")}
             AssertEditsApplied("012[|34|]56789", edits, edits)
@@ -65,7 +67,7 @@ Namespace Microsoft.VisualStudio.LanguageServices.UnitTests.Venus
         ''' <summary>
         ''' Change starts before and ends at start of visible span
         ''' </summary>
-        <Fact, Trait(Traits.Feature, Traits.Features.Venus)>
+        <WpfFact, Trait(Traits.Feature, Traits.Features.Venus)>
         Public Sub ChangeEndsAtStartOfVisibleSpanWithWhitespace()
             Dim edits = {New TextChange(TextSpan.FromBounds(4, 8), " a ")}
             Dim expected = {New TextChange(TextSpan.FromBounds(5, 7), "a")}
@@ -78,7 +80,7 @@ Namespace Microsoft.VisualStudio.LanguageServices.UnitTests.Venus
         ''' <summary>
         ''' Change starts before and ends inside visible span
         ''' </summary>
-        <Fact, Trait(Traits.Feature, Traits.Features.Venus)>
+        <WpfFact, Trait(Traits.Feature, Traits.Features.Venus)>
         Public Sub ChangeStartsBeforeAndEndsInVisibleSpan()
             Dim expected = {
                 New TextChange(TextSpan.FromBounds(0, 5), "01a" & vbCrLf),
@@ -100,7 +102,7 @@ Namespace Microsoft.VisualStudio.LanguageServices.UnitTests.Venus
         ''' <summary>
         ''' Change starts before and ends inside visible span
         ''' </summary>
-        <Fact, Trait(Traits.Feature, Traits.Features.Venus)>
+        <WpfFact, Trait(Traits.Feature, Traits.Features.Venus)>
         Public Sub ChangeStartsBeforeAndEndsInVisibleSpanChangingLength()
             Dim edits = {New TextChange(TextSpan.FromBounds(2, 6), "a" & vbCrLf & "bc")}
             Dim expected = {
@@ -124,7 +126,7 @@ Namespace Microsoft.VisualStudio.LanguageServices.UnitTests.Venus
         ''' <summary>
         ''' Change starts before and ends at end of visible span
         ''' </summary>
-        <Fact, Trait(Traits.Feature, Traits.Features.Venus)>
+        <WpfFact, Trait(Traits.Feature, Traits.Features.Venus)>
         Public Sub ChangeStartsBeforeAndEndsAtEndOfVisibleSpan()
             Dim edits = {New TextChange(TextSpan.FromBounds(2, 7), "a" & vbCrLf & "bc")}
 
@@ -148,7 +150,7 @@ Namespace Microsoft.VisualStudio.LanguageServices.UnitTests.Venus
         ''' <summary>
         ''' Change starts before and ends after visible span
         ''' </summary>
-        <Fact, Trait(Traits.Feature, Traits.Features.Venus)>
+        <WpfFact, Trait(Traits.Feature, Traits.Features.Venus)>
         Public Sub ChangeEncompassesVisibleSpan()
             Dim edits = {New TextChange(TextSpan.FromBounds(2, 11), "a" & vbCrLf & "bc" & vbCrLf & "de")}
 
@@ -172,7 +174,7 @@ de789</Text>.Value
         ''' <summary>
         ''' Change starts at start of visible span and ends inside visible span
         ''' </summary>
-        <Fact, Trait(Traits.Feature, Traits.Features.Venus)>
+        <WpfFact, Trait(Traits.Feature, Traits.Features.Venus)>
         Public Sub ChangeStartsAtStartOfVisibleSpanAndEndsInside()
             Dim edits = {New TextChange(TextSpan.FromBounds(3, 4), "a")}
             AssertEditsApplied("012[|34|]56789", edits, edits)
@@ -181,7 +183,7 @@ de789</Text>.Value
         ''' <summary>
         ''' Change starts at start of visible span and ends at end of visible span
         ''' </summary>
-        <Fact, Trait(Traits.Feature, Traits.Features.Venus)>
+        <WpfFact, Trait(Traits.Feature, Traits.Features.Venus)>
         Public Sub ChangeEqualsVisibleSpan()
             Dim edits = {New TextChange(TextSpan.FromBounds(3, 5), "ab")}
             AssertEditsApplied("012[|34|]56789", edits, edits)
@@ -190,7 +192,7 @@ de789</Text>.Value
         ''' <summary>
         ''' Change starts at start of visible span and ends after visible span
         ''' </summary>
-        <Fact, Trait(Traits.Feature, Traits.Features.Venus)>
+        <WpfFact, Trait(Traits.Feature, Traits.Features.Venus)>
         Public Sub ChangeStartsAtStartOfVisibleSpanAndEndsAfter()
             Dim edits = {New TextChange(TextSpan.FromBounds(3, 10), vbCrLf & "ab" & vbCrLf & "c")}
 
@@ -214,7 +216,7 @@ c6789</Text>.Value
         ''' <summary>
         ''' Change starts inside visible span and ends inside visible span
         ''' </summary>
-        <Fact, Trait(Traits.Feature, Traits.Features.Venus)>
+        <WpfFact, Trait(Traits.Feature, Traits.Features.Venus)>
         Public Sub ChangeIsInsideVisibleSpan()
             Dim edits = {New TextChange(TextSpan.FromBounds(3, 4), "n")}
             AssertEditsApplied("01[|234|]56789", edits, edits)
@@ -223,7 +225,7 @@ c6789</Text>.Value
         ''' <summary>
         ''' Change starts inside visible span and ends at end of visible span
         ''' </summary>
-        <Fact, Trait(Traits.Feature, Traits.Features.Venus)>
+        <WpfFact, Trait(Traits.Feature, Traits.Features.Venus)>
         Public Sub ChangeStartsInsideVisibleSpanAndEndsAtEnd()
             Dim edits = {New TextChange(TextSpan.FromBounds(4, 5), "a")}
             AssertEditsApplied("012[|34|]56789", edits, edits)
@@ -232,7 +234,7 @@ c6789</Text>.Value
         ''' <summary>
         ''' Change starts inside visible span and ends after visible span
         ''' </summary>
-        <Fact, Trait(Traits.Feature, Traits.Features.Venus)>
+        <WpfFact, Trait(Traits.Feature, Traits.Features.Venus)>
         Public Sub ChangeStartsInsideVisibleSpanAndEndsAfter()
             Dim edits = {New TextChange(TextSpan.FromBounds(6, 10), "a" & vbCrLf & "b")}
 
@@ -256,7 +258,7 @@ b6789</Text>.Value
         ''' <summary>
         ''' Change starts at end of visible span and ends after visible span
         ''' </summary>
-        <Fact, Trait(Traits.Feature, Traits.Features.Venus)>
+        <WpfFact, Trait(Traits.Feature, Traits.Features.Venus)>
         Public Sub ChangeStartsAtEndOfVisibleSpan()
             Dim edits = {New TextChange(TextSpan.FromBounds(5, 6), "a")}
             AssertEditsApplied("012[|34|]56789", edits, edits)
@@ -265,7 +267,7 @@ b6789</Text>.Value
         ''' <summary>
         ''' Change starts after visible span and ends after visible span
         ''' </summary>
-        <Fact, Trait(Traits.Feature, Traits.Features.Venus)>
+        <WpfFact, Trait(Traits.Feature, Traits.Features.Venus)>
         Public Sub ChangeAfterVisibleSpan()
             Dim edits = {New TextChange(TextSpan.FromBounds(7, 8), "a")}
             AssertEditsApplied("012[|34|]56789", edits, edits)
@@ -274,7 +276,7 @@ b6789</Text>.Value
         ''' <summary>
         ''' Multiple visible spans
         ''' </summary>
-        <Fact, Trait(Traits.Feature, Traits.Features.Venus)>
+        <WpfFact, Trait(Traits.Feature, Traits.Features.Venus)>
         Public Sub ChangeStartsInsideVisibleSpanAndEndsAfterMultipleVisibleSpans1()
             Dim edits = {New TextChange(TextSpan.FromBounds(1, 8), "a" & vbCrLf & "b" & vbCrLf & "c")}
             Dim expectedEdits = {
@@ -301,7 +303,7 @@ b
         ''' <summary>
         ''' Multiple visible spans
         ''' </summary>
-        <Fact, Trait(Traits.Feature, Traits.Features.Venus)>
+        <WpfFact, Trait(Traits.Feature, Traits.Features.Venus)>
         Public Sub ChangeStartsInsideVisibleSpanAndEndsAtAfterMultipleVisibleSpans2()
             Dim edits = {New TextChange(TextSpan.FromBounds(1, 6), "a" & vbCrLf & "bc")}
             Dim expectedEdits = {
@@ -328,7 +330,7 @@ bc4
         ''' <summary>
         ''' Multiple visible spans and Multiple Edits
         ''' </summary>
-        <Fact, Trait(Traits.Feature, Traits.Features.Venus)>
+        <WpfFact, Trait(Traits.Feature, Traits.Features.Venus)>
         Public Sub MultipleChangesAndMultipleVisibleSpans1()
             Dim edits = {New TextChange(TextSpan.FromBounds(1, 8), "a" & vbCrLf & "b" & vbCrLf & "c")}
             Dim expectedEdits = {
@@ -352,7 +354,7 @@ b
             AssertEditsSplit(input, result, edits, expectedEdits)
         End Sub
 
-        <Fact, WorkItem(529800), Trait(Traits.Feature, Traits.Features.Venus)>
+        <WpfFact, WorkItem(529800), Trait(Traits.Feature, Traits.Features.Venus)>
         Public Sub LargeAddAndRemove()
             Dim input = <Text>0
 [|12|]
@@ -385,9 +387,9 @@ b
         ''' <summary>
         ''' The point of this test is that when we get a request to replace the entire contents of
         ''' the file, we want to make sure to NOT replace where the boundaries between the projected
-        ''' spans are.  In expression scenarios (Razor inline "@" expressions, and &lt;%= or %lt;%:
+        ''' spans are.  In expression scenarios (Razor inline "@" expressions, and &lt;%= or &lt;%:
         ''' nuggets for aspx files, they end up generating code like:
-        '''     #line "Foo.aspx", 3
+        '''     #line "Goo.aspx", 3
         '''         __o = |expr|;
         '''     
         '''     #line default
@@ -398,25 +400,25 @@ b
         ''' To preserve the boundaries, we also skip whitespace and the "__o = ", as well as the 
         ''' ending newlines and ; if there is one.
         ''' </summary>
-        <Fact, WorkItem(617816), Trait(Traits.Feature, Traits.Features.Venus)>
+        <WpfFact, WorkItem(617816), Trait(Traits.Feature, Traits.Features.Venus)>
         Public Sub AtEndOfExpressionNugget()
             Dim inputMarkup = <text>
 class C
 {
     static void M()
     {
-#line "Foo", 1
+#line "Goo", 1
         [|foreach (var item in new[] { 1, 2, 3 })
         {|]
 
 #line default
 #line hidden
-#line "Foo", 2
+#line "Goo", 2
             __o = [|item|]
 
 #line default
 #line hidden
-#line "Foo", 3
+#line "Goo", 3
         [|}|]
 
 #line default
@@ -430,18 +432,18 @@ class C
 {
     static void M()
     {
-#line "Foo", 1
+#line "Goo", 1
         [|foreach (var itemss in new[] { 1, 2, 3 })
         {
 
 |]#line default
 #line hidden
-#line "Foo", 2
+#line "Goo", 2
             [|__o = itemss;
 
 |]#line default
 #line hidden
-#line "Foo", 3
+#line "Goo", 3
         [|}
 
 |]#line default
@@ -463,7 +465,7 @@ class C
 {
     static void M()
     {
-#line "Foo", 1
+#line "Goo", 1
         </text>.NormalizedValue),
                 New TextChange(TextSpan.FromBounds(66, 116), <text>foreach (var itemss in new[] { 1, 2, 3 })
         {
@@ -471,12 +473,12 @@ class C
 </text>.NormalizedValue),
                 New TextChange(TextSpan.FromBounds(116, 165), <text>#line default
 #line hidden
-#line "Foo", 2
+#line "Goo", 2
             </text>.NormalizedValue),
                 New TextChange(TextSpan.FromBounds(183, 187), <text>itemss</text>.NormalizedValue),
                 New TextChange(TextSpan.FromBounds(187, 236), <text>#line default
 #line hidden
-#line "Foo", 3
+#line "Goo", 3
         </text>.NormalizedValue),
                 New TextChange(TextSpan.FromBounds(244, 245), <text>}
 

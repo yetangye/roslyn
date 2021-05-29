@@ -1,7 +1,10 @@
-﻿// Copyright (c) Microsoft.  All Rights Reserved.  Licensed under the Apache License, Version 2.0.  See License.txt in the project root for license information.
+﻿// Licensed to the .NET Foundation under one or more agreements.
+// The .NET Foundation licenses this file to you under the MIT license.
+// See the LICENSE file in the project root for more information.
+
+#nullable disable
 
 using System;
-using System.Collections.Generic;
 using Microsoft.CodeAnalysis.Editor.Shared.Utilities;
 using Microsoft.CodeAnalysis.Shared.TestHooks;
 using Microsoft.VisualStudio.Text;
@@ -23,13 +26,14 @@ namespace Microsoft.CodeAnalysis.Editor.Implementation.IntelliSense
         private readonly string _asyncOperationId;
 
         // Null when we absolutely know we don't have any sort of item computation going on. Non
-        // null the moment we think we start computating state. Null again once we decide we can
+        // null the moment we think we start computing state. Null again once we decide we can
         // stop.
         protected TSession sessionOpt;
 
-        protected bool IsSessionActive { get { return sessionOpt != null; } }
+        protected bool IsSessionActive => sessionOpt != null;
 
-        public AbstractController(ITextView textView, ITextBuffer subjectBuffer, IIntelliSensePresenter<TPresenterSession, TEditorSession> presenter, IAsynchronousOperationListener asyncListener, IDocumentProvider documentProvider, string asyncOperationId)
+        protected AbstractController(IThreadingContext threadingContext, ITextView textView, ITextBuffer subjectBuffer, IIntelliSensePresenter<TPresenterSession, TEditorSession> presenter, IAsynchronousOperationListener asyncListener, IDocumentProvider documentProvider, string asyncOperationId)
+            : base(threadingContext)
         {
             this.TextView = textView;
             this.SubjectBuffer = subjectBuffer;
@@ -77,11 +81,14 @@ namespace Microsoft.CodeAnalysis.Editor.Implementation.IntelliSense
             this.OnModelUpdated(result);
         }
 
-        IAsyncToken IController<TModel>.BeginAsyncOperation()
+        IAsyncToken IController<TModel>.BeginAsyncOperation(string name, object tag, string filePath, int lineNumber)
         {
             AssertIsForeground();
             VerifySessionIsActive();
-            return _asyncListener.BeginAsyncOperation(_asyncOperationId);
+            name = String.IsNullOrEmpty(name)
+                ? _asyncOperationId
+                : $"{_asyncOperationId} - {name}";
+            return _asyncListener.BeginAsyncOperation(name, tag, filePath: filePath, lineNumber: lineNumber);
         }
 
         protected void VerifySessionIsActive()
@@ -133,7 +140,7 @@ namespace Microsoft.CodeAnalysis.Editor.Implementation.IntelliSense
             // have even shown ui yet.
             var handledCommand = sessionOpt.InitialUnfilteredModel != null;
 
-            // In the presense of an escape, we always stop what we're doing.
+            // In the presence of an escape, we always stop what we're doing.
             this.StopModelComputation();
 
             return handledCommand;

@@ -1,4 +1,8 @@
-// Copyright (c) Microsoft.  All Rights Reserved.  Licensed under the Apache License, Version 2.0.  See License.txt in the project root for license information.
+﻿// Licensed to the .NET Foundation under one or more agreements.
+// The .NET Foundation licenses this file to you under the MIT license.
+// See the LICENSE file in the project root for more information.
+
+#nullable disable
 
 using System;
 using System.Runtime.InteropServices;
@@ -8,7 +12,7 @@ namespace Microsoft.VisualStudio.LanguageServices.Implementation.ProjectSystem.I
 {
     /// <remarks>
     /// A redefinition of Microsoft.VisualStudio.Shell.Interop.IVsInvisibleEditorManager. One critical difference
-    /// here is is we declare the ppEditor retval argument as IntPtr instead of IVsInvisibleEditor. Since the
+    /// here is we declare the ppEditor retval argument as IntPtr instead of IVsInvisibleEditor. Since the
     /// invisible editor is saved and closed when the last reference is Released(), it's critical we have precise
     /// control when the COM object goes away. By default, the COM marshaller will return a non-unique RCW, which
     /// means we have no control over when the RCW will call Release(). To have control, we need a unique RCW, but

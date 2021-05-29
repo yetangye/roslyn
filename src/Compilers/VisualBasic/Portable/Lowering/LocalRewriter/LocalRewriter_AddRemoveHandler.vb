@@ -1,4 +1,6 @@
-﻿' Copyright (c) Microsoft.  All Rights Reserved.  Licensed under the Apache License, Version 2.0.  See License.txt in the project root for license information.
+﻿' Licensed to the .NET Foundation under one or more agreements.
+' The .NET Foundation licenses this file to you under the MIT license.
+' See the LICENSE file in the project root for more information.
 
 Imports System.Collections.Immutable
 Imports System.Diagnostics
@@ -10,14 +12,26 @@ Imports Microsoft.CodeAnalysis.VisualBasic.Syntax
 Namespace Microsoft.CodeAnalysis.VisualBasic
     Partial Friend NotInheritable Class LocalRewriter
         Public Overrides Function VisitAddHandlerStatement(node As BoundAddHandlerStatement) As BoundNode
-            Return RewriteAddRemoveHandler(node)
+            Dim rewritten = RewriteAddRemoveHandler(node)
+
+            If Instrument(node, rewritten) Then
+                rewritten = _instrumenterOpt.InstrumentAddHandlerStatement(node, rewritten)
+            End If
+
+            Return rewritten
         End Function
 
         Public Overrides Function VisitRemoveHandlerStatement(node As BoundRemoveHandlerStatement) As BoundNode
-            Return RewriteAddRemoveHandler(node)
+            Dim rewritten = RewriteAddRemoveHandler(node)
+
+            If Instrument(node, rewritten) Then
+                rewritten = _instrumenterOpt.InstrumentRemoveHandlerStatement(node, rewritten)
+            End If
+
+            Return rewritten
         End Function
 
-        Private Function RewriteAddRemoveHandler(node As BoundAddRemoveHandlerStatement) As BoundNode
+        Private Function RewriteAddRemoveHandler(node As BoundAddRemoveHandlerStatement) As BoundStatement
             Dim unwrappedEventAccess As BoundEventAccess = UnwrapEventAccess(node.EventAccess)
             Dim [event] = unwrappedEventAccess.EventSymbol
 
@@ -37,7 +51,7 @@ Namespace Microsoft.CodeAnalysis.VisualBasic
                 result = RegisterUnstructuredExceptionHandlingResumeTarget(node.Syntax, result, canThrow:=True)
             End If
 
-            Return If(node.WasCompilerGenerated, result, MarkStatementWithSequencePoint(result))
+            Return result
         End Function
 
         ''' <summary>
@@ -66,7 +80,7 @@ Namespace Microsoft.CodeAnalysis.VisualBasic
         Private Function RewriteWinRtEvent(node As BoundAddRemoveHandlerStatement, unwrappedEventAccess As BoundEventAccess,
                                                isAddition As Boolean) As BoundStatement
 
-            Dim syntax As VisualBasicSyntaxNode = node.Syntax
+            Dim syntax As SyntaxNode = node.Syntax
             Dim eventSymbol As EventSymbol = unwrappedEventAccess.EventSymbol
 
             Dim rewrittenReceiverOpt As BoundExpression = GetEventAccessReceiver(unwrappedEventAccess)
@@ -76,7 +90,7 @@ Namespace Microsoft.CodeAnalysis.VisualBasic
             Dim boundTemp As BoundLocal = Nothing
             If Not eventSymbol.IsShared AndAlso EventReceiverNeedsTemp(rewrittenReceiverOpt) Then
                 Dim receiverType As TypeSymbol = rewrittenReceiverOpt.Type
-                boundTemp = New BoundLocal(syntax, New SynthesizedLocal(Me.currentMethodOrLambda, receiverType, SynthesizedLocalKind.LoweringTemp), receiverType)
+                boundTemp = New BoundLocal(syntax, New SynthesizedLocal(Me._currentMethodOrLambda, receiverType, SynthesizedLocalKind.LoweringTemp), receiverType)
                 tempAssignment = New BoundAssignmentOperator(syntax, boundTemp, GenerateObjectCloneIfNeeded(unwrappedEventAccess.ReceiverOpt, rewrittenReceiverOpt.MakeRValue), True)
             End If
 
@@ -131,7 +145,7 @@ Namespace Microsoft.CodeAnalysis.VisualBasic
                         syntax,
                         LookupResultKind.Empty,
                         ImmutableArray.Create(Of Symbol)(eventSymbol),
-                        ImmutableArray(Of BoundNode).Empty,
+                        ImmutableArray(Of BoundExpression).Empty,
                         ErrorTypeSymbol.UnknownResultType,
                         hasErrors:=True))
             End If
@@ -142,8 +156,8 @@ Namespace Microsoft.CodeAnalysis.VisualBasic
                 New BoundCall(
                     syntax:=syntax,
                     method:=DirectCast(marshalMethod, MethodSymbol),
-                    methodGroup:=Nothing,
-                    receiver:=Nothing,
+                    methodGroupOpt:=Nothing,
+                    receiverOpt:=Nothing,
                     arguments:=marshalArguments,
                     constantValueOpt:=Nothing,
                     suppressObjectClone:=True,
@@ -219,13 +233,7 @@ Namespace Microsoft.CodeAnalysis.VisualBasic
                                      accessorSymbol.ReturnType)
             End If
 
-            Dim statement As BoundStatement = New BoundExpressionStatement(node.Syntax, expr)
-
-            If Me.GenerateDebugInfo AndAlso Not node.WasCompilerGenerated Then
-                statement = Me.MarkStatementWithSequencePoint(statement)
-            End If
-
-            Return statement
+            Return New BoundExpressionStatement(node.Syntax, expr)
         End Function
 
         Private Function UnwrapEventAccess(node As BoundExpression) As BoundEventAccess
@@ -256,7 +264,7 @@ Namespace Microsoft.CodeAnalysis.VisualBasic
             ' Translate: AddHandler myPIA.Event, Handler
             ' to: New ComAwareEventInfo(GetType(myPIA), "Event").AddEventHandler(myPIA, Handler)
 
-            Dim factory As New SyntheticBoundNodeFactory(topMethod, currentMethodOrLambda, node.Syntax, compilationState, diagnostics)
+            Dim factory As New SyntheticBoundNodeFactory(_topMethod, _currentMethodOrLambda, node.Syntax, _compilationState, _diagnostics)
             Dim result As BoundExpression = Nothing
 
             Dim ctor = factory.WellKnownMember(Of MethodSymbol)(WellKnownMember.System_Runtime_InteropServices_ComAwareEventInfo__ctor)
@@ -276,8 +284,8 @@ Namespace Microsoft.CodeAnalysis.VisualBasic
             ' The code we just generated doesn't contain any direct references to the event itself,
             ' but the com event binder needs the event to exist on the local type. We'll poke the pia reference
             ' cache directly so that the event is embedded.
-            If emitModule IsNot Nothing Then
-                emitModule.EmbeddedTypesManagerOpt.EmbedEventIfNeedTo([event], node.Syntax, diagnostics, isUsedForComAwareEventBinding:=True)
+            If _emitModule IsNot Nothing Then
+                _emitModule.EmbeddedTypesManagerOpt.EmbedEventIfNeedTo([event].GetCciAdapter(), node.Syntax, _diagnostics.DiagnosticBag, isUsedForComAwareEventBinding:=True)
             End If
 
             If result IsNot Nothing Then
@@ -287,7 +295,7 @@ Namespace Microsoft.CodeAnalysis.VisualBasic
             Return New BoundBadExpression(node.Syntax,
                                           LookupResultKind.NotCreatable,
                                           ImmutableArray.Create(Of Symbol)([event]),
-                                          ImmutableArray.Create(Of BoundNode)(receiver, handler),
+                                          ImmutableArray.Create(receiver, handler),
                                           ErrorTypeSymbol.UnknownResultType,
                                           hasErrors:=True)
         End Function

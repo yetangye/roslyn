@@ -1,4 +1,8 @@
-﻿// Copyright (c) Microsoft.  All Rights Reserved.  Licensed under the Apache License, Version 2.0.  See License.txt in the project root for license information.
+﻿// Licensed to the .NET Foundation under one or more agreements.
+// The .NET Foundation licenses this file to you under the MIT license.
+// See the LICENSE file in the project root for more information.
+
+#nullable disable
 
 using System;
 using System.Linq;
@@ -351,24 +355,23 @@ class Test
 
             var asmRef = TestReferences.MetadataTests.InterfaceAndClass.VBInterfaces01;
 
-            var comp1 = CreateCompilationWithMscorlib(
+            var comp1 = CreateCompilation(
                 text1,
                 references: new[] { asmRef },
                 assemblyName: "OHI_ExpImpImplVBNested001");
 
-            var comp2 = CreateCompilationWithMscorlib(
+            var comp2 = CreateCompilation(
                 text2,
                 references: new[] { asmRef, comp1.EmitToImageReference() },
                 assemblyName: "OHI_ExpImpImplVBNested002");
 
-            var comp3 = CreateCompilationWithMscorlib(
+            var comp3 = CreateCompilation(
                 text3,
                 references: new MetadataReference[] { asmRef, new CSharpCompilationReference(comp1), new CSharpCompilationReference(comp2) },
                 options: TestOptions.ReleaseExe,
                 assemblyName: "OHI_ExpImpImplVBNested003");
 
-            // TODO(tomat): seems like RefEmit test infrastructure issue
-            CompileAndVerify(comp3, emitOptions: TestEmitters.RefEmitBug, expectedOutput: @"ImpSubDerived ImpFuncDerived ImpSubDerived ImpFunc ExpSubDerived ExpFuncDerived");
+            CompileAndVerify(comp3, expectedOutput: @"ImpSubDerived ImpFuncDerived ImpSubDerived ImpFunc ExpSubDerived ExpFuncDerived");
         }
 
         [Fact]
@@ -691,8 +694,8 @@ Derived.Interface.Property",
             comp.VerifyDiagnostics(); // No errors
         }
 
-        [WorkItem(540558, "DevDiv")]
-        [WorkItem(540561, "DevDiv")]
+        [WorkItem(540558, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/540558")]
+        [WorkItem(540561, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/540561")]
         [Fact]
         public void TestInterfaceMappingAcrossBaseClasses3()
         {
@@ -783,8 +786,8 @@ Derived.Property",
 }");
         }
 
-        [WorkItem(540558, "DevDiv")]
-        [WorkItem(540561, "DevDiv")]
+        [WorkItem(540558, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/540558")]
+        [WorkItem(540561, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/540561")]
         [Fact]
         public void TestInterfaceMappingAcrossBaseClasses3A()
         {
@@ -2109,7 +2112,7 @@ class Test
                 Diagnostic(ErrorCode.WRN_ExplicitImplCollision, "Method").WithArguments("Explicit.I1<int, int>.Method<V>(int, System.Func<int, int, V>, int)"));
         }
 
-        [WorkItem(540581, "DevDiv")]
+        [WorkItem(540581, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/540581")]
         [Fact]
         public void TestImplementAmbiguousSignaturesFromDifferentInterfaces()
         {
@@ -2274,7 +2277,7 @@ Explicit2.I3<string>.get_Property");
                 Diagnostic(ErrorCode.WRN_NewRequired, "Property").WithArguments("Base2.Property", "Base.Property"));
         }
 
-        [WorkItem(540581, "DevDiv")]
+        [WorkItem(540581, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/540581")]
         [Fact]
         public void RegressionTestRefEmitBugRelatedToHidingInInterfaces()
         {
@@ -2488,7 +2491,7 @@ int Method(int x, Func<int, int> v, params int[] y)");
                 Diagnostic(ErrorCode.WRN_NewRequired, "Method").WithArguments("ImplicitInBase.Method(int, System.Func<int, int>, params int[])", "Base.Method(int, System.Func<int, int>, int[])"));
         }
 
-        [WorkItem(540582, "DevDiv")]
+        [WorkItem(540582, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/540582")]
         [Fact]
         public void TestImplementNestedInterface()
         {
@@ -2538,7 +2541,7 @@ class Test
         j.Property = 0;
     }
 }";
-            CompileAndVerify(source, emitOptions: TestEmitters.RefEmitUnsupported_646042, expectedOutput: @"
+            CompileAndVerify(source, expectedOutput: @"
 C.Method
 Base.Method
 C.IY.set_Property
@@ -2564,7 +2567,7 @@ U.set_Property").VerifyDiagnostics(); // No errors
             });
         }
 
-        [WorkItem(545625, "DevDiv")]
+        [WorkItem(545625, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/545625")]
         [Fact]
         public void ReverseArrayRankSpecifiersInExplicitImplementationName()
         {
@@ -2573,7 +2576,7 @@ using System;
  
 interface I<T>
 {
-    void Foo();
+    void Goo();
 }
  
 class C : I<int[][,]>
@@ -2581,19 +2584,19 @@ class C : I<int[][,]>
     static void Main()
     {
         I<int[][,]> x = new C();
-        Action a = x.Foo;
+        Action a = x.Goo;
         Console.WriteLine(a.Method);
     }
  
-    void I<int[][,]>.Foo() { }
+    void I<int[][,]>.Goo() { }
 }
 ";
             // NOTE: order reversed from C# notation.
-            CompileAndVerify(source, expectedOutput: @"Void I<System.Int32[,][]>.Foo()");
+            CompileAndVerify(source, expectedOutput: @"Void I<System.Int32[,][]>.Goo()");
         }
 
         [Fact]
-        [WorkItem(530164, "DevDiv"), WorkItem(531642, "DevDiv"), WorkItem(531643, "DevDiv")]
+        [WorkItem(530164, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/530164"), WorkItem(531642, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/531642"), WorkItem(531643, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/531643")]
         public void SynthesizedExplicitImplementationOfByRefReturn()
         {
             var il = @"
@@ -2633,9 +2636,9 @@ public class D : B, I
 }
 ";
 
-            var comp = CreateCompilationWithCustomILSource(source, il, options: TestOptions.DebugDll);
+            var comp = CreateCompilationWithILAndMscorlib40(source, il, options: TestOptions.DebugDll);
 
-            var verifier = CompileAndVerify(comp, emitOptions: TestEmitters.RefEmitBug, expectedSignatures: new[]
+            var verifier = CompileAndVerify(comp, expectedSignatures: new[]
             {
                 // NOTE: dev11 has the return type as void, which doesn't peverify.
                 Signature("D", "I.M", ".method private hidebysig newslot virtual final instance System.Int32& I.M() cil managed")
@@ -2647,14 +2650,14 @@ public class D : B, I
   // Code size        7 (0x7)
   .maxstack  1
   IL_0000:  ldarg.0
-  IL_0001:  call       "" B.M()""
+  IL_0001:  call       ""ref int B.M()""
   IL_0006:  ret
 }
 ");
         }
 
         [Fact]
-        [WorkItem(530164, "DevDiv")]
+        [WorkItem(530164, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/530164")]
         public void SynthesizedExplicitImplementationOfGenericByRefReturn()
         {
             var il = @"
@@ -2728,13 +2731,13 @@ public class D : B<char>, I<char>
 }
 ";
 
-            var comp = CreateCompilationWithCustomILSource(source, il, options: TestOptions.DebugDll);
+            var comp = CreateCompilationWithILAndMscorlib40(source, il, options: TestOptions.DebugDll);
 
             var global = comp.GlobalNamespace;
             var derivedType = global.GetMember<NamedTypeSymbol>("D");
-            var interfaceType = derivedType.Interfaces.Single();
+            var interfaceType = derivedType.Interfaces().Single();
             Assert.Equal(global.GetMember<NamedTypeSymbol>("I"), interfaceType.OriginalDefinition);
-            var baseType = derivedType.BaseType;
+            var baseType = derivedType.BaseType();
             Assert.Equal(global.GetMember<NamedTypeSymbol>("B"), baseType.OriginalDefinition);
 
             var baseMethods = Enumerable.Range(1, 4).Select(i => baseType.GetMember<MethodSymbol>("M" + i)).ToArray();
@@ -2742,7 +2745,7 @@ public class D : B<char>, I<char>
 
             AssertEx.Equal(baseMethods, interfaceMethods.Select(interfaceMethod => derivedType.FindImplementationForInterfaceMember(interfaceMethod)));
 
-            var verifier = CompileAndVerify(comp, emitOptions: TestEmitters.RefEmitBug, expectedSignatures: new[]
+            var verifier = CompileAndVerify(comp, expectedSignatures: new[]
             {
                 // NOTE: dev11 has the return type as void, which doesn't peverify.
                 Signature("D", "I<System.Char>.M1", ".method private hidebysig newslot virtual final instance System.Char& I<System.Char>.M1() cil managed"),
@@ -2751,15 +2754,15 @@ public class D : B<char>, I<char>
                 Signature("D", "I<System.Char>.M4", ".method private hidebysig newslot virtual final instance I`1[U[]]& I<System.Char>.M4<U>() cil managed"),
             });
 
-            foreach (var suffix in new[] { "1", "2", "3<U>", "4<U>" })
+            foreach (var pair in new[] { new[] { "1", "char" }, new[] { "2", "I<char[]>" }, new[] { "3<U>", "U" }, new[] { "4<U>", "I<U[]>" } })
             {
                 // NOTE: local optimized away even with optimizations turned off (since returning a ref local doesn't peverify).
-                verifier.VerifyIL("D.I<char>.M" + suffix, @"
+                verifier.VerifyIL("D.I<char>.M" + pair[0], @"
 {
   // Code size        7 (0x7)
   .maxstack  1
   IL_0000:  ldarg.0
-  IL_0001:  call       "" B<char>.M" + suffix + @"()""
+  IL_0001:  call       ""ref " + pair[1] + " B<char>.M" + pair[0] + @"()""
   IL_0006:  ret
 }
 ");

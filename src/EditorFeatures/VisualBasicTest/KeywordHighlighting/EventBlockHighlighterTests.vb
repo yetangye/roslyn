@@ -1,4 +1,6 @@
-' Copyright (c) Microsoft.  All Rights Reserved.  Licensed under the Apache License, Version 2.0.  See License.txt in the project root for license information.
+﻿' Licensed to the .NET Foundation under one or more agreements.
+' The .NET Foundation licenses this file to you under the MIT license.
+' See the LICENSE file in the project root for more information.
 
 Imports Microsoft.CodeAnalysis.Editor.VisualBasic.KeywordHighlighting
 
@@ -6,15 +8,15 @@ Namespace Microsoft.CodeAnalysis.Editor.VisualBasic.UnitTests.KeywordHighlightin
     Public Class EventBlockHighlighterTests
         Inherits AbstractVisualBasicKeywordHighlighterTests
 
-        Friend Overrides Function CreateHighlighter() As IHighlighter
-            Return New EventBlockHighlighter()
+        Friend Overrides Function GetHighlighterType() As Type
+            Return GetType(EventBlockHighlighter)
         End Function
 
         <Fact, Trait(Traits.Feature, Traits.Features.KeywordHighlighting)>
-        Public Sub TestEventSample2_1()
-            Test(<Text>
+        Public Async Function TestEventSample2_1() As Task
+            Await TestAsync(<Text>
 Class C
-{|Cursor:[|Public Custom Event|]|} Foo As EventHandler [|Implements|] IFoo.Foo
+{|Cursor:[|Public Custom Event|]|} Goo As EventHandler [|Implements|] IGoo.Goo
     AddHandler(value As EventHandler)
     End AddHandler
     RemoveHandler(value As EventHandler)
@@ -23,13 +25,13 @@ Class C
     End RaiseEvent
 [|End Event|]
 End Class</Text>)
-        End Sub
+        End Function
 
         <Fact, Trait(Traits.Feature, Traits.Features.KeywordHighlighting)>
-        Public Sub TestEventSample2_2()
-            Test(<Text>
+        Public Async Function TestEventSample2_2() As Task
+            Await TestAsync(<Text>
 Class C
-[|Public Custom Event|] Foo As EventHandler {|Cursor:[|Implements|]|} IFoo.Foo
+[|Public Custom Event|] Goo As EventHandler {|Cursor:[|Implements|]|} IGoo.Goo
     AddHandler(value As EventHandler)
     End AddHandler
     RemoveHandler(value As EventHandler)
@@ -38,13 +40,13 @@ Class C
     End RaiseEvent
 [|End Event|]
 End Class</Text>)
-        End Sub
+        End Function
 
         <Fact, Trait(Traits.Feature, Traits.Features.KeywordHighlighting)>
-        Public Sub TestEventSample2_3()
-            Test(<Text>
+        Public Async Function TestEventSample2_3() As Task
+            Await TestAsync(<Text>
 Class C
-[|Public Custom Event|] Foo As EventHandler [|Implements|] IFoo.Foo
+[|Public Custom Event|] Goo As EventHandler [|Implements|] IGoo.Goo
     AddHandler(value As EventHandler)
     End AddHandler
     RemoveHandler(value As EventHandler)
@@ -53,6 +55,6 @@ Class C
     End RaiseEvent
 {|Cursor:[|End Event|]|}
 End Class</Text>)
-        End Sub
+        End Function
     End Class
 End Namespace

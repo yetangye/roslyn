@@ -1,4 +1,6 @@
-' Copyright (c) Microsoft.  All Rights Reserved.  Licensed under the Apache License, Version 2.0.  See License.txt in the project root for license information.
+﻿' Licensed to the .NET Foundation under one or more agreements.
+' The .NET Foundation licenses this file to you under the MIT license.
+' See the LICENSE file in the project root for more information.
 
 Imports Microsoft.CodeAnalysis.VisualBasic.Syntax
 Imports Microsoft.CodeAnalysis.VisualBasic.Extensions
@@ -8,21 +10,21 @@ Imports System.Threading
 Namespace Microsoft.CodeAnalysis.Editor.VisualBasic.UnitTests.Extensions
     Public Class StatementSyntaxExtensionTests
 
-        Private Sub TestStatementDeclarationWithPublicModifier(Of T As StatementSyntax)(node As T)
+        Private Shared Sub TestStatementDeclarationWithPublicModifier(Of T As StatementSyntax)(node As T)
             Dim modifierList = SyntaxFactory.TokenList(SyntaxFactory.Token(SyntaxKind.PublicKeyword))
             Dim newNode = DirectCast(node.WithModifiers(modifierList), T)
             Dim actual = newNode.GetModifiers().First().ToString()
             Assert.Equal("Public", actual)
         End Sub
 
-        Private Sub VerifyTokenName(Of T As StatementSyntax)(code As String, expectedName As String)
+        Private Shared Sub VerifyTokenName(Of T As DeclarationStatementSyntax)(code As String, expectedName As String)
             Dim node = SyntaxFactory.ParseCompilationUnit(code).DescendantNodes.OfType(Of T).First()
-            Dim actualNameToken = node.GetNameTokenOrNothing()
+            Dim actualNameToken = node.GetNameToken()
             Assert.Equal(expectedName, actualNameToken.ToString())
         End Sub
 
         <Fact>
-        Sub MethodReturnType()
+        Public Sub MethodReturnType()
             Dim methodDeclaration = SyntaxFactory.FunctionStatement(attributeLists:=Nothing,
                                                               modifiers:=Nothing,
                                                               identifier:=SyntaxFactory.Identifier("F1"),
@@ -39,7 +41,7 @@ Namespace Microsoft.CodeAnalysis.Editor.VisualBasic.UnitTests.Extensions
         End Sub
 
         <Fact>
-        Sub PropertyReturnType()
+        Public Sub PropertyReturnType()
             Dim propertyDeclaration = SyntaxFactory.PropertyStatement(attributeLists:=Nothing,
                                                                modifiers:=Nothing,
                                                                identifier:=SyntaxFactory.Identifier("P1"),
@@ -54,7 +56,7 @@ Namespace Microsoft.CodeAnalysis.Editor.VisualBasic.UnitTests.Extensions
             Assert.Equal("Byte", returnTypeName)
         End Sub
 
-        Private Sub TestTypeBlockWithPublicModifier(Of T As TypeBlockSyntax)(code As String)
+        Private Shared Sub TestTypeBlockWithPublicModifier(Of T As TypeBlockSyntax)(code As String)
             Dim node = SyntaxFactory.ParseCompilationUnit(code).Members.First()
             Dim modifierList = SyntaxFactory.TokenList(SyntaxFactory.Token(SyntaxKind.PublicKeyword))
             Dim newNode = DirectCast(node.WithModifiers(modifierList), T)
@@ -63,7 +65,7 @@ Namespace Microsoft.CodeAnalysis.Editor.VisualBasic.UnitTests.Extensions
         End Sub
 
         <Fact>
-        Sub GetClassStatementModifiers()
+        Public Sub GetClassStatementModifiers()
             Dim code = <String>Public Class C</String>.Value
             Dim node = SyntaxFactory.ParseCompilationUnit(code).DescendantNodes.OfType(Of ClassStatementSyntax).First()
             Dim actualModifierName = node.Modifiers().First().ToString()
@@ -71,7 +73,7 @@ Namespace Microsoft.CodeAnalysis.Editor.VisualBasic.UnitTests.Extensions
         End Sub
 
         <Fact>
-        Sub GetEnumStatementModifiers()
+        Public Sub GetEnumStatementModifiers()
             Dim code = <String>Public Enum E</String>.Value
             Dim node = SyntaxFactory.ParseCompilationUnit(code).DescendantNodes.OfType(Of EnumStatementSyntax).First()
             Dim actualModifierName = node.Modifiers().First().ToString()
@@ -79,7 +81,7 @@ Namespace Microsoft.CodeAnalysis.Editor.VisualBasic.UnitTests.Extensions
         End Sub
 
         <Fact>
-        Sub InterfaceBlockWithPublicModifier()
+        Public Sub InterfaceBlockWithPublicModifier()
             Dim code = <String>Interface I
 End Interface</String>.Value
 
@@ -87,7 +89,7 @@ End Interface</String>.Value
         End Sub
 
         <Fact>
-        Sub ModuleBlockWithPublicModifier()
+        Public Sub ModuleBlockWithPublicModifier()
             Dim code = <String>Module M
 End Module</String>.Value
 
@@ -95,7 +97,7 @@ End Module</String>.Value
         End Sub
 
         <Fact>
-        Sub StructureBlockWithPublicModifier()
+        Public Sub StructureBlockWithPublicModifier()
             Dim code = <string>Structure S
 End Structure</string>.Value
 
@@ -103,7 +105,7 @@ End Structure</string>.Value
         End Sub
 
         <Fact>
-        Sub EnumBlockWithPublicModifier()
+        Public Sub EnumBlockWithPublicModifier()
             Dim code = <String>Enum E
 End Enum</String>.Value
 
@@ -112,19 +114,19 @@ End Enum</String>.Value
         End Sub
 
         <Fact>
-        Sub ClassStatementWithPublicModifier()
+        Public Sub ClassStatementWithPublicModifier()
             Dim node = SyntaxFactory.ClassStatement(SyntaxFactory.Identifier("C"))
             TestStatementDeclarationWithPublicModifier(node)
         End Sub
 
         <Fact>
-        Sub EnumStatementWithPublicModifier()
+        Public Sub EnumStatementWithPublicModifier()
             Dim node = SyntaxFactory.EnumStatement(SyntaxFactory.Identifier("E"))
             TestStatementDeclarationWithPublicModifier(node)
         End Sub
 
         <Fact>
-        Sub FieldDeclarationWithPublicModifier()
+        Public Sub FieldDeclarationWithPublicModifier()
             Dim code = <String>Class C
     dim _field as Integer = 1
 End Class</String>.Value
@@ -133,7 +135,7 @@ End Class</String>.Value
         End Sub
 
         <Fact>
-        Sub EventBlockWithPublicModifier()
+        Public Sub EventBlockWithPublicModifier()
             Dim code = <String>Custom Event E As EventHandler
 End Event</String>.Value
             Dim node = SyntaxFactory.ParseCompilationUnit(code).DescendantNodes.OfType(Of EventBlockSyntax).First()
@@ -141,13 +143,13 @@ End Event</String>.Value
         End Sub
 
         <Fact>
-        Sub EventStatementWithPublicModifier()
+        Public Sub EventStatementWithPublicModifier()
             Dim node = SyntaxFactory.EventStatement(SyntaxFactory.Identifier("E"))
             TestStatementDeclarationWithPublicModifier(node)
         End Sub
 
         <Fact>
-        Sub PropertyBlockWithPublicModifier()
+        Public Sub PropertyBlockWithPublicModifier()
             Dim code = <String>Property P as Integer
 End Property</String>.Value
             Dim node = SyntaxFactory.ParseCompilationUnit(code).DescendantNodes.OfType(Of PropertyBlockSyntax).First()
@@ -155,58 +157,58 @@ End Property</String>.Value
         End Sub
 
         <Fact>
-        Sub SubBlockWithPublicModifier()
-            Dim code = <String>Sub Foo
+        Public Sub SubBlockWithPublicModifier()
+            Dim code = <String>Sub Goo
 End Sub</String>.Value
             Dim node = SyntaxFactory.ParseCompilationUnit(code).DescendantNodes.OfType(Of MethodBlockSyntax).First()
             TestStatementDeclarationWithPublicModifier(node)
         End Sub
 
         <Fact>
-        Sub VerifyClassNameToken()
+        Public Sub VerifyClassNameToken()
             Dim code = <String>Class C
 End Class</String>.Value
             VerifyTokenName(Of ClassBlockSyntax)(code, "C")
         End Sub
 
         <Fact>
-        Sub VerifyInterfaceNameToken()
+        Public Sub VerifyInterfaceNameToken()
             Dim code = <String>Interface I
 End Interface</String>.Value
             VerifyTokenName(Of InterfaceBlockSyntax)(code, "I")
         End Sub
 
         <Fact>
-        Sub VerifyStructureNameToken()
+        Public Sub VerifyStructureNameToken()
             Dim code = <String>Structure S
 End Structure</String>.Value
             VerifyTokenName(Of StructureBlockSyntax)(code, "S")
         End Sub
 
         <Fact>
-        Sub VerifyModuleNameToken()
+        Public Sub VerifyModuleNameToken()
             Dim code = <String>Module M
 End Module</String>.Value
             VerifyTokenName(Of ModuleBlockSyntax)(code, "M")
         End Sub
 
         <Fact>
-        Sub VerifyStructureStatementNameToken()
+        Public Sub VerifyStructureStatementNameToken()
             Dim code = <String>Structure SS
 </String>.Value
             VerifyTokenName(Of StructureStatementSyntax)(code, "SS")
         End Sub
 
         <Fact>
-        Sub VerifyConstructorNameTokenIsNothing()
+        Public Sub VerifyConstructorNameTokenIsNothing()
             Dim code = <String>Class C
     Sub New()
 End Class</String>.Value
             VerifyTokenName(Of SubNewStatementSyntax)(code, "")
         End Sub
 
-        <Fact, WorkItem(552823)>
-        Sub TestIsInStatementBlockOfKindForBrokenCode()
+        <Fact, WorkItem(552823, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/552823")>
+        Public Sub TestIsInStatementBlockOfKindForBrokenCode()
             Dim code = <String>End Sub
 End Module
 End Namespace

@@ -1,13 +1,17 @@
-// Copyright (c) Microsoft.  All Rights Reserved.  Licensed under the Apache License, Version 2.0.  See License.txt in the project root for license information.
+﻿// Licensed to the .NET Foundation under one or more agreements.
+// The .NET Foundation licenses this file to you under the MIT license.
+// See the LICENSE file in the project root for more information.
+
+#nullable disable
 
 using System;
 
 namespace Microsoft.CodeAnalysis.Editor.Tagging
 {
     /// <summary>
-    /// The events that the <see cref="AsynchronousTaggerProvider{TTag}"/> listens to to know when 
+    /// The events that the <see cref="AbstractAsynchronousTaggerProvider{TTag}"/> listens to, to know when 
     /// to request more tags.  For example, an <see cref="ITaggerEventSource"/> may listen to text 
-    /// buffer changes, and can tell the <see cref="AsynchronousTaggerProvider{TTag}"/> that it needs
+    /// buffer changes, and can tell the <see cref="AbstractAsynchronousTaggerProvider{TTag}"/> that it needs
     /// to recompute tags.
     /// </summary>
     internal interface ITaggerEventSource

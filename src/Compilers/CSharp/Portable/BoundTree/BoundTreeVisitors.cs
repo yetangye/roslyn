@@ -1,9 +1,16 @@
-﻿// Copyright (c) Microsoft.  All Rights Reserved.  Licensed under the Apache License, Version 2.0.  See License.txt in the project root for license information.
+﻿// Licensed to the .NET Foundation under one or more agreements.
+// The .NET Foundation licenses this file to you under the MIT license.
+// See the LICENSE file in the project root for more information.
+
+#nullable disable
 
 using System.Diagnostics;
 using Microsoft.CodeAnalysis.CSharp.Symbols;
 using Microsoft.CodeAnalysis.CSharp.Syntax;
 using Microsoft.CodeAnalysis.Text;
+using System;
+using Roslyn.Utilities;
+using System.Linq;
 
 namespace Microsoft.CodeAnalysis.CSharp
 {
@@ -45,8 +52,10 @@ namespace Microsoft.CodeAnalysis.CSharp
                     return VisitArrayAccess(node as BoundArrayAccess, arg);
                 case BoundKind.TypeOfOperator:
                     return VisitTypeOfOperator(node as BoundTypeOfOperator, arg);
-                case BoundKind.DefaultOperator:
-                    return VisitDefaultOperator(node as BoundDefaultOperator, arg);
+                case BoundKind.DefaultLiteral:
+                    return VisitDefaultLiteral(node as BoundDefaultLiteral, arg);
+                case BoundKind.DefaultExpression:
+                    return VisitDefaultExpression(node as BoundDefaultExpression, arg);
                 case BoundKind.IsOperator:
                     return VisitIsOperator(node as BoundIsOperator, arg);
                 case BoundKind.AsOperator:
@@ -75,8 +84,6 @@ namespace Microsoft.CodeAnalysis.CSharp
                     return VisitThrowStatement(node as BoundThrowStatement, arg);
                 case BoundKind.ExpressionStatement:
                     return VisitExpressionStatement(node as BoundExpressionStatement, arg);
-                case BoundKind.SwitchStatement:
-                    return VisitSwitchStatement(node as BoundSwitchStatement, arg);
                 case BoundKind.BreakStatement:
                     return VisitBreakStatement(node as BoundBreakStatement, arg);
                 case BoundKind.ContinueStatement:
@@ -152,5 +159,93 @@ namespace Microsoft.CodeAnalysis.CSharp
         {
             return null;
         }
+
+        public class CancelledByStackGuardException : Exception
+        {
+            public readonly BoundNode Node;
+
+            public CancelledByStackGuardException(Exception inner, BoundNode node)
+                : base(inner.Message, inner)
+            {
+                Node = node;
+            }
+
+            public void AddAnError(DiagnosticBag diagnostics)
+            {
+                diagnostics.Add(ErrorCode.ERR_InsufficientStack, GetTooLongOrComplexExpressionErrorLocation(Node));
+            }
+
+            public void AddAnError(BindingDiagnosticBag diagnostics)
+            {
+                diagnostics.Add(ErrorCode.ERR_InsufficientStack, GetTooLongOrComplexExpressionErrorLocation(Node));
+            }
+
+            public static Location GetTooLongOrComplexExpressionErrorLocation(BoundNode node)
+            {
+                SyntaxNode syntax = node.Syntax;
+
+                if (!(syntax is ExpressionSyntax))
+                {
+                    syntax = syntax.DescendantNodes(n => !(n is ExpressionSyntax)).OfType<ExpressionSyntax>().FirstOrDefault() ?? syntax;
+                }
+
+                return syntax.GetFirstToken().GetLocation();
+            }
+        }
+
+        /// <summary>
+        /// Consumers must provide implementation for <see cref="VisitExpressionWithoutStackGuard"/>.
+        /// </summary>
+        [DebuggerStepThrough]
+        protected BoundExpression VisitExpressionWithStackGuard(ref int recursionDepth, BoundExpression node)
+        {
+            BoundExpression result;
+            recursionDepth++;
+#if DEBUG
+            int saveRecursionDepth = recursionDepth;
+#endif
+
+            if (recursionDepth > 1 || !ConvertInsufficientExecutionStackExceptionToCancelledByStackGuardException())
+            {
+                StackGuard.EnsureSufficientExecutionStack(recursionDepth);
+
+                result = VisitExpressionWithoutStackGuard(node);
+            }
+            else
+            {
+                result = VisitExpressionWithStackGuard(node);
+            }
+
+#if DEBUG
+            Debug.Assert(saveRecursionDepth == recursionDepth);
+#endif
+            recursionDepth--;
+            return result;
+        }
+
+        protected virtual bool ConvertInsufficientExecutionStackExceptionToCancelledByStackGuardException()
+        {
+            return true;
+        }
+
+#nullable enable
+        [DebuggerStepThrough]
+        private BoundExpression? VisitExpressionWithStackGuard(BoundExpression node)
+        {
+            try
+            {
+                return VisitExpressionWithoutStackGuard(node);
+            }
+            catch (InsufficientExecutionStackException ex)
+            {
+                throw new CancelledByStackGuardException(ex, node);
+            }
+        }
+
+        /// <summary>
+        /// We should be intentional about behavior of derived classes regarding guarding against stack overflow.
+        /// </summary>
+        protected abstract BoundExpression? VisitExpressionWithoutStackGuard(BoundExpression node);
+#nullable disable
     }
 }

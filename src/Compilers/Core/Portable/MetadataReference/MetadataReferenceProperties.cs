@@ -1,10 +1,11 @@
-﻿// Copyright (c) Microsoft.  All Rights Reserved.  Licensed under the Apache License, Version 2.0.  See License.txt in the project root for license information.
+﻿// Licensed to the .NET Foundation under one or more agreements.
+// The .NET Foundation licenses this file to you under the MIT license.
+// See the LICENSE file in the project root for more information.
 
 using System;
 using System.Linq;
 using System.Collections.Generic;
 using System.Collections.Immutable;
-using Microsoft.CodeAnalysis.Text;
 using Roslyn.Utilities;
 
 namespace Microsoft.CodeAnalysis
@@ -21,12 +22,12 @@ namespace Microsoft.CodeAnalysis
         /// <summary>
         /// Default properties for a module reference.
         /// </summary>
-        public static readonly MetadataReferenceProperties Module = new MetadataReferenceProperties(MetadataImageKind.Module);
+        public static MetadataReferenceProperties Module => new MetadataReferenceProperties(MetadataImageKind.Module);
 
         /// <summary>
         /// Default properties for an assembly reference.
         /// </summary>
-        public static readonly MetadataReferenceProperties Assembly = new MetadataReferenceProperties(MetadataImageKind.Assembly);
+        public static MetadataReferenceProperties Assembly => new MetadataReferenceProperties(MetadataImageKind.Assembly);
 
         /// <summary>
         /// Initializes reference properties.
@@ -34,23 +35,23 @@ namespace Microsoft.CodeAnalysis
         /// <param name="kind">The image kind - assembly or module.</param>
         /// <param name="aliases">Assembly aliases. Can't be set for a module.</param>
         /// <param name="embedInteropTypes">True to embed interop types from the referenced assembly to the referencing compilation. Must be false for a module.</param>
-        public MetadataReferenceProperties(MetadataImageKind kind = MetadataImageKind.Assembly, ImmutableArray<string> aliases = default(ImmutableArray<string>), bool embedInteropTypes = false)
+        public MetadataReferenceProperties(MetadataImageKind kind = MetadataImageKind.Assembly, ImmutableArray<string> aliases = default, bool embedInteropTypes = false)
         {
             if (!kind.IsValid())
             {
-                throw new ArgumentOutOfRangeException("kind");
+                throw new ArgumentOutOfRangeException(nameof(kind));
             }
 
             if (kind == MetadataImageKind.Module)
             {
                 if (embedInteropTypes)
                 {
-                    throw new ArgumentException(CodeAnalysisResources.CannotEmbedInteropTypesFromModule, "embedInteropTypes");
+                    throw new ArgumentException(CodeAnalysisResources.CannotEmbedInteropTypesFromModule, nameof(embedInteropTypes));
                 }
 
                 if (!aliases.IsDefaultOrEmpty)
                 {
-                    throw new ArgumentException(CodeAnalysisResources.CannotAliasModule, "aliases");
+                    throw new ArgumentException(CodeAnalysisResources.CannotAliasModule, nameof(aliases));
                 }
             }
 
@@ -60,7 +61,7 @@ namespace Microsoft.CodeAnalysis
                 {
                     if (!alias.IsValidClrTypeName())
                     {
-                        throw new ArgumentException(CodeAnalysisResources.InvalidAlias, "aliases");
+                        throw new ArgumentException(CodeAnalysisResources.InvalidAlias, nameof(aliases));
                     }
                 }
             }
@@ -68,6 +69,13 @@ namespace Microsoft.CodeAnalysis
             _kind = kind;
             _aliases = aliases;
             _embedInteropTypes = embedInteropTypes;
+            HasRecursiveAliases = false;
+        }
+
+        internal MetadataReferenceProperties(MetadataImageKind kind, ImmutableArray<string> aliases, bool embedInteropTypes, bool hasRecursiveAliases)
+            : this(kind, aliases, embedInteropTypes)
+        {
+            HasRecursiveAliases = hasRecursiveAliases;
         }
 
         /// <summary>
@@ -89,7 +97,7 @@ namespace Microsoft.CodeAnalysis
         /// </exception>
         public MetadataReferenceProperties WithAliases(ImmutableArray<string> aliases)
         {
-            return new MetadataReferenceProperties(_kind, aliases, this.EmbedInteropTypes);
+            return new MetadataReferenceProperties(_kind, aliases, _embedInteropTypes, HasRecursiveAliases);
         }
 
         /// <summary>
@@ -98,16 +106,21 @@ namespace Microsoft.CodeAnalysis
         /// <exception cref="ArgumentException"><see cref="Kind"/> is <see cref="MetadataImageKind.Module"/>, as interop types can't be embedded from modules.</exception>
         public MetadataReferenceProperties WithEmbedInteropTypes(bool embedInteropTypes)
         {
-            return new MetadataReferenceProperties(_kind, _aliases, embedInteropTypes);
+            return new MetadataReferenceProperties(_kind, _aliases, embedInteropTypes, HasRecursiveAliases);
+        }
+
+        /// <summary>
+        /// Returns <see cref="MetadataReferenceProperties"/> with <see cref="HasRecursiveAliases"/> set to specified value.
+        /// </summary>
+        internal MetadataReferenceProperties WithRecursiveAliases(bool value)
+        {
+            return new MetadataReferenceProperties(_kind, _aliases, _embedInteropTypes, value);
         }
 
         /// <summary>
         /// The image kind (assembly or module) the reference refers to.
         /// </summary>
-        public MetadataImageKind Kind
-        {
-            get { return _kind; }
-        }
+        public MetadataImageKind Kind => _kind;
 
         /// <summary>
         /// Alias that represents a global declaration space.
@@ -115,7 +128,7 @@ namespace Microsoft.CodeAnalysis
         /// <remarks>
         /// Namespaces in references whose <see cref="Aliases"/> contain <see cref="GlobalAlias"/> are available in global declaration space.
         /// </remarks>
-        public static readonly string GlobalAlias = "global";
+        public static string GlobalAlias => "global";
 
         /// <summary>
         /// Aliases for the metadata reference. Empty if the reference has no aliases.
@@ -135,12 +148,15 @@ namespace Microsoft.CodeAnalysis
         /// <summary>
         /// True if interop types defined in the referenced metadata should be embedded into the compilation referencing the metadata.
         /// </summary>
-        public bool EmbedInteropTypes
-        {
-            get { return _embedInteropTypes; }
-        }
+        public bool EmbedInteropTypes => _embedInteropTypes;
 
-        public override bool Equals(object obj)
+        /// <summary>
+        /// True to apply <see cref="Aliases"/> recursively on the target assembly and on all its transitive dependencies.
+        /// False to apply <see cref="Aliases"/> only on the target assembly.
+        /// </summary>
+        internal bool HasRecursiveAliases { get; private set; }
+
+        public override bool Equals(object? obj)
         {
             return obj is MetadataReferenceProperties && Equals((MetadataReferenceProperties)obj);
         }
@@ -149,12 +165,13 @@ namespace Microsoft.CodeAnalysis
         {
             return Aliases.SequenceEqual(other.Aliases)
                 && _embedInteropTypes == other._embedInteropTypes
-                && _kind == other._kind;
+                && _kind == other._kind
+                && HasRecursiveAliases == other.HasRecursiveAliases;
         }
 
         public override int GetHashCode()
         {
-            return Hash.Combine(Hash.CombineValues(Aliases), Hash.Combine(_embedInteropTypes, _kind.GetHashCode()));
+            return Hash.Combine(Hash.CombineValues(Aliases), Hash.Combine(_embedInteropTypes, Hash.Combine(HasRecursiveAliases, _kind.GetHashCode())));
         }
 
         public static bool operator ==(MetadataReferenceProperties left, MetadataReferenceProperties right)

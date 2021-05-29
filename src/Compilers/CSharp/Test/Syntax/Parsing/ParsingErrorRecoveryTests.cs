@@ -1,4 +1,8 @@
-﻿// Copyright (c) Microsoft.  All Rights Reserved.  Licensed under the Apache License, Version 2.0.  See License.txt in the project root for license information.
+﻿// Licensed to the .NET Foundation under one or more agreements.
+// The .NET Foundation licenses this file to you under the MIT license.
+// See the LICENSE file in the project root for more information.
+
+#nullable disable
 
 using System;
 using System.Linq;
@@ -10,11 +14,59 @@ using Xunit;
 
 namespace Microsoft.CodeAnalysis.CSharp.UnitTests
 {
-    public class ParsingErrorRecoveryTests
+    public class ParsingErrorRecoveryTests : CSharpTestBase
     {
         private CompilationUnitSyntax ParseTree(string text, CSharpParseOptions options = null)
         {
             return SyntaxFactory.ParseCompilationUnit(text, options: options);
+        }
+
+        [Theory]
+        [InlineData("public")]
+        [InlineData("internal")]
+        [InlineData("protected")]
+        [InlineData("private")]
+        public void AccessibilityModifierErrorRecovery(string accessibility)
+        {
+            var file = ParseTree($@"
+class C
+{{
+    void M()
+    {{
+        // bad visibility modifier
+        {accessibility} void localFunc() {{}}
+    }}
+    void M2()
+    {{
+        typing
+        {accessibility} void localFunc() {{}}
+    }}
+    void M3()
+    {{
+    // Ambiguous between local func with bad modifier and missing closing
+    // brace on previous method. Parsing currently assumes the former,
+    // assuming the tokens are parseable as a local func.
+    {accessibility} void M4() {{}}
+}}");
+
+            Assert.NotNull(file);
+            file.GetDiagnostics().Verify(
+                // (7,9): error CS0106: The modifier '{accessibility}' is not valid for this item
+                //         {accessibility} void localFunc() {}
+                Diagnostic(ErrorCode.ERR_BadMemberFlag, accessibility).WithArguments(accessibility).WithLocation(7, 9),
+                // (11,15): error CS1002: ; expected
+                //         typing
+                Diagnostic(ErrorCode.ERR_SemicolonExpected, "").WithLocation(11, 15),
+                // (12,9): error CS0106: The modifier '{accessibility}' is not valid for this item
+                //         {accessibility} void localFunc() {}
+                Diagnostic(ErrorCode.ERR_BadMemberFlag, accessibility).WithArguments(accessibility).WithLocation(12, 9),
+                // (19,5): error CS0106: The modifier '{accessibility}' is not valid for this item
+                //     {accessibility} void M4() {}
+                Diagnostic(ErrorCode.ERR_BadMemberFlag, accessibility).WithArguments(accessibility).WithLocation(19, 5),
+                // (20,2): error CS1513: } expected
+                // }
+                Diagnostic(ErrorCode.ERR_RbraceExpected, "").WithLocation(20, 2)
+                );
         }
 
         [Fact]
@@ -214,9 +266,15 @@ namespace Microsoft.CodeAnalysis.CSharp.UnitTests
             Assert.Equal(text, file.ToFullString());
             Assert.Equal(1, file.AttributeLists.Count);
             Assert.Equal(0, file.Members.Count);
-            Assert.Equal(2, file.Errors().Length);
-            Assert.Equal((int)ErrorCode.ERR_UnexpectedCharacter, file.Errors()[0].Code);
-            Assert.Equal((int)ErrorCode.ERR_SyntaxError, file.Errors()[1].Code);
+            Assert.Equal(3, file.Errors().Length);
+            file.Errors().Verify(
+                // error CS1056: Unexpected character '$'
+                Diagnostic(ErrorCode.ERR_UnexpectedCharacter).WithArguments("$"),
+                // error CS1003: Syntax error, ',' expected
+                Diagnostic(ErrorCode.ERR_SyntaxError).WithArguments(",", ""),
+                // error CS1003: Syntax error, ']' expected
+                Diagnostic(ErrorCode.ERR_SyntaxError).WithArguments("]", "")
+                );
         }
 
         [Fact]
@@ -364,7 +422,7 @@ asas
 using System;
 sadasdasd]
 
-[assembly: foo]
+[assembly: goo]
 
 class C
 {
@@ -376,13 +434,6 @@ class C
             var file = this.ParseTree(text);
             Assert.NotNull(file);
             Assert.Equal(text, file.ToFullString());
-            Assert.Equal(1, file.Externs.Count);
-            Assert.Equal(1, file.Usings.Count);
-            Assert.Equal(1, file.AttributeLists.Count);
-            Assert.Equal(3, file.Members.Count);
-            Assert.Equal(SyntaxKind.ClassDeclaration, file.Members[0].Kind());
-            Assert.Equal(SyntaxKind.IncompleteMember, file.Members[1].Kind());
-            Assert.Equal(SyntaxKind.IncompleteMember, file.Members[2].Kind());
         }
 
         [Fact]
@@ -620,10 +671,6 @@ class C
 
             Assert.NotNull(file);
             Assert.Equal(text, file.ToFullString());
-            Assert.Equal(1, file.Members.Count);
-            Assert.Equal(SyntaxKind.NamespaceDeclaration, file.Members[0].Kind());
-            Assert.Equal(1, file.Errors().Length);
-            Assert.Equal((int)ErrorCode.ERR_EOFExpected, file.Errors()[0].Code);
         }
 
         [Fact]
@@ -636,8 +683,7 @@ class C
             Assert.Equal(text, file.ToFullString());
             Assert.Equal(1, file.Members.Count);
             Assert.Equal(SyntaxKind.NamespaceDeclaration, file.Members[0].Kind());
-            Assert.Equal(1, file.Errors().Length);
-            Assert.Equal((int)ErrorCode.ERR_BadModifiersOnNamespace, file.Errors()[0].Code);
+            Assert.Equal(0, file.Errors().Length);
         }
 
         [Fact]
@@ -1816,11 +1862,27 @@ class C
             var agg = (TypeDeclarationSyntax)file.Members[0];
             Assert.Equal(1, agg.Members.Count);
             Assert.Equal(SyntaxKind.IndexerDeclaration, agg.Members[0].Kind());
-            Assert.Equal(4, file.Errors().Length);
-            Assert.Equal((int)ErrorCode.ERR_IndexerNeedsParam, file.Errors()[0].Code);
-            Assert.Equal((int)ErrorCode.ERR_SyntaxError, file.Errors()[1].Code);
-            Assert.Equal((int)ErrorCode.ERR_LbraceExpected, file.Errors()[2].Code);
-            Assert.Equal((int)ErrorCode.ERR_RbraceExpected, file.Errors()[3].Code);
+            Assert.Equal(3, file.Errors().Length);
+            Assert.Equal((int)ErrorCode.ERR_SyntaxError, file.Errors()[0].Code);
+            Assert.Equal((int)ErrorCode.ERR_LbraceExpected, file.Errors()[1].Code);
+            Assert.Equal((int)ErrorCode.ERR_RbraceExpected, file.Errors()[2].Code);
+
+            CreateCompilation(text).VerifyDiagnostics(
+                // (1,21): error CS1003: Syntax error, ']' expected
+                // class c { int this[ }
+                Diagnostic(ErrorCode.ERR_SyntaxError, "}").WithArguments("]", "}").WithLocation(1, 21),
+                // (1,21): error CS1514: { expected
+                // class c { int this[ }
+                Diagnostic(ErrorCode.ERR_LbraceExpected, "}").WithLocation(1, 21),
+                // (1,22): error CS1513: } expected
+                // class c { int this[ }
+                Diagnostic(ErrorCode.ERR_RbraceExpected, "").WithLocation(1, 22),
+                // (1,15): error CS0548: 'c.this': property or indexer must have at least one accessor
+                // class c { int this[ }
+                Diagnostic(ErrorCode.ERR_PropertyWithNoAccessors, "this").WithArguments("c.this").WithLocation(1, 15),
+                // (1,19): error CS1551: Indexers must have at least one parameter
+                // class c { int this[ }
+                Diagnostic(ErrorCode.ERR_IndexerNeedsParam, "[").WithLocation(1, 19));
         }
 
         [Fact]
@@ -1914,9 +1976,19 @@ class C
             var agg = (TypeDeclarationSyntax)file.Members[0];
             Assert.Equal(1, agg.Members.Count);
             Assert.Equal(SyntaxKind.IndexerDeclaration, agg.Members[0].Kind());
-            Assert.Equal(2, file.Errors().Length);
-            Assert.Equal((int)ErrorCode.ERR_IndexerNeedsParam, file.Errors()[0].Code);
-            Assert.Equal((int)ErrorCode.ERR_UnexpectedCharacter, file.Errors()[1].Code);
+            Assert.Equal(1, file.Errors().Length);
+            Assert.Equal((int)ErrorCode.ERR_UnexpectedCharacter, file.Errors()[0].Code);
+
+            CreateCompilation(text).VerifyDiagnostics(
+                // (1,21): error CS1056: Unexpected character '$'
+                // class c { int this[ $ ] { } }
+                Diagnostic(ErrorCode.ERR_UnexpectedCharacter, "").WithArguments("$").WithLocation(1, 21),
+                // (1,15): error CS0548: 'c.this': property or indexer must have at least one accessor
+                // class c { int this[ $ ] { } }
+                Diagnostic(ErrorCode.ERR_PropertyWithNoAccessors, "this").WithArguments("c.this").WithLocation(1, 15),
+                // (1,23): error CS1551: Indexers must have at least one parameter
+                // class c { int this[ $ ] { } }
+                Diagnostic(ErrorCode.ERR_IndexerNeedsParam, "]").WithLocation(1, 23));
         }
 
         [Fact]
@@ -1987,11 +2059,27 @@ class C
             Assert.Equal(2, agg.Members.Count);
             Assert.Equal(SyntaxKind.IndexerDeclaration, agg.Members[0].Kind());
             Assert.Equal(SyntaxKind.MethodDeclaration, agg.Members[1].Kind());
-            Assert.Equal(4, file.Errors().Length);
-            Assert.Equal((int)ErrorCode.ERR_IndexerNeedsParam, file.Errors()[0].Code);
-            Assert.Equal((int)ErrorCode.ERR_SyntaxError, file.Errors()[1].Code);
-            Assert.Equal((int)ErrorCode.ERR_LbraceExpected, file.Errors()[2].Code);
-            Assert.Equal((int)ErrorCode.ERR_RbraceExpected, file.Errors()[3].Code);
+            Assert.Equal(3, file.Errors().Length);
+            Assert.Equal((int)ErrorCode.ERR_SyntaxError, file.Errors()[0].Code);
+            Assert.Equal((int)ErrorCode.ERR_LbraceExpected, file.Errors()[1].Code);
+            Assert.Equal((int)ErrorCode.ERR_RbraceExpected, file.Errors()[2].Code);
+
+            CreateCompilation(text).VerifyDiagnostics(
+                // (1,21): error CS1003: Syntax error, ']' expected
+                // class c { int this[ public void m() { } }
+                Diagnostic(ErrorCode.ERR_SyntaxError, "public").WithArguments("]", "public").WithLocation(1, 21),
+                // (1,21): error CS1514: { expected
+                // class c { int this[ public void m() { } }
+                Diagnostic(ErrorCode.ERR_LbraceExpected, "public").WithLocation(1, 21),
+                // (1,21): error CS1513: } expected
+                // class c { int this[ public void m() { } }
+                Diagnostic(ErrorCode.ERR_RbraceExpected, "public").WithLocation(1, 21),
+                // (1,15): error CS0548: 'c.this': property or indexer must have at least one accessor
+                // class c { int this[ public void m() { } }
+                Diagnostic(ErrorCode.ERR_PropertyWithNoAccessors, "this").WithArguments("c.this").WithLocation(1, 15),
+                // (1,19): error CS1551: Indexers must have at least one parameter
+                // class c { int this[ public void m() { } }
+                Diagnostic(ErrorCode.ERR_IndexerNeedsParam, "[").WithLocation(1, 19));
         }
 
         [Fact]
@@ -3818,9 +3906,28 @@ class C
             Assert.Equal(1, ms.Body.Statements.Count);
             Assert.Equal(SyntaxKind.FixedStatement, ms.Body.Statements[0].Kind());
             var diags = file.ErrorsAndWarnings();
-            Assert.Equal(2, diags.Length);
+            Assert.Equal(1, diags.Length);
             Assert.Equal((int)ErrorCode.ERR_CloseParenExpected, diags[0].Code);
-            Assert.Equal((int)ErrorCode.WRN_PossibleMistakenNullStatement, diags[1].Code);
+
+            CreateCompilation(text).VerifyDiagnostics(
+                // (1,31): error CS1026: ) expected
+                // class c { void m() { fixed(t v; } }
+                Diagnostic(ErrorCode.ERR_CloseParenExpected, ";").WithLocation(1, 31),
+                // (1,22): error CS0214: Pointers and fixed size buffers may only be used in an unsafe context
+                // class c { void m() { fixed(t v; } }
+                Diagnostic(ErrorCode.ERR_UnsafeNeeded, "fixed(t v;").WithLocation(1, 22),
+                // (1,28): error CS0246: The type or namespace name 't' could not be found (are you missing a using directive or an assembly reference?)
+                // class c { void m() { fixed(t v; } }
+                Diagnostic(ErrorCode.ERR_SingleTypeNameNotFound, "t").WithArguments("t").WithLocation(1, 28),
+                // (1,30): error CS0209: The type of a local declared in a fixed statement must be a pointer type
+                // class c { void m() { fixed(t v; } }
+                Diagnostic(ErrorCode.ERR_BadFixedInitType, "v").WithLocation(1, 30),
+                // (1,30): error CS0210: You must provide an initializer in a fixed or using statement declaration
+                // class c { void m() { fixed(t v; } }
+                Diagnostic(ErrorCode.ERR_FixedMustInit, "v").WithLocation(1, 30),
+                // (1,31): warning CS0642: Possible mistaken empty statement
+                // class c { void m() { fixed(t v; } }
+                Diagnostic(ErrorCode.WRN_PossibleMistakenNullStatement, ";").WithLocation(1, 31));
         }
 
         [Fact]
@@ -3925,10 +4032,9 @@ class C
             Assert.NotNull(ms.Body);
             Assert.Equal(1, ms.Body.Statements.Count);
             Assert.Equal(SyntaxKind.TryStatement, ms.Body.Statements[0].Kind());
-            Assert.Equal(3, file.Errors().Length);
+            Assert.Equal(2, file.Errors().Length);
             Assert.Equal((int)ErrorCode.ERR_LbraceExpected, file.Errors()[0].Code);
             Assert.Equal((int)ErrorCode.ERR_RbraceExpected, file.Errors()[1].Code);
-            Assert.Equal((int)ErrorCode.ERR_TooManyCatches, file.Errors()[2].Code);
         }
 
         [Fact]
@@ -4061,8 +4167,12 @@ class C
             Assert.NotNull(ms.Body);
             Assert.Equal(1, ms.Body.Statements.Count);
             Assert.Equal(SyntaxKind.DoStatement, ms.Body.Statements[0].Kind());
-            Assert.Equal(1, file.Errors().Length);
-            Assert.Equal((int)ErrorCode.ERR_SyntaxError, file.Errors()[0].Code);
+            file.Errors().Verify(
+                // error CS1003: Syntax error, ']' expected
+                Diagnostic(ErrorCode.ERR_SyntaxError).WithArguments("]", ")").WithLocation(1, 1),
+                // error CS1026: ) expected
+                Diagnostic(ErrorCode.ERR_CloseParenExpected).WithLocation(1, 1)
+                );
         }
 
         [Fact]
@@ -4227,8 +4337,12 @@ class C
             Assert.NotNull(ms.Body);
             Assert.Equal(1, ms.Body.Statements.Count);
             Assert.Equal(SyntaxKind.ForStatement, ms.Body.Statements[0].Kind());
-            Assert.Equal(1, file.Errors().Length);
-            Assert.Equal((int)ErrorCode.ERR_SyntaxError, file.Errors()[0].Code);
+            file.Errors().Verify(
+                // error CS1003: Syntax error, ']' expected
+                Diagnostic(ErrorCode.ERR_SyntaxError).WithArguments("]", ")").WithLocation(1, 1),
+                // error CS1026: ) expected
+                Diagnostic(ErrorCode.ERR_CloseParenExpected).WithLocation(1, 1)
+                );
         }
 
         [Fact]
@@ -4324,7 +4438,7 @@ class C
             var ds = (LocalDeclarationStatementSyntax)ms.Body.Statements[0];
             Assert.Equal(1, ds.Declaration.Variables.Count);
             Assert.NotEqual(SyntaxKind.None, ds.Declaration.Variables[0].Initializer.Kind());
-            Assert.NotNull(ds.Declaration.Variables[0].Initializer.EqualsToken);
+            Assert.NotEqual(default, ds.Declaration.Variables[0].Initializer.EqualsToken);
             Assert.NotNull(ds.Declaration.Variables[0].Initializer.Value);
             Assert.Equal(SyntaxKind.AnonymousObjectCreationExpression, ds.Declaration.Variables[0].Initializer.Value.Kind());
             Assert.Equal(1, file.Errors().Length);
@@ -5246,20 +5360,20 @@ class C
             Assert.NotNull(ds.Declaration.Variables[0].Initializer);
             Assert.NotEqual(SyntaxKind.None, ds.Declaration.Variables[0].Initializer.EqualsToken.Kind());
             Assert.NotNull(ds.Declaration.Variables[0].Initializer.Value);
-            Assert.Equal(SyntaxKind.ParenthesizedLambdaExpression, ds.Declaration.Variables[0].Initializer.Value.Kind());
-            Assert.Equal(5, file.Errors().Length);
-            Assert.Equal((int)ErrorCode.ERR_TypeExpected, file.Errors()[0].Code);
-            Assert.Equal((int)ErrorCode.ERR_IdentifierExpected, file.Errors()[1].Code);
-            Assert.Equal((int)ErrorCode.ERR_CloseParenExpected, file.Errors()[2].Code);
-            Assert.Equal((int)ErrorCode.ERR_SyntaxError, file.Errors()[3].Code);
-            Assert.Equal((int)ErrorCode.ERR_InvalidExprTerm, file.Errors()[4].Code);
+            Assert.Equal(SyntaxKind.TupleExpression, ds.Declaration.Variables[0].Initializer.Value.Kind());
+            file.Errors().Verify(
+                // error CS1525: Invalid expression term ';'
+                Diagnostic(ErrorCode.ERR_InvalidExprTerm).WithArguments(";").WithLocation(1, 1),
+                // error CS1026: ) expected
+                Diagnostic(ErrorCode.ERR_CloseParenExpected).WithLocation(1, 1)
+                );
         }
 
         [Fact]
         public void TestSemicolonAfterUntypedLambdaParameter()
         {
             var text = "class c { void m() { var x = (y, ; } }";
-            var file = this.ParseTree(text);
+            var file = this.ParseTree(text, options: TestOptions.Regular);
 
             Assert.NotNull(file);
             Assert.Equal(text, file.ToFullString());
@@ -5277,12 +5391,41 @@ class C
             Assert.NotNull(ds.Declaration.Variables[0].Initializer);
             Assert.NotEqual(SyntaxKind.None, ds.Declaration.Variables[0].Initializer.EqualsToken.Kind());
             Assert.NotNull(ds.Declaration.Variables[0].Initializer.Value);
-            Assert.Equal(SyntaxKind.ParenthesizedLambdaExpression, ds.Declaration.Variables[0].Initializer.Value.Kind());
-            Assert.Equal(4, file.Errors().Length);
-            Assert.Equal((int)ErrorCode.ERR_IdentifierExpected, file.Errors()[0].Code);
+            Assert.Equal(SyntaxKind.TupleExpression, ds.Declaration.Variables[0].Initializer.Value.Kind());
+            Assert.Equal(2, file.Errors().Length);
+            Assert.Equal((int)ErrorCode.ERR_InvalidExprTerm, file.Errors()[0].Code);
             Assert.Equal((int)ErrorCode.ERR_CloseParenExpected, file.Errors()[1].Code);
-            Assert.Equal((int)ErrorCode.ERR_SyntaxError, file.Errors()[2].Code);
-            Assert.Equal((int)ErrorCode.ERR_InvalidExprTerm, file.Errors()[3].Code);
+        }
+
+        [Fact]
+        public void TestSemicolonAfterUntypedLambdaParameterWithCSharp6()
+        {
+            var text = "class c { void m() { var x = (y, ; } }";
+            var file = this.ParseTree(text, TestOptions.Regular.WithLanguageVersion(LanguageVersion.CSharp6));
+
+            Assert.NotNull(file);
+            Assert.Equal(text, file.ToFullString());
+            Assert.Equal(1, file.Members.Count);
+            Assert.Equal(SyntaxKind.ClassDeclaration, file.Members[0].Kind());
+            var agg = (TypeDeclarationSyntax)file.Members[0];
+            Assert.Equal(1, agg.Members.Count);
+            Assert.Equal(SyntaxKind.MethodDeclaration, agg.Members[0].Kind());
+            var ms = (MethodDeclarationSyntax)agg.Members[0];
+            Assert.NotNull(ms.Body);
+            Assert.Equal(1, ms.Body.Statements.Count);
+            Assert.Equal(SyntaxKind.LocalDeclarationStatement, ms.Body.Statements[0].Kind());
+            var ds = (LocalDeclarationStatementSyntax)ms.Body.Statements[0];
+            Assert.Equal(1, ds.Declaration.Variables.Count);
+            Assert.NotNull(ds.Declaration.Variables[0].Initializer);
+            Assert.NotEqual(SyntaxKind.None, ds.Declaration.Variables[0].Initializer.EqualsToken.Kind());
+            Assert.NotNull(ds.Declaration.Variables[0].Initializer.Value);
+            Assert.Equal(SyntaxKind.TupleExpression, ds.Declaration.Variables[0].Initializer.Value.Kind());
+
+            Assert.Equal(new[] {
+                                (int)ErrorCode.ERR_FeatureNotAvailableInVersion6,
+                                (int)ErrorCode.ERR_InvalidExprTerm,
+                                (int)ErrorCode.ERR_CloseParenExpected
+                            }, file.Errors().Select(e => e.Code));
         }
 
         [Fact]
@@ -5308,21 +5451,22 @@ class C
             Assert.NotNull(ds.Declaration.Variables[0].Initializer);
             Assert.NotEqual(SyntaxKind.None, ds.Declaration.Variables[0].Initializer.EqualsToken.Kind());
             Assert.NotNull(ds.Declaration.Variables[0].Initializer.Value);
-            Assert.Equal(SyntaxKind.ParenthesizedLambdaExpression, ds.Declaration.Variables[0].Initializer.Value.Kind());
-            Assert.Equal(6, file.Errors().Length);
-            Assert.Equal((int)ErrorCode.ERR_TypeExpected, file.Errors()[0].Code);
-            Assert.Equal((int)ErrorCode.ERR_IdentifierExpected, file.Errors()[1].Code);
-            Assert.Equal((int)ErrorCode.ERR_CloseParenExpected, file.Errors()[2].Code);
-            Assert.Equal((int)ErrorCode.ERR_SyntaxError, file.Errors()[3].Code);
-            Assert.Equal((int)ErrorCode.ERR_InvalidExprTerm, file.Errors()[4].Code);
-            Assert.Equal((int)ErrorCode.ERR_SemicolonExpected, file.Errors()[5].Code);
+            Assert.Equal(SyntaxKind.TupleExpression, ds.Declaration.Variables[0].Initializer.Value.Kind());
+            file.Errors().Verify(
+                // error CS1525: Invalid expression term 'while'
+                Diagnostic(ErrorCode.ERR_InvalidExprTerm).WithArguments("while").WithLocation(1, 1),
+                // error CS1026: ) expected
+                Diagnostic(ErrorCode.ERR_CloseParenExpected).WithLocation(1, 1),
+                // error CS1002: ; expected
+                Diagnostic(ErrorCode.ERR_SemicolonExpected).WithLocation(1, 1)
+                );
         }
 
         [Fact]
         public void TestStatementAfterUntypedLambdaParameter()
         {
             var text = "class c { void m() { var x = (y, while (c) { } } }";
-            var file = this.ParseTree(text);
+            var file = this.ParseTree(text, options: TestOptions.Regular);
 
             Assert.NotNull(file);
             Assert.Equal(text, file.ToFullString());
@@ -5341,13 +5485,46 @@ class C
             Assert.NotNull(ds.Declaration.Variables[0].Initializer);
             Assert.NotEqual(SyntaxKind.None, ds.Declaration.Variables[0].Initializer.EqualsToken.Kind());
             Assert.NotNull(ds.Declaration.Variables[0].Initializer.Value);
-            Assert.Equal(SyntaxKind.ParenthesizedLambdaExpression, ds.Declaration.Variables[0].Initializer.Value.Kind());
-            Assert.Equal(5, file.Errors().Length);
-            Assert.Equal((int)ErrorCode.ERR_IdentifierExpected, file.Errors()[0].Code);
+            Assert.Equal(SyntaxKind.TupleExpression, ds.Declaration.Variables[0].Initializer.Value.Kind());
+            Assert.Equal(3, file.Errors().Length);
+            Assert.Equal((int)ErrorCode.ERR_InvalidExprTerm, file.Errors()[0].Code);
             Assert.Equal((int)ErrorCode.ERR_CloseParenExpected, file.Errors()[1].Code);
-            Assert.Equal((int)ErrorCode.ERR_SyntaxError, file.Errors()[2].Code);
-            Assert.Equal((int)ErrorCode.ERR_InvalidExprTerm, file.Errors()[3].Code);
-            Assert.Equal((int)ErrorCode.ERR_SemicolonExpected, file.Errors()[4].Code);
+            Assert.Equal((int)ErrorCode.ERR_SemicolonExpected, file.Errors()[2].Code);
+        }
+
+        [Fact]
+        public void TestStatementAfterUntypedLambdaParameterWithCSharp6()
+        {
+            var text = "class c { void m() { var x = (y, while (c) { } } }";
+            var file = this.ParseTree(text, options: TestOptions.Regular.WithLanguageVersion(LanguageVersion.CSharp6));
+
+            Assert.NotNull(file);
+            Assert.Equal(text, file.ToFullString());
+            Assert.Equal(1, file.Members.Count);
+            Assert.Equal(SyntaxKind.ClassDeclaration, file.Members[0].Kind());
+            var agg = (TypeDeclarationSyntax)file.Members[0];
+            Assert.Equal(1, agg.Members.Count);
+            Assert.Equal(SyntaxKind.MethodDeclaration, agg.Members[0].Kind());
+            var ms = (MethodDeclarationSyntax)agg.Members[0];
+            Assert.NotNull(ms.Body);
+            Assert.Equal(2, ms.Body.Statements.Count);
+            Assert.Equal(SyntaxKind.LocalDeclarationStatement, ms.Body.Statements[0].Kind());
+            Assert.Equal(SyntaxKind.WhileStatement, ms.Body.Statements[1].Kind());
+
+            var ds = (LocalDeclarationStatementSyntax)ms.Body.Statements[0];
+            Assert.Equal("var x = (y, ", ds.ToFullString());
+            Assert.Equal(1, ds.Declaration.Variables.Count);
+            Assert.NotNull(ds.Declaration.Variables[0].Initializer);
+            Assert.NotEqual(SyntaxKind.None, ds.Declaration.Variables[0].Initializer.EqualsToken.Kind());
+            Assert.NotNull(ds.Declaration.Variables[0].Initializer.Value);
+            Assert.Equal(SyntaxKind.TupleExpression, ds.Declaration.Variables[0].Initializer.Value.Kind());
+
+            Assert.Equal(new[] {
+                                (int)ErrorCode.ERR_FeatureNotAvailableInVersion6,
+                                (int)ErrorCode.ERR_InvalidExprTerm,
+                                (int)ErrorCode.ERR_CloseParenExpected,
+                                (int)ErrorCode.ERR_SemicolonExpected
+                            }, file.Errors().Select(e => e.Code));
         }
 
         [Fact]
@@ -5366,9 +5543,9 @@ class C
             Assert.Equal(SyntaxKind.PropertyDeclaration, agg.Members[0].Kind());
             var pd = (PropertyDeclarationSyntax)agg.Members[0];
             Assert.NotNull(pd.AccessorList);
-            Assert.NotNull(pd.AccessorList.OpenBraceToken);
+            Assert.NotEqual(default, pd.AccessorList.OpenBraceToken);
             Assert.False(pd.AccessorList.OpenBraceToken.IsMissing);
-            Assert.NotNull(pd.AccessorList.CloseBraceToken);
+            Assert.NotEqual(default, pd.AccessorList.CloseBraceToken);
             Assert.False(pd.AccessorList.CloseBraceToken.IsMissing);
             Assert.Equal(0, pd.AccessorList.Accessors.Count);
             Assert.Equal(0, file.Errors().Length);
@@ -5391,9 +5568,9 @@ class C
             Assert.Equal(SyntaxKind.MethodDeclaration, agg.Members[1].Kind());
             var pd = (PropertyDeclarationSyntax)agg.Members[0];
             Assert.NotNull(pd.AccessorList);
-            Assert.NotNull(pd.AccessorList.OpenBraceToken);
+            Assert.NotEqual(default, pd.AccessorList.OpenBraceToken);
             Assert.False(pd.AccessorList.OpenBraceToken.IsMissing);
-            Assert.NotNull(pd.AccessorList.CloseBraceToken);
+            Assert.NotEqual(default, pd.AccessorList.CloseBraceToken);
             Assert.True(pd.AccessorList.CloseBraceToken.IsMissing);
             Assert.Equal(0, pd.AccessorList.Accessors.Count);
             Assert.Equal(1, file.Errors().Length);
@@ -5416,22 +5593,22 @@ class C
             Assert.Equal(SyntaxKind.MethodDeclaration, agg.Members[1].Kind());
             var pd = (PropertyDeclarationSyntax)agg.Members[0];
             Assert.NotNull(pd.AccessorList);
-            Assert.NotNull(pd.AccessorList.OpenBraceToken);
+            Assert.NotEqual(default, pd.AccessorList.OpenBraceToken);
             Assert.False(pd.AccessorList.OpenBraceToken.IsMissing);
-            Assert.NotNull(pd.AccessorList.CloseBraceToken);
+            Assert.NotEqual(default, pd.AccessorList.CloseBraceToken);
             Assert.True(pd.AccessorList.CloseBraceToken.IsMissing);
             Assert.Equal(1, pd.AccessorList.Accessors.Count);
             var acc = pd.AccessorList.Accessors[0];
             Assert.Equal(SyntaxKind.GetAccessorDeclaration, acc.Kind());
-            Assert.NotNull(acc.Keyword);
+            Assert.NotEqual(default, acc.Keyword);
             Assert.False(acc.Keyword.IsMissing);
             Assert.Equal(SyntaxKind.GetKeyword, acc.Keyword.Kind());
             Assert.Null(acc.Body);
-            Assert.NotNull(acc.SemicolonToken);
+            Assert.NotEqual(default, acc.SemicolonToken);
             Assert.True(acc.SemicolonToken.IsMissing);
 
             Assert.Equal(2, file.Errors().Length);
-            Assert.Equal((int)ErrorCode.ERR_SemiOrLBraceExpected, file.Errors()[0].Code);
+            Assert.Equal((int)ErrorCode.ERR_SemiOrLBraceOrArrowExpected, file.Errors()[0].Code);
             Assert.Equal((int)ErrorCode.ERR_RbraceExpected, file.Errors()[1].Code);
         }
 
@@ -5451,21 +5628,21 @@ class C
             Assert.Equal(SyntaxKind.ClassDeclaration, agg.Members[1].Kind());
             var pd = (PropertyDeclarationSyntax)agg.Members[0];
             Assert.NotNull(pd.AccessorList);
-            Assert.NotNull(pd.AccessorList.OpenBraceToken);
+            Assert.NotEqual(default, pd.AccessorList.OpenBraceToken);
             Assert.False(pd.AccessorList.OpenBraceToken.IsMissing);
-            Assert.NotNull(pd.AccessorList.CloseBraceToken);
+            Assert.NotEqual(default, pd.AccessorList.CloseBraceToken);
             Assert.True(pd.AccessorList.CloseBraceToken.IsMissing);
             Assert.Equal(1, pd.AccessorList.Accessors.Count);
             var acc = pd.AccessorList.Accessors[0];
             Assert.Equal(SyntaxKind.GetAccessorDeclaration, acc.Kind());
-            Assert.NotNull(acc.Keyword);
+            Assert.NotEqual(default, acc.Keyword);
             Assert.False(acc.Keyword.IsMissing);
             Assert.Equal(SyntaxKind.GetKeyword, acc.Keyword.Kind());
             Assert.NotNull(acc.Body);
-            Assert.NotNull(acc.Body.OpenBraceToken);
+            Assert.NotEqual(default, acc.Body.OpenBraceToken);
             Assert.False(acc.Body.OpenBraceToken.IsMissing);
             Assert.Equal(0, acc.Body.Statements.Count);
-            Assert.NotNull(acc.Body.CloseBraceToken);
+            Assert.NotEqual(default, acc.Body.CloseBraceToken);
             Assert.True(acc.Body.CloseBraceToken.IsMissing);
             Assert.Equal(SyntaxKind.None, acc.SemicolonToken.Kind());
 
@@ -5490,28 +5667,27 @@ class C
             Assert.Equal(SyntaxKind.ClassDeclaration, agg.Members[1].Kind());
             var pd = (PropertyDeclarationSyntax)agg.Members[0];
             Assert.NotNull(pd.AccessorList);
-            Assert.NotNull(pd.AccessorList.OpenBraceToken);
+            Assert.NotEqual(default, pd.AccessorList.OpenBraceToken);
             Assert.False(pd.AccessorList.OpenBraceToken.IsMissing);
-            Assert.NotNull(pd.AccessorList.CloseBraceToken);
+            Assert.NotEqual(default, pd.AccessorList.CloseBraceToken);
             Assert.True(pd.AccessorList.CloseBraceToken.IsMissing);
-            Assert.Equal(2, pd.AccessorList.Accessors.Count);
+            Assert.Equal(1, pd.AccessorList.Accessors.Count);
             var acc = pd.AccessorList.Accessors[0];
             Assert.Equal(SyntaxKind.GetAccessorDeclaration, acc.Kind());
-            Assert.NotNull(acc.Keyword);
+            Assert.NotEqual(default, acc.Keyword);
             Assert.False(acc.Keyword.IsMissing);
             Assert.Equal(SyntaxKind.GetKeyword, acc.Keyword.Kind());
             Assert.NotNull(acc.Body);
-            Assert.NotNull(acc.Body.OpenBraceToken);
+            Assert.NotEqual(default, acc.Body.OpenBraceToken);
             Assert.False(acc.Body.OpenBraceToken.IsMissing);
             Assert.Equal(0, acc.Body.Statements.Count);
-            Assert.NotNull(acc.Body.CloseBraceToken);
+            Assert.NotEqual(default, acc.Body.CloseBraceToken);
             Assert.True(acc.Body.CloseBraceToken.IsMissing);
             Assert.Equal(SyntaxKind.None, acc.SemicolonToken.Kind());
 
-            Assert.Equal(3, file.Errors().Length);
+            Assert.Equal(2, file.Errors().Length);
             Assert.Equal((int)ErrorCode.ERR_RbraceExpected, file.Errors()[0].Code);
-            Assert.Equal((int)ErrorCode.ERR_GetOrSetExpected, file.Errors()[1].Code);
-            Assert.Equal((int)ErrorCode.ERR_RbraceExpected, file.Errors()[2].Code);
+            Assert.Equal((int)ErrorCode.ERR_RbraceExpected, file.Errors()[1].Code);
         }
 
         [Fact]
@@ -5543,7 +5719,7 @@ class C
             Assert.False(getBodyStmts[0].ContainsDiagnostics);
 
             Assert.Equal(1, file.Errors().Length);
-            Assert.Equal(ErrorCode.ERR_SemiOrLBraceExpected, (ErrorCode)file.Errors()[0].Code);
+            Assert.Equal(ErrorCode.ERR_SemiOrLBraceOrArrowExpected, (ErrorCode)file.Errors()[0].Code);
         }
 
         [Fact]
@@ -5573,8 +5749,8 @@ class C
             Assert.True(setDecl.SemicolonToken.IsMissing);
 
             Assert.Equal(2, file.Errors().Length);
-            Assert.Equal(ErrorCode.ERR_SemiOrLBraceExpected, (ErrorCode)file.Errors()[0].Code);
-            Assert.Equal(ErrorCode.ERR_SemiOrLBraceExpected, (ErrorCode)file.Errors()[1].Code);
+            Assert.Equal(ErrorCode.ERR_SemiOrLBraceOrArrowExpected, (ErrorCode)file.Errors()[0].Code);
+            Assert.Equal(ErrorCode.ERR_SemiOrLBraceOrArrowExpected, (ErrorCode)file.Errors()[1].Code);
         }
 
         [Fact]
@@ -5593,9 +5769,9 @@ class C
             var md = (MethodDeclarationSyntax)agg.Members[0];
 
             Assert.NotNull(md.Body);
-            Assert.NotNull(md.Body.OpenBraceToken);
+            Assert.NotEqual(default, md.Body.OpenBraceToken);
             Assert.False(md.Body.OpenBraceToken.IsMissing);
-            Assert.NotNull(md.Body.CloseBraceToken);
+            Assert.NotEqual(default, md.Body.CloseBraceToken);
             Assert.False(md.Body.CloseBraceToken.IsMissing);
             Assert.Equal(1, md.Body.Statements.Count);
             Assert.Equal(SyntaxKind.LocalDeclarationStatement, md.Body.Statements[0].Kind());
@@ -5609,7 +5785,7 @@ class C
             Assert.Equal(SyntaxKind.FromClause, qx.FromClause.Kind());
             Assert.Equal(SyntaxKind.OrderByClause, qx.Body.Clauses[0].Kind());
             var oc = (OrderByClauseSyntax)qx.Body.Clauses[0];
-            Assert.NotNull(oc.OrderByKeyword);
+            Assert.NotEqual(default, oc.OrderByKeyword);
             Assert.False(oc.OrderByKeyword.IsMissing);
             Assert.Equal(1, oc.Orderings.Count);
             Assert.NotNull(oc.Orderings[0].Expression);
@@ -5638,9 +5814,9 @@ class C
             var md = (MethodDeclarationSyntax)agg.Members[0];
 
             Assert.NotNull(md.Body);
-            Assert.NotNull(md.Body.OpenBraceToken);
+            Assert.NotEqual(default, md.Body.OpenBraceToken);
             Assert.False(md.Body.OpenBraceToken.IsMissing);
-            Assert.NotNull(md.Body.CloseBraceToken);
+            Assert.NotEqual(default, md.Body.CloseBraceToken);
             Assert.False(md.Body.CloseBraceToken.IsMissing);
             Assert.Equal(1, md.Body.Statements.Count);
             Assert.Equal(SyntaxKind.LocalDeclarationStatement, md.Body.Statements[0].Kind());
@@ -5654,7 +5830,7 @@ class C
             Assert.Equal(SyntaxKind.FromClause, qx.FromClause.Kind());
             Assert.Equal(SyntaxKind.OrderByClause, qx.Body.Clauses[0].Kind());
             var oc = (OrderByClauseSyntax)qx.Body.Clauses[0];
-            Assert.NotNull(oc.OrderByKeyword);
+            Assert.NotEqual(default, oc.OrderByKeyword);
             Assert.False(oc.OrderByKeyword.IsMissing);
             Assert.Equal(1, oc.Orderings.Count);
             Assert.NotNull(oc.Orderings[0].Expression);
@@ -5682,9 +5858,9 @@ class C
             var md = (MethodDeclarationSyntax)agg.Members[0];
 
             Assert.NotNull(md.Body);
-            Assert.NotNull(md.Body.OpenBraceToken);
+            Assert.NotEqual(default, md.Body.OpenBraceToken);
             Assert.False(md.Body.OpenBraceToken.IsMissing);
-            Assert.NotNull(md.Body.CloseBraceToken);
+            Assert.NotEqual(default, md.Body.CloseBraceToken);
             Assert.False(md.Body.CloseBraceToken.IsMissing);
             Assert.Equal(1, md.Body.Statements.Count);
             Assert.Equal(SyntaxKind.LocalDeclarationStatement, md.Body.Statements[0].Kind());
@@ -5698,7 +5874,7 @@ class C
             Assert.Equal(SyntaxKind.FromClause, qx.FromClause.Kind());
             Assert.Equal(SyntaxKind.OrderByClause, qx.Body.Clauses[0].Kind());
             var oc = (OrderByClauseSyntax)qx.Body.Clauses[0];
-            Assert.NotNull(oc.OrderByKeyword);
+            Assert.NotEqual(default, oc.OrderByKeyword);
             Assert.False(oc.OrderByKeyword.IsMissing);
             Assert.Equal(2, oc.Orderings.Count);
             Assert.NotNull(oc.Orderings[0].Expression);
@@ -5718,7 +5894,7 @@ class C
         [Fact]
         public void TestMemberAfterOrderingStart()
         {
-            var text = "class c { void m() { var q = from x in y orderby public int Foo; }";
+            var text = "class c { void m() { var q = from x in y orderby public int Goo; }";
             var file = this.ParseTree(text);
 
             Assert.NotNull(file);
@@ -5732,9 +5908,9 @@ class C
             var md = (MethodDeclarationSyntax)agg.Members[0];
 
             Assert.NotNull(md.Body);
-            Assert.NotNull(md.Body.OpenBraceToken);
+            Assert.NotEqual(default, md.Body.OpenBraceToken);
             Assert.False(md.Body.OpenBraceToken.IsMissing);
-            Assert.NotNull(md.Body.CloseBraceToken);
+            Assert.NotEqual(default, md.Body.CloseBraceToken);
             Assert.True(md.Body.CloseBraceToken.IsMissing);
             Assert.Equal(1, md.Body.Statements.Count);
             Assert.Equal(SyntaxKind.LocalDeclarationStatement, md.Body.Statements[0].Kind());
@@ -5748,7 +5924,7 @@ class C
             Assert.Equal(SyntaxKind.FromClause, qx.FromClause.Kind());
             Assert.Equal(SyntaxKind.OrderByClause, qx.Body.Clauses[0].Kind());
             var oc = (OrderByClauseSyntax)qx.Body.Clauses[0];
-            Assert.NotNull(oc.OrderByKeyword);
+            Assert.NotEqual(default, oc.OrderByKeyword);
             Assert.False(oc.OrderByKeyword.IsMissing);
             Assert.Equal(1, oc.Orderings.Count);
             Assert.NotNull(oc.Orderings[0].Expression);
@@ -5766,7 +5942,7 @@ class C
         [Fact]
         public void TestMemberAfterOrderingExpression()
         {
-            var text = "class c { void m() { var q = from x in y orderby e public int Foo; }";
+            var text = "class c { void m() { var q = from x in y orderby e public int Goo; }";
             var file = this.ParseTree(text);
 
             Assert.NotNull(file);
@@ -5780,9 +5956,9 @@ class C
             var md = (MethodDeclarationSyntax)agg.Members[0];
 
             Assert.NotNull(md.Body);
-            Assert.NotNull(md.Body.OpenBraceToken);
+            Assert.NotEqual(default, md.Body.OpenBraceToken);
             Assert.False(md.Body.OpenBraceToken.IsMissing);
-            Assert.NotNull(md.Body.CloseBraceToken);
+            Assert.NotEqual(default, md.Body.CloseBraceToken);
             Assert.True(md.Body.CloseBraceToken.IsMissing);
             Assert.Equal(1, md.Body.Statements.Count);
             Assert.Equal(SyntaxKind.LocalDeclarationStatement, md.Body.Statements[0].Kind());
@@ -5796,7 +5972,7 @@ class C
             Assert.Equal(SyntaxKind.FromClause, qx.FromClause.Kind());
             Assert.Equal(SyntaxKind.OrderByClause, qx.Body.Clauses[0].Kind());
             var oc = (OrderByClauseSyntax)qx.Body.Clauses[0];
-            Assert.NotNull(oc.OrderByKeyword);
+            Assert.NotEqual(default, oc.OrderByKeyword);
             Assert.False(oc.OrderByKeyword.IsMissing);
             Assert.Equal(1, oc.Orderings.Count);
             Assert.NotNull(oc.Orderings[0].Expression);
@@ -5813,7 +5989,7 @@ class C
         [Fact]
         public void TestMemberAfterOrderingExpressionAndComma()
         {
-            var text = "class c { void m() { var q = from x in y orderby e, public int Foo; }";
+            var text = "class c { void m() { var q = from x in y orderby e, public int Goo; }";
             var file = this.ParseTree(text);
 
             Assert.NotNull(file);
@@ -5827,9 +6003,9 @@ class C
             var md = (MethodDeclarationSyntax)agg.Members[0];
 
             Assert.NotNull(md.Body);
-            Assert.NotNull(md.Body.OpenBraceToken);
+            Assert.NotEqual(default, md.Body.OpenBraceToken);
             Assert.False(md.Body.OpenBraceToken.IsMissing);
-            Assert.NotNull(md.Body.CloseBraceToken);
+            Assert.NotEqual(default, md.Body.CloseBraceToken);
             Assert.True(md.Body.CloseBraceToken.IsMissing);
             Assert.Equal(1, md.Body.Statements.Count);
             Assert.Equal(SyntaxKind.LocalDeclarationStatement, md.Body.Statements[0].Kind());
@@ -5843,7 +6019,7 @@ class C
             Assert.Equal(SyntaxKind.FromClause, qx.FromClause.Kind());
             Assert.Equal(SyntaxKind.OrderByClause, qx.Body.Clauses[0].Kind());
             var oc = (OrderByClauseSyntax)qx.Body.Clauses[0];
-            Assert.NotNull(oc.OrderByKeyword);
+            Assert.NotEqual(default, oc.OrderByKeyword);
             Assert.False(oc.OrderByKeyword.IsMissing);
             Assert.Equal(2, oc.Orderings.Count);
             Assert.NotNull(oc.Orderings[0].Expression);
@@ -5914,7 +6090,7 @@ class C
         {
             var text = @"public class Test
                          {
-                             public void Foo()
+                             public void Goo()
                              {
                                  var x = ((x, this
                              }
@@ -6054,7 +6230,7 @@ class A
         [Fact]
         public void TestNamespaceDeclarationInUsingDirective()
         {
-            var text = @"using namespace Foo";
+            var text = @"using namespace Goo";
             var file = this.ParseTree(text);
 
             Assert.Equal(text, file.ToFullString());
@@ -6090,7 +6266,7 @@ class C
             Assert.Equal((int)ErrorCode.ERR_IdentifierExpected, file.Errors()[0].Code);
         }
 
-        [WorkItem(537210, "DevDiv")]
+        [WorkItem(537210, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/537210")]
         [Fact]
         public void RegressException4UseValueInAccessor()
         {
@@ -6152,7 +6328,7 @@ class C
             Assert.True(file.ContainsDiagnostics);
         }
 
-        [WorkItem(537214, "DevDiv")]
+        [WorkItem(537214, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/537214")]
         [Fact]
         public void RegressWarning4UseContextKeyword()
         {
@@ -6173,7 +6349,7 @@ class C
             Assert.False(file.ContainsDiagnostics);
         }
 
-        [WorkItem(537150, "DevDiv")]
+        [WorkItem(537150, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/537150")]
         [Fact]
         public void ParseStartOfAccessor()
         {
@@ -6192,11 +6368,11 @@ class C
             Assert.Equal((int)ErrorCode.ERR_GetOrSetExpected, file.Errors()[0].Code);
         }
 
-        [WorkItem(536050, "DevDiv")]
+        [WorkItem(536050, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/536050")]
         [Fact]
         public void ParseMethodWithConstructorInitializer()
         {
-            //someone has a typo in the name of their ctor - parse it as a method, but accept the initializer 
+            //someone has a typo in the name of their ctor - parse it as a ctor, and accept the initializer 
             var text = @"
 class C
 {
@@ -6208,9 +6384,7 @@ class C
             var file = this.ParseTree(text);
 
             Assert.Equal(text, file.ToFullString());
-            Assert.Equal(2, file.Errors().Length);
-            Assert.Equal((int)ErrorCode.ERR_MemberNeedsType, file.Errors()[0].Code); //for the missing 'void'
-            Assert.Equal((int)ErrorCode.ERR_UnexpectedToken, file.Errors()[1].Code); //colon is unexpected
+            Assert.Equal(0, file.Errors().Length);
 
             // CONSIDER: Dev10 actually gives 'CS1002: ; expected', because it thinks you were trying to
             // specify a method without a body.  This is a little silly, since we already know the method
@@ -6220,15 +6394,15 @@ class C
             Assert.Equal(SyntaxKind.ClassDeclaration, classDecl.Kind());
 
             var methodDecl = classDecl.ChildNodesAndTokens()[3];
-            Assert.Equal(SyntaxKind.MethodDeclaration, methodDecl.Kind()); //not ConstructorDeclaration
-            Assert.True(methodDecl.ContainsDiagnostics);
+            Assert.Equal(SyntaxKind.ConstructorDeclaration, methodDecl.Kind()); //not MethodDeclaration
+            Assert.False(methodDecl.ContainsDiagnostics);
 
             var methodBody = methodDecl.ChildNodesAndTokens()[3];
             Assert.Equal(SyntaxKind.Block, methodBody.Kind());
             Assert.False(methodBody.ContainsDiagnostics);
         }
 
-        [WorkItem(537157, "DevDiv")]
+        [WorkItem(537157, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/537157")]
         [Fact]
         public void MissingInternalNode()
         {
@@ -6238,31 +6412,31 @@ class C
             Assert.Equal(text, file.ToFullString());
 
             var incompleteMemberDecl = file.ChildNodesAndTokens()[0];
-            Assert.Equal(incompleteMemberDecl.Kind(), SyntaxKind.IncompleteMember);
+            Assert.Equal(SyntaxKind.IncompleteMember, incompleteMemberDecl.Kind());
             Assert.False(incompleteMemberDecl.IsMissing);
 
             var attributeDecl = incompleteMemberDecl.ChildNodesAndTokens()[0];
-            Assert.Equal(attributeDecl.Kind(), SyntaxKind.AttributeList);
+            Assert.Equal(SyntaxKind.AttributeList, attributeDecl.Kind());
             Assert.False(attributeDecl.IsMissing);
 
             var openBracketToken = attributeDecl.ChildNodesAndTokens()[0];
-            Assert.Equal(openBracketToken.Kind(), SyntaxKind.OpenBracketToken);
+            Assert.Equal(SyntaxKind.OpenBracketToken, openBracketToken.Kind());
             Assert.False(openBracketToken.IsMissing);
 
             var attribute = attributeDecl.ChildNodesAndTokens()[1];
-            Assert.Equal(attribute.Kind(), SyntaxKind.Attribute);
+            Assert.Equal(SyntaxKind.Attribute, attribute.Kind());
             Assert.True(attribute.IsMissing);
 
             var identifierName = attribute.ChildNodesAndTokens()[0];
-            Assert.Equal(identifierName.Kind(), SyntaxKind.IdentifierName);
+            Assert.Equal(SyntaxKind.IdentifierName, identifierName.Kind());
             Assert.True(identifierName.IsMissing);
 
             var identifierToken = identifierName.ChildNodesAndTokens()[0];
-            Assert.Equal(identifierToken.Kind(), SyntaxKind.IdentifierToken);
+            Assert.Equal(SyntaxKind.IdentifierToken, identifierToken.Kind());
             Assert.True(identifierToken.IsMissing);
         }
 
-        [WorkItem(538469, "DevDiv")]
+        [WorkItem(538469, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/538469")]
         [Fact]
         public void FromKeyword()
         {
@@ -6290,19 +6464,19 @@ public class QueryExpressionTest
             Assert.Equal((int)ErrorCode.ERR_SemicolonExpected, file.Errors()[2].Code); //we inserted a missing semicolon in a place we didn't expect
         }
 
-        [WorkItem(538971, "DevDiv")]
+        [WorkItem(538971, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/538971")]
         [Fact]
         public void UnclosedGenericInExplicitInterfaceName()
         {
             var text = @"
 interface I<T>
 {
-    void Foo();
+    void Goo();
 }
  
 class C : I<int>
 {
-    void I<.Foo() { }
+    void I<.Goo() { }
 }
 ";
             var file = this.ParseTree(text);
@@ -6314,7 +6488,7 @@ class C : I<int>
             Assert.Equal((int)ErrorCode.ERR_SyntaxError, file.Errors()[1].Code); //expecting close angle bracket
         }
 
-        [WorkItem(540788, "DevDiv")]
+        [WorkItem(540788, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/540788")]
         [Fact]
         public void IncompleteForEachStatement()
         {
@@ -6337,7 +6511,7 @@ public class Test
             Assert.Equal(3, foreachNode.ChildNodes().ToList().Count);
         }
 
-        [WorkItem(542236, "DevDiv")]
+        [WorkItem(542236, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/542236")]
         [Fact]
         public void InsertOpenBraceBeforeCodes()
         {
@@ -6346,28 +6520,17 @@ public class Test
     };
 }";
 
-            SyntaxTree syntaxTree = SyntaxFactory.ParseSyntaxTree(text);
+            SyntaxTree syntaxTree = SyntaxFactory.ParseSyntaxTree(text, TestOptions.Regular9);
             Assert.Equal(text, syntaxTree.GetCompilationUnitRoot().ToFullString());
-
-            Assert.Equal("{\r\n", syntaxTree.GetCompilationUnitRoot().GetLeadingTrivia().Node.ToFullString());
 
             // The issue (9391) was exhibited while enumerating the diagnostics
             Assert.True(syntaxTree.GetDiagnostics().Select(d => ((IFormattable)d).ToString(null, EnsureEnglishUICulture.PreferredOrNull)).SequenceEqual(new[]
             {
-                "(1,2): error CS1031: Type expected",
-                "(1,1): error CS1022: Type or namespace definition, or end-of-file expected",
-                "(2,13): error CS1003: Syntax error, '[' expected",
-                "(2,13): error CS1001: Identifier expected",
-                "(2,16): error CS1001: Identifier expected",
-                "(2,19): error CS1003: Syntax error, ',' expected",
-                "(2,20): error CS1003: Syntax error, ']' expected",
-                "(2,20): error CS1514: { expected",
-                "(3,6): error CS1597: Semicolon after method or accessor block is not valid",
                 "(4,1): error CS1022: Type or namespace definition, or end-of-file expected",
             }));
         }
 
-        [WorkItem(542352, "DevDiv")]
+        [WorkItem(542352, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/542352")]
         [Fact]
         public void IncompleteTopLevelOperator()
         {
@@ -6395,7 +6558,7 @@ class C { }
             }));
         }
 
-        [WorkItem(545647, "DevDiv")]
+        [WorkItem(545647, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/545647")]
         [Fact]
         public void IncompleteVariableDeclarationAboveDotMemberAccess()
         {
@@ -6420,7 +6583,7 @@ class C
             }));
         }
 
-        [WorkItem(545647, "DevDiv")]
+        [WorkItem(545647, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/545647")]
         [Fact]
         public void IncompleteVariableDeclarationAbovePointerMemberAccess()
         {
@@ -6445,7 +6608,7 @@ class C
             }));
         }
 
-        [WorkItem(545647, "DevDiv")]
+        [WorkItem(545647, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/545647")]
         [Fact]
         public void IncompleteVariableDeclarationAboveBinaryExpression()
         {
@@ -6470,7 +6633,7 @@ class C
             }));
         }
 
-        [WorkItem(545647, "DevDiv")]
+        [WorkItem(545647, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/545647")]
         [Fact]
         public void IncompleteVariableDeclarationAboveMemberAccess_MultiLine()
         {
@@ -6496,7 +6659,7 @@ class C
             }));
         }
 
-        [WorkItem(545647, "DevDiv")]
+        [WorkItem(545647, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/545647")]
         [Fact]
         public void IncompleteVariableDeclarationBeforeMemberAccessOnSameLine()
         {
@@ -6520,7 +6683,7 @@ class C
             }));
         }
 
-        [WorkItem(545647, "DevDiv")]
+        [WorkItem(545647, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/545647")]
         [Fact]
         public void EqualsIsNotAmbiguous()
         {
@@ -6541,7 +6704,7 @@ class C
             Assert.Empty(syntaxTree.GetDiagnostics());
         }
 
-        [WorkItem(547120, "DevDiv")]
+        [WorkItem(547120, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/547120")]
         [Fact]
         public void ColonColonInExplicitInterfaceMember()
         {
@@ -6555,25 +6718,53 @@ _ _::this
             syntaxTree.GetDiagnostics().Verify(
                 // (2,4): error CS1003: Syntax error, '.' expected
                 // _ _::this
-                CSharpTestBase.Diagnostic(ErrorCode.ERR_SyntaxError, "::").WithArguments(".", "::"),
-                // (3,1): error CS1551: Indexers must have at least one parameter
-                // 
-                CSharpTestBase.Diagnostic(ErrorCode.ERR_IndexerNeedsParam, ""),
+                Diagnostic(ErrorCode.ERR_SyntaxError, "::").WithArguments(".", "::"),
                 // (2,10): error CS1003: Syntax error, '[' expected
                 // _ _::this
-                CSharpTestBase.Diagnostic(ErrorCode.ERR_SyntaxError, "").WithArguments("[", ""),
+                Diagnostic(ErrorCode.ERR_SyntaxError, "").WithArguments("[", ""),
                 // (2,10): error CS1003: Syntax error, ']' expected
                 // _ _::this
-                CSharpTestBase.Diagnostic(ErrorCode.ERR_SyntaxError, "").WithArguments("]", ""),
+                Diagnostic(ErrorCode.ERR_SyntaxError, "").WithArguments("]", ""),
                 // (2,10): error CS1514: { expected
                 // _ _::this
-                CSharpTestBase.Diagnostic(ErrorCode.ERR_LbraceExpected, ""),
+                Diagnostic(ErrorCode.ERR_LbraceExpected, ""),
                 // (2,10): error CS1513: } expected
                 // _ _::this
-                CSharpTestBase.Diagnostic(ErrorCode.ERR_RbraceExpected, ""));
+                Diagnostic(ErrorCode.ERR_RbraceExpected, ""));
+
+            CreateCompilation(text).VerifyDiagnostics(
+                // (2,4): error CS1003: Syntax error, '.' expected
+                // _ _::this
+                Diagnostic(ErrorCode.ERR_SyntaxError, "::").WithArguments(".", "::").WithLocation(2, 4),
+                // (2,10): error CS1003: Syntax error, '[' expected
+                // _ _::this
+                Diagnostic(ErrorCode.ERR_SyntaxError, "").WithArguments("[", "").WithLocation(2, 10),
+                // (2,10): error CS1003: Syntax error, ']' expected
+                // _ _::this
+                Diagnostic(ErrorCode.ERR_SyntaxError, "").WithArguments("]", "").WithLocation(2, 10),
+                // (2,10): error CS1514: { expected
+                // _ _::this
+                Diagnostic(ErrorCode.ERR_LbraceExpected, "").WithLocation(2, 10),
+                // (2,10): error CS1513: } expected
+                // _ _::this
+                Diagnostic(ErrorCode.ERR_RbraceExpected, "").WithLocation(2, 10),
+                // (2,3): error CS0246: The type or namespace name '_' could not be found (are you missing a using directive or an assembly reference?)
+                // _ _::this
+                Diagnostic(ErrorCode.ERR_SingleTypeNameNotFound, "_").WithArguments("_").WithLocation(2, 3),
+                // (2,1): error CS0246: The type or namespace name '_' could not be found (are you missing a using directive or an assembly reference?)
+                // _ _::this
+                Diagnostic(ErrorCode.ERR_SingleTypeNameNotFound, "_").WithArguments("_").WithLocation(2, 1),
+                // error CS1551: Indexers must have at least one parameter
+                Diagnostic(ErrorCode.ERR_IndexerNeedsParam).WithLocation(1, 1),
+                // (2,3): error CS0538: '_' in explicit interface declaration is not an interface
+                // _ _::this
+                Diagnostic(ErrorCode.ERR_ExplicitInterfaceImplementationNotInterface, "_").WithArguments("_").WithLocation(2, 3),
+                // (2,6): error CS0548: '<invalid-global-code>.this': property or indexer must have at least one accessor
+                // _ _::this
+                Diagnostic(ErrorCode.ERR_PropertyWithNoAccessors, "this").WithArguments("<invalid-global-code>.this").WithLocation(2, 6));
         }
 
-        [WorkItem(649806, "DevDiv")]
+        [WorkItem(649806, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/649806")]
         [Fact]
         public void Repro649806()
         {
@@ -6584,7 +6775,7 @@ _ _::this
             Assert.Equal(1, diags.Count(d => d.Code == (int)ErrorCode.ERR_AliasQualAsExpression));
         }
 
-        [WorkItem(674564, "DevDiv")]
+        [WorkItem(674564, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/674564")]
         [Fact]
         public void Repro674564()
         {
@@ -6601,7 +6792,7 @@ class C
 
                 // (4,17): error CS1043: { or ; expected
                 //     int P { set . } }
-                CSharpTestBase.Diagnostic(ErrorCode.ERR_SemiOrLBraceExpected, "."),
+                Diagnostic(ErrorCode.ERR_SemiOrLBraceOrArrowExpected, "."),
 
                 // We see this diagnostic because we're trying to skip bad tokens in the block and 
                 // the "expected" token (i.e. the one we report when we see something that's not a
@@ -6610,10 +6801,10 @@ class C
 
                 // (4,17): error CS1513: } expected
                 //     int P { set . } }
-                CSharpTestBase.Diagnostic(ErrorCode.ERR_RbraceExpected, "."));
+                Diagnostic(ErrorCode.ERR_RbraceExpected, "."));
         }
 
-        [WorkItem(680733, "DevDiv")]
+        [WorkItem(680733, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/680733")]
         [Fact]
         public void Repro680733a()
         {
@@ -6629,7 +6820,7 @@ class Test
             AssertEqualRoundtrip(source);
         }
 
-        [WorkItem(680733, "DevDiv")]
+        [WorkItem(680733, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/680733")]
         [Fact]
         public void Repro680733b()
         {
@@ -6647,7 +6838,7 @@ class Test
             AssertEqualRoundtrip(source);
         }
 
-        [WorkItem(680739, "DevDiv")]
+        [WorkItem(680739, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/680739")]
         [Fact]
         public void Repro680739()
         {
@@ -6655,7 +6846,7 @@ class Test
             AssertEqualRoundtrip(source);
         }
 
-        [WorkItem(675600, "DevDiv")]
+        [WorkItem(675600, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/675600")]
         [Fact]
         public void TestBracesToOperatorDoubleGreaterThan()
         {
@@ -6683,7 +6874,7 @@ class C {}");
             Assert.Equal(source, toString);
         }
 
-        [WorkItem(684816, "DevDiv")]
+        [WorkItem(684816, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/684816")]
         [Fact]
         public void GenericPropertyWithMissingIdentifier()
         {
@@ -6699,22 +6890,22 @@ class C : I
             tree.GetDiagnostics().Verify(
                 // (4,22): error CS1001: Identifier expected
                 //     int I./*missing*/< {
-                CSharpTestBase.Diagnostic(ErrorCode.ERR_IdentifierExpected, "<"),
+                Diagnostic(ErrorCode.ERR_IdentifierExpected, "<"),
                 // (4,22): error CS7002: Unexpected use of a generic name
                 //     int I./*missing*/< {
-                CSharpTestBase.Diagnostic(ErrorCode.ERR_UnexpectedGenericName, "<"),
+                Diagnostic(ErrorCode.ERR_UnexpectedGenericName, "<"),
                 // (4,24): error CS1003: Syntax error, '>' expected
                 //     int I./*missing*/< {
-                CSharpTestBase.Diagnostic(ErrorCode.ERR_SyntaxError, "{").WithArguments(">", "{"),
+                Diagnostic(ErrorCode.ERR_SyntaxError, "{").WithArguments(">", "{"),
                 // (4,25): error CS1513: } expected
                 //     int I./*missing*/< {
-                CSharpTestBase.Diagnostic(ErrorCode.ERR_RbraceExpected, ""),
+                Diagnostic(ErrorCode.ERR_RbraceExpected, ""),
                 // (4,25): error CS1513: } expected
                 //     int I./*missing*/< {
-                CSharpTestBase.Diagnostic(ErrorCode.ERR_RbraceExpected, ""));
+                Diagnostic(ErrorCode.ERR_RbraceExpected, ""));
         }
 
-        [WorkItem(684816, "DevDiv")]
+        [WorkItem(684816, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/684816")]
         [Fact]
         public void GenericEventWithMissingIdentifier()
         {
@@ -6730,25 +6921,25 @@ class C : I
             tree.GetDiagnostics().Verify(
                 // (4,26): error CS1001: Identifier expected
                 //     event D I./*missing*/< {
-                CSharpTestBase.Diagnostic(ErrorCode.ERR_IdentifierExpected, "<"),
+                Diagnostic(ErrorCode.ERR_IdentifierExpected, "<"),
                 // (4,26): error CS1001: Identifier expected
                 //     event D I./*missing*/< {
-                CSharpTestBase.Diagnostic(ErrorCode.ERR_IdentifierExpected, "<"),
+                Diagnostic(ErrorCode.ERR_IdentifierExpected, "<"),
                 // (4,28): error CS1003: Syntax error, '>' expected
                 //     event D I./*missing*/< {
-                CSharpTestBase.Diagnostic(ErrorCode.ERR_SyntaxError, "{").WithArguments(">", "{"),
+                Diagnostic(ErrorCode.ERR_SyntaxError, "{").WithArguments(">", "{"),
                 // (4,26): error CS7002: Unexpected use of a generic name
                 //     event D I./*missing*/< {
-                CSharpTestBase.Diagnostic(ErrorCode.ERR_UnexpectedGenericName, "<"),
+                Diagnostic(ErrorCode.ERR_UnexpectedGenericName, "<"),
                 // (4,29): error CS1513: } expected
                 //     event D I./*missing*/< {
-                CSharpTestBase.Diagnostic(ErrorCode.ERR_RbraceExpected, ""),
+                Diagnostic(ErrorCode.ERR_RbraceExpected, ""),
                 // (4,29): error CS1513: } expected
                 //     event D I./*missing*/< {
-                CSharpTestBase.Diagnostic(ErrorCode.ERR_RbraceExpected, ""));
+                Diagnostic(ErrorCode.ERR_RbraceExpected, ""));
         }
 
-        [WorkItem(684816, "DevDiv")]
+        [WorkItem(684816, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/684816")]
         [Fact]
         public void ExplicitImplementationEventWithColonColon()
         {
@@ -6764,16 +6955,16 @@ class C : I
             tree.GetDiagnostics().Verify(
                 // (4,14): error CS0071: An explicit interface implementation of an event must use event accessor syntax
                 //     event D I::
-                CSharpTestBase.Diagnostic(ErrorCode.ERR_ExplicitEventFieldImpl, "::"),
+                Diagnostic(ErrorCode.ERR_ExplicitEventFieldImpl, "::"),
                 // (4,14): error CS0687: The namespace alias qualifier '::' always resolves to a type or namespace so is illegal here. Consider using '.' instead.
                 //     event D I::
-                CSharpTestBase.Diagnostic(ErrorCode.ERR_AliasQualAsExpression, "::"),
+                Diagnostic(ErrorCode.ERR_AliasQualAsExpression, "::"),
                 // (4,16): error CS1513: } expected
                 //     event D I::
-                CSharpTestBase.Diagnostic(ErrorCode.ERR_RbraceExpected, ""));
+                Diagnostic(ErrorCode.ERR_RbraceExpected, ""));
         }
 
-        [WorkItem(684816, "DevDiv")]
+        [WorkItem(684816, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/684816")]
         [Fact]
         public void EventNamedThis()
         {
@@ -6789,19 +6980,19 @@ class C
             tree.GetDiagnostics().Verify(
                 // (4,25): error CS1001: Identifier expected
                 //     event System.Action this
-                CSharpTestBase.Diagnostic(ErrorCode.ERR_IdentifierExpected, "this"),
+                Diagnostic(ErrorCode.ERR_IdentifierExpected, "this"),
                 // (4,29): error CS1514: { expected
                 //     event System.Action this
-                CSharpTestBase.Diagnostic(ErrorCode.ERR_LbraceExpected, ""),
+                Diagnostic(ErrorCode.ERR_LbraceExpected, ""),
                 // (4,29): error CS1513: } expected
                 //     event System.Action this
-                CSharpTestBase.Diagnostic(ErrorCode.ERR_RbraceExpected, ""),
+                Diagnostic(ErrorCode.ERR_RbraceExpected, ""),
                 // (4,29): error CS1513: } expected
                 //     event System.Action this
-                CSharpTestBase.Diagnostic(ErrorCode.ERR_RbraceExpected, ""));
+                Diagnostic(ErrorCode.ERR_RbraceExpected, ""));
         }
 
-        [WorkItem(697022, "DevDiv")]
+        [WorkItem(697022, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/697022")]
         [Fact]
         public void GenericEnumWithMissingIdentifiers()
         {
@@ -6816,7 +7007,7 @@ enum
             tree.GetDiagnostics().ToArray();
         }
 
-        [WorkItem(703809, "DevDiv")]
+        [WorkItem(703809, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/703809")]
         [Fact]
         public void ReplaceOmittedArrayRankWithMissingIdentifier()
         {
@@ -6830,7 +7021,7 @@ static
             tree.GetDiagnostics().ToArray();
         }
 
-        [WorkItem(716245, "DevDiv")]
+        [WorkItem(716245, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/716245")]
         [Fact]
         public void ManySkippedTokens()
         {
@@ -6843,7 +7034,7 @@ static
         }
 
 
-        [WorkItem(947819, "DevDiv")]
+        [WorkItem(947819, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/947819")]
         [Fact]
         public void MissingOpenBraceForClass()
         {
@@ -6855,12 +7046,17 @@ static
             var root = SyntaxFactory.ParseSyntaxTree(source).GetRoot();
 
             Assert.Equal(source, root.ToFullString());
+            // Verify incomplete class decls don't eat tokens of surrounding nodes
             var classDecl = root.DescendantNodes().OfType<ClassDeclarationSyntax>().Single();
-            Assert.Equal(new Text.TextSpan(20, 9), classDecl.Span);
-            Assert.Equal(new Text.TextSpan(16, 13), classDecl.FullSpan);
+            Assert.False(classDecl.Identifier.IsMissing);
+            Assert.True(classDecl.OpenBraceToken.IsMissing);
+            Assert.True(classDecl.CloseBraceToken.IsMissing);
+            var ns = root.DescendantNodes().OfType<NamespaceDeclarationSyntax>().Single();
+            Assert.False(ns.OpenBraceToken.IsMissing);
+            Assert.False(ns.CloseBraceToken.IsMissing);
         }
 
-        [WorkItem(947819, "DevDiv")]
+        [WorkItem(947819, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/947819")]
         [Fact]
         public void MissingOpenBraceForStruct()
         {
@@ -6872,12 +7068,16 @@ static
             var root = SyntaxFactory.ParseSyntaxTree(source).GetRoot();
 
             Assert.Equal(source, root.ToFullString());
+            // Verify incomplete struct decls don't eat tokens of surrounding nodes
             var structDecl = root.DescendantNodes().OfType<StructDeclarationSyntax>().Single();
-            Assert.Equal(new Text.TextSpan(20, 14), structDecl.Span);
-            Assert.Equal(new Text.TextSpan(16, 18), structDecl.FullSpan);
+            Assert.True(structDecl.OpenBraceToken.IsMissing);
+            Assert.True(structDecl.CloseBraceToken.IsMissing);
+            var ns = root.DescendantNodes().OfType<NamespaceDeclarationSyntax>().Single();
+            Assert.False(ns.OpenBraceToken.IsMissing);
+            Assert.False(ns.CloseBraceToken.IsMissing);
         }
 
-        [WorkItem(947819, "DevDiv")]
+        [WorkItem(947819, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/947819")]
         [Fact]
         public void MissingNameForStruct()
         {
@@ -6891,12 +7091,17 @@ static
             var root = SyntaxFactory.ParseSyntaxTree(source).GetRoot();
 
             Assert.Equal(source, root.ToFullString());
+            // Verify incomplete struct decls don't eat tokens of surrounding nodes
             var structDecl = root.DescendantNodes().OfType<StructDeclarationSyntax>().Single();
-            Assert.Equal(new Text.TextSpan(20, 24), structDecl.Span);
-            Assert.Equal(new Text.TextSpan(16, 30), structDecl.FullSpan);
+            Assert.True(structDecl.Identifier.IsMissing);
+            Assert.False(structDecl.OpenBraceToken.IsMissing);
+            Assert.False(structDecl.CloseBraceToken.IsMissing);
+            var ns = root.DescendantNodes().OfType<NamespaceDeclarationSyntax>().Single();
+            Assert.False(ns.OpenBraceToken.IsMissing);
+            Assert.False(ns.CloseBraceToken.IsMissing);
         }
 
-        [WorkItem(947819, "DevDiv")]
+        [WorkItem(947819, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/947819")]
         [Fact]
         public void MissingNameForClass()
         {
@@ -6910,9 +7115,14 @@ static
             var root = SyntaxFactory.ParseSyntaxTree(source).GetRoot();
 
             Assert.Equal(source, root.ToFullString());
+            // Verify incomplete class decls don't eat tokens of surrounding nodes
             var classDecl = root.DescendantNodes().OfType<ClassDeclarationSyntax>().Single();
-            Assert.Equal(new Text.TextSpan(20, 19), classDecl.Span);
-            Assert.Equal(new Text.TextSpan(16, 25), classDecl.FullSpan);
+            Assert.True(classDecl.Identifier.IsMissing);
+            Assert.False(classDecl.OpenBraceToken.IsMissing);
+            Assert.False(classDecl.CloseBraceToken.IsMissing);
+            var ns = root.DescendantNodes().OfType<NamespaceDeclarationSyntax>().Single();
+            Assert.False(ns.OpenBraceToken.IsMissing);
+            Assert.False(ns.CloseBraceToken.IsMissing);
         }
     }
 }

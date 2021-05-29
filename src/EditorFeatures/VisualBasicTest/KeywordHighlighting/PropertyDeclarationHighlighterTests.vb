@@ -1,4 +1,6 @@
-' Copyright (c) Microsoft.  All Rights Reserved.  Licensed under the Apache License, Version 2.0.  See License.txt in the project root for license information.
+﻿' Licensed to the .NET Foundation under one or more agreements.
+' The .NET Foundation licenses this file to you under the MIT license.
+' See the LICENSE file in the project root for more information.
 
 Imports Microsoft.CodeAnalysis.Editor.VisualBasic.KeywordHighlighting
 
@@ -6,25 +8,25 @@ Namespace Microsoft.CodeAnalysis.Editor.VisualBasic.UnitTests.KeywordHighlightin
     Public Class PropertyDeclarationHighlighterTests
         Inherits AbstractVisualBasicKeywordHighlighterTests
 
-        Friend Overrides Function CreateHighlighter() As IHighlighter
-            Return New PropertyDeclarationHighlighter()
+        Friend Overrides Function GetHighlighterType() As Type
+            Return GetType(PropertyDeclarationHighlighter)
         End Function
 
         <Fact, Trait(Traits.Feature, Traits.Features.KeywordHighlighting)>
-        Public Sub TestAutoProperty1()
-            Test(<Text>
+        Public Async Function TestAutoProperty1() As Task
+            Await TestAsync(<Text>
 Class C
-{|Cursor:[|Public Property|]|} Foo As Integer [|Implements|] IFoo.Foo
+{|Cursor:[|Public Property|]|} Goo As Integer [|Implements|] IGoo.Goo
 End Class</Text>)
-        End Sub
+        End Function
 
         <Fact, Trait(Traits.Feature, Traits.Features.KeywordHighlighting)>
-        Public Sub TestAutoProperty2()
-            Test(<Text>
+        Public Async Function TestAutoProperty2() As Task
+            Await TestAsync(<Text>
 Class C
-[|Public Property|] Foo As Integer {|Cursor:[|Implements|]|} IFoo.Foo
+[|Public Property|] Goo As Integer {|Cursor:[|Implements|]|} IGoo.Goo
 End Class</Text>)
-        End Sub
+        End Function
 
     End Class
 End Namespace

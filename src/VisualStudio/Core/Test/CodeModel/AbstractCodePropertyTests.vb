@@ -1,4 +1,8 @@
-' Copyright (c) Microsoft.  All Rights Reserved.  Licensed under the Apache License, Version 2.0.  See License.txt in the project root for license information.
+﻿' Licensed to the .NET Foundation under one or more agreements.
+' The .NET Foundation licenses this file to you under the MIT license.
+' See the LICENSE file in the project root for more information.
+
+Imports System.Threading.Tasks
 
 Namespace Microsoft.VisualStudio.LanguageServices.UnitTests.CodeModel
     Public MustInherit Class AbstractCodePropertyTests
@@ -6,6 +10,10 @@ Namespace Microsoft.VisualStudio.LanguageServices.UnitTests.CodeModel
 
         Protected Overrides Function GetAccess(codeElement As EnvDTE80.CodeProperty2) As EnvDTE.vsCMAccess
             Return codeElement.Access
+        End Function
+
+        Protected Overrides Function GetAttributes(codeElement As EnvDTE80.CodeProperty2) As EnvDTE.CodeElements
+            Return codeElement.Attributes
         End Function
 
         Protected Overrides Function GetComment(codeElement As EnvDTE80.CodeProperty2) As String
@@ -76,8 +84,16 @@ Namespace Microsoft.VisualStudio.LanguageServices.UnitTests.CodeModel
             Return Sub(value) codeElement.Type = value
         End Function
 
+        Protected Overrides Function AddAttribute(codeElement As EnvDTE80.CodeProperty2, data As AttributeData) As EnvDTE.CodeAttribute
+            Return codeElement.AddAttribute(data.Name, data.Value, data.Position)
+        End Function
+
         Protected Overrides Function AddParameter(codeElement As EnvDTE80.CodeProperty2, data As ParameterData) As EnvDTE.CodeParameter
             Return codeElement.AddParameter(data.Name, data.Type, data.Position)
+        End Function
+
+        Protected Overrides Function GetParameters(codeElement As EnvDTE80.CodeProperty2) As EnvDTE.CodeElements
+            Return codeElement.Parameters
         End Function
 
         Protected Overrides Sub RemoveChild(codeElement As EnvDTE80.CodeProperty2, child As Object)
@@ -89,30 +105,24 @@ Namespace Microsoft.VisualStudio.LanguageServices.UnitTests.CodeModel
         End Function
 
         Protected Sub TestAutoImplementedPropertyExtender_IsAutoImplemented(code As XElement, expected As Boolean)
-            Using state = CreateCodeModelTestState(GetWorkspaceDefinition(code))
-                Dim codeElement = state.GetCodeElementAtCursor(Of EnvDTE80.CodeProperty2)()
-                Assert.NotNull(codeElement)
-
-                Assert.Equal(expected, AutoImplementedPropertyExtender_GetIsAutoImplemented(codeElement))
-            End Using
+            TestElement(code,
+                Sub(codeElement)
+                    Assert.Equal(expected, AutoImplementedPropertyExtender_GetIsAutoImplemented(codeElement))
+                End Sub)
         End Sub
 
         Protected Sub TestGetter(code As XElement, verifier As Action(Of EnvDTE.CodeFunction))
-            Using state = CreateCodeModelTestState(GetWorkspaceDefinition(code))
-                Dim codeElement = state.GetCodeElementAtCursor(Of EnvDTE80.CodeProperty2)()
-                Assert.NotNull(codeElement)
-
-                verifier(codeElement.Getter)
-            End Using
+            TestElement(code,
+                Sub(codeElement)
+                    verifier(codeElement.Getter)
+                End Sub)
         End Sub
 
         Protected Sub TestSetter(code As XElement, verifier As Action(Of EnvDTE.CodeFunction))
-            Using state = CreateCodeModelTestState(GetWorkspaceDefinition(code))
-                Dim codeElement = state.GetCodeElementAtCursor(Of EnvDTE80.CodeProperty2)()
-                Assert.NotNull(codeElement)
-
-                verifier(codeElement.Setter)
-            End Using
+            TestElement(code,
+                Sub(codeElement)
+                    verifier(codeElement.Setter)
+                End Sub)
         End Sub
 
     End Class

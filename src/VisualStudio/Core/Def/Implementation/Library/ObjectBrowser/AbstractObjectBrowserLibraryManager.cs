@@ -1,18 +1,25 @@
-﻿// Copyright (c) Microsoft.  All Rights Reserved.  Licensed under the Apache License, Version 2.0.  See License.txt in the project root for license information.
+﻿// Licensed to the .NET Foundation under one or more agreements.
+// The .NET Foundation licenses this file to you under the MIT license.
+// See the LICENSE file in the project root for more information.
+
+#nullable disable
 
 using System;
 using System.Diagnostics;
 using System.Text;
 using System.Threading;
 using Microsoft.CodeAnalysis;
+using Microsoft.CodeAnalysis.Editor;
+using Microsoft.CodeAnalysis.Editor.FindUsages;
+using Microsoft.CodeAnalysis.Editor.Host;
+using Microsoft.CodeAnalysis.ErrorReporting;
 using Microsoft.VisualStudio.ComponentModelHost;
 using Microsoft.VisualStudio.LanguageServices.Implementation.Library.ObjectBrowser.Lists;
-using Microsoft.VisualStudio.LanguageServices.Implementation.Library.ObjectBrowser.NavInfos;
 using Microsoft.VisualStudio.OLE.Interop;
 using Microsoft.VisualStudio.Shell;
 using Microsoft.VisualStudio.Shell.Interop;
-using Roslyn.Utilities;
 using IServiceProvider = System.IServiceProvider;
+using Task = System.Threading.Tasks.Task;
 
 namespace Microsoft.VisualStudio.LanguageServices.Implementation.Library.ObjectBrowser
 {
@@ -20,6 +27,9 @@ namespace Microsoft.VisualStudio.LanguageServices.Implementation.Library.ObjectB
     {
         internal readonly VisualStudioWorkspace Workspace;
 
+        internal ILibraryService LibraryService => _libraryService.Value;
+
+        private readonly Lazy<ILibraryService> _libraryService;
         private readonly string _languageName;
 
         private uint _classVersion;
@@ -28,18 +38,26 @@ namespace Microsoft.VisualStudio.LanguageServices.Implementation.Library.ObjectB
 
         private ObjectListItem _activeListItem;
         private AbstractListItemFactory _listItemFactory;
+        private readonly object _classMemberGate = new();
 
-        protected AbstractObjectBrowserLibraryManager(string languageName, Guid libraryGuid, IServiceProvider serviceProvider)
+        private readonly IStreamingFindUsagesPresenter _streamingPresenter;
+
+        protected AbstractObjectBrowserLibraryManager(
+            string languageName,
+            Guid libraryGuid,
+            IServiceProvider serviceProvider,
+            IComponentModel componentModel,
+            VisualStudioWorkspace workspace)
             : base(libraryGuid, serviceProvider)
         {
             _languageName = languageName;
 
-            var componentModel = (IComponentModel)serviceProvider.GetService(typeof(SComponentModel));
-            this.Workspace = componentModel.GetService<VisualStudioWorkspace>();
-            this.Workspace.WorkspaceChanged += OnWorkspaceChanged;
-        }
+            Workspace = workspace;
+            Workspace.WorkspaceChanged += OnWorkspaceChanged;
 
-        public abstract __SymbolToolLanguage SymbolToolLanguage { get; }
+            _libraryService = new Lazy<ILibraryService>(() => Workspace.Services.GetLanguageServices(_languageName).GetService<ILibraryService>());
+            _streamingPresenter = componentModel.DefaultExportProvider.GetExportedValue<IStreamingFindUsagesPresenter>();
+        }
 
         internal abstract AbstractDescriptionBuilder CreateDescriptionBuilder(
             IVsObjectBrowserDescription3 description,
@@ -59,9 +77,7 @@ namespace Microsoft.VisualStudio.LanguageServices.Implementation.Library.ObjectB
         }
 
         public void Dispose()
-        {
-            this.Workspace.WorkspaceChanged -= OnWorkspaceChanged;
-        }
+            => this.Workspace.WorkspaceChanged -= OnWorkspaceChanged;
 
         private void OnWorkspaceChanged(object sender, WorkspaceChangeEventArgs e)
         {
@@ -73,15 +89,7 @@ namespace Microsoft.VisualStudio.LanguageServices.Implementation.Library.ObjectB
                     var oldDocument = e.OldSolution.GetDocument(e.DocumentId);
                     var newDocument = e.NewSolution.GetDocument(e.DocumentId);
 
-                    var oldTextVersion = oldDocument.GetTextVersionAsync(CancellationToken.None).WaitAndGetResult(CancellationToken.None);
-                    var newTextVersion = newDocument.GetTextVersionAsync(CancellationToken.None).WaitAndGetResult(CancellationToken.None);
-
-                    if (oldTextVersion != newTextVersion)
-                    {
-                        UpdateClassVersion();
-                        UpdateMembersVersion();
-                    }
-
+                    UpdateDocument(oldDocument, newDocument);
                     break;
 
                 case WorkspaceChangeKind.ProjectAdded:
@@ -101,14 +109,48 @@ namespace Microsoft.VisualStudio.LanguageServices.Implementation.Library.ObjectB
             }
         }
 
+        private void UpdateDocument(Document oldDocument, Document newDocument)
+        {
+            try
+            {
+                // If the versions are the same, avoid updating the object browser. However, avoid
+                // loading the document to determine the version because it can cause extreme memory
+                // pressure during batch changes.
+                if (oldDocument.TryGetTextVersion(out var oldTextVersion)
+                    && newDocument.TryGetTextVersion(out var newTextVersion)
+                    && oldTextVersion == newTextVersion)
+                {
+                    return;
+                }
+
+                UpdateClassAndMemberVersions();
+            }
+            catch (Exception e) when (FatalError.ReportAndPropagate(e))
+            {
+                // make it crash VS on any exception
+            }
+        }
+
         internal uint ClassVersion
         {
-            get { return _classVersion; }
+            get
+            {
+                lock (_classMemberGate)
+                {
+                    return _classVersion;
+                }
+            }
         }
 
         internal uint MembersVersion
         {
-            get { return _membersVersion; }
+            get
+            {
+                lock (_classMemberGate)
+                {
+                    return _membersVersion;
+                }
+            }
         }
 
         internal uint PackageVersion
@@ -116,25 +158,26 @@ namespace Microsoft.VisualStudio.LanguageServices.Implementation.Library.ObjectB
             get { return _packageVersion; }
         }
 
-        internal void UpdateClassVersion()
+        internal void UpdateClassAndMemberVersions()
         {
-            _classVersion = unchecked(_classVersion + 1);
+            lock (_classMemberGate)
+            {
+                UpdateClassVersion();
+                UpdateMembersVersion();
+            }
         }
 
-        internal void UpdateMembersVersion()
-        {
-            _membersVersion = unchecked(_membersVersion + 1);
-        }
+        private void UpdateClassVersion()
+            => _classVersion = unchecked(_classVersion + 1);
+
+        private void UpdateMembersVersion()
+            => _membersVersion = unchecked(_membersVersion + 1);
 
         internal void UpdatePackageVersion()
-        {
-            _packageVersion = unchecked(_packageVersion + 1);
-        }
+            => _packageVersion = unchecked(_packageVersion + 1);
 
         internal void SetActiveListItem(ObjectListItem listItem)
-        {
-            _activeListItem = listItem;
-        }
+            => _activeListItem = listItem;
 
         private bool IsFindAllReferencesSupported()
         {
@@ -147,9 +190,7 @@ namespace Microsoft.VisualStudio.LanguageServices.Implementation.Library.ObjectB
         }
 
         internal Project GetProject(ProjectId projectId)
-        {
-            return this.Workspace.CurrentSolution.GetProject(projectId);
-        }
+            => this.Workspace.CurrentSolution.GetProject(projectId);
 
         internal Project GetProject(ObjectListItem listItem)
         {
@@ -172,7 +213,7 @@ namespace Microsoft.VisualStudio.LanguageServices.Implementation.Library.ObjectB
 
             return project
                 .GetCompilationAsync(CancellationToken.None)
-                .WaitAndGetResult(CancellationToken.None);
+                .WaitAndGetResult_ObjectBrowser(CancellationToken.None);
         }
 
         public override uint GetLibraryFlags()
@@ -285,13 +326,11 @@ namespace Microsoft.VisualStudio.LanguageServices.Implementation.Library.ObjectB
 
             Debug.Assert(listKind == ObjectListKind.Projects);
 
-            return new ObjectList(ObjectListKind.Projects, flags, this, this.GetProjectListItems(this.Workspace.CurrentSolution, _languageName, flags, CancellationToken.None));
+            return new ObjectList(ObjectListKind.Projects, flags, this, this.GetProjectListItems(this.Workspace.CurrentSolution, _languageName, flags));
         }
 
         protected override uint GetUpdateCounter()
-        {
-            return _packageVersion;
-        }
+            => _packageVersion;
 
         protected override int CreateNavInfo(SYMBOL_DESCRIPTION_NODE[] rgSymbolNodes, uint ulcNodes, out IVsNavInfo ppNavInfo)
         {
@@ -300,9 +339,9 @@ namespace Microsoft.VisualStudio.LanguageServices.Implementation.Library.ObjectB
             ppNavInfo = null;
 
             var count = 0;
-            var libraryName = string.Empty;
-            var metadataProjectItem = string.Empty;
+            string referenceOwnerName = null;
 
+            string libraryName;
             if (rgSymbolNodes[0].dwType != (uint)_LIB_LISTTYPE.LLT_PACKAGE)
             {
                 Debug.Fail("Symbol description should always contain LLT_PACKAGE node as first node");
@@ -320,7 +359,7 @@ namespace Microsoft.VisualStudio.LanguageServices.Implementation.Library.ObjectB
                 {
                     count++;
 
-                    metadataProjectItem = rgSymbolNodes[0].pszName;
+                    referenceOwnerName = rgSymbolNodes[0].pszName;
                     libraryName = rgSymbolNodes[1].pszName;
                 }
                 else
@@ -329,8 +368,8 @@ namespace Microsoft.VisualStudio.LanguageServices.Implementation.Library.ObjectB
                 }
             }
 
-            var namespaceName = new StringBuilder();
-            var className = new StringBuilder();
+            var namespaceName = SharedPools.Default<StringBuilder>().AllocateAndClear();
+            var className = SharedPools.Default<StringBuilder>().AllocateAndClear();
             var memberName = string.Empty;
 
             // Populate namespace, class and member names
@@ -369,16 +408,48 @@ namespace Microsoft.VisualStudio.LanguageServices.Implementation.Library.ObjectB
             }
 
             // TODO: Make sure we pass the right value for Visual Basic.
-            ppNavInfo = new NavInfo(
-                this.LibraryGuid,
-                this.SymbolToolLanguage,
-                libraryName,
-                metadataProjectItem,
-                namespaceName.ToString(),
-                className.ToString(),
-                memberName);
+            ppNavInfo = this.LibraryService.NavInfoFactory.Create(libraryName, referenceOwnerName, namespaceName.ToString(), className.ToString(), memberName);
+
+            SharedPools.Default<StringBuilder>().ClearAndFree(namespaceName);
+            SharedPools.Default<StringBuilder>().ClearAndFree(className);
 
             return VSConstants.S_OK;
+        }
+
+        internal IVsNavInfo GetNavInfo(SymbolListItem symbolListItem, bool useExpandedHierarchy)
+        {
+            var project = GetProject(symbolListItem);
+            if (project == null)
+            {
+                return null;
+            }
+
+            var compilation = symbolListItem.GetCompilation(this.Workspace);
+            if (compilation == null)
+            {
+                return null;
+            }
+
+            var symbol = symbolListItem.ResolveSymbol(compilation);
+            if (symbol == null)
+            {
+                return null;
+            }
+
+            if (symbolListItem is MemberListItem)
+            {
+                return this.LibraryService.NavInfoFactory.CreateForMember(symbol, project, compilation, useExpandedHierarchy);
+            }
+            else if (symbolListItem is TypeListItem)
+            {
+                return this.LibraryService.NavInfoFactory.CreateForType((INamedTypeSymbol)symbol, project, compilation, useExpandedHierarchy);
+            }
+            else if (symbolListItem is NamespaceListItem)
+            {
+                return this.LibraryService.NavInfoFactory.CreateForNamespace((INamespaceSymbol)symbol, project, compilation, useExpandedHierarchy);
+            }
+
+            return this.LibraryService.NavInfoFactory.CreateForProject(project);
         }
 
         protected override bool TryQueryStatus(Guid commandGroup, uint commandId, ref OLECMDF commandFlags)
@@ -412,23 +483,18 @@ namespace Microsoft.VisualStudio.LanguageServices.Implementation.Library.ObjectB
                 {
                     case (uint)VSConstants.VSStd97CmdID.FindReferences:
                         var symbolListItem = _activeListItem as SymbolListItem;
-                        if (symbolListItem != null)
+                        if (symbolListItem?.ProjectId != null)
                         {
-                            var projectId = symbolListItem.ProjectId;
-                            if (projectId != null)
+                            var project = this.Workspace.CurrentSolution.GetProject(symbolListItem.ProjectId);
+                            if (project != null)
                             {
-                                var project = this.Workspace.CurrentSolution.GetProject(projectId);
-                                if (project != null)
-                                {
-                                    var compilation = project
-                                        .GetCompilationAsync(CancellationToken.None)
-                                        .WaitAndGetResult(CancellationToken.None);
-
-                                    var symbol = symbolListItem.ResolveSymbol(compilation);
-
-                                    this.Workspace.TryFindAllReferences(symbol, project, CancellationToken.None);
-                                    return true;
-                                }
+                                // Note: we kick of FindReferencesAsync in a 'fire and forget' manner. We don't want to
+                                // block the UI thread while we compute the references, and the references will be
+                                // asynchronously added to the FindReferences window as they are computed.  The user
+                                // also knows something is happening as the window, with the progress-banner will pop up
+                                // immediately.
+                                _ = FindReferencesAsync(_streamingPresenter, symbolListItem, project, CancellationToken.None);
+                                return true;
                             }
                         }
 
@@ -437,6 +503,46 @@ namespace Microsoft.VisualStudio.LanguageServices.Implementation.Library.ObjectB
             }
 
             return false;
+        }
+
+        private async Task FindReferencesAsync(
+            IStreamingFindUsagesPresenter presenter, SymbolListItem symbolListItem, Project project, CancellationToken cancellationToken)
+        {
+            try
+            {
+                // Let the presented know we're starting a search.  It will give us back the context object that the FAR
+                // service will push results into.
+                var context = presenter.StartSearch(EditorFeaturesResources.Find_References, supportsReferences: true, cancellationToken);
+
+                try
+                {
+                    // Kick off the work to do the actual finding on a BG thread.  That way we don'
+                    // t block the calling (UI) thread too long if we happen to do our work on this
+                    // thread.
+                    await Task.Run(async () =>
+                    {
+                        await FindReferencesAsync(symbolListItem, project, context).ConfigureAwait(false);
+                    }, cancellationToken).ConfigureAwait(false);
+                }
+                finally
+                {
+                    await context.OnCompletedAsync().ConfigureAwait(false);
+                }
+            }
+            catch (OperationCanceledException)
+            {
+            }
+            catch (Exception e) when (FatalError.ReportAndCatch(e))
+            {
+            }
+        }
+
+        private static async Task FindReferencesAsync(SymbolListItem symbolListItem, Project project, CodeAnalysis.FindUsages.FindUsagesContext context)
+        {
+            var compilation = await project.GetCompilationAsync(context.CancellationToken).ConfigureAwait(false);
+            var symbol = symbolListItem.ResolveSymbol(compilation);
+            if (symbol != null)
+                await AbstractFindUsagesService.FindSymbolReferencesAsync(context, symbol, project).ConfigureAwait(false);
         }
     }
 }

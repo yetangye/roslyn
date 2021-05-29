@@ -1,5 +1,8 @@
-﻿' Copyright (c) Microsoft.  All Rights Reserved.  Licensed under the Apache License, Version 2.0.  See License.txt in the project root for license information.
+﻿' Licensed to the .NET Foundation under one or more agreements.
+' The .NET Foundation licenses this file to you under the MIT license.
+' See the LICENSE file in the project root for more information.
 
+Imports Microsoft.CodeAnalysis.Test.Utilities
 Imports Microsoft.CodeAnalysis.Text
 Imports Microsoft.CodeAnalysis.VisualBasic.Symbols
 Imports Microsoft.CodeAnalysis.VisualBasic.Syntax
@@ -21,7 +24,7 @@ Imports System
 Imports System.Linq
 Class C1
     Sub MAIN()
-        Dim lists = foo()
+        Dim lists = goo()
         lists.Where(Function(ByVal item)
                         [|GoTo lab1|]
                         For Each item In lists
@@ -31,7 +34,7 @@ lab1:
                         Return item.ToString() = ""
                     End Function).ToList()
     End Sub
-    Shared Function foo() As List(Of myattribute1)
+    Shared Function goo() As List(Of myattribute1)
         Return Nothing
     End Function
 End Class
@@ -46,14 +49,14 @@ End Class
             Dim controlFlowResults = analysis.Item1
             Dim dataFlowResults = analysis.Item2
 
-            Assert.Equal(Nothing, GetSymbolNamesSortedAndJoined(dataFlowResults.VariablesDeclared))
-            Assert.Equal(Nothing, GetSymbolNamesSortedAndJoined(dataFlowResults.AlwaysAssigned))
-            Assert.Equal(Nothing, GetSymbolNamesSortedAndJoined(dataFlowResults.DataFlowsIn))
-            Assert.Equal(Nothing, GetSymbolNamesSortedAndJoined(dataFlowResults.DataFlowsOut))
-            Assert.Equal(Nothing, GetSymbolNamesSortedAndJoined(dataFlowResults.ReadInside))
-            Assert.Equal("item, lists", GetSymbolNamesSortedAndJoined(dataFlowResults.ReadOutside))
-            Assert.Equal(Nothing, GetSymbolNamesSortedAndJoined(dataFlowResults.WrittenInside))
-            Assert.Equal("item, lists, Me", GetSymbolNamesSortedAndJoined(dataFlowResults.WrittenOutside))
+            Assert.Equal(Nothing, GetSymbolNamesJoined(dataFlowResults.VariablesDeclared))
+            Assert.Equal(Nothing, GetSymbolNamesJoined(dataFlowResults.AlwaysAssigned))
+            Assert.Equal(Nothing, GetSymbolNamesJoined(dataFlowResults.DataFlowsIn))
+            Assert.Equal(Nothing, GetSymbolNamesJoined(dataFlowResults.DataFlowsOut))
+            Assert.Equal(Nothing, GetSymbolNamesJoined(dataFlowResults.ReadInside))
+            Assert.Equal("lists, item", GetSymbolNamesJoined(dataFlowResults.ReadOutside))
+            Assert.Equal(Nothing, GetSymbolNamesJoined(dataFlowResults.WrittenInside))
+            Assert.Equal("Me, lists, item", GetSymbolNamesJoined(dataFlowResults.WrittenOutside))
 
             Assert.Equal(1, controlFlowResults.ExitPoints.Count)
             Assert.Equal(0, controlFlowResults.EntryPoints.Count)
@@ -90,14 +93,14 @@ End Class
             Dim controlFlowResults = analysis.Item1
             Dim dataFlowResults = analysis.Item2
 
-            Assert.Equal(Nothing, GetSymbolNamesSortedAndJoined(dataFlowResults.VariablesDeclared))
-            Assert.Equal(Nothing, GetSymbolNamesSortedAndJoined(dataFlowResults.AlwaysAssigned))
-            Assert.Equal(Nothing, GetSymbolNamesSortedAndJoined(dataFlowResults.DataFlowsIn))
-            Assert.Equal(Nothing, GetSymbolNamesSortedAndJoined(dataFlowResults.DataFlowsOut))
-            Assert.Equal(Nothing, GetSymbolNamesSortedAndJoined(dataFlowResults.ReadInside))
-            Assert.Equal("y", GetSymbolNamesSortedAndJoined(dataFlowResults.ReadOutside))
-            Assert.Equal(Nothing, GetSymbolNamesSortedAndJoined(dataFlowResults.WrittenInside))
-            Assert.Equal("x, y", GetSymbolNamesSortedAndJoined(dataFlowResults.WrittenOutside))
+            Assert.Equal(Nothing, GetSymbolNamesJoined(dataFlowResults.VariablesDeclared))
+            Assert.Equal(Nothing, GetSymbolNamesJoined(dataFlowResults.AlwaysAssigned))
+            Assert.Equal(Nothing, GetSymbolNamesJoined(dataFlowResults.DataFlowsIn))
+            Assert.Equal(Nothing, GetSymbolNamesJoined(dataFlowResults.DataFlowsOut))
+            Assert.Equal(Nothing, GetSymbolNamesJoined(dataFlowResults.ReadInside))
+            Assert.Equal("y", GetSymbolNamesJoined(dataFlowResults.ReadOutside))
+            Assert.Equal(Nothing, GetSymbolNamesJoined(dataFlowResults.WrittenInside))
+            Assert.Equal("x, y", GetSymbolNamesJoined(dataFlowResults.WrittenOutside))
 
             Assert.Equal(0, controlFlowResults.ExitPoints.Count)
             Assert.Equal(0, controlFlowResults.EntryPoints.Count)
@@ -133,14 +136,14 @@ End Module
             Dim controlFlowResults = analysis.Item1
             Dim dataFlowResults = analysis.Item2
 
-            Assert.Equal(Nothing, GetSymbolNamesSortedAndJoined(dataFlowResults.VariablesDeclared))
-            Assert.Equal(Nothing, GetSymbolNamesSortedAndJoined(dataFlowResults.AlwaysAssigned))
-            Assert.Equal(Nothing, GetSymbolNamesSortedAndJoined(dataFlowResults.DataFlowsIn))
-            Assert.Equal(Nothing, GetSymbolNamesSortedAndJoined(dataFlowResults.DataFlowsOut))
-            Assert.Equal("flag1", GetSymbolNamesSortedAndJoined(dataFlowResults.ReadInside))
-            Assert.Equal("str", GetSymbolNamesSortedAndJoined(dataFlowResults.ReadOutside))
-            Assert.Equal("str", GetSymbolNamesSortedAndJoined(dataFlowResults.WrittenInside))
-            Assert.Equal("flag1", GetSymbolNamesSortedAndJoined(dataFlowResults.WrittenOutside))
+            Assert.Equal(Nothing, GetSymbolNamesJoined(dataFlowResults.VariablesDeclared))
+            Assert.Equal(Nothing, GetSymbolNamesJoined(dataFlowResults.AlwaysAssigned))
+            Assert.Equal(Nothing, GetSymbolNamesJoined(dataFlowResults.DataFlowsIn))
+            Assert.Equal(Nothing, GetSymbolNamesJoined(dataFlowResults.DataFlowsOut))
+            Assert.Equal("flag1", GetSymbolNamesJoined(dataFlowResults.ReadInside))
+            Assert.Equal("str", GetSymbolNamesJoined(dataFlowResults.ReadOutside))
+            Assert.Equal("str", GetSymbolNamesJoined(dataFlowResults.WrittenInside))
+            Assert.Equal("flag1", GetSymbolNamesJoined(dataFlowResults.WrittenOutside))
             Assert.Equal(0, controlFlowResults.ExitPoints.Count)
             Assert.Equal(0, controlFlowResults.EntryPoints.Count)
             Assert.True(controlFlowResults.EndPointIsReachable)
@@ -178,8 +181,8 @@ End Module
 #Region "Semantic API test"
 
         <Fact()>
-        Sub SimpleLabel()
-            Dim Compilation = CreateCompilationWithMscorlibAndVBRuntime(
+        Public Sub SimpleLabel()
+            Dim Compilation = CreateCompilationWithMscorlib40AndVBRuntime(
 <compilation name="SimpleLabel">
     <file name="a.vb">
 Module M
@@ -208,10 +211,10 @@ End Module
 
         End Sub
 
-        <WorkItem(543378, "DevDiv")>
+        <WorkItem(543378, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/543378")>
         <Fact()>
-        Sub DuplicatedLabel()
-            Dim Compilation = CreateCompilationWithMscorlibAndVBRuntime(
+        Public Sub DuplicatedLabel()
+            Dim Compilation = CreateCompilationWithMscorlib40AndVBRuntime(
 <compilation name="DuplicatedLabel">
     <file name="a.vb">
 Module M
@@ -252,8 +255,8 @@ End Module
         End Sub
 
         <Fact()>
-        Sub NumericLabel()
-            Dim Compilation = CreateCompilationWithMscorlibAndVBRuntime(
+        Public Sub NumericLabel()
+            Dim Compilation = CreateCompilationWithMscorlib40AndVBRuntime(
 <compilation name="NumericLabel">
     <file name="a.vb">
 Module M
@@ -282,8 +285,8 @@ End Module
         End Sub
 
         <Fact()>
-        Sub SameLabelNameInDifferentScope()
-            Dim Compilation = CreateCompilationWithMscorlibAndVBRuntime(
+        Public Sub SameLabelNameInDifferentScope()
+            Dim Compilation = CreateCompilationWithMscorlib40AndVBRuntime(
 <compilation name="SameLabelNameInDifferentScope">
     <file name="a.vb">
 Module M
@@ -317,8 +320,8 @@ End Module
         End Sub
 
         <Fact()>
-        Sub LabelOnCaseElse()
-            Dim Compilation = CreateCompilationWithMscorlibAndVBRuntime(
+        Public Sub LabelOnCaseElse()
+            Dim Compilation = CreateCompilationWithMscorlib40AndVBRuntime(
 <compilation name="LabelOnCaseElse">
     <file name="a.vb">
 Module M
@@ -355,8 +358,8 @@ End Module
         End Sub
 
         <Fact()>
-        Sub LabelOnIfElse()
-            Dim Compilation = CreateCompilationWithMscorlibAndVBRuntime(
+        Public Sub LabelOnIfElse()
+            Dim Compilation = CreateCompilationWithMscorlib40AndVBRuntime(
 <compilation name="LabelOnIfElse">
     <file name="a.vb">
 Module M
@@ -391,8 +394,8 @@ End Module
         End Sub
 
         <Fact()>
-        Sub GotoLabelDefinedInTryFromCatch()
-            Dim Compilation = CreateCompilationWithMscorlibAndVBRuntime(
+        Public Sub GotoLabelDefinedInTryFromCatch()
+            Dim Compilation = CreateCompilationWithMscorlib40AndVBRuntime(
 <compilation name="GotoLabelDefinedInTryFromCatch">
     <file name="a.vb">
 Module M
@@ -425,8 +428,8 @@ End Module
         End Sub
 
         <Fact()>
-        Sub GoToInNestedLambda()
-            Dim Compilation = CreateCompilationWithMscorlibAndVBRuntime(
+        Public Sub GoToInNestedLambda()
+            Dim Compilation = CreateCompilationWithMscorlib40AndVBRuntime(
 <compilation name="GoToInNestedLambda">
     <file name="a.vb">
 Module M

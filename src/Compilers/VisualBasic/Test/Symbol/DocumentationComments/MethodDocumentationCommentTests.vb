@@ -1,4 +1,6 @@
-﻿' Copyright (c) Microsoft.  All Rights Reserved.  Licensed under the Apache License, Version 2.0.  See License.txt in the project root for license information.
+﻿' Licensed to the .NET Foundation under one or more agreements.
+' The .NET Foundation licenses this file to you under the MIT license.
+' See the LICENSE file in the project root for more information.
 
 Imports Microsoft.CodeAnalysis.Text
 Imports Microsoft.CodeAnalysis.VisualBasic.Symbols
@@ -10,12 +12,12 @@ Namespace Microsoft.CodeAnalysis.VisualBasic.UnitTests
     Public Class MethodDocumentationCommentTests
         Inherits BasicTestBase
 
-        Private m_compilation As VisualBasicCompilation
-        Private m_acmeNamespace As NamespaceSymbol
-        Private m_widgetClass As NamedTypeSymbol
+        Private ReadOnly _compilation As VisualBasicCompilation
+        Private ReadOnly _acmeNamespace As NamespaceSymbol
+        Private ReadOnly _widgetClass As NamedTypeSymbol
 
         Public Sub New()
-            m_compilation = CompilationUtils.CreateCompilationWithMscorlib(
+            _compilation = CompilationUtils.CreateCompilationWithMscorlib40(
                 <compilation name="MethodDocumentationCommentTests">
                     <file name="a.vb">
                     Namespace Acme
@@ -53,6 +55,12 @@ Namespace Microsoft.CodeAnalysis.VisualBasic.UnitTests
 
                             Public Sub M5(ParamArray args() As Object)
                             End Sub
+
+                            Public Sub M7(z As (x1 As Integer, x2 As Integer, x3 As Integer, x4 As Integer, x5 As Integer, x6 As Integer, x7 As Short))
+                            End Sub
+
+                            Public Sub M10(y As (x1 As Integer, x2 As Short), z As System.Tuple(Of Integer, Short))
+                            End Sub
                         End Class
 
                         Class MyList(Of T)
@@ -78,94 +86,106 @@ Namespace Microsoft.CodeAnalysis.VisualBasic.UnitTests
                     </file>
                 </compilation>)
 
-            m_acmeNamespace = DirectCast(m_compilation.GlobalNamespace.GetMembers("Acme").Single(), NamespaceSymbol)
-            m_widgetClass = DirectCast(m_acmeNamespace.GetTypeMembers("Widget").Single(), NamedTypeSymbol)
+            _acmeNamespace = DirectCast(_compilation.GlobalNamespace.GetMembers("Acme").Single(), NamespaceSymbol)
+            _widgetClass = DirectCast(_acmeNamespace.GetTypeMembers("Widget").Single(), NamedTypeSymbol)
         End Sub
 
         <Fact>
         Public Sub TestMethodInStructure()
             Assert.Equal("M:Acme.ValueType.M(System.Int32)",
-                         m_acmeNamespace.GetTypeMembers("ValueType").Single() _
+                         _acmeNamespace.GetTypeMembers("ValueType").Single() _
                              .GetMembers("M").Single().GetDocumentationCommentId())
         End Sub
 
         <Fact>
         Public Sub TestMethodInNestedClass()
             Assert.Equal("M:Acme.Widget.NestedClass.M(System.Int32)",
-                         m_widgetClass.GetTypeMembers("NestedClass").Single() _
+                         _widgetClass.GetTypeMembers("NestedClass").Single() _
                              .GetMembers("M").Single().GetDocumentationCommentId())
         End Sub
 
         <Fact>
         Public Sub TestMethod1()
             Assert.Equal("M:Acme.Widget.M0",
-                         m_widgetClass.GetMembers("M0").Single().GetDocumentationCommentId())
+                         _widgetClass.GetMembers("M0").Single().GetDocumentationCommentId())
         End Sub
 
         <Fact>
         Public Sub TestMethod2()
             Assert.Equal("M:Acme.Widget.M1(System.Char,System.Single@,Acme.ValueType@)",
-                         m_widgetClass.GetMembers("M1").Single().GetDocumentationCommentId())
+                         _widgetClass.GetMembers("M1").Single().GetDocumentationCommentId())
         End Sub
 
         <Fact>
         Public Sub TestMethod3()
             Assert.Equal("M:Acme.Widget.M2(System.Int16[],System.Int32[0:,0:],System.Int64[][])",
-                         m_widgetClass.GetMembers("M2").Single().GetDocumentationCommentId())
+                         _widgetClass.GetMembers("M2").Single().GetDocumentationCommentId())
         End Sub
 
         <Fact>
         Public Sub TestMethod4()
             Assert.Equal("M:Acme.Widget.M3(System.Int64[][],Acme.Widget[0:,0:,0:][])",
-                         m_widgetClass.GetMembers("M3").Single().GetDocumentationCommentId())
+                         _widgetClass.GetMembers("M3").Single().GetDocumentationCommentId())
         End Sub
 
         <Fact>
         Public Sub TestMethod5()
             Assert.Equal("M:Acme.Widget.M4(System.Int32)",
-                         m_widgetClass.GetMembers("M4").Single().GetDocumentationCommentId())
+                         _widgetClass.GetMembers("M4").Single().GetDocumentationCommentId())
         End Sub
 
         <Fact>
         Public Sub TestMethod6()
             Assert.Equal("M:Acme.Widget.M5(System.Object[])",
-                         m_widgetClass.GetMembers("M5").Single().GetDocumentationCommentId())
+                         _widgetClass.GetMembers("M5").Single().GetDocumentationCommentId())
+        End Sub
+
+        <Fact>
+        Public Sub TestMethod7()
+            Assert.Equal("M:Acme.Widget.M7(System.ValueTuple{System.Int32,System.Int32,System.Int32,System.Int32,System.Int32,System.Int32,System.Int16})",
+                         _widgetClass.GetMembers("M7").Single().GetDocumentationCommentId())
+        End Sub
+
+        <Fact>
+        Public Sub TestMethod10()
+            Assert.Equal("M:Acme.Widget.M10(System.ValueTuple{System.Int32,System.Int16},System.Tuple{System.Int32,System.Int16})",
+                         _widgetClass.GetMembers("M10").Single().GetDocumentationCommentId())
         End Sub
 
         <Fact>
         Public Sub TestMethodInGenericClass()
             Assert.Equal("M:Acme.MyList`1.Test(`0)",
-                         m_acmeNamespace.GetTypeMembers("MyList", 1).Single() _
+                         _acmeNamespace.GetTypeMembers("MyList", 1).Single() _
                             .GetMembers("Test").Single().GetDocumentationCommentId())
         End Sub
 
-        <WorkItem(766313, "DevDiv")>
+        <WorkItem(766313, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/766313")>
         <Fact>
         Public Sub TestMethodWithGenericDeclaringTypeAsParameter()
             Assert.Equal("M:Acme.MyList`1.Zip(Acme.MyList{`0})",
-                         m_acmeNamespace.GetTypeMembers("MyList", 1).Single() _
+                         _acmeNamespace.GetTypeMembers("MyList", 1).Single() _
                             .GetMembers("Zip").Single().GetDocumentationCommentId())
         End Sub
 
-        <WorkItem(766313, "DevDiv")>
+        <WorkItem(766313, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/766313")>
         <Fact>
         Public Sub TestMethodWithGenericDeclaringTypeAsTypeParameter()
             Assert.Equal("M:Acme.MyList`1.ReallyZip(Acme.MyList{Acme.MyList{`0}})",
-                         m_acmeNamespace.GetTypeMembers("MyList", 1).Single() _
+                         _acmeNamespace.GetTypeMembers("MyList", 1).Single() _
                             .GetMembers("ReallyZip").Single().GetDocumentationCommentId())
         End Sub
 
         <Fact>
         Public Sub TestMethodWithClosedGenericParameter()
             Assert.Equal("M:Acme.UseList.Process(Acme.MyList{System.Int32})",
-                         m_acmeNamespace.GetTypeMembers("UseList").Single() _
+                         _acmeNamespace.GetTypeMembers("UseList").Single() _
                             .GetMembers("Process").Single().GetDocumentationCommentId())
         End Sub
 
         <Fact>
         Public Sub TestGenericMethod()
             Assert.Equal("M:Acme.UseList.GetValues``1(``0)",
-                         m_acmeNamespace.GetTypeMembers("UseList").Single() _
+                         _acmeNamespace.GetTypeMembers("UseList").Single() _
                             .GetMembers("GetValues").Single().GetDocumentationCommentId())
         End Sub
 
@@ -173,7 +193,7 @@ Namespace Microsoft.CodeAnalysis.VisualBasic.UnitTests
         Public Sub TestMethodWithMissingType()
             Dim csharpAssemblyReference = TestReferences.SymbolsTests.UseSiteErrors.CSharp
             Dim ilAssemblyReference = TestReferences.SymbolsTests.UseSiteErrors.IL
-            Dim compilation = CompilationUtils.CreateCompilationWithMscorlibAndReferences(
+            Dim compilation = CompilationUtils.CreateCompilationWithMscorlib40AndReferences(
 <compilation>
     <file name="a.vb">
 Class C
@@ -192,11 +212,55 @@ End Class
             Next
         End Sub
 
-        <Fact, WorkItem(530924, "DevDiv")>
+        <Fact, WorkItem(530924, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/530924")>
         Public Sub TestConversionOperator()
             Assert.Equal("M:Acme.ValueType.op_Implicit(System.Byte)~Acme.ValueType",
-                         m_acmeNamespace.GetTypeMembers("ValueType").Single() _
+                         _acmeNamespace.GetTypeMembers("ValueType").Single() _
                              .GetMembers("op_Implicit").Single().GetDocumentationCommentId())
+        End Sub
+
+        <Fact, WorkItem(4699, "https://github.com/dotnet/roslyn/issues/4699")>
+        Public Sub GetMalformedDocumentationCommentXml()
+            Dim source =
+<compilation>
+    <file name="a.vb"><![CDATA[
+Class Test
+    ''' <summary>
+    ''' Info
+    ''' <!-- comment
+    ''' </summary
+    Shared Sub Main()
+    End Sub
+End Class
+    ]]></file>
+</compilation>
+
+            Dim compilation = CompilationUtils.CreateCompilationWithMscorlib40(source, parseOptions:=TestOptions.Regular.WithDocumentationMode(DocumentationMode.Diagnose))
+            Dim main = compilation.GetTypeByMetadataName("Test").GetMember(Of MethodSymbol)("Main")
+
+            Assert.Equal(
+"<member name=""M:Test.Main"">
+ <summary>
+ Info
+ <!-- comment
+ </summary
+</member>", main.GetDocumentationCommentXml().Trim())
+
+            compilation = CompilationUtils.CreateCompilationWithMscorlib40(source, parseOptions:=TestOptions.Regular.WithDocumentationMode(DocumentationMode.Parse))
+            main = compilation.GetTypeByMetadataName("Test").GetMember(Of MethodSymbol)("Main")
+
+            Assert.Equal(
+"<member name=""M:Test.Main"">
+ <summary>
+ Info
+ <!-- comment
+ </summary
+</member>", main.GetDocumentationCommentXml().Trim())
+
+            compilation = CompilationUtils.CreateCompilationWithMscorlib40(source, parseOptions:=TestOptions.Regular.WithDocumentationMode(DocumentationMode.None))
+            main = compilation.GetTypeByMetadataName("Test").GetMember(Of MethodSymbol)("Main")
+
+            Assert.Equal("", main.GetDocumentationCommentXml().Trim())
         End Sub
 
     End Class

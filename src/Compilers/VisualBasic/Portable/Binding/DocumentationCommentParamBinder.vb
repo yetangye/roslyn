@@ -1,4 +1,6 @@
-﻿' Copyright (c) Microsoft.  All Rights Reserved.  Licensed under the Apache License, Version 2.0.  See License.txt in the project root for license information.
+﻿' Licensed to the .NET Foundation under one or more agreements.
+' The .NET Foundation licenses this file to you under the MIT license.
+' See the LICENSE file in the project root for more information.
 
 Imports System.Collections.Immutable
 Imports Microsoft.CodeAnalysis.Text
@@ -48,7 +50,7 @@ Namespace Microsoft.CodeAnalysis.VisualBasic
             End Get
         End Property
 
-        Friend Overrides Function BindXmlNameAttributeValue(identifier As IdentifierNameSyntax, <[In], Out> ByRef useSiteDiagnostics As HashSet(Of DiagnosticInfo)) As ImmutableArray(Of Symbol)
+        Friend Overrides Function BindXmlNameAttributeValue(identifier As IdentifierNameSyntax, <[In], Out> ByRef useSiteInfo As CompoundUseSiteInfo(Of AssemblySymbol)) As ImmutableArray(Of Symbol)
             If Me.CommentedSymbol Is Nothing Then
                 Return ImmutableArray(Of Symbol).Empty
             End If
@@ -61,7 +63,7 @@ Namespace Microsoft.CodeAnalysis.VisualBasic
             Return FindSymbolInSymbolArray(name, Me.Parameters)
         End Function
 
-        Private Const InvalidLookupOptions As LookupOptions =
+        Private Const s_invalidLookupOptions As LookupOptions =
                             LookupOptions.LabelsOnly Or
                             LookupOptions.MustNotBeInstance Or
                             LookupOptions.MustBeInstance Or
@@ -73,12 +75,12 @@ Namespace Microsoft.CodeAnalysis.VisualBasic
                                                                    options As LookupOptions,
                                                                    originalBinder As Binder)
 
-            If (options And InvalidLookupOptions) <> 0 Then
+            If (options And s_invalidLookupOptions) <> 0 Then
                 Return
             End If
 
             For Each parameter In Me.Parameters
-                If originalBinder.CanAddLookupSymbolInfo(parameter, options, Nothing) Then
+                If originalBinder.CanAddLookupSymbolInfo(parameter, options, nameSet, Nothing) Then
                     nameSet.AddSymbol(parameter, parameter.Name, 0)
                 End If
             Next
@@ -89,16 +91,16 @@ Namespace Microsoft.CodeAnalysis.VisualBasic
                                                      arity As Integer,
                                                      options As LookupOptions,
                                                      originalBinder As Binder,
-                                                     <[In], Out> ByRef useSiteDiagnostics As HashSet(Of DiagnosticInfo))
+                                                     <[In], Out> ByRef useSiteInfo As CompoundUseSiteInfo(Of AssemblySymbol))
             Debug.Assert(lookupResult.IsClear)
 
-            If (options And InvalidLookupOptions) <> 0 OrElse arity > 0 Then
+            If (options And s_invalidLookupOptions) <> 0 OrElse arity > 0 Then
                 Return
             End If
 
             For Each parameter In Me.Parameters
                 If IdentifierComparison.Equals(parameter.Name, name) Then
-                    lookupResult.SetFrom(CheckViability(parameter, arity, options, Nothing, useSiteDiagnostics))
+                    lookupResult.SetFrom(CheckViability(parameter, arity, options, Nothing, useSiteInfo))
                 End If
             Next
         End Sub

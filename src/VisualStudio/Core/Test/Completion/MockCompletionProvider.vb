@@ -1,47 +1,30 @@
-' Copyright (c) Microsoft.  All Rights Reserved.  Licensed under the Apache License, Version 2.0.  See License.txt in the project root for license information.
+﻿' Licensed to the .NET Foundation under one or more agreements.
+' The .NET Foundation licenses this file to you under the MIT license.
+' See the LICENSE file in the project root for more information.
 
 Imports System.Threading
-Imports System.Threading.Tasks
 Imports Microsoft.CodeAnalysis
 Imports Microsoft.CodeAnalysis.Completion
-Imports Microsoft.CodeAnalysis.Completion.Providers
 Imports Microsoft.CodeAnalysis.Options
 Imports Microsoft.CodeAnalysis.Text
-Imports Roslyn.Utilities
 
 Namespace Microsoft.VisualStudio.LanguageServices.UnitTests.Completion
-    Friend Class MockCompletionProvider
-        Implements ICompletionProvider
+    Friend MustInherit Class MockCompletionProvider
+        Inherits CommonCompletionProvider
 
-        Private ReadOnly span As TextSpan
+        Public Overrides Function ProvideCompletionsAsync(context As CompletionContext) As Task
+            Dim item = CommonCompletionItem.Create("DisplayText", "", rules:=CompletionItemRules.Default)
+            context.AddItem(item)
 
-        Public Sub New(span As TextSpan)
-            Me.span = span
-        End Sub
-
-        Public Function GetGroupAsync(document As Document, position As Integer, triggerInfo As CompletionTriggerInfo, Optional cancellationToken As CancellationToken = Nothing) As Task(Of CompletionItemGroup) Implements ICompletionProvider.GetGroupAsync
-            Dim item = New CompletionItem(Me, "DisplayText", span)
-            Return Task.FromResult(New CompletionItemGroup(SpecializedCollections.SingletonEnumerable(item)))
+            Return Task.CompletedTask
         End Function
 
-        Public Function IsCommitCharacter(completionItem As CompletionItem, ch As Char, textTypedSoFar As String) As Boolean Implements ICompletionProvider.IsCommitCharacter
-            Return False
-        End Function
-
-        Public Function IsTriggerCharacter(text As SourceText, characterPosition As Integer, options As OptionSet) As Boolean Implements ICompletionProvider.IsTriggerCharacter
+        Public Overrides Function IsInsertionTrigger(text As SourceText, characterPosition As Integer, options As OptionSet) As Boolean
             Return True
         End Function
 
-        Public Function SendEnterThroughToEditor(completionItem As CompletionItem, textTypedSoFar As String) As Boolean Implements ICompletionProvider.SendEnterThroughToEditor
-            Return False
-        End Function
-
-        Public Function GetTextChange(selectedItem As CompletionItem, Optional ch As Char? = Nothing, Optional textTypedSoFar As String = Nothing) As TextChange Implements ICompletionProvider.GetTextChange
-            Return New TextChange(selectedItem.FilterSpan, "InsertionText")
-        End Function
-
-        Public Function IsFilterCharacter(completionItem As CompletionItem, ch As Char, textTypedSoFar As String) As Boolean Implements ICompletionProvider.IsFilterCharacter
-            Return False
+        Public Overrides Function GetTextChangeAsync(document As Document, selectedItem As CompletionItem, ch As Char?, cancellationToken As CancellationToken) As Task(Of TextChange?)
+            Return Task.FromResult(Of TextChange?)(New TextChange(selectedItem.Span, "InsertionText"))
         End Function
     End Class
 End Namespace

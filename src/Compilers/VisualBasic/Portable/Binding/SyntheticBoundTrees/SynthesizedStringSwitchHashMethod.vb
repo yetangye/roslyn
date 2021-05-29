@@ -1,4 +1,6 @@
-﻿' Copyright (c) Microsoft.  All Rights Reserved.  Licensed under the Apache License, Version 2.0.  See License.txt in the project root for license information.
+﻿' Licensed to the .NET Foundation under one or more agreements.
+' The .NET Foundation licenses this file to you under the MIT license.
+' See the LICENSE file in the project root for more information.
 
 Imports System.Collections.Immutable
 Imports Microsoft.CodeAnalysis.CodeGen
@@ -29,11 +31,11 @@ Namespace Microsoft.CodeAnalysis.VisualBasic.Symbols
                 Dim i As Integer = 0
                 GoTo start
 
-again :
+again:
                 hashCode = CUInt((AscW(text(i)) Xor hashCode) * 16777619)
                 i = i + 1
 
-start :
+start:
                 If (i < text.Length) Then
                     GoTo again
                 End If
@@ -50,8 +52,8 @@ start :
         ''' <remarks>
         ''' This method should be kept consistent with ComputeStringHash
         ''' </remarks>
-        Friend Overrides Function GetBoundMethodBody(diagnostics As DiagnosticBag, Optional ByRef methodBodyBinder As Binder = Nothing) As BoundBlock
-            Dim F = New SyntheticBoundNodeFactory(Me, Me, Me.Syntax, Nothing, diagnostics)
+        Friend Overrides Function GetBoundMethodBody(compilationState As TypeCompilationState, diagnostics As BindingDiagnosticBag, Optional ByRef methodBodyBinder As Binder = Nothing) As BoundBlock
+            Dim F = New SyntheticBoundNodeFactory(Me, Me, Me.Syntax, compilationState, diagnostics)
             F.CurrentMethod = Me
 
             Dim i As LocalSymbol = F.SynthesizedLocal(Me.ContainingAssembly.GetSpecialType(SpecialType.System_Int32))

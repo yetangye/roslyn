@@ -1,13 +1,20 @@
-' Copyright (c) Microsoft.  All Rights Reserved.  Licensed under the Apache License, Version 2.0.  See License.txt in the project root for license information.
+﻿' Licensed to the .NET Foundation under one or more agreements.
+' The .NET Foundation licenses this file to you under the MIT license.
+' See the LICENSE file in the project root for more information.
 
 Imports Microsoft.CodeAnalysis.Text
+Imports Xunit.Abstractions
 
 Namespace Microsoft.CodeAnalysis.Editor.VisualBasic.UnitTests.Formatting
     Public Class FormattingEngineTests_Venus
-        Inherits FormattingTestBase
+        Inherits VisualBasicFormatterTestBase
 
-        <Fact, Trait(Traits.Feature, Traits.Features.Formatting), Trait(Traits.Feature, Traits.Features.Venus)>
-        Public Sub SimpleOneLineNugget()
+        Public Sub New(output As ITestOutputHelper)
+            MyBase.New(output)
+        End Sub
+
+        <WpfFact, Trait(Traits.Feature, Traits.Features.Formatting), Trait(Traits.Feature, Traits.Features.Venus)>
+        Public Async Function SimpleOneLineNugget() As Threading.Tasks.Task
             Dim code = <Code>Imports System
 Imports System.Collections.Generic
 Imports System.Linq
@@ -32,12 +39,12 @@ Module Program
 End Sub
 End Module</Code>
 
-            AssertFormatWithBaseIndentAfterReplacingLfToCrLf(code.Value, expected.Value, baseIndentation:=3)
-        End Sub
+            Await AssertFormatWithBaseIndentAfterReplacingLfToCrLfAsync(code.Value, expected.Value, baseIndentation:=3)
+        End Function
 
-        <Fact, Trait(Traits.Feature, Traits.Features.Formatting), Trait(Traits.Feature, Traits.Features.Venus)>
-        <WorkItem(530138)>
-        Public Sub SimpleScriptBlock()
+        <WpfFact, Trait(Traits.Feature, Traits.Features.Formatting), Trait(Traits.Feature, Traits.Features.Venus)>
+        <WorkItem(530138, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/530138")>
+        Public Async Function SimpleScriptBlock() As Threading.Tasks.Task
             Dim code = <Code>Imports System
 Imports System.Collections.Generic
 Imports System.Linq
@@ -46,7 +53,7 @@ Module Program
   Sub Main(args As String())
   End Sub
 #ExternalSource ("Default.aspx", 3)[|
-            Sub     Foo (   )   
+            Sub     Goo (   )   
             End Sub 
 |]#End ExternalSource
 End Module</Code>
@@ -59,16 +66,16 @@ Module Program
   Sub Main(args As String())
   End Sub
 #ExternalSource ("Default.aspx", 3)
-    Sub Foo()
+    Sub Goo()
     End Sub
 #End ExternalSource
 End Module</Code>
 
-            AssertFormatWithBaseIndentAfterReplacingLfToCrLf(code.Value, expected.Value, baseIndentation:=0)
-        End Sub
+            Await AssertFormatWithBaseIndentAfterReplacingLfToCrLfAsync(code.Value, expected.Value, baseIndentation:=0)
+        End Function
 
-        <Fact, Trait(Traits.Feature, Traits.Features.Formatting), Trait(Traits.Feature, Traits.Features.Venus)>
-        Public Sub SimpleMultiLineNugget()
+        <WpfFact, Trait(Traits.Feature, Traits.Features.Formatting), Trait(Traits.Feature, Traits.Features.Venus)>
+        Public Async Function SimpleMultiLineNugget() As Threading.Tasks.Task
             Dim code = <Code>Imports System
 Imports System.Collections.Generic
 Imports System.Linq
@@ -101,12 +108,12 @@ Module Program
 End Sub
 End Module</Code>
 
-            AssertFormatWithBaseIndentAfterReplacingLfToCrLf(code.Value, expected.Value, baseIndentation:=7)
-        End Sub
+            Await AssertFormatWithBaseIndentAfterReplacingLfToCrLfAsync(code.Value, expected.Value, baseIndentation:=7)
+        End Function
 
-        <WorkItem(576526)>
-        <Fact, Trait(Traits.Feature, Traits.Features.Formatting), Trait(Traits.Feature, Traits.Features.Venus)>
-        Public Sub SimpleQueryWithinNugget()
+        <WorkItem(576526, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/576526")>
+        <WpfFact, Trait(Traits.Feature, Traits.Features.Formatting), Trait(Traits.Feature, Traits.Features.Venus)>
+        Public Async Function SimpleQueryWithinNugget() As Threading.Tasks.Task
             Dim code = <Code>Imports System
 Imports System.Collections.Generic
 Imports System.Linq
@@ -140,11 +147,11 @@ Module Program
 End Sub
 End Module</Code>
 
-            AssertFormatWithBaseIndentAfterReplacingLfToCrLf(code.Value, expected.Value, baseIndentation:=7)
-        End Sub
+            Await AssertFormatWithBaseIndentAfterReplacingLfToCrLfAsync(code.Value, expected.Value, baseIndentation:=7)
+        End Function
 
-        <Fact, Trait(Traits.Feature, Traits.Features.Formatting), Trait(Traits.Feature, Traits.Features.Venus)>
-        Public Sub SingleLineFunctionLambdaInNugget()
+        <WpfFact, Trait(Traits.Feature, Traits.Features.Formatting), Trait(Traits.Feature, Traits.Features.Venus)>
+        Public Async Function SingleLineFunctionLambdaInNugget() As Threading.Tasks.Task
             Dim code = <Code>Imports System
 Imports System.Collections.Generic
 Imports System.Linq
@@ -175,11 +182,11 @@ Module Program
 End Sub
 End Module</Code>
 
-            AssertFormatWithBaseIndentAfterReplacingLfToCrLf(code.Value, expected.Value, baseIndentation:=7)
-        End Sub
+            Await AssertFormatWithBaseIndentAfterReplacingLfToCrLfAsync(code.Value, expected.Value, baseIndentation:=7)
+        End Function
 
-        <Fact, Trait(Traits.Feature, Traits.Features.Formatting), Trait(Traits.Feature, Traits.Features.Venus)>
-        Public Sub MultiLineFunctionLambdaInNugget()
+        <WpfFact, Trait(Traits.Feature, Traits.Features.Formatting), Trait(Traits.Feature, Traits.Features.Venus)>
+        Public Async Function MultiLineFunctionLambdaInNugget() As Threading.Tasks.Task
             Dim code = <Code>Imports System
 Imports System.Collections.Generic
 Imports System.Linq
@@ -228,8 +235,8 @@ Module Program
 End Sub
 End Module</Code>
 
-            AssertFormatWithBaseIndentAfterReplacingLfToCrLf(code.Value, expected.Value, baseIndentation:=7)
-        End Sub
+            Await AssertFormatWithBaseIndentAfterReplacingLfToCrLfAsync(code.Value, expected.Value, baseIndentation:=7)
+        End Function
 
         ''' <summary>
         ''' Sets up the Base Indentation Formatting Rule with the given Base Indent
@@ -237,9 +244,9 @@ End Module</Code>
         ''' Then asserts that the formatting on that span results in text that we'd expect.
         ''' </summary>
         ''' <remarks>The rule has to be set up for each set of spans, currently we test just one</remarks>
-        Private Sub AssertFormatWithBaseIndentAfterReplacingLfToCrLf(content As String,
+        Private Shared Async Function AssertFormatWithBaseIndentAfterReplacingLfToCrLfAsync(content As String,
                                                                      expected As String,
-                                                                     baseIndentation As Integer)
+                                                                     baseIndentation As Integer) As Threading.Tasks.Task
 
             ' do this since xml value put only vbLf
             content = content.Replace(vbLf, vbCrLf)
@@ -249,8 +256,7 @@ End Module</Code>
             Dim textSpan As TextSpan
             MarkupTestFile.GetSpan(content, code, textSpan)
 
-            AssertFormatSpan(content, expected, baseIndentation, textSpan)
-        End Sub
-
+            Await AssertFormatSpanAsync(content, expected, baseIndentation, textSpan)
+        End Function
     End Class
 End Namespace

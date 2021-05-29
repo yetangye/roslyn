@@ -1,7 +1,8 @@
-﻿// Copyright (c) Microsoft.  All Rights Reserved.  Licensed under the Apache License, Version 2.0.  See License.txt in the project root for license information.
+﻿// Licensed to the .NET Foundation under one or more agreements.
+// The .NET Foundation licenses this file to you under the MIT license.
+// See the LICENSE file in the project root for more information.
 
 using System;
-using Microsoft.CodeAnalysis.Text;
 using Roslyn.Utilities;
 
 namespace Microsoft.CodeAnalysis.Text
@@ -9,9 +10,9 @@ namespace Microsoft.CodeAnalysis.Text
     /// <summary>
     /// Information about the character boundaries of a single line of text.
     /// </summary>
-    public struct TextLine : IEquatable<TextLine>
+    public readonly struct TextLine : IEquatable<TextLine>
     {
-        private readonly SourceText _text;
+        private readonly SourceText? _text;
         private readonly int _start;
         private readonly int _endIncludingBreaks;
 
@@ -33,12 +34,12 @@ namespace Microsoft.CodeAnalysis.Text
         {
             if (text == null)
             {
-                throw new ArgumentNullException("text");
+                throw new ArgumentNullException(nameof(text));
             }
 
             if (span.Start > text.Length || span.Start < 0 || span.End > text.Length)
             {
-                throw new ArgumentOutOfRangeException("span");
+                throw new ArgumentOutOfRangeException(nameof(span));
             }
 
             if (text.Length > 0)
@@ -46,7 +47,7 @@ namespace Microsoft.CodeAnalysis.Text
                 // check span is start of line
                 if (span.Start > 0 && !TextUtilities.IsAnyLineBreakCharacter(text[span.Start - 1]))
                 {
-                    throw new ArgumentOutOfRangeException(CodeAnalysisResources.SpanDoesNotIncludeStartOfLine);
+                    throw new ArgumentOutOfRangeException(nameof(span), CodeAnalysisResources.SpanDoesNotIncludeStartOfLine);
                 }
 
                 bool endIncludesLineBreak = false;
@@ -69,7 +70,7 @@ namespace Microsoft.CodeAnalysis.Text
                 // check end of span is at end of line
                 if (span.End < text.Length && !endIncludesLineBreak)
                 {
-                    throw new ArgumentOutOfRangeException(CodeAnalysisResources.SpanDoesNotIncludeEndOfLine);
+                    throw new ArgumentOutOfRangeException(nameof(span), CodeAnalysisResources.SpanDoesNotIncludeEndOfLine);
                 }
 
                 return new TextLine(text, span.Start, span.End);
@@ -83,7 +84,7 @@ namespace Microsoft.CodeAnalysis.Text
         /// <summary>
         /// Gets the source text.
         /// </summary>
-        public SourceText Text
+        public SourceText? Text
         {
             get { return _text; }
         }
@@ -95,14 +96,7 @@ namespace Microsoft.CodeAnalysis.Text
         {
             get
             {
-                if (_text != null)
-                {
-                    return _text.Lines.IndexOf(_start);
-                }
-                else
-                {
-                    return 0;
-                }
+                return _text?.Lines.IndexOf(_start) ?? 0;
             }
         }
 
@@ -130,13 +124,11 @@ namespace Microsoft.CodeAnalysis.Text
                 {
                     return 0;
                 }
-                else
-                {
-                    int startLineBreak;
-                    int lineBreakLength;
-                    TextUtilities.GetStartAndLengthOfLineBreakEndingAt(_text, _endIncludingBreaks - 1, out startLineBreak, out lineBreakLength);
-                    return lineBreakLength;
-                }
+
+                int startLineBreak;
+                int lineBreakLength;
+                TextUtilities.GetStartAndLengthOfLineBreakEndingAt(_text, _endIncludingBreaks - 1, out startLineBreak, out lineBreakLength);
+                return lineBreakLength;
             }
         }
 
@@ -193,7 +185,7 @@ namespace Microsoft.CodeAnalysis.Text
                 && other._endIncludingBreaks == _endIncludingBreaks;
         }
 
-        public override bool Equals(object obj)
+        public override bool Equals(object? obj)
         {
             if (obj is TextLine)
             {

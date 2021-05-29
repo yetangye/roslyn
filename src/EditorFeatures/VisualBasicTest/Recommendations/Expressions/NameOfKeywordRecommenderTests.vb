@@ -1,121 +1,122 @@
-' Copyright (c) Microsoft.  All Rights Reserved.  Licensed under the Apache License, Version 2.0.  See License.txt in the project root for license information.
+﻿' Licensed to the .NET Foundation under one or more agreements.
+' The .NET Foundation licenses this file to you under the MIT license.
+' See the LICENSE file in the project root for more information.
 
 Namespace Microsoft.CodeAnalysis.Editor.VisualBasic.UnitTests.Recommendations.Expressions
     Public Class NameOfKeywordRecommenderTests
 
         <Fact, Trait(Traits.Feature, Traits.Features.KeywordRecommending)>
-        Public Sub NotInClassDeclaration()
+        Public Sub NotInClassDeclarationTest()
             VerifyRecommendationsMissing(<ClassDeclaration>|</ClassDeclaration>, "NameOf")
         End Sub
 
         <Fact, Trait(Traits.Feature, Traits.Features.KeywordRecommending)>
-        Public Sub NotAtStartOfStatement()
+        Public Sub NotAtStartOfStatementTest()
             VerifyRecommendationsMissing(<MethodBody>|</MethodBody>, "NameOf")
         End Sub
 
         <Fact, Trait(Traits.Feature, Traits.Features.KeywordRecommending)>
-        Public Sub AfterReturn()
+        Public Sub AfterReturnTest()
             VerifyRecommendationsContain(<MethodBody>Return |</MethodBody>, "NameOf")
         End Sub
 
         <Fact, Trait(Traits.Feature, Traits.Features.KeywordRecommending)>
-        Public Sub InArgumentList_Position1()
-            VerifyRecommendationsContain(<MethodBody>Foo(|</MethodBody>, "NameOf")
+        Public Sub InArgumentList_Position1Test()
+            VerifyRecommendationsContain(<MethodBody>Goo(|</MethodBody>, "NameOf")
         End Sub
 
         <Fact, Trait(Traits.Feature, Traits.Features.KeywordRecommending)>
-        Public Sub InArgumentList_Position2()
-            VerifyRecommendationsContain(<MethodBody>Foo(bar, |</MethodBody>, "NameOf")
+        Public Sub InArgumentList_Position2Test()
+            VerifyRecommendationsContain(<MethodBody>Goo(bar, |</MethodBody>, "NameOf")
         End Sub
 
         <Fact, Trait(Traits.Feature, Traits.Features.KeywordRecommending)>
-        Public Sub InBinaryExpression()
-            VerifyRecommendationsContain(<MethodBody>Foo(bar + |</MethodBody>, "NameOf")
+        Public Sub InBinaryExpressionTest()
+            VerifyRecommendationsContain(<MethodBody>Goo(bar + |</MethodBody>, "NameOf")
         End Sub
 
         <Fact, Trait(Traits.Feature, Traits.Features.KeywordRecommending)>
-        Public Sub AfterNot()
-            VerifyRecommendationsContain(<MethodBody>Foo(Not |</MethodBody>, "NameOf")
+        Public Sub AfterNotTest()
+            VerifyRecommendationsContain(<MethodBody>Goo(Not |</MethodBody>, "NameOf")
         End Sub
 
         <Fact, Trait(Traits.Feature, Traits.Features.KeywordRecommending)>
-        Public Sub AfterTypeOf()
+        Public Sub AfterTypeOfTest()
             VerifyRecommendationsContain(<MethodBody>If TypeOf |</MethodBody>, "NameOf")
         End Sub
 
         <Fact, Trait(Traits.Feature, Traits.Features.KeywordRecommending)>
-        Public Sub AfterDoWhile()
+        Public Sub AfterDoWhileTest()
             VerifyRecommendationsContain(<MethodBody>Do While |</MethodBody>, "NameOf")
         End Sub
 
         <Fact, Trait(Traits.Feature, Traits.Features.KeywordRecommending)>
-        Public Sub AfterDoUntil()
+        Public Sub AfterDoUntilTest()
             VerifyRecommendationsContain(<MethodBody>Do Until |</MethodBody>, "NameOf")
         End Sub
 
         <Fact, Trait(Traits.Feature, Traits.Features.KeywordRecommending)>
-        Public Sub AfterLoopWhile()
+        Public Sub AfterLoopWhileTest()
             VerifyRecommendationsContain(<MethodBody>
 Do
 Loop While |</MethodBody>, "NameOf")
         End Sub
 
         <Fact, Trait(Traits.Feature, Traits.Features.KeywordRecommending)>
-        Public Sub AfterLoopUntil()
+        Public Sub AfterLoopUntilTest()
             VerifyRecommendationsContain(<MethodBody>
 Do
 Loop Until |</MethodBody>, "NameOf")
         End Sub
 
         <Fact, Trait(Traits.Feature, Traits.Features.KeywordRecommending)>
-        Public Sub AfterIf()
+        Public Sub AfterIfTest()
             VerifyRecommendationsContain(<MethodBody>If |</MethodBody>, "NameOf")
         End Sub
 
         <Fact, Trait(Traits.Feature, Traits.Features.KeywordRecommending)>
-        Public Sub AfterElseIf()
+        Public Sub AfterElseIfTest()
             VerifyRecommendationsContain(<MethodBody>ElseIf |</MethodBody>, "NameOf")
         End Sub
 
         <Fact, Trait(Traits.Feature, Traits.Features.KeywordRecommending)>
-        Public Sub AfterElseSpaceIf()
+        Public Sub AfterElseSpaceIfTest()
             VerifyRecommendationsContain(<MethodBody>Else If |</MethodBody>, "NameOf")
         End Sub
 
         <Fact, Trait(Traits.Feature, Traits.Features.KeywordRecommending)>
-        Public Sub AfterError()
+        Public Sub AfterErrorTest()
             VerifyRecommendationsContain(<MethodBody>Error |</MethodBody>, "NameOf")
         End Sub
 
         <Fact, Trait(Traits.Feature, Traits.Features.KeywordRecommending)>
-        Public Sub AfterThrow()
+        Public Sub AfterThrowTest()
             VerifyRecommendationsContain(<MethodBody>Throw |</MethodBody>, "NameOf")
         End Sub
 
         <Fact, Trait(Traits.Feature, Traits.Features.KeywordRecommending)>
-        Public Sub InVariableInitializer()
+        Public Sub InVariableInitializerTest()
             VerifyRecommendationsContain(<MethodBody>Dim x = |</MethodBody>, "NameOf")
         End Sub
 
         <Fact, Trait(Traits.Feature, Traits.Features.KeywordRecommending)>
-        Public Sub InArrayInitializer()
+        Public Sub InArrayInitializerTest()
             VerifyRecommendationsContain(<MethodBody>Dim x = {|</MethodBody>, "NameOf")
         End Sub
 
         <Fact, Trait(Traits.Feature, Traits.Features.KeywordRecommending)>
-        Public Sub InArrayInitializerAfterComma()
+        Public Sub InArrayInitializerAfterCommaTest()
             VerifyRecommendationsContain(<MethodBody>Dim x = {0, |</MethodBody>, "NameOf")
         End Sub
 
         <Fact, Trait(Traits.Feature, Traits.Features.KeywordRecommending)>
-        Public Sub AfterWhile()
+        Public Sub AfterWhileTest()
             VerifyRecommendationsContain(<MethodBody>While |</MethodBody>, "NameOf")
         End Sub
 
         <Fact, Trait(Traits.Feature, Traits.Features.KeywordRecommending)>
-        Public Sub AfterCall()
+        Public Sub AfterCallTest()
             VerifyRecommendationsContain(<MethodBody>Call |</MethodBody>, "NameOf")
         End Sub
-
     End Class
 End Namespace

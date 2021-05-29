@@ -1,4 +1,6 @@
-﻿' Copyright (c) Microsoft.  All Rights Reserved.  Licensed under the Apache License, Version 2.0.  See License.txt in the project root for license information.
+﻿' Licensed to the .NET Foundation under one or more agreements.
+' The .NET Foundation licenses this file to you under the MIT license.
+' See the LICENSE file in the project root for more information.
 
 Imports System.Collections.Immutable
 Imports System.Runtime.CompilerServices
@@ -79,7 +81,7 @@ End Module
 
         End Sub
 
-        <WorkItem(543829, "DevDiv")>
+        <WorkItem(543829, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/543829")>
         <Fact()>
         Public Sub AnonymousTypeSymbolWithExplicitNew()
             Dim compilationDef =
@@ -96,28 +98,28 @@ End Module
     </compilation>
             Dim text As String = compilationDef.Value.Replace(vbLf, vbCrLf)
 
-            Dim compilation = CompilationUtils.CreateCompilationWithMscorlibAndReferences(compilationDef, {SystemRef, SystemCoreRef, MsvbRef})
+            Dim compilation = CompilationUtils.CreateCompilationWithMscorlib40AndReferences(compilationDef, {SystemRef, SystemCoreRef, MsvbRef})
             CompilationUtils.AssertNoDiagnostics(compilation)
 
             Dim tree As SyntaxTree = compilation.SyntaxTrees(0)
             Dim model = compilation.GetSemanticModel(tree)
 
             ' check 'q'
-            Dim posQ As Integer = text.IndexOf("q")
+            Dim posQ As Integer = text.IndexOf("q"c)
             Dim declaratorQ = tree.GetRoot().FindToken(posQ).Parent.FirstAncestorOrSelf(Of VariableDeclaratorSyntax)()
             CheckAnonymousTypeExplicit(model,
                                        DirectCast(model.GetDeclaredSymbol(declaratorQ.Names(0)), LocalSymbol),
                                        DirectCast(declaratorQ.Initializer.Value, AnonymousObjectCreationExpressionSyntax))
 
             ' check 'x'
-            Dim posX = text.IndexOf("x")
+            Dim posX = text.IndexOf("x"c)
             Dim declaratorX = tree.GetRoot().FindToken(posX).Parent.FirstAncestorOrSelf(Of VariableDeclaratorSyntax)()
             CheckAnonymousTypeExplicit(model,
                                        DirectCast(model.GetDeclaredSymbol(declaratorX.Names(0)), LocalSymbol),
                                        DirectCast(declaratorX.Initializer.Value, AnonymousObjectCreationExpressionSyntax))
 
             ' check 'z' --> 'x'
-            Dim posZ = text.IndexOf("z")
+            Dim posZ = text.IndexOf("z"c)
             Dim declaratorZ = tree.GetRoot().FindToken(posZ).Parent.FirstAncestorOrSelf(Of VariableDeclaratorSyntax)()
             CheckAnonymousTypeExplicit(model,
                                        DirectCast(model.GetDeclaredSymbol(declaratorZ.Names(0)), LocalSymbol),
@@ -161,7 +163,7 @@ End Module
                     Assert.Equal(1, members.Length)
                     Assert.Equal(member, members(0))
 
-                    ' IsImplicitlyDeclared: Return false. The foo = bar clause in 
+                    ' IsImplicitlyDeclared: Return false. The goo = bar clause in 
                     '                       the new { } clause serves as the declaration.
                     Assert.False(member.IsImplicitlyDeclared)
 
@@ -187,7 +189,7 @@ End Module
             Next
         End Sub
 
-        <WorkItem(543829, "DevDiv")>
+        <WorkItem(543829, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/543829")>
         <Fact()>
         Public Sub AnonymousTypeSymbolImplicit()
             Dim compilationDef =
@@ -218,33 +220,33 @@ End Module
     </compilation>
             Dim text As String = compilationDef.Value.Replace(vbLf, vbCrLf)
 
-            Dim compilation = CompilationUtils.CreateCompilationWithMscorlibAndReferences(compilationDef, {SystemRef, SystemCoreRef, MsvbRef})
+            Dim compilation = CompilationUtils.CreateCompilationWithMscorlib40AndReferences(compilationDef, {SystemRef, SystemCoreRef, MsvbRef})
             CompilationUtils.AssertNoDiagnostics(compilation)
 
             Dim tree As SyntaxTree = compilation.SyntaxTrees(0)
             Dim model = compilation.GetSemanticModel(tree)
 
             ' calculate offsets
-            Dim x1 = text.IndexOf("x")
-            Dim x2 = text.IndexOf("x", x1 + 1)
-            Dim x3 = text.IndexOf("x", x2 + 1)
-            Dim x4 = text.IndexOf("x", x3 + 1)
-            Dim x5 = text.IndexOf("x", x4 + 1)
-            Dim y1 = text.IndexOf("y")
-            Dim y2 = text.IndexOf("y", y1 + 1)
-            Dim y3 = text.IndexOf("y", y2 + 1)
-            Dim y4 = text.IndexOf("y", y3 + 1)
-            Dim y5 = text.IndexOf("y", y4 + 1)
-            Dim select1 = text.IndexOf("Select")
-            Dim select2 = text.IndexOf("Select", select1 + 1)
+            Dim x1 = text.IndexOf("x"c)
+            Dim x2 = text.IndexOf("x"c, x1 + 1)
+            Dim x3 = text.IndexOf("x"c, x2 + 1)
+            Dim x4 = text.IndexOf("x"c, x3 + 1)
+            Dim x5 = text.IndexOf("x"c, x4 + 1)
+            Dim y1 = text.IndexOf("y"c)
+            Dim y2 = text.IndexOf("y"c, y1 + 1)
+            Dim y3 = text.IndexOf("y"c, y2 + 1)
+            Dim y4 = text.IndexOf("y"c, y3 + 1)
+            Dim y5 = text.IndexOf("y"c, y4 + 1)
+            Dim select1 = text.IndexOf("Select", StringComparison.Ordinal)
+            Dim select2 = text.IndexOf("Select", select1 + 1, StringComparison.Ordinal)
 
             ' get 'other' type
-            Dim posW As Integer = text.IndexOf("w")
+            Dim posW As Integer = text.IndexOf("w"c)
             Dim declaratorW = tree.GetRoot().FindToken(posW).Parent.FirstAncestorOrSelf(Of VariableDeclaratorSyntax)()
             Dim typeW = DirectCast(model.GetDeclaredSymbol(declaratorW.Names(0)), LocalSymbol).Type
 
             ' check 'zf'
-            Dim posZF As Integer = text.IndexOf("zf")
+            Dim posZF As Integer = text.IndexOf("zf", StringComparison.Ordinal)
             Dim declaratorZF = tree.GetRoot().FindToken(posZF).Parent.FirstAncestorOrSelf(Of VariableDeclaratorSyntax)()
             CheckAnonymousTypeImplicit(DirectCast(model.GetDeclaredSymbol(declaratorZF.Names(0)), LocalSymbol),
                                        tree.GetRoot().FindToken(select1).GetLocation,
@@ -254,7 +256,7 @@ End Module
                                        tree.GetRoot().FindToken(y4 - 2).GetLocation())
 
             ' check 'zk'
-            Dim posZL As Integer = text.IndexOf("zl")
+            Dim posZL As Integer = text.IndexOf("zl", StringComparison.Ordinal)
             Dim declaratorZL = tree.GetRoot().FindToken(posZL).Parent.FirstAncestorOrSelf(Of VariableDeclaratorSyntax)()
             CheckAnonymousTypeImplicit(DirectCast(model.GetDeclaredSymbol(declaratorZL.Names(0)), LocalSymbol),
                                        tree.GetRoot().FindToken(select2).GetLocation,
@@ -265,7 +267,7 @@ End Module
 
         End Sub
 
-        <WorkItem(543829, "DevDiv")>
+        <WorkItem(543829, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/543829")>
         <Fact()>
         Public Sub AnonymousDelegateSymbolImplicit()
             Dim compilationDef =
@@ -291,31 +293,31 @@ End Module
     </compilation>
             Dim text As String = compilationDef.Value.Replace(vbLf, vbCrLf)
 
-            Dim compilation = CompilationUtils.CreateCompilationWithMscorlibAndReferences(compilationDef, {SystemRef, SystemCoreRef, MsvbRef})
+            Dim compilation = CompilationUtils.CreateCompilationWithMscorlib40AndReferences(compilationDef, {SystemRef, SystemCoreRef, MsvbRef})
             CompilationUtils.AssertNoDiagnostics(compilation)
 
             Dim tree As SyntaxTree = compilation.SyntaxTrees(0)
             Dim model = compilation.GetSemanticModel(tree)
 
             ' calculate offsets
-            Dim x1 = text.IndexOf("x")
-            Dim x2 = text.IndexOf("x", x1 + 1)
-            Dim x3 = text.IndexOf("x", x2 + 1)
-            Dim y1 = text.IndexOf("yy")
-            Dim y2 = text.IndexOf("yy", y1 + 1)
-            Dim y3 = text.IndexOf("yy", y2 + 1)
-            Dim sub1 = text.IndexOf("Sub")
-            Dim sub2 = text.IndexOf("Sub", sub1 + 1)
-            Dim sub3 = text.IndexOf("Sub", sub2 + 1)
-            Dim sub4 = text.IndexOf("Sub", sub3 + 1)
+            Dim x1 = text.IndexOf("x"c)
+            Dim x2 = text.IndexOf("x"c, x1 + 1)
+            Dim x3 = text.IndexOf("x"c, x2 + 1)
+            Dim y1 = text.IndexOf("yy", StringComparison.Ordinal)
+            Dim y2 = text.IndexOf("yy", y1 + 1, StringComparison.Ordinal)
+            Dim y3 = text.IndexOf("yy", y2 + 1, StringComparison.Ordinal)
+            Dim sub1 = text.IndexOf("Sub", StringComparison.Ordinal)
+            Dim sub2 = text.IndexOf("Sub", sub1 + 1, StringComparison.Ordinal)
+            Dim sub3 = text.IndexOf("Sub", sub2 + 1, StringComparison.Ordinal)
+            Dim sub4 = text.IndexOf("Sub", sub3 + 1, StringComparison.Ordinal)
 
             ' get 'model' type
-            Dim posT As Integer = text.IndexOf("del_t")
+            Dim posT As Integer = text.IndexOf("del_t", StringComparison.Ordinal)
             Dim declaratorT = tree.GetRoot().FindToken(posT).Parent.FirstAncestorOrSelf(Of VariableDeclaratorSyntax)()
             Dim typeT = DirectCast(model.GetDeclaredSymbol(declaratorT.Names(0)), LocalSymbol).Type
 
             ' check 'a'
-            Dim posA As Integer = text.IndexOf("del_a")
+            Dim posA As Integer = text.IndexOf("del_a", StringComparison.Ordinal)
             Dim declaratorA = tree.GetRoot().FindToken(posA).Parent.FirstAncestorOrSelf(Of VariableDeclaratorSyntax)()
             CheckAnonymousTypeImplicit(DirectCast(model.GetDeclaredSymbol(declaratorA.Names(0)), LocalSymbol),
                                        tree.GetRoot().FindToken(sub2).Parent.Parent.GetLocation,
@@ -325,7 +327,7 @@ End Module
                                        tree.GetRoot().FindToken(y1 - 2).GetLocation())
 
             ' check 'b'
-            Dim posB As Integer = text.IndexOf("del_b")
+            Dim posB As Integer = text.IndexOf("del_b", StringComparison.Ordinal)
             Dim declaratorB = tree.GetRoot().FindToken(posB).Parent.FirstAncestorOrSelf(Of VariableDeclaratorSyntax)()
             CheckAnonymousTypeImplicit(DirectCast(model.GetDeclaredSymbol(declaratorB.Names(0)), LocalSymbol),
                                        tree.GetRoot().FindToken(sub4).Parent.Parent.GetLocation,
@@ -336,7 +338,7 @@ End Module
 
         End Sub
 
-        <WorkItem(543829, "DevDiv")>
+        <WorkItem(543829, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/543829")>
         <Fact()>
         Public Sub AnonymousDelegateSymbolImplicit2()
             Dim compilationDef =
@@ -360,29 +362,29 @@ End Module
     </compilation>
             Dim text As String = compilationDef.Value.Replace(vbLf, vbCrLf)
 
-            Dim compilation = CompilationUtils.CreateCompilationWithMscorlibAndReferences(compilationDef, {SystemRef, SystemCoreRef, MsvbRef})
+            Dim compilation = CompilationUtils.CreateCompilationWithMscorlib40AndReferences(compilationDef, {SystemRef, SystemCoreRef, MsvbRef})
             CompilationUtils.AssertNoDiagnostics(compilation)
 
             Dim tree As SyntaxTree = compilation.SyntaxTrees(0)
             Dim model = compilation.GetSemanticModel(tree)
 
             ' calculate offsets
-            Dim x1 = text.IndexOf("x")
-            Dim x2 = text.IndexOf("x", x1 + 1)
-            Dim x3 = text.IndexOf("x", x2 + 1)
-            Dim y1 = text.IndexOf("yy")
-            Dim y2 = text.IndexOf("yy", y1 + 1)
-            Dim y3 = text.IndexOf("yy", y2 + 1)
-            Dim sub1 = text.IndexOf("Sub")
-            Dim sub2 = text.IndexOf("Sub", sub1 + 1)
+            Dim x1 = text.IndexOf("x"c)
+            Dim x2 = text.IndexOf("x"c, x1 + 1)
+            Dim x3 = text.IndexOf("x"c, x2 + 1)
+            Dim y1 = text.IndexOf("yy", StringComparison.Ordinal)
+            Dim y2 = text.IndexOf("yy", y1 + 1, StringComparison.Ordinal)
+            Dim y3 = text.IndexOf("yy", y2 + 1, StringComparison.Ordinal)
+            Dim sub1 = text.IndexOf("Sub", StringComparison.Ordinal)
+            Dim sub2 = text.IndexOf("Sub", sub1 + 1, StringComparison.Ordinal)
 
             ' get 'model' type
-            Dim posT As Integer = text.IndexOf("del_t")
+            Dim posT As Integer = text.IndexOf("del_t", StringComparison.Ordinal)
             Dim declaratorT = tree.GetRoot().FindToken(posT).Parent.FirstAncestorOrSelf(Of VariableDeclaratorSyntax)()
             Dim typeT = DirectCast(model.GetDeclaredSymbol(declaratorT.Names(0)), LocalSymbol).Type
 
             ' check 'a'
-            Dim posA As Integer = text.IndexOf("del_a")
+            Dim posA As Integer = text.IndexOf("del_a", StringComparison.Ordinal)
             Dim declaratorA = tree.GetRoot().FindToken(posA).Parent.FirstAncestorOrSelf(Of VariableDeclaratorSyntax)()
             CheckAnonymousTypeImplicit(DirectCast(model.GetDeclaredSymbol(declaratorA.Names(0)), LocalSymbol),
                                        tree.GetRoot().FindToken(sub1).Parent.Parent.GetLocation,
@@ -392,15 +394,18 @@ End Module
                                        tree.GetRoot().FindToken(y1 - 2).GetLocation())
 
             ' check 'b'
-            Dim posB As Integer = text.IndexOf("del_b")
+            Dim posB As Integer = text.IndexOf("del_b", StringComparison.Ordinal)
             Dim declaratorB = tree.GetRoot().FindToken(posB).Parent.FirstAncestorOrSelf(Of VariableDeclaratorSyntax)()
+            Dim delegateA = DirectCast(model.GetDeclaredSymbol(declaratorA.Names(0)), LocalSymbol).Type
             CheckAnonymousTypeImplicit(DirectCast(model.GetDeclaredSymbol(declaratorB.Names(0)), LocalSymbol),
                                        tree.GetRoot().FindToken(sub2).Parent.Parent.GetLocation,
-                                       DirectCast(model.GetDeclaredSymbol(declaratorA.Names(0)), LocalSymbol).Type,
+                                       delegateA,
                                        False,
                                        tree.GetRoot().FindToken(x2 - 2).GetLocation(),
                                        tree.GetRoot().FindToken(y2 - 2).GetLocation())
 
+            Assert.IsType(Of AnonymousTypeManager.AnonymousDelegatePublicSymbol)(delegateA)
+            Assert.False(DirectCast(delegateA, INamedTypeSymbol).IsSerializable)
         End Sub
 
         Private Sub CheckAnonymousTypeImplicit(local As LocalSymbol, location As Location, anotherType As TypeSymbol, isType As Boolean, ParamArray locations() As Location)
@@ -440,7 +445,7 @@ End Module
                     Assert.Equal(1, members.Length)
                     Assert.Equal(member, members(0))
 
-                    ' IsImplicitlyDeclared: Return true. The foo = bar clause initializes 
+                    ' IsImplicitlyDeclared: Return true. The goo = bar clause initializes 
                     '                       a property on the implicitly-declared type.
                     Assert.True(member.IsImplicitlyDeclared)
 
@@ -648,7 +653,7 @@ Module M
         Return Nothing
     End Function
 
-    Sub Foo(o As String)
+    Sub Goo(o As String)
         Dim at = [#0 New With {.f1 = o.ExtF, Key .f2 = .f1, .f3 = DirectCast(.f2, Integer)} 0#]
     End Sub
 
@@ -669,7 +674,7 @@ End Module
             Assert.Equal(1, typeInfo.Type.Interfaces.Length)
         End Sub
 
-        <Fact(), WorkItem(542245, "DevDiv")>
+        <Fact(), WorkItem(542245, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/542245")>
         Public Sub AnonymousTypeReferenceLambdas()
             Dim compilationDef =
     <compilation name="AnonymousTypeReferenceLambda">
@@ -1044,7 +1049,7 @@ End Module
             Assert.Equal("Public Property a As Integer", info.Symbol.ToDisplayString())
         End Sub
 
-        <WorkItem(543723, "DevDiv")>
+        <WorkItem(543723, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/543723")>
         <Fact()>
         Public Sub AnonymousTypeFieldDeclarationIdentifier4()
             Dim compilationDef =
@@ -1071,7 +1076,7 @@ End Class
             Assert.Equal("Program", info.Symbol.ToDisplayString())
         End Sub
 
-        <WorkItem(543723, "DevDiv")>
+        <WorkItem(543723, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/543723")>
         <Fact()>
         Public Sub AnonymousTypePropertyDeclarationIdentifier4()
             Dim compilationDef =
@@ -1316,7 +1321,7 @@ End Module
                          model.GetTypeInfo(DirectCast(nodes(0), ExpressionSyntax)).Type.ToDisplayString())
         End Sub
 
-        <WorkItem(542268, "DevDiv")>
+        <WorkItem(542268, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/542268")>
         <Fact()>
         Public Sub AnonymousTypeCreationSymbolInAsNew_TypeInference_Cycle()
             Dim compilationDef =
@@ -1350,7 +1355,7 @@ BC42104: Variable 'tmp' is used before it has been assigned a value. A null refe
                          model.GetTypeInfo(DirectCast(nodes(0), ExpressionSyntax)).Type.ToDisplayString())
         End Sub
 
-        <WorkItem(542268, "DevDiv")>
+        <WorkItem(542268, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/542268")>
         <Fact()>
         Public Sub AnonymousTypeCreationSymbolInAsNew_TypeInference_Cycle1()
             Dim compilationDef =
@@ -1447,7 +1452,7 @@ BC36010: 'Using' operand of type '&lt;anonymous type: Key aa As Integer, bb As I
                          model.GetSymbolInfo(DirectCast(nodes(0), ExpressionSyntax)).Symbol.ToDisplayString())
         End Sub
 
-        <Fact(), WorkItem(528745, "DevDiv")>
+        <Fact(), WorkItem(528745, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/528745")>
         Public Sub AnonymousTypeCreationSymbolInAsNew_Field()
             Dim compilationDef =
     <compilation name="AnonymousTypeCreationSymbolInAsNew_Field">
@@ -1688,7 +1693,7 @@ End Module
     </file>
 </compilation>
 
-            Dim comp = CreateCompilationWithMscorlib(source)
+            Dim comp = CreateCompilationWithMscorlib40(source)
             Dim tree = comp.SyntaxTrees(0)
             Dim model = comp.GetSemanticModel(tree)
             Dim anonProps = tree.GetRoot().DescendantNodes().OfType(Of FieldInitializerSyntax)()
@@ -1715,7 +1720,7 @@ End Class
     </file>
 </compilation>
 
-            Dim comp = CreateCompilationWithMscorlib(source)
+            Dim comp = CreateCompilationWithMscorlib40(source)
             Dim tree = comp.SyntaxTrees(0)
             Dim model = comp.GetSemanticModel(tree)
             Dim anonProps = tree.GetRoot().DescendantNodes().OfType(Of FieldInitializerSyntax)()
@@ -1766,7 +1771,7 @@ End Class
     </file>
 </compilation>
 
-            Dim comp = CreateCompilationWithMscorlib(source)
+            Dim comp = CreateCompilationWithMscorlib40(source)
             Dim tree = comp.SyntaxTrees(0)
             Dim model = comp.GetSemanticModel(tree)
             Dim anonProps = tree.GetRoot().DescendantNodes().OfType(Of FieldInitializerSyntax)()
@@ -1790,11 +1795,11 @@ End Enum
 
 Structure S
     Public Shared sField As E
-    Public Interface IFoo
+    Public Interface IGoo
     End Interface
 
-    Public Property GetFoo As IFoo
-    Public Function GetFoo2() As Action(Of UShort)
+    Public Property GetGoo As IGoo
+    Public Function GetGoo2() As Action(Of UShort)
         Return Nothing
     End Function
 End Structure
@@ -1802,22 +1807,22 @@ End Structure
 Class AnonTypeTest
 
     Function F() As Action(Of UShort)
-        Dim anonType1 = New With {.a1 = New With {S.sField, .ifoo = New With {New S().GetFoo}}}
-        Dim anonType2 = New With {.a1 = New With {.a2 = New With {.a2 = S.sField, .a3 = New With {.a3 = New S().GetFoo2()}}}}
+        Dim anonType1 = New With {.a1 = New With {S.sField, .igoo = New With {New S().GetGoo}}}
+        Dim anonType2 = New With {.a1 = New With {.a2 = New With {.a2 = S.sField, .a3 = New With {.a3 = New S().GetGoo2()}}}}
         Return anonType2.a1.a2.a3.a3
     End Function
 End Class
     </file>
 </compilation>
 
-            Dim comp = CreateCompilationWithMscorlib(source)
+            Dim comp = CreateCompilationWithMscorlib40(source)
             Dim tree = comp.SyntaxTrees(0)
             Dim model = comp.GetSemanticModel(tree)
             Dim anonProps = tree.GetRoot().DescendantNodes().OfType(Of FieldInitializerSyntax)()
             Assert.Equal(9, anonProps.Count())
             Dim symList = From ap In anonProps Let apsym = model.GetDeclaredSymbol(ap) Order By apsym.Name Select apsym.Name
             Dim results = String.Join(", ", symList)
-            Assert.Equal("a1, a1, a2, a2, a3, a3, GetFoo, ifoo, sField", results)
+            Assert.Equal("a1, a1, a2, a2, a3, a3, GetGoo, igoo, sField", results)
         End Sub
 
         <Fact>
@@ -1840,7 +1845,7 @@ End Module
     </file>
 </compilation>
 
-            Dim comp = CreateCompilationWithMscorlib(source)
+            Dim comp = CreateCompilationWithMscorlib40(source)
             Dim tree = comp.SyntaxTrees(0)
             Dim model = comp.GetSemanticModel(tree)
 
@@ -1890,7 +1895,7 @@ End Module
     </file>
 </compilation>
 
-            Dim comp = CreateCompilationWithMscorlib(source)
+            Dim comp = CreateCompilationWithMscorlib40(source)
             Dim tree = comp.SyntaxTrees(0)
             Dim model = comp.GetSemanticModel(tree)
 
@@ -1963,7 +1968,7 @@ End Module
             Dim spans As New List(Of TextSpan)
             ExtractTextIntervals(text, spans)
 
-            Dim compilation = CompilationUtils.CreateCompilationWithMscorlibAndReferences(text, {SystemRef, SystemCoreRef, MsvbRef})
+            Dim compilation = CompilationUtils.CreateCompilationWithMscorlib40AndReferences(text, {TestMetadata.Net40.System, TestMetadata.Net40.SystemCore, TestMetadata.Net40.MicrosoftVisualBasic})
             If errors Is Nothing Then
                 CompilationUtils.AssertNoErrors(compilation)
             Else
@@ -2002,13 +2007,13 @@ End Module
                 Dim endMarker = index & "#]"
 
                 ' opening '[#{0-9}'
-                Dim start = text.<file>.Value.IndexOf(startMarker)
+                Dim start = text.<file>.Value.IndexOf(startMarker, StringComparison.Ordinal)
                 If start < 0 Then
                     Exit Do
                 End If
 
                 ' closing '{0-9}#]'
-                Dim [end] = text.<file>.Value.IndexOf(endMarker)
+                Dim [end] = text.<file>.Value.IndexOf(endMarker, StringComparison.Ordinal)
                 Assert.InRange([end], 0, Int32.MaxValue)
 
                 nodes.Add(New TextSpan(start, [end] - start + 3))
@@ -2033,11 +2038,42 @@ End Module
 
 #End Region
 
+        <Fact>
+        <WorkItem(2928, "https://github.com/dotnet/roslyn/issues/2928")>
+        Public Sub ContainingSymbol()
+            Dim comp = CompilationUtils.CreateCompilationWithMscorlib40AndVBRuntime(
+<compilation>
+    <file name="a.vb">
+Module Test
+    Sub Main()
+        Dim x = New With {.y = 1}
+        System.Console.WriteLine(x.GetType())
+    End Sub
+End Module
+    </file>
+</compilation>, options:=TestOptions.DebugExe.WithRootNamespace("Ns1.Ns2"))
+
+            Dim tree As SyntaxTree = comp.SyntaxTrees.Single()
+            Dim semanticModel = comp.GetSemanticModel(tree)
+            Dim x = tree.GetRoot().DescendantNodes().OfType(Of IdentifierNameSyntax)().Where(Function(n) n.Identifier.ValueText = "x").Single()
+
+            Dim type = semanticModel.GetTypeInfo(x).Type
+            Assert.Equal("<anonymous type: y As System.Int32>", type.ToTestDisplayString())
+            Assert.True(type.ContainingNamespace.IsGlobalNamespace)
+
+            Dim validator As Action(Of ModuleSymbol) =
+                Sub(m As ModuleSymbol)
+                    Dim anonType = (From sym In m.GlobalNamespace.GetMembers()
+                                    Where sym.Name.Contains("AnonymousType")).Single()
+                End Sub
+
+            CompileAndVerify(comp, symbolValidator:=validator, expectedOutput:="VB$AnonymousType_0`1[System.Int32]")
+        End Sub
     End Class
 
 #Region "Extensions"
 
-    Module TestExtensions
+    Friend Module TestExtensions
 
         <Extension()>
         Public Function TheOnlyConstructor(type As ITypeSymbol) As MethodSymbol

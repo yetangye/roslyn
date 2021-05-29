@@ -1,8 +1,10 @@
-' Copyright (c) Microsoft.  All Rights Reserved.  Licensed under the Apache License, Version 2.0.  See License.txt in the project root for license information.
+﻿' Licensed to the .NET Foundation under one or more agreements.
+' The .NET Foundation licenses this file to you under the MIT license.
+' See the LICENSE file in the project root for more information.
 
-Imports System.Runtime.InteropServices
+Imports System.Threading.Tasks
 Imports Microsoft.CodeAnalysis
-Imports Microsoft.CodeAnalysis.Text
+Imports Microsoft.CodeAnalysis.Test.Utilities
 Imports Roslyn.Test.Utilities
 
 Namespace Microsoft.VisualStudio.LanguageServices.UnitTests.CodeModel.CSharp
@@ -11,8 +13,8 @@ Namespace Microsoft.VisualStudio.LanguageServices.UnitTests.CodeModel.CSharp
 
 #Region "GetStartPoint tests"
 
-        <ConditionalFact(GetType(x86)), Trait(Traits.Feature, Traits.Features.CodeModel)>
-        Public Sub GetStartPoint1()
+        <WpfFact, Trait(Traits.Feature, Traits.Features.CodeModel)>
+        Public Sub TestGetStartPoint1()
             Dim code =
 <Code>
 class C
@@ -44,8 +46,8 @@ class C
                      TextPoint(line:=3, lineOffset:=5, absoluteOffset:=15, lineLength:=42)))
         End Sub
 
-        <ConditionalFact(GetType(x86)), Trait(Traits.Feature, Traits.Features.CodeModel)>
-        Public Sub GetStartPoint2()
+        <WpfFact, Trait(Traits.Feature, Traits.Features.CodeModel)>
+        Public Sub TestGetStartPoint2()
             Dim code =
 <Code>
 class C
@@ -77,8 +79,8 @@ class C
                      TextPoint(line:=3, lineOffset:=5, absoluteOffset:=15, lineLength:=42)))
         End Sub
 
-        <ConditionalFact(GetType(x86)), Trait(Traits.Feature, Traits.Features.CodeModel)>
-        Public Sub GetStartPoint3()
+        <WpfFact, Trait(Traits.Feature, Traits.Features.CodeModel)>
+        Public Sub TestGetStartPoint3()
             Dim code =
 <Code>
 class C
@@ -114,12 +116,44 @@ class C
                      TextPoint(line:=3, lineOffset:=5, absoluteOffset:=15, lineLength:=38)))
         End Sub
 
+        <WorkItem(2437, "https://github.com/dotnet/roslyn/issues/2437")>
+        <WpfFact, Trait(Traits.Feature, Traits.Features.CodeModel)>
+        Public Sub TestGetStartPointExplicitlyImplementedEvent()
+            Dim code =
+<Code>
+delegate void SampleEventHandler(object sender);
+
+interface I1
+{
+    event SampleEventHandler SampleEvent;
+}
+
+class C1 : I1
+{
+    event SampleEventHandler $$I1.SampleEvent
+    {
+        add
+        {
+        }
+
+        remove
+        {
+        }
+    }
+}
+</Code>
+
+            TestGetStartPoint(code,
+                Part(EnvDTE.vsCMPart.vsCMPartWholeWithAttributes,
+                     TextPoint(line:=10, lineOffset:=5, absoluteOffset:=131, lineLength:=43)))
+        End Sub
+
 #End Region
 
 #Region "GetEndPoint tests"
 
-        <ConditionalFact(GetType(x86)), Trait(Traits.Feature, Traits.Features.CodeModel)>
-        Public Sub GetEndPoint1()
+        <WpfFact, Trait(Traits.Feature, Traits.Features.CodeModel)>
+        Public Sub TestGetEndPoint1()
             Dim code =
 <Code>
 class C
@@ -151,8 +185,8 @@ class C
                      TextPoint(line:=3, lineOffset:=43, absoluteOffset:=53, lineLength:=42)))
         End Sub
 
-        <ConditionalFact(GetType(x86)), Trait(Traits.Feature, Traits.Features.CodeModel)>
-        Public Sub GetEndPoint2()
+        <WpfFact, Trait(Traits.Feature, Traits.Features.CodeModel)>
+        Public Sub TestGetEndPoint2()
             Dim code =
 <Code>
 class C
@@ -184,8 +218,8 @@ class C
                      TextPoint(line:=3, lineOffset:=43, absoluteOffset:=53, lineLength:=42)))
         End Sub
 
-        <ConditionalFact(GetType(x86)), Trait(Traits.Feature, Traits.Features.CodeModel)>
-        Public Sub GetEndPoint3()
+        <WpfFact, Trait(Traits.Feature, Traits.Features.CodeModel)>
+        Public Sub TestGetEndPoint3()
             Dim code =
 <Code>
 class C
@@ -221,12 +255,44 @@ class C
                      TextPoint(line:=7, lineOffset:=6, absoluteOffset:=96, lineLength:=5)))
         End Sub
 
+        <WorkItem(2437, "https://github.com/dotnet/roslyn/issues/2437")>
+        <WpfFact, Trait(Traits.Feature, Traits.Features.CodeModel)>
+        Public Sub TestGetEndPointExplicitlyImplementedEvent()
+            Dim code =
+<Code>
+delegate void SampleEventHandler(object sender);
+
+interface I1
+{
+    event SampleEventHandler SampleEvent;
+}
+
+class C1 : I1
+{
+    event SampleEventHandler $$I1.SampleEvent
+    {
+        add
+        {
+        }
+
+        remove
+        {
+        }
+    }
+}
+</Code>
+
+            TestGetEndPoint(code,
+                Part(EnvDTE.vsCMPart.vsCMPartWholeWithAttributes,
+                     TextPoint(line:=19, lineOffset:=6, absoluteOffset:=250, lineLength:=5)))
+        End Sub
+
 #End Region
 
 #Region "Access tests"
 
-        <ConditionalFact(GetType(x86)), Trait(Traits.Feature, Traits.Features.CodeModel)>
-        Public Sub Access1()
+        <WpfFact, Trait(Traits.Feature, Traits.Features.CodeModel)>
+        Public Sub TestAccess1()
             Dim code =
 <Code>
 class C
@@ -238,8 +304,8 @@ class C
             TestAccess(code, EnvDTE.vsCMAccess.vsCMAccessPrivate)
         End Sub
 
-        <ConditionalFact(GetType(x86)), Trait(Traits.Feature, Traits.Features.CodeModel)>
-        Public Sub Access2()
+        <WpfFact, Trait(Traits.Feature, Traits.Features.CodeModel)>
+        Public Sub TestAccess2()
             Dim code =
 <Code>
 class C
@@ -251,8 +317,8 @@ class C
             TestAccess(code, EnvDTE.vsCMAccess.vsCMAccessPrivate)
         End Sub
 
-        <ConditionalFact(GetType(x86)), Trait(Traits.Feature, Traits.Features.CodeModel)>
-        Public Sub Access3()
+        <WpfFact, Trait(Traits.Feature, Traits.Features.CodeModel)>
+        Public Sub TestAccess3()
             Dim code =
 <Code>
 class C
@@ -264,8 +330,8 @@ class C
             TestAccess(code, EnvDTE.vsCMAccess.vsCMAccessProtected)
         End Sub
 
-        <ConditionalFact(GetType(x86)), Trait(Traits.Feature, Traits.Features.CodeModel)>
-        Public Sub Access4()
+        <WpfFact, Trait(Traits.Feature, Traits.Features.CodeModel)>
+        Public Sub TestAccess4()
             Dim code =
 <Code>
 class C
@@ -277,8 +343,8 @@ class C
             TestAccess(code, EnvDTE.vsCMAccess.vsCMAccessProjectOrProtected)
         End Sub
 
-        <ConditionalFact(GetType(x86)), Trait(Traits.Feature, Traits.Features.CodeModel)>
-        Public Sub Access5()
+        <WpfFact, Trait(Traits.Feature, Traits.Features.CodeModel)>
+        Public Sub TestAccess5()
             Dim code =
 <Code>
 class C
@@ -290,8 +356,8 @@ class C
             TestAccess(code, EnvDTE.vsCMAccess.vsCMAccessProject)
         End Sub
 
-        <ConditionalFact(GetType(x86)), Trait(Traits.Feature, Traits.Features.CodeModel)>
-        Public Sub Access6()
+        <WpfFact, Trait(Traits.Feature, Traits.Features.CodeModel)>
+        Public Sub TestAccess6()
             Dim code =
 <Code>
 class C
@@ -307,8 +373,8 @@ class C
 
 #Region "FullName tests"
 
-        <ConditionalFact(GetType(x86)), Trait(Traits.Feature, Traits.Features.CodeModel)>
-        Public Sub FullName1()
+        <WpfFact, Trait(Traits.Feature, Traits.Features.CodeModel)>
+        Public Sub TestFullName1()
             Dim code =
 <Code>
 class C
@@ -320,8 +386,8 @@ class C
             TestFullName(code, "C.E")
         End Sub
 
-        <ConditionalFact(GetType(x86)), Trait(Traits.Feature, Traits.Features.CodeModel)>
-        Public Sub FullName2()
+        <WpfFact, Trait(Traits.Feature, Traits.Features.CodeModel)>
+        Public Sub TestFullName2()
             Dim code =
 <Code>
 class C
@@ -333,12 +399,42 @@ class C
             TestFullName(code, "C.F")
         End Sub
 
+        <WorkItem(2437, "https://github.com/dotnet/roslyn/issues/2437")>
+        <WpfFact, Trait(Traits.Feature, Traits.Features.CodeModel)>
+        Public Sub TestFullName_ExplicitlyImplementedEvent()
+            Dim code =
+<Code>
+delegate void SampleEventHandler(object sender);
+
+interface I1
+{
+    event SampleEventHandler SampleEvent;
+}
+
+class C1 : I1
+{
+    event SampleEventHandler $$I1.SampleEvent
+    {
+        add
+        {
+        }
+
+        remove
+        {
+        }
+    }
+}
+</Code>
+
+            TestFullName(code, "C1.I1.SampleEvent")
+        End Sub
+
 #End Region
 
 #Region "IsPropertyStyleEvent tests"
 
-        <ConditionalFact(GetType(x86)), Trait(Traits.Feature, Traits.Features.CodeModel)>
-        Public Sub IsPropertyStyleEvent1()
+        <WpfFact, Trait(Traits.Feature, Traits.Features.CodeModel)>
+        Public Sub TestIsPropertyStyleEvent1()
             Dim code =
 <Code>
 class C
@@ -350,8 +446,8 @@ class C
             TestIsPropertyStyleEvent(code, False)
         End Sub
 
-        <ConditionalFact(GetType(x86)), Trait(Traits.Feature, Traits.Features.CodeModel)>
-        Public Sub IsPropertyStyleEvent2()
+        <WpfFact, Trait(Traits.Feature, Traits.Features.CodeModel)>
+        Public Sub TestIsPropertyStyleEvent2()
             Dim code =
 <Code>
 class C
@@ -371,8 +467,8 @@ class C
 
 #Region "IsShared tests"
 
-        <ConditionalFact(GetType(x86)), Trait(Traits.Feature, Traits.Features.CodeModel)>
-        Public Sub IsShared1()
+        <WpfFact, Trait(Traits.Feature, Traits.Features.CodeModel)>
+        Public Sub TestIsShared1()
             Dim code =
 <Code>
 class C
@@ -384,8 +480,8 @@ class C
             TestIsShared(code, False)
         End Sub
 
-        <ConditionalFact(GetType(x86)), Trait(Traits.Feature, Traits.Features.CodeModel)>
-        Public Sub IsShared2()
+        <WpfFact, Trait(Traits.Feature, Traits.Features.CodeModel)>
+        Public Sub TestIsShared2()
             Dim code =
 <Code>
 class C
@@ -401,8 +497,8 @@ class C
 
 #Region "Name tests"
 
-        <ConditionalFact(GetType(x86)), Trait(Traits.Feature, Traits.Features.CodeModel)>
-        Public Sub Name1()
+        <WpfFact, Trait(Traits.Feature, Traits.Features.CodeModel)>
+        Public Sub TestName1()
             Dim code =
 <Code>
 class C
@@ -414,8 +510,8 @@ class C
             TestName(code, "E")
         End Sub
 
-        <ConditionalFact(GetType(x86)), Trait(Traits.Feature, Traits.Features.CodeModel)>
-        Public Sub Name2()
+        <WpfFact, Trait(Traits.Feature, Traits.Features.CodeModel)>
+        Public Sub TestName2()
             Dim code =
 <Code>
 class C
@@ -427,17 +523,112 @@ class C
             TestName(code, "F")
         End Sub
 
+        <WorkItem(2437, "https://github.com/dotnet/roslyn/issues/2437")>
+        <WpfFact, Trait(Traits.Feature, Traits.Features.CodeModel)>
+        Public Sub TestName_ExplicitlyImplementedEvent()
+            Dim code =
+<Code>
+delegate void SampleEventHandler(object sender);
+
+interface I1
+{
+    event SampleEventHandler SampleEvent;
+}
+
+class C1 : I1
+{
+    event SampleEventHandler $$I1.SampleEvent
+    {
+        add
+        {
+        }
+
+        remove
+        {
+        }
+    }
+}
+</Code>
+
+            TestName(code, "I1.SampleEvent")
+        End Sub
+
+#End Region
+
+#Region "OverrideKind tests"
+
+        <WorkItem(150349, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/150349")>
+        <WpfFact, Trait(Traits.Feature, Traits.Features.CodeModel)>
+        Public Sub TestOverrideKind_Abstract()
+            Dim code =
+<Code>
+class C
+{
+    abstract class A
+    {
+        protected abstract event System.EventHandler $$E;
+    }
+}
+</Code>
+
+            TestOverrideKind(code, EnvDTE80.vsCMOverrideKind.vsCMOverrideKindAbstract)
+        End Sub
+
+        <WorkItem(150349, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/150349")>
+        <WpfFact, Trait(Traits.Feature, Traits.Features.CodeModel)>
+        Public Sub TestOverrideKind_Virtual()
+            Dim code =
+<Code>
+class C
+{
+    abstract class A
+    {
+        protected virtual event System.EventHandler $$E
+        {
+            add { }
+            remove { }
+        }
+    }
+}
+}
+</Code>
+
+            TestOverrideKind(code, EnvDTE80.vsCMOverrideKind.vsCMOverrideKindVirtual)
+        End Sub
+
+        <WorkItem(150349, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/150349")>
+        <WpfFact, Trait(Traits.Feature, Traits.Features.CodeModel)>
+        Public Sub TestOverrideKind_None()
+            Dim code =
+<Code>
+class C
+{
+    abstract class A
+    {
+        protected event System.EventHandler $$E
+        {
+            add { }
+            remove { }
+        }
+    }
+}
+}
+</Code>
+
+            TestOverrideKind(code, EnvDTE80.vsCMOverrideKind.vsCMOverrideKindNone)
+        End Sub
+
 #End Region
 
 #Region "Type tests"
 
-        <ConditionalFact(GetType(x86)), Trait(Traits.Feature, Traits.Features.CodeModel)>
-        Public Sub Type1()
+        <WpfFact, Trait(Traits.Feature, Traits.Features.CodeModel)>
+        Public Sub TestType1()
             Dim code =
 <Code>
 class C
 {
-    public event System.EventHandler $$Foo;
+    public event System.EventHandler $$Goo;
 }
 </Code>
 
@@ -450,13 +641,13 @@ class C
                          })
         End Sub
 
-        <ConditionalFact(GetType(x86)), Trait(Traits.Feature, Traits.Features.CodeModel)>
-        Public Sub Type2()
+        <WpfFact, Trait(Traits.Feature, Traits.Features.CodeModel)>
+        Public Sub TestType2()
             Dim code =
 <Code>
 class C
 {
-    public event System.EventHandler Foo, $$Bar;
+    public event System.EventHandler Goo, $$Bar;
 }
 </Code>
 
@@ -469,13 +660,13 @@ class C
                          })
         End Sub
 
-        <ConditionalFact(GetType(x86)), Trait(Traits.Feature, Traits.Features.CodeModel)>
-        Public Sub Type3()
+        <WpfFact, Trait(Traits.Feature, Traits.Features.CodeModel)>
+        Public Sub TestType3()
             Dim code =
 <Code>
 class C
 {
-    public event System.EventHandler $$Foo
+    public event System.EventHandler $$Goo
     {
         add { }
         remove { }
@@ -496,13 +687,13 @@ class C
 
 #Region "Set IsShared tests"
 
-        <ConditionalFact(GetType(x86)), Trait(Traits.Feature, Traits.Features.CodeModel)>
-        Sub SetIsShared1()
+        <WpfFact, Trait(Traits.Feature, Traits.Features.CodeModel)>
+        Public Async Function TestSetIsShared1() As Task
             Dim code =
 <Code>
 class C
 {
-    event System.EventHandler $$Foo;
+    event System.EventHandler $$Goo;
 }
 </Code>
 
@@ -510,20 +701,20 @@ class C
 <Code>
 class C
 {
-    event System.EventHandler Foo;
+    event System.EventHandler Goo;
 }
 </Code>
 
-            TestSetIsShared(code, expected, False)
-        End Sub
+            Await TestSetIsShared(code, expected, False)
+        End Function
 
-        <ConditionalFact(GetType(x86)), Trait(Traits.Feature, Traits.Features.CodeModel)>
-        Sub SetIsShared2()
+        <WpfFact, Trait(Traits.Feature, Traits.Features.CodeModel)>
+        Public Async Function TestSetIsShared2() As Task
             Dim code =
 <Code>
 class C
 {
-    event System.EventHandler $$Foo;
+    event System.EventHandler $$Goo;
 }
 </Code>
 
@@ -531,20 +722,20 @@ class C
 <Code>
 class C
 {
-    static event System.EventHandler Foo;
+    static event System.EventHandler Goo;
 }
 </Code>
 
-            TestSetIsShared(code, expected, True)
-        End Sub
+            Await TestSetIsShared(code, expected, True)
+        End Function
 
-        <ConditionalFact(GetType(x86)), Trait(Traits.Feature, Traits.Features.CodeModel)>
-        Sub SetIsShared3()
+        <WpfFact, Trait(Traits.Feature, Traits.Features.CodeModel)>
+        Public Async Function TestSetIsShared3() As Task
             Dim code =
 <Code>
 class C
 {
-    static event System.EventHandler $$Foo;
+    static event System.EventHandler $$Goo;
 }
 </Code>
 
@@ -552,20 +743,20 @@ class C
 <Code>
 class C
 {
-    static event System.EventHandler Foo;
+    static event System.EventHandler Goo;
 }
 </Code>
 
-            TestSetIsShared(code, expected, True)
-        End Sub
+            Await TestSetIsShared(code, expected, True)
+        End Function
 
-        <ConditionalFact(GetType(x86)), Trait(Traits.Feature, Traits.Features.CodeModel)>
-        Sub SetIsShared4()
+        <WpfFact, Trait(Traits.Feature, Traits.Features.CodeModel)>
+        Public Async Function TestSetIsShared4() As Task
             Dim code =
 <Code>
 class C
 {
-    static event System.EventHandler $$Foo;
+    static event System.EventHandler $$Goo;
 }
 </Code>
 
@@ -573,24 +764,24 @@ class C
 <Code>
 class C
 {
-    event System.EventHandler Foo;
+    event System.EventHandler Goo;
 }
 </Code>
 
-            TestSetIsShared(code, expected, False)
-        End Sub
+            Await TestSetIsShared(code, expected, False)
+        End Function
 
 #End Region
 
 #Region "Set Name tests"
 
-        <ConditionalFact(GetType(x86)), Trait(Traits.Feature, Traits.Features.CodeModel)>
-        Sub SetName1()
+        <WpfFact, Trait(Traits.Feature, Traits.Features.CodeModel)>
+        Public Async Function TestSetName1() As Task
             Dim code =
 <Code>
 class C
 {
-    event System.EventHandler $$Foo;
+    event System.EventHandler $$Goo;
 }
 </Code>
 
@@ -602,20 +793,20 @@ class C
 }
 </Code>
 
-            TestSetName(code, expected, "Bar", NoThrow(Of String)())
-        End Sub
+            Await TestSetName(code, expected, "Bar", NoThrow(Of String)())
+        End Function
 
 #End Region
 
 #Region "Set Type tests"
 
-        <ConditionalFact(GetType(x86)), Trait(Traits.Feature, Traits.Features.CodeModel)>
-        Public Sub SetType1()
+        <WpfFact, Trait(Traits.Feature, Traits.Features.CodeModel)>
+        Public Async Function TestSetType1() As Task
             Dim code =
 <Code>
 class C
 {
-    public event System.EventHandler $$Foo;
+    public event System.EventHandler $$Goo;
 }
 </Code>
 
@@ -623,20 +814,20 @@ class C
 <Code>
 class C
 {
-    public event System.ConsoleCancelEventHandler Foo;
+    public event System.ConsoleCancelEventHandler Goo;
 }
 </Code>
 
-            TestSetTypeProp(code, expected, "System.ConsoleCancelEventHandler")
-        End Sub
+            Await TestSetTypeProp(code, expected, "System.ConsoleCancelEventHandler")
+        End Function
 
-        <ConditionalFact(GetType(x86)), Trait(Traits.Feature, Traits.Features.CodeModel)>
-        Public Sub SetType2()
+        <WpfFact, Trait(Traits.Feature, Traits.Features.CodeModel)>
+        Public Async Function TestSetType2() As Task
             Dim code =
 <Code>
 class C
 {
-    public event System.EventHandler Foo, $$Bar;
+    public event System.EventHandler Goo, $$Bar;
 }
 </Code>
 
@@ -644,20 +835,20 @@ class C
 <Code>
 class C
 {
-    public event System.ConsoleCancelEventHandler Foo, Bar;
+    public event System.ConsoleCancelEventHandler Goo, Bar;
 }
 </Code>
 
-            TestSetTypeProp(code, expected, "System.ConsoleCancelEventHandler")
-        End Sub
+            Await TestSetTypeProp(code, expected, "System.ConsoleCancelEventHandler")
+        End Function
 
-        <ConditionalFact(GetType(x86)), Trait(Traits.Feature, Traits.Features.CodeModel)>
-        Public Sub SetType3()
+        <WpfFact, Trait(Traits.Feature, Traits.Features.CodeModel)>
+        Public Async Function TestSetType3() As Task
             Dim code =
 <Code>
 class C
 {
-    public event System.EventHandler $$Foo
+    public event System.EventHandler $$Goo
     {
         add { }
         remove { }
@@ -669,7 +860,7 @@ class C
 <Code>
 class C
 {
-    public event System.ConsoleCancelEventHandler Foo
+    public event System.ConsoleCancelEventHandler Goo
     {
         add { }
         remove { }
@@ -677,10 +868,106 @@ class C
 }
 </Code>
 
-            TestSetTypeProp(code, expected, "System.ConsoleCancelEventHandler")
-        End Sub
+            Await TestSetTypeProp(code, expected, "System.ConsoleCancelEventHandler")
+        End Function
 
 #End Region
+
+#Region "AddAttribute tests"
+        <WpfFact, Trait(Traits.Feature, Traits.Features.CodeModel)>
+        Public Async Function TestAddAttribute1() As Task
+            Dim code =
+<Code>
+using System;
+
+class C
+{
+    public event EventHandler $$E;
+}
+</Code>
+
+            Dim expected =
+<Code>
+using System;
+
+class C
+{
+    [Serializable()]
+    public event EventHandler E;
+}
+</Code>
+            Await TestAddAttribute(code, expected, New AttributeData With {.Name = "Serializable"})
+        End Function
+
+        <WpfFact, Trait(Traits.Feature, Traits.Features.CodeModel)>
+        Public Async Function TestAddAttribute2() As Task
+            Dim code =
+<Code>
+using System;
+
+class C
+{
+    [Serializable]
+    public event EventHandler $$E;
+}
+</Code>
+
+            Dim expected =
+<Code>
+using System;
+
+class C
+{
+    [Serializable]
+    [CLSCompliant(true)]
+    public event EventHandler E;
+}
+</Code>
+            Await TestAddAttribute(code, expected, New AttributeData With {.Name = "CLSCompliant", .Value = "true", .Position = 1})
+        End Function
+
+        <WorkItem(2825, "https://github.com/dotnet/roslyn/issues/2825")>
+        <WpfFact, Trait(Traits.Feature, Traits.Features.CodeModel)>
+        Public Async Function TestAddAttribute_BelowDocComment() As Task
+            Dim code =
+<Code>
+using System;
+
+class C
+{
+    /// &lt;summary&gt;&lt;/summary&gt;
+    public event EventHandler $$E;
+}
+</Code>
+
+            Dim expected =
+<Code>
+using System;
+
+class C
+{
+    /// &lt;summary&gt;&lt;/summary&gt;
+    [CLSCompliant(true)]
+    public event EventHandler E;
+}
+</Code>
+            Await TestAddAttribute(code, expected, New AttributeData With {.Name = "CLSCompliant", .Value = "true"})
+        End Function
+
+#End Region
+
+        <WpfFact, Trait(Traits.Feature, Traits.Features.CodeModel)>
+        Public Sub TestTypeDescriptor_GetProperties()
+            Dim code =
+<Code>
+class C
+{
+    event System.EventHandler $$E;
+}
+</Code>
+
+            TestPropertyDescriptors(Of EnvDTE80.CodeEvent)(code)
+        End Sub
 
         Protected Overrides ReadOnly Property LanguageName As String
             Get

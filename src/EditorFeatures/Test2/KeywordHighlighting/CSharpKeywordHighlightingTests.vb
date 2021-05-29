@@ -1,16 +1,20 @@
-' Copyright (c) Microsoft.  All Rights Reserved.  Licensed under the Apache License, Version 2.0.  See License.txt in the project root for license information.
+﻿' Licensed to the .NET Foundation under one or more agreements.
+' The .NET Foundation licenses this file to you under the MIT license.
+' See the LICENSE file in the project root for more information.
+
+Imports System.Threading.Tasks
 
 Namespace Microsoft.CodeAnalysis.Editor.UnitTests.KeywordHighlighting
     Public Class CSharpKeywordHighlightingTests
         Inherits AbstractKeywordHighlightingTests
 
-        <Fact, Trait(Traits.Feature, Traits.Features.KeywordHighlighting)>
-        Public Sub VerifyNoHighlightsWhenOptionDisabled()
-            VerifyHighlights(
+        <WpfFact, Trait(Traits.Feature, Traits.Features.KeywordHighlighting)>
+        Public Async Function TestVerifyNoHighlightsWhenOptionDisabled() As Task
+            Await VerifyHighlightsAsync(
                 <Workspace>
                     <Project Language="C#" CommonReferences="true">
                         <Document>
-                            class Foo
+                            class Goo
                             {
                                 void M()
                                 {
@@ -22,15 +26,15 @@ Namespace Microsoft.CodeAnalysis.Editor.UnitTests.KeywordHighlighting
                     </Project>
                 </Workspace>,
                 optionIsEnabled:=False)
-        End Sub
+        End Function
 
-        <Fact, Trait(Traits.Feature, Traits.Features.KeywordHighlighting)>
-        Public Sub VerifyHighlightsWhenOptionEnabled()
-            VerifyHighlights(
+        <WpfFact, Trait(Traits.Feature, Traits.Features.KeywordHighlighting)>
+        Public Async Function TestVerifyHighlightsWhenOptionEnabled() As Task
+            Await VerifyHighlightsAsync(
                 <Workspace>
                     <Project Language="C#" CommonReferences="true">
                         <Document>
-                            class Foo
+                            class Goo
                             {
                                 void M()
                                 {
@@ -41,6 +45,6 @@ Namespace Microsoft.CodeAnalysis.Editor.UnitTests.KeywordHighlighting
                         </Document>
                     </Project>
                 </Workspace>)
-        End Sub
+        End Function
     End Class
 End Namespace

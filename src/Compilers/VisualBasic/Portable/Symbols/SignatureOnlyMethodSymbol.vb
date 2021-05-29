@@ -1,4 +1,6 @@
-﻿' Copyright (c) Microsoft.  All Rights Reserved.  Licensed under the Apache License, Version 2.0.  See License.txt in the project root for license information.
+﻿' Licensed to the .NET Foundation under one or more agreements.
+' The .NET Foundation licenses this file to you under the MIT license.
+' See the LICENSE file in the project root for more information.
 
 Imports System.Collections.Generic
 Imports System.Collections.Immutable
@@ -16,41 +18,46 @@ Namespace Microsoft.CodeAnalysis.VisualBasic.Symbols
     ''' </summary>
     Friend NotInheritable Class SignatureOnlyMethodSymbol
         Inherits MethodSymbol
-        Private ReadOnly m_name As String
-        Private ReadOnly m_containingType As TypeSymbol
-        Private ReadOnly m_methodKind As MethodKind
-        Private ReadOnly m_callingConvention As CallingConvention
-        Private ReadOnly m_typeParameters As ImmutableArray(Of TypeParameterSymbol)
-        Private ReadOnly m_parameters As ImmutableArray(Of ParameterSymbol)
-        Private ReadOnly m_returnType As TypeSymbol
-        Private ReadOnly m_returnTypeCustomModifiers As ImmutableArray(Of CustomModifier)
-        Private ReadOnly m_explicitInterfaceImplementations As ImmutableArray(Of MethodSymbol)
-        Private ReadOnly m_isOverrides As Boolean
+        Private ReadOnly _name As String
+        Private ReadOnly _containingType As TypeSymbol
+        Private ReadOnly _methodKind As MethodKind
+        Private ReadOnly _callingConvention As CallingConvention
+        Private ReadOnly _typeParameters As ImmutableArray(Of TypeParameterSymbol)
+        Private ReadOnly _parameters As ImmutableArray(Of ParameterSymbol)
+        Private ReadOnly _returnsByRef As Boolean
+        Private ReadOnly _returnType As TypeSymbol
+        Private ReadOnly _returnTypeCustomModifiers As ImmutableArray(Of CustomModifier)
+        Private ReadOnly _refCustomModifiers As ImmutableArray(Of CustomModifier)
+        Private ReadOnly _explicitInterfaceImplementations As ImmutableArray(Of MethodSymbol)
+        Private ReadOnly _isOverrides As Boolean
 
         Public Sub New(ByVal name As String, ByVal m_containingType As TypeSymbol, ByVal methodKind As MethodKind, ByVal callingConvention As CallingConvention, ByVal typeParameters As ImmutableArray(Of TypeParameterSymbol), ByVal parameters As ImmutableArray(Of ParameterSymbol),
-         ByVal returnType As TypeSymbol, ByVal returnTypeCustomModifiers As ImmutableArray(Of CustomModifier), ByVal explicitInterfaceImplementations As ImmutableArray(Of MethodSymbol),
+                       ByVal returnsByRef As Boolean, ByVal returnType As TypeSymbol, ByVal returnTypeCustomModifiers As ImmutableArray(Of CustomModifier), refCustomModifiers As ImmutableArray(Of CustomModifier),
+                       ByVal explicitInterfaceImplementations As ImmutableArray(Of MethodSymbol),
                        Optional isOverrides As Boolean = False)
-            Me.m_callingConvention = callingConvention
-            Me.m_typeParameters = typeParameters
-            Me.m_returnType = returnType
-            Me.m_returnTypeCustomModifiers = returnTypeCustomModifiers
-            Me.m_parameters = parameters
-            Me.m_explicitInterfaceImplementations = If(explicitInterfaceImplementations.IsDefault, ImmutableArray(Of MethodSymbol).Empty, explicitInterfaceImplementations)
-            Me.m_containingType = m_containingType
-            Me.m_methodKind = methodKind
-            Me.m_name = name
-            Me.m_isOverrides = isOverrides
+            _callingConvention = callingConvention
+            _typeParameters = typeParameters
+            _returnsByRef = returnsByRef
+            _returnType = returnType
+            _returnTypeCustomModifiers = returnTypeCustomModifiers
+            _refCustomModifiers = refCustomModifiers
+            _parameters = parameters
+            _explicitInterfaceImplementations = explicitInterfaceImplementations.NullToEmpty()
+            _containingType = m_containingType
+            _methodKind = methodKind
+            _name = name
+            _isOverrides = isOverrides
         End Sub
 
         Friend Overrides ReadOnly Property CallingConvention() As CallingConvention
             Get
-                Return m_callingConvention
+                Return _callingConvention
             End Get
         End Property
 
         Public Overrides ReadOnly Property IsVararg() As Boolean
             Get
-                Return New SignatureHeader(CByte(m_callingConvention)).CallingConvention = SignatureCallingConvention.VarArgs
+                Return New SignatureHeader(CByte(_callingConvention)).CallingConvention = SignatureCallingConvention.VarArgs
             End Get
         End Property
 
@@ -62,49 +69,61 @@ Namespace Microsoft.CodeAnalysis.VisualBasic.Symbols
 
         Public Overrides ReadOnly Property Arity() As Integer
             Get
-                Return m_typeParameters.Length
+                Return _typeParameters.Length
             End Get
         End Property
 
         Public Overrides ReadOnly Property TypeParameters() As ImmutableArray(Of TypeParameterSymbol)
             Get
-                Return m_typeParameters
+                Return _typeParameters
+            End Get
+        End Property
+
+        Public Overrides ReadOnly Property ReturnsByRef As Boolean
+            Get
+                Return _returnsByRef
             End Get
         End Property
 
         Public Overrides ReadOnly Property ReturnType() As TypeSymbol
             Get
-                Return m_returnType
+                Return _returnType
             End Get
         End Property
 
         Public Overrides ReadOnly Property ReturnTypeCustomModifiers() As ImmutableArray(Of CustomModifier)
             Get
-                Return m_returnTypeCustomModifiers
+                Return _returnTypeCustomModifiers
+            End Get
+        End Property
+
+        Public Overrides ReadOnly Property RefCustomModifiers() As ImmutableArray(Of CustomModifier)
+            Get
+                Return _refCustomModifiers
             End Get
         End Property
 
         Public Overrides ReadOnly Property Parameters() As ImmutableArray(Of ParameterSymbol)
             Get
-                Return m_parameters
+                Return _parameters
             End Get
         End Property
 
         Public Overrides ReadOnly Property ExplicitInterfaceImplementations() As ImmutableArray(Of MethodSymbol)
             Get
-                Return m_explicitInterfaceImplementations
+                Return _explicitInterfaceImplementations
             End Get
         End Property
 
         Public Overrides ReadOnly Property ContainingSymbol() As Symbol
             Get
-                Return m_containingType
+                Return _containingType
             End Get
         End Property
 
         Public Overrides ReadOnly Property MethodKind() As MethodKind
             Get
-                Return m_methodKind
+                Return _methodKind
             End Get
         End Property
 
@@ -116,7 +135,7 @@ Namespace Microsoft.CodeAnalysis.VisualBasic.Symbols
 
         Public Overrides ReadOnly Property Name() As String
             Get
-                Return m_name
+                Return _name
             End Get
         End Property
 
@@ -133,6 +152,12 @@ Namespace Microsoft.CodeAnalysis.VisualBasic.Symbols
         End Property
 
         Public Overrides ReadOnly Property IsIterator As Boolean
+            Get
+                Return False
+            End Get
+        End Property
+
+        Public Overrides ReadOnly Property IsInitOnly As Boolean
             Get
                 Return False
             End Get
@@ -208,11 +233,11 @@ Namespace Microsoft.CodeAnalysis.VisualBasic.Symbols
 
         Public Overrides ReadOnly Property IsOverrides As Boolean
             Get
-                Return m_isOverrides
+                Return _isOverrides
             End Get
         End Property
 
-        Friend Overrides ReadOnly Property Syntax As VisualBasicSyntaxNode
+        Friend Overrides ReadOnly Property Syntax As SyntaxNode
             Get
                 Throw ExceptionUtilities.Unreachable
             End Get

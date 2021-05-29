@@ -1,6 +1,9 @@
-﻿// Copyright (c) Microsoft.  All Rights Reserved.  Licensed under the Apache License, Version 2.0.  See License.txt in the project root for license information.
+﻿// Licensed to the .NET Foundation under one or more agreements.
+// The .NET Foundation licenses this file to you under the MIT license.
+// See the LICENSE file in the project root for more information.
 
 using System;
+using System.Collections.Immutable;
 
 namespace Microsoft.CodeAnalysis.Diagnostics
 {
@@ -11,62 +14,28 @@ namespace Microsoft.CodeAnalysis.Diagnostics
     /// </summary>
     internal sealed class SymbolDeclaredCompilationEvent : CompilationEvent
     {
-        public SymbolDeclaredCompilationEvent(Compilation compilation, ISymbol symbol) : base(compilation)
-        {
-            this.Symbol = symbol;
-        }
-        public SymbolDeclaredCompilationEvent(Compilation compilation, ISymbol symbol, Lazy<SemanticModel> lazySemanticModel) : this(compilation, symbol)
-        {
-            _lazySemanticModel = lazySemanticModel;
-        }
-        public ISymbol Symbol { get; private set; }
+        private readonly Lazy<ImmutableArray<SyntaxReference>> _lazyCachedDeclaringReferences;
 
-        // At most one of these should be non-null.
-        private Lazy<SemanticModel> _lazySemanticModel;
-        private SemanticModel _semanticModel;
-        private WeakReference<SemanticModel> _weakModel = null;
-        public SemanticModel SemanticModel(SyntaxReference reference)
+        public SymbolDeclaredCompilationEvent(Compilation compilation, ISymbol symbol, SemanticModel? semanticModelWithCachedBoundNodes = null)
+            : base(compilation)
         {
-            lock (this)
-            {
-                var semanticModel = _semanticModel;
-                if (semanticModel == null && _lazySemanticModel != null)
-                {
-                    _semanticModel = semanticModel = _lazySemanticModel.Value;
-                    _lazySemanticModel = null;
-                }
-                if (semanticModel == null && _weakModel != null)
-                {
-                    _weakModel.TryGetTarget(out semanticModel);
-                }
-                if (semanticModel == null || semanticModel.SyntaxTree != reference.SyntaxTree)
-                {
-                    semanticModel = Compilation.GetSemanticModel(reference.SyntaxTree);
-                    _weakModel = new WeakReference<SemanticModel>(semanticModel);
-                }
+            Symbol = symbol;
+            SemanticModelWithCachedBoundNodes = semanticModelWithCachedBoundNodes;
+            _lazyCachedDeclaringReferences = new Lazy<ImmutableArray<SyntaxReference>>(() => symbol.DeclaringSyntaxReferences);
+        }
 
-                return semanticModel;
-            }
-        }
-        override public void FlushCache()
-        {
-            lock (this)
-            {
-                var semanticModel = _semanticModel;
-                _lazySemanticModel = null;
-                if (semanticModel == null) return;
-                _weakModel = new WeakReference<SemanticModel>(semanticModel);
-                _semanticModel = null;
-            }
-        }
-        private static SymbolDisplayFormat s_displayFormat = SymbolDisplayFormat.FullyQualifiedFormat;
+        public ISymbol Symbol { get; }
+        public SemanticModel? SemanticModelWithCachedBoundNodes { get; }
+
+        // PERF: We avoid allocations in re-computing syntax references for declared symbol during event processing by caching them directly on this member.
+        public ImmutableArray<SyntaxReference> DeclaringSyntaxReferences => _lazyCachedDeclaringReferences.Value;
+
         public override string ToString()
         {
-            var refs = Symbol.DeclaringSyntaxReferences;
-            var name = this.Symbol.Name;
+            var name = Symbol.Name;
             if (name == "") name = "<empty>";
-            var loc = refs.Length != 0 ? " @ " + String.Join(", ", System.Linq.Enumerable.Select(refs, r => r.GetLocation().GetLineSpan())) : null;
-            return "SymbolDeclaredCompilationEvent(" + name + " " + this.Symbol.ToDisplayString(SymbolDisplayFormat.MinimallyQualifiedFormat) + loc + ")";
+            var loc = DeclaringSyntaxReferences.Length != 0 ? " @ " + string.Join(", ", System.Linq.Enumerable.Select(DeclaringSyntaxReferences, r => r.GetLocation().GetLineSpan())) : null;
+            return "SymbolDeclaredCompilationEvent(" + name + " " + Symbol.ToDisplayString(SymbolDisplayFormat.MinimallyQualifiedFormat) + loc + ")";
         }
     }
 }

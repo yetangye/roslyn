@@ -1,4 +1,8 @@
-// Copyright (c) Microsoft.  All Rights Reserved.  Licensed under the Apache License, Version 2.0.  See License.txt in the project root for license information.
+﻿// Licensed to the .NET Foundation under one or more agreements.
+// The .NET Foundation licenses this file to you under the MIT license.
+// See the LICENSE file in the project root for more information.
+
+#nullable disable
 
 using Microsoft.CodeAnalysis.CSharp.Symbols;
 using Microsoft.CodeAnalysis.ExpressionEvaluator;
@@ -10,32 +14,20 @@ namespace Microsoft.CodeAnalysis.CSharp.ExpressionEvaluator
     {
         private readonly int _index;
 
-        internal ReturnValueLocalSymbol(MethodSymbol method, string name, TypeSymbol type, int index) :
-            base(method, name, type)
+        internal ReturnValueLocalSymbol(MethodSymbol method, string name, string displayName, TypeSymbol type, int index) :
+            base(method, name, displayName, type)
         {
             _index = index;
         }
 
-        internal override bool IsWritable
+        internal override bool IsWritableVariable
         {
             get { return false; }
         }
 
-        internal override BoundExpression RewriteLocal(CSharpCompilation compilation, EENamedTypeSymbol container, CSharpSyntaxNode syntax)
+        internal override BoundExpression RewriteLocal(CSharpCompilation compilation, EENamedTypeSymbol container, SyntaxNode syntax, DiagnosticBag diagnostics)
         {
-            var method = container.GetOrAddSynthesizedMethod(
-                ExpressionCompilerConstants.GetReturnValueMethodName,
-                (c, n, s) =>
-                {
-                    var parameterType = compilation.GetSpecialType(SpecialType.System_Int32);
-                    var returnType = compilation.GetSpecialType(SpecialType.System_Object);
-                    return new PlaceholderMethodSymbol(
-                        c,
-                        s,
-                        n,
-                        returnType,
-                        m => ImmutableArray.Create<ParameterSymbol>(new SynthesizedParameterSymbol(m, parameterType, ordinal: 0, refKind: RefKind.None)));
-                });
+            var method = GetIntrinsicMethod(compilation, ExpressionCompilerConstants.GetReturnValueMethodName);
             var argument = new BoundLiteral(
                 syntax,
                 Microsoft.CodeAnalysis.ConstantValue.Create(_index),
@@ -45,7 +37,7 @@ namespace Microsoft.CodeAnalysis.CSharp.ExpressionEvaluator
                 receiverOpt: null,
                 method: method,
                 arguments: ImmutableArray.Create<BoundExpression>(argument));
-            return ConvertToLocalType(compilation, call, this.Type);
+            return ConvertToLocalType(compilation, call, this.Type, diagnostics);
         }
     }
 }

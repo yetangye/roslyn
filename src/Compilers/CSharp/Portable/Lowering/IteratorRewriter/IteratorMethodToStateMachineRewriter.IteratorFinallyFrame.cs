@@ -1,4 +1,8 @@
-﻿// Copyright (c) Microsoft.  All Rights Reserved.  Licensed under the Apache License, Version 2.0.  See License.txt in the project root for license information.
+﻿// Licensed to the .NET Foundation under one or more agreements.
+// The .NET Foundation licenses this file to you under the MIT license.
+// See the LICENSE file in the project root for more information.
+
+#nullable disable
 
 using Microsoft.CodeAnalysis.CSharp.Symbols;
 using System.Collections.Generic;
@@ -11,7 +15,7 @@ namespace Microsoft.CodeAnalysis.CSharp
         // storage of various information about a given try/finally frame
         private sealed class IteratorFinallyFrame
         {
-            // finalize state of this frame. This is the state we shoudl be in when we are "between real states"
+            // finalize state of this frame. This is the state we should be in when we are "between real states"
             public readonly int finalizeState;
 
             // Enclosing frame. Root frame does not have parent.
@@ -24,7 +28,7 @@ namespace Microsoft.CodeAnalysis.CSharp
             // This is enough information to restore Try/Finally tree structure in Dispose and dispatch any valid state
             // into a corresponding try.
             // NOTE: union of all values in this map gives all nested frames.
-            public Dictionary<int, IteratorFinallyFrame> knownStates = null;
+            public Dictionary<int, IteratorFinallyFrame> knownStates;
 
             // labels within this frame (branching to these labels does not go through finally).
             public readonly HashSet<LabelSymbol> labels;
@@ -32,9 +36,9 @@ namespace Microsoft.CodeAnalysis.CSharp
             // proxy labels for branches leaving the frame. 
             // we build this on demand once we encounter leaving branches.
             // subsequent leaves to an already proxied label redirected to the proxy.
-            // At the proxy lable we will execute finally and forward the control flow 
+            // At the proxy label we will execute finally and forward the control flow 
             // to the actual destination. (which could be proxied again in the parent)
-            public Dictionary<LabelSymbol, LabelSymbol> proxyLabels = null;
+            public Dictionary<LabelSymbol, LabelSymbol> proxyLabels;
 
             public IteratorFinallyFrame(
                 IteratorFinallyFrame parent,

@@ -1,143 +1,157 @@
-' Copyright (c) Microsoft.  All Rights Reserved.  Licensed under the Apache License, Version 2.0.  See License.txt in the project root for license information.
+﻿' Licensed to the .NET Foundation under one or more agreements.
+' The .NET Foundation licenses this file to you under the MIT license.
+' See the LICENSE file in the project root for more information.
 
 Namespace Microsoft.CodeAnalysis.Editor.VisualBasic.UnitTests.Recommendations.PreprocessorDirectives
     Public Class WarningDirectiveKeywordRecommenderTests
         <Fact, Trait(Traits.Feature, Traits.Features.KeywordRecommending)>
-        Public Sub HashEnableWarningInFile()
+        Public Sub HashEnableWarningInFileTest()
             VerifyRecommendationsContain(<File>|</File>, "#Enable Warning")
         End Sub
 
         <Fact, Trait(Traits.Feature, Traits.Features.KeywordRecommending)>
-        Public Sub HashDisableWarningInFile()
+        Public Sub HashDisableWarningInFileTest()
             VerifyRecommendationsContain(<File>|</File>, "#Disable Warning")
         End Sub
 
         <Fact, Trait(Traits.Feature, Traits.Features.KeywordRecommending)>
-        Public Sub NoHashEnableInFile()
+        Public Sub NoHashEnableInFileTest()
             VerifyRecommendationsMissing(<File>|</File>, "#Enable")
         End Sub
 
         <Fact, Trait(Traits.Feature, Traits.Features.KeywordRecommending)>
-        Public Sub NoHashDisableInFile()
+        Public Sub NoHashDisableInFileTest()
             VerifyRecommendationsMissing(<File>|</File>, "#Disable")
         End Sub
 
         <Fact, Trait(Traits.Feature, Traits.Features.KeywordRecommending)>
-        Public Sub NoWarningInFile()
+        Public Sub NoWarningInFileTest()
             VerifyRecommendationsMissing(<File>|</File>, "Warning")
         End Sub
 
         <Fact, Trait(Traits.Feature, Traits.Features.KeywordRecommending)>
-        Public Sub NoHashWarningInFile()
+        Public Sub NoHashWarningInFileTest()
             VerifyRecommendationsMissing(<File>|</File>, "#Warning")
         End Sub
 
         <Fact, Trait(Traits.Feature, Traits.Features.KeywordRecommending)>
-        Public Sub HashEnableWarningInCode()
+        Public Sub HashEnableWarningInCodeTest()
             VerifyRecommendationsContain(<ClassDeclaration>Dim x = Function()
 |
 End Function</ClassDeclaration>, "#Enable Warning")
         End Sub
 
         <Fact, Trait(Traits.Feature, Traits.Features.KeywordRecommending)>
-        Public Sub WarningAfterEnable()
+        Public Sub WarningAfterEnableTest()
             VerifyRecommendationsContain(<File>
 #Enable |
                                          </File>, "Warning")
         End Sub
 
         <Fact, Trait(Traits.Feature, Traits.Features.KeywordRecommending)>
-        Public Sub WarningAfterDisable()
+        Public Sub WarningAfterDisableTest()
             VerifyRecommendationsContain(<File>
 #Disable |
                                          </File>, "Warning")
         End Sub
 
         <Fact, Trait(Traits.Feature, Traits.Features.KeywordRecommending)>
-        Public Sub NoEnableAfterEnable()
+        Public Sub NoEnableAfterEnableTest()
             VerifyRecommendationsMissing(<File>
 #Enable |
                                          </File>, "Enable")
         End Sub
 
         <Fact, Trait(Traits.Feature, Traits.Features.KeywordRecommending)>
-        Public Sub NoDisableAfterWarning()
+        Public Sub NoDisableAfterWarningTest()
             VerifyRecommendationsMissing(<File>
 #Enable Warning |
                                          </File>, "Disable")
         End Sub
 
         <Fact, Trait(Traits.Feature, Traits.Features.KeywordRecommending)>
-        Public Sub NoHashDisableAfterEnable()
+        Public Sub NoHashDisableAfterEnableTest()
             VerifyRecommendationsMissing(<File>
 #Enable |
                                          </File>, "#Disable")
         End Sub
 
         <Fact, Trait(Traits.Feature, Traits.Features.KeywordRecommending)>
-        Public Sub NoHashEnableAfterWarning()
+        Public Sub NoHashEnableAfterWarningTest()
             VerifyRecommendationsMissing(<File>
 #Enable Warning |
                                          </File>, "#Enable")
         End Sub
 
         <Fact, Trait(Traits.Feature, Traits.Features.KeywordRecommending)>
-        Public Sub NoHashDisableWarningAfterEnable()
+        Public Sub NoHashDisableWarningAfterEnableTest()
             VerifyRecommendationsMissing(<File>
 #Enable |
                                          </File>, "#Disable Warning")
         End Sub
 
         <Fact, Trait(Traits.Feature, Traits.Features.KeywordRecommending)>
-        Public Sub NoHashEnableWarningAfterWarning()
+        Public Sub NoHashEnableWarningAfterWarningTest()
             VerifyRecommendationsMissing(<File>
 #Disable Warning |
                                          </File>, "#Enable Warning")
         End Sub
 
         <Fact, Trait(Traits.Feature, Traits.Features.KeywordRecommending)>
-        Public Sub NoWarningAfterWarning()
+        Public Sub NoWarningAfterWarningTest()
             VerifyRecommendationsMissing(<File>
 #Disable Warning |
                                          </File>, "Warning")
         End Sub
 
         <Fact, Trait(Traits.Feature, Traits.Features.KeywordRecommending)>
-        Public Sub NoDisableAfterIf()
+        Public Sub NoDisableAfterIfTest()
             VerifyRecommendationsMissing(<File>
 #If |
                                          </File>, "Disable")
         End Sub
 
         <Fact, Trait(Traits.Feature, Traits.Features.KeywordRecommending)>
-        Public Sub NoHashEnableAfterIf()
+        Public Sub NoHashEnableAfterIfTest()
             VerifyRecommendationsMissing(<File>
 #If |
                                          </File>, "#Enable")
         End Sub
 
         <Fact, Trait(Traits.Feature, Traits.Features.KeywordRecommending)>
-        Public Sub NoHashDisableWarningAfterIf()
+        Public Sub NoHashDisableWarningAfterIfTest()
             VerifyRecommendationsMissing(<File>
 #If |
                                          </File>, "#Disable Warning")
         End Sub
 
         <Fact, Trait(Traits.Feature, Traits.Features.KeywordRecommending)>
-        Public Sub NoWarningAfterIf()
+        Public Sub NoWarningAfterIfTest()
             VerifyRecommendationsMissing(<File>
 #If |
                                          </File>, "Warning")
         End Sub
 
-        <WorkItem(1020079)>
+        <WorkItem(1020079, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/1020079")>
         <Fact, Trait(Traits.Feature, Traits.Features.KeywordRecommending)>
-        Public Sub NotInEnum()
+        Public Sub NotInEnumTest()
             VerifyRecommendationsMissing(<File>
 Enum E
     A
     |
 End Enum
+                                         </File>, "#Enable Warning", "#Disable Warning")
+        End Sub
+
+        <WorkItem(6389, "https://github.com/dotnet/roslyn/issues/6389")>
+        <Fact, Trait(Traits.Feature, Traits.Features.KeywordRecommending)>
+        Public Sub NotAfterHashRegionTest()
+            VerifyRecommendationsMissing(<File>
+                                         Class C
+
+                                             #Region |
+
+                                         End Class
                                          </File>, "#Enable Warning", "#Disable Warning")
         End Sub
     End Class

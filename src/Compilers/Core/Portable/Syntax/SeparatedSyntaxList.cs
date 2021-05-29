@@ -1,4 +1,6 @@
-﻿// Copyright (c) Microsoft.  All Rights Reserved.  Licensed under the Apache License, Version 2.0.  See License.txt in the project root for license information.
+﻿// Licensed to the .NET Foundation under one or more agreements.
+// The .NET Foundation licenses this file to you under the MIT license.
+// See the LICENSE file in the project root for more information.
 
 using System;
 using System.Collections;
@@ -10,7 +12,7 @@ using Roslyn.Utilities;
 
 namespace Microsoft.CodeAnalysis
 {
-    public partial struct SeparatedSyntaxList<TNode> : IEquatable<SeparatedSyntaxList<TNode>>, IReadOnlyList<TNode> where TNode : SyntaxNode
+    public readonly partial struct SeparatedSyntaxList<TNode> : IEquatable<SeparatedSyntaxList<TNode>>, IReadOnlyList<TNode> where TNode : SyntaxNode
     {
         private readonly SyntaxNodeOrTokenList _list;
         private readonly int _count;
@@ -53,7 +55,7 @@ namespace Microsoft.CodeAnalysis
         {
         }
 
-        internal SyntaxNode Node
+        internal SyntaxNode? Node
         {
             get
             {
@@ -95,12 +97,12 @@ namespace Microsoft.CodeAnalysis
                     {
                         if (unchecked((uint)index < (uint)_count))
                         {
-                            return (TNode)node.GetNodeSlot(index << 1);
+                            return (TNode)node.GetRequiredNodeSlot(index << 1);
                         }
                     }
                 }
 
-                throw new ArgumentOutOfRangeException("index");
+                throw new ArgumentOutOfRangeException(nameof(index));
             }
         }
 
@@ -118,13 +120,13 @@ namespace Microsoft.CodeAnalysis
                 if (unchecked((uint)index < (uint)_separatorCount))
                 {
                     index = (index << 1) + 1;
-                    var green = node.Green.GetSlot(index);
+                    var green = node.Green.GetRequiredSlot(index);
                     Debug.Assert(green.IsToken);
                     return new SyntaxToken(node.Parent, green, node.GetChildPosition(index), _list.index + index);
                 }
             }
 
-            throw new ArgumentOutOfRangeException("index");
+            throw new ArgumentOutOfRangeException(nameof(index));
         }
 
         /// <summary>
@@ -182,16 +184,14 @@ namespace Microsoft.CodeAnalysis
             return this[0];
         }
 
-        public TNode FirstOrDefault()
+        public TNode? FirstOrDefault()
         {
             if (this.Any())
             {
                 return this[0];
             }
-            else
-            {
-                return null;
-            }
+
+            return null;
         }
 
         public TNode Last()
@@ -199,16 +199,14 @@ namespace Microsoft.CodeAnalysis
             return this[this.Count - 1];
         }
 
-        public TNode LastOrDefault()
+        public TNode? LastOrDefault()
         {
             if (this.Any())
             {
                 return this[this.Count - 1];
             }
-            else
-            {
-                return null;
-            }
+
+            return null;
         }
 
         public bool Contains(TNode node)
@@ -286,6 +284,19 @@ namespace Microsoft.CodeAnalysis
             return _list.Any();
         }
 
+        internal bool Any(Func<TNode, bool> predicate)
+        {
+            for (int i = 0; i < this.Count; i++)
+            {
+                if (predicate(this[i]))
+                {
+                    return true;
+                }
+            }
+
+            return false;
+        }
+
         public SyntaxNodeOrTokenList GetWithSeparators()
         {
             return _list;
@@ -306,9 +317,9 @@ namespace Microsoft.CodeAnalysis
             return _list == other._list;
         }
 
-        public override bool Equals(object obj)
+        public override bool Equals(object? obj)
         {
-            return (obj is SeparatedSyntaxList<TNode>) && Equals((SeparatedSyntaxList<TNode>)obj);
+            return (obj is SeparatedSyntaxList<TNode> list) && Equals(list);
         }
 
         public override int GetHashCode()
@@ -343,7 +354,7 @@ namespace Microsoft.CodeAnalysis
         {
             if (node == null)
             {
-                throw new ArgumentNullException("node");
+                throw new ArgumentNullException(nameof(node));
             }
 
             return InsertRange(index, new[] { node });
@@ -358,12 +369,12 @@ namespace Microsoft.CodeAnalysis
         {
             if (nodes == null)
             {
-                throw new ArgumentNullException("nodes");
+                throw new ArgumentNullException(nameof(nodes));
             }
 
             if (index < 0 || index > this.Count)
             {
-                throw new ArgumentOutOfRangeException("index");
+                throw new ArgumentOutOfRangeException(nameof(index));
             }
 
             var nodesWithSeps = this.GetWithSeparators();
@@ -396,21 +407,23 @@ namespace Microsoft.CodeAnalysis
             }
 
             // if item after last inserted node is a node, add separator
-            if (insertionIndex < nodesWithSeps.Count && nodesWithSeps[insertionIndex].IsNode)
+            if (insertionIndex < nodesWithSeps.Count && nodesWithSeps[insertionIndex] is { IsNode: true } nodeOrToken)
             {
                 var node = nodesWithSeps[insertionIndex].AsNode();
+                Debug.Assert(node is object);
                 nodesToInsertWithSeparators.Add(node.Green.CreateSeparator<TNode>(node)); // separator
             }
 
             return new SeparatedSyntaxList<TNode>(nodesWithSeps.InsertRange(insertionIndex, nodesToInsertWithSeparators));
         }
 
-        private static bool KeepSeparatorWithPreviousNode(SyntaxToken separator)
+        private static bool KeepSeparatorWithPreviousNode(in SyntaxToken separator)
         {
             // if the trivia after the separator contains an explicit end of line or a single line comment
             // then it should stay associated with previous node
             foreach (var tr in separator.TrailingTrivia)
             {
+                Debug.Assert(tr.UnderlyingNode is object);
                 if (tr.UnderlyingNode.IsTriviaWithEndOfLine())
                 {
                     return true;
@@ -428,7 +441,7 @@ namespace Microsoft.CodeAnalysis
         {
             if (index < 0 || index > this.Count)
             {
-                throw new ArgumentOutOfRangeException("index");
+                throw new ArgumentOutOfRangeException(nameof(index));
             }
 
             return this.Remove(this[index]);
@@ -459,10 +472,8 @@ namespace Microsoft.CodeAnalysis
 
                 return new SeparatedSyntaxList<TNode>(nodesWithSeps);
             }
-            else
-            {
-                return this;
-            }
+
+            return this;
         }
 
         /// <summary>
@@ -474,7 +485,7 @@ namespace Microsoft.CodeAnalysis
         {
             if (newNode == null)
             {
-                throw new ArgumentNullException("newNode");
+                throw new ArgumentNullException(nameof(newNode));
             }
 
             var index = this.IndexOf(nodeInList);
@@ -482,10 +493,8 @@ namespace Microsoft.CodeAnalysis
             {
                 return new SeparatedSyntaxList<TNode>(this.GetWithSeparators().Replace(nodeInList, newNode));
             }
-            else
-            {
-                throw new ArgumentException("nodeInList");
-            }
+
+            throw new ArgumentOutOfRangeException(nameof(nodeInList));
         }
 
         /// <summary>
@@ -497,7 +506,7 @@ namespace Microsoft.CodeAnalysis
         {
             if (newNodes == null)
             {
-                throw new ArgumentNullException("newNodes");
+                throw new ArgumentNullException(nameof(newNodes));
             }
 
             var index = this.IndexOf(nodeInList);
@@ -516,15 +525,11 @@ namespace Microsoft.CodeAnalysis
                     newNodeList.RemoveAt(0);
                     return listWithFirstReplaced.InsertRange(index + 1, newNodeList);
                 }
-                else
-                {
-                    return listWithFirstReplaced;
-                }
+
+                return listWithFirstReplaced;
             }
-            else
-            {
-                throw new ArgumentException("nodeInList");
-            }
+
+            throw new ArgumentOutOfRangeException(nameof(nodeInList));
         }
 
         /// <summary>
@@ -536,7 +541,7 @@ namespace Microsoft.CodeAnalysis
         {
             var nodesWithSeps = this.GetWithSeparators();
             var index = nodesWithSeps.IndexOf(separatorToken);
-            if (index < 0 || index >= this.Count)
+            if (index < 0)
             {
                 throw new ArgumentException("separatorToken");
             }
@@ -561,7 +566,9 @@ namespace Microsoft.CodeAnalysis
             get { return _list.ToArray(); }
         }
 
+#pragma warning disable RS0041 // uses oblivious reference types
         public Enumerator GetEnumerator()
+#pragma warning restore RS0041 // uses oblivious reference types
         {
             return new Enumerator(this);
         }
@@ -584,6 +591,16 @@ namespace Microsoft.CodeAnalysis
             }
 
             return SpecializedCollections.EmptyEnumerator<TNode>();
+        }
+
+        public static implicit operator SeparatedSyntaxList<SyntaxNode>(SeparatedSyntaxList<TNode> nodes)
+        {
+            return new SeparatedSyntaxList<SyntaxNode>(nodes._list);
+        }
+
+        public static implicit operator SeparatedSyntaxList<TNode>(SeparatedSyntaxList<SyntaxNode> nodes)
+        {
+            return new SeparatedSyntaxList<TNode>(nodes._list);
         }
     }
 }

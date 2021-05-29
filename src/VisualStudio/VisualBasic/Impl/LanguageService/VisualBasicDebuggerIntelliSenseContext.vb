@@ -1,4 +1,6 @@
-' Copyright (c) Microsoft.  All Rights Reserved.  Licensed under the Apache License, Version 2.0.  See License.txt in the project root for license information.
+﻿' Licensed to the .NET Foundation under one or more agreements.
+' The .NET Foundation licenses this file to you under the MIT license.
+' See the LICENSE file in the project root for more information.
 
 Imports System.Threading
 Imports Microsoft.CodeAnalysis
@@ -19,9 +21,9 @@ Namespace Microsoft.VisualStudio.LanguageServices.VisualBasic
     Friend Class VisualBasicDebuggerIntelliSenseContext
         Inherits AbstractDebuggerIntelliSenseContext
 
-        Private innerMostContainingNodeIsExpression As Boolean = False
+        Private _innerMostContainingNodeIsExpression As Boolean
 
-        Sub New(wpfTextView As IWpfTextView,
+        Public Sub New(wpfTextView As IWpfTextView,
                 vsTextView As IVsTextView,
                 debuggerBuffer As IVsTextLines,
                 contextBuffer As ITextBuffer,
@@ -41,7 +43,7 @@ Namespace Microsoft.VisualStudio.LanguageServices.VisualBasic
         End Sub
 
         ' Test constructor
-        Sub New(wpfTextView As IWpfTextView,
+        Public Sub New(wpfTextView As IWpfTextView,
                 textBuffer As ITextBuffer,
                 span As TextSpan(),
                 componentModel As IComponentModel,
@@ -57,7 +59,7 @@ Namespace Microsoft.VisualStudio.LanguageServices.VisualBasic
         End Sub
 
         Protected Overrides Function GetAdjustedContextPoint(contextPoint As Integer, document As Document) As Integer
-            Dim tree = document.GetVisualBasicSyntaxTreeAsync(CancellationToken.None).WaitAndGetResult(CancellationToken.None)
+            Dim tree = document.GetSyntaxTreeSynchronously(CancellationToken.None)
             Dim token = tree.FindTokenOnLeftOfPosition(contextPoint, CancellationToken.None)
 
             Dim containingNode = token.Parent.AncestorsAndSelf().Where(Function(s) TypeOf s Is ExpressionSyntax OrElse
@@ -65,7 +67,7 @@ Namespace Microsoft.VisualStudio.LanguageServices.VisualBasic
                                                                              s.IsExecutableBlock()).FirstOrDefault()
             If containingNode IsNot Nothing Then
                 If TypeOf containingNode Is ExpressionSyntax AndAlso Not IsRightSideOfLocalDeclaration(containingNode) Then
-                    innerMostContainingNodeIsExpression = True
+                    _innerMostContainingNodeIsExpression = True
                     Return containingNode.Span.End
                 Else
                     Dim statement = containingNode.GetExecutableBlockStatements().FirstOrDefault()
@@ -73,7 +75,7 @@ Namespace Microsoft.VisualStudio.LanguageServices.VisualBasic
                         Return statement.FullSpan.End
                     ElseIf TypeOf containingNode Is MethodBlockBaseSyntax
                         ' Something like
-                        ' Sub Foo(o as integer)
+                        ' Sub Goo(o as integer)
                         ' [| End Sub |]
                         Return DirectCast(containingNode, MethodBlockBaseSyntax).EndBlockStatement.SpanStart
                     Else
@@ -108,7 +110,7 @@ Namespace Microsoft.VisualStudio.LanguageServices.VisualBasic
             ' intellisense to trigger a new expression context
             Dim forceExpressionContext = ".__o("
 
-            If Not innerMostContainingNodeIsExpression Then
+            If Not _innerMostContainingNodeIsExpression Then
                 ' We're after some statement, could be a for loop, using block, try block, etc, fake a
                 ' local declaration on the following line
                 forceExpressionContext = vbCrLf + "Dim __o = "

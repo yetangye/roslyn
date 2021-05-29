@@ -1,4 +1,6 @@
-﻿' Copyright (c) Microsoft.  All Rights Reserved.  Licensed under the Apache License, Version 2.0.  See License.txt in the project root for license information.
+﻿' Licensed to the .NET Foundation under one or more agreements.
+' The .NET Foundation licenses this file to you under the MIT license.
+' See the LICENSE file in the project root for more information.
 
 Imports Microsoft.CodeAnalysis.Text
 Imports Microsoft.CodeAnalysis.VisualBasic.Symbols
@@ -11,8 +13,8 @@ Namespace Microsoft.CodeAnalysis.VisualBasic.UnitTests
         Inherits BasicTestBase
 
         <Fact()>
-        Sub WithTestNotDeclared()
-            CreateCompilationWithMscorlibAndVBRuntime(
+        Public Sub WithTestNotDeclared()
+            CreateCompilationWithMscorlib40AndVBRuntime(
 <compilation>
     <file name="a.vb">
 Module WithTestNotDeclared
@@ -31,8 +33,8 @@ End Module
         End Sub
 
         <Fact()>
-        Sub WithTestScoping()
-            CreateCompilationWithMscorlibAndVBRuntime(
+        Public Sub WithTestScoping()
+            CreateCompilationWithMscorlib40AndVBRuntime(
 <compilation>
     <file name="a.vb">
 Module WithTestScoping
@@ -57,8 +59,8 @@ End Module
         End Sub
 
         <Fact()>
-        Sub WithTestNotAMember()
-            Dim compilation = CreateCompilationWithMscorlibAndVBRuntime(
+        Public Sub WithTestNotAMember()
+            Dim compilation = CreateCompilationWithMscorlib40AndVBRuntime(
 <compilation>
     <file name="a.vb">
 Class Class2
@@ -85,8 +87,8 @@ End Module
         End Sub
 
         <Fact()>
-        Sub WithTestCannotLiftMeReference()
-            Dim compilation = CreateCompilationWithMscorlibAndVBRuntime(
+        Public Sub WithTestCannotLiftMeReference()
+            Dim compilation = CreateCompilationWithMscorlib40AndVBRuntime(
 <compilation>
     <file name="a.vb">
 Imports System
@@ -120,8 +122,8 @@ BC36638: Instance members and 'Me' cannot be used within a lambda expression in 
         End Sub
 
         <Fact()>
-        Sub WithTestCannotLiftMeReference2()
-            Dim compilation = CreateCompilationWithMscorlibAndVBRuntime(
+        Public Sub WithTestCannotLiftMeReference2()
+            Dim compilation = CreateCompilationWithMscorlib40AndVBRuntime(
 <compilation>
     <file name="a.vb">
 Imports System
@@ -154,8 +156,8 @@ BC36638: Instance members and 'Me' cannot be used within a lambda expression in 
         End Sub
 
         <Fact()>
-        Sub WithTestCannotLiftMeReference3()
-            Dim compilation = CreateCompilationWithMscorlibAndVBRuntime(
+        Public Sub WithTestCannotLiftMeReference3()
+            Dim compilation = CreateCompilationWithMscorlib40AndVBRuntime(
 <compilation>
     <file name="a.vb">
 Imports System
@@ -192,8 +194,8 @@ BC36638: Instance members and 'Me' cannot be used within a lambda expression in 
         End Sub
 
         <Fact()>
-        Sub WithTestCannotLiftMeReference4()
-            Dim compilation = CreateCompilationWithMscorlibAndVBRuntime(
+        Public Sub WithTestCannotLiftMeReference4()
+            Dim compilation = CreateCompilationWithMscorlib40AndVBRuntime(
 <compilation>
     <file name="a.vb">
 Imports System
@@ -221,8 +223,8 @@ End Structure
         End Sub
 
         <Fact()>
-        Sub WithTestCannotLiftMeReference_NestedLambda()
-            Dim compilation = CreateCompilationWithMscorlibAndVBRuntime(
+        Public Sub WithTestCannotLiftMeReference_NestedLambda()
+            Dim compilation = CreateCompilationWithMscorlib40AndVBRuntime(
 <compilation>
     <file name="a.vb">
 Imports System
@@ -258,8 +260,8 @@ BC36638: Instance members and 'Me' cannot be used within a lambda expression in 
         End Sub
 
         <Fact()>
-        Sub WithTestCannotLiftMeReference_NestedWith()
-            Dim compilation = CreateCompilationWithMscorlibAndVBRuntime(
+        Public Sub WithTestCannotLiftMeReference_NestedWith()
+            Dim compilation = CreateCompilationWithMscorlib40AndVBRuntime(
 <compilation>
     <file name="a.vb">
 Imports System
@@ -295,8 +297,8 @@ BC36638: Instance members and 'Me' cannot be used within a lambda expression in 
         End Sub
 
         <Fact()>
-        Sub WithTest_ValueTypeLValueInParentheses()
-            Dim compilation = CreateCompilationWithMscorlibAndVBRuntime(
+        Public Sub WithTest_ValueTypeLValueInParentheses()
+            Dim compilation = CreateCompilationWithMscorlib40AndVBRuntime(
 <compilation>
     <file name="a.vb">
 Imports System
@@ -322,25 +324,25 @@ End Structure
         End Sub
 
         <Fact()>
-        Sub WithTest_UnknownMember()
-            Dim compilation = CreateCompilationWithMscorlibAndVBRuntime(
+        Public Sub WithTest_UnknownMember()
+            Dim compilation = CreateCompilationWithMscorlib40AndVBRuntime(
 <compilation>
     <file name="a.vb">
 Option Strict On
 Class S
     Sub S()
         With New Object()
-            Dim x = .Foo()
+            Dim x = .Goo()
         End With
     End Sub
 End Class
     </file>
-</compilation>).VerifyDiagnostics(Diagnostic(ERRID.ERR_StrictDisallowsLateBinding, ".Foo"))
+</compilation>).VerifyDiagnostics(Diagnostic(ERRID.ERR_StrictDisallowsLateBinding, ".Goo"))
         End Sub
 
         <Fact()>
         Public Sub BC36549ERR_CannotLiftAnonymousType1_2()
-            Dim compilation = CompilationUtils.CreateCompilationWithMscorlibAndVBRuntimeAndReferences(
+            Dim compilation = CompilationUtils.CreateCompilationWithMscorlib40AndVBRuntimeAndReferences(
 <compilation name="BC36549ERR_CannotLiftAnonymousType1_2">
     <file name="a.vb">
 Class Outer
@@ -365,7 +367,7 @@ BC36549: Anonymous type property 'a' cannot be used in the definition of a lambd
 
         <Fact()>
         Public Sub BC36549ERR_CannotLiftAnonymousType1_3()
-            Dim compilation = CompilationUtils.CreateCompilationWithMscorlibAndVBRuntimeAndReferences(
+            Dim compilation = CompilationUtils.CreateCompilationWithMscorlib40AndVBRuntimeAndReferences(
 <compilation name="BC36549ERR_CannotLiftAnonymousType1_3">
     <file name="a.vb">
 Structure Clazz
@@ -400,7 +402,7 @@ BC36549: Anonymous type property 'a' cannot be used in the definition of a lambd
 
         <Fact()>
         Public Sub BC30044ERR_UseOfKeywordFromStructure1_2()
-            Dim compilation = CompilationUtils.CreateCompilationWithMscorlibAndVBRuntime(
+            Dim compilation = CompilationUtils.CreateCompilationWithMscorlib40AndVBRuntime(
 <compilation name="UseOfKeywordFromStructure1_2">
     <file name="a.vb">
 Structure Clazz
@@ -432,7 +434,7 @@ BC30044: 'MyBase' is not valid within a structure.
 
         <Fact()>
         Public Sub BC30068ERR_LValueRequired_3()
-            Dim compilation = CompilationUtils.CreateCompilationWithMscorlib(
+            Dim compilation = CompilationUtils.CreateCompilationWithMscorlib40(
 <compilation name="LValueRequired_3">
     <file name="a.vb">
 Class C2
@@ -458,7 +460,7 @@ BC30068: Expression is a value and therefore cannot be the target of an assignme
 
         <Fact()>
         Public Sub BC30367ERR_NoDefaultNotExtend1_2()
-            Dim compilation = CompilationUtils.CreateCompilationWithMscorlib(
+            Dim compilation = CompilationUtils.CreateCompilationWithMscorlib40(
 <compilation>
     <file name="a.vb">
 Class S
@@ -480,7 +482,7 @@ BC30367: Class '&lt;anonymous type&gt;' cannot be indexed because it has no defa
 
         <Fact()>
         Public Sub BC30491ERR_VoidValue_InWithStatement()
-            Dim compilation = CompilationUtils.CreateCompilationWithMscorlibAndVBRuntime(
+            Dim compilation = CompilationUtils.CreateCompilationWithMscorlib40AndVBRuntime(
     <compilation name="BC30491ERR_VoidValue_InWithStatement">
         <file name="a.vb">
 Imports System
@@ -502,7 +504,7 @@ BC30491: Expression does not produce a value.
 
         <Fact()>
         Public Sub BC30491ERR_VoidValue_InWithStatement2()
-            Dim compilation = CompilationUtils.CreateCompilationWithMscorlibAndVBRuntime(
+            Dim compilation = CompilationUtils.CreateCompilationWithMscorlib40AndVBRuntime(
     <compilation name="BC30491ERR_VoidValue_InWithStatement2">
         <file name="a.vb">
 Imports System
@@ -524,7 +526,7 @@ BC30491: Expression does not produce a value.
 
         <Fact()>
         Public Sub BC30524ERR_NoGetProperty1_4()
-            Dim compilation = CompilationUtils.CreateCompilationWithMscorlibAndVBRuntime(
+            Dim compilation = CompilationUtils.CreateCompilationWithMscorlib40AndVBRuntime(
     <compilation>
         <file name="a.vb">
 Imports System
@@ -553,7 +555,7 @@ BC30524: Property 'IntProp' is 'WriteOnly'.
         <Fact()>
         Public Sub BC36535ERR_CannotLiftStructureMeQuery()
 
-            Dim compilation = CompilationUtils.CreateCompilationWithMscorlibAndReferences(
+            Dim compilation = CompilationUtils.CreateCompilationWithMscorlib40AndReferences(
     <compilation name="CannotLiftStructureMeQuery">
         <file name="a.vb">
 Option Infer On
@@ -584,7 +586,7 @@ BC36535: Instance members and 'Me' cannot be used within query expressions in st
         <Fact()>
         Public Sub MultipleNestedWithWithNestedStructMe()
 
-            Dim compilation = CompilationUtils.CreateCompilationWithMscorlibAndReferences(
+            Dim compilation = CompilationUtils.CreateCompilationWithMscorlib40AndReferences(
     <compilation name="MultipleNestedWithWithNestedStructMe">
         <file name="a.vb">
 Imports System
@@ -632,7 +634,7 @@ BC36638: Instance members and 'Me' cannot be used within a lambda expression in 
         <Fact()>
         Public Sub MultipleNestedWithWithNestedStructMe2()
 
-            Dim compilation = CompilationUtils.CreateCompilationWithMscorlibAndReferences(
+            Dim compilation = CompilationUtils.CreateCompilationWithMscorlib40AndReferences(
     <compilation name="MultipleNestedWithWithNestedStructMe2">
         <file name="a.vb">
 Imports System
@@ -680,7 +682,7 @@ BC36638: Instance members and 'Me' cannot be used within a lambda expression in 
         <Fact()>
         Public Sub MultipleNestedWithRValueStruct()
 
-            Dim compilation = CompilationUtils.CreateCompilationWithMscorlibAndReferences(
+            Dim compilation = CompilationUtils.CreateCompilationWithMscorlib40AndReferences(
     <compilation name="MultipleNestedWithRValueStruct">
         <file name="a.vb">
 Imports System
@@ -916,7 +918,7 @@ End Structure
 
         <Fact()>
         Public Sub TestWithInsideUsing()
-            Dim compilation = CompilationUtils.CreateCompilationWithMscorlibAndReferences(
+            Dim compilation = CompilationUtils.CreateCompilationWithMscorlib40AndReferences(
 <compilation name="TestWithInsideUsing">
     <file name="a.vb">
 Imports System
@@ -953,7 +955,7 @@ BC30068: Expression is a value and therefore cannot be the target of an assignme
 
         <Fact()>
         Public Sub TestWithAndQueryVariable()
-            Dim compilation = CompilationUtils.CreateCompilationWithMscorlibAndReferences(
+            Dim compilation = CompilationUtils.CreateCompilationWithMscorlib40AndReferences(
 <compilation name="TestWithAndQueryVariable">
     <file name="a.vb">
 Imports System
@@ -987,10 +989,10 @@ BC30068: Expression is a value and therefore cannot be the target of an assignme
 </errors>)
         End Sub
 
-        <WorkItem(543921, "DevDiv")>
+        <WorkItem(543921, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/543921")>
         <Fact()>
-        Sub WithNewT()
-            Dim compilation = CreateCompilationWithMscorlibAndVBRuntime(
+        Public Sub WithNewT()
+            Dim compilation = CreateCompilationWithMscorlib40AndVBRuntime(
 <compilation>
     <file name="c.vb">
 Interface I
@@ -1008,9 +1010,9 @@ End Module
             compilation.AssertNoErrors()
         End Sub
 
-        <Fact(), WorkItem(544195, "DevDiv")>
+        <Fact(), WorkItem(544195, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/544195")>
         Public Sub WithMeMyClassMyBase()
-            CompilationUtils.CreateCompilationWithMscorlib(
+            CompilationUtils.CreateCompilationWithMscorlib40(
 <compilation>
     <file name="a.vb">
 Class Class1
@@ -1031,6 +1033,120 @@ End Class
            Diagnostic(ERRID.ERR_ExpectedDotAfterMyClass, "MyClass"),
            Diagnostic(ERRID.ERR_ExpectedDotAfterMyBase, "MyBase"),
            Diagnostic(ERRID.ERR_InvalidConstructorCall, ".New"))
+        End Sub
+
+        <Fact()>
+        <WorkItem(49904, "https://github.com/dotnet/roslyn/issues/49904")>
+        Public Sub ArrayAccessWithOmittedIndexAsWithTarget_01()
+            Dim compilation = CreateCompilation(
+<compilation>
+    <file name="c.vb">
+Class Test
+
+    Private MyArr(9, 3, 11) As MyStruct
+
+    Sub Main()
+        Dim n, p, r As Integer
+        For n = 0 To 9
+            For p = 0 To 3
+                For r = 0 To 11
+                    With MyArr(n, )
+                        .A = n
+                        .B = p
+                        .C = r
+                    End With
+                Next
+            Next
+        Next
+    End Sub
+
+End Class
+
+Structure MyStruct
+    Dim A As Integer
+    Dim B As Integer
+    Dim C As Integer
+End Structure
+    </file>
+</compilation>)
+
+            Dim tree = compilation.SyntaxTrees.Single()
+
+            For Each node In tree.GetRoot().DescendantNodes()
+                Dim model = compilation.GetSemanticModel(tree)
+                model.GetMemberGroup(node)
+                model = compilation.GetSemanticModel(tree)
+                model.GetSymbolInfo(node)
+                model = compilation.GetSemanticModel(tree)
+                model.GetTypeInfo(node)
+            Next
+
+            compilation.AssertTheseEmitDiagnostics(
+<expected>
+BC30105: Number of indices is less than the number of dimensions of the indexed array.
+                    With MyArr(n, )
+                              ~~~~~
+BC30491: Expression does not produce a value.
+                    With MyArr(n, )
+                                  ~
+</expected>)
+        End Sub
+
+        <Fact()>
+        <WorkItem(49904, "https://github.com/dotnet/roslyn/issues/49904")>
+        Public Sub ArrayAccessWithOmittedIndexAsWithTarget_02()
+            Dim compilation = CreateCompilation(
+<compilation>
+    <file name="c.vb">
+Class Test
+
+    Private MyArr(9, 3, 11) As MyStruct
+
+    Sub Main()
+        Dim n, p, r As Integer
+        For n = 0 To 9
+            For p = 0 To 3
+                For r = 0 To 11
+                    With MyArr(n, , )
+                        .A = n
+                        .B = p
+                        .C = r
+                    End With
+                Next
+            Next
+        Next
+    End Sub
+
+End Class
+
+Structure MyStruct
+    Dim A As Integer
+    Dim B As Integer
+    Dim C As Integer
+End Structure
+    </file>
+</compilation>)
+
+            Dim tree = compilation.SyntaxTrees.Single()
+
+            For Each node In tree.GetRoot().DescendantNodes()
+                Dim model = compilation.GetSemanticModel(tree)
+                model.GetMemberGroup(node)
+                model = compilation.GetSemanticModel(tree)
+                model.GetSymbolInfo(node)
+                model = compilation.GetSemanticModel(tree)
+                model.GetTypeInfo(node)
+            Next
+
+            compilation.AssertTheseEmitDiagnostics(
+<expected>
+BC30491: Expression does not produce a value.
+                    With MyArr(n, , )
+                                  ~
+BC30491: Expression does not produce a value.
+                    With MyArr(n, , )
+                                    ~
+</expected>)
         End Sub
 
     End Class

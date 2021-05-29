@@ -1,4 +1,6 @@
-﻿// Copyright (c) Microsoft.  All Rights Reserved.  Licensed under the Apache License, Version 2.0.  See License.txt in the project root for license information.
+﻿// Licensed to the .NET Foundation under one or more agreements.
+// The .NET Foundation licenses this file to you under the MIT license.
+// See the LICENSE file in the project root for more information.
 
 using System;
 using System.Diagnostics;
@@ -11,7 +13,7 @@ namespace Microsoft.CodeAnalysis
     /// </summary>
     public class AssemblyIdentityComparer
     {
-        public static readonly AssemblyIdentityComparer Default = new AssemblyIdentityComparer();
+        public static AssemblyIdentityComparer Default { get; } = new AssemblyIdentityComparer();
 
         public static StringComparer SimpleNameComparer
         {
@@ -57,8 +59,7 @@ namespace Microsoft.CodeAnalysis
         /// <returns>True if the reference name matches the definition identity.</returns>
         public bool ReferenceMatchesDefinition(string referenceDisplayName, AssemblyIdentity definition)
         {
-            bool unificationApplied;
-            return Compare(null, referenceDisplayName, definition, out unificationApplied, ignoreVersion: false) != ComparisonResult.NotEquivalent;
+            return Compare(reference: null, referenceDisplayName, definition, unificationApplied: out _, ignoreVersion: false) != ComparisonResult.NotEquivalent;
         }
 
         /// <summary>
@@ -69,8 +70,7 @@ namespace Microsoft.CodeAnalysis
         /// <returns>True if the reference identity matches the definition identity.</returns>
         public bool ReferenceMatchesDefinition(AssemblyIdentity reference, AssemblyIdentity definition)
         {
-            bool unificationApplied;
-            return Compare(reference, null, definition, out unificationApplied, ignoreVersion: false) != ComparisonResult.NotEquivalent;
+            return Compare(reference, referenceDisplayName: null, definition, unificationApplied: out _, ignoreVersion: false) != ComparisonResult.NotEquivalent;
         }
 
         /// <summary>
@@ -80,12 +80,11 @@ namespace Microsoft.CodeAnalysis
         /// <param name="definition">Definition identity.</param>
         public ComparisonResult Compare(AssemblyIdentity reference, AssemblyIdentity definition)
         {
-            bool unificationApplied;
-            return Compare(reference, null, definition, out unificationApplied, ignoreVersion: true);
+            return Compare(reference, referenceDisplayName: null, definition, unificationApplied: out _, ignoreVersion: true);
         }
 
         // internal for testing
-        internal ComparisonResult Compare(AssemblyIdentity reference, string referenceDisplayName, AssemblyIdentity definition, out bool unificationApplied, bool ignoreVersion)
+        internal ComparisonResult Compare(AssemblyIdentity? reference, string? referenceDisplayName, AssemblyIdentity definition, out bool unificationApplied, bool ignoreVersion)
         {
             Debug.Assert((reference != null) ^ (referenceDisplayName != null));
             unificationApplied = false;
@@ -104,7 +103,7 @@ namespace Microsoft.CodeAnalysis
             }
             else
             {
-                if (!AssemblyIdentity.TryParseDisplayName(referenceDisplayName, out reference, out parts) ||
+                if (!AssemblyIdentity.TryParseDisplayName(referenceDisplayName!, out reference, out parts) ||
                     reference.ContentType != definition.ContentType)
                 {
                     return ComparisonResult.NotEquivalent;
@@ -113,8 +112,8 @@ namespace Microsoft.CodeAnalysis
 
             Debug.Assert(reference.ContentType == definition.ContentType);
 
-            bool isFxAssembly;
-            if (!ApplyUnificationPolicies(ref reference, ref definition, parts, out isFxAssembly))
+            bool isDefinitionFxAssembly;
+            if (!ApplyUnificationPolicies(ref reference, ref definition, parts, out isDefinitionFxAssembly))
             {
                 return ComparisonResult.NotEquivalent;
             }
@@ -151,7 +150,7 @@ namespace Microsoft.CodeAnalysis
                     return ComparisonResult.Equivalent;
                 }
 
-                isFxAssembly = false;
+                isDefinitionFxAssembly = false;
             }
 
             if (!SimpleNameComparer.Equals(reference.Name, definition.Name))
@@ -177,7 +176,16 @@ namespace Microsoft.CodeAnalysis
                 hasSomeVersionParts &&
                 (hasPartialVersion || reference.Version != definition.Version))
             {
-                if (isFxAssembly)
+                // Note:
+                // System.Numerics.Vectors, Version=4.0 is an FX assembly
+                // System.Numerics.Vectors, Version=4.1+ is not an FX assembly
+                //
+                // It seems like a bug in Fusion: it only determines whether the definition is an FX assembly 
+                // and calculates the result based upon that, regardless of whether the reference is an FX assembly or not.
+                // We do replicate the behavior.
+                //
+                // As a result unification is asymmetric when comparing the above identities.
+                if (isDefinitionFxAssembly)
                 {
                     unificationApplied = true;
                     return ComparisonResult.Equivalent;
@@ -211,10 +219,11 @@ namespace Microsoft.CodeAnalysis
             return AssemblyIdentity.MemberwiseEqual(x, y);
         }
 
-        internal virtual bool ApplyUnificationPolicies(ref AssemblyIdentity reference, ref AssemblyIdentity definition, AssemblyIdentityParts referenceParts, out bool isFxAssembly)
+        internal virtual bool ApplyUnificationPolicies(ref AssemblyIdentity reference, ref AssemblyIdentity definition, AssemblyIdentityParts referenceParts, out bool isDefinitionFxAssembly)
         {
-            isFxAssembly = false;
+            isDefinitionFxAssembly = false;
             return true;
         }
     }
 }
+

@@ -1,4 +1,8 @@
-﻿// Copyright (c) Microsoft.  All Rights Reserved.  Licensed under the Apache License, Version 2.0.  See License.txt in the project root for license information.
+﻿// Licensed to the .NET Foundation under one or more agreements.
+// The .NET Foundation licenses this file to you under the MIT license.
+// See the LICENSE file in the project root for more information.
+
+#nullable disable
 
 using System;
 using System.Globalization;
@@ -113,7 +117,7 @@ namespace Microsoft.CodeAnalysis
             {
                 // As in the native C# compiler (see IMPORTER::ImportMethod), drop any method prefixed
                 // with "_VtblGap".  They should be impossible to call/implement/etc.
-                // BREAK: The native VB compiler does not drop such methods, but it produces unverfiable
+                // BREAK: The native VB compiler does not drop such methods, but it produces unverifiable
                 // code when they are called, so the break is acceptable.
                 // TODO: Keep some record of vtable gaps (DevDiv #17472).
                 var name = module.GetMethodDefNameOrThrow(methodDef);
@@ -149,7 +153,7 @@ namespace Microsoft.CodeAnalysis
             // _VtblGap<SequenceNumber><_CountOfSlots>
             // where <SequenceNumber> and <CountOfSlots> are decimal numbers
             // ----------------------
-            string prefix = VTableGapMethodNamePrefix;
+            const string prefix = VTableGapMethodNamePrefix;
 
             if (emittedMethodName.StartsWith(prefix, StringComparison.Ordinal))
             {

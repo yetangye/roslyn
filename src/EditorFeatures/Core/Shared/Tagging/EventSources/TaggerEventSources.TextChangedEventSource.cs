@@ -1,4 +1,6 @@
-// Copyright (c) Microsoft.  All Rights Reserved.  Licensed under the Apache License, Version 2.0.  See License.txt in the project root for license information.
+﻿// Licensed to the .NET Foundation under one or more agreements.
+// The .NET Foundation licenses this file to you under the MIT license.
+// See the LICENSE file in the project root for more information.
 
 using Microsoft.CodeAnalysis.Editor.Tagging;
 using Microsoft.VisualStudio.Text;
@@ -11,50 +13,29 @@ namespace Microsoft.CodeAnalysis.Editor.Shared.Tagging
         private class TextChangedEventSource : AbstractTaggerEventSource
         {
             private readonly ITextBuffer _subjectBuffer;
-            private readonly bool _reportChangedSpans;
 
-            public TextChangedEventSource(ITextBuffer subjectBuffer, TaggerDelay delay, bool reportChangedSpans)
+            public TextChangedEventSource(ITextBuffer subjectBuffer, TaggerDelay delay)
                 : base(delay)
             {
                 Contract.ThrowIfNull(subjectBuffer);
 
                 _subjectBuffer = subjectBuffer;
-                _reportChangedSpans = reportChangedSpans;
-            }
-
-            public override string EventKind
-            {
-                get
-                {
-                    return PredefinedChangedEventKinds.TextChanged;
-                }
             }
 
             public override void Connect()
-            {
-                _subjectBuffer.Changed += OnTextBufferChanged;
-            }
+                => _subjectBuffer.Changed += OnTextBufferChanged;
 
             public override void Disconnect()
-            {
-                _subjectBuffer.Changed -= OnTextBufferChanged;
-            }
+                => _subjectBuffer.Changed -= OnTextBufferChanged;
 
-            private void OnTextBufferChanged(object sender, TextContentChangedEventArgs e)
+            private void OnTextBufferChanged(object? sender, TextContentChangedEventArgs e)
             {
                 if (e.Changes.Count == 0)
                 {
                     return;
                 }
 
-                if (_reportChangedSpans)
-                {
-                    this.RaiseChanged(e);
-                }
-                else
-                {
-                    this.RaiseChanged();
-                }
+                this.RaiseChanged();
             }
         }
     }

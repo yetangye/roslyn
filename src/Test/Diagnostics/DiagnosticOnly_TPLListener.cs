@@ -1,3 +1,9 @@
+﻿// Licensed to the .NET Foundation under one or more agreements.
+// The .NET Foundation licenses this file to you under the MIT license.
+// See the LICENSE file in the project root for more information.
+
+#nullable disable
+
 using System;
 using System.Collections.Generic;
 using System.Diagnostics.Tracing;
@@ -14,21 +20,21 @@ namespace Roslyn.Hosting.Diagnostics
     /// </summary>
     public static class DiagnosticOnly_TPLListener
     {
-        private static TPLListener listener = null;
+        private static TPLListener s_listener = null;
 
         public static void Install()
         {
             // make sure TPL installs its own event source
-            Task.Factory.StartNew(() => { });
+            Task.Factory.StartNew(() => { }, CancellationToken.None, TaskCreationOptions.None, TaskScheduler.Default);
 
             var local = new TPLListener();
-            Interlocked.CompareExchange(ref listener, local, null);
+            Interlocked.CompareExchange(ref s_listener, local, null);
         }
 
         public static void Uninstall()
         {
             TPLListener local = null;
-            Interlocked.Exchange(ref local, listener);
+            Interlocked.Exchange(ref local, s_listener);
 
             if (local != null)
             {

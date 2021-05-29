@@ -1,7 +1,11 @@
-' Copyright (c) Microsoft.  All Rights Reserved.  Licensed under the Apache License, Version 2.0.  See License.txt in the project root for license information.
+﻿' Licensed to the .NET Foundation under one or more agreements.
+' The .NET Foundation licenses this file to you under the MIT license.
+' See the LICENSE file in the project root for more information.
 
 Imports System.Runtime.InteropServices
+Imports System.Threading.Tasks
 Imports Microsoft.CodeAnalysis
+Imports Microsoft.CodeAnalysis.Test.Utilities
 Imports Microsoft.VisualStudio.LanguageServices.VisualBasic.CodeModel.Extenders
 Imports Microsoft.VisualStudio.LanguageServices.VisualBasic.CodeModel.Interop
 Imports Roslyn.Test.Utilities
@@ -12,8 +16,8 @@ Namespace Microsoft.VisualStudio.LanguageServices.UnitTests.CodeModel.VisualBasi
 
 #Region "Access tests"
 
-        <ConditionalFact(GetType(x86)), Trait(Traits.Feature, Traits.Features.CodeModel)>
-        Public Sub Access1()
+        <WpfFact, Trait(Traits.Feature, Traits.Features.CodeModel)>
+        Public Sub TestAccess1()
             Dim code =
 <Code>
 Interface $$I : End Interface
@@ -22,8 +26,8 @@ Interface $$I : End Interface
             TestAccess(code, EnvDTE.vsCMAccess.vsCMAccessPublic)
         End Sub
 
-        <ConditionalFact(GetType(x86)), Trait(Traits.Feature, Traits.Features.CodeModel)>
-        Public Sub Access2()
+        <WpfFact, Trait(Traits.Feature, Traits.Features.CodeModel)>
+        Public Sub TestAccess2()
             Dim code =
 <Code>
 Friend Interface $$I : End Interface
@@ -32,8 +36,8 @@ Friend Interface $$I : End Interface
             TestAccess(code, EnvDTE.vsCMAccess.vsCMAccessProject)
         End Sub
 
-        <ConditionalFact(GetType(x86)), Trait(Traits.Feature, Traits.Features.CodeModel)>
-        Public Sub Access3()
+        <WpfFact, Trait(Traits.Feature, Traits.Features.CodeModel)>
+        Public Sub TestAccess3()
             Dim code =
 <Code>
 Public Interface $$I : End Interface
@@ -45,8 +49,8 @@ Public Interface $$I : End Interface
 #End Region
 
 #Region "Parts tests"
-        <ConditionalFact(GetType(x86)), Trait(Traits.Feature, Traits.Features.CodeModel)>
-        Public Sub Parts1()
+        <WpfFact, Trait(Traits.Feature, Traits.Features.CodeModel)>
+        Public Sub TestParts1()
             Dim code =
 <Code>
 Interface $$I
@@ -56,8 +60,8 @@ End Interface
             TestParts(code, 1)
         End Sub
 
-        <ConditionalFact(GetType(x86)), Trait(Traits.Feature, Traits.Features.CodeModel)>
-        Public Sub Parts2()
+        <WpfFact, Trait(Traits.Feature, Traits.Features.CodeModel)>
+        Public Sub TestParts2()
             Dim code =
 <Code>
 Partial Interface $$I
@@ -67,8 +71,8 @@ End Interface
             TestParts(code, 1)
         End Sub
 
-        <ConditionalFact(GetType(x86)), Trait(Traits.Feature, Traits.Features.CodeModel)>
-        Public Sub Parts3()
+        <WpfFact, Trait(Traits.Feature, Traits.Features.CodeModel)>
+        Public Sub TestParts3()
             Dim code =
 <Code>
 Partial Interface $$I
@@ -83,13 +87,14 @@ End Interface
 #End Region
 
 #Region "AddAttribute tests"
-        <ConditionalFact(GetType(x86)), Trait(Traits.Feature, Traits.Features.CodeModel)>
-        Public Sub AddAttribute1()
+
+        <WpfFact, Trait(Traits.Feature, Traits.Features.CodeModel)>
+        Public Async Function TestAddAttribute1() As Task
             Dim code =
 <Code>
 Imports System
 
-Interface $$C
+Interface $$I
 End Interface
 </Code>
 
@@ -98,20 +103,20 @@ End Interface
 Imports System
 
 &lt;Serializable()&gt;
-Interface C
+Interface I
 End Interface
 </Code>
-            TestAddAttribute(code, expected, New AttributeData With {.Name = "Serializable"})
-        End Sub
+            Await TestAddAttribute(code, expected, New AttributeData With {.Name = "Serializable"})
+        End Function
 
-        <ConditionalFact(GetType(x86)), Trait(Traits.Feature, Traits.Features.CodeModel)>
-        Public Sub AddAttribute2()
+        <WpfFact, Trait(Traits.Feature, Traits.Features.CodeModel)>
+        Public Async Function TestAddAttribute2() As Task
             Dim code =
 <Code>
 Imports System
 
 &lt;Serializable&gt;
-Interface $$C
+Interface $$I
 End Interface
 </Code>
 
@@ -121,18 +126,42 @@ Imports System
 
 &lt;Serializable&gt;
 &lt;CLSCompliant(True)&gt;
-Interface C
+Interface I
 End Interface
 </Code>
-            TestAddAttribute(code, expected, New AttributeData With {.Name = "CLSCompliant", .Value = "True", .Position = 1})
-        End Sub
+            Await TestAddAttribute(code, expected, New AttributeData With {.Name = "CLSCompliant", .Value = "True", .Position = 1})
+        End Function
+
+        <WorkItem(2825, "https://github.com/dotnet/roslyn/issues/2825")>
+        <WpfFact, Trait(Traits.Feature, Traits.Features.CodeModel)>
+        Public Async Function TestAddAttribute_BelowDocComment() As Task
+            Dim code =
+<Code>
+Imports System
+
+''' &lt;summary&gt;&lt;/summary&gt;
+Interface $$I
+End Interface
+</Code>
+
+            Dim expected =
+<Code>
+Imports System
+
+''' &lt;summary&gt;&lt;/summary&gt;
+&lt;CLSCompliant(True)&gt;
+Interface I
+End Interface
+</Code>
+            Await TestAddAttribute(code, expected, New AttributeData With {.Name = "CLSCompliant", .Value = "True"})
+        End Function
 
 #End Region
 
 #Region "AddBase tests"
 
-        <ConditionalFact(GetType(x86)), Trait(Traits.Feature, Traits.Features.CodeModel)>
-        Public Sub AddBase1()
+        <WpfFact, Trait(Traits.Feature, Traits.Features.CodeModel)>
+        Public Async Function TestAddBase1() As Task
             Dim code =
 <Code>
 Interface $$I
@@ -151,11 +180,11 @@ End Interface
 Interface J
 End Interface
 </Code>
-            TestAddBase(code, "J", Nothing, expected)
-        End Sub
+            Await TestAddBase(code, "J", Nothing, expected)
+        End Function
 
-        <ConditionalFact(GetType(x86)), Trait(Traits.Feature, Traits.Features.CodeModel)>
-        Public Sub AddBase2()
+        <WpfFact, Trait(Traits.Feature, Traits.Features.CodeModel)>
+        Public Async Function TestAddBase2() As Task
             Dim code =
 <Code>
 Interface $$I
@@ -176,15 +205,15 @@ End Interface
 Interface K
 End Interface
 </Code>
-            TestAddBase(code, "K", Nothing, expected)
-        End Sub
+            Await TestAddBase(code, "K", Nothing, expected)
+        End Function
 
 #End Region
 
 #Region "RemoveBase tests"
 
-        <ConditionalFact(GetType(x86)), Trait(Traits.Feature, Traits.Features.CodeModel)>
-        Public Sub RemoveBase1()
+        <WpfFact, Trait(Traits.Feature, Traits.Features.CodeModel)>
+        Public Async Function TestRemoveBase1() As Task
             Dim code =
 <Code>
 Interface $$I
@@ -197,11 +226,11 @@ End Interface
 Interface I
 End Interface
 </Code>
-            TestRemoveBase(code, "J", expected)
-        End Sub
+            Await TestRemoveBase(code, "J", expected)
+        End Function
 
-        <ConditionalFact(GetType(x86)), Trait(Traits.Feature, Traits.Features.CodeModel)>
-        Public Sub RemoveBase2()
+        <WpfFact, Trait(Traits.Feature, Traits.Features.CodeModel)>
+        Public Sub TestRemoveBase2()
             Dim code =
 <Code>
 Interface $$I
@@ -211,8 +240,8 @@ End Interface
             TestRemoveBaseThrows(Of COMException)(code, "J")
         End Sub
 
-        <ConditionalFact(GetType(x86)), Trait(Traits.Feature, Traits.Features.CodeModel)>
-        Public Sub RemoveBase3()
+        <WpfFact, Trait(Traits.Feature, Traits.Features.CodeModel)>
+        Public Async Function TestRemoveBase3() As Task
             Dim code =
 <Code>
 Interface $$I
@@ -226,11 +255,11 @@ Interface I
     Inherits J
 End Interface
 </Code>
-            TestRemoveBase(code, "K", expected)
-        End Sub
+            Await TestRemoveBase(code, "K", expected)
+        End Function
 
-        <ConditionalFact(GetType(x86)), Trait(Traits.Feature, Traits.Features.CodeModel)>
-        Public Sub RemoveBase4()
+        <WpfFact, Trait(Traits.Feature, Traits.Features.CodeModel)>
+        Public Async Function TestRemoveBase4() As Task
             Dim code =
 <Code>
 Interface $$I
@@ -244,17 +273,18 @@ Interface I
     Inherits K
 End Interface
 </Code>
-            TestRemoveBase(code, "J", expected)
-        End Sub
+            Await TestRemoveBase(code, "J", expected)
+        End Function
 
 #End Region
 
 #Region "Set Name tests"
-        <ConditionalFact(GetType(x86)), Trait(Traits.Feature, Traits.Features.CodeModel)>
-        Sub SetName1()
+
+        <WpfFact, Trait(Traits.Feature, Traits.Features.CodeModel)>
+        Public Async Function TestSetName1() As Task
             Dim code =
 <Code>
-Interface $$Foo
+Interface $$Goo
 End Interface
 </Code>
 
@@ -264,14 +294,14 @@ Interface Bar
 End Interface
 </Code>
 
-            TestSetName(code, expected, "Bar", NoThrow(Of String)())
-        End Sub
+            Await TestSetName(code, expected, "Bar", NoThrow(Of String)())
+        End Function
 #End Region
 
 #Region "GenericExtender"
 
-        <ConditionalFact(GetType(x86)), Trait(Traits.Feature, Traits.Features.CodeModel)>
-        Sub GenericExtender_GetBaseTypesCount1()
+        <WpfFact, Trait(Traits.Feature, Traits.Features.CodeModel)>
+        Public Sub TestGenericExtender_GetBaseTypesCount1()
             Dim code =
 <Code>
 Interface I$$
@@ -281,19 +311,19 @@ End Interface
             TestGenericNameExtender_GetBaseTypesCount(code, 0)
         End Sub
 
-        <ConditionalFact(GetType(x86)), Trait(Traits.Feature, Traits.Features.CodeModel)>
-        Sub GenericExtender_GetBaseTypesCount2()
+        <WpfFact, Trait(Traits.Feature, Traits.Features.CodeModel)>
+        Public Sub TestGenericExtender_GetBaseTypesCount2()
             Dim code =
 <Code>
 Namespace N
     Interface I$$
-        Inherits IFoo(Of Integer)
+        Inherits IGoo(Of Integer)
     End Interface
 
     Interface IBar
     End Interface
 
-    Interface IFoo(Of T)
+    Interface IGoo(Of T)
         Inherits IBar
     End Interface
 End Namespace
@@ -302,8 +332,8 @@ End Namespace
             TestGenericNameExtender_GetBaseTypesCount(code, 1)
         End Sub
 
-        <ConditionalFact(GetType(x86)), Trait(Traits.Feature, Traits.Features.CodeModel)>
-        Sub GenericExtender_GetBaseGenericName1()
+        <WpfFact, Trait(Traits.Feature, Traits.Features.CodeModel)>
+        Public Sub TestGenericExtender_GetBaseGenericName1()
             Dim code =
 <Code>
 Interface I$$
@@ -313,29 +343,29 @@ End Interface
             TestGenericNameExtender_GetBaseGenericName(code, 1, Nothing)
         End Sub
 
-        <ConditionalFact(GetType(x86)), Trait(Traits.Feature, Traits.Features.CodeModel)>
-        Sub GenericExtender_GetBaseGenericName2()
+        <WpfFact, Trait(Traits.Feature, Traits.Features.CodeModel)>
+        Public Sub TestGenericExtender_GetBaseGenericName2()
             Dim code =
 <Code>
 Namespace N
     Interface I$$
-        Inherits IFoo(Of System.Int32)
+        Inherits IGoo(Of System.Int32)
     End Interface
 
     Interface IBar
     End Interface
 
-    Interface IFoo(Of T)
+    Interface IGoo(Of T)
         Inherits IBar
     End Interface
 End Namespace
 </Code>
 
-            TestGenericNameExtender_GetBaseGenericName(code, 1, "N.IFoo(Of Integer)")
+            TestGenericNameExtender_GetBaseGenericName(code, 1, "N.IGoo(Of Integer)")
         End Sub
 
-        <ConditionalFact(GetType(x86)), Trait(Traits.Feature, Traits.Features.CodeModel)>
-        Sub GenericExtender_GetImplementedTypesCount1()
+        <WpfFact, Trait(Traits.Feature, Traits.Features.CodeModel)>
+        Public Sub TestGenericExtender_GetImplementedTypesCount1()
             Dim code =
 <Code>
 Interface I$$
@@ -345,19 +375,19 @@ End Interface
             TestGenericNameExtender_GetImplementedTypesCountThrows(Of ArgumentException)(code)
         End Sub
 
-        <ConditionalFact(GetType(x86)), Trait(Traits.Feature, Traits.Features.CodeModel)>
-        Sub GenericExtender_GetImplementedTypesCount2()
+        <WpfFact, Trait(Traits.Feature, Traits.Features.CodeModel)>
+        Public Sub TestGenericExtender_GetImplementedTypesCount2()
             Dim code =
 <Code>
 Namespace N
     Interface I$$
-        Inherits IFoo(Of Integer)
+        Inherits IGoo(Of Integer)
     End Interface
 
     Interface IBar
     End Interface
 
-    Interface IFoo(Of T)
+    Interface IGoo(Of T)
         Inherits IBar
     End Interface
 End Namespace
@@ -366,8 +396,8 @@ End Namespace
             TestGenericNameExtender_GetImplementedTypesCountThrows(Of ArgumentException)(code)
         End Sub
 
-        <ConditionalFact(GetType(x86)), Trait(Traits.Feature, Traits.Features.CodeModel)>
-        Sub GenericExtender_GetImplTypeGenericName1()
+        <WpfFact, Trait(Traits.Feature, Traits.Features.CodeModel)>
+        Public Sub TestGenericExtender_GetImplTypeGenericName1()
             Dim code =
 <Code>
 Interface I$$
@@ -377,19 +407,19 @@ End Interface
             TestGenericNameExtender_GetImplTypeGenericNameThrows(Of ArgumentException)(code, 1)
         End Sub
 
-        <ConditionalFact(GetType(x86)), Trait(Traits.Feature, Traits.Features.CodeModel)>
-        Sub GenericExtender_GetImplTypeGenericName2()
+        <WpfFact, Trait(Traits.Feature, Traits.Features.CodeModel)>
+        Public Sub TestGenericExtender_GetImplTypeGenericName2()
             Dim code =
 <Code>
 Namespace N
     Interface I$$
-        Inherits IFoo(Of Integer)
+        Inherits IGoo(Of Integer)
     End Interface
 
     Interface IBar
     End Interface
 
-    Interface IFoo(Of T)
+    Interface IGoo(Of T)
         Inherits IBar
     End Interface
 End Namespace

@@ -1,4 +1,9 @@
-﻿using System;
+﻿// Licensed to the .NET Foundation under one or more agreements.
+// The .NET Foundation licenses this file to you under the MIT license.
+// See the LICENSE file in the project root for more information.
+
+using System;
+using System.Diagnostics;
 using System.IO;
 using System.Text;
 
@@ -10,8 +15,10 @@ namespace Microsoft.CodeAnalysis.Text
     internal sealed class SourceTextStream : Stream
     {
         private readonly SourceText _source;
+        private readonly Encoding _encoding;
         private readonly Encoder _encoder;
 
+        private readonly int _minimumTargetBufferCount;
         private int _position;
         private int _sourceOffset;
         private readonly char[] _charBuffer;
@@ -19,10 +26,16 @@ namespace Microsoft.CodeAnalysis.Text
         private int _bufferUnreadChars;
         private bool _preambleWritten;
 
-        public SourceTextStream(SourceText source, int bufferSize = 2048)
+        private static readonly Encoding s_utf8EncodingWithNoBOM = new UTF8Encoding(encoderShouldEmitUTF8Identifier: false, throwOnInvalidBytes: false);
+
+        public SourceTextStream(SourceText source, int bufferSize = 2048, bool useDefaultEncodingIfNull = false)
         {
+            Debug.Assert(source.Encoding != null || useDefaultEncodingIfNull);
+
             _source = source;
-            _encoder = source.Encoding.GetEncoder();
+            _encoding = source.Encoding ?? s_utf8EncodingWithNoBOM;
+            _encoder = _encoding.GetEncoder();
+            _minimumTargetBufferCount = _encoding.GetMaxByteCount(charCount: 1);
             _sourceOffset = 0;
             _position = 0;
             _charBuffer = new char[Math.Min(bufferSize, _source.Length)];
@@ -58,18 +71,20 @@ namespace Microsoft.CodeAnalysis.Text
 
         public override long Position
         {
-            get
-            {
-                return _position;
-            }
-            set
-            {
-                throw new NotSupportedException();
-            }
+            get { return _position; }
+            set { throw new NotSupportedException(); }
         }
 
         public override int Read(byte[] buffer, int offset, int count)
         {
+            if (count < _minimumTargetBufferCount)
+            {
+                // The buffer must be able to hold at least one character from the 
+                // SourceText stream.  Returning 0 for that case isn't correct because
+                // that indicates end of stream vs. insufficient buffer. 
+                throw new ArgumentException($"{nameof(count)} must be greater than or equal to {_minimumTargetBufferCount}", nameof(count));
+            }
+
             int originalCount = count;
 
             if (!_preambleWritten)
@@ -79,7 +94,7 @@ namespace Microsoft.CodeAnalysis.Text
                 count -= bytesWritten;
             }
 
-            while (count > 0 && _position < _source.Length)
+            while (count >= _minimumTargetBufferCount && _position < _source.Length)
             {
                 if (_bufferUnreadChars == 0)
                 {
@@ -103,7 +118,7 @@ namespace Microsoft.CodeAnalysis.Text
         private int WritePreamble(byte[] buffer, int offset, int count)
         {
             _preambleWritten = true;
-            byte[] preambleBytes = _source.Encoding.GetPreamble();
+            byte[] preambleBytes = _encoding.GetPreamble();
             if (preambleBytes == null)
             {
                 return 0;

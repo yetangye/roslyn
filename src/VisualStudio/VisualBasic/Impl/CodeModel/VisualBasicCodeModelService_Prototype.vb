@@ -1,4 +1,6 @@
-' Copyright (c) Microsoft.  All Rights Reserved.  Licensed under the Apache License, Version 2.0.  See License.txt in the project root for license information.
+﻿' Licensed to the .NET Foundation under one or more agreements.
+' The .NET Foundation licenses this file to you under the MIT license.
+' See the LICENSE file in the project root for more information.
 
 Imports System.Collections.Immutable
 Imports System.Text
@@ -12,14 +14,14 @@ Imports Microsoft.VisualStudio.LanguageServices.Implementation.Utilities
 Namespace Microsoft.VisualStudio.LanguageServices.VisualBasic.CodeModel
     Partial Friend Class VisualBasicCodeModelService
 
-        Private Shared ReadOnly prototypeFullNameFormat As SymbolDisplayFormat =
+        Private Shared ReadOnly s_prototypeFullNameFormat As SymbolDisplayFormat =
             New SymbolDisplayFormat(
                 memberOptions:=SymbolDisplayMemberOptions.IncludeContainingType,
                 typeQualificationStyle:=SymbolDisplayTypeQualificationStyle.NameAndContainingTypesAndNamespaces,
                 genericsOptions:=SymbolDisplayGenericsOptions.IncludeTypeParameters,
                 miscellaneousOptions:=SymbolDisplayMiscellaneousOptions.ExpandNullable Or SymbolDisplayMiscellaneousOptions.UseSpecialTypes)
 
-        Private Shared ReadOnly prototypeTypeNameFormat As SymbolDisplayFormat =
+        Private Shared ReadOnly s_prototypeTypeNameFormat As SymbolDisplayFormat =
             New SymbolDisplayFormat(
                 memberOptions:=SymbolDisplayMemberOptions.IncludeContainingType,
                 typeQualificationStyle:=SymbolDisplayTypeQualificationStyle.NameAndContainingTypes,
@@ -147,6 +149,8 @@ Namespace Microsoft.VisualStudio.LanguageServices.VisualBasic.CodeModel
                     builder.Append("Friend")
                 Case Accessibility.ProtectedOrFriend
                     builder.Append("Protected Friend")
+                Case Accessibility.ProtectedAndFriend
+                    builder.Append("Private Protected")
                 Case Accessibility.Public
                     builder.Append("Public")
             End Select
@@ -155,9 +159,9 @@ Namespace Microsoft.VisualStudio.LanguageServices.VisualBasic.CodeModel
         Private Shared Sub AppendName(builder As StringBuilder, symbol As ISymbol, flags As PrototypeFlags)
             Select Case flags And PrototypeFlags.NameMask
                 Case PrototypeFlags.FullName
-                    builder.Append(symbol.ToDisplayString(prototypeFullNameFormat))
+                    builder.Append(symbol.ToDisplayString(s_prototypeFullNameFormat))
                 Case PrototypeFlags.TypeName
-                    builder.Append(symbol.ToDisplayString(prototypeTypeNameFormat))
+                    builder.Append(symbol.ToDisplayString(s_prototypeTypeNameFormat))
                 Case PrototypeFlags.BaseName
                     builder.Append(symbol.Name)
             End Select
@@ -183,7 +187,7 @@ Namespace Microsoft.VisualStudio.LanguageServices.VisualBasic.CodeModel
                     End If
 
                     If (flags And PrototypeFlags.ParameterTypes) <> 0 Then
-                        builder.Append(parameter.Type.ToDisplayString(prototypeFullNameFormat))
+                        builder.Append(parameter.Type.ToDisplayString(s_prototypeFullNameFormat))
                     End If
 
                     If (flags And PrototypeFlags.ParameterDefaultValues) <> 0 Then
@@ -206,18 +210,9 @@ Namespace Microsoft.VisualStudio.LanguageServices.VisualBasic.CodeModel
         Private Shared Sub AppendType(builder As StringBuilder, type As ITypeSymbol, flags As PrototypeFlags)
             If (flags And PrototypeFlags.Type) <> 0 Then
                 builder.Append(" As ")
-                builder.Append(type.ToDisplayString(prototypeFullNameFormat))
+                builder.Append(type.ToDisplayString(s_prototypeFullNameFormat))
             End If
         End Sub
-
-        Private Shared Function AreValidEventPrototypeFlags(flags As PrototypeFlags) As Boolean
-            ' Unsupported flags for events
-            If (flags And PrototypeFlags.Initializer) <> 0 Then
-                Return False
-            End If
-
-            Return AreValidPrototypeFlags(flags)
-        End Function
 
         Private Shared Function AreValidFunctionPrototypeFlags(flags As PrototypeFlags) As Boolean
             ' Unsupported flags for functions
@@ -238,7 +233,7 @@ Namespace Microsoft.VisualStudio.LanguageServices.VisualBasic.CodeModel
         End Function
 
         Private Shared Function AreValidPrototypeFlags(ByRef flags As PrototypeFlags) As Boolean
-            ' Signature cannot be compined with anything else
+            ' Signature cannot be combined with anything else
             If (flags And PrototypeFlags.Signature) <> 0 AndAlso flags <> PrototypeFlags.Signature Then
                 Return False
             End If

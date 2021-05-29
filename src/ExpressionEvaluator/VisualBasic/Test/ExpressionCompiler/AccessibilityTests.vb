@@ -1,12 +1,17 @@
-﻿Imports Microsoft.CodeAnalysis.CodeGen
+﻿' Licensed to the .NET Foundation under one or more agreements.
+' The .NET Foundation licenses this file to you under the MIT license.
+' See the LICENSE file in the project root for more information.
+
+Imports System.Collections.Immutable
+Imports Microsoft.CodeAnalysis.CodeGen
 Imports Microsoft.CodeAnalysis.ExpressionEvaluator
-Imports Microsoft.CodeAnalysis.Test.Utilities
-Imports Microsoft.CodeAnalysis.VisualBasic.ExpressionEvaluator
-Imports Microsoft.VisualStudio.Debugger.Evaluation.ClrCompilation
+Imports Microsoft.CodeAnalysis.ExpressionEvaluator.UnitTests
+Imports Microsoft.CodeAnalysis.VisualBasic.UnitTests
+Imports Microsoft.VisualStudio.Debugger.Evaluation
 Imports Roslyn.Test.Utilities
 Imports Xunit
 
-Namespace Microsoft.CodeAnalysis.VisualBasic.UnitTests
+Namespace Microsoft.CodeAnalysis.VisualBasic.ExpressionEvaluator.UnitTests
     Public Class AccessibilityTests
         Inherits ExpressionCompilerTestBase
 
@@ -29,16 +34,27 @@ Class C
 End Class
 "
 
-            Dim resultProperties As ResultProperties = Nothing
-            Dim errorMessage As String = Nothing
-            Dim testData = Evaluate(
-                source,
-                OutputKind.DynamicallyLinkedLibrary,
-                methodName:="C.M",
-                expr:="Me.get_P()",
-                resultProperties:=resultProperties,
-                errorMessage:=errorMessage)
-            Assert.Equal("(1) : error BC30456: 'get_P' is not a member of 'C'.", errorMessage)
+            Dim comp = CreateCompilationWithMscorlib40({source}, options:=TestOptions.DebugDll)
+            WithRuntimeInstance(comp,
+                Sub(runtime)
+                    Dim context = CreateMethodContext(runtime, "C.M")
+
+                    Dim resultProperties As ResultProperties = Nothing
+                    Dim errorMessage As String = Nothing
+                    Dim missingAssemblyIdentities As ImmutableArray(Of AssemblyIdentity) = Nothing
+                    context.CompileExpression(
+                        "Me.get_P()",
+                        DkmEvaluationFlags.TreatAsExpression,
+                        NoAliases,
+                        DebuggerDiagnosticFormatter.Instance,
+                        resultProperties,
+                        errorMessage,
+                        missingAssemblyIdentities,
+                        EnsureEnglishUICulture.PreferredOrNull,
+                        testData:=Nothing)
+
+                    Assert.Equal("error BC30456: 'get_P' is not a member of 'C'.", errorMessage)
+                End Sub)
         End Sub
 
         <Fact>
@@ -154,26 +170,25 @@ Friend Class C
 End Class
 "
 
-            Dim comp = CreateCompilationWithMscorlib({source}, compOptions:=TestOptions.DebugDll)
-            Dim runtime = CreateRuntimeInstance(comp)
-            Dim context = CreateMethodContext(
-                runtime,
-                methodName:="C.Test")
-            Dim resultProperties As ResultProperties = Nothing
-            Dim errorMessage As String = Nothing
-            Dim testData = New CompilationTestData()
-            context.CompileExpression("Me.M(Me.P)", resultProperties, errorMessage, testData)
-            testData.GetMethodData("<>x.<>m0").VerifyIL(
+            Dim comp = CreateCompilationWithMscorlib40({source}, options:=TestOptions.DebugDll)
+            WithRuntimeInstance(comp,
+                Sub(runtime)
+                    Dim context = CreateMethodContext(runtime, "C.Test")
+                    Dim errorMessage As String = Nothing
+                    Dim testData = New CompilationTestData()
+                    context.CompileExpression("Me.M(Me.P)", errorMessage, testData)
+                    testData.GetMethodData("<>x.<>m0").VerifyIL(
 "{
   // Code size       13 (0xd)
   .maxstack  2
   .locals init (Integer V_0) //Test
   IL_0000:  ldarg.0
-  IL_0001:  dup
+  IL_0001:  ldarg.0
   IL_0002:  callvirt   ""Function C.get_P() As Integer""
   IL_0007:  callvirt   ""Function B.M(Integer) As Integer""
   IL_000c:  ret
 }")
+                End Sub)
         End Sub
 
         <Fact>

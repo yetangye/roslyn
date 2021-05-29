@@ -1,4 +1,8 @@
-﻿// Copyright (c) Microsoft.  All Rights Reserved.  Licensed under the Apache License, Version 2.0.  See License.txt in the project root for license information.
+﻿// Licensed to the .NET Foundation under one or more agreements.
+// The .NET Foundation licenses this file to you under the MIT license.
+// See the LICENSE file in the project root for more information.
+
+#nullable disable
 
 using System.Collections.Generic;
 using System.Collections.Immutable;
@@ -39,14 +43,11 @@ namespace Microsoft.CodeAnalysis.CSharp.Symbols
         /// Returns an array of assembly identities for assemblies referenced by this module.
         /// Items at the same position from GetReferencedAssemblies and from GetReferencedAssemblySymbols 
         /// should correspond to each other.
-        /// 
-        /// The array and its content is provided by ReferenceManager and must not be modified.
         /// </summary>
-        /// <returns></returns>
         internal sealed override ImmutableArray<AssemblyIdentity> GetReferencedAssemblies()
         {
             AssertReferencesInitialized();
-            return _moduleReferences.Names;
+            return _moduleReferences.Identities;
         }
 
         /// <summary>
@@ -54,9 +55,7 @@ namespace Microsoft.CodeAnalysis.CSharp.Symbols
         /// by this module. Items at the same position from GetReferencedAssemblies and 
         /// from GetReferencedAssemblySymbols should correspond to each other. If reference is 
         /// not resolved by compiler, GetReferencedAssemblySymbols returns MissingAssemblySymbol in the
-        /// correspnding item.
-        /// 
-        /// The array and its content is provided by ReferenceManager and must not be modified.
+        /// corresponding item.
         /// </summary>
         internal sealed override ImmutableArray<AssemblySymbol> GetReferencedAssemblySymbols()
         {

@@ -1,4 +1,6 @@
-﻿' Copyright (c) Microsoft.  All Rights Reserved.  Licensed under the Apache License, Version 2.0.  See License.txt in the project root for license information.
+﻿' Licensed to the .NET Foundation under one or more agreements.
+' The .NET Foundation licenses this file to you under the MIT license.
+' See the LICENSE file in the project root for more information.
 
 Imports System.IO
 Imports Microsoft.CodeAnalysis
@@ -6,16 +8,17 @@ Imports Microsoft.CodeAnalysis.Text
 Imports Microsoft.CodeAnalysis.VisualBasic
 Imports Microsoft.CodeAnalysis.VisualBasic.Symbols
 Imports Microsoft.CodeAnalysis.VisualBasic.Syntax
+Imports Roslyn.Test.Utilities
 
 Public Class StatementSyntaxWalkerTests
-    <Fact>
+    <ConditionalFact(GetType(WindowsOnly))>
     Public Sub TestStatementSyntaxWalker()
         Dim tree = ParseAndVerify(<![CDATA[
 Option Explicit Off
 Imports System
 <Assembly: CLSCompliant(False)> 
 
-Namespace Foo.Bar
+Namespace Goo.Bar
     Public Class Class1
         Dim x As Integer
         Public Function f(ByVal a As Boolean) As Integer
@@ -57,7 +60,7 @@ End Namespace
 Option Explicit Off
 Imports System
 <Assembly: CLSCompliant(False)>
-Namespace Foo.Bar
+Namespace Goo.Bar
 Public Class Class1
 Dim x As Integer
 Public Function f(ByVal a As Boolean) As Integer
@@ -103,15 +106,15 @@ End Namespace
     Friend Class TestWalker
         Inherits StatementSyntaxWalker
 
-        Dim arg As TextWriter
+        Private ReadOnly _arg As TextWriter
 
         Public Sub New(arg As TextWriter)
-            Me.arg = arg
+            Me._arg = arg
         End Sub
 
         Public Overrides Sub DefaultVisit(node As SyntaxNode)
             If TypeOf node Is StatementSyntax Then
-                arg.WriteLine(node.ToString())
+                _arg.WriteLine(node.ToString())
             End If
 
             MyBase.DefaultVisit(node)

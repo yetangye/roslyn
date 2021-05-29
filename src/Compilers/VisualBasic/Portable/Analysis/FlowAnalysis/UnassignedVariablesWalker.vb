@@ -1,4 +1,6 @@
-﻿' Copyright (c) Microsoft.  All Rights Reserved.  Licensed under the Apache License, Version 2.0.  See License.txt in the project root for license information.
+﻿' Licensed to the .NET Foundation under one or more agreements.
+' The .NET Foundation licenses this file to you under the MIT license.
+' See the LICENSE file in the project root for more information.
 
 Imports System.Collections.Generic
 Imports Microsoft.CodeAnalysis.Text
@@ -12,27 +14,27 @@ Namespace Microsoft.CodeAnalysis.VisualBasic
     ''' before being assigned anywhere within a method.
     ''' </summary>
     ''' <remarks></remarks>
-    Class UnassignedVariablesWalker
+    Friend NotInheritable Class UnassignedVariablesWalker
         Inherits DataFlowPass
 
         ' TODO: normalize the result by removing variables that are unassigned in an unmodified flow analysis.
-        Sub New(info As FlowAnalysisInfo)
+        Private Sub New(info As FlowAnalysisInfo)
             MyBase.New(info, suppressConstExpressionsSupport:=False, trackStructsWithIntrinsicTypedFields:=True)
         End Sub
 
         Friend Overloads Shared Function Analyze(info As FlowAnalysisInfo) As HashSet(Of Symbol)
             Dim walker = New UnassignedVariablesWalker(info)
             Try
-                Return If(walker.Analyze(), walker.result, New HashSet(Of Symbol)())
+                Return If(walker.Analyze(), walker._result, New HashSet(Of Symbol)())
             Finally
                 walker.Free()
             End Try
         End Function
 
-        Dim result As HashSet(Of Symbol) = New HashSet(Of Symbol)()
+        Private ReadOnly _result As HashSet(Of Symbol) = New HashSet(Of Symbol)()
 
         Protected Overrides Sub ReportUnassigned(local As Symbol,
-                                                 node As VisualBasicSyntaxNode,
+                                                 node As SyntaxNode,
                                                  rwContext As ReadWriteContext,
                                                  Optional slot As Integer = SlotKind.NotTracked,
                                                  Optional boundFieldAccess As BoundFieldAccess = Nothing)
@@ -46,11 +48,11 @@ Namespace Microsoft.CodeAnalysis.VisualBasic
                 Debug.Assert(Not TypeOf sym Is AmbiguousLocalsPseudoSymbol)
 
                 If sym IsNot Nothing Then
-                    result.Add(sym)
+                    _result.Add(sym)
                 End If
 
             Else
-                result.Add(local)
+                _result.Add(local)
             End If
 
             MyBase.ReportUnassigned(local, node, rwContext, slot, boundFieldAccess)

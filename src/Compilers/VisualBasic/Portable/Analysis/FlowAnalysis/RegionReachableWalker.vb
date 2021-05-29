@@ -1,4 +1,6 @@
-﻿' Copyright (c) Microsoft.  All Rights Reserved.  Licensed under the Apache License, Version 2.0.  See License.txt in the project root for license information.
+﻿' Licensed to the .NET Foundation under one or more agreements.
+' The .NET Foundation licenses this file to you under the MIT license.
+' See the LICENSE file in the project root for more information.
 
 Imports System.Runtime.InteropServices
 Imports Microsoft.CodeAnalysis.Text
@@ -21,8 +23,8 @@ Namespace Microsoft.CodeAnalysis.VisualBasic
             Dim walker = New RegionReachableWalker(info, region)
             Try
                 If walker.Analyze() Then
-                    startPointIsReachable = If(walker.regionStartPointIsReachable.HasValue, walker.regionStartPointIsReachable.Value, True)
-                    endPointIsReachable = If(walker.regionEndPointIsReachable.HasValue, walker.regionEndPointIsReachable.Value, walker.State.Alive)
+                    startPointIsReachable = If(walker._regionStartPointIsReachable.HasValue, walker._regionStartPointIsReachable.Value, True)
+                    endPointIsReachable = If(walker._regionEndPointIsReachable.HasValue, walker._regionEndPointIsReachable.Value, walker.State.Alive)
                 Else
                     startPointIsReachable = True
                     startPointIsReachable = False
@@ -32,20 +34,20 @@ Namespace Microsoft.CodeAnalysis.VisualBasic
             End Try
         End Sub
 
-        Private regionStartPointIsReachable As Boolean?
-        Private regionEndPointIsReachable As Boolean?
+        Private _regionStartPointIsReachable As Boolean?
+        Private _regionEndPointIsReachable As Boolean?
 
         Private Sub New(info As FlowAnalysisInfo, region As FlowAnalysisRegionInfo)
             MyBase.New(info, region)
         End Sub
 
         Protected Overrides Sub EnterRegion()
-            regionStartPointIsReachable = State.Alive
+            _regionStartPointIsReachable = State.Alive
             MyBase.EnterRegion()
         End Sub
 
         Protected Overrides Sub LeaveRegion()
-            regionEndPointIsReachable = State.Alive
+            _regionEndPointIsReachable = State.Alive
             MyBase.LeaveRegion()
         End Sub
 

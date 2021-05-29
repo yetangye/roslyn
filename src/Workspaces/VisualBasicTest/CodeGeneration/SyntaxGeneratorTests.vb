@@ -1,776 +1,1283 @@
-﻿Imports System.Globalization
+﻿' Licensed to the .NET Foundation under one or more agreements.
+' The .NET Foundation licenses this file to you under the MIT license.
+' See the LICENSE file in the project root for more information.
+
+Imports System.Globalization
 Imports Microsoft.CodeAnalysis.Editing
-Imports Microsoft.CodeAnalysis.Options
+Imports Microsoft.CodeAnalysis.Shared.Extensions
 Imports Microsoft.CodeAnalysis.Test.Utilities
-Imports Microsoft.CodeAnalysis.Text
 Imports Microsoft.CodeAnalysis.VisualBasic.Syntax
 Imports Roslyn.Test.Utilities
 Imports Xunit
 
 Namespace Microsoft.CodeAnalysis.VisualBasic.UnitTests.Editting
+    <[UseExportProvider]>
     Public Class SyntaxGeneratorTests
-        Private ReadOnly g As SyntaxGenerator = SyntaxGenerator.GetGenerator(New AdhocWorkspace(), LanguageNames.VisualBasic)
+        Private _g As SyntaxGenerator
 
-        Private ReadOnly emptyCompilation As VisualBasicCompilation = VisualBasicCompilation.Create("empty", references:={TestReferences.NetFx.v4_0_30319.mscorlib})
+        Private ReadOnly _emptyCompilation As VisualBasicCompilation = VisualBasicCompilation.Create("empty", references:={TestMetadata.Net451.mscorlib, TestMetadata.Net451.System})
 
-        Private ienumerableInt As INamedTypeSymbol
+        Private ReadOnly _ienumerableInt As INamedTypeSymbol
 
         Public Sub New()
-            Me.ienumerableInt = emptyCompilation.GetSpecialType(SpecialType.System_Collections_Generic_IEnumerable_T).Construct(emptyCompilation.GetSpecialType(SpecialType.System_Int32))
+            Me._ienumerableInt = _emptyCompilation.GetSpecialType(SpecialType.System_Collections_Generic_IEnumerable_T).Construct(_emptyCompilation.GetSpecialType(SpecialType.System_Int32))
         End Sub
 
-        Public Function Compile(code As String) As Compilation
-            code = code.Replace(vbLf, vbCrLf)
-            Return VisualBasicCompilation.Create("test").AddReferences(TestReferences.NetFx.v4_0_30319.mscorlib).AddSyntaxTrees(SyntaxFactory.ParseSyntaxTree(code))
+        Private ReadOnly Property Generator As SyntaxGenerator
+            Get
+                If _g Is Nothing Then
+                    _g = SyntaxGenerator.GetGenerator(New AdhocWorkspace(), LanguageNames.VisualBasic)
+                End If
+
+                Return _g
+            End Get
+        End Property
+
+        Public Shared Function Compile(code As String) As Compilation
+            Return VisualBasicCompilation.Create("test").AddReferences(TestMetadata.Net451.mscorlib).AddSyntaxTrees(SyntaxFactory.ParseSyntaxTree(code))
         End Function
 
-        Private Sub VerifySyntax(Of TSyntax As SyntaxNode)(type As SyntaxNode, expectedText As String)
+        Private Shared Sub VerifySyntax(Of TSyntax As SyntaxNode)(type As SyntaxNode, expectedText As String)
             Assert.IsAssignableFrom(GetType(TSyntax), type)
             Dim normalized = type.NormalizeWhitespace().ToFullString()
-            Dim fixedExpectations = expectedText.Replace(vbLf, vbCrLf)
+            Dim fixedExpectations = expectedText.Replace(vbCrLf, vbLf).Replace(vbLf, vbCrLf)
             Assert.Equal(fixedExpectations, normalized)
         End Sub
 
-        Private Function ParseCompilationUnit(text As String) As CompilationUnitSyntax
+        Private Shared Sub VerifySyntaxRaw(Of TSyntax As SyntaxNode)(type As SyntaxNode, expectedText As String)
+            Assert.IsAssignableFrom(GetType(TSyntax), type)
+            Dim text = type.ToFullString()
+            Assert.Equal(expectedText, text)
+        End Sub
+
+        Private Shared Function ParseCompilationUnit(text As String) As CompilationUnitSyntax
             Dim fixedText = text.Replace(vbLf, vbCrLf)
             Return SyntaxFactory.ParseCompilationUnit(fixedText)
         End Function
 
+#Region "Expressions & Statements"
         <Fact>
         Public Sub TestLiteralExpressions()
-            VerifySyntax(Of LiteralExpressionSyntax)(g.LiteralExpression(0), "0")
-            VerifySyntax(Of LiteralExpressionSyntax)(g.LiteralExpression(1), "1")
-            VerifySyntax(Of LiteralExpressionSyntax)(g.LiteralExpression(-1), "-1")
-            VerifySyntax(Of MemberAccessExpressionSyntax)(g.LiteralExpression(Integer.MinValue), "Global.System.Int32.MinValue")
-            VerifySyntax(Of MemberAccessExpressionSyntax)(g.LiteralExpression(Integer.MaxValue), "Global.System.Int32.MaxValue")
+            VerifySyntax(Of LiteralExpressionSyntax)(Generator.LiteralExpression(0), "0")
+            VerifySyntax(Of LiteralExpressionSyntax)(Generator.LiteralExpression(1), "1")
+            VerifySyntax(Of UnaryExpressionSyntax)(Generator.LiteralExpression(-1), "-1")
+            VerifySyntax(Of MemberAccessExpressionSyntax)(Generator.LiteralExpression(Integer.MinValue), "Global.System.Int32.MinValue")
+            VerifySyntax(Of MemberAccessExpressionSyntax)(Generator.LiteralExpression(Integer.MaxValue), "Global.System.Int32.MaxValue")
 
-            VerifySyntax(Of LiteralExpressionSyntax)(g.LiteralExpression(0L), "0L")
-            VerifySyntax(Of LiteralExpressionSyntax)(g.LiteralExpression(1L), "1L")
-            VerifySyntax(Of LiteralExpressionSyntax)(g.LiteralExpression(-1L), "-1L")
-            VerifySyntax(Of MemberAccessExpressionSyntax)(g.LiteralExpression(Long.MinValue), "Global.System.Int64.MinValue")
-            VerifySyntax(Of MemberAccessExpressionSyntax)(g.LiteralExpression(Long.MaxValue), "Global.System.Int64.MaxValue")
+            VerifySyntax(Of LiteralExpressionSyntax)(Generator.LiteralExpression(0L), "0L")
+            VerifySyntax(Of LiteralExpressionSyntax)(Generator.LiteralExpression(1L), "1L")
+            VerifySyntax(Of UnaryExpressionSyntax)(Generator.LiteralExpression(-1L), "-1L")
+            VerifySyntax(Of MemberAccessExpressionSyntax)(Generator.LiteralExpression(Long.MinValue), "Global.System.Int64.MinValue")
+            VerifySyntax(Of MemberAccessExpressionSyntax)(Generator.LiteralExpression(Long.MaxValue), "Global.System.Int64.MaxValue")
 
-            VerifySyntax(Of LiteralExpressionSyntax)(g.LiteralExpression(0UL), "0UL")
-            VerifySyntax(Of LiteralExpressionSyntax)(g.LiteralExpression(1UL), "1UL")
-            VerifySyntax(Of LiteralExpressionSyntax)(g.LiteralExpression(ULong.MinValue), "0UL")
-            VerifySyntax(Of MemberAccessExpressionSyntax)(g.LiteralExpression(ULong.MaxValue), "Global.System.UInt64.MaxValue")
+            VerifySyntax(Of LiteralExpressionSyntax)(Generator.LiteralExpression(0UL), "0UL")
+            VerifySyntax(Of LiteralExpressionSyntax)(Generator.LiteralExpression(1UL), "1UL")
+            VerifySyntax(Of LiteralExpressionSyntax)(Generator.LiteralExpression(ULong.MinValue), "0UL")
+            VerifySyntax(Of MemberAccessExpressionSyntax)(Generator.LiteralExpression(ULong.MaxValue), "Global.System.UInt64.MaxValue")
 
-            VerifySyntax(Of LiteralExpressionSyntax)(g.LiteralExpression(0.0F), "0F")
-            VerifySyntax(Of LiteralExpressionSyntax)(g.LiteralExpression(1.0F), "1F")
-            VerifySyntax(Of LiteralExpressionSyntax)(g.LiteralExpression(-1.0F), "-1F")
-            VerifySyntax(Of MemberAccessExpressionSyntax)(g.LiteralExpression(Single.MinValue), "Global.System.Single.MinValue")
-            VerifySyntax(Of MemberAccessExpressionSyntax)(g.LiteralExpression(Single.MaxValue), "Global.System.Single.MaxValue")
-            VerifySyntax(Of MemberAccessExpressionSyntax)(g.LiteralExpression(Single.Epsilon), "Global.System.Single.Epsilon")
-            VerifySyntax(Of MemberAccessExpressionSyntax)(g.LiteralExpression(Single.NaN), "Global.System.Single.NaN")
-            VerifySyntax(Of MemberAccessExpressionSyntax)(g.LiteralExpression(Single.NegativeInfinity), "Global.System.Single.NegativeInfinity")
-            VerifySyntax(Of MemberAccessExpressionSyntax)(g.LiteralExpression(Single.PositiveInfinity), "Global.System.Single.PositiveInfinity")
+            VerifySyntax(Of LiteralExpressionSyntax)(Generator.LiteralExpression(0.0F), "0F")
+            VerifySyntax(Of LiteralExpressionSyntax)(Generator.LiteralExpression(1.0F), "1F")
+            VerifySyntax(Of UnaryExpressionSyntax)(Generator.LiteralExpression(-1.0F), "-1F")
+            VerifySyntax(Of MemberAccessExpressionSyntax)(Generator.LiteralExpression(Single.MinValue), "Global.System.Single.MinValue")
+            VerifySyntax(Of MemberAccessExpressionSyntax)(Generator.LiteralExpression(Single.MaxValue), "Global.System.Single.MaxValue")
+            VerifySyntax(Of MemberAccessExpressionSyntax)(Generator.LiteralExpression(Single.Epsilon), "Global.System.Single.Epsilon")
+            VerifySyntax(Of MemberAccessExpressionSyntax)(Generator.LiteralExpression(Single.NaN), "Global.System.Single.NaN")
+            VerifySyntax(Of MemberAccessExpressionSyntax)(Generator.LiteralExpression(Single.NegativeInfinity), "Global.System.Single.NegativeInfinity")
+            VerifySyntax(Of MemberAccessExpressionSyntax)(Generator.LiteralExpression(Single.PositiveInfinity), "Global.System.Single.PositiveInfinity")
 
-            VerifySyntax(Of LiteralExpressionSyntax)(g.LiteralExpression(0.0), "0R")
-            VerifySyntax(Of LiteralExpressionSyntax)(g.LiteralExpression(1.0), "1R")
-            VerifySyntax(Of LiteralExpressionSyntax)(g.LiteralExpression(-1.0), "-1R")
-            VerifySyntax(Of MemberAccessExpressionSyntax)(g.LiteralExpression(Double.MinValue), "Global.System.Double.MinValue")
-            VerifySyntax(Of MemberAccessExpressionSyntax)(g.LiteralExpression(Double.MaxValue), "Global.System.Double.MaxValue")
-            VerifySyntax(Of MemberAccessExpressionSyntax)(g.LiteralExpression(Double.Epsilon), "Global.System.Double.Epsilon")
-            VerifySyntax(Of MemberAccessExpressionSyntax)(g.LiteralExpression(Double.NaN), "Global.System.Double.NaN")
-            VerifySyntax(Of MemberAccessExpressionSyntax)(g.LiteralExpression(Double.NegativeInfinity), "Global.System.Double.NegativeInfinity")
-            VerifySyntax(Of MemberAccessExpressionSyntax)(g.LiteralExpression(Double.PositiveInfinity), "Global.System.Double.PositiveInfinity")
+            VerifySyntax(Of LiteralExpressionSyntax)(Generator.LiteralExpression(0.0), "0R")
+            VerifySyntax(Of LiteralExpressionSyntax)(Generator.LiteralExpression(1.0), "1R")
+            VerifySyntax(Of UnaryExpressionSyntax)(Generator.LiteralExpression(-1.0), "-1R")
+            VerifySyntax(Of MemberAccessExpressionSyntax)(Generator.LiteralExpression(Double.MinValue), "Global.System.Double.MinValue")
+            VerifySyntax(Of MemberAccessExpressionSyntax)(Generator.LiteralExpression(Double.MaxValue), "Global.System.Double.MaxValue")
+            VerifySyntax(Of MemberAccessExpressionSyntax)(Generator.LiteralExpression(Double.Epsilon), "Global.System.Double.Epsilon")
+            VerifySyntax(Of MemberAccessExpressionSyntax)(Generator.LiteralExpression(Double.NaN), "Global.System.Double.NaN")
+            VerifySyntax(Of MemberAccessExpressionSyntax)(Generator.LiteralExpression(Double.NegativeInfinity), "Global.System.Double.NegativeInfinity")
+            VerifySyntax(Of MemberAccessExpressionSyntax)(Generator.LiteralExpression(Double.PositiveInfinity), "Global.System.Double.PositiveInfinity")
 
-            VerifySyntax(Of LiteralExpressionSyntax)(g.LiteralExpression(0D), "0D")
-            VerifySyntax(Of LiteralExpressionSyntax)(g.LiteralExpression(0.00D), "0.00D")
-            VerifySyntax(Of LiteralExpressionSyntax)(g.LiteralExpression(Decimal.Parse("1.00", CultureInfo.InvariantCulture)), "1.00D")
-            VerifySyntax(Of LiteralExpressionSyntax)(g.LiteralExpression(Decimal.Parse("-1.00", CultureInfo.InvariantCulture)), "-1.00D")
-            VerifySyntax(Of LiteralExpressionSyntax)(g.LiteralExpression(Decimal.Parse("1.0000000000", CultureInfo.InvariantCulture)), "1.0000000000D")
-            VerifySyntax(Of LiteralExpressionSyntax)(g.LiteralExpression(Decimal.Parse("0.000000", CultureInfo.InvariantCulture)), "0.000000D")
-            VerifySyntax(Of LiteralExpressionSyntax)(g.LiteralExpression(Decimal.Parse("0.0000000", CultureInfo.InvariantCulture)), "0.0000000D")
-            VerifySyntax(Of LiteralExpressionSyntax)(g.LiteralExpression(1000000000D), "1000000000D")
-            VerifySyntax(Of LiteralExpressionSyntax)(g.LiteralExpression(123456789.123456789D), "123456789.123456789D")
-            VerifySyntax(Of LiteralExpressionSyntax)(g.LiteralExpression(Decimal.Parse("1E-28", NumberStyles.Any, CultureInfo.InvariantCulture)), "0.0000000000000000000000000001D")
-            VerifySyntax(Of LiteralExpressionSyntax)(g.LiteralExpression(Decimal.Parse("0E-28", NumberStyles.Any, CultureInfo.InvariantCulture)), "0.0000000000000000000000000000D")
-            VerifySyntax(Of LiteralExpressionSyntax)(g.LiteralExpression(Decimal.Parse("1E-29", NumberStyles.Any, CultureInfo.InvariantCulture)), "0.0000000000000000000000000000D")
-            VerifySyntax(Of LiteralExpressionSyntax)(g.LiteralExpression(Decimal.Parse("-1E-29", NumberStyles.Any, CultureInfo.InvariantCulture)), "0.0000000000000000000000000000D")
-            VerifySyntax(Of MemberAccessExpressionSyntax)(g.LiteralExpression(Decimal.MinValue), "Global.System.Decimal.MinValue")
-            VerifySyntax(Of MemberAccessExpressionSyntax)(g.LiteralExpression(Decimal.MaxValue), "Global.System.Decimal.MaxValue")
+            VerifySyntax(Of LiteralExpressionSyntax)(Generator.LiteralExpression(0D), "0D")
+            VerifySyntax(Of LiteralExpressionSyntax)(Generator.LiteralExpression(0.00D), "0.00D")
+            VerifySyntax(Of LiteralExpressionSyntax)(Generator.LiteralExpression(Decimal.Parse("1.00", CultureInfo.InvariantCulture)), "1.00D")
+            VerifySyntax(Of LiteralExpressionSyntax)(Generator.LiteralExpression(Decimal.Parse("-1.00", CultureInfo.InvariantCulture)), "-1.00D")
+            VerifySyntax(Of LiteralExpressionSyntax)(Generator.LiteralExpression(Decimal.Parse("1.0000000000", CultureInfo.InvariantCulture)), "1.0000000000D")
+            VerifySyntax(Of LiteralExpressionSyntax)(Generator.LiteralExpression(Decimal.Parse("0.000000", CultureInfo.InvariantCulture)), "0.000000D")
+            VerifySyntax(Of LiteralExpressionSyntax)(Generator.LiteralExpression(Decimal.Parse("0.0000000", CultureInfo.InvariantCulture)), "0.0000000D")
+            VerifySyntax(Of LiteralExpressionSyntax)(Generator.LiteralExpression(1000000000D), "1000000000D")
+            VerifySyntax(Of LiteralExpressionSyntax)(Generator.LiteralExpression(123456789.123456789D), "123456789.123456789D")
+            VerifySyntax(Of LiteralExpressionSyntax)(Generator.LiteralExpression(Decimal.Parse("1E-28", NumberStyles.Any, CultureInfo.InvariantCulture)), "0.0000000000000000000000000001D")
+            VerifySyntax(Of LiteralExpressionSyntax)(Generator.LiteralExpression(Decimal.Parse("0E-28", NumberStyles.Any, CultureInfo.InvariantCulture)), "0.0000000000000000000000000000D")
+            VerifySyntax(Of LiteralExpressionSyntax)(Generator.LiteralExpression(Decimal.Parse("1E-29", NumberStyles.Any, CultureInfo.InvariantCulture)), "0.0000000000000000000000000000D")
+            VerifySyntax(Of LiteralExpressionSyntax)(Generator.LiteralExpression(Decimal.Parse("-1E-29", NumberStyles.Any, CultureInfo.InvariantCulture)), "0.0000000000000000000000000000D")
+            VerifySyntax(Of MemberAccessExpressionSyntax)(Generator.LiteralExpression(Decimal.MinValue), "Global.System.Decimal.MinValue")
+            VerifySyntax(Of MemberAccessExpressionSyntax)(Generator.LiteralExpression(Decimal.MaxValue), "Global.System.Decimal.MaxValue")
 
-            VerifySyntax(Of LiteralExpressionSyntax)(g.LiteralExpression("c"c), """c""c")
+            VerifySyntax(Of LiteralExpressionSyntax)(Generator.LiteralExpression("c"c), """c""c")
 
-            VerifySyntax(Of LiteralExpressionSyntax)(g.LiteralExpression("str"), """str""")
+            VerifySyntax(Of LiteralExpressionSyntax)(Generator.LiteralExpression("str"), """str""")
 
-            VerifySyntax(Of LiteralExpressionSyntax)(g.LiteralExpression(True), "True")
-            VerifySyntax(Of LiteralExpressionSyntax)(g.LiteralExpression(False), "False")
+            VerifySyntax(Of LiteralExpressionSyntax)(Generator.LiteralExpression(True), "True")
+            VerifySyntax(Of LiteralExpressionSyntax)(Generator.LiteralExpression(False), "False")
         End Sub
 
         <Fact>
+        Public Sub TestAttributeData()
+            VerifySyntax(Of AttributeListSyntax)(Generator.Attribute(GetAttributeData("
+Imports System
+Public Class MyAttribute
+  Inherits Attribute
+End Class
+", "<MyAttribute>")), "<Global.MyAttribute>")
+
+            VerifySyntax(Of AttributeListSyntax)(Generator.Attribute(GetAttributeData("
+Imports System
+Public Class MyAttribute
+  Inherits Attribute
+  Public Sub New(value As Object)
+  End Sub
+End Class
+", "<MyAttribute(Nothing)>")), "<Global.MyAttribute(Nothing)>")
+
+            VerifySyntax(Of AttributeListSyntax)(Generator.Attribute(GetAttributeData("
+Imports System
+Public Class MyAttribute
+  Inherits Attribute
+  Public Sub New(value As Integer)
+  End Sub
+End Class
+", "<MyAttribute(123)>")), "<Global.MyAttribute(123)>")
+
+            VerifySyntax(Of AttributeListSyntax)(Generator.Attribute(GetAttributeData("
+Imports System
+Public Class MyAttribute
+  Inherits Attribute
+  Public Sub New(value As Double)
+  End Sub
+End Class
+", "<MyAttribute(12.3)>")), "<Global.MyAttribute(12.3)>")
+
+            VerifySyntax(Of AttributeListSyntax)(Generator.Attribute(GetAttributeData("
+Imports System
+Public Class MyAttribute
+  Inherits Attribute
+  Public Sub New(value As String)
+  End Sub
+End Class
+", "<MyAttribute(""value"")>")), "<Global.MyAttribute(""value"")>")
+
+            VerifySyntax(Of AttributeListSyntax)(Generator.Attribute(GetAttributeData("
+Imports System
+Public Enum E
+    A
+End Enum
+
+Public Class MyAttribute
+  Inherits Attribute
+  Public Sub New(value As E)
+  End Sub
+End Class
+", "<MyAttribute(E.A)>")), "<Global.MyAttribute(Global.E.A)>")
+
+            VerifySyntax(Of AttributeListSyntax)(Generator.Attribute(GetAttributeData("
+Imports System
+Public Class MyAttribute
+  Inherits Attribute
+  Public Sub New(value As Type)
+  End Sub
+End Class
+", "<MyAttribute(GetType(MyAttribute))>")), "<Global.MyAttribute(GetType(Global.MyAttribute))>")
+
+            VerifySyntax(Of AttributeListSyntax)(Generator.Attribute(GetAttributeData("
+Imports System
+Public Class MyAttribute
+  Inherits Attribute
+  Public Sub New(values as Integer())
+  End Sub
+End Class
+", "<MyAttribute({1, 2, 3})>")), "<Global.MyAttribute({1, 2, 3})>")
+
+            VerifySyntax(Of AttributeListSyntax)(Generator.Attribute(GetAttributeData("
+Imports System
+Public Class MyAttribute
+  Inherits Attribute
+  Public Property Value As Integer
+End Class
+", "<MyAttribute(Value := 123)>")), "<Global.MyAttribute(Value:=123)>")
+
+        End Sub
+
+        Private Shared Function GetAttributeData(decl As String, use As String) As AttributeData
+            Dim code = decl & vbCrLf & use & vbCrLf & "Public Class C " & vbCrLf & "End Class" & vbCrLf
+            Dim compilation = Compile(code)
+            Dim typeC = DirectCast(compilation.GlobalNamespace.GetMembers("C").First, INamedTypeSymbol)
+            Return typeC.GetAttributes().First()
+        End Function
+
+        <Fact>
         Public Sub TestNameExpressions()
-            VerifySyntax(Of IdentifierNameSyntax)(g.IdentifierName("x"), "x")
-            VerifySyntax(Of QualifiedNameSyntax)(g.QualifiedName(g.IdentifierName("x"), g.IdentifierName("y")), "x.y")
-            VerifySyntax(Of QualifiedNameSyntax)(g.DottedName("x.y"), "x.y")
+            VerifySyntax(Of IdentifierNameSyntax)(Generator.IdentifierName("x"), "x")
+            VerifySyntax(Of QualifiedNameSyntax)(Generator.QualifiedName(Generator.IdentifierName("x"), Generator.IdentifierName("y")), "x.y")
+            VerifySyntax(Of QualifiedNameSyntax)(Generator.DottedName("x.y"), "x.y")
 
-            VerifySyntax(Of GenericNameSyntax)(g.GenericName("x", g.IdentifierName("y")), "x(Of y)")
-            VerifySyntax(Of GenericNameSyntax)(g.GenericName("x", g.IdentifierName("y"), g.IdentifierName("z")), "x(Of y, z)")
+            VerifySyntax(Of GenericNameSyntax)(Generator.GenericName("x", Generator.IdentifierName("y")), "x(Of y)")
+            VerifySyntax(Of GenericNameSyntax)(Generator.GenericName("x", Generator.IdentifierName("y"), Generator.IdentifierName("z")), "x(Of y, z)")
 
-            ' convert identifer name into generic name
-            VerifySyntax(Of GenericNameSyntax)(g.WithTypeArguments(g.IdentifierName("x"), g.IdentifierName("y")), "x(Of y)")
+            ' convert identifier name into generic name
+            VerifySyntax(Of GenericNameSyntax)(Generator.WithTypeArguments(Generator.IdentifierName("x"), Generator.IdentifierName("y")), "x(Of y)")
 
             ' convert qualified name into qualified generic name
-            VerifySyntax(Of QualifiedNameSyntax)(g.WithTypeArguments(g.DottedName("x.y"), g.IdentifierName("z")), "x.y(Of z)")
+            VerifySyntax(Of QualifiedNameSyntax)(Generator.WithTypeArguments(Generator.DottedName("x.y"), Generator.IdentifierName("z")), "x.y(Of z)")
 
             ' convert member access expression into generic member access expression
-            VerifySyntax(Of MemberAccessExpressionSyntax)(g.WithTypeArguments(g.MemberAccessExpression(g.IdentifierName("x"), g.IdentifierName("y")), g.IdentifierName("z")), "x.y(Of z)")
+            VerifySyntax(Of MemberAccessExpressionSyntax)(Generator.WithTypeArguments(Generator.MemberAccessExpression(Generator.IdentifierName("x"), Generator.IdentifierName("y")), Generator.IdentifierName("z")), "x.y(Of z)")
 
             ' convert existing generic name into a different generic name
-            Dim gname = g.WithTypeArguments(g.IdentifierName("x"), g.IdentifierName("y"))
+            Dim gname = Generator.WithTypeArguments(Generator.IdentifierName("x"), Generator.IdentifierName("y"))
             VerifySyntax(Of GenericNameSyntax)(gname, "x(Of y)")
-            VerifySyntax(Of GenericNameSyntax)(g.WithTypeArguments(gname, g.IdentifierName("z")), "x(Of z)")
+            VerifySyntax(Of GenericNameSyntax)(Generator.WithTypeArguments(gname, Generator.IdentifierName("z")), "x(Of z)")
         End Sub
 
         <Fact>
         Public Sub TestTypeExpressions()
             ' these are all type syntax too
-            VerifySyntax(Of TypeSyntax)(g.IdentifierName("x"), "x")
-            VerifySyntax(Of TypeSyntax)(g.QualifiedName(g.IdentifierName("x"), g.IdentifierName("y")), "x.y")
-            VerifySyntax(Of TypeSyntax)(g.DottedName("x.y"), "x.y")
-            VerifySyntax(Of TypeSyntax)(g.GenericName("x", g.IdentifierName("y")), "x(Of y)")
-            VerifySyntax(Of TypeSyntax)(g.GenericName("x", g.IdentifierName("y"), g.IdentifierName("z")), "x(Of y, z)")
+            VerifySyntax(Of TypeSyntax)(Generator.IdentifierName("x"), "x")
+            VerifySyntax(Of TypeSyntax)(Generator.QualifiedName(Generator.IdentifierName("x"), Generator.IdentifierName("y")), "x.y")
+            VerifySyntax(Of TypeSyntax)(Generator.DottedName("x.y"), "x.y")
+            VerifySyntax(Of TypeSyntax)(Generator.GenericName("x", Generator.IdentifierName("y")), "x(Of y)")
+            VerifySyntax(Of TypeSyntax)(Generator.GenericName("x", Generator.IdentifierName("y"), Generator.IdentifierName("z")), "x(Of y, z)")
 
-            VerifySyntax(Of TypeSyntax)(g.ArrayTypeExpression(g.IdentifierName("x")), "x()")
-            VerifySyntax(Of TypeSyntax)(g.ArrayTypeExpression(g.ArrayTypeExpression(g.IdentifierName("x"))), "x()()")
-            VerifySyntax(Of TypeSyntax)(g.NullableTypeExpression(g.IdentifierName("x")), "x?")
-            VerifySyntax(Of TypeSyntax)(g.NullableTypeExpression(g.NullableTypeExpression(g.IdentifierName("x"))), "x?")
+            VerifySyntax(Of TypeSyntax)(Generator.ArrayTypeExpression(Generator.IdentifierName("x")), "x()")
+            VerifySyntax(Of TypeSyntax)(Generator.ArrayTypeExpression(Generator.ArrayTypeExpression(Generator.IdentifierName("x"))), "x()()")
+            VerifySyntax(Of TypeSyntax)(Generator.NullableTypeExpression(Generator.IdentifierName("x")), "x?")
+            VerifySyntax(Of TypeSyntax)(Generator.NullableTypeExpression(Generator.NullableTypeExpression(Generator.IdentifierName("x"))), "x?")
+
+            Dim intType = _emptyCompilation.GetSpecialType(SpecialType.System_Int32)
+            VerifySyntax(Of TupleElementSyntax)(Generator.TupleElementExpression(Generator.IdentifierName("x")), "x")
+            VerifySyntax(Of TupleElementSyntax)(Generator.TupleElementExpression(Generator.IdentifierName("x"), "y"), "y As x")
+            VerifySyntax(Of TupleElementSyntax)(Generator.TupleElementExpression(intType), "System.Int32")
+            VerifySyntax(Of TupleElementSyntax)(Generator.TupleElementExpression(intType, "y"), "y As System.Int32")
+            VerifySyntax(Of TypeSyntax)(Generator.TupleTypeExpression(Generator.TupleElementExpression(Generator.IdentifierName("x")), Generator.TupleElementExpression(Generator.IdentifierName("y"))), "(x, y)")
+            VerifySyntax(Of TypeSyntax)(Generator.TupleTypeExpression(New ITypeSymbol() {intType, intType}), "(System.Int32, System.Int32)")
+            VerifySyntax(Of TypeSyntax)(Generator.TupleTypeExpression(New ITypeSymbol() {intType, intType}, New String() {"x", "y"}), "(x As System.Int32, y As System.Int32)")
         End Sub
 
         <Fact>
         Public Sub TestSpecialTypeExpression()
-            VerifySyntax(Of TypeSyntax)(g.TypeExpression(SpecialType.System_Byte), "Byte")
-            VerifySyntax(Of TypeSyntax)(g.TypeExpression(SpecialType.System_SByte), "SByte")
+            VerifySyntax(Of TypeSyntax)(Generator.TypeExpression(SpecialType.System_Byte), "Byte")
+            VerifySyntax(Of TypeSyntax)(Generator.TypeExpression(SpecialType.System_SByte), "SByte")
 
-            VerifySyntax(Of TypeSyntax)(g.TypeExpression(SpecialType.System_Int16), "Short")
-            VerifySyntax(Of TypeSyntax)(g.TypeExpression(SpecialType.System_UInt16), "UShort")
+            VerifySyntax(Of TypeSyntax)(Generator.TypeExpression(SpecialType.System_Int16), "Short")
+            VerifySyntax(Of TypeSyntax)(Generator.TypeExpression(SpecialType.System_UInt16), "UShort")
 
-            VerifySyntax(Of TypeSyntax)(g.TypeExpression(SpecialType.System_Int32), "Integer")
-            VerifySyntax(Of TypeSyntax)(g.TypeExpression(SpecialType.System_UInt32), "UInteger")
+            VerifySyntax(Of TypeSyntax)(Generator.TypeExpression(SpecialType.System_Int32), "Integer")
+            VerifySyntax(Of TypeSyntax)(Generator.TypeExpression(SpecialType.System_UInt32), "UInteger")
 
-            VerifySyntax(Of TypeSyntax)(g.TypeExpression(SpecialType.System_Int64), "Long")
-            VerifySyntax(Of TypeSyntax)(g.TypeExpression(SpecialType.System_UInt64), "ULong")
+            VerifySyntax(Of TypeSyntax)(Generator.TypeExpression(SpecialType.System_Int64), "Long")
+            VerifySyntax(Of TypeSyntax)(Generator.TypeExpression(SpecialType.System_UInt64), "ULong")
 
-            VerifySyntax(Of TypeSyntax)(g.TypeExpression(SpecialType.System_Single), "Single")
-            VerifySyntax(Of TypeSyntax)(g.TypeExpression(SpecialType.System_Double), "Double")
+            VerifySyntax(Of TypeSyntax)(Generator.TypeExpression(SpecialType.System_Single), "Single")
+            VerifySyntax(Of TypeSyntax)(Generator.TypeExpression(SpecialType.System_Double), "Double")
 
-            VerifySyntax(Of TypeSyntax)(g.TypeExpression(SpecialType.System_Char), "Char")
-            VerifySyntax(Of TypeSyntax)(g.TypeExpression(SpecialType.System_String), "String")
+            VerifySyntax(Of TypeSyntax)(Generator.TypeExpression(SpecialType.System_Char), "Char")
+            VerifySyntax(Of TypeSyntax)(Generator.TypeExpression(SpecialType.System_String), "String")
 
-            VerifySyntax(Of TypeSyntax)(g.TypeExpression(SpecialType.System_Object), "Object")
-            VerifySyntax(Of TypeSyntax)(g.TypeExpression(SpecialType.System_Decimal), "Decimal")
+            VerifySyntax(Of TypeSyntax)(Generator.TypeExpression(SpecialType.System_Object), "Object")
+            VerifySyntax(Of TypeSyntax)(Generator.TypeExpression(SpecialType.System_Decimal), "Decimal")
         End Sub
 
         <Fact>
         Public Sub TestSymbolTypeExpressions()
-            Dim genericType = emptyCompilation.GetSpecialType(SpecialType.System_Collections_Generic_IEnumerable_T)
-            VerifySyntax(Of QualifiedNameSyntax)(g.TypeExpression(genericType), "Global.System.Collections.Generic.IEnumerable(Of T)")
+            Dim genericType = _emptyCompilation.GetSpecialType(SpecialType.System_Collections_Generic_IEnumerable_T)
+            VerifySyntax(Of QualifiedNameSyntax)(Generator.TypeExpression(genericType), "Global.System.Collections.Generic.IEnumerable(Of T)")
 
-            Dim arrayType = emptyCompilation.CreateArrayTypeSymbol(emptyCompilation.GetSpecialType(SpecialType.System_Int32))
-            VerifySyntax(Of ArrayTypeSyntax)(g.TypeExpression(arrayType), "System.Int32()")
+            Dim arrayType = _emptyCompilation.CreateArrayTypeSymbol(_emptyCompilation.GetSpecialType(SpecialType.System_Int32))
+            VerifySyntax(Of ArrayTypeSyntax)(Generator.TypeExpression(arrayType), "System.Int32()")
         End Sub
 
         <Fact>
         Public Sub TestMathAndLogicExpressions()
-            VerifySyntax(Of UnaryExpressionSyntax)(g.NegateExpression(g.IdentifierName("x")), "-(x)")
-            VerifySyntax(Of BinaryExpressionSyntax)(g.AddExpression(g.IdentifierName("x"), g.IdentifierName("y")), "(x) + (y)")
-            VerifySyntax(Of BinaryExpressionSyntax)(g.SubtractExpression(g.IdentifierName("x"), g.IdentifierName("y")), "(x) - (y)")
-            VerifySyntax(Of BinaryExpressionSyntax)(g.MultiplyExpression(g.IdentifierName("x"), g.IdentifierName("y")), "(x) * (y)")
-            VerifySyntax(Of BinaryExpressionSyntax)(g.DivideExpression(g.IdentifierName("x"), g.IdentifierName("y")), "(x) / (y)")
-            VerifySyntax(Of BinaryExpressionSyntax)(g.ModuloExpression(g.IdentifierName("x"), g.IdentifierName("y")), "(x) Mod (y)")
+            VerifySyntax(Of UnaryExpressionSyntax)(Generator.NegateExpression(Generator.IdentifierName("x")), "-(x)")
+            VerifySyntax(Of BinaryExpressionSyntax)(Generator.AddExpression(Generator.IdentifierName("x"), Generator.IdentifierName("y")), "(x) + (y)")
+            VerifySyntax(Of BinaryExpressionSyntax)(Generator.SubtractExpression(Generator.IdentifierName("x"), Generator.IdentifierName("y")), "(x) - (y)")
+            VerifySyntax(Of BinaryExpressionSyntax)(Generator.MultiplyExpression(Generator.IdentifierName("x"), Generator.IdentifierName("y")), "(x) * (y)")
+            VerifySyntax(Of BinaryExpressionSyntax)(Generator.DivideExpression(Generator.IdentifierName("x"), Generator.IdentifierName("y")), "(x) / (y)")
+            VerifySyntax(Of BinaryExpressionSyntax)(Generator.ModuloExpression(Generator.IdentifierName("x"), Generator.IdentifierName("y")), "(x) Mod (y)")
 
-            VerifySyntax(Of UnaryExpressionSyntax)(g.BitwiseNotExpression(g.IdentifierName("x")), "Not(x)")
-            VerifySyntax(Of BinaryExpressionSyntax)(g.BitwiseAndExpression(g.IdentifierName("x"), g.IdentifierName("y")), "(x) And (y)")
-            VerifySyntax(Of BinaryExpressionSyntax)(g.BitwiseOrExpression(g.IdentifierName("x"), g.IdentifierName("y")), "(x) Or (y)")
+            VerifySyntax(Of UnaryExpressionSyntax)(Generator.BitwiseNotExpression(Generator.IdentifierName("x")), "Not(x)")
+            VerifySyntax(Of BinaryExpressionSyntax)(Generator.BitwiseAndExpression(Generator.IdentifierName("x"), Generator.IdentifierName("y")), "(x) And (y)")
+            VerifySyntax(Of BinaryExpressionSyntax)(Generator.BitwiseOrExpression(Generator.IdentifierName("x"), Generator.IdentifierName("y")), "(x) Or (y)")
 
-            VerifySyntax(Of UnaryExpressionSyntax)(g.LogicalNotExpression(g.IdentifierName("x")), "Not(x)")
-            VerifySyntax(Of BinaryExpressionSyntax)(g.LogicalAndExpression(g.IdentifierName("x"), g.IdentifierName("y")), "(x) AndAlso (y)")
-            VerifySyntax(Of BinaryExpressionSyntax)(g.LogicalOrExpression(g.IdentifierName("x"), g.IdentifierName("y")), "(x) OrElse (y)")
+            VerifySyntax(Of UnaryExpressionSyntax)(Generator.LogicalNotExpression(Generator.IdentifierName("x")), "Not(x)")
+            VerifySyntax(Of BinaryExpressionSyntax)(Generator.LogicalAndExpression(Generator.IdentifierName("x"), Generator.IdentifierName("y")), "(x) AndAlso (y)")
+            VerifySyntax(Of BinaryExpressionSyntax)(Generator.LogicalOrExpression(Generator.IdentifierName("x"), Generator.IdentifierName("y")), "(x) OrElse (y)")
         End Sub
 
         <Fact>
         Public Sub TestEqualityAndInequalityExpressions()
-            VerifySyntax(Of BinaryExpressionSyntax)(g.ReferenceEqualsExpression(g.IdentifierName("x"), g.IdentifierName("y")), "(x) Is (y)")
-            VerifySyntax(Of BinaryExpressionSyntax)(g.ValueEqualsExpression(g.IdentifierName("x"), g.IdentifierName("y")), "(x) = (y)")
+            VerifySyntax(Of BinaryExpressionSyntax)(Generator.ReferenceEqualsExpression(Generator.IdentifierName("x"), Generator.IdentifierName("y")), "(x) Is (y)")
+            VerifySyntax(Of BinaryExpressionSyntax)(Generator.ValueEqualsExpression(Generator.IdentifierName("x"), Generator.IdentifierName("y")), "(x) = (y)")
 
-            VerifySyntax(Of BinaryExpressionSyntax)(g.ReferenceNotEqualsExpression(g.IdentifierName("x"), g.IdentifierName("y")), "(x) IsNot (y)")
-            VerifySyntax(Of BinaryExpressionSyntax)(g.ValueNotEqualsExpression(g.IdentifierName("x"), g.IdentifierName("y")), "(x) <> (y)")
+            VerifySyntax(Of BinaryExpressionSyntax)(Generator.ReferenceNotEqualsExpression(Generator.IdentifierName("x"), Generator.IdentifierName("y")), "(x) IsNot (y)")
+            VerifySyntax(Of BinaryExpressionSyntax)(Generator.ValueNotEqualsExpression(Generator.IdentifierName("x"), Generator.IdentifierName("y")), "(x) <> (y)")
 
-            VerifySyntax(Of BinaryExpressionSyntax)(g.LessThanExpression(g.IdentifierName("x"), g.IdentifierName("y")), "(x) < (y)")
-            VerifySyntax(Of BinaryExpressionSyntax)(g.LessThanOrEqualExpression(g.IdentifierName("x"), g.IdentifierName("y")), "(x) <= (y)")
+            VerifySyntax(Of BinaryExpressionSyntax)(Generator.LessThanExpression(Generator.IdentifierName("x"), Generator.IdentifierName("y")), "(x) < (y)")
+            VerifySyntax(Of BinaryExpressionSyntax)(Generator.LessThanOrEqualExpression(Generator.IdentifierName("x"), Generator.IdentifierName("y")), "(x) <= (y)")
 
-            VerifySyntax(Of BinaryExpressionSyntax)(g.GreaterThanExpression(g.IdentifierName("x"), g.IdentifierName("y")), "(x) > (y)")
-            VerifySyntax(Of BinaryExpressionSyntax)(g.GreaterThanOrEqualExpression(g.IdentifierName("x"), g.IdentifierName("y")), "(x) >= (y)")
+            VerifySyntax(Of BinaryExpressionSyntax)(Generator.GreaterThanExpression(Generator.IdentifierName("x"), Generator.IdentifierName("y")), "(x) > (y)")
+            VerifySyntax(Of BinaryExpressionSyntax)(Generator.GreaterThanOrEqualExpression(Generator.IdentifierName("x"), Generator.IdentifierName("y")), "(x) >= (y)")
         End Sub
 
         <Fact>
         Public Sub TestConditionalExpressions()
-            VerifySyntax(Of BinaryConditionalExpressionSyntax)(g.CoalesceExpression(g.IdentifierName("x"), g.IdentifierName("y")), "If(x, y)")
-            VerifySyntax(Of TernaryConditionalExpressionSyntax)(g.ConditionalExpression(g.IdentifierName("x"), g.IdentifierName("y"), g.IdentifierName("z")), "If(x, y, z)")
+            VerifySyntax(Of BinaryConditionalExpressionSyntax)(Generator.CoalesceExpression(Generator.IdentifierName("x"), Generator.IdentifierName("y")), "If(x, y)")
+            VerifySyntax(Of TernaryConditionalExpressionSyntax)(Generator.ConditionalExpression(Generator.IdentifierName("x"), Generator.IdentifierName("y"), Generator.IdentifierName("z")), "If(x, y, z)")
         End Sub
 
         <Fact>
         Public Sub TestMemberAccessExpressions()
-            VerifySyntax(Of MemberAccessExpressionSyntax)(g.MemberAccessExpression(g.IdentifierName("x"), g.IdentifierName("y")), "x.y")
-            VerifySyntax(Of MemberAccessExpressionSyntax)(g.MemberAccessExpression(g.IdentifierName("x"), "y"), "x.y")
-            VerifySyntax(Of MemberAccessExpressionSyntax)(g.MemberAccessExpression(g.MemberAccessExpression(g.IdentifierName("x"), g.IdentifierName("y")), g.IdentifierName("z")), "x.y.z")
-            VerifySyntax(Of MemberAccessExpressionSyntax)(g.MemberAccessExpression(g.InvocationExpression(g.IdentifierName("x"), g.IdentifierName("y")), g.IdentifierName("z")), "x(y).z")
-            VerifySyntax(Of MemberAccessExpressionSyntax)(g.MemberAccessExpression(g.ElementAccessExpression(g.IdentifierName("x"), g.IdentifierName("y")), g.IdentifierName("z")), "x(y).z")
-            VerifySyntax(Of MemberAccessExpressionSyntax)(g.MemberAccessExpression(g.AddExpression(g.IdentifierName("x"), g.IdentifierName("y")), g.IdentifierName("z")), "((x) + (y)).z")
-            VerifySyntax(Of MemberAccessExpressionSyntax)(g.MemberAccessExpression(g.NegateExpression(g.IdentifierName("x")), g.IdentifierName("y")), "(-(x)).y")
+            VerifySyntax(Of MemberAccessExpressionSyntax)(Generator.MemberAccessExpression(Generator.IdentifierName("x"), Generator.IdentifierName("y")), "x.y")
+            VerifySyntax(Of MemberAccessExpressionSyntax)(Generator.MemberAccessExpression(Generator.IdentifierName("x"), "y"), "x.y")
+            VerifySyntax(Of MemberAccessExpressionSyntax)(Generator.MemberAccessExpression(Generator.MemberAccessExpression(Generator.IdentifierName("x"), Generator.IdentifierName("y")), Generator.IdentifierName("z")), "x.y.z")
+            VerifySyntax(Of MemberAccessExpressionSyntax)(Generator.MemberAccessExpression(Generator.InvocationExpression(Generator.IdentifierName("x"), Generator.IdentifierName("y")), Generator.IdentifierName("z")), "x(y).z")
+            VerifySyntax(Of MemberAccessExpressionSyntax)(Generator.MemberAccessExpression(Generator.ElementAccessExpression(Generator.IdentifierName("x"), Generator.IdentifierName("y")), Generator.IdentifierName("z")), "x(y).z")
+            VerifySyntax(Of MemberAccessExpressionSyntax)(Generator.MemberAccessExpression(Generator.AddExpression(Generator.IdentifierName("x"), Generator.IdentifierName("y")), Generator.IdentifierName("z")), "((x) + (y)).z")
+            VerifySyntax(Of MemberAccessExpressionSyntax)(Generator.MemberAccessExpression(Generator.NegateExpression(Generator.IdentifierName("x")), Generator.IdentifierName("y")), "(-(x)).y")
+        End Sub
+
+        <Fact>
+        Public Sub TestArrayCreationExpressions()
+            VerifySyntax(Of ArrayCreationExpressionSyntax)(
+                Generator.ArrayCreationExpression(Generator.IdentifierName("x"), Generator.LiteralExpression(10)),
+                "New x(10) {}")
+
+            VerifySyntax(Of ArrayCreationExpressionSyntax)(
+                Generator.ArrayCreationExpression(Generator.IdentifierName("x"), {Generator.IdentifierName("y"), Generator.IdentifierName("z")}),
+                "New x() {y, z}")
         End Sub
 
         <Fact>
         Public Sub TestObjectCreationExpressions()
             VerifySyntax(Of ObjectCreationExpressionSyntax)(
-                g.ObjectCreationExpression(g.IdentifierName("x")),
+                Generator.ObjectCreationExpression(Generator.IdentifierName("x")),
                 "New x()")
 
             VerifySyntax(Of ObjectCreationExpressionSyntax)(
-                g.ObjectCreationExpression(g.IdentifierName("x"), g.IdentifierName("y")),
+                Generator.ObjectCreationExpression(Generator.IdentifierName("x"), Generator.IdentifierName("y")),
                 "New x(y)")
 
-            Dim intType = emptyCompilation.GetSpecialType(SpecialType.System_Int32)
-            Dim listType = emptyCompilation.GetTypeByMetadataName("System.Collections.Generic.List`1")
+            Dim intType = _emptyCompilation.GetSpecialType(SpecialType.System_Int32)
+            Dim listType = _emptyCompilation.GetTypeByMetadataName("System.Collections.Generic.List`1")
             Dim listOfIntType = listType.Construct(intType)
 
             VerifySyntax(Of ObjectCreationExpressionSyntax)(
-                g.ObjectCreationExpression(listOfIntType, g.IdentifierName("y")),
+                Generator.ObjectCreationExpression(listOfIntType, Generator.IdentifierName("y")),
                 "New Global.System.Collections.Generic.List(Of System.Int32)(y)")
         End Sub
 
         <Fact>
         Public Sub TestElementAccessExpressions()
             VerifySyntax(Of InvocationExpressionSyntax)(
-                g.ElementAccessExpression(g.IdentifierName("x"), g.IdentifierName("y")),
+                Generator.ElementAccessExpression(Generator.IdentifierName("x"), Generator.IdentifierName("y")),
                 "x(y)")
 
             VerifySyntax(Of InvocationExpressionSyntax)(
-                g.ElementAccessExpression(g.IdentifierName("x"), g.IdentifierName("y"), g.IdentifierName("z")),
+                Generator.ElementAccessExpression(Generator.IdentifierName("x"), Generator.IdentifierName("y"), Generator.IdentifierName("z")),
                 "x(y, z)")
 
             VerifySyntax(Of InvocationExpressionSyntax)(
-                g.ElementAccessExpression(g.MemberAccessExpression(g.IdentifierName("x"), g.IdentifierName("y")), g.IdentifierName("z")),
+                Generator.ElementAccessExpression(Generator.MemberAccessExpression(Generator.IdentifierName("x"), Generator.IdentifierName("y")), Generator.IdentifierName("z")),
                 "x.y(z)")
 
             VerifySyntax(Of InvocationExpressionSyntax)(
-                g.ElementAccessExpression(g.ElementAccessExpression(g.IdentifierName("x"), g.IdentifierName("y")), g.IdentifierName("z")),
+                Generator.ElementAccessExpression(Generator.ElementAccessExpression(Generator.IdentifierName("x"), Generator.IdentifierName("y")), Generator.IdentifierName("z")),
                 "x(y)(z)")
 
             VerifySyntax(Of InvocationExpressionSyntax)(
-                g.ElementAccessExpression(g.InvocationExpression(g.IdentifierName("x"), g.IdentifierName("y")), g.IdentifierName("z")),
+                Generator.ElementAccessExpression(Generator.InvocationExpression(Generator.IdentifierName("x"), Generator.IdentifierName("y")), Generator.IdentifierName("z")),
                 "x(y)(z)")
 
             VerifySyntax(Of InvocationExpressionSyntax)(
-                g.ElementAccessExpression(g.AddExpression(g.IdentifierName("x"), g.IdentifierName("y")), g.IdentifierName("z")),
+                Generator.ElementAccessExpression(Generator.AddExpression(Generator.IdentifierName("x"), Generator.IdentifierName("y")), Generator.IdentifierName("z")),
                 "((x) + (y))(z)")
         End Sub
 
         <Fact>
         Public Sub TestCastAndConvertExpressions()
-            VerifySyntax(Of DirectCastExpressionSyntax)(g.CastExpression(g.IdentifierName("x"), g.IdentifierName("y")), "DirectCast(y, x)")
-            VerifySyntax(Of CTypeExpressionSyntax)(g.ConvertExpression(g.IdentifierName("x"), g.IdentifierName("y")), "CType(y, x)")
+            VerifySyntax(Of DirectCastExpressionSyntax)(Generator.CastExpression(Generator.IdentifierName("x"), Generator.IdentifierName("y")), "DirectCast(y, x)")
+            VerifySyntax(Of CTypeExpressionSyntax)(Generator.ConvertExpression(Generator.IdentifierName("x"), Generator.IdentifierName("y")), "CType(y, x)")
         End Sub
 
         <Fact>
         Public Sub TestIsAndAsExpressions()
-            VerifySyntax(Of TypeOfExpressionSyntax)(g.IsTypeExpression(g.IdentifierName("x"), g.IdentifierName("y")), "TypeOf(x) Is y")
-            VerifySyntax(Of TryCastExpressionSyntax)(g.TryCastExpression(g.IdentifierName("x"), g.IdentifierName("y")), "TryCast(x, y)")
+            VerifySyntax(Of TypeOfExpressionSyntax)(Generator.IsTypeExpression(Generator.IdentifierName("x"), Generator.IdentifierName("y")), "TypeOf(x) Is y")
+            VerifySyntax(Of TryCastExpressionSyntax)(Generator.TryCastExpression(Generator.IdentifierName("x"), Generator.IdentifierName("y")), "TryCast(x, y)")
+            VerifySyntax(Of GetTypeExpressionSyntax)(Generator.TypeOfExpression(Generator.IdentifierName("x")), "GetType(x)")
         End Sub
 
         <Fact>
         Public Sub TestInvocationExpressions()
             ' without explicit arguments
-            VerifySyntax(Of InvocationExpressionSyntax)(g.InvocationExpression(g.IdentifierName("x")), "x()")
-            VerifySyntax(Of InvocationExpressionSyntax)(g.InvocationExpression(g.IdentifierName("x"), g.IdentifierName("y")), "x(y)")
-            VerifySyntax(Of InvocationExpressionSyntax)(g.InvocationExpression(g.IdentifierName("x"), g.IdentifierName("y"), g.IdentifierName("z")), "x(y, z)")
+            VerifySyntax(Of InvocationExpressionSyntax)(Generator.InvocationExpression(Generator.IdentifierName("x")), "x()")
+            VerifySyntax(Of InvocationExpressionSyntax)(Generator.InvocationExpression(Generator.IdentifierName("x"), Generator.IdentifierName("y")), "x(y)")
+            VerifySyntax(Of InvocationExpressionSyntax)(Generator.InvocationExpression(Generator.IdentifierName("x"), Generator.IdentifierName("y"), Generator.IdentifierName("z")), "x(y, z)")
 
             ' using explicit arguments
-            VerifySyntax(Of InvocationExpressionSyntax)(g.InvocationExpression(g.IdentifierName("x"), g.Argument(g.IdentifierName("y"))), "x(y)")
-            VerifySyntax(Of InvocationExpressionSyntax)(g.InvocationExpression(g.IdentifierName("x"), g.Argument(RefKind.Ref, g.IdentifierName("y"))), "x(y)")
-            VerifySyntax(Of InvocationExpressionSyntax)(g.InvocationExpression(g.IdentifierName("x"), g.Argument(RefKind.Out, g.IdentifierName("y"))), "x(y)")
+            VerifySyntax(Of InvocationExpressionSyntax)(Generator.InvocationExpression(Generator.IdentifierName("x"), Generator.Argument(Generator.IdentifierName("y"))), "x(y)")
+            VerifySyntax(Of InvocationExpressionSyntax)(Generator.InvocationExpression(Generator.IdentifierName("x"), Generator.Argument(RefKind.Ref, Generator.IdentifierName("y"))), "x(y)")
+            VerifySyntax(Of InvocationExpressionSyntax)(Generator.InvocationExpression(Generator.IdentifierName("x"), Generator.Argument(RefKind.Out, Generator.IdentifierName("y"))), "x(y)")
 
-            VerifySyntax(Of InvocationExpressionSyntax)(g.InvocationExpression(g.MemberAccessExpression(g.IdentifierName("x"), g.IdentifierName("y"))), "x.y()")
-            VerifySyntax(Of InvocationExpressionSyntax)(g.InvocationExpression(g.ElementAccessExpression(g.IdentifierName("x"), g.IdentifierName("y"))), "x(y)()")
-            VerifySyntax(Of InvocationExpressionSyntax)(g.InvocationExpression(g.InvocationExpression(g.IdentifierName("x"), g.IdentifierName("y"))), "x(y)()")
-            VerifySyntax(Of InvocationExpressionSyntax)(g.InvocationExpression(g.AddExpression(g.IdentifierName("x"), g.IdentifierName("y"))), "((x) + (y))()")
+            VerifySyntax(Of InvocationExpressionSyntax)(Generator.InvocationExpression(Generator.MemberAccessExpression(Generator.IdentifierName("x"), Generator.IdentifierName("y"))), "x.y()")
+            VerifySyntax(Of InvocationExpressionSyntax)(Generator.InvocationExpression(Generator.ElementAccessExpression(Generator.IdentifierName("x"), Generator.IdentifierName("y"))), "x(y)()")
+            VerifySyntax(Of InvocationExpressionSyntax)(Generator.InvocationExpression(Generator.InvocationExpression(Generator.IdentifierName("x"), Generator.IdentifierName("y"))), "x(y)()")
+            VerifySyntax(Of InvocationExpressionSyntax)(Generator.InvocationExpression(Generator.AddExpression(Generator.IdentifierName("x"), Generator.IdentifierName("y"))), "((x) + (y))()")
         End Sub
 
         <Fact>
         Public Sub TestAssignmentStatement()
-            VerifySyntax(Of AssignmentStatementSyntax)(g.AssignmentStatement(g.IdentifierName("x"), g.IdentifierName("y")), "x = y")
+            VerifySyntax(Of AssignmentStatementSyntax)(Generator.AssignmentStatement(Generator.IdentifierName("x"), Generator.IdentifierName("y")), "x = y")
         End Sub
 
         <Fact>
         Public Sub TestExpressionStatement()
-            VerifySyntax(Of ExpressionStatementSyntax)(g.ExpressionStatement(g.IdentifierName("x")), "x")
-            VerifySyntax(Of ExpressionStatementSyntax)(g.ExpressionStatement(g.InvocationExpression(g.IdentifierName("x"))), "x()")
+            VerifySyntax(Of ExpressionStatementSyntax)(Generator.ExpressionStatement(Generator.IdentifierName("x")), "x")
+            VerifySyntax(Of ExpressionStatementSyntax)(Generator.ExpressionStatement(Generator.InvocationExpression(Generator.IdentifierName("x"))), "x()")
         End Sub
 
         <Fact>
         Public Sub TestLocalDeclarationStatements()
-            VerifySyntax(Of LocalDeclarationStatementSyntax)(g.LocalDeclarationStatement(g.IdentifierName("x"), "y"), "Dim y As x")
-            VerifySyntax(Of LocalDeclarationStatementSyntax)(g.LocalDeclarationStatement(g.IdentifierName("x"), "y", g.IdentifierName("z")), "Dim y As x = z")
-            VerifySyntax(Of LocalDeclarationStatementSyntax)(g.LocalDeclarationStatement("y", g.IdentifierName("z")), "Dim y = z")
+            VerifySyntax(Of LocalDeclarationStatementSyntax)(Generator.LocalDeclarationStatement(Generator.IdentifierName("x"), "y"), "Dim y As x")
+            VerifySyntax(Of LocalDeclarationStatementSyntax)(Generator.LocalDeclarationStatement(Generator.IdentifierName("x"), "y", Generator.IdentifierName("z")), "Dim y As x = z")
+            VerifySyntax(Of LocalDeclarationStatementSyntax)(Generator.LocalDeclarationStatement("y", Generator.IdentifierName("z")), "Dim y = z")
 
-            VerifySyntax(Of LocalDeclarationStatementSyntax)(g.LocalDeclarationStatement(g.IdentifierName("x"), "y", isConst:=True), "Const y As x")
-            VerifySyntax(Of LocalDeclarationStatementSyntax)(g.LocalDeclarationStatement(g.IdentifierName("x"), "y", g.IdentifierName("z"), isConst:=True), "Const y As x = z")
-            VerifySyntax(Of LocalDeclarationStatementSyntax)(g.LocalDeclarationStatement(DirectCast(Nothing, SyntaxNode), "y", g.IdentifierName("z"), isConst:=True), "Const y = z")
+            VerifySyntax(Of LocalDeclarationStatementSyntax)(Generator.LocalDeclarationStatement(Generator.IdentifierName("x"), "y", isConst:=True), "Const y As x")
+            VerifySyntax(Of LocalDeclarationStatementSyntax)(Generator.LocalDeclarationStatement(Generator.IdentifierName("x"), "y", Generator.IdentifierName("z"), isConst:=True), "Const y As x = z")
+            VerifySyntax(Of LocalDeclarationStatementSyntax)(Generator.LocalDeclarationStatement(DirectCast(Nothing, SyntaxNode), "y", Generator.IdentifierName("z"), isConst:=True), "Const y = z")
+        End Sub
+
+        <Fact>
+        Public Sub TestAwaitExpressions()
+            VerifySyntax(Of AwaitExpressionSyntax)(Generator.AwaitExpression(Generator.IdentifierName("x")), "Await x")
+        End Sub
+
+        <Fact>
+        Public Sub TestNameOfExpressions()
+            VerifySyntax(Of NameOfExpressionSyntax)(Generator.NameOfExpression(Generator.IdentifierName("x")), "NameOf(x)")
+        End Sub
+
+        <Fact>
+        Public Sub TestTupleExpression()
+            VerifySyntax(Of TupleExpressionSyntax)(Generator.TupleExpression(
+                {Generator.IdentifierName("x"), Generator.IdentifierName("y")}), "(x, y)")
+            VerifySyntax(Of TupleExpressionSyntax)(Generator.TupleExpression(
+                {Generator.Argument("goo", RefKind.None, Generator.IdentifierName("x")),
+                 Generator.Argument("bar", RefKind.None, Generator.IdentifierName("y"))}), "(goo:=x, bar:=y)")
         End Sub
 
         <Fact>
         Public Sub TestReturnStatements()
-            VerifySyntax(Of ReturnStatementSyntax)(g.ReturnStatement(), "Return")
-            VerifySyntax(Of ReturnStatementSyntax)(g.ReturnStatement(g.IdentifierName("x")), "Return x")
+            VerifySyntax(Of ReturnStatementSyntax)(Generator.ReturnStatement(), "Return")
+            VerifySyntax(Of ReturnStatementSyntax)(Generator.ReturnStatement(Generator.IdentifierName("x")), "Return x")
+        End Sub
+
+        <Fact>
+        Public Sub TestYieldReturnStatements()
+            VerifySyntax(Of YieldStatementSyntax)(Generator.YieldReturnStatement(Generator.LiteralExpression(1)), "Yield 1")
+            VerifySyntax(Of YieldStatementSyntax)(Generator.YieldReturnStatement(Generator.IdentifierName("x")), "Yield x")
         End Sub
 
         <Fact>
         Public Sub TestThrowStatements()
-            VerifySyntax(Of ThrowStatementSyntax)(g.ThrowStatement(), "Throw")
-            VerifySyntax(Of ThrowStatementSyntax)(g.ThrowStatement(g.IdentifierName("x")), "Throw x")
+            VerifySyntax(Of ThrowStatementSyntax)(Generator.ThrowStatement(), "Throw")
+            VerifySyntax(Of ThrowStatementSyntax)(Generator.ThrowStatement(Generator.IdentifierName("x")), "Throw x")
         End Sub
 
         <Fact>
         Public Sub TestIfStatements()
             VerifySyntax(Of MultiLineIfBlockSyntax)(
-                g.IfStatement(g.IdentifierName("x"), New SyntaxNode() {}),
-<x>If x Then
-End If</x>.Value)
+                Generator.IfStatement(Generator.IdentifierName("x"), New SyntaxNode() {}),
+"If x Then
+End If")
 
             VerifySyntax(Of MultiLineIfBlockSyntax)(
-                g.IfStatement(g.IdentifierName("x"), Nothing),
-<x>If x Then
-End If</x>.Value)
+                Generator.IfStatement(Generator.IdentifierName("x"), Nothing),
+"If x Then
+End If")
 
             VerifySyntax(Of MultiLineIfBlockSyntax)(
-                g.IfStatement(g.IdentifierName("x"), New SyntaxNode() {}, New SyntaxNode() {}),
-<x>If x Then
+                Generator.IfStatement(Generator.IdentifierName("x"), New SyntaxNode() {}, New SyntaxNode() {}),
+"If x Then
 Else
-End If</x>.Value)
+End If")
 
             VerifySyntax(Of MultiLineIfBlockSyntax)(
-                g.IfStatement(g.IdentifierName("x"),
-                    {g.IdentifierName("y")}),
-<x>If x Then
+                Generator.IfStatement(Generator.IdentifierName("x"),
+                    {Generator.IdentifierName("y")}),
+"If x Then
     y
-End If</x>.Value)
+End If")
 
             VerifySyntax(Of MultiLineIfBlockSyntax)(
-                g.IfStatement(g.IdentifierName("x"),
-                    {g.IdentifierName("y")},
-                    {g.IdentifierName("z")}),
-<x>If x Then
+                Generator.IfStatement(Generator.IdentifierName("x"),
+                    {Generator.IdentifierName("y")},
+                    {Generator.IdentifierName("z")}),
+"If x Then
     y
 Else
     z
-End If</x>.Value)
+End If")
 
             VerifySyntax(Of MultiLineIfBlockSyntax)(
-                g.IfStatement(g.IdentifierName("x"),
-                    {g.IdentifierName("y")},
-                    {g.IfStatement(g.IdentifierName("p"), {g.IdentifierName("q")})}),
-<x>If x Then
+                Generator.IfStatement(Generator.IdentifierName("x"),
+                    {Generator.IdentifierName("y")},
+                    {Generator.IfStatement(Generator.IdentifierName("p"), {Generator.IdentifierName("q")})}),
+"If x Then
     y
 ElseIf p Then
     q
-End If</x>.Value)
+End If")
 
             VerifySyntax(Of MultiLineIfBlockSyntax)(
-                g.IfStatement(g.IdentifierName("x"),
-                    {g.IdentifierName("y")},
-                    g.IfStatement(g.IdentifierName("p"),
-                        {g.IdentifierName("q")},
-                        {g.IdentifierName("z")})),
-<x>If x Then
+                Generator.IfStatement(Generator.IdentifierName("x"),
+                    {Generator.IdentifierName("y")},
+                    Generator.IfStatement(Generator.IdentifierName("p"),
+                        {Generator.IdentifierName("q")},
+                        {Generator.IdentifierName("z")})),
+"If x Then
     y
 ElseIf p Then
     q
 Else
     z
-End If</x>.Value)
+End If")
 
         End Sub
 
         <Fact>
         Public Sub TestSwitchStatements()
-            Dim x = 10
-
             VerifySyntax(Of SelectBlockSyntax)(
-                g.SwitchStatement(g.IdentifierName("x"),
-                    g.SwitchSection(g.IdentifierName("y"),
-                        {g.IdentifierName("z")})),
-<x>Select x
+                Generator.SwitchStatement(Generator.IdentifierName("x"),
+                    Generator.SwitchSection(Generator.IdentifierName("y"),
+                        {Generator.IdentifierName("z")})),
+"Select x
     Case y
         z
-End Select</x>.Value)
+End Select")
 
             VerifySyntax(Of SelectBlockSyntax)(
-                g.SwitchStatement(g.IdentifierName("x"),
-                    g.SwitchSection(
-                        {g.IdentifierName("y"), g.IdentifierName("p"), g.IdentifierName("q")},
-                        {g.IdentifierName("z")})),
-<x>Select x
+                Generator.SwitchStatement(Generator.IdentifierName("x"),
+                    Generator.SwitchSection(
+                        {Generator.IdentifierName("y"), Generator.IdentifierName("p"), Generator.IdentifierName("q")},
+                        {Generator.IdentifierName("z")})),
+"Select x
     Case y, p, q
         z
-End Select</x>.Value)
+End Select")
 
             VerifySyntax(Of SelectBlockSyntax)(
-                g.SwitchStatement(g.IdentifierName("x"),
-                    g.SwitchSection(g.IdentifierName("y"),
-                        {g.IdentifierName("z")}),
-                    g.SwitchSection(g.IdentifierName("a"),
-                        {g.IdentifierName("b")})),
-<x>Select x
+                Generator.SwitchStatement(Generator.IdentifierName("x"),
+                    Generator.SwitchSection(Generator.IdentifierName("y"),
+                        {Generator.IdentifierName("z")}),
+                    Generator.SwitchSection(Generator.IdentifierName("a"),
+                        {Generator.IdentifierName("b")})),
+"Select x
     Case y
         z
     Case a
         b
-End Select</x>.Value)
+End Select")
 
             VerifySyntax(Of SelectBlockSyntax)(
-                g.SwitchStatement(g.IdentifierName("x"),
-                    g.SwitchSection(g.IdentifierName("y"),
-                        {g.IdentifierName("z")}),
-                    g.DefaultSwitchSection(
-                        {g.IdentifierName("b")})),
-<x>Select x
+                Generator.SwitchStatement(Generator.IdentifierName("x"),
+                    Generator.SwitchSection(Generator.IdentifierName("y"),
+                        {Generator.IdentifierName("z")}),
+                    Generator.DefaultSwitchSection(
+                        {Generator.IdentifierName("b")})),
+"Select x
     Case y
         z
     Case Else
         b
-End Select</x>.Value)
+End Select")
 
             VerifySyntax(Of SelectBlockSyntax)(
-                g.SwitchStatement(g.IdentifierName("x"),
-                    g.SwitchSection(g.IdentifierName("y"),
-                        {g.ExitSwitchStatement()})),
-<x>Select x
+                Generator.SwitchStatement(Generator.IdentifierName("x"),
+                    Generator.SwitchSection(Generator.IdentifierName("y"),
+                        {Generator.ExitSwitchStatement()})),
+"Select x
     Case y
         Exit Select
-End Select</x>.Value)
+End Select")
         End Sub
 
         <Fact>
         Public Sub TestUsingStatements()
             VerifySyntax(Of UsingBlockSyntax)(
-                g.UsingStatement(g.IdentifierName("x"), {g.IdentifierName("y")}),
-<x>Using x
+                Generator.UsingStatement(Generator.IdentifierName("x"), {Generator.IdentifierName("y")}),
+"Using x
     y
-End Using</x>.Value)
+End Using")
 
             VerifySyntax(Of UsingBlockSyntax)(
-                g.UsingStatement("x", g.IdentifierName("y"), {g.IdentifierName("z")}),
-<x>Using x = y
+                Generator.UsingStatement("x", Generator.IdentifierName("y"), {Generator.IdentifierName("z")}),
+"Using x = y
     z
-End Using</x>.Value)
+End Using")
 
             VerifySyntax(Of UsingBlockSyntax)(
-                g.UsingStatement(g.IdentifierName("x"), "y", g.IdentifierName("z"), {g.IdentifierName("q")}),
-<x>Using y As x = z
+                Generator.UsingStatement(Generator.IdentifierName("x"), "y", Generator.IdentifierName("z"), {Generator.IdentifierName("q")}),
+"Using y As x = z
     q
-End Using</x>.Value)
+End Using")
+        End Sub
+
+        <Fact>
+        Public Sub TestLockStatements()
+            VerifySyntax(Of SyncLockBlockSyntax)(
+                Generator.LockStatement(Generator.IdentifierName("x"), {Generator.IdentifierName("y")}),
+"SyncLock x
+    y
+End SyncLock")
         End Sub
 
         <Fact>
         Public Sub TestTryCatchStatements()
 
             VerifySyntax(Of TryBlockSyntax)(
-                g.TryCatchStatement(
-                    {g.IdentifierName("x")},
-                    g.CatchClause(g.IdentifierName("y"), "z",
-                        {g.IdentifierName("a")})),
-<x>Try
+                Generator.TryCatchStatement(
+                    {Generator.IdentifierName("x")},
+                    Generator.CatchClause(Generator.IdentifierName("y"), "z",
+                        {Generator.IdentifierName("a")})),
+"Try
     x
 Catch z As y
     a
-End Try</x>.Value)
+End Try")
 
             VerifySyntax(Of TryBlockSyntax)(
-                g.TryCatchStatement(
-                    {g.IdentifierName("s")},
-                    g.CatchClause(g.IdentifierName("x"), "y",
-                        {g.IdentifierName("z")}),
-                    g.CatchClause(g.IdentifierName("a"), "b",
-                        {g.IdentifierName("c")})),
-<x>Try
+                Generator.TryCatchStatement(
+                    {Generator.IdentifierName("s")},
+                    Generator.CatchClause(Generator.IdentifierName("x"), "y",
+                        {Generator.IdentifierName("z")}),
+                    Generator.CatchClause(Generator.IdentifierName("a"), "b",
+                        {Generator.IdentifierName("c")})),
+"Try
     s
 Catch y As x
     z
 Catch b As a
     c
-End Try</x>.Value)
+End Try")
 
             VerifySyntax(Of TryBlockSyntax)(
-                g.TryCatchStatement(
-                    {g.IdentifierName("s")},
-                    {g.CatchClause(g.IdentifierName("x"), "y",
-                        {g.IdentifierName("z")})},
-                    {g.IdentifierName("a")}),
-<x>Try
+                Generator.TryCatchStatement(
+                    {Generator.IdentifierName("s")},
+                    {Generator.CatchClause(Generator.IdentifierName("x"), "y",
+                        {Generator.IdentifierName("z")})},
+                    {Generator.IdentifierName("a")}),
+"Try
     s
 Catch y As x
     z
 Finally
     a
-End Try</x>.Value)
+End Try")
 
             VerifySyntax(Of TryBlockSyntax)(
-                g.TryFinallyStatement(
-                    {g.IdentifierName("x")},
-                    {g.IdentifierName("a")}),
-<x>Try
+                Generator.TryFinallyStatement(
+                    {Generator.IdentifierName("x")},
+                    {Generator.IdentifierName("a")}),
+"Try
     x
 Finally
     a
-End Try</x>.Value)
+End Try")
 
         End Sub
 
         <Fact>
         Public Sub TestWhileStatements()
             VerifySyntax(Of WhileBlockSyntax)(
-                g.WhileStatement(g.IdentifierName("x"), {g.IdentifierName("y")}),
-<x>While x
+                Generator.WhileStatement(Generator.IdentifierName("x"), {Generator.IdentifierName("y")}),
+"While x
     y
-End While</x>.Value)
+End While")
 
             VerifySyntax(Of WhileBlockSyntax)(
-                g.WhileStatement(g.IdentifierName("x"), Nothing),
-<x>While x
-End While</x>.Value)
+                Generator.WhileStatement(Generator.IdentifierName("x"), Nothing),
+"While x
+End While")
         End Sub
 
         <Fact>
         Public Sub TestLambdaExpressions()
             VerifySyntax(Of SingleLineLambdaExpressionSyntax)(
-                g.ValueReturningLambdaExpression("x", g.IdentifierName("y")),
-                <x>Function(x) y</x>.Value)
+                Generator.ValueReturningLambdaExpression("x", Generator.IdentifierName("y")),
+                "Function(x) y")
 
             VerifySyntax(Of SingleLineLambdaExpressionSyntax)(
-                g.ValueReturningLambdaExpression({g.LambdaParameter("x"), g.LambdaParameter("y")}, g.IdentifierName("z")),
-                <x>Function(x, y) z</x>.Value)
+                Generator.ValueReturningLambdaExpression({Generator.LambdaParameter("x"), Generator.LambdaParameter("y")}, Generator.IdentifierName("z")),
+                "Function(x, y) z")
 
             VerifySyntax(Of SingleLineLambdaExpressionSyntax)(
-                g.ValueReturningLambdaExpression(New SyntaxNode() {}, g.IdentifierName("y")),
-                <x>Function() y</x>.Value)
+                Generator.ValueReturningLambdaExpression(New SyntaxNode() {}, Generator.IdentifierName("y")),
+                "Function() y")
 
             VerifySyntax(Of SingleLineLambdaExpressionSyntax)(
-                g.VoidReturningLambdaExpression("x", g.IdentifierName("y")),
-                <x>Sub(x) y</x>.Value)
+                Generator.VoidReturningLambdaExpression("x", Generator.IdentifierName("y")),
+                "Sub(x) y")
 
             VerifySyntax(Of SingleLineLambdaExpressionSyntax)(
-                g.VoidReturningLambdaExpression({g.LambdaParameter("x"), g.LambdaParameter("y")}, g.IdentifierName("z")),
-                <x>Sub(x, y) z</x>.Value)
+                Generator.VoidReturningLambdaExpression({Generator.LambdaParameter("x"), Generator.LambdaParameter("y")}, Generator.IdentifierName("z")),
+                "Sub(x, y) z")
 
             VerifySyntax(Of SingleLineLambdaExpressionSyntax)(
-                g.VoidReturningLambdaExpression(New SyntaxNode() {}, g.IdentifierName("y")),
-                <x>Sub() y</x>.Value)
+                Generator.VoidReturningLambdaExpression(New SyntaxNode() {}, Generator.IdentifierName("y")),
+                "Sub() y")
 
             VerifySyntax(Of MultiLineLambdaExpressionSyntax)(
-                g.ValueReturningLambdaExpression("x", {g.ReturnStatement(g.IdentifierName("y"))}),
-<x>Function(x)
+                Generator.ValueReturningLambdaExpression("x", {Generator.ReturnStatement(Generator.IdentifierName("y"))}),
+"Function(x)
     Return y
-End Function</x>.Value)
+End Function")
 
             VerifySyntax(Of MultiLineLambdaExpressionSyntax)(
-                g.ValueReturningLambdaExpression({g.LambdaParameter("x"), g.LambdaParameter("y")}, {g.ReturnStatement(g.IdentifierName("z"))}),
-<x>Function(x, y)
+                Generator.ValueReturningLambdaExpression({Generator.LambdaParameter("x"), Generator.LambdaParameter("y")}, {Generator.ReturnStatement(Generator.IdentifierName("z"))}),
+"Function(x, y)
     Return z
-End Function</x>.Value)
+End Function")
 
             VerifySyntax(Of MultiLineLambdaExpressionSyntax)(
-                g.ValueReturningLambdaExpression(New SyntaxNode() {}, {g.ReturnStatement(g.IdentifierName("y"))}),
-<x>Function()
+                Generator.ValueReturningLambdaExpression(New SyntaxNode() {}, {Generator.ReturnStatement(Generator.IdentifierName("y"))}),
+"Function()
     Return y
-End Function</x>.Value)
+End Function")
 
             VerifySyntax(Of MultiLineLambdaExpressionSyntax)(
-                g.VoidReturningLambdaExpression("x", {g.IdentifierName("y")}),
-<x>Sub(x)
+                Generator.VoidReturningLambdaExpression("x", {Generator.IdentifierName("y")}),
+"Sub(x)
     y
-End Sub</x>.Value)
+End Sub")
 
             VerifySyntax(Of MultiLineLambdaExpressionSyntax)(
-                g.VoidReturningLambdaExpression({g.LambdaParameter("x"), g.LambdaParameter("y")}, {g.IdentifierName("z")}),
-<x>Sub(x, y)
+                Generator.VoidReturningLambdaExpression({Generator.LambdaParameter("x"), Generator.LambdaParameter("y")}, {Generator.IdentifierName("z")}),
+"Sub(x, y)
     z
-End Sub</x>.Value)
+End Sub")
 
             VerifySyntax(Of MultiLineLambdaExpressionSyntax)(
-                g.VoidReturningLambdaExpression(New SyntaxNode() {}, {g.IdentifierName("y")}),
-<x>Sub()
+                Generator.VoidReturningLambdaExpression(New SyntaxNode() {}, {Generator.IdentifierName("y")}),
+"Sub()
     y
-End Sub</x>.Value)
+End Sub")
 
             VerifySyntax(Of SingleLineLambdaExpressionSyntax)(
-                g.ValueReturningLambdaExpression({g.LambdaParameter("x", g.IdentifierName("y"))}, g.IdentifierName("z")),
-                <x>Function(x As y) z</x>.Value)
+                Generator.ValueReturningLambdaExpression({Generator.LambdaParameter("x", Generator.IdentifierName("y"))}, Generator.IdentifierName("z")),
+                "Function(x As y) z")
 
             VerifySyntax(Of SingleLineLambdaExpressionSyntax)(
-                g.ValueReturningLambdaExpression({g.LambdaParameter("x", g.IdentifierName("y")), g.LambdaParameter("a", g.IdentifierName("b"))}, g.IdentifierName("z")),
-                <x>Function(x As y, a As b) z</x>.Value)
+                Generator.ValueReturningLambdaExpression({Generator.LambdaParameter("x", Generator.IdentifierName("y")), Generator.LambdaParameter("a", Generator.IdentifierName("b"))}, Generator.IdentifierName("z")),
+                "Function(x As y, a As b) z")
 
             VerifySyntax(Of SingleLineLambdaExpressionSyntax)(
-                g.VoidReturningLambdaExpression({g.LambdaParameter("x", g.IdentifierName("y"))}, g.IdentifierName("z")),
-                <x>Sub(x As y) z</x>.Value)
+                Generator.VoidReturningLambdaExpression({Generator.LambdaParameter("x", Generator.IdentifierName("y"))}, Generator.IdentifierName("z")),
+                "Sub(x As y) z")
 
             VerifySyntax(Of SingleLineLambdaExpressionSyntax)(
-                g.VoidReturningLambdaExpression({g.LambdaParameter("x", g.IdentifierName("y")), g.LambdaParameter("a", g.IdentifierName("b"))}, g.IdentifierName("z")),
-                <x>Sub(x As y, a As b) z</x>.Value)
+                Generator.VoidReturningLambdaExpression({Generator.LambdaParameter("x", Generator.IdentifierName("y")), Generator.LambdaParameter("a", Generator.IdentifierName("b"))}, Generator.IdentifierName("z")),
+                "Sub(x As y, a As b) z")
         End Sub
 
+        <Fact, WorkItem(31720, "https://github.com/dotnet/roslyn/issues/31720")>
+        Public Sub TestGetAttributeOnMethodBodies()
+            Dim compilation = Compile("
+Imports System
+<AttributeUsage(System.AttributeTargets.All)>
+Public Class MyAttribute
+  Inherits Attribute
+End Class
+
+Public Class C
+    <MyAttribute>
+    Sub New()
+    End Sub
+
+    <MyAttribute>
+    Sub M1()
+    End Sub
+
+    <MyAttribute>
+    Function M1() As String
+        Return Nothing
+    End Sub
+End Class
+")
+
+            Dim syntaxTree = compilation.SyntaxTrees(0)
+            Dim declarations = syntaxTree.GetRoot().DescendantNodes().OfType(Of MethodBlockBaseSyntax)
+
+            For Each decl In declarations
+                Assert.Equal("<MyAttribute>", Generator.GetAttributes(decl).Single().ToString())
+            Next
+        End Sub
+#End Region
+
+#Region "Declarations"
         <Fact>
         Public Sub TestFieldDeclarations()
             VerifySyntax(Of FieldDeclarationSyntax)(
-                g.FieldDeclaration("fld", g.TypeExpression(SpecialType.System_Int32)),
-                <x>Dim fld As Integer</x>.Value)
+                Generator.FieldDeclaration("fld", Generator.TypeExpression(SpecialType.System_Int32)),
+                "Dim fld As Integer")
 
             VerifySyntax(Of FieldDeclarationSyntax)(
-                g.FieldDeclaration("fld", g.TypeExpression(SpecialType.System_Int32), initializer:=g.LiteralExpression(0)),
-                <x>Dim fld As Integer = 0</x>.Value)
+                Generator.FieldDeclaration("fld", Generator.TypeExpression(SpecialType.System_Int32), initializer:=Generator.LiteralExpression(0)),
+                "Dim fld As Integer = 0")
 
             VerifySyntax(Of FieldDeclarationSyntax)(
-                g.FieldDeclaration("fld", g.TypeExpression(SpecialType.System_Int32), accessibility:=Accessibility.Public),
-                <x>Public fld As Integer</x>.Value)
+                Generator.FieldDeclaration("fld", Generator.TypeExpression(SpecialType.System_Int32), accessibility:=Accessibility.Public),
+                "Public fld As Integer")
 
             VerifySyntax(Of FieldDeclarationSyntax)(
-                g.FieldDeclaration("fld", g.TypeExpression(SpecialType.System_Int32), modifiers:=DeclarationModifiers.Static Or DeclarationModifiers.ReadOnly),
-                <x>Shared ReadOnly fld As Integer</x>.Value)
+                Generator.FieldDeclaration("fld", Generator.TypeExpression(SpecialType.System_Int32), modifiers:=DeclarationModifiers.Static Or DeclarationModifiers.ReadOnly Or DeclarationModifiers.WithEvents),
+                "Shared ReadOnly WithEvents fld As Integer")
         End Sub
 
         <Fact>
         Public Sub TestMethodDeclarations()
             VerifySyntax(Of MethodBlockSyntax)(
-                g.MethodDeclaration("m"),
-<x>Sub m()
-End Sub</x>.Value)
+                Generator.MethodDeclaration("m"),
+"Sub m()
+End Sub")
 
             VerifySyntax(Of MethodBlockSyntax)(
-                g.MethodDeclaration("m", typeParameters:={"x", "y"}),
-<x>Sub m(Of x, y)()
-End Sub</x>.Value)
+                Generator.MethodDeclaration("m", typeParameters:={"x", "y"}),
+"Sub m(Of x, y)()
+End Sub")
 
             VerifySyntax(Of MethodBlockSyntax)(
-                g.MethodDeclaration("m", returnType:=g.IdentifierName("x")),
-<x>Function m() As x
-End Function</x>.Value)
+                Generator.MethodDeclaration("m", returnType:=Generator.IdentifierName("x")),
+"Function m() As x
+End Function")
 
             VerifySyntax(Of MethodBlockSyntax)(
-                g.MethodDeclaration("m", returnType:=g.IdentifierName("x"), statements:={g.ReturnStatement(g.IdentifierName("y"))}),
-<x>Function m() As x
+                Generator.MethodDeclaration("m", returnType:=Generator.IdentifierName("x"), statements:={Generator.ReturnStatement(Generator.IdentifierName("y"))}),
+"Function m() As x
     Return y
-End Function</x>.Value)
+End Function")
 
             VerifySyntax(Of MethodBlockSyntax)(
-                g.MethodDeclaration("m", parameters:={g.ParameterDeclaration("z", g.IdentifierName("y"))}, returnType:=g.IdentifierName("x")),
-<x>Function m(z As y) As x
-End Function</x>.Value)
+                Generator.MethodDeclaration("m", parameters:={Generator.ParameterDeclaration("z", Generator.IdentifierName("y"))}, returnType:=Generator.IdentifierName("x")),
+"Function m(z As y) As x
+End Function")
 
             VerifySyntax(Of MethodBlockSyntax)(
-                g.MethodDeclaration("m", parameters:={g.ParameterDeclaration("z", g.IdentifierName("y"), g.IdentifierName("a"))}, returnType:=g.IdentifierName("x")),
-<x>Function m(Optional z As y = a) As x
-End Function</x>.Value)
+                Generator.MethodDeclaration("m", parameters:={Generator.ParameterDeclaration("z", Generator.IdentifierName("y"), Generator.IdentifierName("a"))}, returnType:=Generator.IdentifierName("x")),
+"Function m(Optional z As y = a) As x
+End Function")
 
             VerifySyntax(Of MethodBlockSyntax)(
-                g.MethodDeclaration("m", returnType:=g.IdentifierName("x"), accessibility:=Accessibility.Public, modifiers:=DeclarationModifiers.None),
-<x>Public Function m() As x
-End Function</x>.Value)
+                Generator.MethodDeclaration("m", returnType:=Generator.IdentifierName("x"), accessibility:=Accessibility.Public, modifiers:=DeclarationModifiers.None),
+"Public Function m() As x
+End Function")
 
             VerifySyntax(Of MethodStatementSyntax)(
-                g.MethodDeclaration("m", returnType:=g.IdentifierName("x"), accessibility:=Accessibility.Public, modifiers:=DeclarationModifiers.Abstract),
-<x>Public MustInherit Function m() As x</x>.Value)
+                Generator.MethodDeclaration("m", returnType:=Generator.IdentifierName("x"), accessibility:=Accessibility.Public, modifiers:=DeclarationModifiers.Abstract),
+"Public MustOverride Function m() As x")
+
+            VerifySyntax(Of MethodBlockSyntax)(
+                Generator.MethodDeclaration("m", accessibility:=Accessibility.Private, modifiers:=DeclarationModifiers.Partial),
+"Partial Private Sub m()
+End Sub")
+
+        End Sub
+
+        <Fact>
+        Public Sub TestSealedDeclarationModifier()
+            Dim md = Generator.MethodDeclaration("m", modifiers:=DeclarationModifiers.Sealed)
+            Assert.Equal(DeclarationModifiers.Sealed, Generator.GetModifiers(md))
+            VerifySyntax(Of MethodBlockSyntax)(
+                md,
+"NotOverridable Sub m()
+End Sub")
+
+            Dim md2 = Generator.MethodDeclaration("m", modifiers:=DeclarationModifiers.Sealed + DeclarationModifiers.Override)
+            Assert.Equal(DeclarationModifiers.Sealed + DeclarationModifiers.Override, Generator.GetModifiers(md2))
+            VerifySyntax(Of MethodBlockSyntax)(
+                md2,
+"NotOverridable Overrides Sub m()
+End Sub")
+
+            Dim cd = Generator.ClassDeclaration("c", modifiers:=DeclarationModifiers.Sealed)
+            Assert.Equal(DeclarationModifiers.Sealed, Generator.GetModifiers(cd))
+            VerifySyntax(Of ClassBlockSyntax)(
+                cd,
+"NotInheritable Class c
+End Class")
+
+        End Sub
+
+        <Fact>
+        Public Sub TestAbstractDeclarationModifier()
+            Dim md = Generator.MethodDeclaration("m", modifiers:=DeclarationModifiers.Abstract)
+            Assert.Equal(DeclarationModifiers.Abstract, Generator.GetModifiers(md))
+            VerifySyntax(Of MethodStatementSyntax)(
+                md,
+"MustOverride Sub m()")
+
+            Dim cd = Generator.ClassDeclaration("c", modifiers:=DeclarationModifiers.Abstract)
+            Assert.Equal(DeclarationModifiers.Abstract, Generator.GetModifiers(cd))
+            VerifySyntax(Of ClassBlockSyntax)(
+                cd,
+"MustInherit Class c
+End Class")
+
+        End Sub
+
+        <Fact>
+        Public Sub TestOperatorDeclaration()
+            Dim parameterTypes = {
+                _emptyCompilation.GetSpecialType(SpecialType.System_Int32),
+                _emptyCompilation.GetSpecialType(SpecialType.System_String)
+                }
+
+            Dim parameters = parameterTypes.Select(Function(t, i) Generator.ParameterDeclaration("p" & i, Generator.TypeExpression(t))).ToList()
+            Dim returnType = Generator.TypeExpression(SpecialType.System_Boolean)
+
+            VerifySyntax(Of OperatorBlockSyntax)(
+                Generator.OperatorDeclaration(OperatorKind.Addition, parameters, returnType),
+"Operator +(p0 As System.Int32, p1 As System.String) As Boolean
+End Operator")
+
+            VerifySyntax(Of OperatorBlockSyntax)(
+                Generator.OperatorDeclaration(OperatorKind.BitwiseAnd, parameters, returnType),
+"Operator And(p0 As System.Int32, p1 As System.String) As Boolean
+End Operator")
+
+            VerifySyntax(Of OperatorBlockSyntax)(
+                Generator.OperatorDeclaration(OperatorKind.BitwiseOr, parameters, returnType),
+"Operator Or(p0 As System.Int32, p1 As System.String) As Boolean
+End Operator")
+
+            VerifySyntax(Of OperatorBlockSyntax)(
+                Generator.OperatorDeclaration(OperatorKind.Division, parameters, returnType),
+"Operator /(p0 As System.Int32, p1 As System.String) As Boolean
+End Operator")
+
+            VerifySyntax(Of OperatorBlockSyntax)(
+                Generator.OperatorDeclaration(OperatorKind.Equality, parameters, returnType),
+"Operator =(p0 As System.Int32, p1 As System.String) As Boolean
+End Operator")
+
+            VerifySyntax(Of OperatorBlockSyntax)(
+                Generator.OperatorDeclaration(OperatorKind.ExclusiveOr, parameters, returnType),
+"Operator Xor(p0 As System.Int32, p1 As System.String) As Boolean
+End Operator")
+
+            VerifySyntax(Of OperatorBlockSyntax)(
+                Generator.OperatorDeclaration(OperatorKind.False, parameters, returnType),
+"Operator IsFalse(p0 As System.Int32, p1 As System.String) As Boolean
+End Operator")
+
+            VerifySyntax(Of OperatorBlockSyntax)(
+                Generator.OperatorDeclaration(OperatorKind.GreaterThan, parameters, returnType),
+"Operator>(p0 As System.Int32, p1 As System.String) As Boolean
+End Operator")
+
+            VerifySyntax(Of OperatorBlockSyntax)(
+                Generator.OperatorDeclaration(OperatorKind.GreaterThanOrEqual, parameters, returnType),
+"Operator >=(p0 As System.Int32, p1 As System.String) As Boolean
+End Operator")
+
+            VerifySyntax(Of OperatorBlockSyntax)(
+                Generator.OperatorDeclaration(OperatorKind.Inequality, parameters, returnType),
+"Operator <>(p0 As System.Int32, p1 As System.String) As Boolean
+End Operator")
+
+            VerifySyntax(Of OperatorBlockSyntax)(
+                Generator.OperatorDeclaration(OperatorKind.LeftShift, parameters, returnType),
+"Operator <<(p0 As System.Int32, p1 As System.String) As Boolean
+End Operator")
+
+            VerifySyntax(Of OperatorBlockSyntax)(
+                Generator.OperatorDeclaration(OperatorKind.LessThan, parameters, returnType),
+"Operator <(p0 As System.Int32, p1 As System.String) As Boolean
+End Operator")
+
+            VerifySyntax(Of OperatorBlockSyntax)(
+                Generator.OperatorDeclaration(OperatorKind.LessThanOrEqual, parameters, returnType),
+"Operator <=(p0 As System.Int32, p1 As System.String) As Boolean
+End Operator")
+
+            VerifySyntax(Of OperatorBlockSyntax)(
+                Generator.OperatorDeclaration(OperatorKind.LogicalNot, parameters, returnType),
+"Operator Not(p0 As System.Int32, p1 As System.String) As Boolean
+End Operator")
+
+            VerifySyntax(Of OperatorBlockSyntax)(
+                Generator.OperatorDeclaration(OperatorKind.Modulus, parameters, returnType),
+"Operator Mod(p0 As System.Int32, p1 As System.String) As Boolean
+End Operator")
+
+            VerifySyntax(Of OperatorBlockSyntax)(
+                Generator.OperatorDeclaration(OperatorKind.Multiply, parameters, returnType),
+"Operator *(p0 As System.Int32, p1 As System.String) As Boolean
+End Operator")
+
+            VerifySyntax(Of OperatorBlockSyntax)(
+                Generator.OperatorDeclaration(OperatorKind.RightShift, parameters, returnType),
+"Operator >>(p0 As System.Int32, p1 As System.String) As Boolean
+End Operator")
+
+            VerifySyntax(Of OperatorBlockSyntax)(
+                Generator.OperatorDeclaration(OperatorKind.Subtraction, parameters, returnType),
+"Operator -(p0 As System.Int32, p1 As System.String) As Boolean
+End Operator")
+
+            VerifySyntax(Of OperatorBlockSyntax)(
+                Generator.OperatorDeclaration(OperatorKind.True, parameters, returnType),
+"Operator IsTrue(p0 As System.Int32, p1 As System.String) As Boolean
+End Operator")
+
+            VerifySyntax(Of OperatorBlockSyntax)(
+                Generator.OperatorDeclaration(OperatorKind.UnaryNegation, parameters, returnType),
+"Operator -(p0 As System.Int32, p1 As System.String) As Boolean
+End Operator")
+
+            VerifySyntax(Of OperatorBlockSyntax)(
+                Generator.OperatorDeclaration(OperatorKind.UnaryPlus, parameters, returnType),
+"Operator +(p0 As System.Int32, p1 As System.String) As Boolean
+End Operator")
+
+            ' Conversion operators
+
+            VerifySyntax(Of OperatorBlockSyntax)(
+                Generator.OperatorDeclaration(OperatorKind.ImplicitConversion, parameters, returnType),
+"Widening Operator CType(p0 As System.Int32, p1 As System.String) As Boolean
+End Operator")
+
+            VerifySyntax(Of OperatorBlockSyntax)(
+                Generator.OperatorDeclaration(OperatorKind.ExplicitConversion, parameters, returnType),
+"Narrowing Operator CType(p0 As System.Int32, p1 As System.String) As Boolean
+End Operator")
+        End Sub
+
+        <Fact>
+        Public Sub MethodDeclarationCanRoundTrip()
+            Dim tree = VisualBasicSyntaxTree.ParseText(
+"
+Public Sub Test()
+End Sub")
+            Dim compilation = VisualBasicCompilation.Create("AssemblyName", syntaxTrees:={tree})
+            Dim model = compilation.GetSemanticModel(tree)
+            Dim node = tree.GetRoot().DescendantNodes().First()
+            Dim symbol = CType(model.GetDeclaredSymbol(node), IMethodSymbol)
+            VerifySyntax(Of MethodBlockSyntax)(
+                Generator.MethodDeclaration(symbol),
+"Public Sub Test()
+End Sub")
         End Sub
 
         <Fact>
         Public Sub TestPropertyDeclarations()
             VerifySyntax(Of PropertyStatementSyntax)(
-                g.PropertyDeclaration("p", g.IdentifierName("x"), modifiers:=DeclarationModifiers.Abstract + DeclarationModifiers.ReadOnly),
-<x>MustInherit ReadOnly Property p As x</x>.Value)
-
-            VerifySyntax(Of PropertyBlockSyntax)(
-                g.PropertyDeclaration("p", g.IdentifierName("x"), modifiers:=DeclarationModifiers.ReadOnly),
-<x>ReadOnly Property p As x
-    Get
-    End Get
-End Property</x>.Value)
+                Generator.PropertyDeclaration("p", Generator.IdentifierName("x"), modifiers:=DeclarationModifiers.Abstract + DeclarationModifiers.ReadOnly),
+"MustOverride ReadOnly Property p As x")
 
             VerifySyntax(Of PropertyStatementSyntax)(
-                g.PropertyDeclaration("p", g.IdentifierName("x"), modifiers:=DeclarationModifiers.Abstract),
-<x>MustInherit Property p As x</x>.Value)
+                Generator.PropertyDeclaration("p", Generator.IdentifierName("x"), modifiers:=DeclarationModifiers.Abstract + DeclarationModifiers.WriteOnly),
+"MustOverride WriteOnly Property p As x")
 
             VerifySyntax(Of PropertyBlockSyntax)(
-                g.PropertyDeclaration("p", g.IdentifierName("x"), modifiers:=DeclarationModifiers.ReadOnly, getAccessorStatements:={g.IdentifierName("y")}),
-<x>ReadOnly Property p As x
+                Generator.PropertyDeclaration("p", Generator.IdentifierName("x"), modifiers:=DeclarationModifiers.ReadOnly),
+"ReadOnly Property p As x
+    Get
+    End Get
+End Property")
+
+            VerifySyntax(Of PropertyBlockSyntax)(
+                Generator.PropertyDeclaration("p", Generator.IdentifierName("x"), modifiers:=DeclarationModifiers.WriteOnly),
+"WriteOnly Property p As x
+    Set(value As x)
+    End Set
+End Property")
+
+            VerifySyntax(Of PropertyStatementSyntax)(
+                Generator.PropertyDeclaration("p", Generator.IdentifierName("x"), modifiers:=DeclarationModifiers.Abstract),
+"MustOverride Property p As x")
+
+            VerifySyntax(Of PropertyBlockSyntax)(
+                Generator.PropertyDeclaration("p", Generator.IdentifierName("x"), modifiers:=DeclarationModifiers.ReadOnly, getAccessorStatements:={Generator.IdentifierName("y")}),
+"ReadOnly Property p As x
     Get
         y
     End Get
-End Property</x>.Value)
+End Property")
 
             VerifySyntax(Of PropertyBlockSyntax)(
-                g.PropertyDeclaration("p", g.IdentifierName("x"), setAccessorStatements:={g.IdentifierName("y")}),
-<x>Property p As x
+                Generator.PropertyDeclaration("p", Generator.IdentifierName("x"), modifiers:=DeclarationModifiers.WriteOnly, setAccessorStatements:={Generator.IdentifierName("y")}),
+"WriteOnly Property p As x
+    Set(value As x)
+        y
+    End Set
+End Property")
+
+            VerifySyntax(Of PropertyBlockSyntax)(
+                Generator.PropertyDeclaration("p", Generator.IdentifierName("x"), setAccessorStatements:={Generator.IdentifierName("y")}),
+"Property p As x
     Get
     End Get
 
     Set(value As x)
         y
     End Set
-End Property</x>.Value)
+End Property")
+        End Sub
+
+        <Fact>
+        Public Sub TestAccessorDeclarations2()
+            VerifySyntax(Of PropertyStatementSyntax)(
+                Generator.WithAccessorDeclarations(Generator.PropertyDeclaration("p", Generator.IdentifierName("x"))),
+                "Property p As x")
+
+            VerifySyntax(Of PropertyBlockSyntax)(
+                Generator.WithAccessorDeclarations(
+                    Generator.PropertyDeclaration("p", Generator.IdentifierName("x")),
+                    Generator.GetAccessorDeclaration(Accessibility.NotApplicable, {Generator.ReturnStatement()})),
+"ReadOnly Property p As x
+    Get
+        Return
+    End Get
+End Property")
+
+            VerifySyntax(Of PropertyBlockSyntax)(
+                Generator.WithAccessorDeclarations(
+                    Generator.PropertyDeclaration("p", Generator.IdentifierName("x")),
+                    Generator.GetAccessorDeclaration(Accessibility.NotApplicable, {Generator.ReturnStatement()}),
+                    Generator.SetAccessorDeclaration(Accessibility.NotApplicable, {Generator.ReturnStatement()})),
+"Property p As x
+    Get
+        Return
+    End Get
+
+    Set
+        Return
+    End Set
+End Property")
+
+            VerifySyntax(Of PropertyBlockSyntax)(
+                Generator.WithAccessorDeclarations(
+                    Generator.PropertyDeclaration("p", Generator.IdentifierName("x")),
+                    Generator.GetAccessorDeclaration(Accessibility.Protected, {Generator.ReturnStatement()})),
+"ReadOnly Property p As x
+    Protected Get
+        Return
+    End Get
+End Property")
+
+            VerifySyntax(Of PropertyBlockSyntax)(
+                Generator.WithAccessorDeclarations(
+                    Generator.PropertyDeclaration("p", Generator.IdentifierName("x")),
+                    Generator.SetAccessorDeclaration(Accessibility.Protected, {Generator.ReturnStatement()})),
+"WriteOnly Property p As x
+    Protected Set
+        Return
+    End Set
+End Property")
+
+            VerifySyntax(Of PropertyStatementSyntax)(
+                Generator.WithAccessorDeclarations(Generator.IndexerDeclaration({Generator.ParameterDeclaration("p", Generator.IdentifierName("t"))}, Generator.IdentifierName("x"))),
+                "Default Property Item(p As t) As x")
+
+            VerifySyntax(Of PropertyBlockSyntax)(
+                Generator.WithAccessorDeclarations(Generator.IndexerDeclaration({Generator.ParameterDeclaration("p", Generator.IdentifierName("t"))}, Generator.IdentifierName("x")),
+                    Generator.GetAccessorDeclaration(Accessibility.Protected, {Generator.ReturnStatement()})),
+"Default ReadOnly Property Item(p As t) As x
+    Protected Get
+        Return
+    End Get
+End Property")
+
+            VerifySyntax(Of PropertyBlockSyntax)(
+                Generator.WithAccessorDeclarations(
+                    Generator.IndexerDeclaration({Generator.ParameterDeclaration("p", Generator.IdentifierName("t"))}, Generator.IdentifierName("x")),
+                    Generator.SetAccessorDeclaration(Accessibility.Protected, {Generator.ReturnStatement()})),
+"Default WriteOnly Property Item(p As t) As x
+    Protected Set
+        Return
+    End Set
+End Property")
         End Sub
 
         <Fact>
         Public Sub TestIndexerDeclarations()
             VerifySyntax(Of PropertyStatementSyntax)(
-                g.IndexerDeclaration({g.ParameterDeclaration("z", g.IdentifierName("y"))}, g.IdentifierName("x"), modifiers:=DeclarationModifiers.Abstract + DeclarationModifiers.ReadOnly),
-<x>Default MustInherit ReadOnly Property Item(z As y) As x</x>.Value)
+                Generator.IndexerDeclaration({Generator.ParameterDeclaration("z", Generator.IdentifierName("y"))}, Generator.IdentifierName("x"), modifiers:=DeclarationModifiers.Abstract + DeclarationModifiers.ReadOnly),
+"Default MustOverride ReadOnly Property Item(z As y) As x")
 
             VerifySyntax(Of PropertyStatementSyntax)(
-                g.IndexerDeclaration({g.ParameterDeclaration("z", g.IdentifierName("y"))}, g.IdentifierName("x"), modifiers:=DeclarationModifiers.Abstract),
-<x>Default MustInherit Property Item(z As y) As x</x>.Value)
+                Generator.IndexerDeclaration({Generator.ParameterDeclaration("z", Generator.IdentifierName("y"))}, Generator.IdentifierName("x"), modifiers:=DeclarationModifiers.Abstract + DeclarationModifiers.WriteOnly),
+"Default MustOverride WriteOnly Property Item(z As y) As x")
+
+            VerifySyntax(Of PropertyStatementSyntax)(
+                Generator.IndexerDeclaration({Generator.ParameterDeclaration("z", Generator.IdentifierName("y"))}, Generator.IdentifierName("x"), modifiers:=DeclarationModifiers.Abstract),
+"Default MustOverride Property Item(z As y) As x")
 
             VerifySyntax(Of PropertyBlockSyntax)(
-                g.IndexerDeclaration({g.ParameterDeclaration("z", g.IdentifierName("y"))}, g.IdentifierName("x"), modifiers:=DeclarationModifiers.ReadOnly),
-<x>Default ReadOnly Property Item(z As y) As x
+                Generator.IndexerDeclaration({Generator.ParameterDeclaration("z", Generator.IdentifierName("y"))}, Generator.IdentifierName("x"), modifiers:=DeclarationModifiers.ReadOnly),
+"Default ReadOnly Property Item(z As y) As x
     Get
     End Get
-End Property</x>.Value)
+End Property")
 
             VerifySyntax(Of PropertyBlockSyntax)(
-                g.IndexerDeclaration({g.ParameterDeclaration("z", g.IdentifierName("y"))}, g.IdentifierName("x"), modifiers:=DeclarationModifiers.ReadOnly,
-                    getAccessorStatements:={g.IdentifierName("a")}),
-<x>Default ReadOnly Property Item(z As y) As x
+                Generator.IndexerDeclaration({Generator.ParameterDeclaration("z", Generator.IdentifierName("y"))}, Generator.IdentifierName("x"), modifiers:=DeclarationModifiers.WriteOnly),
+"Default WriteOnly Property Item(z As y) As x
+    Set(value As x)
+    End Set
+End Property")
+
+            VerifySyntax(Of PropertyBlockSyntax)(
+                Generator.IndexerDeclaration({Generator.ParameterDeclaration("z", Generator.IdentifierName("y"))}, Generator.IdentifierName("x"), modifiers:=DeclarationModifiers.ReadOnly,
+                    getAccessorStatements:={Generator.IdentifierName("a")}),
+"Default ReadOnly Property Item(z As y) As x
     Get
         a
     End Get
-End Property</x>.Value)
+End Property")
 
             VerifySyntax(Of PropertyBlockSyntax)(
-                g.IndexerDeclaration({g.ParameterDeclaration("z", g.IdentifierName("y"))}, g.IdentifierName("x"), modifiers:=DeclarationModifiers.None),
-<x>Default Property Item(z As y) As x
+                Generator.IndexerDeclaration({Generator.ParameterDeclaration("z", Generator.IdentifierName("y"))}, Generator.IdentifierName("x"), modifiers:=DeclarationModifiers.WriteOnly,
+                    setAccessorStatements:={Generator.IdentifierName("a")}),
+"Default WriteOnly Property Item(z As y) As x
+    Set(value As x)
+        a
+    End Set
+End Property")
+
+            VerifySyntax(Of PropertyBlockSyntax)(
+                Generator.IndexerDeclaration({Generator.ParameterDeclaration("z", Generator.IdentifierName("y"))}, Generator.IdentifierName("x"), modifiers:=DeclarationModifiers.None),
+"Default Property Item(z As y) As x
     Get
     End Get
 
     Set(value As x)
     End Set
-End Property</x>.Value)
+End Property")
 
             VerifySyntax(Of PropertyBlockSyntax)(
-                g.IndexerDeclaration({g.ParameterDeclaration("z", g.IdentifierName("y"))}, g.IdentifierName("x"),
-                    setAccessorStatements:={g.IdentifierName("a")}),
-<x>Default Property Item(z As y) As x
+                Generator.IndexerDeclaration({Generator.ParameterDeclaration("z", Generator.IdentifierName("y"))}, Generator.IdentifierName("x"),
+                    setAccessorStatements:={Generator.IdentifierName("a")}),
+"Default Property Item(z As y) As x
     Get
     End Get
 
     Set(value As x)
         a
     End Set
-End Property</x>.Value)
+End Property")
 
             VerifySyntax(Of PropertyBlockSyntax)(
-                g.IndexerDeclaration({g.ParameterDeclaration("z", g.IdentifierName("y"))}, g.IdentifierName("x"),
-                    getAccessorStatements:={g.IdentifierName("a")}, setAccessorStatements:={g.IdentifierName("b")}),
-<x>Default Property Item(z As y) As x
+                Generator.IndexerDeclaration({Generator.ParameterDeclaration("z", Generator.IdentifierName("y"))}, Generator.IdentifierName("x"),
+                    getAccessorStatements:={Generator.IdentifierName("a")}, setAccessorStatements:={Generator.IdentifierName("b")}),
+"Default Property Item(z As y) As x
     Get
         a
     End Get
@@ -778,23 +1285,23 @@ End Property</x>.Value)
     Set(value As x)
         b
     End Set
-End Property</x>.Value)
+End Property")
 
         End Sub
 
         <Fact>
         Public Sub TestEventDeclarations()
             VerifySyntax(Of EventStatementSyntax)(
-                g.EventDeclaration("ev", g.IdentifierName("t")),
-<x>Event ev As t</x>.Value)
+                Generator.EventDeclaration("ev", Generator.IdentifierName("t")),
+"Event ev As t")
 
             VerifySyntax(Of EventStatementSyntax)(
-                g.EventDeclaration("ev", g.IdentifierName("t"), accessibility:=Accessibility.Public, modifiers:=DeclarationModifiers.Static),
-<x>Public Shared Event ev As t</x>.Value)
+                Generator.EventDeclaration("ev", Generator.IdentifierName("t"), accessibility:=Accessibility.Public, modifiers:=DeclarationModifiers.Static),
+"Public Shared Event ev As t")
 
             VerifySyntax(Of EventBlockSyntax)(
-                g.CustomEventDeclaration("ev", g.IdentifierName("t")),
-<x>Custom Event ev As t
+                Generator.CustomEventDeclaration("ev", Generator.IdentifierName("t")),
+"Custom Event ev As t
     AddHandler(value As t)
     End AddHandler
 
@@ -803,12 +1310,12 @@ End Property</x>.Value)
 
     RaiseEvent()
     End RaiseEvent
-End Event</x>.Value)
+End Event")
 
-            Dim params = {g.ParameterDeclaration("sender", g.TypeExpression(SpecialType.System_Object)), g.ParameterDeclaration("args", g.IdentifierName("EventArgs"))}
+            Dim params = {Generator.ParameterDeclaration("sender", Generator.TypeExpression(SpecialType.System_Object)), Generator.ParameterDeclaration("args", Generator.IdentifierName("EventArgs"))}
             VerifySyntax(Of EventBlockSyntax)(
-                g.CustomEventDeclaration("ev", g.IdentifierName("t"), parameters:=params),
-<x>Custom Event ev As t
+                Generator.CustomEventDeclaration("ev", Generator.IdentifierName("t"), parameters:=params),
+"Custom Event ev As t
     AddHandler(value As t)
     End AddHandler
 
@@ -817,367 +1324,366 @@ End Event</x>.Value)
 
     RaiseEvent(sender As Object, args As EventArgs)
     End RaiseEvent
-End Event</x>.Value)
+End Event")
 
         End Sub
 
         <Fact>
         Public Sub TestConstructorDeclaration()
             VerifySyntax(Of ConstructorBlockSyntax)(
-                g.ConstructorDeclaration("c"),
-<x>Sub New()
-End Sub</x>.Value)
+                Generator.ConstructorDeclaration("c"),
+"Sub New()
+End Sub")
 
             VerifySyntax(Of ConstructorBlockSyntax)(
-                g.ConstructorDeclaration("c", accessibility:=Accessibility.Public, modifiers:=DeclarationModifiers.Static),
-<x>Public Shared Sub New()
-End Sub</x>.Value)
+                Generator.ConstructorDeclaration("c", accessibility:=Accessibility.Public, modifiers:=DeclarationModifiers.Static),
+"Public Shared Sub New()
+End Sub")
 
             VerifySyntax(Of ConstructorBlockSyntax)(
-                g.ConstructorDeclaration("c", parameters:={g.ParameterDeclaration("p", g.IdentifierName("t"))}),
-<x>Sub New(p As t)
-End Sub</x>.Value)
+                Generator.ConstructorDeclaration("c", parameters:={Generator.ParameterDeclaration("p", Generator.IdentifierName("t"))}),
+"Sub New(p As t)
+End Sub")
 
             VerifySyntax(Of ConstructorBlockSyntax)(
-                g.ConstructorDeclaration("c",
-                    parameters:={g.ParameterDeclaration("p", g.IdentifierName("t"))},
-                    baseConstructorArguments:={g.IdentifierName("p")}),
-<x>Sub New(p As t)
+                Generator.ConstructorDeclaration("c",
+                    parameters:={Generator.ParameterDeclaration("p", Generator.IdentifierName("t"))},
+                    baseConstructorArguments:={Generator.IdentifierName("p")}),
+"Sub New(p As t)
     MyBase.New(p)
-End Sub</x>.Value)
+End Sub")
         End Sub
 
         <Fact>
         Public Sub TestClassDeclarations()
             VerifySyntax(Of ClassBlockSyntax)(
-                g.ClassDeclaration("c"),
-<x>Class c
-End Class</x>.Value)
+                Generator.ClassDeclaration("c"),
+"Class c
+End Class")
 
             VerifySyntax(Of ClassBlockSyntax)(
-                g.ClassDeclaration("c", typeParameters:={"x", "y"}),
-<x>Class c(Of x, y)
-End Class</x>.Value)
+                Generator.ClassDeclaration("c", typeParameters:={"x", "y"}),
+"Class c(Of x, y)
+End Class")
 
             VerifySyntax(Of ClassBlockSyntax)(
-                g.ClassDeclaration("c", accessibility:=Accessibility.Public),
-<x>Public Class c
-End Class</x>.Value)
+                Generator.ClassDeclaration("c", accessibility:=Accessibility.Public),
+"Public Class c
+End Class")
 
             VerifySyntax(Of ClassBlockSyntax)(
-                g.ClassDeclaration("c", baseType:=g.IdentifierName("x")),
-<x>Class c
+                Generator.ClassDeclaration("c", baseType:=Generator.IdentifierName("x")),
+"Class c
     Inherits x
 
-End Class</x>.Value)
+End Class")
 
             VerifySyntax(Of ClassBlockSyntax)(
-                g.ClassDeclaration("c", interfaceTypes:={g.IdentifierName("x")}),
-<x>Class c
+                Generator.ClassDeclaration("c", interfaceTypes:={Generator.IdentifierName("x")}),
+"Class c
     Implements x
 
-End Class</x>.Value)
+End Class")
 
             VerifySyntax(Of ClassBlockSyntax)(
-                g.ClassDeclaration("c", baseType:=g.IdentifierName("x"), interfaceTypes:={g.IdentifierName("y"), g.IdentifierName("z")}),
-<x>Class c
+                Generator.ClassDeclaration("c", baseType:=Generator.IdentifierName("x"), interfaceTypes:={Generator.IdentifierName("y"), Generator.IdentifierName("z")}),
+"Class c
     Inherits x
     Implements y, z
 
-End Class</x>.Value)
+End Class")
 
             VerifySyntax(Of ClassBlockSyntax)(
-                g.ClassDeclaration("c", interfaceTypes:={}),
-<x>Class c
-End Class</x>.Value)
+                Generator.ClassDeclaration("c", interfaceTypes:={}),
+"Class c
+End Class")
 
             VerifySyntax(Of ClassBlockSyntax)(
-                g.ClassDeclaration("c", members:={g.FieldDeclaration("y", type:=g.IdentifierName("x"))}),
-<x>Class c
+                Generator.ClassDeclaration("c", members:={Generator.FieldDeclaration("y", type:=Generator.IdentifierName("x"))}),
+"Class c
 
     Dim y As x
-End Class</x>.Value)
+End Class")
 
         End Sub
 
         <Fact>
         Public Sub TestStructDeclarations()
             VerifySyntax(Of StructureBlockSyntax)(
-                g.StructDeclaration("s"),
-<x>Structure s
-End Structure</x>.Value)
+                Generator.StructDeclaration("s"),
+"Structure s
+End Structure")
 
             VerifySyntax(Of StructureBlockSyntax)(
-                g.StructDeclaration("s", typeParameters:={"x", "y"}),
-<x>Structure s(Of x, y)
-End Structure</x>.Value)
+                Generator.StructDeclaration("s", typeParameters:={"x", "y"}),
+"Structure s(Of x, y)
+End Structure")
 
             VerifySyntax(Of StructureBlockSyntax)(
-                g.StructDeclaration("s", accessibility:=Accessibility.Public, modifiers:=DeclarationModifiers.Partial),
-<x>Public Partial Structure s
-End Structure</x>.Value)
+                Generator.StructDeclaration("s", accessibility:=Accessibility.Public, modifiers:=DeclarationModifiers.Partial),
+"Partial Public Structure s
+End Structure")
 
             VerifySyntax(Of StructureBlockSyntax)(
-                g.StructDeclaration("s", interfaceTypes:={g.IdentifierName("x")}),
-<x>Structure s
+                Generator.StructDeclaration("s", interfaceTypes:={Generator.IdentifierName("x")}),
+"Structure s
     Implements x
 
-End Structure</x>.Value)
+End Structure")
 
             VerifySyntax(Of StructureBlockSyntax)(
-                g.StructDeclaration("s", interfaceTypes:={g.IdentifierName("x"), g.IdentifierName("y")}),
-<x>Structure s
+                Generator.StructDeclaration("s", interfaceTypes:={Generator.IdentifierName("x"), Generator.IdentifierName("y")}),
+"Structure s
     Implements x, y
 
-End Structure</x>.Value)
+End Structure")
 
             VerifySyntax(Of StructureBlockSyntax)(
-                g.StructDeclaration("s", interfaceTypes:={}),
-<x>Structure s
-End Structure</x>.Value)
+                Generator.StructDeclaration("s", interfaceTypes:={}),
+"Structure s
+End Structure")
 
             VerifySyntax(Of StructureBlockSyntax)(
-                g.StructDeclaration("s", members:={g.FieldDeclaration("y", g.IdentifierName("x"))}),
-<x>Structure s
+                Generator.StructDeclaration("s", members:={Generator.FieldDeclaration("y", Generator.IdentifierName("x"))}),
+"Structure s
 
     Dim y As x
-End Structure</x>.Value)
+End Structure")
 
             VerifySyntax(Of StructureBlockSyntax)(
-                g.StructDeclaration("s", members:={g.MethodDeclaration("m", returnType:=g.IdentifierName("t"))}),
-<x>Structure s
+                Generator.StructDeclaration("s", members:={Generator.MethodDeclaration("m", returnType:=Generator.IdentifierName("t"))}),
+"Structure s
 
     Function m() As t
     End Function
-End Structure</x>.Value)
+End Structure")
 
             VerifySyntax(Of StructureBlockSyntax)(
-                g.StructDeclaration("s",
-                    members:={g.ConstructorDeclaration(accessibility:=Accessibility.NotApplicable, modifiers:=DeclarationModifiers.None)}),
-<x>Structure s
+                Generator.StructDeclaration("s",
+                    members:={Generator.ConstructorDeclaration(accessibility:=Accessibility.NotApplicable, modifiers:=DeclarationModifiers.None)}),
+"Structure s
 
     Sub New()
     End Sub
-End Structure</x>.Value)
+End Structure")
         End Sub
 
         <Fact>
         Public Sub TestInterfaceDeclarations()
             VerifySyntax(Of InterfaceBlockSyntax)(
-                g.InterfaceDeclaration("i"),
-<x>Interface i
-End Interface</x>.Value)
+                Generator.InterfaceDeclaration("i"),
+"Interface i
+End Interface")
 
             VerifySyntax(Of InterfaceBlockSyntax)(
-                g.InterfaceDeclaration("i", typeParameters:={"x", "y"}),
-<x>Interface i(Of x, y)
-End Interface</x>.Value)
+                Generator.InterfaceDeclaration("i", typeParameters:={"x", "y"}),
+"Interface i(Of x, y)
+End Interface")
 
             VerifySyntax(Of InterfaceBlockSyntax)(
-                g.InterfaceDeclaration("i", interfaceTypes:={g.IdentifierName("a")}),
-<x>Interface i
+                Generator.InterfaceDeclaration("i", interfaceTypes:={Generator.IdentifierName("a")}),
+"Interface i
     Inherits a
 
-End Interface</x>.Value)
+End Interface")
 
             VerifySyntax(Of InterfaceBlockSyntax)(
-                g.InterfaceDeclaration("i", interfaceTypes:={g.IdentifierName("a"), g.IdentifierName("b")}),
-<x>Interface i
+                Generator.InterfaceDeclaration("i", interfaceTypes:={Generator.IdentifierName("a"), Generator.IdentifierName("b")}),
+"Interface i
     Inherits a, b
 
-End Interface</x>.Value)
+End Interface")
 
             VerifySyntax(Of InterfaceBlockSyntax)(
-                g.InterfaceDeclaration("i", interfaceTypes:={}),
-<x>Interface i
-End Interface</x>.Value)
+                Generator.InterfaceDeclaration("i", interfaceTypes:={}),
+"Interface i
+End Interface")
 
             VerifySyntax(Of InterfaceBlockSyntax)(
-                g.InterfaceDeclaration("i", members:={g.MethodDeclaration("m", returnType:=g.IdentifierName("t"), accessibility:=Accessibility.Public, modifiers:=DeclarationModifiers.Sealed)}),
-<x>Interface i
+                Generator.InterfaceDeclaration("i", members:={Generator.MethodDeclaration("m", returnType:=Generator.IdentifierName("t"), accessibility:=Accessibility.Public, modifiers:=DeclarationModifiers.Sealed)}),
+"Interface i
 
     Function m() As t
 
-End Interface</x>.Value)
+End Interface")
 
             VerifySyntax(Of InterfaceBlockSyntax)(
-                g.InterfaceDeclaration("i", members:={g.PropertyDeclaration("p", g.IdentifierName("t"), accessibility:=Accessibility.Public, modifiers:=DeclarationModifiers.Sealed)}),
-<x>Interface i
+                Generator.InterfaceDeclaration("i", members:={Generator.PropertyDeclaration("p", Generator.IdentifierName("t"), accessibility:=Accessibility.Public, modifiers:=DeclarationModifiers.Sealed)}),
+"Interface i
 
     Property p As t
 
-End Interface</x>.Value)
+End Interface")
 
             VerifySyntax(Of InterfaceBlockSyntax)(
-                g.InterfaceDeclaration("i", members:={g.PropertyDeclaration("p", g.IdentifierName("t"), accessibility:=Accessibility.Public, modifiers:=DeclarationModifiers.ReadOnly)}),
-<x>Interface i
+                Generator.InterfaceDeclaration("i", members:={Generator.PropertyDeclaration("p", Generator.IdentifierName("t"), accessibility:=Accessibility.Public, modifiers:=DeclarationModifiers.ReadOnly)}),
+"Interface i
 
     ReadOnly Property p As t
 
-End Interface</x>.Value)
+End Interface")
 
             VerifySyntax(Of InterfaceBlockSyntax)(
-                g.InterfaceDeclaration("i", members:={g.IndexerDeclaration({g.ParameterDeclaration("y", g.IdentifierName("x"))}, g.IdentifierName("t"), Accessibility.Public, DeclarationModifiers.Sealed)}),
-<x>Interface i
+                Generator.InterfaceDeclaration("i", members:={Generator.IndexerDeclaration({Generator.ParameterDeclaration("y", Generator.IdentifierName("x"))}, Generator.IdentifierName("t"), Accessibility.Public, DeclarationModifiers.Sealed)}),
+"Interface i
 
     Default Property Item(y As x) As t
 
-End Interface</x>.Value)
+End Interface")
 
             VerifySyntax(Of InterfaceBlockSyntax)(
-                g.InterfaceDeclaration("i", members:={g.IndexerDeclaration({g.ParameterDeclaration("y", g.IdentifierName("x"))}, g.IdentifierName("t"), Accessibility.Public, DeclarationModifiers.ReadOnly)}),
-<x>Interface i
+                Generator.InterfaceDeclaration("i", members:={Generator.IndexerDeclaration({Generator.ParameterDeclaration("y", Generator.IdentifierName("x"))}, Generator.IdentifierName("t"), Accessibility.Public, DeclarationModifiers.ReadOnly)}),
+"Interface i
 
     Default ReadOnly Property Item(y As x) As t
 
-End Interface</x>.Value)
+End Interface")
         End Sub
 
         <Fact>
         Public Sub TestEnumDeclarations()
             VerifySyntax(Of EnumBlockSyntax)(
-                g.EnumDeclaration("e"),
-<x>Enum e
-End Enum</x>.Value)
+                Generator.EnumDeclaration("e"),
+"Enum e
+End Enum")
 
             VerifySyntax(Of EnumBlockSyntax)(
-                g.EnumDeclaration("e", members:={g.EnumMember("a"), g.EnumMember("b"), g.EnumMember("c")}),
-<x>Enum e
+                Generator.EnumDeclaration("e", members:={Generator.EnumMember("a"), Generator.EnumMember("b"), Generator.EnumMember("c")}),
+"Enum e
     a
     b
     c
-End Enum</x>.Value)
+End Enum")
 
             VerifySyntax(Of EnumBlockSyntax)(
-                g.EnumDeclaration("e", members:={g.IdentifierName("a"), g.EnumMember("b"), g.IdentifierName("c")}),
-<x>Enum e
+                Generator.EnumDeclaration("e", members:={Generator.IdentifierName("a"), Generator.EnumMember("b"), Generator.IdentifierName("c")}),
+"Enum e
     a
     b
     c
-End Enum</x>.Value)
+End Enum")
 
             VerifySyntax(Of EnumBlockSyntax)(
-                g.EnumDeclaration("e", members:={g.EnumMember("a", g.LiteralExpression(0)), g.EnumMember("b"), g.EnumMember("c", g.LiteralExpression(5))}),
-<x>Enum e
+                Generator.EnumDeclaration("e", members:={Generator.EnumMember("a", Generator.LiteralExpression(0)), Generator.EnumMember("b"), Generator.EnumMember("c", Generator.LiteralExpression(5))}),
+"Enum e
     a = 0
     b
     c = 5
-End Enum</x>.Value)
+End Enum")
         End Sub
 
         <Fact>
         Public Sub TestDelegateDeclarations()
             VerifySyntax(Of DelegateStatementSyntax)(
-                g.DelegateDeclaration("d"),
-<x>Delegate Sub d()</x>.Value)
+                Generator.DelegateDeclaration("d"),
+"Delegate Sub d()")
 
             VerifySyntax(Of DelegateStatementSyntax)(
-                g.DelegateDeclaration("d", parameters:={g.ParameterDeclaration("p", g.IdentifierName("t"))}),
-<x>Delegate Sub d(p As t)</x>.Value)
+                Generator.DelegateDeclaration("d", parameters:={Generator.ParameterDeclaration("p", Generator.IdentifierName("t"))}),
+"Delegate Sub d(p As t)")
 
             VerifySyntax(Of DelegateStatementSyntax)(
-                g.DelegateDeclaration("d", returnType:=g.IdentifierName("t")),
-<x>Delegate Function d() As t</x>.Value)
+                Generator.DelegateDeclaration("d", returnType:=Generator.IdentifierName("t")),
+"Delegate Function d() As t")
 
             VerifySyntax(Of DelegateStatementSyntax)(
-                g.DelegateDeclaration("d", parameters:={g.ParameterDeclaration("p", g.IdentifierName("t"))}, returnType:=g.IdentifierName("t")),
-<x>Delegate Function d(p As t) As t</x>.Value)
+                Generator.DelegateDeclaration("d", parameters:={Generator.ParameterDeclaration("p", Generator.IdentifierName("t"))}, returnType:=Generator.IdentifierName("t")),
+"Delegate Function d(p As t) As t")
 
             VerifySyntax(Of DelegateStatementSyntax)(
-                g.DelegateDeclaration("d", accessibility:=Accessibility.Public),
-<x>Public Delegate Sub d()</x>.Value)
+                Generator.DelegateDeclaration("d", accessibility:=Accessibility.Public),
+"Public Delegate Sub d()")
 
             ' ignores modifiers
             VerifySyntax(Of DelegateStatementSyntax)(
-                g.DelegateDeclaration("d", modifiers:=DeclarationModifiers.Static),
-<x>Delegate Sub d()</x>.Value)
+                Generator.DelegateDeclaration("d", modifiers:=DeclarationModifiers.Static),
+"Delegate Sub d()")
         End Sub
 
         <Fact>
         Public Sub TestNamespaceImportDeclarations()
             VerifySyntax(Of ImportsStatementSyntax)(
-                g.NamespaceImportDeclaration(g.IdentifierName("n")),
-<x>Imports n</x>.Value)
+                Generator.NamespaceImportDeclaration(Generator.IdentifierName("n")),
+"Imports n")
 
             VerifySyntax(Of ImportsStatementSyntax)(
-                g.NamespaceImportDeclaration("n"),
-<x>Imports n</x>.Value)
+                Generator.NamespaceImportDeclaration("n"),
+"Imports n")
 
             VerifySyntax(Of ImportsStatementSyntax)(
-                g.NamespaceImportDeclaration("n.m"),
-<x>Imports n.m</x>.Value)
+                Generator.NamespaceImportDeclaration("n.m"),
+"Imports n.m")
         End Sub
 
         <Fact>
         Public Sub TestNamespaceDeclarations()
             VerifySyntax(Of NamespaceBlockSyntax)(
-                g.NamespaceDeclaration("n"),
-<x>Namespace n
-End Namespace</x>.Value)
+                Generator.NamespaceDeclaration("n"),
+"Namespace n
+End Namespace")
 
             VerifySyntax(Of NamespaceBlockSyntax)(
-                g.NamespaceDeclaration("n.m"),
-<x>Namespace n.m
-End Namespace</x>.Value)
+                Generator.NamespaceDeclaration("n.m"),
+"Namespace n.m
+End Namespace")
 
             VerifySyntax(Of NamespaceBlockSyntax)(
-                g.NamespaceDeclaration("n",
-                    g.NamespaceImportDeclaration("m")),
-<x>Namespace n
+                Generator.NamespaceDeclaration("n",
+                    Generator.NamespaceImportDeclaration("m")),
+"Namespace n
 
     Imports m
-End Namespace</x>.Value)
+End Namespace")
 
             VerifySyntax(Of NamespaceBlockSyntax)(
-                g.NamespaceDeclaration("n",
-                    g.ClassDeclaration("c"),
-                    g.NamespaceImportDeclaration("m")),
-<x>Namespace n
+                Generator.NamespaceDeclaration("n",
+                    Generator.ClassDeclaration("c"),
+                    Generator.NamespaceImportDeclaration("m")),
+"Namespace n
 
     Imports m
 
     Class c
     End Class
-End Namespace</x>.Value)
+End Namespace")
         End Sub
-
 
         <Fact>
         Public Sub TestCompilationUnits()
             VerifySyntax(Of CompilationUnitSyntax)(
-                g.CompilationUnit(),
+                Generator.CompilationUnit(),
                 "")
 
             VerifySyntax(Of CompilationUnitSyntax)(
-                g.CompilationUnit(
-                    g.NamespaceDeclaration("n")),
-<x>Namespace n
+                Generator.CompilationUnit(
+                    Generator.NamespaceDeclaration("n")),
+"Namespace n
 End Namespace
-</x>.Value)
+")
 
             VerifySyntax(Of CompilationUnitSyntax)(
-                g.CompilationUnit(
-                    g.NamespaceImportDeclaration("n")),
-<x>Imports n
-</x>.Value)
+                Generator.CompilationUnit(
+                    Generator.NamespaceImportDeclaration("n")),
+"Imports n
+")
 
             VerifySyntax(Of CompilationUnitSyntax)(
-                g.CompilationUnit(
-                    g.ClassDeclaration("c"),
-                    g.NamespaceImportDeclaration("m")),
-<x>Imports m
+                Generator.CompilationUnit(
+                    Generator.ClassDeclaration("c"),
+                    Generator.NamespaceImportDeclaration("m")),
+"Imports m
 
 Class c
 End Class
-</x>.Value)
+")
 
             VerifySyntax(Of CompilationUnitSyntax)(
-                g.CompilationUnit(
-                    g.NamespaceImportDeclaration("n"),
-                    g.NamespaceDeclaration("n",
-                        g.NamespaceImportDeclaration("m"),
-                        g.ClassDeclaration("c"))),
-<x>Imports n
+                Generator.CompilationUnit(
+                    Generator.NamespaceImportDeclaration("n"),
+                    Generator.NamespaceDeclaration("n",
+                        Generator.NamespaceImportDeclaration("m"),
+                        Generator.ClassDeclaration("c"))),
+"Imports n
 
 Namespace n
 
@@ -1186,178 +1692,208 @@ Namespace n
     Class c
     End Class
 End Namespace
-</x>.Value)
+")
         End Sub
 
         <Fact>
         Public Sub TestAsPublicInterfaceImplementation()
             VerifySyntax(Of MethodBlockBaseSyntax)(
-                g.AsPublicInterfaceImplementation(
-                    g.MethodDeclaration("m", returnType:=g.IdentifierName("t"), modifiers:=DeclarationModifiers.Abstract),
-                    g.IdentifierName("i")),
-<x>Public Function m() As t Implements i.m
-End Function</x>.Value)
+                Generator.AsPublicInterfaceImplementation(
+                    Generator.MethodDeclaration("m", returnType:=Generator.IdentifierName("t"), modifiers:=DeclarationModifiers.Abstract),
+                    Generator.IdentifierName("i")),
+"Public Function m() As t Implements i.m
+End Function")
 
             VerifySyntax(Of MethodBlockBaseSyntax)(
-                g.AsPublicInterfaceImplementation(
-                    g.MethodDeclaration("m", returnType:=g.IdentifierName("t"), modifiers:=DeclarationModifiers.None),
-                    g.IdentifierName("i")),
-<x>Public Function m() As t Implements i.m
-End Function</x>.Value)
+                Generator.AsPublicInterfaceImplementation(
+                    Generator.MethodDeclaration("m", returnType:=Generator.IdentifierName("t"), modifiers:=DeclarationModifiers.None),
+                    Generator.IdentifierName("i")),
+"Public Function m() As t Implements i.m
+End Function")
 
             VerifySyntax(Of PropertyBlockSyntax)(
-                g.AsPublicInterfaceImplementation(
-                    g.PropertyDeclaration("p", g.IdentifierName("t"), accessibility:=Accessibility.Private, modifiers:=DeclarationModifiers.Abstract),
-                    g.IdentifierName("i")),
-<x>Public Property p As t Implements i.p
+                Generator.AsPublicInterfaceImplementation(
+                    Generator.PropertyDeclaration("p", Generator.IdentifierName("t"), accessibility:=Accessibility.Private, modifiers:=DeclarationModifiers.Abstract),
+                    Generator.IdentifierName("i")),
+"Public Property p As t Implements i.p
     Get
     End Get
 
     Set(value As t)
     End Set
-End Property</x>.Value)
+End Property")
 
             VerifySyntax(Of PropertyBlockSyntax)(
-                g.AsPublicInterfaceImplementation(
-                    g.PropertyDeclaration("p", g.IdentifierName("t"), accessibility:=Accessibility.Private, modifiers:=DeclarationModifiers.None),
-                    g.IdentifierName("i")),
-<x>Public Property p As t Implements i.p
+                Generator.AsPublicInterfaceImplementation(
+                    Generator.PropertyDeclaration("p", Generator.IdentifierName("t"), accessibility:=Accessibility.Private, modifiers:=DeclarationModifiers.None),
+                    Generator.IdentifierName("i")),
+"Public Property p As t Implements i.p
     Get
     End Get
 
     Set(value As t)
     End Set
-End Property</x>.Value)
+End Property")
 
             VerifySyntax(Of PropertyBlockSyntax)(
-                g.AsPublicInterfaceImplementation(
-                    g.IndexerDeclaration({g.ParameterDeclaration("p", g.IdentifierName("a"))}, g.IdentifierName("t"), Accessibility.Internal, DeclarationModifiers.Abstract),
-                    g.IdentifierName("i")),
-<x>Default Public Property Item(p As a) As t Implements i.Item
+                Generator.AsPublicInterfaceImplementation(
+                    Generator.IndexerDeclaration({Generator.ParameterDeclaration("p", Generator.IdentifierName("a"))}, Generator.IdentifierName("t"), Accessibility.Internal, DeclarationModifiers.Abstract),
+                    Generator.IdentifierName("i")),
+"Default Public Property Item(p As a) As t Implements i.Item
     Get
     End Get
 
     Set(value As t)
     End Set
-End Property</x>.Value)
+End Property")
+
+            ' convert private method to public
+            Dim pim = Generator.AsPrivateInterfaceImplementation(
+                    Generator.MethodDeclaration("m", returnType:=Generator.IdentifierName("t")),
+                    Generator.IdentifierName("i"))
+
+            VerifySyntax(Of MethodBlockBaseSyntax)(
+                Generator.AsPublicInterfaceImplementation(pim, Generator.IdentifierName("i2")),
+"Public Function m() As t Implements i2.m
+End Function")
+
+            VerifySyntax(Of MethodBlockBaseSyntax)(
+                Generator.AsPublicInterfaceImplementation(pim, Generator.IdentifierName("i2"), "m2"),
+"Public Function m2() As t Implements i2.m2
+End Function")
         End Sub
 
         <Fact>
         Public Sub TestAsPrivateInterfaceImplementation()
             VerifySyntax(Of MethodBlockBaseSyntax)(
-                g.AsPrivateInterfaceImplementation(
-                    g.MethodDeclaration("m", returnType:=g.IdentifierName("t"), accessibility:=Accessibility.Private, modifiers:=DeclarationModifiers.Abstract),
-                    g.IdentifierName("i")),
-<x>Private Function i_m() As t Implements i.m
-End Function</x>.Value)
+                Generator.AsPrivateInterfaceImplementation(
+                    Generator.MethodDeclaration("m", returnType:=Generator.IdentifierName("t"), accessibility:=Accessibility.Private, modifiers:=DeclarationModifiers.Abstract),
+                    Generator.IdentifierName("i")),
+"Private Function i_m() As t Implements i.m
+End Function")
 
             VerifySyntax(Of MethodBlockBaseSyntax)(
-                g.AsPrivateInterfaceImplementation(
-                    g.MethodDeclaration("m", returnType:=g.IdentifierName("t"), accessibility:=Accessibility.Private, modifiers:=DeclarationModifiers.Abstract),
-                    g.TypeExpression(Me.ienumerableInt)),
-<x>Private Function IEnumerable_Int32_m() As t Implements Global.System.Collections.Generic.IEnumerable(Of System.Int32).m
-End Function</x>.Value)
+                Generator.AsPrivateInterfaceImplementation(
+                    Generator.MethodDeclaration("m", returnType:=Generator.IdentifierName("t"), accessibility:=Accessibility.Private, modifiers:=DeclarationModifiers.Abstract),
+                    Generator.TypeExpression(Me._ienumerableInt)),
+"Private Function IEnumerable_Int32_m() As t Implements Global.System.Collections.Generic.IEnumerable(Of System.Int32).m
+End Function")
 
             VerifySyntax(Of PropertyBlockSyntax)(
-                g.AsPrivateInterfaceImplementation(
-                    g.PropertyDeclaration("p", g.IdentifierName("t"), accessibility:=Accessibility.Internal, modifiers:=DeclarationModifiers.Abstract),
-                    g.IdentifierName("i")),
-<x>Private Property i_p As t Implements i.p
+                Generator.AsPrivateInterfaceImplementation(
+                    Generator.PropertyDeclaration("p", Generator.IdentifierName("t"), accessibility:=Accessibility.Internal, modifiers:=DeclarationModifiers.Abstract),
+                    Generator.IdentifierName("i")),
+"Private Property i_p As t Implements i.p
     Get
     End Get
 
     Set(value As t)
     End Set
-End Property</x>.Value)
+End Property")
 
             VerifySyntax(Of PropertyBlockSyntax)(
-                g.AsPrivateInterfaceImplementation(
-                    g.IndexerDeclaration({g.ParameterDeclaration("p", g.IdentifierName("a"))}, g.IdentifierName("t"), Accessibility.Protected, DeclarationModifiers.Abstract),
-                    g.IdentifierName("i")),
-<x>Private Property i_Item(p As a) As t Implements i.Item
+                Generator.AsPrivateInterfaceImplementation(
+                    Generator.IndexerDeclaration({Generator.ParameterDeclaration("p", Generator.IdentifierName("a"))}, Generator.IdentifierName("t"), Accessibility.Protected, DeclarationModifiers.Abstract),
+                    Generator.IdentifierName("i")),
+"Private Property i_Item(p As a) As t Implements i.Item
     Get
     End Get
 
     Set(value As t)
     End Set
-End Property</x>.Value)
+End Property")
+
+            ' convert public method to private
+            Dim pim = Generator.AsPublicInterfaceImplementation(
+                    Generator.MethodDeclaration("m", returnType:=Generator.IdentifierName("t")),
+                    Generator.IdentifierName("i"))
+
+            VerifySyntax(Of MethodBlockBaseSyntax)(
+                Generator.AsPrivateInterfaceImplementation(pim, Generator.IdentifierName("i2")),
+"Private Function i2_m() As t Implements i2.m
+End Function")
+
+            VerifySyntax(Of MethodBlockBaseSyntax)(
+                Generator.AsPrivateInterfaceImplementation(pim, Generator.IdentifierName("i2"), "m2"),
+"Private Function i2_m2() As t Implements i2.m2
+End Function")
         End Sub
 
         <Fact>
         Public Sub TestWithTypeParameters()
             VerifySyntax(Of MethodStatementSyntax)(
-                g.WithTypeParameters(
-                    g.MethodDeclaration("m", modifiers:=DeclarationModifiers.Abstract),
+                Generator.WithTypeParameters(
+                    Generator.MethodDeclaration("m", modifiers:=DeclarationModifiers.Abstract),
                     "a"),
-<x>MustInherit Sub m(Of a)()</x>.Value)
+"MustOverride Sub m(Of a)()")
 
             VerifySyntax(Of MethodBlockSyntax)(
-                g.WithTypeParameters(
-                    g.MethodDeclaration("m", modifiers:=DeclarationModifiers.None),
+                Generator.WithTypeParameters(
+                    Generator.MethodDeclaration("m", modifiers:=DeclarationModifiers.None),
                     "a"),
-<x>Sub m(Of a)()
-End Sub</x>.Value)
+"Sub m(Of a)()
+End Sub")
 
             ' assigning no type parameters is legal
             VerifySyntax(Of MethodStatementSyntax)(
-                g.WithTypeParameters(
-                    g.MethodDeclaration("m", modifiers:=DeclarationModifiers.Abstract)),
-<x>MustInherit Sub m()</x>.Value)
+                Generator.WithTypeParameters(
+                    Generator.MethodDeclaration("m", modifiers:=DeclarationModifiers.Abstract)),
+"MustOverride Sub m()")
 
             VerifySyntax(Of MethodBlockSyntax)(
-                g.WithTypeParameters(
-                    g.MethodDeclaration("m", modifiers:=DeclarationModifiers.None)),
-<x>Sub m()
-End Sub</x>.Value)
+                Generator.WithTypeParameters(
+                    Generator.MethodDeclaration("m", modifiers:=DeclarationModifiers.None)),
+"Sub m()
+End Sub")
 
             ' removing type parameters
             VerifySyntax(Of MethodStatementSyntax)(
-                g.WithTypeParameters(g.WithTypeParameters(
-                    g.MethodDeclaration("m", modifiers:=DeclarationModifiers.Abstract),
+                Generator.WithTypeParameters(Generator.WithTypeParameters(
+                    Generator.MethodDeclaration("m", modifiers:=DeclarationModifiers.Abstract),
                     "a")),
-<x>MustInherit Sub m()</x>.Value)
+"MustOverride Sub m()")
 
             VerifySyntax(Of MethodBlockSyntax)(
-                g.WithTypeParameters(g.WithTypeParameters(
-                    g.MethodDeclaration("m"),
+                Generator.WithTypeParameters(Generator.WithTypeParameters(
+                    Generator.MethodDeclaration("m"),
                     "a")),
-<x>Sub m()
-End Sub</x>.Value)
+"Sub m()
+End Sub")
 
             ' multiple type parameters
             VerifySyntax(Of MethodStatementSyntax)(
-                g.WithTypeParameters(
-                    g.MethodDeclaration("m", modifiers:=DeclarationModifiers.Abstract),
+                Generator.WithTypeParameters(
+                    Generator.MethodDeclaration("m", modifiers:=DeclarationModifiers.Abstract),
                     "a", "b"),
-<x>MustInherit Sub m(Of a, b)()</x>.Value)
+"MustOverride Sub m(Of a, b)()")
 
             VerifySyntax(Of MethodBlockSyntax)(
-                g.WithTypeParameters(
-                    g.MethodDeclaration("m"),
+                Generator.WithTypeParameters(
+                    Generator.MethodDeclaration("m"),
                     "a", "b"),
-<x>Sub m(Of a, b)()
-End Sub</x>.Value)
+"Sub m(Of a, b)()
+End Sub")
 
             VerifySyntax(Of ClassBlockSyntax)(
-                g.WithTypeParameters(
-                    g.ClassDeclaration("c"),
+                Generator.WithTypeParameters(
+                    Generator.ClassDeclaration("c"),
                     "a", "b"),
-<x>Class c(Of a, b)
-End Class</x>.Value)
+"Class c(Of a, b)
+End Class")
 
             VerifySyntax(Of StructureBlockSyntax)(
-                g.WithTypeParameters(
-                    g.StructDeclaration("s"),
+                Generator.WithTypeParameters(
+                    Generator.StructDeclaration("s"),
                     "a", "b"),
-<x>Structure s(Of a, b)
-End Structure</x>.Value)
+"Structure s(Of a, b)
+End Structure")
 
             VerifySyntax(Of InterfaceBlockSyntax)(
-                g.WithTypeParameters(
-                    g.InterfaceDeclaration("i"),
+                Generator.WithTypeParameters(
+                    Generator.InterfaceDeclaration("i"),
                     "a", "b"),
-<x>Interface i(Of a, b)
-End Interface</x>.Value)
+"Interface i(Of a, b)
+End Interface")
 
         End Sub
 
@@ -1365,836 +1901,1038 @@ End Interface</x>.Value)
         Public Sub TestWithTypeConstraint()
             ' single type constraint
             VerifySyntax(Of MethodStatementSyntax)(
-                g.WithTypeConstraint(
-                    g.WithTypeParameters(g.MethodDeclaration("m", modifiers:=DeclarationModifiers.Abstract), "a"),
-                    "a", g.IdentifierName("b")),
-<x>MustInherit Sub m(Of a As b)()</x>.Value)
+                Generator.WithTypeConstraint(
+                    Generator.WithTypeParameters(Generator.MethodDeclaration("m", modifiers:=DeclarationModifiers.Abstract), "a"),
+                    "a", Generator.IdentifierName("b")),
+"MustOverride Sub m(Of a As b)()")
 
             VerifySyntax(Of MethodBlockSyntax)(
-                g.WithTypeConstraint(
-                    g.WithTypeParameters(g.MethodDeclaration("m"), "a"),
-                    "a", g.IdentifierName("b")),
-<x>Sub m(Of a As b)()
-End Sub</x>.Value)
+                Generator.WithTypeConstraint(
+                    Generator.WithTypeParameters(Generator.MethodDeclaration("m"), "a"),
+                    "a", Generator.IdentifierName("b")),
+"Sub m(Of a As b)()
+End Sub")
 
             ' multiple type constraints
             VerifySyntax(Of MethodStatementSyntax)(
-                g.WithTypeConstraint(
-                    g.WithTypeParameters(g.MethodDeclaration("m", modifiers:=DeclarationModifiers.Abstract), "a"),
-                    "a", g.IdentifierName("b"), g.IdentifierName("c")),
-<x>MustInherit Sub m(Of a As {b, c})()</x>.Value)
+                Generator.WithTypeConstraint(
+                    Generator.WithTypeParameters(Generator.MethodDeclaration("m", modifiers:=DeclarationModifiers.Abstract), "a"),
+                    "a", Generator.IdentifierName("b"), Generator.IdentifierName("c")),
+"MustOverride Sub m(Of a As {b, c})()")
 
             VerifySyntax(Of MethodBlockSyntax)(
-                g.WithTypeConstraint(
-                    g.WithTypeParameters(g.MethodDeclaration("m"), "a"),
-                    "a", g.IdentifierName("b"), g.IdentifierName("c")),
-<x>Sub m(Of a As {b, c})()
-End Sub</x>.Value)
+                Generator.WithTypeConstraint(
+                    Generator.WithTypeParameters(Generator.MethodDeclaration("m"), "a"),
+                    "a", Generator.IdentifierName("b"), Generator.IdentifierName("c")),
+"Sub m(Of a As {b, c})()
+End Sub")
 
             ' no type constraints
             VerifySyntax(Of MethodStatementSyntax)(
-                g.WithTypeConstraint(
-                    g.WithTypeParameters(g.MethodDeclaration("m", modifiers:=DeclarationModifiers.Abstract), "a"),
+                Generator.WithTypeConstraint(
+                    Generator.WithTypeParameters(Generator.MethodDeclaration("m", modifiers:=DeclarationModifiers.Abstract), "a"),
                     "a"),
-<x>MustInherit Sub m(Of a)()</x>.Value)
+"MustOverride Sub m(Of a)()")
 
             VerifySyntax(Of MethodBlockSyntax)(
-                g.WithTypeConstraint(
-                    g.WithTypeParameters(g.MethodDeclaration("m"), "a"),
+                Generator.WithTypeConstraint(
+                    Generator.WithTypeParameters(Generator.MethodDeclaration("m"), "a"),
                     "a"),
-<x>Sub m(Of a)()
-End Sub</x>.Value)
+"Sub m(Of a)()
+End Sub")
 
             ' removed type constraints
             VerifySyntax(Of MethodStatementSyntax)(
-                g.WithTypeConstraint(g.WithTypeConstraint(
-                    g.WithTypeParameters(g.MethodDeclaration("m", modifiers:=DeclarationModifiers.Abstract), "a"),
-                    "a", g.IdentifierName("b"), g.IdentifierName("c")), "a"),
-<x>MustInherit Sub m(Of a)()</x>.Value)
+                Generator.WithTypeConstraint(Generator.WithTypeConstraint(
+                    Generator.WithTypeParameters(Generator.MethodDeclaration("m", modifiers:=DeclarationModifiers.Abstract), "a"),
+                    "a", Generator.IdentifierName("b"), Generator.IdentifierName("c")), "a"),
+"MustOverride Sub m(Of a)()")
 
             VerifySyntax(Of MethodBlockSyntax)(
-                g.WithTypeConstraint(g.WithTypeConstraint(
-                    g.WithTypeParameters(g.MethodDeclaration("m"), "a"),
-                    "a", g.IdentifierName("b"), g.IdentifierName("c")), "a"),
-<x>Sub m(Of a)()
-End Sub</x>.Value)
+                Generator.WithTypeConstraint(Generator.WithTypeConstraint(
+                    Generator.WithTypeParameters(Generator.MethodDeclaration("m"), "a"),
+                    "a", Generator.IdentifierName("b"), Generator.IdentifierName("c")), "a"),
+"Sub m(Of a)()
+End Sub")
 
-            ' multipe type parameters with constraints
+            ' multiple type parameters with constraints
             VerifySyntax(Of MethodStatementSyntax)(
-                g.WithTypeConstraint(
-                    g.WithTypeConstraint(
-                        g.WithTypeParameters(g.MethodDeclaration("m", modifiers:=DeclarationModifiers.Abstract), "a", "x"),
-                        "a", g.IdentifierName("b"), g.IdentifierName("c")),
-                    "x", g.IdentifierName("y")),
-<x>MustInherit Sub m(Of a As {b, c}, x As y)()</x>.Value)
+                Generator.WithTypeConstraint(
+                    Generator.WithTypeConstraint(
+                        Generator.WithTypeParameters(Generator.MethodDeclaration("m", modifiers:=DeclarationModifiers.Abstract), "a", "x"),
+                        "a", Generator.IdentifierName("b"), Generator.IdentifierName("c")),
+                    "x", Generator.IdentifierName("y")),
+"MustOverride Sub m(Of a As {b, c}, x As y)()")
 
             ' with constructor constraint
             VerifySyntax(Of MethodStatementSyntax)(
-                g.WithTypeConstraint(
-                    g.WithTypeParameters(g.MethodDeclaration("m", modifiers:=DeclarationModifiers.Abstract), "a"),
+                Generator.WithTypeConstraint(
+                    Generator.WithTypeParameters(Generator.MethodDeclaration("m", modifiers:=DeclarationModifiers.Abstract), "a"),
                     "a", SpecialTypeConstraintKind.Constructor),
-<x>MustInherit Sub m(Of a As New)()</x>.Value)
+"MustOverride Sub m(Of a As New)()")
 
             ' with reference constraint
             VerifySyntax(Of MethodStatementSyntax)(
-                g.WithTypeConstraint(
-                    g.WithTypeParameters(g.MethodDeclaration("m", modifiers:=DeclarationModifiers.Abstract), "a"),
+                Generator.WithTypeConstraint(
+                    Generator.WithTypeParameters(Generator.MethodDeclaration("m", modifiers:=DeclarationModifiers.Abstract), "a"),
                     "a", SpecialTypeConstraintKind.ReferenceType),
-<x>MustInherit Sub m(Of a As Class)()</x>.Value)
+"MustOverride Sub m(Of a As Class)()")
 
             ' with value type constraint
             VerifySyntax(Of MethodStatementSyntax)(
-                g.WithTypeConstraint(
-                    g.WithTypeParameters(g.MethodDeclaration("m", modifiers:=DeclarationModifiers.Abstract), "a"),
+                Generator.WithTypeConstraint(
+                    Generator.WithTypeParameters(Generator.MethodDeclaration("m", modifiers:=DeclarationModifiers.Abstract), "a"),
                     "a", SpecialTypeConstraintKind.ValueType),
-<x>MustInherit Sub m(Of a As Structure)()</x>.Value)
+"MustOverride Sub m(Of a As Structure)()")
 
             ' with reference constraint and constructor constraint
             VerifySyntax(Of MethodStatementSyntax)(
-                g.WithTypeConstraint(
-                    g.WithTypeParameters(g.MethodDeclaration("m", modifiers:=DeclarationModifiers.Abstract), "a"),
+                Generator.WithTypeConstraint(
+                    Generator.WithTypeParameters(Generator.MethodDeclaration("m", modifiers:=DeclarationModifiers.Abstract), "a"),
                     "a", SpecialTypeConstraintKind.ReferenceType Or SpecialTypeConstraintKind.Constructor),
-<x>MustInherit Sub m(Of a As {Class, New})()</x>.Value)
+"MustOverride Sub m(Of a As {Class, New})()")
 
             ' with value type constraint and constructor constraint
             VerifySyntax(Of MethodStatementSyntax)(
-                g.WithTypeConstraint(
-                    g.WithTypeParameters(g.MethodDeclaration("m", modifiers:=DeclarationModifiers.Abstract), "a"),
+                Generator.WithTypeConstraint(
+                    Generator.WithTypeParameters(Generator.MethodDeclaration("m", modifiers:=DeclarationModifiers.Abstract), "a"),
                     "a", SpecialTypeConstraintKind.ValueType Or SpecialTypeConstraintKind.Constructor),
-<x>MustInherit Sub m(Of a As {Structure, New})()</x>.Value)
+"MustOverride Sub m(Of a As {Structure, New})()")
 
             ' with reference constraint and type constraints
             VerifySyntax(Of MethodStatementSyntax)(
-                g.WithTypeConstraint(
-                    g.WithTypeParameters(g.MethodDeclaration("m", modifiers:=DeclarationModifiers.Abstract), "a"),
-                    "a", SpecialTypeConstraintKind.ReferenceType, g.IdentifierName("b"), g.IdentifierName("c")),
-<x>MustInherit Sub m(Of a As {Class, b, c})()</x>.Value)
+                Generator.WithTypeConstraint(
+                    Generator.WithTypeParameters(Generator.MethodDeclaration("m", modifiers:=DeclarationModifiers.Abstract), "a"),
+                    "a", SpecialTypeConstraintKind.ReferenceType, Generator.IdentifierName("b"), Generator.IdentifierName("c")),
+"MustOverride Sub m(Of a As {Class, b, c})()")
 
             ' class declarations
             VerifySyntax(Of ClassBlockSyntax)(
-                g.WithTypeConstraint(
-                    g.WithTypeParameters(
-                        g.ClassDeclaration("c"),
+                Generator.WithTypeConstraint(
+                    Generator.WithTypeParameters(
+                        Generator.ClassDeclaration("c"),
                         "a", "b"),
-                    "a", g.IdentifierName("x")),
-<x>Class c(Of a As x, b)
-End Class</x>.Value)
+                    "a", Generator.IdentifierName("x")),
+"Class c(Of a As x, b)
+End Class")
 
             ' structure declarations
             VerifySyntax(Of StructureBlockSyntax)(
-                g.WithTypeConstraint(
-                    g.WithTypeParameters(
-                        g.StructDeclaration("s"),
+                Generator.WithTypeConstraint(
+                    Generator.WithTypeParameters(
+                        Generator.StructDeclaration("s"),
                         "a", "b"),
-                    "a", g.IdentifierName("x")),
-<x>Structure s(Of a As x, b)
-End Structure</x>.Value)
+                    "a", Generator.IdentifierName("x")),
+"Structure s(Of a As x, b)
+End Structure")
 
-            ' interface delcarations
+            ' interface declarations
             VerifySyntax(Of InterfaceBlockSyntax)(
-                g.WithTypeConstraint(
-                    g.WithTypeParameters(
-                        g.InterfaceDeclaration("i"),
+                Generator.WithTypeConstraint(
+                    Generator.WithTypeParameters(
+                        Generator.InterfaceDeclaration("i"),
                         "a", "b"),
-                    "a", g.IdentifierName("x")),
-<x>Interface i(Of a As x, b)
-End Interface</x>.Value)
+                    "a", Generator.IdentifierName("x")),
+"Interface i(Of a As x, b)
+End Interface")
 
         End Sub
 
         <Fact>
         Public Sub TestAttributeDeclarations()
             VerifySyntax(Of AttributeListSyntax)(
-                g.Attribute(g.IdentifierName("a")),
+                Generator.Attribute(Generator.IdentifierName("a")),
                 "<a>")
 
             VerifySyntax(Of AttributeListSyntax)(
-                g.Attribute("a"),
+                Generator.Attribute("a"),
                 "<a>")
 
             VerifySyntax(Of AttributeListSyntax)(
-                g.Attribute("a.b"),
+                Generator.Attribute("a.b"),
                 "<a.b>")
 
             VerifySyntax(Of AttributeListSyntax)(
-                g.Attribute("a", {}),
+                Generator.Attribute("a", {}),
                 "<a()>")
 
             VerifySyntax(Of AttributeListSyntax)(
-                g.Attribute("a", {g.IdentifierName("x")}),
+                Generator.Attribute("a", {Generator.IdentifierName("x")}),
                 "<a(x)>")
 
             VerifySyntax(Of AttributeListSyntax)(
-                g.Attribute("a", {g.AttributeArgument(g.IdentifierName("x"))}),
+                Generator.Attribute("a", {Generator.AttributeArgument(Generator.IdentifierName("x"))}),
                 "<a(x)>")
 
             VerifySyntax(Of AttributeListSyntax)(
-                g.Attribute("a", {g.AttributeArgument("x", g.IdentifierName("y"))}),
+                Generator.Attribute("a", {Generator.AttributeArgument("x", Generator.IdentifierName("y"))}),
                 "<a(x:=y)>")
 
             VerifySyntax(Of AttributeListSyntax)(
-                g.Attribute("a", {g.IdentifierName("x"), g.IdentifierName("y")}),
+                Generator.Attribute("a", {Generator.IdentifierName("x"), Generator.IdentifierName("y")}),
                 "<a(x, y)>")
         End Sub
 
         <Fact>
         Public Sub TestAddAttributes()
             VerifySyntax(Of FieldDeclarationSyntax)(
-                g.AddAttributes(
-                    g.FieldDeclaration("y", g.IdentifierName("x")),
-                    g.Attribute("a")),
-<x>&lt;a&gt;
-Dim y As x</x>.Value)
+                Generator.AddAttributes(
+                    Generator.FieldDeclaration("y", Generator.IdentifierName("x")),
+                    Generator.Attribute("a")),
+"<a>
+Dim y As x")
 
             VerifySyntax(Of FieldDeclarationSyntax)(
-                g.AddAttributes(
-                    g.AddAttributes(
-                        g.FieldDeclaration("y", g.IdentifierName("x")),
-                        g.Attribute("a")),
-                    g.Attribute("b")),
-<x>&lt;a&gt;
-&lt;b&gt;
-Dim y As x</x>.Value)
+                Generator.AddAttributes(
+                    Generator.AddAttributes(
+                        Generator.FieldDeclaration("y", Generator.IdentifierName("x")),
+                        Generator.Attribute("a")),
+                    Generator.Attribute("b")),
+"<a>
+<b>
+Dim y As x")
 
             VerifySyntax(Of MethodStatementSyntax)(
-                g.AddAttributes(
-                    g.MethodDeclaration("m", returnType:=g.IdentifierName("t"), modifiers:=DeclarationModifiers.Abstract),
-                    g.Attribute("a")),
-<x>&lt;a&gt;
-MustInherit Function m() As t</x>.Value)
+                Generator.AddAttributes(
+                    Generator.MethodDeclaration("m", returnType:=Generator.IdentifierName("t"), modifiers:=DeclarationModifiers.Abstract),
+                    Generator.Attribute("a")),
+"<a>
+MustOverride Function m() As t")
 
             VerifySyntax(Of MethodStatementSyntax)(
-                g.AddReturnAttributes(
-                    g.MethodDeclaration("m", returnType:=g.IdentifierName("t"), modifiers:=DeclarationModifiers.Abstract),
-                    g.Attribute("a")),
-<x>MustInherit Function m() As &lt;a&gt; t</x>.Value)
+                Generator.AddReturnAttributes(
+                    Generator.MethodDeclaration("m", returnType:=Generator.IdentifierName("t"), modifiers:=DeclarationModifiers.Abstract),
+                    Generator.Attribute("a")),
+"MustOverride Function m() As <a> t")
 
             VerifySyntax(Of MethodBlockSyntax)(
-                g.AddAttributes(
-                    g.MethodDeclaration("m", returnType:=g.IdentifierName("t"), modifiers:=DeclarationModifiers.None),
-                    g.Attribute("a")),
-<x>&lt;a&gt;
+                Generator.AddAttributes(
+                    Generator.MethodDeclaration("m", returnType:=Generator.IdentifierName("t"), modifiers:=DeclarationModifiers.None),
+                    Generator.Attribute("a")),
+"<a>
 Function m() As t
-End Function</x>.Value)
+End Function")
 
             VerifySyntax(Of MethodBlockSyntax)(
-                g.AddReturnAttributes(
-                    g.MethodDeclaration("m", returnType:=g.IdentifierName("t"), modifiers:=DeclarationModifiers.None),
-                    g.Attribute("a")),
-<x>Function m() As &lt;a&gt; t
-End Function</x>.Value)
+                Generator.AddReturnAttributes(
+                    Generator.MethodDeclaration("m", returnType:=Generator.IdentifierName("t"), modifiers:=DeclarationModifiers.None),
+                    Generator.Attribute("a")),
+"Function m() As <a> t
+End Function")
 
             VerifySyntax(Of PropertyStatementSyntax)(
-                g.AddAttributes(
-                    g.PropertyDeclaration("p", g.IdentifierName("x"), modifiers:=DeclarationModifiers.Abstract),
-                    g.Attribute("a")),
-<x>&lt;a&gt;
-MustInherit Property p As x</x>.Value)
+                Generator.AddAttributes(
+                    Generator.PropertyDeclaration("p", Generator.IdentifierName("x"), modifiers:=DeclarationModifiers.Abstract),
+                    Generator.Attribute("a")),
+"<a>
+MustOverride Property p As x")
 
             VerifySyntax(Of PropertyBlockSyntax)(
-                g.AddAttributes(
-                    g.PropertyDeclaration("p", g.IdentifierName("x")),
-                    g.Attribute("a")),
-<x>&lt;a&gt;
+                Generator.AddAttributes(
+                    Generator.PropertyDeclaration("p", Generator.IdentifierName("x")),
+                    Generator.Attribute("a")),
+"<a>
 Property p As x
     Get
     End Get
 
     Set(value As x)
     End Set
-End Property</x>.Value)
+End Property")
 
             VerifySyntax(Of PropertyStatementSyntax)(
-                g.AddAttributes(
-                    g.IndexerDeclaration({g.ParameterDeclaration("z", g.IdentifierName("y"))}, g.IdentifierName("x"), modifiers:=DeclarationModifiers.Abstract),
-                    g.Attribute("a")),
-<x>&lt;a&gt;
-Default MustInherit Property Item(z As y) As x</x>.Value)
+                Generator.AddAttributes(
+                    Generator.IndexerDeclaration({Generator.ParameterDeclaration("z", Generator.IdentifierName("y"))}, Generator.IdentifierName("x"), modifiers:=DeclarationModifiers.Abstract),
+                    Generator.Attribute("a")),
+"<a>
+Default MustOverride Property Item(z As y) As x")
 
             VerifySyntax(Of PropertyBlockSyntax)(
-                g.AddAttributes(
-                    g.IndexerDeclaration({g.ParameterDeclaration("z", g.IdentifierName("y"))}, g.IdentifierName("x")),
-                    g.Attribute("a")),
-<x>&lt;a&gt;
+                Generator.AddAttributes(
+                    Generator.IndexerDeclaration({Generator.ParameterDeclaration("z", Generator.IdentifierName("y"))}, Generator.IdentifierName("x")),
+                    Generator.Attribute("a")),
+"<a>
 Default Property Item(z As y) As x
     Get
     End Get
 
     Set(value As x)
     End Set
-End Property</x>.Value)
+End Property")
 
             VerifySyntax(Of ClassBlockSyntax)(
-                g.AddAttributes(
-                    g.ClassDeclaration("c"),
-                    g.Attribute("a")),
-<x>&lt;a&gt;
+                Generator.AddAttributes(
+                    Generator.ClassDeclaration("c"),
+                    Generator.Attribute("a")),
+"<a>
 Class c
-End Class</x>.Value)
+End Class")
 
             VerifySyntax(Of ParameterSyntax)(
-                g.AddAttributes(
-                    g.ParameterDeclaration("p", g.IdentifierName("t")),
-                    g.Attribute("a")),
-<x>&lt;a&gt; p As t</x>.Value)
+                Generator.AddAttributes(
+                    Generator.ParameterDeclaration("p", Generator.IdentifierName("t")),
+                    Generator.Attribute("a")),
+"<a> p As t")
 
             VerifySyntax(Of CompilationUnitSyntax)(
-                g.AddAttributes(
-                    g.CompilationUnit(g.NamespaceDeclaration("n")),
-                    g.Attribute("a")),
-<x>&lt;Assembly:a&gt;
+                Generator.AddAttributes(
+                    Generator.CompilationUnit(Generator.NamespaceDeclaration("n")),
+                    Generator.Attribute("a")),
+"<Assembly:a>
 Namespace n
 End Namespace
-</x>.Value)
+")
 
             VerifySyntax(Of DelegateStatementSyntax)(
-                g.AddAttributes(
-                    g.DelegateDeclaration("d"),
-                    g.Attribute("a")),
-<x>&lt;a&gt;
-Delegate Sub d()</x>.Value)
+                Generator.AddAttributes(
+                    Generator.DelegateDeclaration("d"),
+                    Generator.Attribute("a")),
+"<a>
+Delegate Sub d()")
 
+        End Sub
+
+        <Fact>
+        <WorkItem(5066, "https://github.com/dotnet/roslyn/issues/5066")>
+        Public Sub TestAddAttributesOnAccessors()
+            Dim prop = Generator.PropertyDeclaration("P", Generator.IdentifierName("T"))
+
+            Dim evnt = DirectCast(SyntaxFactory.ParseCompilationUnit("
+Class C
+  Custom Event MyEvent As MyDelegate
+      AddHandler(ByVal value As MyDelegate)
+      End AddHandler
+
+      RemoveHandler(ByVal value As MyDelegate)
+      End RemoveHandler
+
+      RaiseEvent(ByVal message As String)
+      End RaiseEvent
+  End Event
+End Class
+").Members(0), ClassBlockSyntax).Members(0)
+
+            CheckAddRemoveAttribute(Generator.GetAccessor(prop, DeclarationKind.GetAccessor))
+            CheckAddRemoveAttribute(Generator.GetAccessor(prop, DeclarationKind.SetAccessor))
+            CheckAddRemoveAttribute(Generator.GetAccessor(evnt, DeclarationKind.AddAccessor))
+            CheckAddRemoveAttribute(Generator.GetAccessor(evnt, DeclarationKind.RemoveAccessor))
+            CheckAddRemoveAttribute(Generator.GetAccessor(evnt, DeclarationKind.RaiseAccessor))
+        End Sub
+
+        Private Sub CheckAddRemoveAttribute(declaration As SyntaxNode)
+            Dim initialAttributes = Generator.GetAttributes(declaration)
+            Assert.Equal(0, initialAttributes.Count)
+
+            Dim withAttribute = Generator.AddAttributes(declaration, Generator.Attribute("a"))
+            Dim attrsAdded = Generator.GetAttributes(withAttribute)
+            Assert.Equal(1, attrsAdded.Count)
+
+            Dim withoutAttribute = Generator.RemoveNode(withAttribute, attrsAdded(0))
+            Dim attrsRemoved = Generator.GetAttributes(withoutAttribute)
+            Assert.Equal(0, attrsRemoved.Count)
         End Sub
 
         <Fact>
         Public Sub TestAddRemoveAttributesPreservesTrivia()
             Dim cls = ParseCompilationUnit(
-<x>' comment
+"' comment
 Class C
-End Class ' end</x>.Value).Members(0)
+End Class ' end").Members(0)
 
-            Dim added = g.AddAttributes(cls, g.Attribute("a"))
+            Dim added = Generator.AddAttributes(cls, Generator.Attribute("a"))
             VerifySyntax(Of ClassBlockSyntax)(
                 added,
-<x>' comment
-&lt;a&gt;
+"' comment
+<a>
 Class C
-End Class ' end</x>.Value)
+End Class ' end")
 
-            Dim removed = g.RemoveAllAttributes(added)
+            Dim removed = Generator.RemoveAllAttributes(added)
             VerifySyntax(Of ClassBlockSyntax)(
                 removed,
-<x>' comment
+"' comment
 Class C
-End Class ' end</x>.Value)
+End Class ' end")
 
-            Dim attrWithComment = g.GetAttributes(added).First()
+            Dim attrWithComment = Generator.GetAttributes(added).First()
             VerifySyntax(Of AttributeListSyntax)(
                 attrWithComment,
-<x>' comment
-&lt;a&gt;
-</x>.Value)
+"' comment
+<a>")
 
-            ' added attributes are stripped of trivia
-            Dim added2 = g.AddAttributes(cls, attrWithComment)
-            VerifySyntax(Of ClassBlockSyntax)(
-                added2,
-<x>' comment
-&lt;a&gt;
-Class C
-End Class ' end</x>.Value)
+        End Sub
 
+        <Fact>
+        Public Sub TestInterfaceDeclarationWithEventSymbol()
+            VerifySyntax(Of InterfaceBlockSyntax)(
+                Generator.Declaration(_emptyCompilation.GetTypeByMetadataName("System.ComponentModel.INotifyPropertyChanged")),
+"Public Interface INotifyPropertyChanged
+
+    Event PropertyChanged As Global.System.ComponentModel.PropertyChangedEventHandler
+
+End Interface")
+        End Sub
+
+        <Fact>
+        Public Sub TestEnumDeclarationFromSymbol()
+            VerifySyntax(Of EnumBlockSyntax)(Generator.Declaration(_emptyCompilation.GetTypeByMetadataName("System.DateTimeKind")),
+"Public Enum DateTimeKind
+    Unspecified = 0
+    Utc = 1
+    Local = 2
+End Enum")
+        End Sub
+
+        <Fact>
+        Public Sub TestEnumWithUnderlyingTypeFromSymbol()
+            VerifySyntax(Of EnumBlockSyntax)(Generator.Declaration(_emptyCompilation.GetTypeByMetadataName("System.Security.SecurityRuleSet")),
+"Public Enum SecurityRuleSet As Byte
+    None = CByte(0)
+    Level1 = CByte(1)
+    Level2 = CByte(2)
+End Enum")
+        End Sub
+#End Region
+
+#Region "Add/Insert/Remove/Get/Set members & elements"
+
+        <Fact>
+        Public Sub TestRemoveNodeInTrivia()
+            Dim code = "
+'''<summary> ... </summary>
+Public Class C
+End Class
+"
+            Dim cu = SyntaxFactory.ParseCompilationUnit(code)
+            Dim cls = cu.Members(0)
+            Dim summary = cls.DescendantNodes(descendIntoTrivia:=True).OfType(Of XmlElementSyntax)().First()
+            Dim newCu = Generator.RemoveNode(cu, summary)
+            VerifySyntaxRaw(Of CompilationUnitSyntax)(
+                newCu,
+                "
+
+Public Class C
+End Class
+")
+        End Sub
+
+        <Fact>
+        Public Sub TestReplaceNodeInTrivia()
+            Dim code = "
+'''<summary> ... </summary>
+Public Class C
+End Class
+"
+            Dim cu = SyntaxFactory.ParseCompilationUnit(code)
+            Dim cls = cu.Members(0)
+            Dim summary = cls.DescendantNodes(descendIntoTrivia:=True).OfType(Of XmlElementSyntax)().First()
+            Dim summary2 = summary.WithContent(Nothing)
+            Dim newCu = Generator.ReplaceNode(cu, summary, summary2)
+            VerifySyntaxRaw(Of CompilationUnitSyntax)(
+                newCu,
+                "
+'''<summary></summary>
+Public Class C
+End Class
+")
+        End Sub
+
+        <Fact>
+        Public Sub TestInsertNodeAfterInTrivia()
+            Dim code = "
+'''<summary> ... </summary>
+Public Class C
+End Class
+"
+            Dim cu = SyntaxFactory.ParseCompilationUnit(code)
+            Dim cls = cu.Members(0)
+            Dim text = cls.DescendantNodes(descendIntoTrivia:=True).OfType(Of XmlTextSyntax)().First()
+            Dim newCu = Generator.InsertNodesAfter(cu, text, {text})
+            VerifySyntaxRaw(Of CompilationUnitSyntax)(
+                newCu,
+                "
+'''<summary> ...  ... </summary>
+Public Class C
+End Class
+")
+        End Sub
+
+        <Fact>
+        Public Sub TestInsertNodeBeforeInTrivia()
+            Dim code = "
+'''<summary> ... </summary>
+Public Class C
+End Class
+"
+            Dim cu = SyntaxFactory.ParseCompilationUnit(code)
+            Dim cls = cu.Members(0)
+            Dim text = cls.DescendantNodes(descendIntoTrivia:=True).OfType(Of XmlTextSyntax)().First()
+            Dim newCu = Generator.InsertNodesBefore(cu, text, {text})
+            VerifySyntaxRaw(Of CompilationUnitSyntax)(
+                newCu,
+                "
+'''<summary> ...  ... </summary>
+Public Class C
+End Class
+")
         End Sub
 
         <Fact>
         Public Sub TestDeclarationKind()
-            Assert.Equal(DeclarationKind.CompilationUnit, g.GetDeclarationKind(g.CompilationUnit()))
-            Assert.Equal(DeclarationKind.Class, g.GetDeclarationKind(g.ClassDeclaration("c")))
-            Assert.Equal(DeclarationKind.Struct, g.GetDeclarationKind(g.StructDeclaration("s")))
-            Assert.Equal(DeclarationKind.Interface, g.GetDeclarationKind(g.InterfaceDeclaration("i")))
-            Assert.Equal(DeclarationKind.Enum, g.GetDeclarationKind(g.EnumDeclaration("e")))
-            Assert.Equal(DeclarationKind.Delegate, g.GetDeclarationKind(g.DelegateDeclaration("d")))
-            Assert.Equal(DeclarationKind.Method, g.GetDeclarationKind(g.MethodDeclaration("m")))
-            Assert.Equal(DeclarationKind.Method, g.GetDeclarationKind(g.MethodDeclaration("m", modifiers:=DeclarationModifiers.Abstract)))
-            Assert.Equal(DeclarationKind.Constructor, g.GetDeclarationKind(g.ConstructorDeclaration()))
-            Assert.Equal(DeclarationKind.Parameter, g.GetDeclarationKind(g.ParameterDeclaration("p")))
-            Assert.Equal(DeclarationKind.Property, g.GetDeclarationKind(g.PropertyDeclaration("p", g.IdentifierName("t"))))
-            Assert.Equal(DeclarationKind.Property, g.GetDeclarationKind(g.PropertyDeclaration("p", g.IdentifierName("t"), modifiers:=DeclarationModifiers.Abstract)))
-            Assert.Equal(DeclarationKind.Indexer, g.GetDeclarationKind(g.IndexerDeclaration({g.ParameterDeclaration("i")}, g.IdentifierName("t"))))
-            Assert.Equal(DeclarationKind.Indexer, g.GetDeclarationKind(g.IndexerDeclaration({g.ParameterDeclaration("i")}, g.IdentifierName("t"), modifiers:=DeclarationModifiers.Abstract)))
-            Assert.Equal(DeclarationKind.Field, g.GetDeclarationKind(g.FieldDeclaration("f", g.IdentifierName("t"))))
-            Assert.Equal(DeclarationKind.EnumMember, g.GetDeclarationKind(g.EnumMember("v")))
-            Assert.Equal(DeclarationKind.Event, g.GetDeclarationKind(g.EventDeclaration("e", g.IdentifierName("t"))))
-            Assert.Equal(DeclarationKind.CustomEvent, g.GetDeclarationKind(g.CustomEventDeclaration("ce", g.IdentifierName("t"))))
-            Assert.Equal(DeclarationKind.Namespace, g.GetDeclarationKind(g.NamespaceDeclaration("n")))
-            Assert.Equal(DeclarationKind.NamespaceImport, g.GetDeclarationKind(g.NamespaceImportDeclaration("u")))
-            Assert.Equal(DeclarationKind.Variable, g.GetDeclarationKind(g.LocalDeclarationStatement(g.IdentifierName("t"), "loc")))
-            Assert.Equal(DeclarationKind.Attribute, g.GetDeclarationKind(g.Attribute("a")))
+            Assert.Equal(DeclarationKind.CompilationUnit, Generator.GetDeclarationKind(Generator.CompilationUnit()))
+            Assert.Equal(DeclarationKind.Class, Generator.GetDeclarationKind(Generator.ClassDeclaration("c")))
+            Assert.Equal(DeclarationKind.Struct, Generator.GetDeclarationKind(Generator.StructDeclaration("s")))
+            Assert.Equal(DeclarationKind.Interface, Generator.GetDeclarationKind(Generator.InterfaceDeclaration("i")))
+            Assert.Equal(DeclarationKind.Enum, Generator.GetDeclarationKind(Generator.EnumDeclaration("e")))
+            Assert.Equal(DeclarationKind.Delegate, Generator.GetDeclarationKind(Generator.DelegateDeclaration("d")))
+            Assert.Equal(DeclarationKind.Method, Generator.GetDeclarationKind(Generator.MethodDeclaration("m")))
+            Assert.Equal(DeclarationKind.Method, Generator.GetDeclarationKind(Generator.MethodDeclaration("m", modifiers:=DeclarationModifiers.Abstract)))
+            Assert.Equal(DeclarationKind.Constructor, Generator.GetDeclarationKind(Generator.ConstructorDeclaration()))
+            Assert.Equal(DeclarationKind.Parameter, Generator.GetDeclarationKind(Generator.ParameterDeclaration("p")))
+            Assert.Equal(DeclarationKind.Property, Generator.GetDeclarationKind(Generator.PropertyDeclaration("p", Generator.IdentifierName("t"))))
+            Assert.Equal(DeclarationKind.Property, Generator.GetDeclarationKind(Generator.PropertyDeclaration("p", Generator.IdentifierName("t"), modifiers:=DeclarationModifiers.Abstract)))
+            Assert.Equal(DeclarationKind.Indexer, Generator.GetDeclarationKind(Generator.IndexerDeclaration({Generator.ParameterDeclaration("i")}, Generator.IdentifierName("t"))))
+            Assert.Equal(DeclarationKind.Indexer, Generator.GetDeclarationKind(Generator.IndexerDeclaration({Generator.ParameterDeclaration("i")}, Generator.IdentifierName("t"), modifiers:=DeclarationModifiers.Abstract)))
+            Assert.Equal(DeclarationKind.Field, Generator.GetDeclarationKind(Generator.FieldDeclaration("f", Generator.IdentifierName("t"))))
+            Assert.Equal(DeclarationKind.EnumMember, Generator.GetDeclarationKind(Generator.EnumMember("v")))
+            Assert.Equal(DeclarationKind.Event, Generator.GetDeclarationKind(Generator.EventDeclaration("e", Generator.IdentifierName("t"))))
+            Assert.Equal(DeclarationKind.CustomEvent, Generator.GetDeclarationKind(Generator.CustomEventDeclaration("ce", Generator.IdentifierName("t"))))
+            Assert.Equal(DeclarationKind.Namespace, Generator.GetDeclarationKind(Generator.NamespaceDeclaration("n")))
+            Assert.Equal(DeclarationKind.NamespaceImport, Generator.GetDeclarationKind(Generator.NamespaceImportDeclaration("u")))
+            Assert.Equal(DeclarationKind.Variable, Generator.GetDeclarationKind(Generator.LocalDeclarationStatement(Generator.IdentifierName("t"), "loc")))
+            Assert.Equal(DeclarationKind.Attribute, Generator.GetDeclarationKind(Generator.Attribute("a")))
         End Sub
 
         <Fact>
         Public Sub TestGetName()
-            Assert.Equal("c", g.GetName(g.ClassDeclaration("c")))
-            Assert.Equal("s", g.GetName(g.StructDeclaration("s")))
-            Assert.Equal("i", g.GetName(g.EnumDeclaration("i")))
-            Assert.Equal("e", g.GetName(g.EnumDeclaration("e")))
-            Assert.Equal("d", g.GetName(g.DelegateDeclaration("d")))
-            Assert.Equal("m", g.GetName(g.MethodDeclaration("m")))
-            Assert.Equal("m", g.GetName(g.MethodDeclaration("m", modifiers:=DeclarationModifiers.Abstract)))
-            Assert.Equal("", g.GetName(g.ConstructorDeclaration()))
-            Assert.Equal("p", g.GetName(g.ParameterDeclaration("p")))
-            Assert.Equal("p", g.GetName(g.PropertyDeclaration("p", g.IdentifierName("t"), modifiers:=DeclarationModifiers.Abstract)))
-            Assert.Equal("p", g.GetName(g.PropertyDeclaration("p", g.IdentifierName("t"))))
-            Assert.Equal("", g.GetName(g.IndexerDeclaration({g.ParameterDeclaration("i")}, g.IdentifierName("t"))))
-            Assert.Equal("", g.GetName(g.IndexerDeclaration({g.ParameterDeclaration("i")}, g.IdentifierName("t"), modifiers:=DeclarationModifiers.Abstract)))
-            Assert.Equal("f", g.GetName(g.FieldDeclaration("f", g.IdentifierName("t"))))
-            Assert.Equal("v", g.GetName(g.EnumMember("v")))
-            Assert.Equal("ef", g.GetName(g.EventDeclaration("ef", g.IdentifierName("t"))))
-            Assert.Equal("ep", g.GetName(g.CustomEventDeclaration("ep", g.IdentifierName("t"))))
-            Assert.Equal("n", g.GetName(g.NamespaceDeclaration("n")))
-            Assert.Equal("u", g.GetName(g.NamespaceImportDeclaration("u")))
-            Assert.Equal("loc", g.GetName(g.LocalDeclarationStatement(g.IdentifierName("t"), "loc")))
-            Assert.Equal("a", g.GetName(g.Attribute("a")))
+            Assert.Equal("c", Generator.GetName(Generator.ClassDeclaration("c")))
+            Assert.Equal("s", Generator.GetName(Generator.StructDeclaration("s")))
+            Assert.Equal("i", Generator.GetName(Generator.EnumDeclaration("i")))
+            Assert.Equal("e", Generator.GetName(Generator.EnumDeclaration("e")))
+            Assert.Equal("d", Generator.GetName(Generator.DelegateDeclaration("d")))
+            Assert.Equal("m", Generator.GetName(Generator.MethodDeclaration("m")))
+            Assert.Equal("m", Generator.GetName(Generator.MethodDeclaration("m", modifiers:=DeclarationModifiers.Abstract)))
+            Assert.Equal("", Generator.GetName(Generator.ConstructorDeclaration()))
+            Assert.Equal("p", Generator.GetName(Generator.ParameterDeclaration("p")))
+            Assert.Equal("p", Generator.GetName(Generator.PropertyDeclaration("p", Generator.IdentifierName("t"), modifiers:=DeclarationModifiers.Abstract)))
+            Assert.Equal("p", Generator.GetName(Generator.PropertyDeclaration("p", Generator.IdentifierName("t"))))
+            Assert.Equal("Item", Generator.GetName(Generator.IndexerDeclaration({Generator.ParameterDeclaration("i")}, Generator.IdentifierName("t"))))
+            Assert.Equal("Item", Generator.GetName(Generator.IndexerDeclaration({Generator.ParameterDeclaration("i")}, Generator.IdentifierName("t"), modifiers:=DeclarationModifiers.Abstract)))
+            Assert.Equal("f", Generator.GetName(Generator.FieldDeclaration("f", Generator.IdentifierName("t"))))
+            Assert.Equal("v", Generator.GetName(Generator.EnumMember("v")))
+            Assert.Equal("ef", Generator.GetName(Generator.EventDeclaration("ef", Generator.IdentifierName("t"))))
+            Assert.Equal("ep", Generator.GetName(Generator.CustomEventDeclaration("ep", Generator.IdentifierName("t"))))
+            Assert.Equal("n", Generator.GetName(Generator.NamespaceDeclaration("n")))
+            Assert.Equal("u", Generator.GetName(Generator.NamespaceImportDeclaration("u")))
+            Assert.Equal("loc", Generator.GetName(Generator.LocalDeclarationStatement(Generator.IdentifierName("t"), "loc")))
+            Assert.Equal("a", Generator.GetName(Generator.Attribute("a")))
         End Sub
 
         <Fact>
         Public Sub TestWithName()
-            Assert.Equal("c", g.GetName(g.WithName(g.ClassDeclaration("x"), "c")))
-            Assert.Equal("s", g.GetName(g.WithName(g.StructDeclaration("x"), "s")))
-            Assert.Equal("i", g.GetName(g.WithName(g.EnumDeclaration("x"), "i")))
-            Assert.Equal("e", g.GetName(g.WithName(g.EnumDeclaration("x"), "e")))
-            Assert.Equal("d", g.GetName(g.WithName(g.DelegateDeclaration("x"), "d")))
-            Assert.Equal("m", g.GetName(g.WithName(g.MethodDeclaration("x"), "m")))
-            Assert.Equal("m", g.GetName(g.WithName(g.MethodDeclaration("x", modifiers:=DeclarationModifiers.Abstract), "m")))
-            Assert.Equal("", g.GetName(g.WithName(g.ConstructorDeclaration(), ".ctor")))
-            Assert.Equal("p", g.GetName(g.WithName(g.ParameterDeclaration("x"), "p")))
-            Assert.Equal("p", g.GetName(g.WithName(g.PropertyDeclaration("x", g.IdentifierName("t")), "p")))
-            Assert.Equal("p", g.GetName(g.WithName(g.PropertyDeclaration("x", g.IdentifierName("t"), modifiers:=DeclarationModifiers.Abstract), "p")))
-            Assert.Equal("", g.GetName(g.WithName(g.IndexerDeclaration({g.ParameterDeclaration("i")}, g.IdentifierName("t")), "this")))
-            Assert.Equal("", g.GetName(g.WithName(g.IndexerDeclaration({g.ParameterDeclaration("i")}, g.IdentifierName("t"), modifiers:=DeclarationModifiers.Abstract), "this")))
-            Assert.Equal("f", g.GetName(g.WithName(g.FieldDeclaration("x", g.IdentifierName("t")), "f")))
-            Assert.Equal("v", g.GetName(g.WithName(g.EnumMember("x"), "v")))
-            Assert.Equal("ef", g.GetName(g.WithName(g.EventDeclaration("x", g.IdentifierName("t")), "ef")))
-            Assert.Equal("ep", g.GetName(g.WithName(g.CustomEventDeclaration("x", g.IdentifierName("t")), "ep")))
-            Assert.Equal("n", g.GetName(g.WithName(g.NamespaceDeclaration("x"), "n")))
-            Assert.Equal("u", g.GetName(g.WithName(g.NamespaceImportDeclaration("x"), "u")))
-            Assert.Equal("loc", g.GetName(g.WithName(g.LocalDeclarationStatement(g.IdentifierName("t"), "x"), "loc")))
-            Assert.Equal("a", g.GetName(g.WithName(g.Attribute("x"), "a")))
+            Assert.Equal("c", Generator.GetName(Generator.WithName(Generator.ClassDeclaration("x"), "c")))
+            Assert.Equal("s", Generator.GetName(Generator.WithName(Generator.StructDeclaration("x"), "s")))
+            Assert.Equal("i", Generator.GetName(Generator.WithName(Generator.EnumDeclaration("x"), "i")))
+            Assert.Equal("e", Generator.GetName(Generator.WithName(Generator.EnumDeclaration("x"), "e")))
+            Assert.Equal("d", Generator.GetName(Generator.WithName(Generator.DelegateDeclaration("x"), "d")))
+            Assert.Equal("m", Generator.GetName(Generator.WithName(Generator.MethodDeclaration("x"), "m")))
+            Assert.Equal("m", Generator.GetName(Generator.WithName(Generator.MethodDeclaration("x", modifiers:=DeclarationModifiers.Abstract), "m")))
+            Assert.Equal("", Generator.GetName(Generator.WithName(Generator.ConstructorDeclaration(), ".ctor")))
+            Assert.Equal("p", Generator.GetName(Generator.WithName(Generator.ParameterDeclaration("x"), "p")))
+            Assert.Equal("p", Generator.GetName(Generator.WithName(Generator.PropertyDeclaration("x", Generator.IdentifierName("t")), "p")))
+            Assert.Equal("p", Generator.GetName(Generator.WithName(Generator.PropertyDeclaration("x", Generator.IdentifierName("t"), modifiers:=DeclarationModifiers.Abstract), "p")))
+            Assert.Equal("X", Generator.GetName(Generator.WithName(Generator.IndexerDeclaration({Generator.ParameterDeclaration("i")}, Generator.IdentifierName("t")), "X")))
+            Assert.Equal("X", Generator.GetName(Generator.WithName(Generator.IndexerDeclaration({Generator.ParameterDeclaration("i")}, Generator.IdentifierName("t"), modifiers:=DeclarationModifiers.Abstract), "X")))
+            Assert.Equal("f", Generator.GetName(Generator.WithName(Generator.FieldDeclaration("x", Generator.IdentifierName("t")), "f")))
+            Assert.Equal("v", Generator.GetName(Generator.WithName(Generator.EnumMember("x"), "v")))
+            Assert.Equal("ef", Generator.GetName(Generator.WithName(Generator.EventDeclaration("x", Generator.IdentifierName("t")), "ef")))
+            Assert.Equal("ep", Generator.GetName(Generator.WithName(Generator.CustomEventDeclaration("x", Generator.IdentifierName("t")), "ep")))
+            Assert.Equal("n", Generator.GetName(Generator.WithName(Generator.NamespaceDeclaration("x"), "n")))
+            Assert.Equal("u", Generator.GetName(Generator.WithName(Generator.NamespaceImportDeclaration("x"), "u")))
+            Assert.Equal("loc", Generator.GetName(Generator.WithName(Generator.LocalDeclarationStatement(Generator.IdentifierName("t"), "x"), "loc")))
+            Assert.Equal("a", Generator.GetName(Generator.WithName(Generator.Attribute("x"), "a")))
         End Sub
 
         <Fact>
         Public Sub TestGetAccessibility()
-            Assert.Equal(Accessibility.Internal, g.GetAccessibility(g.ClassDeclaration("c", accessibility:=Accessibility.Internal)))
-            Assert.Equal(Accessibility.Internal, g.GetAccessibility(g.StructDeclaration("s", accessibility:=Accessibility.Internal)))
-            Assert.Equal(Accessibility.Internal, g.GetAccessibility(g.EnumDeclaration("i", accessibility:=Accessibility.Internal)))
-            Assert.Equal(Accessibility.Internal, g.GetAccessibility(g.EnumDeclaration("e", accessibility:=Accessibility.Internal)))
-            Assert.Equal(Accessibility.Internal, g.GetAccessibility(g.DelegateDeclaration("d", accessibility:=Accessibility.Internal)))
-            Assert.Equal(Accessibility.Internal, g.GetAccessibility(g.MethodDeclaration("m", accessibility:=Accessibility.Internal)))
-            Assert.Equal(Accessibility.Internal, g.GetAccessibility(g.ConstructorDeclaration(accessibility:=Accessibility.Internal)))
-            Assert.Equal(Accessibility.NotApplicable, g.GetAccessibility(g.ParameterDeclaration("p")))
-            Assert.Equal(Accessibility.Internal, g.GetAccessibility(g.PropertyDeclaration("p", g.IdentifierName("t"), accessibility:=Accessibility.Internal)))
-            Assert.Equal(Accessibility.Internal, g.GetAccessibility(g.IndexerDeclaration({g.ParameterDeclaration("i")}, g.IdentifierName("t"), accessibility:=Accessibility.Internal)))
-            Assert.Equal(Accessibility.Internal, g.GetAccessibility(g.FieldDeclaration("f", g.IdentifierName("t"), accessibility:=Accessibility.Internal)))
-            Assert.Equal(Accessibility.NotApplicable, g.GetAccessibility(g.EnumMember("v")))
-            Assert.Equal(Accessibility.Internal, g.GetAccessibility(g.EventDeclaration("ef", g.IdentifierName("t"), accessibility:=Accessibility.Internal)))
-            Assert.Equal(Accessibility.Internal, g.GetAccessibility(g.CustomEventDeclaration("ep", g.IdentifierName("t"), accessibility:=Accessibility.Internal)))
-            Assert.Equal(Accessibility.NotApplicable, g.GetAccessibility(g.NamespaceDeclaration("n")))
-            Assert.Equal(Accessibility.NotApplicable, g.GetAccessibility(g.NamespaceImportDeclaration("u")))
-            Assert.Equal(Accessibility.NotApplicable, g.GetAccessibility(g.LocalDeclarationStatement(g.IdentifierName("t"), "loc")))
-            Assert.Equal(Accessibility.NotApplicable, g.GetAccessibility(g.Attribute("a")))
-            Assert.Equal(Accessibility.NotApplicable, g.GetAccessibility(SyntaxFactory.TypeParameter("tp")))
+            Assert.Equal(Accessibility.Internal, Generator.GetAccessibility(Generator.ClassDeclaration("c", accessibility:=Accessibility.Internal)))
+            Assert.Equal(Accessibility.Internal, Generator.GetAccessibility(Generator.StructDeclaration("s", accessibility:=Accessibility.Internal)))
+            Assert.Equal(Accessibility.Internal, Generator.GetAccessibility(Generator.InterfaceDeclaration("i", accessibility:=Accessibility.Internal)))
+            Assert.Equal(Accessibility.Internal, Generator.GetAccessibility(Generator.EnumDeclaration("e", accessibility:=Accessibility.Internal)))
+            Assert.Equal(Accessibility.Internal, Generator.GetAccessibility(Generator.DelegateDeclaration("d", accessibility:=Accessibility.Internal)))
+            Assert.Equal(Accessibility.Internal, Generator.GetAccessibility(Generator.MethodDeclaration("m", accessibility:=Accessibility.Internal)))
+            Assert.Equal(Accessibility.Internal, Generator.GetAccessibility(Generator.ConstructorDeclaration(accessibility:=Accessibility.Internal)))
+            Assert.Equal(Accessibility.NotApplicable, Generator.GetAccessibility(Generator.ParameterDeclaration("p")))
+            Assert.Equal(Accessibility.Internal, Generator.GetAccessibility(Generator.PropertyDeclaration("p", Generator.IdentifierName("t"), accessibility:=Accessibility.Internal)))
+            Assert.Equal(Accessibility.Internal, Generator.GetAccessibility(Generator.IndexerDeclaration({Generator.ParameterDeclaration("i")}, Generator.IdentifierName("t"), accessibility:=Accessibility.Internal)))
+            Assert.Equal(Accessibility.Internal, Generator.GetAccessibility(Generator.FieldDeclaration("f", Generator.IdentifierName("t"), accessibility:=Accessibility.Internal)))
+            Assert.Equal(Accessibility.NotApplicable, Generator.GetAccessibility(Generator.EnumMember("v")))
+            Assert.Equal(Accessibility.Internal, Generator.GetAccessibility(Generator.EventDeclaration("ef", Generator.IdentifierName("t"), accessibility:=Accessibility.Internal)))
+            Assert.Equal(Accessibility.Internal, Generator.GetAccessibility(Generator.CustomEventDeclaration("ep", Generator.IdentifierName("t"), accessibility:=Accessibility.Internal)))
+            Assert.Equal(Accessibility.NotApplicable, Generator.GetAccessibility(Generator.NamespaceDeclaration("n")))
+            Assert.Equal(Accessibility.NotApplicable, Generator.GetAccessibility(Generator.NamespaceImportDeclaration("u")))
+            Assert.Equal(Accessibility.NotApplicable, Generator.GetAccessibility(Generator.LocalDeclarationStatement(Generator.IdentifierName("t"), "loc")))
+            Assert.Equal(Accessibility.NotApplicable, Generator.GetAccessibility(Generator.Attribute("a")))
+            Assert.Equal(Accessibility.NotApplicable, Generator.GetAccessibility(SyntaxFactory.TypeParameter("tp")))
+
+            Dim m = SyntaxFactory.ModuleBlock(
+                SyntaxFactory.ModuleStatement("module2").
+                              WithModifiers(SyntaxFactory.TokenList(SyntaxFactory.Token(SyntaxKind.PublicKeyword))))
+            Assert.Equal(Accessibility.Public, Generator.GetAccessibility(m))
         End Sub
 
         <Fact>
         Public Sub TestWithAccessibility()
-            Assert.Equal(Accessibility.Private, g.GetAccessibility(g.WithAccessibility(g.ClassDeclaration("c", accessibility:=Accessibility.Internal), Accessibility.Private)))
-            Assert.Equal(Accessibility.Private, g.GetAccessibility(g.WithAccessibility(g.StructDeclaration("s", accessibility:=Accessibility.Internal), Accessibility.Private)))
-            Assert.Equal(Accessibility.Private, g.GetAccessibility(g.WithAccessibility(g.EnumDeclaration("i", accessibility:=Accessibility.Internal), Accessibility.Private)))
-            Assert.Equal(Accessibility.Private, g.GetAccessibility(g.WithAccessibility(g.EnumDeclaration("e", accessibility:=Accessibility.Internal), Accessibility.Private)))
-            Assert.Equal(Accessibility.Private, g.GetAccessibility(g.WithAccessibility(g.DelegateDeclaration("d", accessibility:=Accessibility.Internal), Accessibility.Private)))
-            Assert.Equal(Accessibility.Private, g.GetAccessibility(g.WithAccessibility(g.MethodDeclaration("m", accessibility:=Accessibility.Internal), Accessibility.Private)))
-            Assert.Equal(Accessibility.Private, g.GetAccessibility(g.WithAccessibility(g.ConstructorDeclaration(accessibility:=Accessibility.Internal), Accessibility.Private)))
-            Assert.Equal(Accessibility.NotApplicable, g.GetAccessibility(g.WithAccessibility(g.ParameterDeclaration("p"), Accessibility.Private)))
-            Assert.Equal(Accessibility.Private, g.GetAccessibility(g.WithAccessibility(g.PropertyDeclaration("p", g.IdentifierName("t"), accessibility:=Accessibility.Internal), Accessibility.Private)))
-            Assert.Equal(Accessibility.Private, g.GetAccessibility(g.WithAccessibility(g.IndexerDeclaration({g.ParameterDeclaration("i")}, g.IdentifierName("t"), accessibility:=Accessibility.Internal), Accessibility.Private)))
-            Assert.Equal(Accessibility.Private, g.GetAccessibility(g.WithAccessibility(g.FieldDeclaration("f", g.IdentifierName("t"), accessibility:=Accessibility.Internal), Accessibility.Private)))
-            Assert.Equal(Accessibility.NotApplicable, g.GetAccessibility(g.WithAccessibility(g.EnumMember("v"), Accessibility.Private)))
-            Assert.Equal(Accessibility.Private, g.GetAccessibility(g.WithAccessibility(g.EventDeclaration("ef", g.IdentifierName("t"), accessibility:=Accessibility.Internal), Accessibility.Private)))
-            Assert.Equal(Accessibility.Private, g.GetAccessibility(g.WithAccessibility(g.CustomEventDeclaration("ep", g.IdentifierName("t"), accessibility:=Accessibility.Internal), Accessibility.Private)))
-            Assert.Equal(Accessibility.NotApplicable, g.GetAccessibility(g.WithAccessibility(g.NamespaceDeclaration("n"), Accessibility.Private)))
-            Assert.Equal(Accessibility.NotApplicable, g.GetAccessibility(g.WithAccessibility(g.NamespaceImportDeclaration("u"), Accessibility.Private)))
-            Assert.Equal(Accessibility.NotApplicable, g.GetAccessibility(g.WithAccessibility(g.LocalDeclarationStatement(g.IdentifierName("t"), "loc"), Accessibility.Private)))
-            Assert.Equal(Accessibility.NotApplicable, g.GetAccessibility(g.WithAccessibility(g.Attribute("a"), Accessibility.Private)))
-            Assert.Equal(Accessibility.NotApplicable, g.GetAccessibility(g.WithAccessibility(SyntaxFactory.TypeParameter("tp"), Accessibility.Private)))
+            Assert.Equal(Accessibility.Private, Generator.GetAccessibility(Generator.WithAccessibility(Generator.ClassDeclaration("c", accessibility:=Accessibility.Internal), Accessibility.Private)))
+            Assert.Equal(Accessibility.Private, Generator.GetAccessibility(Generator.WithAccessibility(Generator.StructDeclaration("s", accessibility:=Accessibility.Internal), Accessibility.Private)))
+            Assert.Equal(Accessibility.Private, Generator.GetAccessibility(Generator.WithAccessibility(Generator.EnumDeclaration("i", accessibility:=Accessibility.Internal), Accessibility.Private)))
+            Assert.Equal(Accessibility.Private, Generator.GetAccessibility(Generator.WithAccessibility(Generator.EnumDeclaration("e", accessibility:=Accessibility.Internal), Accessibility.Private)))
+            Assert.Equal(Accessibility.Private, Generator.GetAccessibility(Generator.WithAccessibility(Generator.DelegateDeclaration("d", accessibility:=Accessibility.Internal), Accessibility.Private)))
+            Assert.Equal(Accessibility.Private, Generator.GetAccessibility(Generator.WithAccessibility(Generator.MethodDeclaration("m", accessibility:=Accessibility.Internal), Accessibility.Private)))
+            Assert.Equal(Accessibility.Private, Generator.GetAccessibility(Generator.WithAccessibility(Generator.ConstructorDeclaration(accessibility:=Accessibility.Internal), Accessibility.Private)))
+            Assert.Equal(Accessibility.NotApplicable, Generator.GetAccessibility(Generator.WithAccessibility(Generator.ParameterDeclaration("p"), Accessibility.Private)))
+            Assert.Equal(Accessibility.Private, Generator.GetAccessibility(Generator.WithAccessibility(Generator.PropertyDeclaration("p", Generator.IdentifierName("t"), accessibility:=Accessibility.Internal), Accessibility.Private)))
+            Assert.Equal(Accessibility.Private, Generator.GetAccessibility(Generator.WithAccessibility(Generator.IndexerDeclaration({Generator.ParameterDeclaration("i")}, Generator.IdentifierName("t"), accessibility:=Accessibility.Internal), Accessibility.Private)))
+            Assert.Equal(Accessibility.Private, Generator.GetAccessibility(Generator.WithAccessibility(Generator.FieldDeclaration("f", Generator.IdentifierName("t"), accessibility:=Accessibility.Internal), Accessibility.Private)))
+            Assert.Equal(Accessibility.NotApplicable, Generator.GetAccessibility(Generator.WithAccessibility(Generator.EnumMember("v"), Accessibility.Private)))
+            Assert.Equal(Accessibility.Private, Generator.GetAccessibility(Generator.WithAccessibility(Generator.EventDeclaration("ef", Generator.IdentifierName("t"), accessibility:=Accessibility.Internal), Accessibility.Private)))
+            Assert.Equal(Accessibility.Private, Generator.GetAccessibility(Generator.WithAccessibility(Generator.CustomEventDeclaration("ep", Generator.IdentifierName("t"), accessibility:=Accessibility.Internal), Accessibility.Private)))
+            Assert.Equal(Accessibility.NotApplicable, Generator.GetAccessibility(Generator.WithAccessibility(Generator.NamespaceDeclaration("n"), Accessibility.Private)))
+            Assert.Equal(Accessibility.NotApplicable, Generator.GetAccessibility(Generator.WithAccessibility(Generator.NamespaceImportDeclaration("u"), Accessibility.Private)))
+            Assert.Equal(Accessibility.NotApplicable, Generator.GetAccessibility(Generator.WithAccessibility(Generator.LocalDeclarationStatement(Generator.IdentifierName("t"), "loc"), Accessibility.Private)))
+            Assert.Equal(Accessibility.NotApplicable, Generator.GetAccessibility(Generator.WithAccessibility(Generator.Attribute("a"), Accessibility.Private)))
+            Assert.Equal(Accessibility.NotApplicable, Generator.GetAccessibility(Generator.WithAccessibility(SyntaxFactory.TypeParameter("tp"), Accessibility.Private)))
+
+            Dim m = SyntaxFactory.ModuleBlock(
+                SyntaxFactory.ModuleStatement("module2").
+                              WithModifiers(SyntaxFactory.TokenList(SyntaxFactory.Token(SyntaxKind.PublicKeyword))))
+            Assert.Equal(Accessibility.Internal, Generator.GetAccessibility(Generator.WithAccessibility(m, Accessibility.Internal)))
         End Sub
 
         <Fact>
         Public Sub TestGetModifiers()
-            Assert.Equal(DeclarationModifiers.Abstract, g.GetModifiers(g.ClassDeclaration("c", modifiers:=DeclarationModifiers.Abstract)))
-            Assert.Equal(DeclarationModifiers.Partial, g.GetModifiers(g.StructDeclaration("s", modifiers:=DeclarationModifiers.Partial)))
-            Assert.Equal(DeclarationModifiers.[New], g.GetModifiers(g.EnumDeclaration("e", modifiers:=DeclarationModifiers.[New])))
-            Assert.Equal(DeclarationModifiers.[New], g.GetModifiers(g.DelegateDeclaration("d", modifiers:=DeclarationModifiers.[New])))
-            Assert.Equal(DeclarationModifiers.Static, g.GetModifiers(g.MethodDeclaration("m", modifiers:=DeclarationModifiers.Static)))
-            Assert.Equal(DeclarationModifiers.Static, g.GetModifiers(g.ConstructorDeclaration(modifiers:=DeclarationModifiers.Static)))
-            Assert.Equal(DeclarationModifiers.None, g.GetModifiers(g.ParameterDeclaration("p")))
-            Assert.Equal(DeclarationModifiers.Abstract, g.GetModifiers(g.PropertyDeclaration("p", g.IdentifierName("t"), modifiers:=DeclarationModifiers.Abstract)))
-            Assert.Equal(DeclarationModifiers.Abstract, g.GetModifiers(g.IndexerDeclaration({g.ParameterDeclaration("i")}, g.IdentifierName("t"), modifiers:=DeclarationModifiers.Abstract)))
-            Assert.Equal(DeclarationModifiers.Const, g.GetModifiers(g.FieldDeclaration("f", g.IdentifierName("t"), modifiers:=DeclarationModifiers.Const)))
-            Assert.Equal(DeclarationModifiers.Static, g.GetModifiers(g.EventDeclaration("ef", g.IdentifierName("t"), modifiers:=DeclarationModifiers.Static)))
-            Assert.Equal(DeclarationModifiers.Static, g.GetModifiers(g.CustomEventDeclaration("ep", g.IdentifierName("t"), modifiers:=DeclarationModifiers.Static)))
-            Assert.Equal(DeclarationModifiers.None, g.GetModifiers(g.EnumMember("v")))
-            Assert.Equal(DeclarationModifiers.None, g.GetModifiers(g.NamespaceDeclaration("n")))
-            Assert.Equal(DeclarationModifiers.None, g.GetModifiers(g.NamespaceImportDeclaration("u")))
-            Assert.Equal(DeclarationModifiers.None, g.GetModifiers(g.LocalDeclarationStatement(g.IdentifierName("t"), "loc")))
-            Assert.Equal(DeclarationModifiers.None, g.GetModifiers(g.Attribute("a")))
-            Assert.Equal(DeclarationModifiers.None, g.GetModifiers(SyntaxFactory.TypeParameter("tp")))
+            Assert.Equal(DeclarationModifiers.Abstract, Generator.GetModifiers(Generator.ClassDeclaration("c", modifiers:=DeclarationModifiers.Abstract)))
+            Assert.Equal(DeclarationModifiers.Partial, Generator.GetModifiers(Generator.StructDeclaration("s", modifiers:=DeclarationModifiers.Partial)))
+            Assert.Equal(DeclarationModifiers.[New], Generator.GetModifiers(Generator.EnumDeclaration("e", modifiers:=DeclarationModifiers.[New])))
+            Assert.Equal(DeclarationModifiers.[New], Generator.GetModifiers(Generator.DelegateDeclaration("d", modifiers:=DeclarationModifiers.[New])))
+            Assert.Equal(DeclarationModifiers.Static, Generator.GetModifiers(Generator.MethodDeclaration("m", modifiers:=DeclarationModifiers.Static)))
+            Assert.Equal(DeclarationModifiers.Static, Generator.GetModifiers(Generator.ConstructorDeclaration(modifiers:=DeclarationModifiers.Static)))
+            Assert.Equal(DeclarationModifiers.None, Generator.GetModifiers(Generator.ParameterDeclaration("p")))
+            Assert.Equal(DeclarationModifiers.Abstract, Generator.GetModifiers(Generator.PropertyDeclaration("p", Generator.IdentifierName("t"), modifiers:=DeclarationModifiers.Abstract)))
+            Assert.Equal(DeclarationModifiers.Abstract, Generator.GetModifiers(Generator.IndexerDeclaration({Generator.ParameterDeclaration("i")}, Generator.IdentifierName("t"), modifiers:=DeclarationModifiers.Abstract)))
+            Assert.Equal(DeclarationModifiers.Const, Generator.GetModifiers(Generator.FieldDeclaration("f", Generator.IdentifierName("t"), modifiers:=DeclarationModifiers.Const)))
+            Assert.Equal(DeclarationModifiers.Static, Generator.GetModifiers(Generator.EventDeclaration("ef", Generator.IdentifierName("t"), modifiers:=DeclarationModifiers.Static)))
+            Assert.Equal(DeclarationModifiers.Static, Generator.GetModifiers(Generator.CustomEventDeclaration("ep", Generator.IdentifierName("t"), modifiers:=DeclarationModifiers.Static)))
+            Assert.Equal(DeclarationModifiers.None, Generator.GetModifiers(Generator.EnumMember("v")))
+            Assert.Equal(DeclarationModifiers.None, Generator.GetModifiers(Generator.NamespaceDeclaration("n")))
+            Assert.Equal(DeclarationModifiers.None, Generator.GetModifiers(Generator.NamespaceImportDeclaration("u")))
+            Assert.Equal(DeclarationModifiers.None, Generator.GetModifiers(Generator.LocalDeclarationStatement(Generator.IdentifierName("t"), "loc")))
+            Assert.Equal(DeclarationModifiers.None, Generator.GetModifiers(Generator.Attribute("a")))
+            Assert.Equal(DeclarationModifiers.None, Generator.GetModifiers(SyntaxFactory.TypeParameter("tp")))
         End Sub
 
         <Fact>
         Public Sub TestWithModifiers()
-            Assert.Equal(DeclarationModifiers.Abstract, g.GetModifiers(g.WithModifiers(g.ClassDeclaration("c"), DeclarationModifiers.Abstract)))
-            Assert.Equal(DeclarationModifiers.Partial, g.GetModifiers(g.WithModifiers(g.StructDeclaration("s"), DeclarationModifiers.Partial)))
-            Assert.Equal(DeclarationModifiers.[New], g.GetModifiers(g.WithModifiers(g.EnumDeclaration("e"), DeclarationModifiers.[New])))
-            Assert.Equal(DeclarationModifiers.[New], g.GetModifiers(g.WithModifiers(g.DelegateDeclaration("d"), DeclarationModifiers.[New])))
-            Assert.Equal(DeclarationModifiers.Static, g.GetModifiers(g.WithModifiers(g.MethodDeclaration("m"), DeclarationModifiers.Static)))
-            Assert.Equal(DeclarationModifiers.Static, g.GetModifiers(g.WithModifiers(g.ConstructorDeclaration(), DeclarationModifiers.Static)))
-            Assert.Equal(DeclarationModifiers.None, g.GetModifiers(g.WithModifiers(g.ParameterDeclaration("p"), DeclarationModifiers.Abstract)))
-            Assert.Equal(DeclarationModifiers.Abstract, g.GetModifiers(g.WithModifiers(g.PropertyDeclaration("p", g.IdentifierName("t")), DeclarationModifiers.Abstract)))
-            Assert.Equal(DeclarationModifiers.Abstract, g.GetModifiers(g.WithModifiers(g.IndexerDeclaration({g.ParameterDeclaration("i")}, g.IdentifierName("t")), DeclarationModifiers.Abstract)))
-            Assert.Equal(DeclarationModifiers.Const, g.GetModifiers(g.WithModifiers(g.FieldDeclaration("f", g.IdentifierName("t")), DeclarationModifiers.Const)))
-            Assert.Equal(DeclarationModifiers.Static, g.GetModifiers(g.WithModifiers(g.EventDeclaration("ef", g.IdentifierName("t")), DeclarationModifiers.Static)))
-            Assert.Equal(DeclarationModifiers.Static, g.GetModifiers(g.WithModifiers(g.CustomEventDeclaration("ep", g.IdentifierName("t")), DeclarationModifiers.Static)))
-            Assert.Equal(DeclarationModifiers.None, g.GetModifiers(g.WithModifiers(g.EnumMember("v"), DeclarationModifiers.Partial)))
-            Assert.Equal(DeclarationModifiers.None, g.GetModifiers(g.WithModifiers(g.NamespaceDeclaration("n"), DeclarationModifiers.Abstract)))
-            Assert.Equal(DeclarationModifiers.None, g.GetModifiers(g.WithModifiers(g.NamespaceImportDeclaration("u"), DeclarationModifiers.Abstract)))
-            Assert.Equal(DeclarationModifiers.None, g.GetModifiers(g.WithModifiers(g.LocalDeclarationStatement(g.IdentifierName("t"), "loc"), DeclarationModifiers.Abstract)))
-            Assert.Equal(DeclarationModifiers.None, g.GetModifiers(g.WithModifiers(g.Attribute("a"), DeclarationModifiers.Abstract)))
-            Assert.Equal(DeclarationModifiers.None, g.GetModifiers(g.WithModifiers(SyntaxFactory.TypeParameter("tp"), DeclarationModifiers.Abstract)))
+            Assert.Equal(DeclarationModifiers.Abstract, Generator.GetModifiers(Generator.WithModifiers(Generator.ClassDeclaration("c"), DeclarationModifiers.Abstract)))
+            Assert.Equal(DeclarationModifiers.Partial, Generator.GetModifiers(Generator.WithModifiers(Generator.StructDeclaration("s"), DeclarationModifiers.Partial)))
+            Assert.Equal(DeclarationModifiers.[New], Generator.GetModifiers(Generator.WithModifiers(Generator.EnumDeclaration("e"), DeclarationModifiers.[New])))
+            Assert.Equal(DeclarationModifiers.[New], Generator.GetModifiers(Generator.WithModifiers(Generator.DelegateDeclaration("d"), DeclarationModifiers.[New])))
+            Assert.Equal(DeclarationModifiers.Static, Generator.GetModifiers(Generator.WithModifiers(Generator.MethodDeclaration("m"), DeclarationModifiers.Static)))
+            Assert.Equal(DeclarationModifiers.Static, Generator.GetModifiers(Generator.WithModifiers(Generator.ConstructorDeclaration(), DeclarationModifiers.Static)))
+            Assert.Equal(DeclarationModifiers.None, Generator.GetModifiers(Generator.WithModifiers(Generator.ParameterDeclaration("p"), DeclarationModifiers.Abstract)))
+            Assert.Equal(DeclarationModifiers.Abstract, Generator.GetModifiers(Generator.WithModifiers(Generator.PropertyDeclaration("p", Generator.IdentifierName("t")), DeclarationModifiers.Abstract)))
+            Assert.Equal(DeclarationModifiers.Abstract, Generator.GetModifiers(Generator.WithModifiers(Generator.IndexerDeclaration({Generator.ParameterDeclaration("i")}, Generator.IdentifierName("t")), DeclarationModifiers.Abstract)))
+            Assert.Equal(DeclarationModifiers.Const, Generator.GetModifiers(Generator.WithModifiers(Generator.FieldDeclaration("f", Generator.IdentifierName("t")), DeclarationModifiers.Const)))
+            Assert.Equal(DeclarationModifiers.Static, Generator.GetModifiers(Generator.WithModifiers(Generator.EventDeclaration("ef", Generator.IdentifierName("t")), DeclarationModifiers.Static)))
+            Assert.Equal(DeclarationModifiers.Static, Generator.GetModifiers(Generator.WithModifiers(Generator.CustomEventDeclaration("ep", Generator.IdentifierName("t")), DeclarationModifiers.Static)))
+            Assert.Equal(DeclarationModifiers.None, Generator.GetModifiers(Generator.WithModifiers(Generator.EnumMember("v"), DeclarationModifiers.Partial)))
+            Assert.Equal(DeclarationModifiers.None, Generator.GetModifiers(Generator.WithModifiers(Generator.NamespaceDeclaration("n"), DeclarationModifiers.Abstract)))
+            Assert.Equal(DeclarationModifiers.None, Generator.GetModifiers(Generator.WithModifiers(Generator.NamespaceImportDeclaration("u"), DeclarationModifiers.Abstract)))
+            Assert.Equal(DeclarationModifiers.None, Generator.GetModifiers(Generator.WithModifiers(Generator.LocalDeclarationStatement(Generator.IdentifierName("t"), "loc"), DeclarationModifiers.Abstract)))
+            Assert.Equal(DeclarationModifiers.None, Generator.GetModifiers(Generator.WithModifiers(Generator.Attribute("a"), DeclarationModifiers.Abstract)))
+            Assert.Equal(DeclarationModifiers.None, Generator.GetModifiers(Generator.WithModifiers(SyntaxFactory.TypeParameter("tp"), DeclarationModifiers.Abstract)))
         End Sub
 
         <Fact>
         Public Sub TestGetType()
-            Assert.Equal("t", g.GetType(g.MethodDeclaration("m", returnType:=g.IdentifierName("t"))).ToString())
-            Assert.Null(g.GetType(g.MethodDeclaration("m")))
+            Assert.Equal("t", Generator.GetType(Generator.MethodDeclaration("m", returnType:=Generator.IdentifierName("t"))).ToString())
+            Assert.Null(Generator.GetType(Generator.MethodDeclaration("m")))
 
-            Assert.Equal("t", g.GetType(g.FieldDeclaration("f", g.IdentifierName("t"))).ToString())
-            Assert.Equal("t", g.GetType(g.PropertyDeclaration("p", g.IdentifierName("t"))).ToString())
-            Assert.Equal("t", g.GetType(g.IndexerDeclaration({g.ParameterDeclaration("p", g.IdentifierName("pt"))}, g.IdentifierName("t"))).ToString())
-            Assert.Equal("t", g.GetType(g.ParameterDeclaration("p", g.IdentifierName("t"))).ToString())
+            Assert.Equal("t", Generator.GetType(Generator.FieldDeclaration("f", Generator.IdentifierName("t"))).ToString())
+            Assert.Equal("t", Generator.GetType(Generator.PropertyDeclaration("p", Generator.IdentifierName("t"))).ToString())
+            Assert.Equal("t", Generator.GetType(Generator.IndexerDeclaration({Generator.ParameterDeclaration("p", Generator.IdentifierName("pt"))}, Generator.IdentifierName("t"))).ToString())
+            Assert.Equal("t", Generator.GetType(Generator.ParameterDeclaration("p", Generator.IdentifierName("t"))).ToString())
 
-            Assert.Equal("t", g.GetType(g.EventDeclaration("ef", g.IdentifierName("t"))).ToString())
-            Assert.Equal("t", g.GetType(g.CustomEventDeclaration("ep", g.IdentifierName("t"))).ToString())
+            Assert.Equal("t", Generator.GetType(Generator.EventDeclaration("ef", Generator.IdentifierName("t"))).ToString())
+            Assert.Equal("t", Generator.GetType(Generator.CustomEventDeclaration("ep", Generator.IdentifierName("t"))).ToString())
 
-            Assert.Equal("t", g.GetType(g.DelegateDeclaration("t", returnType:=g.IdentifierName("t"))).ToString())
-            Assert.Null(g.GetType(g.DelegateDeclaration("d")))
+            Assert.Equal("t", Generator.GetType(Generator.DelegateDeclaration("t", returnType:=Generator.IdentifierName("t"))).ToString())
+            Assert.Null(Generator.GetType(Generator.DelegateDeclaration("d")))
 
-            Assert.Equal("t", g.GetType(g.LocalDeclarationStatement(g.IdentifierName("t"), "v")).ToString())
+            Assert.Equal("t", Generator.GetType(Generator.LocalDeclarationStatement(Generator.IdentifierName("t"), "v")).ToString())
 
-            Assert.Null(g.GetType(g.ClassDeclaration("c")))
-            Assert.Null(g.GetType(g.IdentifierName("x")))
+            Assert.Null(Generator.GetType(Generator.ClassDeclaration("c")))
+            Assert.Null(Generator.GetType(Generator.IdentifierName("x")))
         End Sub
 
         <Fact>
         Public Sub TestWithType()
-            Assert.Equal("t", g.GetType(g.WithType(g.MethodDeclaration("m", returnType:=g.IdentifierName("x")), g.IdentifierName("t"))).ToString())
-            Assert.Equal("t", g.GetType(g.WithType(g.MethodDeclaration("m"), g.IdentifierName("t"))).ToString())
-            Assert.Equal("t", g.GetType(g.WithType(g.FieldDeclaration("f", g.IdentifierName("x")), g.IdentifierName("t"))).ToString())
-            Assert.Equal("t", g.GetType(g.WithType(g.PropertyDeclaration("p", g.IdentifierName("x")), g.IdentifierName("t"))).ToString())
-            Assert.Equal("t", g.GetType(g.WithType(g.IndexerDeclaration({g.ParameterDeclaration("p", g.IdentifierName("pt"))}, g.IdentifierName("x")), g.IdentifierName("t"))).ToString())
-            Assert.Equal("t", g.GetType(g.WithType(g.ParameterDeclaration("p", g.IdentifierName("x")), g.IdentifierName("t"))).ToString())
+            Assert.Equal("t", Generator.GetType(Generator.WithType(Generator.MethodDeclaration("m", returnType:=Generator.IdentifierName("x")), Generator.IdentifierName("t"))).ToString())
+            Assert.Equal("t", Generator.GetType(Generator.WithType(Generator.MethodDeclaration("m"), Generator.IdentifierName("t"))).ToString())
+            Assert.Equal("t", Generator.GetType(Generator.WithType(Generator.FieldDeclaration("f", Generator.IdentifierName("x")), Generator.IdentifierName("t"))).ToString())
+            Assert.Equal("t", Generator.GetType(Generator.WithType(Generator.PropertyDeclaration("p", Generator.IdentifierName("x")), Generator.IdentifierName("t"))).ToString())
+            Assert.Equal("t", Generator.GetType(Generator.WithType(Generator.IndexerDeclaration({Generator.ParameterDeclaration("p", Generator.IdentifierName("pt"))}, Generator.IdentifierName("x")), Generator.IdentifierName("t"))).ToString())
+            Assert.Equal("t", Generator.GetType(Generator.WithType(Generator.ParameterDeclaration("p", Generator.IdentifierName("x")), Generator.IdentifierName("t"))).ToString())
 
-            Assert.Equal("t", g.GetType(g.WithType(g.DelegateDeclaration("t", returnType:=g.IdentifierName("x")), g.IdentifierName("t"))).ToString())
-            Assert.Equal("t", g.GetType(g.WithType(g.DelegateDeclaration("t"), g.IdentifierName("t"))).ToString())
+            Assert.Equal("t", Generator.GetType(Generator.WithType(Generator.DelegateDeclaration("t", returnType:=Generator.IdentifierName("x")), Generator.IdentifierName("t"))).ToString())
+            Assert.Equal("t", Generator.GetType(Generator.WithType(Generator.DelegateDeclaration("t"), Generator.IdentifierName("t"))).ToString())
 
-            Assert.Equal("t", g.GetType(g.WithType(g.EventDeclaration("ef", g.IdentifierName("x")), g.IdentifierName("t"))).ToString())
-            Assert.Equal("t", g.GetType(g.WithType(g.CustomEventDeclaration("ep", g.IdentifierName("x")), g.IdentifierName("t"))).ToString())
+            Assert.Equal("t", Generator.GetType(Generator.WithType(Generator.EventDeclaration("ef", Generator.IdentifierName("x")), Generator.IdentifierName("t"))).ToString())
+            Assert.Equal("t", Generator.GetType(Generator.WithType(Generator.CustomEventDeclaration("ep", Generator.IdentifierName("x")), Generator.IdentifierName("t"))).ToString())
 
-            Assert.Equal("t", g.GetType(g.WithType(g.LocalDeclarationStatement(g.IdentifierName("x"), "v"), g.IdentifierName("t"))).ToString())
-            Assert.Null(g.GetType(g.WithType(g.ClassDeclaration("c"), g.IdentifierName("t"))))
-            Assert.Null(g.GetType(g.WithType(g.IdentifierName("x"), g.IdentifierName("t"))))
+            Assert.Equal("t", Generator.GetType(Generator.WithType(Generator.LocalDeclarationStatement(Generator.IdentifierName("x"), "v"), Generator.IdentifierName("t"))).ToString())
+            Assert.Null(Generator.GetType(Generator.WithType(Generator.ClassDeclaration("c"), Generator.IdentifierName("t"))))
+            Assert.Null(Generator.GetType(Generator.WithType(Generator.IdentifierName("x"), Generator.IdentifierName("t"))))
         End Sub
 
         <Fact>
         Public Sub TestWithTypeChangesSubFunction()
             VerifySyntax(Of MethodBlockSyntax)(
-                g.WithType(g.MethodDeclaration("m", returnType:=g.IdentifierName("x")), Nothing),
-<x>Sub m()
-End Sub</x>.Value)
+                Generator.WithType(Generator.MethodDeclaration("m", returnType:=Generator.IdentifierName("x")), Nothing),
+"Sub m()
+End Sub")
 
             VerifySyntax(Of MethodBlockSyntax)(
-                g.WithType(g.MethodDeclaration("m"), g.IdentifierName("x")),
-<x>Function m() As x
-End Function</x>.Value)
+                Generator.WithType(Generator.MethodDeclaration("m"), Generator.IdentifierName("x")),
+"Function m() As x
+End Function")
 
             VerifySyntax(Of MethodStatementSyntax)(
-                g.WithType(g.MethodDeclaration("m", returnType:=g.IdentifierName("x"), modifiers:=DeclarationModifiers.Abstract), Nothing),
-<x>MustInherit Sub m()</x>.Value)
+                Generator.WithType(Generator.MethodDeclaration("m", returnType:=Generator.IdentifierName("x"), modifiers:=DeclarationModifiers.Abstract), Nothing),
+"MustOverride Sub m()")
 
             VerifySyntax(Of MethodStatementSyntax)(
-                g.WithType(g.MethodDeclaration("m", modifiers:=DeclarationModifiers.Abstract), g.IdentifierName("x")),
-<x>MustInherit Function m() As x</x>.Value)
+                Generator.WithType(Generator.MethodDeclaration("m", modifiers:=DeclarationModifiers.Abstract), Generator.IdentifierName("x")),
+"MustOverride Function m() As x")
 
             VerifySyntax(Of DelegateStatementSyntax)(
-                g.WithType(g.DelegateDeclaration("d", returnType:=g.IdentifierName("x")), Nothing),
-<x>Delegate Sub d()</x>.Value)
+                Generator.WithType(Generator.DelegateDeclaration("d", returnType:=Generator.IdentifierName("x")), Nothing),
+"Delegate Sub d()")
 
             VerifySyntax(Of DelegateStatementSyntax)(
-                g.WithType(g.DelegateDeclaration("d"), g.IdentifierName("x")),
-<x>Delegate Function d() As x</x>.Value)
+                Generator.WithType(Generator.DelegateDeclaration("d"), Generator.IdentifierName("x")),
+"Delegate Function d() As x")
 
         End Sub
 
         <Fact>
         Public Sub TestGetParameters()
-            Assert.Equal(0, g.GetParameters(g.MethodDeclaration("m")).Count)
-            Assert.Equal(1, g.GetParameters(g.MethodDeclaration("m", parameters:={g.ParameterDeclaration("p", g.IdentifierName("t"))})).Count)
-            Assert.Equal(2, g.GetParameters(g.MethodDeclaration("m", parameters:={g.ParameterDeclaration("p", g.IdentifierName("t")), g.ParameterDeclaration("p2", g.IdentifierName("t2"))})).Count)
+            Assert.Equal(0, Generator.GetParameters(Generator.MethodDeclaration("m")).Count)
+            Assert.Equal(1, Generator.GetParameters(Generator.MethodDeclaration("m", parameters:={Generator.ParameterDeclaration("p", Generator.IdentifierName("t"))})).Count)
+            Assert.Equal(2, Generator.GetParameters(Generator.MethodDeclaration("m", parameters:={Generator.ParameterDeclaration("p", Generator.IdentifierName("t")), Generator.ParameterDeclaration("p2", Generator.IdentifierName("t2"))})).Count)
 
-            Assert.Equal(0, g.GetParameters(g.ConstructorDeclaration()).Count)
-            Assert.Equal(1, g.GetParameters(g.ConstructorDeclaration(parameters:={g.ParameterDeclaration("p", g.IdentifierName("t"))})).Count)
-            Assert.Equal(2, g.GetParameters(g.ConstructorDeclaration(parameters:={g.ParameterDeclaration("p", g.IdentifierName("t")), g.ParameterDeclaration("p2", g.IdentifierName("t2"))})).Count)
+            Assert.Equal(0, Generator.GetParameters(Generator.ConstructorDeclaration()).Count)
+            Assert.Equal(1, Generator.GetParameters(Generator.ConstructorDeclaration(parameters:={Generator.ParameterDeclaration("p", Generator.IdentifierName("t"))})).Count)
+            Assert.Equal(2, Generator.GetParameters(Generator.ConstructorDeclaration(parameters:={Generator.ParameterDeclaration("p", Generator.IdentifierName("t")), Generator.ParameterDeclaration("p2", Generator.IdentifierName("t2"))})).Count)
 
-            Assert.Equal(0, g.GetParameters(g.PropertyDeclaration("p", g.IdentifierName("t"))).Count)
+            Assert.Equal(0, Generator.GetParameters(Generator.PropertyDeclaration("p", Generator.IdentifierName("t"))).Count)
 
-            Assert.Equal(1, g.GetParameters(g.IndexerDeclaration({g.ParameterDeclaration("p", g.IdentifierName("t"))}, g.IdentifierName("t"))).Count)
-            Assert.Equal(2, g.GetParameters(g.IndexerDeclaration({g.ParameterDeclaration("p", g.IdentifierName("t")), g.ParameterDeclaration("p2", g.IdentifierName("t2"))}, g.IdentifierName("t"))).Count)
+            Assert.Equal(1, Generator.GetParameters(Generator.IndexerDeclaration({Generator.ParameterDeclaration("p", Generator.IdentifierName("t"))}, Generator.IdentifierName("t"))).Count)
+            Assert.Equal(2, Generator.GetParameters(Generator.IndexerDeclaration({Generator.ParameterDeclaration("p", Generator.IdentifierName("t")), Generator.ParameterDeclaration("p2", Generator.IdentifierName("t2"))}, Generator.IdentifierName("t"))).Count)
 
-            Assert.Equal(0, g.GetParameters(g.ValueReturningLambdaExpression(g.IdentifierName("expr"))).Count)
-            Assert.Equal(1, g.GetParameters(g.ValueReturningLambdaExpression("p1", g.IdentifierName("expr"))).Count)
+            Assert.Equal(0, Generator.GetParameters(Generator.ValueReturningLambdaExpression(Generator.IdentifierName("expr"))).Count)
+            Assert.Equal(1, Generator.GetParameters(Generator.ValueReturningLambdaExpression("p1", Generator.IdentifierName("expr"))).Count)
 
-            Assert.Equal(0, g.GetParameters(g.VoidReturningLambdaExpression(g.IdentifierName("expr"))).Count)
-            Assert.Equal(1, g.GetParameters(g.VoidReturningLambdaExpression("p1", g.IdentifierName("expr"))).Count)
+            Assert.Equal(0, Generator.GetParameters(Generator.VoidReturningLambdaExpression(Generator.IdentifierName("expr"))).Count)
+            Assert.Equal(1, Generator.GetParameters(Generator.VoidReturningLambdaExpression("p1", Generator.IdentifierName("expr"))).Count)
 
-            Assert.Equal(0, g.GetParameters(g.DelegateDeclaration("d")).Count)
-            Assert.Equal(1, g.GetParameters(g.DelegateDeclaration("d", parameters:={g.ParameterDeclaration("p", g.IdentifierName("t"))})).Count)
+            Assert.Equal(0, Generator.GetParameters(Generator.DelegateDeclaration("d")).Count)
+            Assert.Equal(1, Generator.GetParameters(Generator.DelegateDeclaration("d", parameters:={Generator.ParameterDeclaration("p", Generator.IdentifierName("t"))})).Count)
 
-            Assert.Equal(0, g.GetParameters(g.ClassDeclaration("c")).Count)
-            Assert.Equal(0, g.GetParameters(g.IdentifierName("x")).Count)
+            Assert.Equal(0, Generator.GetParameters(Generator.ClassDeclaration("c")).Count)
+            Assert.Equal(0, Generator.GetParameters(Generator.IdentifierName("x")).Count)
         End Sub
 
         <Fact>
         Public Sub TestAddParameters()
-            Assert.Equal(1, g.GetParameters(g.AddParameters(g.MethodDeclaration("m"), {g.ParameterDeclaration("p", g.IdentifierName("t"))})).Count)
-            Assert.Equal(1, g.GetParameters(g.AddParameters(g.ConstructorDeclaration(), {g.ParameterDeclaration("p", g.IdentifierName("t"))})).Count)
-            Assert.Equal(3, g.GetParameters(g.AddParameters(g.IndexerDeclaration({g.ParameterDeclaration("p", g.IdentifierName("t"))}, g.IdentifierName("t")), {g.ParameterDeclaration("p2", g.IdentifierName("t2")), g.ParameterDeclaration("p3", g.IdentifierName("t3"))})).Count)
+            Assert.Equal(1, Generator.GetParameters(Generator.AddParameters(Generator.MethodDeclaration("m"), {Generator.ParameterDeclaration("p", Generator.IdentifierName("t"))})).Count)
+            Assert.Equal(1, Generator.GetParameters(Generator.AddParameters(Generator.ConstructorDeclaration(), {Generator.ParameterDeclaration("p", Generator.IdentifierName("t"))})).Count)
+            Assert.Equal(3, Generator.GetParameters(Generator.AddParameters(Generator.IndexerDeclaration({Generator.ParameterDeclaration("p", Generator.IdentifierName("t"))}, Generator.IdentifierName("t")), {Generator.ParameterDeclaration("p2", Generator.IdentifierName("t2")), Generator.ParameterDeclaration("p3", Generator.IdentifierName("t3"))})).Count)
 
-            Assert.Equal(1, g.GetParameters(g.AddParameters(g.ValueReturningLambdaExpression(g.IdentifierName("expr")), {g.LambdaParameter("p")})).Count)
-            Assert.Equal(1, g.GetParameters(g.AddParameters(g.VoidReturningLambdaExpression(g.IdentifierName("expr")), {g.LambdaParameter("p")})).Count)
+            Assert.Equal(1, Generator.GetParameters(Generator.AddParameters(Generator.ValueReturningLambdaExpression(Generator.IdentifierName("expr")), {Generator.LambdaParameter("p")})).Count)
+            Assert.Equal(1, Generator.GetParameters(Generator.AddParameters(Generator.VoidReturningLambdaExpression(Generator.IdentifierName("expr")), {Generator.LambdaParameter("p")})).Count)
 
-            Assert.Equal(1, g.GetParameters(g.AddParameters(g.DelegateDeclaration("d"), {g.ParameterDeclaration("p", g.IdentifierName("t"))})).Count)
+            Assert.Equal(1, Generator.GetParameters(Generator.AddParameters(Generator.DelegateDeclaration("d"), {Generator.ParameterDeclaration("p", Generator.IdentifierName("t"))})).Count)
 
-            Assert.Equal(0, g.GetParameters(g.AddParameters(g.ClassDeclaration("c"), {g.ParameterDeclaration("p", g.IdentifierName("t"))})).Count)
-            Assert.Equal(0, g.GetParameters(g.AddParameters(g.IdentifierName("x"), {g.ParameterDeclaration("p", g.IdentifierName("t"))})).Count)
-            Assert.Equal(0, g.GetParameters(g.AddParameters(g.PropertyDeclaration("p", g.IdentifierName("t")), {g.ParameterDeclaration("p", g.IdentifierName("t"))})).Count)
+            Assert.Equal(0, Generator.GetParameters(Generator.AddParameters(Generator.ClassDeclaration("c"), {Generator.ParameterDeclaration("p", Generator.IdentifierName("t"))})).Count)
+            Assert.Equal(0, Generator.GetParameters(Generator.AddParameters(Generator.IdentifierName("x"), {Generator.ParameterDeclaration("p", Generator.IdentifierName("t"))})).Count)
+            Assert.Equal(0, Generator.GetParameters(Generator.AddParameters(Generator.PropertyDeclaration("p", Generator.IdentifierName("t")), {Generator.ParameterDeclaration("p", Generator.IdentifierName("t"))})).Count)
         End Sub
 
         <Fact>
         Public Sub TestGetExpression()
             ' initializers
-            Assert.Equal("x", g.GetExpression(g.FieldDeclaration("f", g.IdentifierName("t"), initializer:=g.IdentifierName("x"))).ToString())
-            Assert.Equal("x", g.GetExpression(g.ParameterDeclaration("p", g.IdentifierName("t"), initializer:=g.IdentifierName("x"))).ToString())
-            Assert.Equal("x", g.GetExpression(g.LocalDeclarationStatement("loc", initializer:=g.IdentifierName("x"))).ToString())
+            Assert.Equal("x", Generator.GetExpression(Generator.FieldDeclaration("f", Generator.IdentifierName("t"), initializer:=Generator.IdentifierName("x"))).ToString())
+            Assert.Equal("x", Generator.GetExpression(Generator.ParameterDeclaration("p", Generator.IdentifierName("t"), initializer:=Generator.IdentifierName("x"))).ToString())
+            Assert.Equal("x", Generator.GetExpression(Generator.LocalDeclarationStatement("loc", initializer:=Generator.IdentifierName("x"))).ToString())
 
             ' lambda bodies
-            Assert.Null(g.GetExpression(g.ValueReturningLambdaExpression("p", {g.IdentifierName("x")})))
-            Assert.Equal(1, g.GetStatements(g.ValueReturningLambdaExpression("p", {g.IdentifierName("x")})).Count)
-            Assert.Equal("x", g.GetExpression(g.ValueReturningLambdaExpression(g.IdentifierName("x"))).ToString())
-            Assert.Equal("x", g.GetExpression(g.VoidReturningLambdaExpression(g.IdentifierName("x"))).ToString())
-            Assert.Equal("x", g.GetExpression(g.ValueReturningLambdaExpression("p", g.IdentifierName("x"))).ToString())
-            Assert.Equal("x", g.GetExpression(g.VoidReturningLambdaExpression("p", g.IdentifierName("x"))).ToString())
+            Assert.Null(Generator.GetExpression(Generator.ValueReturningLambdaExpression("p", {Generator.IdentifierName("x")})))
+            Assert.Equal(1, Generator.GetStatements(Generator.ValueReturningLambdaExpression("p", {Generator.IdentifierName("x")})).Count)
+            Assert.Equal("x", Generator.GetExpression(Generator.ValueReturningLambdaExpression(Generator.IdentifierName("x"))).ToString())
+            Assert.Equal("x", Generator.GetExpression(Generator.VoidReturningLambdaExpression(Generator.IdentifierName("x"))).ToString())
+            Assert.Equal("x", Generator.GetExpression(Generator.ValueReturningLambdaExpression("p", Generator.IdentifierName("x"))).ToString())
+            Assert.Equal("x", Generator.GetExpression(Generator.VoidReturningLambdaExpression("p", Generator.IdentifierName("x"))).ToString())
 
-            Assert.Null(g.GetExpression(g.IdentifierName("e")))
+            Assert.Null(Generator.GetExpression(Generator.IdentifierName("e")))
         End Sub
 
         <Fact>
         Public Sub TestWithExpression()
             ' initializers
-            Assert.Equal("x", g.GetExpression(g.WithExpression(g.FieldDeclaration("f", g.IdentifierName("t")), g.IdentifierName("x"))).ToString())
-            Assert.Equal("x", g.GetExpression(g.WithExpression(g.ParameterDeclaration("p", g.IdentifierName("t")), g.IdentifierName("x"))).ToString())
-            Assert.Equal("x", g.GetExpression(g.WithExpression(g.LocalDeclarationStatement(g.IdentifierName("t"), "loc"), g.IdentifierName("x"))).ToString())
+            Assert.Equal("x", Generator.GetExpression(Generator.WithExpression(Generator.FieldDeclaration("f", Generator.IdentifierName("t")), Generator.IdentifierName("x"))).ToString())
+            Assert.Equal("x", Generator.GetExpression(Generator.WithExpression(Generator.ParameterDeclaration("p", Generator.IdentifierName("t")), Generator.IdentifierName("x"))).ToString())
+            Assert.Equal("x", Generator.GetExpression(Generator.WithExpression(Generator.LocalDeclarationStatement(Generator.IdentifierName("t"), "loc"), Generator.IdentifierName("x"))).ToString())
 
             ' lambda bodies
-            Assert.Equal("y", g.GetExpression(g.WithExpression(g.ValueReturningLambdaExpression("p", {g.IdentifierName("x")}), g.IdentifierName("y"))).ToString())
-            Assert.Equal("y", g.GetExpression(g.WithExpression(g.VoidReturningLambdaExpression("p", {g.IdentifierName("x")}), g.IdentifierName("y"))).ToString())
-            Assert.Equal("y", g.GetExpression(g.WithExpression(g.ValueReturningLambdaExpression({g.IdentifierName("x")}), g.IdentifierName("y"))).ToString())
-            Assert.Equal("y", g.GetExpression(g.WithExpression(g.VoidReturningLambdaExpression({g.IdentifierName("x")}), g.IdentifierName("y"))).ToString())
-            Assert.Equal("y", g.GetExpression(g.WithExpression(g.ValueReturningLambdaExpression("p", g.IdentifierName("x")), g.IdentifierName("y"))).ToString())
-            Assert.Equal("y", g.GetExpression(g.WithExpression(g.VoidReturningLambdaExpression("p", g.IdentifierName("x")), g.IdentifierName("y"))).ToString())
-            Assert.Equal("y", g.GetExpression(g.WithExpression(g.ValueReturningLambdaExpression(g.IdentifierName("x")), g.IdentifierName("y"))).ToString())
-            Assert.Equal("y", g.GetExpression(g.WithExpression(g.VoidReturningLambdaExpression(g.IdentifierName("x")), g.IdentifierName("y"))).ToString())
+            Assert.Equal("y", Generator.GetExpression(Generator.WithExpression(Generator.ValueReturningLambdaExpression("p", {Generator.IdentifierName("x")}), Generator.IdentifierName("y"))).ToString())
+            Assert.Equal("y", Generator.GetExpression(Generator.WithExpression(Generator.VoidReturningLambdaExpression("p", {Generator.IdentifierName("x")}), Generator.IdentifierName("y"))).ToString())
+            Assert.Equal("y", Generator.GetExpression(Generator.WithExpression(Generator.ValueReturningLambdaExpression({Generator.IdentifierName("x")}), Generator.IdentifierName("y"))).ToString())
+            Assert.Equal("y", Generator.GetExpression(Generator.WithExpression(Generator.VoidReturningLambdaExpression({Generator.IdentifierName("x")}), Generator.IdentifierName("y"))).ToString())
+            Assert.Equal("y", Generator.GetExpression(Generator.WithExpression(Generator.ValueReturningLambdaExpression("p", Generator.IdentifierName("x")), Generator.IdentifierName("y"))).ToString())
+            Assert.Equal("y", Generator.GetExpression(Generator.WithExpression(Generator.VoidReturningLambdaExpression("p", Generator.IdentifierName("x")), Generator.IdentifierName("y"))).ToString())
+            Assert.Equal("y", Generator.GetExpression(Generator.WithExpression(Generator.ValueReturningLambdaExpression(Generator.IdentifierName("x")), Generator.IdentifierName("y"))).ToString())
+            Assert.Equal("y", Generator.GetExpression(Generator.WithExpression(Generator.VoidReturningLambdaExpression(Generator.IdentifierName("x")), Generator.IdentifierName("y"))).ToString())
 
             VerifySyntax(Of SingleLineLambdaExpressionSyntax)(
-                g.WithExpression(g.ValueReturningLambdaExpression({g.IdentifierName("s")}), g.IdentifierName("e")),
-                <x>Function() e</x>.Value)
+                Generator.WithExpression(Generator.ValueReturningLambdaExpression({Generator.IdentifierName("s")}), Generator.IdentifierName("e")),
+                "Function() e")
 
-            Assert.Null(g.GetExpression(g.WithExpression(g.IdentifierName("e"), g.IdentifierName("x"))))
+            Assert.Null(Generator.GetExpression(Generator.WithExpression(Generator.IdentifierName("e"), Generator.IdentifierName("x"))))
         End Sub
 
         <Fact>
         Public Sub TestWithExpression_LambdaChanges()
             ' multi line function changes to single line function
             VerifySyntax(Of SingleLineLambdaExpressionSyntax)(
-                g.WithExpression(g.ValueReturningLambdaExpression({g.IdentifierName("s")}), g.IdentifierName("e")),
-                <x>Function() e</x>.Value)
+                Generator.WithExpression(Generator.ValueReturningLambdaExpression({Generator.IdentifierName("s")}), Generator.IdentifierName("e")),
+                "Function() e")
 
             ' multi line sub changes to single line sub
             VerifySyntax(Of SingleLineLambdaExpressionSyntax)(
-                g.WithExpression(g.VoidReturningLambdaExpression({g.IdentifierName("s")}), g.IdentifierName("e")),
-                <x>Sub() e</x>.Value)
+                Generator.WithExpression(Generator.VoidReturningLambdaExpression({Generator.IdentifierName("s")}), Generator.IdentifierName("e")),
+                "Sub() e")
 
             ' single line function changes to multi-line function with null expression
             VerifySyntax(Of MultiLineLambdaExpressionSyntax)(
-                g.WithExpression(g.ValueReturningLambdaExpression(g.IdentifierName("e")), Nothing),
-<x>Function()
-End Function</x>.Value)
+                Generator.WithExpression(Generator.ValueReturningLambdaExpression(Generator.IdentifierName("e")), Nothing),
+"Function()
+End Function")
 
             ' single line sub changes to multi line sub with null expression
             VerifySyntax(Of MultiLineLambdaExpressionSyntax)(
-                g.WithExpression(g.VoidReturningLambdaExpression(g.IdentifierName("e")), Nothing),
-<x>Sub()
-End Sub</x>.Value)
+                Generator.WithExpression(Generator.VoidReturningLambdaExpression(Generator.IdentifierName("e")), Nothing),
+"Sub()
+End Sub")
 
             ' multi line function no-op when assigned null expression
             VerifySyntax(Of MultiLineLambdaExpressionSyntax)(
-                g.WithExpression(g.ValueReturningLambdaExpression({g.IdentifierName("s")}), Nothing),
-<x>Function()
+                Generator.WithExpression(Generator.ValueReturningLambdaExpression({Generator.IdentifierName("s")}), Nothing),
+"Function()
     s
-End Function</x>.Value)
+End Function")
 
             ' multi line sub no-op when assigned null expression
             VerifySyntax(Of MultiLineLambdaExpressionSyntax)(
-                g.WithExpression(g.VoidReturningLambdaExpression({g.IdentifierName("s")}), Nothing),
-<x>Sub()
+                Generator.WithExpression(Generator.VoidReturningLambdaExpression({Generator.IdentifierName("s")}), Nothing),
+"Sub()
     s
-End Sub</x>.Value)
+End Sub")
 
-            Assert.Null(g.GetExpression(g.WithExpression(g.IdentifierName("e"), g.IdentifierName("x"))))
+            Assert.Null(Generator.GetExpression(Generator.WithExpression(Generator.IdentifierName("e"), Generator.IdentifierName("x"))))
         End Sub
 
         <Fact>
         Public Sub TestGetStatements()
-            Dim stmts = {g.ExpressionStatement(g.AssignmentStatement(g.IdentifierName("x"), g.IdentifierName("y"))), g.ExpressionStatement(g.InvocationExpression(g.IdentifierName("fn"), g.IdentifierName("arg")))}
+            Dim stmts = {Generator.ExpressionStatement(Generator.AssignmentStatement(Generator.IdentifierName("x"), Generator.IdentifierName("y"))), Generator.ExpressionStatement(Generator.InvocationExpression(Generator.IdentifierName("fn"), Generator.IdentifierName("arg")))}
 
-            Assert.Equal(0, g.GetStatements(g.MethodDeclaration("m")).Count)
-            Assert.Equal(2, g.GetStatements(g.MethodDeclaration("m", statements:=stmts)).Count)
+            Assert.Equal(0, Generator.GetStatements(Generator.MethodDeclaration("m")).Count)
+            Assert.Equal(2, Generator.GetStatements(Generator.MethodDeclaration("m", statements:=stmts)).Count)
 
-            Assert.Equal(0, g.GetStatements(g.ConstructorDeclaration()).Count)
-            Assert.Equal(2, g.GetStatements(g.ConstructorDeclaration(statements:=stmts)).Count)
+            Assert.Equal(0, Generator.GetStatements(Generator.ConstructorDeclaration()).Count)
+            Assert.Equal(2, Generator.GetStatements(Generator.ConstructorDeclaration(statements:=stmts)).Count)
 
-            Assert.Equal(0, g.GetStatements(g.VoidReturningLambdaExpression(g.IdentifierName("e"))).Count)
-            Assert.Equal(0, g.GetStatements(g.VoidReturningLambdaExpression({})).Count)
-            Assert.Equal(2, g.GetStatements(g.VoidReturningLambdaExpression(stmts)).Count)
+            Assert.Equal(0, Generator.GetStatements(Generator.VoidReturningLambdaExpression(Generator.IdentifierName("e"))).Count)
+            Assert.Equal(0, Generator.GetStatements(Generator.VoidReturningLambdaExpression({})).Count)
+            Assert.Equal(2, Generator.GetStatements(Generator.VoidReturningLambdaExpression(stmts)).Count)
 
-            Assert.Equal(0, g.GetStatements(g.ValueReturningLambdaExpression(g.IdentifierName("e"))).Count)
-            Assert.Equal(0, g.GetStatements(g.ValueReturningLambdaExpression({})).Count)
-            Assert.Equal(2, g.GetStatements(g.ValueReturningLambdaExpression(stmts)).Count)
+            Assert.Equal(0, Generator.GetStatements(Generator.ValueReturningLambdaExpression(Generator.IdentifierName("e"))).Count)
+            Assert.Equal(0, Generator.GetStatements(Generator.ValueReturningLambdaExpression({})).Count)
+            Assert.Equal(2, Generator.GetStatements(Generator.ValueReturningLambdaExpression(stmts)).Count)
 
-            Assert.Equal(0, g.GetStatements(g.IdentifierName("x")).Count)
+            Assert.Equal(0, Generator.GetStatements(Generator.IdentifierName("x")).Count)
         End Sub
 
         <Fact>
         Public Sub TestWithStatements()
-            Dim stmts = {g.ExpressionStatement(g.AssignmentStatement(g.IdentifierName("x"), g.IdentifierName("y"))), g.ExpressionStatement(g.InvocationExpression(g.IdentifierName("fn"), g.IdentifierName("arg")))}
+            Dim stmts = {Generator.ExpressionStatement(Generator.AssignmentStatement(Generator.IdentifierName("x"), Generator.IdentifierName("y"))), Generator.ExpressionStatement(Generator.InvocationExpression(Generator.IdentifierName("fn"), Generator.IdentifierName("arg")))}
 
-            Assert.Equal(2, g.GetStatements(g.WithStatements(g.MethodDeclaration("m"), stmts)).Count)
-            Assert.Equal(2, g.GetStatements(g.WithStatements(g.ConstructorDeclaration(), stmts)).Count)
+            Assert.Equal(2, Generator.GetStatements(Generator.WithStatements(Generator.MethodDeclaration("m"), stmts)).Count)
+            Assert.Equal(2, Generator.GetStatements(Generator.WithStatements(Generator.ConstructorDeclaration(), stmts)).Count)
 
-            Assert.Equal(2, g.GetStatements(g.WithStatements(g.VoidReturningLambdaExpression({}), stmts)).Count)
-            Assert.Equal(2, g.GetStatements(g.WithStatements(g.ValueReturningLambdaExpression({}), stmts)).Count)
+            Assert.Equal(2, Generator.GetStatements(Generator.WithStatements(Generator.VoidReturningLambdaExpression({}), stmts)).Count)
+            Assert.Equal(2, Generator.GetStatements(Generator.WithStatements(Generator.ValueReturningLambdaExpression({}), stmts)).Count)
 
-            Assert.Equal(2, g.GetStatements(g.WithStatements(g.VoidReturningLambdaExpression(g.IdentifierName("e")), stmts)).Count)
-            Assert.Equal(2, g.GetStatements(g.WithStatements(g.ValueReturningLambdaExpression(g.IdentifierName("e")), stmts)).Count)
+            Assert.Equal(2, Generator.GetStatements(Generator.WithStatements(Generator.VoidReturningLambdaExpression(Generator.IdentifierName("e")), stmts)).Count)
+            Assert.Equal(2, Generator.GetStatements(Generator.WithStatements(Generator.ValueReturningLambdaExpression(Generator.IdentifierName("e")), stmts)).Count)
 
-            Assert.Equal(0, g.GetStatements(g.WithStatements(g.IdentifierName("x"), stmts)).Count)
+            Assert.Equal(0, Generator.GetStatements(Generator.WithStatements(Generator.IdentifierName("x"), stmts)).Count)
         End Sub
 
         <Fact>
         Public Sub TestWithStatements_LambdaChanges()
-            Dim stmts = {g.ExpressionStatement(g.IdentifierName("x")), g.ExpressionStatement(g.IdentifierName("y"))}
+            Dim stmts = {Generator.ExpressionStatement(Generator.IdentifierName("x")), Generator.ExpressionStatement(Generator.IdentifierName("y"))}
 
             VerifySyntax(Of MultiLineLambdaExpressionSyntax)(
-                g.WithStatements(g.VoidReturningLambdaExpression({}), stmts),
-<x>Sub()
+                Generator.WithStatements(Generator.VoidReturningLambdaExpression({}), stmts),
+"Sub()
     x
     y
-End Sub</x>.Value)
+End Sub")
 
             VerifySyntax(Of MultiLineLambdaExpressionSyntax)(
-                g.WithStatements(g.ValueReturningLambdaExpression({}), stmts),
-<x>Function()
+                Generator.WithStatements(Generator.ValueReturningLambdaExpression({}), stmts),
+"Function()
     x
     y
-End Function</x>.Value)
+End Function")
 
             VerifySyntax(Of MultiLineLambdaExpressionSyntax)(
-                g.WithStatements(g.VoidReturningLambdaExpression(g.IdentifierName("e")), stmts),
-<x>Sub()
+                Generator.WithStatements(Generator.VoidReturningLambdaExpression(Generator.IdentifierName("e")), stmts),
+"Sub()
     x
     y
-End Sub</x>.Value)
+End Sub")
 
             VerifySyntax(Of MultiLineLambdaExpressionSyntax)(
-                g.WithStatements(g.ValueReturningLambdaExpression(g.IdentifierName("e")), stmts),
-<x>Function()
+                Generator.WithStatements(Generator.ValueReturningLambdaExpression(Generator.IdentifierName("e")), stmts),
+"Function()
     x
     y
-End Function</x>.Value)
+End Function")
 
             VerifySyntax(Of MultiLineLambdaExpressionSyntax)(
-                g.WithStatements(g.VoidReturningLambdaExpression(stmts), {}),
-<x>Sub()
-End Sub</x>.Value)
+                Generator.WithStatements(Generator.VoidReturningLambdaExpression(stmts), {}),
+"Sub()
+End Sub")
 
             VerifySyntax(Of MultiLineLambdaExpressionSyntax)(
-                g.WithStatements(g.ValueReturningLambdaExpression(stmts), {}),
-<x>Function()
-End Function</x>.Value)
+                Generator.WithStatements(Generator.ValueReturningLambdaExpression(stmts), {}),
+"Function()
+End Function")
 
             VerifySyntax(Of MultiLineLambdaExpressionSyntax)(
-                g.WithStatements(g.VoidReturningLambdaExpression(g.IdentifierName("e")), {}),
-<x>Sub()
-End Sub</x>.Value)
+                Generator.WithStatements(Generator.VoidReturningLambdaExpression(Generator.IdentifierName("e")), {}),
+"Sub()
+End Sub")
 
             VerifySyntax(Of MultiLineLambdaExpressionSyntax)(
-                g.WithStatements(g.ValueReturningLambdaExpression(g.IdentifierName("e")), {}),
-<x>Function()
-End Function</x>.Value)
+                Generator.WithStatements(Generator.ValueReturningLambdaExpression(Generator.IdentifierName("e")), {}),
+"Function()
+End Function")
+        End Sub
+
+        <Fact>
+        Public Sub TestAccessorDeclarations()
+            Dim _g = Me.Generator
+            Dim prop = _g.PropertyDeclaration("p", _g.IdentifierName("T"))
+
+            Assert.Equal(2, _g.GetAccessors(prop).Count)
+
+            ' get accessors from property
+            Dim getAccessor = _g.GetAccessor(prop, DeclarationKind.GetAccessor)
+            Assert.NotNull(getAccessor)
+            VerifySyntax(Of AccessorBlockSyntax)(getAccessor,
+"Get
+End Get")
+
+            Assert.NotNull(getAccessor)
+            Assert.Equal(Accessibility.NotApplicable, _g.GetAccessibility(getAccessor))
+
+            ' get accessors from property
+            Dim setAccessor = _g.GetAccessor(prop, DeclarationKind.SetAccessor)
+            Assert.NotNull(setAccessor)
+            Assert.Equal(Accessibility.NotApplicable, _g.GetAccessibility(setAccessor))
+
+            ' remove accessors
+            Assert.Null(_g.GetAccessor(_g.RemoveNode(prop, getAccessor), DeclarationKind.GetAccessor))
+            Assert.Null(_g.GetAccessor(_g.RemoveNode(prop, setAccessor), DeclarationKind.SetAccessor))
+
+            ' change accessor accessibility
+            Assert.Equal(Accessibility.Public, _g.GetAccessibility(_g.WithAccessibility(getAccessor, Accessibility.Public)))
+            Assert.Equal(Accessibility.Private, _g.GetAccessibility(_g.WithAccessibility(setAccessor, Accessibility.Private)))
+
+            ' change accessor statements
+            Assert.Equal(0, _g.GetStatements(getAccessor).Count)
+            Assert.Equal(0, _g.GetStatements(setAccessor).Count)
+
+            Dim newGetAccessor = _g.WithStatements(getAccessor, Nothing)
+            VerifySyntax(Of AccessorBlockSyntax)(newGetAccessor,
+"Get
+End Get")
+
+            ' change accessors
+            Dim newProp = _g.ReplaceNode(prop, getAccessor, _g.WithAccessibility(getAccessor, Accessibility.Public))
+            Assert.Equal(Accessibility.Public, _g.GetAccessibility(_g.GetAccessor(newProp, DeclarationKind.GetAccessor)))
+
+            newProp = _g.ReplaceNode(prop, setAccessor, _g.WithAccessibility(setAccessor, Accessibility.Public))
+            Assert.Equal(Accessibility.Public, _g.GetAccessibility(_g.GetAccessor(newProp, DeclarationKind.SetAccessor)))
         End Sub
 
         <Fact>
         Public Sub TestGetAccessorStatements()
-            Dim stmts = {g.ExpressionStatement(g.AssignmentStatement(g.IdentifierName("x"), g.IdentifierName("y"))), g.ExpressionStatement(g.InvocationExpression(g.IdentifierName("fn"), g.IdentifierName("arg")))}
+            Dim stmts = {Generator.ExpressionStatement(Generator.AssignmentStatement(Generator.IdentifierName("x"), Generator.IdentifierName("y"))), Generator.ExpressionStatement(Generator.InvocationExpression(Generator.IdentifierName("fn"), Generator.IdentifierName("arg")))}
 
-            Dim p = g.ParameterDeclaration("p", g.IdentifierName("t"))
+            Dim p = Generator.ParameterDeclaration("p", Generator.IdentifierName("t"))
 
             ' get-accessor
-            Assert.Equal(0, g.GetGetAccessorStatements(g.PropertyDeclaration("p", g.IdentifierName("t"))).Count)
-            Assert.Equal(2, g.GetGetAccessorStatements(g.PropertyDeclaration("p", g.IdentifierName("t"), getAccessorStatements:=stmts)).Count)
+            Assert.Equal(0, Generator.GetGetAccessorStatements(Generator.PropertyDeclaration("p", Generator.IdentifierName("t"))).Count)
+            Assert.Equal(2, Generator.GetGetAccessorStatements(Generator.PropertyDeclaration("p", Generator.IdentifierName("t"), getAccessorStatements:=stmts)).Count)
 
-            Assert.Equal(0, g.GetGetAccessorStatements(g.IndexerDeclaration({p}, g.IdentifierName("t"))).Count)
-            Assert.Equal(2, g.GetGetAccessorStatements(g.IndexerDeclaration({p}, g.IdentifierName("t"), getAccessorStatements:=stmts)).Count)
+            Assert.Equal(0, Generator.GetGetAccessorStatements(Generator.IndexerDeclaration({p}, Generator.IdentifierName("t"))).Count)
+            Assert.Equal(2, Generator.GetGetAccessorStatements(Generator.IndexerDeclaration({p}, Generator.IdentifierName("t"), getAccessorStatements:=stmts)).Count)
 
-            Assert.Equal(0, g.GetGetAccessorStatements(g.IdentifierName("x")).Count)
+            Assert.Equal(0, Generator.GetGetAccessorStatements(Generator.IdentifierName("x")).Count)
 
             ' set-accessor
-            Assert.Equal(0, g.GetSetAccessorStatements(g.PropertyDeclaration("p", g.IdentifierName("t"))).Count)
-            Assert.Equal(2, g.GetSetAccessorStatements(g.PropertyDeclaration("p", g.IdentifierName("t"), setAccessorStatements:=stmts)).Count)
+            Assert.Equal(0, Generator.GetSetAccessorStatements(Generator.PropertyDeclaration("p", Generator.IdentifierName("t"))).Count)
+            Assert.Equal(2, Generator.GetSetAccessorStatements(Generator.PropertyDeclaration("p", Generator.IdentifierName("t"), setAccessorStatements:=stmts)).Count)
 
-            Assert.Equal(0, g.GetSetAccessorStatements(g.IndexerDeclaration({p}, g.IdentifierName("t"))).Count)
-            Assert.Equal(2, g.GetSetAccessorStatements(g.IndexerDeclaration({p}, g.IdentifierName("t"), setAccessorStatements:=stmts)).Count)
+            Assert.Equal(0, Generator.GetSetAccessorStatements(Generator.IndexerDeclaration({p}, Generator.IdentifierName("t"))).Count)
+            Assert.Equal(2, Generator.GetSetAccessorStatements(Generator.IndexerDeclaration({p}, Generator.IdentifierName("t"), setAccessorStatements:=stmts)).Count)
 
-            Assert.Equal(0, g.GetSetAccessorStatements(g.IdentifierName("x")).Count)
+            Assert.Equal(0, Generator.GetSetAccessorStatements(Generator.IdentifierName("x")).Count)
         End Sub
 
         <Fact>
         Public Sub TestWithAccessorStatements()
-            Dim stmts = {g.ExpressionStatement(g.AssignmentStatement(g.IdentifierName("x"), g.IdentifierName("y"))), g.ExpressionStatement(g.InvocationExpression(g.IdentifierName("fn"), g.IdentifierName("arg")))}
+            Dim stmts = {Generator.ExpressionStatement(Generator.AssignmentStatement(Generator.IdentifierName("x"), Generator.IdentifierName("y"))), Generator.ExpressionStatement(Generator.InvocationExpression(Generator.IdentifierName("fn"), Generator.IdentifierName("arg")))}
 
-            Dim p = g.ParameterDeclaration("p", g.IdentifierName("t"))
+            Dim p = Generator.ParameterDeclaration("p", Generator.IdentifierName("t"))
 
             ' get-accessor
-            Assert.Equal(2, g.GetGetAccessorStatements(g.WithGetAccessorStatements(g.PropertyDeclaration("p", g.IdentifierName("t")), stmts)).Count)
-            Assert.Equal(2, g.GetGetAccessorStatements(g.WithGetAccessorStatements(g.IndexerDeclaration({p}, g.IdentifierName("t")), stmts)).Count)
-            Assert.Equal(0, g.GetGetAccessorStatements(g.WithGetAccessorStatements(g.IdentifierName("x"), stmts)).Count)
+            Assert.Equal(2, Generator.GetGetAccessorStatements(Generator.WithGetAccessorStatements(Generator.PropertyDeclaration("p", Generator.IdentifierName("t")), stmts)).Count)
+            Assert.Equal(2, Generator.GetGetAccessorStatements(Generator.WithGetAccessorStatements(Generator.IndexerDeclaration({p}, Generator.IdentifierName("t")), stmts)).Count)
+            Assert.Equal(0, Generator.GetGetAccessorStatements(Generator.WithGetAccessorStatements(Generator.IdentifierName("x"), stmts)).Count)
 
             ' set-accessor
-            Assert.Equal(2, g.GetSetAccessorStatements(g.WithSetAccessorStatements(g.PropertyDeclaration("p", g.IdentifierName("t")), stmts)).Count)
-            Assert.Equal(2, g.GetSetAccessorStatements(g.WithSetAccessorStatements(g.IndexerDeclaration({p}, g.IdentifierName("t")), stmts)).Count)
-            Assert.Equal(0, g.GetSetAccessorStatements(g.WithSetAccessorStatements(g.IdentifierName("x"), stmts)).Count)
+            Assert.Equal(2, Generator.GetSetAccessorStatements(Generator.WithSetAccessorStatements(Generator.PropertyDeclaration("p", Generator.IdentifierName("t")), stmts)).Count)
+            Assert.Equal(2, Generator.GetSetAccessorStatements(Generator.WithSetAccessorStatements(Generator.IndexerDeclaration({p}, Generator.IdentifierName("t")), stmts)).Count)
+            Assert.Equal(0, Generator.GetSetAccessorStatements(Generator.WithSetAccessorStatements(Generator.IdentifierName("x"), stmts)).Count)
         End Sub
 
         Private Sub AssertNamesEqual(expectedNames As String(), actualNodes As IReadOnlyList(Of SyntaxNode))
-            Dim actualNames = actualNodes.Select(Function(n) g.GetName(n)).ToArray()
+            Dim actualNames = actualNodes.Select(Function(n) Generator.GetName(n)).ToArray()
             Assert.Equal(expectedNames.Length, actualNames.Length)
             Dim expected = String.Join(", ", expectedNames)
             Dim actual = String.Join(", ", actualNames)
@@ -2202,7 +2940,7 @@ End Function</x>.Value)
         End Sub
 
         Private Sub AssertMemberNamesEqual(expectedNames As String(), declaration As SyntaxNode)
-            AssertNamesEqual(expectedNames, g.GetMembers(declaration))
+            AssertNamesEqual(expectedNames, Generator.GetMembers(declaration))
         End Sub
 
         Private Sub AssertMemberNamesEqual(expectedName As String, declaration As SyntaxNode)
@@ -2211,81 +2949,76 @@ End Function</x>.Value)
 
         <Fact>
         Public Sub TestGetMembers()
-            AssertMemberNamesEqual("m", g.ClassDeclaration("c", members:={g.MethodDeclaration("m")}))
-            AssertMemberNamesEqual("m", g.StructDeclaration("s", members:={g.MethodDeclaration("m")}))
-            AssertMemberNamesEqual("m", g.InterfaceDeclaration("i", members:={g.MethodDeclaration("m")}))
-            AssertMemberNamesEqual("v", g.EnumDeclaration("e", members:={g.EnumMember("v")}))
-            AssertMemberNamesEqual("c", g.NamespaceDeclaration("n", declarations:={g.ClassDeclaration("c")}))
-            AssertMemberNamesEqual("c", g.CompilationUnit(declarations:={g.ClassDeclaration("c")}))
+            AssertMemberNamesEqual("m", Generator.ClassDeclaration("c", members:={Generator.MethodDeclaration("m")}))
+            AssertMemberNamesEqual("m", Generator.StructDeclaration("s", members:={Generator.MethodDeclaration("m")}))
+            AssertMemberNamesEqual("m", Generator.InterfaceDeclaration("i", members:={Generator.MethodDeclaration("m")}))
+            AssertMemberNamesEqual("v", Generator.EnumDeclaration("e", members:={Generator.EnumMember("v")}))
+            AssertMemberNamesEqual("c", Generator.NamespaceDeclaration("n", declarations:={Generator.ClassDeclaration("c")}))
+            AssertMemberNamesEqual("c", Generator.CompilationUnit(declarations:={Generator.ClassDeclaration("c")}))
         End Sub
 
         <Fact>
         Public Sub TestAddMembers()
-            AssertMemberNamesEqual("m", g.AddMembers(g.ClassDeclaration("d"), {g.MethodDeclaration("m")}))
-            AssertMemberNamesEqual("m", g.AddMembers(g.StructDeclaration("s"), {g.MethodDeclaration("m")}))
-            AssertMemberNamesEqual("m", g.AddMembers(g.InterfaceDeclaration("i"), {g.MethodDeclaration("m")}))
-            AssertMemberNamesEqual("v", g.AddMembers(g.EnumDeclaration("e"), {g.EnumMember("v")}))
-            AssertMemberNamesEqual("n2", g.AddMembers(g.NamespaceDeclaration("n"), {g.NamespaceDeclaration("n2")}))
-            AssertMemberNamesEqual("n", g.AddMembers(g.CompilationUnit(), {g.NamespaceDeclaration("n")}))
+            AssertMemberNamesEqual("m", Generator.AddMembers(Generator.ClassDeclaration("d"), {Generator.MethodDeclaration("m")}))
+            AssertMemberNamesEqual("m", Generator.AddMembers(Generator.StructDeclaration("s"), {Generator.MethodDeclaration("m")}))
+            AssertMemberNamesEqual("m", Generator.AddMembers(Generator.InterfaceDeclaration("i"), {Generator.MethodDeclaration("m")}))
+            AssertMemberNamesEqual("v", Generator.AddMembers(Generator.EnumDeclaration("e"), {Generator.EnumMember("v")}))
+            AssertMemberNamesEqual("n2", Generator.AddMembers(Generator.NamespaceDeclaration("n"), {Generator.NamespaceDeclaration("n2")}))
+            AssertMemberNamesEqual("n", Generator.AddMembers(Generator.CompilationUnit(), {Generator.NamespaceDeclaration("n")}))
 
-            AssertMemberNamesEqual({"m", "m2"}, g.AddMembers(g.ClassDeclaration("d", members:={g.MethodDeclaration("m")}), {g.MethodDeclaration("m2")}))
-            AssertMemberNamesEqual({"m", "m2"}, g.AddMembers(g.StructDeclaration("s", members:={g.MethodDeclaration("m")}), {g.MethodDeclaration("m2")}))
-            AssertMemberNamesEqual({"m", "m2"}, g.AddMembers(g.InterfaceDeclaration("i", members:={g.MethodDeclaration("m")}), {g.MethodDeclaration("m2")}))
-            AssertMemberNamesEqual({"v", "v2"}, g.AddMembers(g.EnumDeclaration("i", members:={g.EnumMember("v")}), {g.EnumMember("v2")}))
-            AssertMemberNamesEqual({"n1", "n2"}, g.AddMembers(g.NamespaceDeclaration("n", {g.NamespaceDeclaration("n1")}), {g.NamespaceDeclaration("n2")}))
-            AssertMemberNamesEqual({"n1", "n2"}, g.AddMembers(g.CompilationUnit(declarations:={g.NamespaceDeclaration("n1")}), {g.NamespaceDeclaration("n2")}))
+            AssertMemberNamesEqual({"m", "m2"}, Generator.AddMembers(Generator.ClassDeclaration("d", members:={Generator.MethodDeclaration("m")}), {Generator.MethodDeclaration("m2")}))
+            AssertMemberNamesEqual({"m", "m2"}, Generator.AddMembers(Generator.StructDeclaration("s", members:={Generator.MethodDeclaration("m")}), {Generator.MethodDeclaration("m2")}))
+            AssertMemberNamesEqual({"m", "m2"}, Generator.AddMembers(Generator.InterfaceDeclaration("i", members:={Generator.MethodDeclaration("m")}), {Generator.MethodDeclaration("m2")}))
+            AssertMemberNamesEqual({"v", "v2"}, Generator.AddMembers(Generator.EnumDeclaration("i", members:={Generator.EnumMember("v")}), {Generator.EnumMember("v2")}))
+            AssertMemberNamesEqual({"n1", "n2"}, Generator.AddMembers(Generator.NamespaceDeclaration("n", {Generator.NamespaceDeclaration("n1")}), {Generator.NamespaceDeclaration("n2")}))
+            AssertMemberNamesEqual({"n1", "n2"}, Generator.AddMembers(Generator.CompilationUnit(declarations:={Generator.NamespaceDeclaration("n1")}), {Generator.NamespaceDeclaration("n2")}))
         End Sub
 
         <Fact>
         Public Sub TestRemoveMembers()
-            TestRemoveAllMembers(g.ClassDeclaration("d", members:={g.MethodDeclaration("m")}))
-            TestRemoveAllMembers(g.StructDeclaration("s", members:={g.MethodDeclaration("m")}))
-            TestRemoveAllMembers(g.InterfaceDeclaration("i", members:={g.MethodDeclaration("m")}))
-            TestRemoveAllMembers(g.EnumDeclaration("i", members:={g.EnumMember("v")}))
-            TestRemoveAllMembers(g.AddMembers(g.NamespaceDeclaration("n", {g.NamespaceDeclaration("n1")})))
-            TestRemoveAllMembers(g.AddMembers(g.CompilationUnit(declarations:={g.NamespaceDeclaration("n1")})))
+            TestRemoveAllMembers(Generator.ClassDeclaration("d", members:={Generator.MethodDeclaration("m")}))
+            TestRemoveAllMembers(Generator.StructDeclaration("s", members:={Generator.MethodDeclaration("m")}))
+            TestRemoveAllMembers(Generator.InterfaceDeclaration("i", members:={Generator.MethodDeclaration("m")}))
+            TestRemoveAllMembers(Generator.EnumDeclaration("i", members:={Generator.EnumMember("v")}))
+            TestRemoveAllMembers(Generator.AddMembers(Generator.NamespaceDeclaration("n", {Generator.NamespaceDeclaration("n1")})))
+            TestRemoveAllMembers(Generator.AddMembers(Generator.CompilationUnit(declarations:={Generator.NamespaceDeclaration("n1")})))
         End Sub
 
         Private Sub TestRemoveAllMembers(declaration As SyntaxNode)
-            Assert.Equal(0, g.GetMembers(g.RemoveNodes(declaration, g.GetMembers(declaration))).Count)
-        End Sub
-
-        Private Sub TestRemoveMember(declaration As SyntaxNode, name As String, remainingNames As String())
-            Dim newDecl = g.RemoveNode(declaration, g.GetMembers(declaration).First(Function(m) g.GetName(m) = name))
-            AssertMemberNamesEqual(remainingNames, newDecl)
+            Assert.Equal(0, Generator.GetMembers(Generator.RemoveNodes(declaration, Generator.GetMembers(declaration))).Count)
         End Sub
 
         <Fact>
         Public Sub TestGetBaseAndInterfaceTypes()
             Dim classBI = SyntaxFactory.ParseCompilationUnit(
-<x>Class C
+"Class C
     Inherits B
     Implements I
-End Class</x>.Value).Members(0)
+End Class").Members(0)
 
-            Dim baseListBI = g.GetBaseAndInterfaceTypes(classBI)
+            Dim baseListBI = Generator.GetBaseAndInterfaceTypes(classBI)
             Assert.NotNull(baseListBI)
             Assert.Equal(2, baseListBI.Count)
             Assert.Equal("B", baseListBI(0).ToString())
             Assert.Equal("I", baseListBI(1).ToString())
 
             Dim ifaceI = SyntaxFactory.ParseCompilationUnit(
-<x>Interface I
+"Interface I
     Inherits X
     Inherits Y
-End Class</x>.Value).Members(0)
+End Class").Members(0)
 
-            Dim baseListXY = g.GetBaseAndInterfaceTypes(ifaceI)
+            Dim baseListXY = Generator.GetBaseAndInterfaceTypes(ifaceI)
             Assert.NotNull(baseListXY)
             Assert.Equal(2, baseListXY.Count)
             Assert.Equal("X", baseListXY(0).ToString())
             Assert.Equal("Y", baseListXY(1).ToString())
 
             Dim classN = SyntaxFactory.ParseCompilationUnit(
-<x>Class C
-End Class</x>.Value).Members(0)
+"Class C
+End Class").Members(0)
 
-            Dim baseListN = g.GetBaseAndInterfaceTypes(classN)
+            Dim baseListN = Generator.GetBaseAndInterfaceTypes(classN)
             Assert.NotNull(baseListN)
             Assert.Equal(0, baseListN.Count)
         End Sub
@@ -2293,238 +3026,309 @@ End Class</x>.Value).Members(0)
         <Fact>
         Public Sub TestRemoveBaseAndInterfaceTypes()
             Dim classC = SyntaxFactory.ParseCompilationUnit(
-<x>Class C
+"Class C
     Inherits A
     Implements X, Y
 
-End Class</x>.Value).Members(0)
+End Class").Members(0)
 
-            Dim baseList = g.GetBaseAndInterfaceTypes(classC)
+            Dim baseList = Generator.GetBaseAndInterfaceTypes(classC)
             Assert.Equal(3, baseList.Count)
 
             VerifySyntax(Of ClassBlockSyntax)(
-                g.RemoveNode(classC, baseList(0)),
-<x>Class C
+                Generator.RemoveNode(classC, baseList(0)),
+"Class C
     Implements X, Y
 
-End Class</x>.Value)
+End Class")
 
             VerifySyntax(Of ClassBlockSyntax)(
-                g.RemoveNode(classC, baseList(1)),
-<x>Class C
+                Generator.RemoveNode(classC, baseList(1)),
+"Class C
     Inherits A
     Implements Y
 
-End Class</x>.Value)
+End Class")
 
             VerifySyntax(Of ClassBlockSyntax)(
-                g.RemoveNode(classC, baseList(2)),
-<x>Class C
+                Generator.RemoveNode(classC, baseList(2)),
+"Class C
     Inherits A
     Implements X
 
-End Class</x>.Value)
+End Class")
 
             VerifySyntax(Of ClassBlockSyntax)(
-                g.RemoveNodes(classC, {baseList(1), baseList(2)}),
-<x>Class C
+                Generator.RemoveNodes(classC, {baseList(1), baseList(2)}),
+"Class C
     Inherits A
 
-End Class</x>.Value)
+End Class")
 
             VerifySyntax(Of ClassBlockSyntax)(
-                g.RemoveNodes(classC, baseList),
-<x>Class C
-End Class</x>.Value)
+                Generator.RemoveNodes(classC, baseList),
+"Class C
+End Class")
 
         End Sub
 
         <Fact>
         Public Sub TestAddBaseType()
             Dim classC = SyntaxFactory.ParseCompilationUnit(
-<x>Class C
-End Class</x>.Value).Members(0)
+"Class C
+End Class").Members(0)
 
             Dim classCB = SyntaxFactory.ParseCompilationUnit(
-<x>Class C
+"Class C
     Inherits B
 
-End Class</x>.Value).Members(0)
+End Class").Members(0)
 
             Dim structS = SyntaxFactory.ParseCompilationUnit(
-<x>Structure S
-End Structure</x>.Value).Members(0)
+"Structure S
+End Structure").Members(0)
 
             Dim ifaceI = SyntaxFactory.ParseCompilationUnit(
-<x>Interface I
-End Interface</x>.Value).Members(0)
+"Interface I
+End Interface").Members(0)
 
             VerifySyntax(Of ClassBlockSyntax)(
-                g.AddBaseType(classC, g.IdentifierName("T")),
-<x>Class C
+                Generator.AddBaseType(classC, Generator.IdentifierName("T")),
+"Class C
     Inherits T
 
-End Class</x>.Value)
+End Class")
 
             VerifySyntax(Of ClassBlockSyntax)(
-                g.AddBaseType(classCB, g.IdentifierName("T")),
-<x>Class C
+                Generator.AddBaseType(classCB, Generator.IdentifierName("T")),
+"Class C
     Inherits T
 
-End Class</x>.Value)
+End Class")
 
             VerifySyntax(Of StructureBlockSyntax)(
-                g.AddBaseType(structS, g.IdentifierName("T")),
-<x>Structure S
-End Structure</x>.Value)
+                Generator.AddBaseType(structS, Generator.IdentifierName("T")),
+"Structure S
+End Structure")
 
             VerifySyntax(Of InterfaceBlockSyntax)(
-                g.AddBaseType(ifaceI, g.IdentifierName("T")),
-<x>Interface I
-End Interface</x>.Value)
+                Generator.AddBaseType(ifaceI, Generator.IdentifierName("T")),
+"Interface I
+End Interface")
 
         End Sub
 
         <Fact>
         Public Sub TestAddInterfaceType()
             Dim classC = SyntaxFactory.ParseCompilationUnit(
-<x>Class C
-End Class</x>.Value).Members(0)
+"Class C
+End Class").Members(0)
 
             Dim classCB = SyntaxFactory.ParseCompilationUnit(
-<x>Class C
+"Class C
     Inherits B
 
-End Class</x>.Value).Members(0)
+End Class").Members(0)
 
             Dim classCI = SyntaxFactory.ParseCompilationUnit(
-<x>Class C
+"Class C
     Implements I
 
-End Class</x>.Value).Members(0)
+End Class").Members(0)
 
             Dim structS = SyntaxFactory.ParseCompilationUnit(
-<x>Structure S
-End Structure</x>.Value).Members(0)
+"Structure S
+End Structure").Members(0)
 
             Dim ifaceI = SyntaxFactory.ParseCompilationUnit(
-<x>Interface I
-End Interface</x>.Value).Members(0)
+"Interface I
+End Interface").Members(0)
 
             VerifySyntax(Of ClassBlockSyntax)(
-                g.AddInterfaceType(classC, g.IdentifierName("T")),
-<x>Class C
+                Generator.AddInterfaceType(classC, Generator.IdentifierName("T")),
+"Class C
     Implements T
 
-End Class</x>.Value)
+End Class")
 
             VerifySyntax(Of ClassBlockSyntax)(
-                g.AddInterfaceType(classCB, g.IdentifierName("T")),
-<x>Class C
+                Generator.AddInterfaceType(classCB, Generator.IdentifierName("T")),
+"Class C
     Inherits B
     Implements T
 
-End Class</x>.Value)
+End Class")
 
             VerifySyntax(Of ClassBlockSyntax)(
-                g.AddInterfaceType(classCI, g.IdentifierName("T")),
-<x>Class C
+                Generator.AddInterfaceType(classCI, Generator.IdentifierName("T")),
+"Class C
     Implements I, T
 
-End Class</x>.Value)
+End Class")
 
             VerifySyntax(Of StructureBlockSyntax)(
-                g.AddInterfaceType(structS, g.IdentifierName("T")),
-<x>Structure S
+                Generator.AddInterfaceType(structS, Generator.IdentifierName("T")),
+"Structure S
     Implements T
 
-End Structure</x>.Value)
+End Structure")
 
             VerifySyntax(Of InterfaceBlockSyntax)(
-                g.AddInterfaceType(ifaceI, g.IdentifierName("T")),
-<x>Interface I
+                Generator.AddInterfaceType(ifaceI, Generator.IdentifierName("T")),
+"Interface I
     Inherits T
 
-End Interface</x>.Value)
+End Interface")
+
+        End Sub
+
+        <Fact>
+        <WorkItem(5097, "https://github.com/dotnet/roslyn/issues/5097")>
+        Public Sub TestAddInterfaceWithEOLs()
+            Dim classC = SyntaxFactory.ParseCompilationUnit("
+Public Class C
+End Class").Members(0)
+
+            VerifySyntaxRaw(Of ClassBlockSyntax)(
+                Generator.AddInterfaceType(classC, Generator.IdentifierName("X")), "
+Public Class C
+ImplementsXEnd Class")
+
+            Dim interfaceI = SyntaxFactory.ParseCompilationUnit("
+Public Interface I
+End Interface").Members(0)
+
+            VerifySyntaxRaw(Of InterfaceBlockSyntax)(
+                Generator.AddInterfaceType(interfaceI, Generator.IdentifierName("X")), "
+Public Interface I
+InheritsXEnd Interface")
+
+            Dim classCX = SyntaxFactory.ParseCompilationUnit("
+Public Class C
+    Implements X
+End Class").Members(0)
+
+            VerifySyntaxRaw(Of ClassBlockSyntax)(
+                Generator.AddInterfaceType(classCX, Generator.IdentifierName("Y")), "
+Public Class C
+    Implements X,Y
+End Class")
+
+            Dim interfaceIX = SyntaxFactory.ParseCompilationUnit("
+Public Interface I
+    Inherits X
+End Interface").Members(0)
+
+            VerifySyntaxRaw(Of InterfaceBlockSyntax)(
+                Generator.AddInterfaceType(interfaceIX, Generator.IdentifierName("Y")), "
+Public Interface I
+    Inherits X,Y
+End Interface")
+
+            Dim classCXY = SyntaxFactory.ParseCompilationUnit("
+Public Class C
+    Implements X
+    Implements Y
+End Class").Members(0)
+
+            VerifySyntaxRaw(Of ClassBlockSyntax)(
+                Generator.AddInterfaceType(classCXY, Generator.IdentifierName("Z")), "
+Public Class C
+    Implements X
+    Implements Y
+ImplementsZEnd Class")
+
+            Dim interfaceIXY = SyntaxFactory.ParseCompilationUnit("
+Public Interface I
+    Inherits X
+    Inherits Y
+End Interface").Members(0)
+
+            VerifySyntaxRaw(Of InterfaceBlockSyntax)(
+                Generator.AddInterfaceType(interfaceIXY, Generator.IdentifierName("Z")), "
+Public Interface I
+    Inherits X
+    Inherits Y
+InheritsZEnd Interface")
 
         End Sub
 
         <Fact>
         Public Sub TestMultiFieldMembers()
             Dim comp = Compile(
-<x>' Comment
+"' Comment
 Public Class C
     Public Shared X, Y, Z As Integer
-End Class</x>.Value)
+End Class")
 
             Dim symbolC = DirectCast(comp.GlobalNamespace.GetMembers("C").First(), INamedTypeSymbol)
             Dim symbolX = DirectCast(symbolC.GetMembers("X").First(), IFieldSymbol)
             Dim symbolY = DirectCast(symbolC.GetMembers("Y").First(), IFieldSymbol)
             Dim symbolZ = DirectCast(symbolC.GetMembers("Z").First(), IFieldSymbol)
 
-            Dim declC = g.GetDeclaration(symbolC.DeclaringSyntaxReferences.Select(Function(x) x.GetSyntax()).First())
-            Dim declX = g.GetDeclaration(symbolX.DeclaringSyntaxReferences.Select(Function(x) x.GetSyntax()).First())
-            Dim declY = g.GetDeclaration(symbolY.DeclaringSyntaxReferences.Select(Function(x) x.GetSyntax()).First())
-            Dim declZ = g.GetDeclaration(symbolZ.DeclaringSyntaxReferences.Select(Function(x) x.GetSyntax()).First())
+            Dim declC = Generator.GetDeclaration(symbolC.DeclaringSyntaxReferences.Select(Function(x) x.GetSyntax()).First())
+            Dim declX = Generator.GetDeclaration(symbolX.DeclaringSyntaxReferences.Select(Function(x) x.GetSyntax()).First())
+            Dim declY = Generator.GetDeclaration(symbolY.DeclaringSyntaxReferences.Select(Function(x) x.GetSyntax()).First())
+            Dim declZ = Generator.GetDeclaration(symbolZ.DeclaringSyntaxReferences.Select(Function(x) x.GetSyntax()).First())
 
             Assert.Equal(SyntaxKind.ModifiedIdentifier, declX.Kind)
             Assert.Equal(SyntaxKind.ModifiedIdentifier, declY.Kind)
             Assert.Equal(SyntaxKind.ModifiedIdentifier, declZ.Kind)
 
-            Assert.Equal(DeclarationKind.Field, g.GetDeclarationKind(declX))
-            Assert.Equal(DeclarationKind.Field, g.GetDeclarationKind(declY))
-            Assert.Equal(DeclarationKind.Field, g.GetDeclarationKind(declZ))
+            Assert.Equal(DeclarationKind.Field, Generator.GetDeclarationKind(declX))
+            Assert.Equal(DeclarationKind.Field, Generator.GetDeclarationKind(declY))
+            Assert.Equal(DeclarationKind.Field, Generator.GetDeclarationKind(declZ))
 
-            Assert.NotNull(g.GetType(declX))
-            Assert.Equal("Integer", g.GetType(declX).ToString())
-            Assert.Equal("X", g.GetName(declX))
-            Assert.Equal(Accessibility.Public, g.GetAccessibility(declX))
-            Assert.Equal(DeclarationModifiers.Static, g.GetModifiers(declX))
+            Assert.NotNull(Generator.GetType(declX))
+            Assert.Equal("Integer", Generator.GetType(declX).ToString())
+            Assert.Equal("X", Generator.GetName(declX))
+            Assert.Equal(Accessibility.Public, Generator.GetAccessibility(declX))
+            Assert.Equal(DeclarationModifiers.Static, Generator.GetModifiers(declX))
 
-            Assert.NotNull(g.GetType(declY))
-            Assert.Equal("Integer", g.GetType(declY).ToString())
-            Assert.Equal("Y", g.GetName(declY))
-            Assert.Equal(Accessibility.Public, g.GetAccessibility(declY))
-            Assert.Equal(DeclarationModifiers.Static, g.GetModifiers(declY))
+            Assert.NotNull(Generator.GetType(declY))
+            Assert.Equal("Integer", Generator.GetType(declY).ToString())
+            Assert.Equal("Y", Generator.GetName(declY))
+            Assert.Equal(Accessibility.Public, Generator.GetAccessibility(declY))
+            Assert.Equal(DeclarationModifiers.Static, Generator.GetModifiers(declY))
 
-            Assert.NotNull(g.GetType(declZ))
-            Assert.Equal("Integer", g.GetType(declZ).ToString())
-            Assert.Equal("Z", g.GetName(declZ))
-            Assert.Equal(Accessibility.Public, g.GetAccessibility(declZ))
-            Assert.Equal(DeclarationModifiers.Static, g.GetModifiers(declZ))
+            Assert.NotNull(Generator.GetType(declZ))
+            Assert.Equal("Integer", Generator.GetType(declZ).ToString())
+            Assert.Equal("Z", Generator.GetName(declZ))
+            Assert.Equal(Accessibility.Public, Generator.GetAccessibility(declZ))
+            Assert.Equal(DeclarationModifiers.Static, Generator.GetModifiers(declZ))
 
-            Dim xTypedT = g.WithType(declX, g.IdentifierName("T"))
-            Assert.Equal(DeclarationKind.Field, g.GetDeclarationKind(xTypedT))
+            Dim xTypedT = Generator.WithType(declX, Generator.IdentifierName("T"))
+            Assert.Equal(DeclarationKind.Field, Generator.GetDeclarationKind(xTypedT))
             Assert.Equal(SyntaxKind.FieldDeclaration, xTypedT.Kind)
-            Assert.Equal("T", g.GetType(xTypedT).ToString())
+            Assert.Equal("T", Generator.GetType(xTypedT).ToString())
 
-            Dim xNamedQ = g.WithName(declX, "Q")
-            Assert.Equal(DeclarationKind.Field, g.GetDeclarationKind(xNamedQ))
+            Dim xNamedQ = Generator.WithName(declX, "Q")
+            Assert.Equal(DeclarationKind.Field, Generator.GetDeclarationKind(xNamedQ))
             Assert.Equal(SyntaxKind.FieldDeclaration, xNamedQ.Kind)
-            Assert.Equal("Q", g.GetName(xNamedQ).ToString())
+            Assert.Equal("Q", Generator.GetName(xNamedQ).ToString())
 
-            Dim xInitialized = g.WithExpression(declX, g.IdentifierName("e"))
-            Assert.Equal(DeclarationKind.Field, g.GetDeclarationKind(xInitialized))
+            Dim xInitialized = Generator.WithExpression(declX, Generator.IdentifierName("e"))
+            Assert.Equal(DeclarationKind.Field, Generator.GetDeclarationKind(xInitialized))
             Assert.Equal(SyntaxKind.FieldDeclaration, xInitialized.Kind)
-            Assert.Equal("e", g.GetExpression(xInitialized).ToString())
+            Assert.Equal("e", Generator.GetExpression(xInitialized).ToString())
 
-            Dim xPrivate = g.WithAccessibility(declX, Accessibility.Private)
-            Assert.Equal(DeclarationKind.Field, g.GetDeclarationKind(xPrivate))
+            Dim xPrivate = Generator.WithAccessibility(declX, Accessibility.Private)
+            Assert.Equal(DeclarationKind.Field, Generator.GetDeclarationKind(xPrivate))
             Assert.Equal(SyntaxKind.FieldDeclaration, xPrivate.Kind)
-            Assert.Equal(Accessibility.Private, g.GetAccessibility(xPrivate))
+            Assert.Equal(Accessibility.Private, Generator.GetAccessibility(xPrivate))
 
-            Dim xReadOnly = g.WithModifiers(declX, DeclarationModifiers.ReadOnly)
-            Assert.Equal(DeclarationKind.Field, g.GetDeclarationKind(xReadOnly))
+            Dim xReadOnly = Generator.WithModifiers(declX, DeclarationModifiers.ReadOnly)
+            Assert.Equal(DeclarationKind.Field, Generator.GetDeclarationKind(xReadOnly))
             Assert.Equal(SyntaxKind.FieldDeclaration, xReadOnly.Kind)
-            Assert.Equal(DeclarationModifiers.ReadOnly, g.GetModifiers(xReadOnly))
+            Assert.Equal(DeclarationModifiers.ReadOnly, Generator.GetModifiers(xReadOnly))
 
-            Dim xAttributed = g.AddAttributes(declX, g.Attribute("A"))
-            Assert.Equal(DeclarationKind.Field, g.GetDeclarationKind(xAttributed))
+            Dim xAttributed = Generator.AddAttributes(declX, Generator.Attribute("A"))
+            Assert.Equal(DeclarationKind.Field, Generator.GetDeclarationKind(xAttributed))
             Assert.Equal(SyntaxKind.FieldDeclaration, xAttributed.Kind)
-            Assert.Equal(1, g.GetAttributes(xAttributed).Count)
-            Assert.Equal("<A>", g.GetAttributes(xAttributed)(0).ToString())
+            Assert.Equal(1, Generator.GetAttributes(xAttributed).Count)
+            Assert.Equal("<A>", Generator.GetAttributes(xAttributed)(0).ToString())
 
-            Dim membersC = g.GetMembers(declC)
+            Dim membersC = Generator.GetMembers(declC)
             Assert.Equal(3, membersC.Count)
             Assert.Equal(declX, membersC(0))
             Assert.Equal(declY, membersC(1))
@@ -2532,27 +3336,27 @@ End Class</x>.Value)
 
             ' create new class from existing members, now appear as separate declarations
             VerifySyntax(Of ClassBlockSyntax)(
-                g.ClassDeclaration("C", members:={declX, declY}),
-<x>Class C
+                Generator.ClassDeclaration("C", members:={declX, declY}),
+"Class C
 
     Public Shared X As Integer
 
     Public Shared Y As Integer
-End Class</x>.Value)
+End Class")
 
             VerifySyntax(Of ClassBlockSyntax)(
-                g.InsertMembers(declC, 0, g.FieldDeclaration("A", g.IdentifierName("T"))),
-<x>' Comment
+                Generator.InsertMembers(declC, 0, Generator.FieldDeclaration("A", Generator.IdentifierName("T"))),
+"' Comment
 Public Class C
 
     Dim A As T
 
     Public Shared X, Y, Z As Integer
-End Class</x>.Value)
+End Class")
 
             VerifySyntax(Of ClassBlockSyntax)(
-                g.InsertMembers(declC, 1, g.FieldDeclaration("A", g.IdentifierName("T"))),
-<x>' Comment
+                Generator.InsertMembers(declC, 1, Generator.FieldDeclaration("A", Generator.IdentifierName("T"))),
+"' Comment
 Public Class C
 
     Public Shared X As Integer
@@ -2560,11 +3364,11 @@ Public Class C
     Dim A As T
 
     Public Shared Y, Z As Integer
-End Class</x>.Value)
+End Class")
 
             VerifySyntax(Of ClassBlockSyntax)(
-                g.InsertMembers(declC, 2, g.FieldDeclaration("A", g.IdentifierName("T"))),
-<x>' Comment
+                Generator.InsertMembers(declC, 2, Generator.FieldDeclaration("A", Generator.IdentifierName("T"))),
+"' Comment
 Public Class C
 
     Public Shared X, Y As Integer
@@ -2572,49 +3376,57 @@ Public Class C
     Dim A As T
 
     Public Shared Z As Integer
-End Class</x>.Value)
+End Class")
 
             VerifySyntax(Of ClassBlockSyntax)(
-                g.InsertMembers(declC, 3, g.FieldDeclaration("A", g.IdentifierName("T"))),
-<x>' Comment
+                Generator.InsertMembers(declC, 3, Generator.FieldDeclaration("A", Generator.IdentifierName("T"))),
+"' Comment
 Public Class C
 
     Public Shared X, Y, Z As Integer
 
     Dim A As T
-End Class</x>.Value)
+End Class")
 
             VerifySyntax(Of ClassBlockSyntax)(
-                g.ReplaceNode(declC, declX, g.WithType(declX, g.IdentifierName("T"))),
-<x>' Comment
+                Generator.ReplaceNode(declC, declX, Generator.WithType(declX, Generator.IdentifierName("T"))),
+"' Comment
 Public Class C
 
     Public Shared X As T
 
     Public Shared Y, Z As Integer
-End Class</x>.Value)
+End Class")
 
             VerifySyntax(Of ClassBlockSyntax)(
-                g.ReplaceNode(declC, declX, g.WithExpression(declX, g.IdentifierName("e"))),
-<x>' Comment
+                Generator.ReplaceNode(declC, declX, Generator.WithExpression(declX, Generator.IdentifierName("e"))),
+"' Comment
 Public Class C
 
     Public Shared X As Integer = e
 
     Public Shared Y, Z As Integer
-End Class</x>.Value)
+End Class")
 
             VerifySyntax(Of ClassBlockSyntax)(
-                g.ReplaceNode(declC, declX, g.WithName(declX, "Q")),
-<x>' Comment
+                Generator.ReplaceNode(declC, declX, Generator.WithName(declX, "Q")),
+"' Comment
 Public Class C
 
     Public Shared Q, Y, Z As Integer
-End Class</x>.Value)
+End Class")
 
             VerifySyntax(Of ClassBlockSyntax)(
-                g.ReplaceNode(declC, declY, g.WithType(declY, g.IdentifierName("T"))),
-<x>' Comment
+                Generator.ReplaceNode(declC, declX.GetAncestorOrThis(Of ModifiedIdentifierSyntax), SyntaxFactory.ModifiedIdentifier("Q")),
+"' Comment
+Public Class C
+
+    Public Shared Q, Y, Z As Integer
+End Class")
+
+            VerifySyntax(Of ClassBlockSyntax)(
+                Generator.ReplaceNode(declC, declY, Generator.WithType(declY, Generator.IdentifierName("T"))),
+"' Comment
 Public Class C
 
     Public Shared X As Integer
@@ -2622,95 +3434,95 @@ Public Class C
     Public Shared Y As T
 
     Public Shared Z As Integer
-End Class</x>.Value)
+End Class")
 
             VerifySyntax(Of ClassBlockSyntax)(
-                g.ReplaceNode(declC, declZ, g.WithType(declZ, g.IdentifierName("T"))),
-<x>' Comment
+                Generator.ReplaceNode(declC, declZ, Generator.WithType(declZ, Generator.IdentifierName("T"))),
+"' Comment
 Public Class C
 
     Public Shared X, Y As Integer
 
     Public Shared Z As T
-End Class</x>.Value)
+End Class")
 
             VerifySyntax(Of ClassBlockSyntax)(
-                g.ReplaceNode(declC, declX, declZ),
-<x>' Comment
+                Generator.ReplaceNode(declC, declX, declZ),
+"' Comment
 Public Class C
 
     Public Shared Z, Y, Z As Integer
-End Class</x>.Value)
+End Class")
 
-            ' Removing 
+            ' Removing
             VerifySyntax(Of ClassBlockSyntax)(
-                g.RemoveNode(declC, declX),
-<x>' Comment
+                Generator.RemoveNode(declC, declX),
+"' Comment
 Public Class C
 
     Public Shared Y, Z As Integer
-End Class</x>.Value)
+End Class")
 
             VerifySyntax(Of ClassBlockSyntax)(
-                g.RemoveNode(declC, declY),
-<x>' Comment
+                Generator.RemoveNode(declC, declY),
+"' Comment
 Public Class C
 
     Public Shared X, Z As Integer
-End Class</x>.Value)
+End Class")
 
             VerifySyntax(Of ClassBlockSyntax)(
-                g.RemoveNode(declC, declZ),
-<x>' Comment
+                Generator.RemoveNode(declC, declZ),
+"' Comment
 Public Class C
 
     Public Shared X, Y As Integer
-End Class</x>.Value)
+End Class")
 
             VerifySyntax(Of ClassBlockSyntax)(
-                g.RemoveNodes(declC, {declX, declY}),
-<x>' Comment
+                Generator.RemoveNodes(declC, {declX, declY}),
+"' Comment
 Public Class C
 
     Public Shared Z As Integer
-End Class</x>.Value)
+End Class")
 
             VerifySyntax(Of ClassBlockSyntax)(
-                g.RemoveNodes(declC, {declX, declZ}),
-<x>' Comment
+                Generator.RemoveNodes(declC, {declX, declZ}),
+"' Comment
 Public Class C
 
     Public Shared Y As Integer
-End Class</x>.Value)
+End Class")
 
             VerifySyntax(Of ClassBlockSyntax)(
-                g.RemoveNodes(declC, {declY, declZ}),
-<x>' Comment
+                Generator.RemoveNodes(declC, {declY, declZ}),
+"' Comment
 Public Class C
 
     Public Shared X As Integer
-End Class</x>.Value)
+End Class")
 
             VerifySyntax(Of ClassBlockSyntax)(
-                g.RemoveNodes(declC, {declX, declY, declZ}),
-<x>' Comment
+                Generator.RemoveNodes(declC, {declX, declY, declZ}),
+"' Comment
 Public Class C
-End Class</x>.Value)
+End Class")
 
         End Sub
 
         <Fact>
         Public Sub TestMultiAttributes()
             Dim comp = Compile(
-<x>' Comment
-&lt;X, Y, Z&gt;
+"' Comment
+<X, Y, Z>
 Public Class C
-End Class</x>.Value)
+End Class")
 
             Dim symbolC = DirectCast(comp.GlobalNamespace.GetMembers("C").First(), INamedTypeSymbol)
-            Dim declC = g.GetDeclaration(symbolC.DeclaringSyntaxReferences.First().GetSyntax())
+            Dim declC = Generator.GetDeclaration(symbolC.DeclaringSyntaxReferences.First().GetSyntax())
 
-            Dim attrs = g.GetAttributes(declC)
+            Dim attrs = Generator.GetAttributes(declC)
             Assert.Equal(3, attrs.Count)
             Dim declX = attrs(0)
             Dim declY = attrs(1)
@@ -2718,228 +3530,229 @@ End Class</x>.Value)
             Assert.Equal(SyntaxKind.Attribute, declX.Kind)
             Assert.Equal(SyntaxKind.Attribute, declY.Kind)
             Assert.Equal(SyntaxKind.Attribute, declZ.Kind)
-            Assert.Equal("X", g.GetName(declX))
-            Assert.Equal("Y", g.GetName(declY))
-            Assert.Equal("Z", g.GetName(declZ))
+            Assert.Equal("X", Generator.GetName(declX))
+            Assert.Equal("Y", Generator.GetName(declY))
+            Assert.Equal("Z", Generator.GetName(declZ))
 
-            Dim xNamedQ = g.WithName(declX, "Q")
-            Assert.Equal(DeclarationKind.Attribute, g.GetDeclarationKind(xNamedQ))
+            Dim xNamedQ = Generator.WithName(declX, "Q")
+            Assert.Equal(DeclarationKind.Attribute, Generator.GetDeclarationKind(xNamedQ))
             Assert.Equal(SyntaxKind.AttributeList, xNamedQ.Kind)
             Assert.Equal("<Q>", xNamedQ.ToString())
 
-            Dim xWithArg = g.AddAttributeArguments(declX, {g.AttributeArgument(g.IdentifierName("e"))})
-            Assert.Equal(DeclarationKind.Attribute, g.GetDeclarationKind(xWithArg))
+            Dim xWithArg = Generator.AddAttributeArguments(declX, {Generator.AttributeArgument(Generator.IdentifierName("e"))})
+            Assert.Equal(DeclarationKind.Attribute, Generator.GetDeclarationKind(xWithArg))
             Assert.Equal(SyntaxKind.AttributeList, xWithArg.Kind)
             Assert.Equal("<X(e)>", xWithArg.ToString())
 
             ' inserting
             VerifySyntax(Of ClassBlockSyntax)(
-                g.InsertAttributes(declC, 0, g.Attribute("A")),
-<x>' Comment
-&lt;A&gt;
-&lt;X, Y, Z&gt;
+                Generator.InsertAttributes(declC, 0, Generator.Attribute("A")),
+"' Comment
+<A>
+<X, Y, Z>
 Public Class C
-End Class</x>.Value)
+End Class")
 
             VerifySyntax(Of ClassBlockSyntax)(
-                g.InsertAttributes(declC, 1, g.Attribute("A")),
-<x>' Comment
-&lt;X&gt;
-&lt;A&gt;
-&lt;Y, Z&gt;
+                Generator.InsertAttributes(declC, 1, Generator.Attribute("A")),
+"' Comment
+<X>
+<A>
+<Y, Z>
 Public Class C
-End Class</x>.Value)
+End Class")
 
             VerifySyntax(Of ClassBlockSyntax)(
-                g.InsertAttributes(declC, 2, g.Attribute("A")),
-<x>' Comment
-&lt;X, Y&gt;
-&lt;A&gt;
-&lt;Z&gt;
+                Generator.InsertAttributes(declC, 2, Generator.Attribute("A")),
+"' Comment
+<X, Y>
+<A>
+<Z>
 Public Class C
-End Class</x>.Value)
+End Class")
 
             VerifySyntax(Of ClassBlockSyntax)(
-                g.InsertAttributes(declC, 3, g.Attribute("A")),
-<x>' Comment
-&lt;X, Y, Z&gt;
-&lt;A&gt;
+                Generator.InsertAttributes(declC, 3, Generator.Attribute("A")),
+"' Comment
+<X, Y, Z>
+<A>
 Public Class C
-End Class</x>.Value)
+End Class")
 
             ' replacing
             VerifySyntax(Of ClassBlockSyntax)(
-                g.ReplaceNode(declC, declX, g.Attribute("A")),
-<x>' Comment
-&lt;A, Y, Z&gt;
+                Generator.ReplaceNode(declC, declX, Generator.Attribute("A")),
+"' Comment
+<A, Y, Z>
 Public Class C
-End Class</x>.Value)
+End Class")
 
             VerifySyntax(Of ClassBlockSyntax)(
-                g.ReplaceNode(declC, declX, g.InsertAttributeArguments(declX, 0, {g.AttributeArgument(g.IdentifierName("e"))})),
-<x>' Comment
-&lt;X(e), Y, Z&gt;
+                Generator.ReplaceNode(declC, declX, Generator.InsertAttributeArguments(declX, 0, {Generator.AttributeArgument(Generator.IdentifierName("e"))})),
+"' Comment
+<X(e), Y, Z>
 Public Class C
-End Class</x>.Value)
+End Class")
 
             ' removing
             VerifySyntax(Of ClassBlockSyntax)(
-                g.RemoveNode(declC, declX),
-<x>' Comment
-&lt;Y, Z&gt;
+                Generator.RemoveNode(declC, declX),
+"' Comment
+<Y, Z>
 Public Class C
-End Class</x>.Value)
+End Class")
 
             VerifySyntax(Of ClassBlockSyntax)(
-                g.RemoveNode(declC, declY),
-<x>' Comment
-&lt;X, Z&gt;
+                Generator.RemoveNode(declC, declY),
+"' Comment
+<X, Z>
 Public Class C
-End Class</x>.Value)
+End Class")
 
             VerifySyntax(Of ClassBlockSyntax)(
-                g.RemoveNode(declC, declZ),
-<x>' Comment
-&lt;X, Y&gt;
+                Generator.RemoveNode(declC, declZ),
+"' Comment
+<X, Y>
 Public Class C
-End Class</x>.Value)
+End Class")
 
             VerifySyntax(Of ClassBlockSyntax)(
-                g.RemoveNodes(declC, {declX, declY}),
-<x>' Comment
-&lt;Z&gt;
+                Generator.RemoveNodes(declC, {declX, declY}),
+"' Comment
+<Z>
 Public Class C
-End Class</x>.Value)
+End Class")
 
             VerifySyntax(Of ClassBlockSyntax)(
-                g.RemoveNodes(declC, {declX, declZ}),
-<x>' Comment
-&lt;Y&gt;
+                Generator.RemoveNodes(declC, {declX, declZ}),
+"' Comment
+<Y>
 Public Class C
-End Class</x>.Value)
+End Class")
 
             VerifySyntax(Of ClassBlockSyntax)(
-                g.RemoveNodes(declC, {declY, declZ}),
-<x>' Comment
-&lt;X&gt;
+                Generator.RemoveNodes(declC, {declY, declZ}),
+"' Comment
+<X>
 Public Class C
-End Class</x>.Value)
+End Class")
 
             VerifySyntax(Of ClassBlockSyntax)(
-                g.RemoveNodes(declC, {declX, declY, declZ}),
-<x>' Comment
+                Generator.RemoveNodes(declC, {declX, declY, declZ}),
+"' Comment
 Public Class C
-End Class</x>.Value)
+End Class")
         End Sub
 
         <Fact>
         Public Sub TestMultiImports()
             Dim comp = Compile(
-<x>' Comment
+"' Comment
 Imports X, Y, Z
-</x>.Value)
+")
 
             Dim declCU = comp.SyntaxTrees.First().GetRoot()
 
             Assert.Equal(SyntaxKind.CompilationUnit, declCU.Kind)
-            Dim imps = g.GetNamespaceImports(declCU)
+            Dim imps = Generator.GetNamespaceImports(declCU)
             Assert.Equal(3, imps.Count)
             Dim declX = imps(0)
             Dim declY = imps(1)
             Dim declZ = imps(2)
 
-            Dim xRenamedQ = g.WithName(declX, "Q")
-            Assert.Equal(DeclarationKind.NamespaceImport, g.GetDeclarationKind(xRenamedQ))
+            Dim xRenamedQ = Generator.WithName(declX, "Q")
+            Assert.Equal(DeclarationKind.NamespaceImport, Generator.GetDeclarationKind(xRenamedQ))
             Assert.Equal(SyntaxKind.ImportsStatement, xRenamedQ.Kind)
             Assert.Equal("Imports Q", xRenamedQ.ToString())
 
             ' inserting
             VerifySyntax(Of CompilationUnitSyntax)(
-                g.InsertNamespaceImports(declCU, 0, g.NamespaceImportDeclaration("N")),
-<x>' Comment
+                Generator.InsertNamespaceImports(declCU, 0, Generator.NamespaceImportDeclaration("N")),
+"' Comment
 Imports N
 Imports X, Y, Z
-</x>.Value)
+")
 
             VerifySyntax(Of CompilationUnitSyntax)(
-                g.InsertNamespaceImports(declCU, 1, g.NamespaceImportDeclaration("N")),
-<x>' Comment
+                Generator.InsertNamespaceImports(declCU, 1, Generator.NamespaceImportDeclaration("N")),
+"' Comment
 Imports X
 Imports N
 Imports Y, Z
-</x>.Value)
+")
 
             VerifySyntax(Of CompilationUnitSyntax)(
-                g.InsertNamespaceImports(declCU, 2, g.NamespaceImportDeclaration("N")),
-<x>' Comment
+                Generator.InsertNamespaceImports(declCU, 2, Generator.NamespaceImportDeclaration("N")),
+"' Comment
 Imports X, Y
 Imports N
 Imports Z
-</x>.Value)
+")
 
             VerifySyntax(Of CompilationUnitSyntax)(
-                g.InsertNamespaceImports(declCU, 3, g.NamespaceImportDeclaration("N")),
-<x>' Comment
+                Generator.InsertNamespaceImports(declCU, 3, Generator.NamespaceImportDeclaration("N")),
+"' Comment
 Imports X, Y, Z
 Imports N
-</x>.Value)
+")
 
             ' Replacing
             VerifySyntax(Of CompilationUnitSyntax)(
-                g.ReplaceNode(declCU, declX, g.NamespaceImportDeclaration("N")),
-<x>' Comment
+                Generator.ReplaceNode(declCU, declX, Generator.NamespaceImportDeclaration("N")),
+"' Comment
 Imports N, Y, Z
-</x>.Value)
+")
 
             ' Removing
             VerifySyntax(Of CompilationUnitSyntax)(
-                g.RemoveNode(declCU, declX),
-<x>' Comment
+                Generator.RemoveNode(declCU, declX),
+"' Comment
 Imports Y, Z
-</x>.Value)
+")
 
             ' Removing
             VerifySyntax(Of CompilationUnitSyntax)(
-                g.RemoveNode(declCU, declY),
-<x>' Comment
+                Generator.RemoveNode(declCU, declY),
+"' Comment
 Imports X, Z
-</x>.Value)
+")
 
             ' Removing
             VerifySyntax(Of CompilationUnitSyntax)(
-                g.RemoveNode(declCU, declZ),
-<x>' Comment
+                Generator.RemoveNode(declCU, declZ),
+"' Comment
 Imports X, Y
-</x>.Value)
+")
 
             ' Removing
             VerifySyntax(Of CompilationUnitSyntax)(
-                g.RemoveNodes(declCU, {declX, declY}),
-<x>' Comment
+                Generator.RemoveNodes(declCU, {declX, declY}),
+"' Comment
 Imports Z
-</x>.Value)
+")
 
             ' Removing
             VerifySyntax(Of CompilationUnitSyntax)(
-                g.RemoveNodes(declCU, {declX, declZ}),
-<x>' Comment
+                Generator.RemoveNodes(declCU, {declX, declZ}),
+"' Comment
 Imports Y
-</x>.Value)
+")
 
             ' Removing
             VerifySyntax(Of CompilationUnitSyntax)(
-                g.RemoveNodes(declCU, {declY, declZ}),
-<x>' Comment
+                Generator.RemoveNodes(declCU, {declY, declZ}),
+"' Comment
 Imports X
-</x>.Value)
+")
 
             ' Removing
             VerifySyntax(Of CompilationUnitSyntax)(
-                g.RemoveNodes(declCU, {declX, declY, declZ}),
-<x>' Comment
-</x>.Value)
+                Generator.RemoveNodes(declCU, {declX, declY, declZ}),
+"' Comment
+")
 
         End Sub
+#End Region
 
     End Class
 End Namespace

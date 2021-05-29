@@ -1,4 +1,6 @@
-' Copyright (c) Microsoft.  All Rights Reserved.  Licensed under the Apache License, Version 2.0.  See License.txt in the project root for license information.
+﻿' Licensed to the .NET Foundation under one or more agreements.
+' The .NET Foundation licenses this file to you under the MIT license.
+' See the LICENSE file in the project root for more information.
 
 Imports Microsoft.CodeAnalysis.Editor.VisualBasic.KeywordHighlighting
 
@@ -6,102 +8,102 @@ Namespace Microsoft.CodeAnalysis.Editor.VisualBasic.UnitTests.KeywordHighlightin
     Public Class ConditionalPreprocessorHighlighterTests
         Inherits AbstractVisualBasicKeywordHighlighterTests
 
-        Friend Overrides Function CreateHighlighter() As IHighlighter
-            Return New ConditionalPreprocessorHighlighter()
+        Friend Overrides Function GetHighlighterType() As Type
+            Return GetType(ConditionalPreprocessorHighlighter)
         End Function
 
         <Fact, Trait(Traits.Feature, Traits.Features.KeywordHighlighting)>
-        Public Sub TestConditionalPreprocessorSample1_1()
-            Test(<Text>
-#Const Foo1 = 1
-#Const Foo2 = 2
-{|Cursor:[|#If|]|} Foo1 [|Then|]
-[|#ElseIf|] Foo2 [|Then|]
+        Public Async Function TestConditionalPreprocessorSample1_1() As Task
+            Await TestAsync(<Text>
+#Const Goo1 = 1
+#Const Goo2 = 2
+{|Cursor:[|#If|]|} Goo1 [|Then|]
+[|#ElseIf|] Goo2 [|Then|]
 [|#Else|]
 [|#End If|]</Text>)
-        End Sub
+        End Function
 
         <Fact, Trait(Traits.Feature, Traits.Features.KeywordHighlighting)>
-        Public Sub TestConditionalPreprocessorSample1_2()
-            Test(<Text>
-#Const Foo1 = 1
-#Const Foo2 = 2
-[|#If|] Foo1 {|Cursor:[|Then|]|}
-[|#ElseIf|] Foo2 [|Then|]
+        Public Async Function TestConditionalPreprocessorSample1_2() As Task
+            Await TestAsync(<Text>
+#Const Goo1 = 1
+#Const Goo2 = 2
+[|#If|] Goo1 {|Cursor:[|Then|]|}
+[|#ElseIf|] Goo2 [|Then|]
 [|#Else|]
 [|#End If|]</Text>)
-        End Sub
+        End Function
 
         <Fact, Trait(Traits.Feature, Traits.Features.KeywordHighlighting)>
-        Public Sub TestConditionalPreprocessorSample1_3()
-            Test(<Text>
-#Const Foo1 = 1
-#Const Foo2 = 2
-[|#If|] Foo1 [|Then|]
-{|Cursor:[|#ElseIf|]|} Foo2 [|Then|]
+        Public Async Function TestConditionalPreprocessorSample1_3() As Task
+            Await TestAsync(<Text>
+#Const Goo1 = 1
+#Const Goo2 = 2
+[|#If|] Goo1 [|Then|]
+{|Cursor:[|#ElseIf|]|} Goo2 [|Then|]
 [|#Else|]
 [|#End If|]</Text>)
-        End Sub
+        End Function
 
         <Fact, Trait(Traits.Feature, Traits.Features.KeywordHighlighting)>
-        Public Sub TestConditionalPreprocessorSample1_4()
-            Test(<Text>
-#Const Foo1 = 1
-#Const Foo2 = 2
-[|#If|] Foo1 [|Then|]
-[|#ElseIf|] Foo2 {|Cursor:[|Then|]|}
+        Public Async Function TestConditionalPreprocessorSample1_4() As Task
+            Await TestAsync(<Text>
+#Const Goo1 = 1
+#Const Goo2 = 2
+[|#If|] Goo1 [|Then|]
+[|#ElseIf|] Goo2 {|Cursor:[|Then|]|}
 [|#Else|]
 [|#End If|]</Text>)
-        End Sub
+        End Function
 
         <Fact, Trait(Traits.Feature, Traits.Features.KeywordHighlighting)>
-        Public Sub TestConditionalPreprocessorSample1_5()
-            Test(<Text>
-#Const Foo1 = 1
-#Const Foo2 = 2
-[|#If|] Foo1 [|Then|]
-[|#ElseIf|] Foo2 [|Then|]
+        Public Async Function TestConditionalPreprocessorSample1_5() As Task
+            Await TestAsync(<Text>
+#Const Goo1 = 1
+#Const Goo2 = 2
+[|#If|] Goo1 [|Then|]
+[|#ElseIf|] Goo2 [|Then|]
 {|Cursor:[|#Else|]|}
 [|#End If|]</Text>)
-        End Sub
+        End Function
 
         <Fact, Trait(Traits.Feature, Traits.Features.KeywordHighlighting)>
-        Public Sub TestConditionalPreprocessorSample1_6()
-            Test(<Text>
-#Const Foo1 = 1
-#Const Foo2 = 2
-[|#If|] Foo1 [|Then|]
-[|#ElseIf|] Foo2 [|Then|]
+        Public Async Function TestConditionalPreprocessorSample1_6() As Task
+            Await TestAsync(<Text>
+#Const Goo1 = 1
+#Const Goo2 = 2
+[|#If|] Goo1 [|Then|]
+[|#ElseIf|] Goo2 [|Then|]
 [|#Else|]
 {|Cursor:[|#End If|]|}</Text>)
-        End Sub
+        End Function
 
-        <WorkItem(544469)>
+        <WorkItem(544469, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/544469")>
         <Fact, Trait(Traits.Feature, Traits.Features.KeywordHighlighting)>
-        Public Sub TestConditionalWithMissingIf1()
-            Test(<Text>
-#Const foo = _
-True : #If foo Then
+        Public Async Function TestConditionalWithMissingIf1() As Task
+            Await TestAsync(<Text>
+#Const goo = _
+True : #If goo Then
 {|Cursor:[|#Else|]|}
 [|#End If|]
             ' #If should be the first one in sorted order
             Dim ifDirective = condDirectives.First()
             Contract.Assert(ifDirective.Kind = SyntaxKind.IfDirective)
 (ifDirective.Kind == ElseDirective)</Text>)
-        End Sub
+        End Function
 
-        <WorkItem(544469)>
+        <WorkItem(544469, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/544469")>
         <Fact, Trait(Traits.Feature, Traits.Features.KeywordHighlighting)>
-        Public Sub TestConditionalWithMissingIf2()
-            Test(<Text>
-#Const foo = _
-True : #If foo Then
+        Public Async Function TestConditionalWithMissingIf2() As Task
+            Await TestAsync(<Text>
+#Const goo = _
+True : #If goo Then
 [|#Else|]
 {|Cursor:[|#End If|]|}
             ' #If should be the first one in sorted order
             Dim ifDirective = condDirectives.First()
             Contract.Assert(ifDirective.Kind = SyntaxKind.IfDirective)
 (ifDirective.Kind == ElseDirective)</Text>)
-        End Sub
+        End Function
     End Class
 End Namespace

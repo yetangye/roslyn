@@ -1,4 +1,8 @@
-// Copyright (c) Microsoft.  All Rights Reserved.  Licensed under the Apache License, Version 2.0.  See License.txt in the project root for license information.
+﻿// Licensed to the .NET Foundation under one or more agreements.
+// The .NET Foundation licenses this file to you under the MIT license.
+// See the LICENSE file in the project root for more information.
+
+#nullable disable
 
 using System;
 using System.Collections.Generic;
@@ -6,19 +10,35 @@ using System.Collections.Immutable;
 using System.Diagnostics;
 using System.Linq;
 using Microsoft.CodeAnalysis.CodeGen;
-using Microsoft.CodeAnalysis.Collections;
 using Microsoft.CodeAnalysis.CSharp.Symbols;
+using Microsoft.CodeAnalysis.ExpressionEvaluator;
+using Microsoft.CodeAnalysis.PooledObjects;
 using Roslyn.Utilities;
 
 namespace Microsoft.CodeAnalysis.CSharp.ExpressionEvaluator
 {
-    internal delegate BoundStatement GenerateMethodBody(EEMethodSymbol method, DiagnosticBag diagnostics);
+    internal delegate BoundExpression GenerateThisReference(SyntaxNode syntax);
+
+    internal delegate BoundStatement GenerateMethodBody(
+        EEMethodSymbol method,
+        DiagnosticBag diagnostics,
+        out ImmutableArray<LocalSymbol> declaredLocals,
+        out ResultProperties properties);
 
     /// <summary>
     /// Synthesized expression evaluation method.
     /// </summary>
     internal sealed class EEMethodSymbol : MethodSymbol
     {
+        // We only create a single EE method (per EE type) that represents an arbitrary expression,
+        // whose lowering may produce synthesized members (lambdas, dynamic sites, etc).
+        // We may thus assume that the method ordinal is always 0.
+        //
+        // Consider making the implementation more flexible in order to avoid this assumption.
+        // In future we might need to compile multiple expression and then we'll need to assign 
+        // a unique method ordinal to each of them to avoid duplicate synthesized member names.
+        private const int _methodOrdinal = 0;
+
         internal readonly TypeMap TypeMap;
         internal readonly MethodSymbol SubstitutedSourceMethod;
         internal readonly ImmutableArray<LocalSymbol> Locals;
@@ -31,13 +51,15 @@ namespace Microsoft.CodeAnalysis.CSharp.ExpressionEvaluator
         private readonly ImmutableArray<ParameterSymbol> _parameters;
         private readonly ParameterSymbol _thisParameter;
         private readonly ImmutableDictionary<string, DisplayClassVariable> _displayClassVariables;
+
         /// <summary>
         /// Invoked at most once to generate the method body.
         /// (If the compilation has no errors, it will be invoked
         /// exactly once, otherwise it may be skipped.)
         /// </summary>
         private readonly GenerateMethodBody _generateMethodBody;
-        private TypeSymbol _lazyReturnType;
+        private TypeWithAnnotations _lazyReturnType;
+        private ResultProperties _lazyResultProperties;
 
         // NOTE: This is only used for asserts, so it could be conditional on DEBUG.
         private readonly ImmutableArray<TypeParameterSymbol> _allTypeParameters;
@@ -53,7 +75,7 @@ namespace Microsoft.CodeAnalysis.CSharp.ExpressionEvaluator
             GenerateMethodBody generateMethodBody)
         {
             Debug.Assert(sourceMethod.IsDefinition);
-            Debug.Assert(sourceMethod.ContainingSymbol == container.SubstitutedSourceType.OriginalDefinition);
+            Debug.Assert(TypeSymbol.Equals((TypeSymbol)sourceMethod.ContainingSymbol, container.SubstitutedSourceType.OriginalDefinition, TypeCompareKind.ConsiderEverything2));
             Debug.Assert(sourceLocals.All(l => l.ContainingSymbol == sourceMethod));
 
             _container = container;
@@ -97,7 +119,7 @@ namespace Microsoft.CodeAnalysis.CSharp.ExpressionEvaluator
             if (substitutedSourceHasThisParameter)
             {
                 _thisParameter = MakeParameterSymbol(0, GeneratedNames.ThisProxyFieldName(), substitutedSourceThisParameter);
-                Debug.Assert(_thisParameter.Type == this.SubstitutedSourceMethod.ContainingType);
+                Debug.Assert(TypeSymbol.Equals(_thisParameter.Type, this.SubstitutedSourceMethod.ContainingType, TypeCompareKind.ConsiderEverything2));
                 parameterBuilder.Add(_thisParameter);
             }
 
@@ -139,11 +161,16 @@ namespace Microsoft.CodeAnalysis.CSharp.ExpressionEvaluator
             foreach (var pair in sourceDisplayClassVariables)
             {
                 var variable = pair.Value;
-                var displayClassInstanceFromLocal = variable.DisplayClassInstance as DisplayClassInstanceFromLocal;
-                var displayClassInstance = (displayClassInstanceFromLocal == null) ?
-                    (DisplayClassInstance)new DisplayClassInstanceFromThis(_parameters[0]) :
-                    new DisplayClassInstanceFromLocal((EELocalSymbol)localsMap[displayClassInstanceFromLocal.Local]);
-                variable = variable.SubstituteFields(displayClassInstance, this.TypeMap);
+                var oldDisplayClassInstance = variable.DisplayClassInstance;
+
+                // Note: we don't call ToOtherMethod in the local case because doing so would produce
+                // a new LocalSymbol that would not be ReferenceEquals to the one in this.LocalsForBinding.
+                var oldDisplayClassInstanceFromLocal = oldDisplayClassInstance as DisplayClassInstanceFromLocal;
+                var newDisplayClassInstance = (oldDisplayClassInstanceFromLocal == null) ?
+                    oldDisplayClassInstance.ToOtherMethod(this, this.TypeMap) :
+                    new DisplayClassInstanceFromLocal((EELocalSymbol)localsMap[oldDisplayClassInstanceFromLocal.Local]);
+
+                variable = variable.SubstituteFields(newDisplayClassInstance, this.TypeMap);
                 displayClassVariables.Add(pair.Key, variable);
             }
 
@@ -156,7 +183,7 @@ namespace Microsoft.CodeAnalysis.CSharp.ExpressionEvaluator
 
         private ParameterSymbol MakeParameterSymbol(int ordinal, string name, ParameterSymbol sourceParameter)
         {
-            return new SynthesizedParameterSymbol(this, sourceParameter.Type, ordinal, sourceParameter.RefKind, name, sourceParameter.CustomModifiers);
+            return SynthesizedParameterSymbol.Create(this, sourceParameter.TypeWithAnnotations, ordinal, sourceParameter.RefKind, name, sourceParameter.RefCustomModifiers);
         }
 
         internal override bool IsMetadataNewSlot(bool ignoreInterfaceImplementationChanges = false)
@@ -214,6 +241,11 @@ namespace Microsoft.CodeAnalysis.CSharp.ExpressionEvaluator
             return null;
         }
 
+        public override bool AreLocalsZeroed
+        {
+            get { return true; }
+        }
+
         internal override IEnumerable<Cci.SecurityAttribute> GetSecurityInformation()
         {
             throw ExceptionUtilities.Unreachable;
@@ -245,6 +277,11 @@ namespace Microsoft.CodeAnalysis.CSharp.ExpressionEvaluator
             get { return this.SubstitutedSourceMethod.IsVararg; }
         }
 
+        public override RefKind RefKind
+        {
+            get { return this.SubstitutedSourceMethod.RefKind; }
+        }
+
         public override bool ReturnsVoid
         {
             get { return this.ReturnType.SpecialType == SpecialType.System_Void; }
@@ -255,11 +292,11 @@ namespace Microsoft.CodeAnalysis.CSharp.ExpressionEvaluator
             get { return false; }
         }
 
-        public override TypeSymbol ReturnType
+        public override TypeWithAnnotations ReturnTypeWithAnnotations
         {
             get
             {
-                if (_lazyReturnType == null)
+                if ((object)_lazyReturnType == null)
                 {
                     throw new InvalidOperationException();
                 }
@@ -267,9 +304,15 @@ namespace Microsoft.CodeAnalysis.CSharp.ExpressionEvaluator
             }
         }
 
-        public override ImmutableArray<TypeSymbol> TypeArguments
+        public override FlowAnalysisAnnotations ReturnTypeFlowAnalysisAnnotations => FlowAnalysisAnnotations.None;
+
+        public override ImmutableHashSet<string> ReturnNotNullIfParameterNotNull => ImmutableHashSet<string>.Empty;
+
+        public override FlowAnalysisAnnotations FlowAnalysisAnnotations => FlowAnalysisAnnotations.None;
+
+        public override ImmutableArray<TypeWithAnnotations> TypeArgumentsWithAnnotations
         {
-            get { return _typeParameters.Cast<TypeParameterSymbol, TypeSymbol>(); }
+            get { return GetTypeParametersAsTypeArguments(); }
         }
 
         public override ImmutableArray<TypeParameterSymbol> TypeParameters
@@ -287,7 +330,7 @@ namespace Microsoft.CodeAnalysis.CSharp.ExpressionEvaluator
             get { return ImmutableArray<MethodSymbol>.Empty; }
         }
 
-        public override ImmutableArray<CustomModifier> ReturnTypeCustomModifiers
+        public override ImmutableArray<CustomModifier> RefCustomModifiers
         {
             get { return ImmutableArray<CustomModifier>.Empty; }
         }
@@ -375,17 +418,29 @@ namespace Microsoft.CodeAnalysis.CSharp.ExpressionEvaluator
             get { return false; }
         }
 
+        internal override bool IsDeclaredReadOnly => false;
+
+        internal override bool IsInitOnly => false;
+
         internal override ObsoleteAttributeData ObsoleteAttributeData
         {
             get { throw ExceptionUtilities.Unreachable; }
         }
 
-        internal override void GenerateMethodBody(TypeCompilationState compilationState, DiagnosticBag diagnostics)
+        internal sealed override UnmanagedCallersOnlyAttributeData GetUnmanagedCallersOnlyAttributeData(bool forceComplete) => throw ExceptionUtilities.Unreachable;
+
+        internal ResultProperties ResultProperties
         {
-            var body = _generateMethodBody(this, diagnostics);
+            get { return _lazyResultProperties; }
+        }
+
+        internal override void GenerateMethodBody(TypeCompilationState compilationState, BindingDiagnosticBag diagnostics)
+        {
+            ImmutableArray<LocalSymbol> declaredLocalsArray;
+            var body = _generateMethodBody(this, diagnostics.DiagnosticBag, out declaredLocalsArray, out _lazyResultProperties);
             var compilation = compilationState.Compilation;
 
-            _lazyReturnType = CalculateReturnType(compilation, body);
+            _lazyReturnType = TypeWithAnnotations.Create(CalculateReturnType(compilation, body));
 
             // Can't do this until the return type has been computed.
             TypeParameterChecker.Check(this, _allTypeParameters);
@@ -402,184 +457,237 @@ namespace Microsoft.CodeAnalysis.CSharp.ExpressionEvaluator
             }
 
             // Check for use-site diagnostics (e.g. missing types in the signature).
-            DiagnosticInfo useSiteDiagnosticInfo = null;
-            this.CalculateUseSiteDiagnostic(ref useSiteDiagnosticInfo);
-            if (useSiteDiagnosticInfo != null && useSiteDiagnosticInfo.Severity == DiagnosticSeverity.Error)
+            UseSiteInfo<AssemblySymbol> useSiteInfo = default;
+            this.CalculateUseSiteDiagnostic(ref useSiteInfo);
+            if (useSiteInfo.DiagnosticInfo != null && useSiteInfo.DiagnosticInfo.Severity == DiagnosticSeverity.Error)
             {
-                diagnostics.Add(useSiteDiagnosticInfo, this.Locations[0]);
+                diagnostics.Add(useSiteInfo.DiagnosticInfo, this.Locations[0]);
                 return;
             }
 
-            var declaredLocals = PooledHashSet<LocalSymbol>.GetInstance();
             try
             {
-                // Rewrite local declaration statement.
-                body = (BoundStatement)LocalDeclarationRewriter.Rewrite(compilation, _container, declaredLocals, body);
-
-                // Verify local declaration names.
-                foreach (var local in declaredLocals)
+                var declaredLocals = PooledHashSet<LocalSymbol>.GetInstance();
+                try
                 {
-                    Debug.Assert(local.Locations.Length > 0);
-                    var name = local.Name;
-                    if (name.StartsWith("$", StringComparison.Ordinal))
+                    // Rewrite local declaration statement.
+                    body = (BoundStatement)LocalDeclarationRewriter.Rewrite(
+                        compilation,
+                        _container,
+                        declaredLocals,
+                        body,
+                        declaredLocalsArray,
+                        diagnostics.DiagnosticBag);
+
+                    // Verify local declaration names.
+                    foreach (var local in declaredLocals)
                     {
-                        diagnostics.Add(ErrorCode.ERR_UnexpectedCharacter, local.Locations[0], name[0]);
+                        Debug.Assert(local.Locations.Length > 0);
+                        var name = local.Name;
+                        if (name.StartsWith("$", StringComparison.Ordinal))
+                        {
+                            diagnostics.Add(ErrorCode.ERR_UnexpectedCharacter, local.Locations[0], name[0]);
+                            return;
+                        }
+                    }
+
+                    // Rewrite references to placeholder "locals".
+                    body = (BoundStatement)PlaceholderLocalRewriter.Rewrite(compilation, _container, declaredLocals, body, diagnostics.DiagnosticBag);
+
+                    if (diagnostics.HasAnyErrors())
+                    {
                         return;
                     }
                 }
-
-                // Rewrite references to placeholder "locals".
-                body = (BoundStatement)PlaceholderLocalRewriter.Rewrite(compilation, _container, declaredLocals, body);
-            }
-            finally
-            {
-                declaredLocals.Free();
-            }
-
-            var syntax = body.Syntax;
-            var statementsBuilder = ArrayBuilder<BoundStatement>.GetInstance();
-            statementsBuilder.Add(body);
-            // Insert an implicit return statement if necessary.
-            if (body.Kind != BoundKind.ReturnStatement)
-            {
-                statementsBuilder.Add(new BoundReturnStatement(syntax, expressionOpt: null));
-            }
-
-            var localsBuilder = ArrayBuilder<LocalSymbol>.GetInstance();
-            var localsSet = PooledHashSet<LocalSymbol>.GetInstance();
-            foreach (var local in this.LocalsForBinding)
-            {
-                Debug.Assert(!localsSet.Contains(local));
-                localsBuilder.Add(local);
-                localsSet.Add(local);
-            }
-            foreach (var local in this.Locals)
-            {
-                if (!localsSet.Contains(local))
+                finally
                 {
-                    localsBuilder.Add(local);
+                    declaredLocals.Free();
                 }
-            }
-            localsSet.Free();
 
-            body = new BoundBlock(syntax, localsBuilder.ToImmutableAndFree(), statementsBuilder.ToImmutableAndFree()) { WasCompilerGenerated = true };
-
-            Debug.Assert(!diagnostics.HasAnyErrors());
-            Debug.Assert(!body.HasErrors);
-
-            bool sawLambdas;
-            bool sawAwaitInExceptionHandler;
-            body = LocalRewriter.Rewrite(
-                compilation: this.DeclaringCompilation,
-                method: this,
-                methodOrdinal: 0,
-                containingType: _container,
-                statement: body,
-                compilationState: compilationState,
-                previousSubmissionFields: null,
-                allowOmissionOfConditionalCalls: false,
-                diagnostics: diagnostics,
-                sawLambdas: out sawLambdas,
-                sawAwaitInExceptionHandler: out sawAwaitInExceptionHandler);
-
-            Debug.Assert(!sawAwaitInExceptionHandler);
-
-            if (body.HasErrors)
-            {
-                return;
-            }
-
-            // Variables may have been captured by lambdas in the original method
-            // or in the expression, and we need to preserve the existing values of
-            // those variables in the expression. This requires rewriting the variables
-            // in the expression based on the closure classes from both the original
-            // method and the expression, and generating a preamble that copies
-            // values into the expression closure classes.
-            //
-            // Consider the original method:
-            // static void M()
-            // {
-            //     int x, y, z;
-            //     ...
-            //     F(() => x + y);
-            // }
-            // and the expression in the EE: "F(() => x + z)".
-            //
-            // The expression is first rewritten using the closure class and local <1>
-            // from the original method: F(() => <1>.x + z)
-            // Then lambda rewriting introduces a new closure class that includes
-            // the locals <1> and z, and a corresponding local <2>: F(() => <2>.<1>.x + <2>.z)
-            // And a preamble is added to initialize the fields of <2>:
-            //     <2> = new <>c__DisplayClass0();
-            //     <2>.<1> = <1>;
-            //     <2>.z = z;
-
-            // Rewrite "this" and "base" references to parameter in this method.
-            // Rewrite variables within body to reference existing display classes.
-            body = (BoundStatement)CapturedVariableRewriter.Rewrite(
-                this.SubstitutedSourceMethod.IsStatic ? null : _parameters[0],
-                compilation.Conversions,
-                _displayClassVariables,
-                body,
-                diagnostics);
-
-            if (body.HasErrors)
-            {
-                Debug.Assert(false, "Please add a test case capturing whatever caused this assert.");
-                return;
-            }
-
-            if (diagnostics.HasAnyErrors())
-            {
-                return;
-            }
-
-            if (sawLambdas)
-            {
-                var closureDebugInfoBuilder = ArrayBuilder<ClosureDebugInfo>.GetInstance();
-                var lambdaDebugInfoBuilder = ArrayBuilder<LambdaDebugInfo>.GetInstance();
-
-                body = LambdaRewriter.Rewrite(
-                    loweredBody: body,
-                    thisType: this.SubstitutedSourceMethod.ContainingType,
-                    thisParameter: _thisParameter,
-                    method: this,
-                    methodOrdinal: 0,
-                    closureDebugInfoBuilder: closureDebugInfoBuilder,
-                    lambdaDebugInfoBuilder: lambdaDebugInfoBuilder,
-                    slotAllocatorOpt: null,
-                    compilationState: compilationState,
-                    diagnostics: diagnostics,
-                    assignLocals: true);
-
-                // we don't need this information:
-                closureDebugInfoBuilder.Free();
-                lambdaDebugInfoBuilder.Free();
-            }
-
-            // Insert locals from the original method,
-            // followed by any new locals.
-            var block = (BoundBlock)body;
-            var localBuilder = ArrayBuilder<LocalSymbol>.GetInstance();
-            foreach (var local in this.Locals)
-            {
-                Debug.Assert(!(local is EELocalSymbol) || (((EELocalSymbol)local).Ordinal == localBuilder.Count));
-                localBuilder.Add(local);
-            }
-            foreach (var local in block.Locals)
-            {
-                var oldLocal = local as EELocalSymbol;
-                if (oldLocal != null)
+                var syntax = body.Syntax;
+                var statementsBuilder = ArrayBuilder<BoundStatement>.GetInstance();
+                statementsBuilder.Add(body);
+                // Insert an implicit return statement if necessary.
+                if (body.Kind != BoundKind.ReturnStatement)
                 {
-                    Debug.Assert(localBuilder[oldLocal.Ordinal] == oldLocal);
-                    continue;
+                    statementsBuilder.Add(new BoundReturnStatement(syntax, RefKind.None, expressionOpt: null));
                 }
-                localBuilder.Add(local);
-            }
 
-            body = block.Update(localBuilder.ToImmutableAndFree(), block.Statements);
-            TypeParameterChecker.Check(body, _allTypeParameters);
-            compilationState.AddSynthesizedMethod(this, body);
+                var localsSet = PooledHashSet<LocalSymbol>.GetInstance();
+                try
+                {
+                    var localsBuilder = ArrayBuilder<LocalSymbol>.GetInstance();
+                    foreach (var local in this.LocalsForBinding)
+                    {
+                        Debug.Assert(!localsSet.Contains(local));
+                        localsBuilder.Add(local);
+                        localsSet.Add(local);
+                    }
+                    foreach (var local in this.Locals)
+                    {
+                        if (localsSet.Add(local))
+                        {
+                            localsBuilder.Add(local);
+                        }
+                    }
+
+                    body = new BoundBlock(syntax, localsBuilder.ToImmutableAndFree(), statementsBuilder.ToImmutableAndFree()) { WasCompilerGenerated = true };
+
+                    Debug.Assert(!diagnostics.HasAnyErrors());
+                    Debug.Assert(!body.HasErrors);
+
+                    bool sawLambdas;
+                    bool sawLocalFunctions;
+                    bool sawAwaitInExceptionHandler;
+                    ImmutableArray<SourceSpan> dynamicAnalysisSpans = ImmutableArray<SourceSpan>.Empty;
+                    body = LocalRewriter.Rewrite(
+                        compilation: this.DeclaringCompilation,
+                        method: this,
+                        methodOrdinal: _methodOrdinal,
+                        containingType: _container,
+                        statement: body,
+                        compilationState: compilationState,
+                        previousSubmissionFields: null,
+                        allowOmissionOfConditionalCalls: false,
+                        instrumentForDynamicAnalysis: false,
+                        debugDocumentProvider: null,
+                        dynamicAnalysisSpans: ref dynamicAnalysisSpans,
+                        diagnostics: diagnostics,
+                        sawLambdas: out sawLambdas,
+                        sawLocalFunctions: out sawLocalFunctions,
+                        sawAwaitInExceptionHandler: out sawAwaitInExceptionHandler);
+
+                    Debug.Assert(!sawAwaitInExceptionHandler);
+                    Debug.Assert(dynamicAnalysisSpans.Length == 0);
+
+                    if (body.HasErrors)
+                    {
+                        return;
+                    }
+
+                    // Variables may have been captured by lambdas in the original method
+                    // or in the expression, and we need to preserve the existing values of
+                    // those variables in the expression. This requires rewriting the variables
+                    // in the expression based on the closure classes from both the original
+                    // method and the expression, and generating a preamble that copies
+                    // values into the expression closure classes.
+                    //
+                    // Consider the original method:
+                    // static void M()
+                    // {
+                    //     int x, y, z;
+                    //     ...
+                    //     F(() => x + y);
+                    // }
+                    // and the expression in the EE: "F(() => x + z)".
+                    //
+                    // The expression is first rewritten using the closure class and local <1>
+                    // from the original method: F(() => <1>.x + z)
+                    // Then lambda rewriting introduces a new closure class that includes
+                    // the locals <1> and z, and a corresponding local <2>: F(() => <2>.<1>.x + <2>.z)
+                    // And a preamble is added to initialize the fields of <2>:
+                    //     <2> = new <>c__DisplayClass0();
+                    //     <2>.<1> = <1>;
+                    //     <2>.z = z;
+
+                    // Rewrite "this" and "base" references to parameter in this method.
+                    // Rewrite variables within body to reference existing display classes.
+                    body = (BoundStatement)CapturedVariableRewriter.Rewrite(
+                        this.GenerateThisReference,
+                        compilation.Conversions,
+                        _displayClassVariables,
+                        body,
+                        diagnostics.DiagnosticBag);
+
+                    if (body.HasErrors)
+                    {
+                        Debug.Assert(false, "Please add a test case capturing whatever caused this assert.");
+                        return;
+                    }
+
+                    if (diagnostics.HasAnyErrors())
+                    {
+                        return;
+                    }
+
+                    if (sawLambdas || sawLocalFunctions)
+                    {
+                        var closureDebugInfoBuilder = ArrayBuilder<ClosureDebugInfo>.GetInstance();
+                        var lambdaDebugInfoBuilder = ArrayBuilder<LambdaDebugInfo>.GetInstance();
+
+                        body = ClosureConversion.Rewrite(
+                            loweredBody: body,
+                            thisType: this.SubstitutedSourceMethod.ContainingType,
+                            thisParameter: _thisParameter,
+                            method: this,
+                            methodOrdinal: _methodOrdinal,
+                            substitutedSourceMethod: this.SubstitutedSourceMethod.OriginalDefinition,
+                            closureDebugInfoBuilder: closureDebugInfoBuilder,
+                            lambdaDebugInfoBuilder: lambdaDebugInfoBuilder,
+                            slotAllocatorOpt: null,
+                            compilationState: compilationState,
+                            diagnostics: diagnostics,
+                            assignLocals: localsSet);
+
+                        // we don't need this information:
+                        closureDebugInfoBuilder.Free();
+                        lambdaDebugInfoBuilder.Free();
+                    }
+                }
+                finally
+                {
+                    localsSet.Free();
+                }
+
+                // Insert locals from the original method,
+                // followed by any new locals.
+                var block = (BoundBlock)body;
+                var localBuilder = ArrayBuilder<LocalSymbol>.GetInstance();
+                foreach (var local in this.Locals)
+                {
+                    Debug.Assert(!(local is EELocalSymbol) || (((EELocalSymbol)local).Ordinal == localBuilder.Count));
+                    localBuilder.Add(local);
+                }
+                foreach (var local in block.Locals)
+                {
+                    if (local is EELocalSymbol oldLocal)
+                    {
+                        Debug.Assert(localBuilder[oldLocal.Ordinal] == oldLocal);
+                        continue;
+                    }
+                    localBuilder.Add(local);
+                }
+
+                body = block.Update(localBuilder.ToImmutableAndFree(), block.LocalFunctions, block.Statements);
+                TypeParameterChecker.Check(body, _allTypeParameters);
+                compilationState.AddSynthesizedMethod(this, body);
+            }
+            catch (BoundTreeVisitor.CancelledByStackGuardException ex)
+            {
+                ex.AddAnError(diagnostics);
+            }
+        }
+
+        private BoundExpression GenerateThisReference(SyntaxNode syntax)
+        {
+            var thisProxy = CompilationContext.GetThisProxy(_displayClassVariables);
+            if (thisProxy != null)
+            {
+                return thisProxy.ToBoundExpression(syntax);
+            }
+            if ((object)_thisParameter != null)
+            {
+                var typeNameKind = GeneratedNames.GetKind(_thisParameter.TypeWithAnnotations.Type.Name);
+                if (typeNameKind != GeneratedNameKind.None && typeNameKind != GeneratedNameKind.AnonymousType)
+                {
+                    Debug.Assert(typeNameKind == GeneratedNameKind.LambdaDisplayClass ||
+                        typeNameKind == GeneratedNameKind.StateMachineType,
+                        $"Unexpected typeNameKind '{typeNameKind}'");
+                    return null;
+                }
+                return new BoundParameter(syntax, _thisParameter);
+            }
+            return null;
         }
 
         private static TypeSymbol CalculateReturnType(CSharpCompilation compilation, BoundStatement bodyOpt)
@@ -603,23 +711,11 @@ namespace Microsoft.CodeAnalysis.CSharp.ExpressionEvaluator
             }
         }
 
-        internal override void AddSynthesizedReturnTypeAttributes(ref ArrayBuilder<SynthesizedAttributeData> attributes)
-        {
-            base.AddSynthesizedReturnTypeAttributes(ref attributes);
-
-            if (this.ReturnType.ContainsDynamic())
-            {
-                var compilation = this.DeclaringCompilation;
-                if ((object)compilation.GetWellKnownTypeMember(WellKnownMember.System_Runtime_CompilerServices_DynamicAttribute__ctor) != null)
-                {
-                    AddSynthesizedAttribute(ref attributes, compilation.SynthesizeDynamicAttribute(this.ReturnType, this.ReturnTypeCustomModifiers.Length));
-                }
-            }
-        }
-
         internal override int CalculateLocalSyntaxOffset(int localPosition, SyntaxTree localTree)
         {
             return localPosition;
         }
+
+        internal override bool IsNullableAnalysisEnabled() => false;
     }
 }

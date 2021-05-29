@@ -1,4 +1,6 @@
-﻿' Copyright (c) Microsoft.  All Rights Reserved.  Licensed under the Apache License, Version 2.0.  See License.txt in the project root for license information.
+﻿' Licensed to the .NET Foundation under one or more agreements.
+' The .NET Foundation licenses this file to you under the MIT license.
+' See the LICENSE file in the project root for more information.
 
 Imports System.Collections.Concurrent
 Imports System.Collections.Generic
@@ -22,11 +24,11 @@ Namespace Microsoft.CodeAnalysis.VisualBasic
     Friend NotInheritable Class MethodTypeParametersBinder
         Inherits Binder
 
-        Private ReadOnly m_typeParameters As ImmutableArray(Of TypeParameterSymbol)
+        Private ReadOnly _typeParameters As ImmutableArray(Of TypeParameterSymbol)
 
         Public Sub New(containingBinder As Binder, typeParameters As ImmutableArray(Of TypeParameterSymbol))
             MyBase.New(containingBinder)
-            m_typeParameters = typeParameters
+            _typeParameters = typeParameters
         End Sub
 
         ''' <summary>
@@ -39,15 +41,15 @@ Namespace Microsoft.CodeAnalysis.VisualBasic
                                                       arity As Integer,
                                                       options As LookupOptions,
                                                       originalBinder As Binder,
-                                                      <[In], Out> ByRef useSiteDiagnostics As HashSet(Of DiagnosticInfo))
+                                                      <[In], Out> ByRef useSiteInfo As CompoundUseSiteInfo(Of AssemblySymbol))
             Debug.Assert(lookupResult.IsClear)
 
             ' type parameters can only be accessed with arity 0
             ' Since there are typically just one or two type parameters, using a dictionary/ILookup would be overkill.
-            For i = 0 To m_typeParameters.Length - 1
-                Dim tp = m_typeParameters(i)
+            For i = 0 To _typeParameters.Length - 1
+                Dim tp = _typeParameters(i)
                 If IdentifierComparison.Equals(tp.Name, name) Then
-                    lookupResult.SetFrom(CheckViability(tp, arity, options, Nothing, useSiteDiagnostics))
+                    lookupResult.SetFrom(CheckViability(tp, arity, options, Nothing, useSiteInfo))
                 End If
             Next
         End Sub
@@ -56,8 +58,8 @@ Namespace Microsoft.CodeAnalysis.VisualBasic
                                                                     options As LookupOptions,
                                                                     originalBinder As Binder)
             ' UNDONE: check options to see if type parameters should be found.
-            For Each typeParameter In m_typeParameters
-                If originalBinder.CanAddLookupSymbolInfo(typeParameter, options, Nothing) Then
+            For Each typeParameter In _typeParameters
+                If originalBinder.CanAddLookupSymbolInfo(typeParameter, options, nameSet, Nothing) Then
                     nameSet.AddSymbol(typeParameter, typeParameter.Name, 0)
                 End If
             Next

@@ -1,4 +1,6 @@
-﻿' Copyright (c) Microsoft.  All Rights Reserved.  Licensed under the Apache License, Version 2.0.  See License.txt in the project root for license information.
+﻿' Licensed to the .NET Foundation under one or more agreements.
+' The .NET Foundation licenses this file to you under the MIT license.
+' See the LICENSE file in the project root for more information.
 
 Imports System
 Imports System.Collections.Generic
@@ -6,6 +8,7 @@ Imports System.Diagnostics
 Imports System.Linq
 Imports System.Runtime.CompilerServices
 Imports Microsoft.CodeAnalysis.Collections
+Imports Microsoft.CodeAnalysis.PooledObjects
 Imports Microsoft.CodeAnalysis.Text
 Imports Microsoft.CodeAnalysis.VisualBasic.Symbols
 Imports Microsoft.CodeAnalysis.VisualBasic.Syntax
@@ -14,10 +17,10 @@ Namespace Microsoft.CodeAnalysis.VisualBasic
 
     Friend Module BoundExpressionExtensions
 
-        ' returns true when expression has no sideeffects and produces
+        ' returns true when expression has no side-effects and produces
         ' default value (null, zero, false, default(T) ...)
         ' NOTE: This method is a very shallow check.
-        '       It does not make any asumptions about what this node could become 
+        '       It does not make any assumptions about what this node could become 
         '       after some folding/propagation/algebraic transformations.
         <Extension>
         Public Function IsDefaultValue(node As BoundExpression) As Boolean
@@ -39,8 +42,12 @@ Namespace Microsoft.CodeAnalysis.VisualBasic
                     Return constValue IsNot Nothing AndAlso constValue.IsNothing
 
                 Case BoundKind.DirectCast
-                    constValue = DirectCast(node, BoundDirectCast).Operand.ConstantValueOpt
-                    Return constValue IsNot Nothing AndAlso constValue.IsNothing
+                    ' DirectCast(Nothing, <ValueType>) is emitted as an unbox on a null reference.
+                    ' It is not equivalent to a default value
+                    If node.Type.IsTypeParameter() OrElse Not node.Type.IsValueType Then
+                        constValue = DirectCast(node, BoundDirectCast).Operand.ConstantValueOpt
+                        Return constValue IsNot Nothing AndAlso constValue.IsNothing
+                    End If
 
                 Case BoundKind.TryCast
                     constValue = DirectCast(node, BoundTryCast).Operand.ConstantValueOpt
@@ -122,6 +129,12 @@ Namespace Microsoft.CodeAnalysis.VisualBasic
         End Function
 
         <Extension()>
+        Public Function IsPropertyReturnsByRef(node As BoundExpression) As Boolean
+            Return node.Kind = BoundKind.PropertyAccess AndAlso
+                DirectCast(node, BoundPropertyAccess).PropertySymbol.ReturnsByRef
+        End Function
+
+        <Extension()>
         Public Function IsLateBound(node As BoundExpression) As Boolean
             Select Case node.Kind
                 Case BoundKind.LateMemberAccess,
@@ -184,7 +197,7 @@ Namespace Microsoft.CodeAnalysis.VisualBasic
         End Function
 
         ''' <summary>
-        ''' Does this node represent a property or latebound access not yet determied to be Get?
+        ''' Does this node represent a property or latebound access not yet determined to be Get?
         ''' </summary>
         <Extension()>
         Public Function IsSupportingAssignment(node As BoundExpression) As Boolean
@@ -268,11 +281,11 @@ Namespace Microsoft.CodeAnalysis.VisualBasic
             Select Case node.Kind
                 Case BoundKind.XmlMemberAccess
                     Dim memberAccess = DirectCast(node, BoundXmlMemberAccess)
-                    Dim expr = memberAccess.MemberAccess.SetAccessKind(newAccessKind)
-                    Return memberAccess.Update(expr)
+                    Return memberAccess.SetAccessKind(newAccessKind)
 
                 Case BoundKind.PropertyAccess
                     Dim propertyAccess = DirectCast(node, BoundPropertyAccess)
+                    Debug.Assert(Not propertyAccess.PropertySymbol.ReturnsByRef OrElse (newAccessKind And PropertyAccessKind.Set) = 0)
                     Return propertyAccess.SetAccessKind(newAccessKind)
 
                 Case Else
@@ -292,6 +305,36 @@ Namespace Microsoft.CodeAnalysis.VisualBasic
 
                 Case Else
                     Throw ExceptionUtilities.UnexpectedValue(node.Kind)
+            End Select
+        End Function
+
+        <Extension()>
+        Public Function SetAccessKind(node As BoundXmlMemberAccess, newAccessKind As PropertyAccessKind) As BoundXmlMemberAccess
+            Dim expr = node.MemberAccess.SetAccessKind(newAccessKind)
+            Return node.Update(expr)
+        End Function
+
+        <Extension()>
+        Public Function SetGetSetAccessKindIfAppropriate(node As BoundExpression) As BoundExpression
+            Select Case node.Kind
+                Case BoundKind.XmlMemberAccess
+                    Dim memberAccess = DirectCast(node, BoundXmlMemberAccess)
+                    Return memberAccess.SetAccessKind(PropertyAccessKind.Get Or PropertyAccessKind.Set)
+
+                Case BoundKind.PropertyAccess
+                    Dim propertyAccess = DirectCast(node, BoundPropertyAccess)
+                    Dim accessKind = If(propertyAccess.PropertySymbol.ReturnsByRef, PropertyAccessKind.Get, PropertyAccessKind.Get Or PropertyAccessKind.Set)
+                    Return propertyAccess.SetAccessKind(accessKind)
+
+                Case BoundKind.LateMemberAccess
+                    Return DirectCast(node, BoundLateMemberAccess).SetAccessKind(LateBoundAccessKind.Get Or LateBoundAccessKind.Set)
+
+                Case BoundKind.LateInvocation
+                    Return DirectCast(node, BoundLateInvocation).SetAccessKind(LateBoundAccessKind.Get Or LateBoundAccessKind.Set)
+
+                Case Else
+                    Return node
+
             End Select
         End Function
 
@@ -530,7 +573,7 @@ Namespace Microsoft.CodeAnalysis.VisualBasic
             Next
 
             ' Merge methodGroup.AdditionalExtensionMethods into the result.
-            For Each method In methodGroup.AdditionalExtensionMethods(useSiteDiagnostics:=Nothing)
+            For Each method In methodGroup.AdditionalExtensionMethods(useSiteInfo:=CompoundUseSiteInfo(Of AssemblySymbol).Discarded)
                 ' This is a quick fix for the fact that binder lookup in VB does not perform arity check for 
                 '       method symbols leaving it to overload resolution code. Here we filter wrong arity methods
                 If targetArity = 0 Then

@@ -1,8 +1,11 @@
-﻿' Copyright (c) Microsoft.  All Rights Reserved.  Licensed under the Apache License, Version 2.0.  See License.txt in the project root for license information.
+﻿' Licensed to the .NET Foundation under one or more agreements.
+' The .NET Foundation licenses this file to you under the MIT license.
+' See the LICENSE file in the project root for more information.
 
 Imports System.Collections.Immutable
 Imports System.Runtime.InteropServices
 Imports Microsoft.CodeAnalysis.CodeGen
+Imports Microsoft.CodeAnalysis.PooledObjects
 Imports Microsoft.CodeAnalysis.VisualBasic.Symbols
 
 Namespace Microsoft.CodeAnalysis.VisualBasic
@@ -12,7 +15,7 @@ Namespace Microsoft.CodeAnalysis.VisualBasic
     ''' This is used in the lambda rewriter, the iterator rewriter, and the async rewriter.
     ''' </summary>    
     Partial Friend MustInherit Class MethodToClassRewriter(Of TProxy)
-        Inherits BoundTreeRewriter
+        Inherits BoundTreeRewriterWithStackGuard
 
         ''' <summary>
         ''' For each captured variable, the corresponding field of its frame
@@ -38,7 +41,7 @@ Namespace Microsoft.CodeAnalysis.VisualBasic
         ''' </summary>
         Protected MustOverride ReadOnly Property TypeMap As TypeSubstitution
 
-        Friend MustOverride Function FramePointer(syntax As VisualBasicSyntaxNode, frameClass As NamedTypeSymbol) As BoundExpression
+        Friend MustOverride Function FramePointer(syntax As SyntaxNode, frameClass As NamedTypeSymbol) As BoundExpression
 
         ''' <summary>
         ''' The method (e.g. lambda) which is currently being rewritten. If we are 
@@ -55,14 +58,24 @@ Namespace Microsoft.CodeAnalysis.VisualBasic
         ''' </summary>
         Protected ReadOnly CompilationState As TypeCompilationState
 
-        Protected ReadOnly Diagnostics As DiagnosticBag
+        Protected ReadOnly Diagnostics As BindingDiagnosticBag
         Protected ReadOnly SlotAllocatorOpt As VariableSlotAllocator
 
-        Protected Sub New(slotAllocatorOpt As VariableSlotAllocator, compilationState As TypeCompilationState, diagnostics As DiagnosticBag)
+        ''' <summary>
+        ''' During rewriting, we ignore locals that have already been rewritten to a proxy (a field on a closure class).
+        ''' However, in the EE, we need to preserve the original slots for all locals (slots for any new locals must be
+        ''' appended after the originals).  The <see cref="PreserveOriginalLocals"/> field is intended to suppress any
+        ''' rewriter logic that would result in original locals being omitted.
+        ''' </summary>
+        Protected ReadOnly PreserveOriginalLocals As Boolean
+
+        Protected Sub New(slotAllocatorOpt As VariableSlotAllocator, compilationState As TypeCompilationState, diagnostics As BindingDiagnosticBag, preserveOriginalLocals As Boolean)
             Debug.Assert(compilationState IsNot Nothing)
+            Debug.Assert(diagnostics.AccumulatesDiagnostics)
             Me.CompilationState = compilationState
             Me.Diagnostics = diagnostics
             Me.SlotAllocatorOpt = slotAllocatorOpt
+            Me.PreserveOriginalLocals = preserveOriginalLocals
         End Sub
 
 #Region "Visitors"
@@ -86,7 +99,7 @@ Namespace Microsoft.CodeAnalysis.VisualBasic
                 Return type
             End If
 
-            Return type.InternalSubstituteTypeParameters(Me.TypeMap)
+            Return type.InternalSubstituteTypeParameters(Me.TypeMap).Type
         End Function
 
         Public NotOverridable Overrides Function VisitMethodInfo(node As BoundMethodInfo) As BoundNode
@@ -108,10 +121,12 @@ Namespace Microsoft.CodeAnalysis.VisualBasic
             Return node.Update(rewrittenPropertySymbol,
                                Nothing,
                                node.AccessKind,
-                               node.IsWriteable,
-                               rewrittenReceiver,
-                               newArguments.AsImmutableOrNull,
-                               VisitType(node.Type))
+                               isWriteable:=node.IsWriteable,
+                               isLValue:=node.IsLValue,
+                               receiverOpt:=rewrittenReceiver,
+                               arguments:=newArguments.AsImmutableOrNull,
+                               defaultArguments:=node.DefaultArguments,
+                               type:=VisitType(node.Type))
         End Function
 
         Public Overrides Function VisitCall(node As BoundCall) As BoundNode
@@ -130,9 +145,11 @@ Namespace Microsoft.CodeAnalysis.VisualBasic
                                Nothing,
                                rewrittenReceiverOpt,
                                arguments,
+                               node.DefaultArguments,
                                node.ConstantValueOpt,
-                               node.SuppressObjectClone,
-                               type)
+                               isLValue:=node.IsLValue,
+                               suppressObjectClone:=node.SuppressObjectClone,
+                               type:=type)
         End Function
 
         Private Function ShouldRewriteMethodSymbol(originalReceiver As BoundExpression, rewrittenReceiverOpt As BoundExpression, newMethod As MethodSymbol) As Boolean
@@ -189,7 +206,7 @@ Namespace Microsoft.CodeAnalysis.VisualBasic
                                VisitFieldSymbol(node.FieldSymbol),
                                node.IsLValue,
                                node.SuppressVirtualCalls,
-                               node.ConstantsInProgressOpt,
+                               constantsInProgressOpt:=Nothing,
                                VisitType(node.Type))
         End Function
 
@@ -224,6 +241,7 @@ Namespace Microsoft.CodeAnalysis.VisualBasic
                     rewritten = node.Update(
                         newConstructor,
                         rewritten.Arguments,
+                        rewritten.DefaultArguments,
                         rewritten.InitializerOpt,
                         rewritten.Type)
                 End If
@@ -241,7 +259,7 @@ Namespace Microsoft.CodeAnalysis.VisualBasic
             If substitution IsNot Nothing Then
                 Dim newMethod As MethodSymbol = method.OriginalDefinition
 
-                Dim newContainer As TypeSymbol = method.ContainingType.InternalSubstituteTypeParameters(substitution)
+                Dim newContainer As TypeSymbol = method.ContainingType.InternalSubstituteTypeParameters(substitution).AsTypeSymbolOnly()
                 Dim substitutedContainer = TryCast(newContainer, SubstitutedNamedType)
                 If substitutedContainer IsNot Nothing Then
                     newMethod = DirectCast(substitutedContainer.GetMemberForDefinition(newMethod), MethodSymbol)
@@ -276,7 +294,7 @@ Namespace Microsoft.CodeAnalysis.VisualBasic
             If substitution IsNot Nothing Then
                 Dim newProperty As PropertySymbol = [property].OriginalDefinition
 
-                Dim newContainer As TypeSymbol = [property].ContainingType.InternalSubstituteTypeParameters(substitution)
+                Dim newContainer As TypeSymbol = [property].ContainingType.InternalSubstituteTypeParameters(substitution).AsTypeSymbolOnly()
                 Dim substitutedContainer = TryCast(newContainer, SubstitutedNamedType)
                 If substitutedContainer IsNot Nothing Then
                     newProperty = DirectCast(substitutedContainer.GetMemberForDefinition(newProperty), PropertySymbol)
@@ -303,7 +321,7 @@ Namespace Microsoft.CodeAnalysis.VisualBasic
             If substitution IsNot Nothing Then
                 Dim newField As FieldSymbol = field.OriginalDefinition
 
-                Dim newContainer As TypeSymbol = field.ContainingType.InternalSubstituteTypeParameters(substitution)
+                Dim newContainer As TypeSymbol = field.ContainingType.InternalSubstituteTypeParameters(substitution).AsTypeSymbolOnly()
                 Dim substitutedContainer = TryCast(newContainer, SubstitutedNamedType)
                 If substitutedContainer IsNot Nothing Then
                     newField = DirectCast(substitutedContainer.GetMemberForDefinition(newField), FieldSymbol)
@@ -330,9 +348,9 @@ Namespace Microsoft.CodeAnalysis.VisualBasic
                                         newLocals As ArrayBuilder(Of LocalSymbol)) As BoundBlock
 
             For Each v In node.Locals
-                If Not Me.Proxies.ContainsKey(v) Then
+                If Me.PreserveOriginalLocals OrElse Not Me.Proxies.ContainsKey(v) Then
                     Dim vType = VisitType(v.Type)
-                    If vType = v.Type Then
+                    If TypeSymbol.Equals(vType, v.Type, TypeCompareKind.ConsiderEverything) Then
 
                         Dim replacement As LocalSymbol = Nothing
                         Dim wasReplaced As Boolean = False
@@ -358,7 +376,7 @@ Namespace Microsoft.CodeAnalysis.VisualBasic
             Dim nodeStatements = node.Statements
 
             If prologue.Count > 0 Then
-                ' Add hidden sequence point, prolog doesn't map to source, but if 
+                ' Add hidden sequence point, prologue doesn't map to source, but if 
                 ' the first statement in the block is a non-hidden sequence point
                 ' (for example, sequence point for a method block), keep it first. 
                 If nodeStatements.Length > 0 AndAlso nodeStatements(0).Syntax IsNot Nothing Then
@@ -411,7 +429,7 @@ Namespace Microsoft.CodeAnalysis.VisualBasic
             Return RewriteBlock(node, prologue, newLocals)
         End Function
 
-        Protected Function CreateReplacementLocalOrReturnSelf(
+        Protected Shared Function CreateReplacementLocalOrReturnSelf(
             originalLocal As LocalSymbol,
             newType As TypeSymbol,
             Optional onlyReplaceIfFunctionValue As Boolean = False,
@@ -445,7 +463,7 @@ Namespace Microsoft.CodeAnalysis.VisualBasic
             For Each v In origLocals
                 If Not Me.Proxies.ContainsKey(v) Then
                     Dim vType = VisitType(v.Type)
-                    If vType = v.Type Then
+                    If TypeSymbol.Equals(vType, v.Type, TypeCompareKind.ConsiderEverything) Then
                         newLocals.Add(v)
                     Else
                         Dim replacement = CreateReplacementLocalOrReturnSelf(v, vType)
@@ -455,7 +473,7 @@ Namespace Microsoft.CodeAnalysis.VisualBasic
                 End If
             Next
 
-            ' merge sideeffects - prologue followed by rewritten original sideeffects
+            ' merge side-effect - prologue followed by rewritten original side-effect
             For Each s In node.SideEffects
                 Dim replacement = DirectCast(Me.Visit(s), BoundExpression)
                 If replacement IsNot Nothing Then

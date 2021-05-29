@@ -1,4 +1,6 @@
-﻿' Copyright (c) Microsoft.  All Rights Reserved.  Licensed under the Apache License, Version 2.0.  See License.txt in the project root for license information.
+﻿' Licensed to the .NET Foundation under one or more agreements.
+' The .NET Foundation licenses this file to you under the MIT license.
+' See the LICENSE file in the project root for more information.
 
 Imports System.Runtime.CompilerServices
 Imports Microsoft.CodeAnalysis.Text
@@ -11,18 +13,18 @@ Namespace Microsoft.CodeAnalysis.VisualBasic.Symbols
     ''' A NoPiaIllegalGenericInstantiationSymbol is a special kind of ErrorSymbol that represents
     ''' a generic type instantiation that cannot cross assembly boundaries according to NoPia rules.
     ''' </summary>
-    Friend Class NoPiaIllegalGenericInstantiationSymbol
+    Friend NotInheritable Class NoPiaIllegalGenericInstantiationSymbol
         Inherits ErrorTypeSymbol
 
-        Private ReadOnly m_UnderlyingSymbol As NamedTypeSymbol
+        Private ReadOnly _underlyingSymbol As NamedTypeSymbol
 
         Public Sub New(underlyingSymbol As NamedTypeSymbol)
-            m_UnderlyingSymbol = underlyingSymbol
+            _underlyingSymbol = underlyingSymbol
         End Sub
 
         Public ReadOnly Property UnderlyingSymbol As NamedTypeSymbol
             Get
-                Return m_UnderlyingSymbol
+                Return _underlyingSymbol
             End Get
         End Property
 
@@ -37,21 +39,21 @@ Namespace Microsoft.CodeAnalysis.VisualBasic.Symbols
             Return RuntimeHelpers.GetHashCode(Me)
         End Function
 
-        Public Overrides Function Equals(obj As Object) As Boolean
+        Public Overrides Function Equals(obj As TypeSymbol, comparison As TypeCompareKind) As Boolean
             Return obj Is Me
         End Function
 
         Friend Overrides ReadOnly Property ErrorInfo As DiagnosticInfo
             Get
-                If m_UnderlyingSymbol.IsErrorType() Then
-                    Dim underlyingInfo As DiagnosticInfo = DirectCast(m_UnderlyingSymbol, ErrorTypeSymbol).ErrorInfo
+                If _underlyingSymbol.IsErrorType() Then
+                    Dim underlyingInfo As DiagnosticInfo = DirectCast(_underlyingSymbol, ErrorTypeSymbol).ErrorInfo
 
                     If underlyingInfo IsNot Nothing Then
                         Return underlyingInfo
                     End If
                 End If
 
-                Return ErrorFactory.ErrorInfo(ERRID.ERR_CannotUseGenericTypeAcrossAssemblyBoundaries, m_UnderlyingSymbol)
+                Return ErrorFactory.ErrorInfo(ERRID.ERR_CannotUseGenericTypeAcrossAssemblyBoundaries, _underlyingSymbol)
             End Get
         End Property
     End Class

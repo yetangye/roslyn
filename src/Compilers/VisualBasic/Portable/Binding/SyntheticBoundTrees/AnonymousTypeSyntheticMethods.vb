@@ -1,7 +1,10 @@
-﻿' Copyright (c) Microsoft.  All Rights Reserved.  Licensed under the Apache License, Version 2.0.  See License.txt in the project root for license information.
+﻿' Licensed to the .NET Foundation under one or more agreements.
+' The .NET Foundation licenses this file to you under the MIT license.
+' See the LICENSE file in the project root for more information.
 
 Imports System.Collections.Immutable
 Imports Microsoft.CodeAnalysis.Collections
+Imports Microsoft.CodeAnalysis.PooledObjects
 Imports Microsoft.CodeAnalysis.Text
 Imports Microsoft.CodeAnalysis.VisualBasic.Symbols
 Imports Microsoft.CodeAnalysis.VisualBasic.Syntax
@@ -13,10 +16,10 @@ Namespace Microsoft.CodeAnalysis.VisualBasic.Symbols
         Partial Private Class AnonymousTypeConstructorSymbol
             Inherits SynthesizedConstructorBase
 
-            Friend Overrides Function GetBoundMethodBody(diagnostics As DiagnosticBag, Optional ByRef methodBodyBinder As Binder = Nothing) As BoundBlock
+            Friend Overrides Function GetBoundMethodBody(compilationState As TypeCompilationState, diagnostics As BindingDiagnosticBag, Optional ByRef methodBodyBinder As Binder = Nothing) As BoundBlock
                 methodBodyBinder = Nothing
 
-                Dim syntax As VisualBasicSyntaxNode = Me.Syntax
+                Dim syntax As SyntaxNode = Me.Syntax
 
                 ' List of statements
                 Dim statements = ArrayBuilder(Of BoundStatement).GetInstance()
@@ -34,7 +37,7 @@ Namespace Microsoft.CodeAnalysis.VisualBasic.Symbols
 
                     '  Generate 'field' = 'parameter' statement
                     Dim fieldAccess = New BoundFieldAccess(syntax, boundMeReference, [property].AssociatedField, True, propertyType).MakeCompilerGenerated()
-                    Dim parameter = New BoundParameter(syntax, Me.m_parameters(index), isLValue:=False, type:=propertyType).MakeCompilerGenerated()
+                    Dim parameter = New BoundParameter(syntax, Me._parameters(index), isLValue:=False, type:=propertyType).MakeCompilerGenerated()
                     Dim assignment = New BoundAssignmentOperator(syntax, fieldAccess, parameter, False, propertyType).MakeCompilerGenerated()
                     statements.Add(New BoundExpressionStatement(syntax, assignment).MakeCompilerGenerated())
                 Next
@@ -50,16 +53,16 @@ Namespace Microsoft.CodeAnalysis.VisualBasic.Symbols
         Partial Private NotInheritable Class AnonymousTypeEqualsMethodSymbol
             Inherits SynthesizedRegularMethodBase
 
-            Friend Overrides Function GetBoundMethodBody(diagnostics As DiagnosticBag, Optional ByRef methodBodyBinder As Binder = Nothing) As BoundBlock
+            Friend Overrides Function GetBoundMethodBody(compilationState As TypeCompilationState, diagnostics As BindingDiagnosticBag, Optional ByRef methodBodyBinder As Binder = Nothing) As BoundBlock
                 methodBodyBinder = Nothing
 
-                Dim syntax As VisualBasicSyntaxNode = Me.Syntax
+                Dim syntax As SyntaxNode = Me.Syntax
 
                 ' 'Me' reference
                 Dim boundMeReference As BoundMeReference = New BoundMeReference(syntax, AnonymousType).MakeCompilerGenerated()
 
                 ' Argument 'obj' reference
-                Dim boundObjReference As BoundParameter = New BoundParameter(syntax, Me.m_parameters(0), isLValue:=False,
+                Dim boundObjReference As BoundParameter = New BoundParameter(syntax, Me._parameters(0), isLValue:=False,
                                                                              type:=AnonymousType.Manager.System_Object).MakeCompilerGenerated()
 
                 ' TryCast(obj, <anonymous-type>)
@@ -67,7 +70,7 @@ Namespace Microsoft.CodeAnalysis.VisualBasic.Symbols
                                                                        AnonymousType, Nothing).MakeCompilerGenerated()
 
                 ' Call Me.Equals(TryCast(obj, <anonymous-type>))
-                Dim boundCallToEquals As BoundExpression = New BoundCall(syntax, Me.m_iEquatableEqualsMethod, Nothing,
+                Dim boundCallToEquals As BoundExpression = New BoundCall(syntax, Me._iEquatableEqualsMethod, Nothing,
                                                                          boundMeReference, ImmutableArray.Create(Of BoundExpression)(boundTryCast),
                                                                          Nothing, AnonymousType.Manager.System_Boolean).MakeCompilerGenerated()
 
@@ -81,10 +84,10 @@ Namespace Microsoft.CodeAnalysis.VisualBasic.Symbols
         Partial Private NotInheritable Class AnonymousTypeGetHashCodeMethodSymbol
             Inherits SynthesizedRegularMethodBase
 
-            Friend Overrides Function GetBoundMethodBody(diagnostics As DiagnosticBag, Optional ByRef methodBodyBinder As Binder = Nothing) As BoundBlock
+            Friend Overrides Function GetBoundMethodBody(compilationState As TypeCompilationState, diagnostics As BindingDiagnosticBag, Optional ByRef methodBodyBinder As Binder = Nothing) As BoundBlock
                 methodBodyBinder = Nothing
 
-                Dim syntax As VisualBasicSyntaxNode = Me.Syntax
+                Dim syntax As SyntaxNode = Me.Syntax
 
                 Dim objectType As TypeSymbol = Me.AnonymousType.Manager.System_Object
                 Dim getHashCodeMethod As MethodSymbol = Me.AnonymousType.Manager.System_Object__GetHashCode
@@ -180,10 +183,10 @@ Namespace Microsoft.CodeAnalysis.VisualBasic.Symbols
         Partial Private NotInheritable Class AnonymousType_IEquatable_EqualsMethodSymbol
             Inherits SynthesizedRegularMethodBase
 
-            Friend Overrides Function GetBoundMethodBody(diagnostics As DiagnosticBag, Optional ByRef methodBodyBinder As Binder = Nothing) As BoundBlock
+            Friend Overrides Function GetBoundMethodBody(compilationState As TypeCompilationState, diagnostics As BindingDiagnosticBag, Optional ByRef methodBodyBinder As Binder = Nothing) As BoundBlock
                 methodBodyBinder = Nothing
 
-                Dim syntax As VisualBasicSyntaxNode = Me.Syntax
+                Dim syntax As SyntaxNode = Me.Syntax
 
                 Dim objectType As TypeSymbol = Me.AnonymousType.Manager.System_Object
                 Dim booleanType As TypeSymbol = Me.AnonymousType.Manager.System_Boolean
@@ -196,12 +199,12 @@ Namespace Microsoft.CodeAnalysis.VisualBasic.Symbols
                 Dim boundMeReference As BoundMeReference = New BoundMeReference(syntax, AnonymousType)
 
                 ' Argument 'val' reference
-                Dim boundValReference As BoundParameter = New BoundParameter(syntax, Me.m_parameters(0), isLValue:=False, type:=AnonymousType)
+                Dim boundValReference As BoundParameter = New BoundParameter(syntax, Me._parameters(0), isLValue:=False, type:=AnonymousType)
 
                 ' 'Nothing' Literal to be reused 
                 Dim nothingLiteral = New BoundLiteral(syntax, ConstantValue.Nothing, objectType).MakeCompilerGenerated()
 
-                ' Build conbined condition for all fields
+                ' Build combined condition for all fields
                 Dim combinedFieldCheck = BuildConditionsForFields(boundMeReference, boundValReference, nothingLiteral,
                                                                   localMyFieldBoxed, localOtherFieldBoxed, booleanType)
 
@@ -210,8 +213,11 @@ Namespace Microsoft.CodeAnalysis.VisualBasic.Symbols
                                                                        ConversionKind.WideningReference, objectType, Nothing).MakeCompilerGenerated(),
                                                    nothingLiteral, booleanType, reverse:=True)
 
-                ' Final equality check: <valIsNotNothing> AndAlso <combinedFieldCheck>
+                ' Final equality check: Me Is val OrElse (<valIsNotNothing> AndAlso <combinedFieldCheck>)
                 Dim finalEqualityCheck = BuildAndAlso(valIsNotNothing, combinedFieldCheck, booleanType)
+
+                Dim meIsValCheck = BuildIsCheck(boundMeReference, boundValReference, booleanType)
+                finalEqualityCheck = BuildOrElse(meIsValCheck, finalEqualityCheck, booleanType)
 
                 ' Create a bound block 
                 Return New BoundBlock(syntax, Nothing,
@@ -252,7 +258,7 @@ Namespace Microsoft.CodeAnalysis.VisualBasic.Symbols
                                                     boundNothing As BoundExpression, localMyFieldBoxed As LocalSymbol, localOtherFieldBoxed As LocalSymbol,
                                                     booleanType As TypeSymbol) As BoundExpression
                 Dim field As FieldSymbol = [property].AssociatedField
-                Dim syntax As VisualBasicSyntaxNode = Me.Syntax
+                Dim syntax As SyntaxNode = Me.Syntax
 
                 Dim boundLocalMyFieldBoxed = New BoundLocal(syntax, localMyFieldBoxed,
                                                             False, localMyFieldBoxed.Type).MakeCompilerGenerated()
@@ -309,15 +315,20 @@ Namespace Microsoft.CodeAnalysis.VisualBasic.Symbols
                 Return New BoundBinaryOperator(Syntax, BinaryOperatorKind.AndAlso,
                                                left, right, False, booleanType).MakeCompilerGenerated()
             End Function
+
+            Private Function BuildOrElse(left As BoundExpression, right As BoundExpression, booleanType As TypeSymbol) As BoundExpression
+                Return New BoundBinaryOperator(Syntax, BinaryOperatorKind.OrElse,
+                                               left, right, False, booleanType).MakeCompilerGenerated()
+            End Function
         End Class
 
         Partial Private NotInheritable Class AnonymousTypeToStringMethodSymbol
             Inherits SynthesizedRegularMethodBase
 
-            Friend Overrides Function GetBoundMethodBody(diagnostics As DiagnosticBag, Optional ByRef methodBodyBinder As Binder = Nothing) As BoundBlock
+            Friend Overrides Function GetBoundMethodBody(compilationState As TypeCompilationState, diagnostics As BindingDiagnosticBag, Optional ByRef methodBodyBinder As Binder = Nothing) As BoundBlock
                 methodBodyBinder = Nothing
 
-                Dim syntax As VisualBasicSyntaxNode = Me.Syntax
+                Dim syntax As SyntaxNode = Me.Syntax
 
                 Dim objectType As TypeSymbol = Me.AnonymousType.Manager.System_Object
                 Dim stringType As TypeSymbol = Me.ReturnType

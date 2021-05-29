@@ -1,4 +1,8 @@
-﻿// Copyright (c) Microsoft.  All Rights Reserved.  Licensed under the Apache License, Version 2.0.  See License.txt in the project root for license information.
+﻿// Licensed to the .NET Foundation under one or more agreements.
+// The .NET Foundation licenses this file to you under the MIT license.
+// See the LICENSE file in the project root for more information.
+
+#nullable disable
 
 using System.Linq;
 using Microsoft.CodeAnalysis.CSharp.Symbols.Retargeting;
@@ -14,7 +18,7 @@ namespace Microsoft.CodeAnalysis.CSharp.UnitTests.Semantics
     public class StructsTests : CompilingTestBase
     {
         // Cannot have instance field initializers in structs
-        [WorkItem(540982, "DevDiv")]
+        [WorkItem(540982, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/540982")]
         [Fact()]
         public void TestInitFieldStruct()
         {
@@ -25,20 +29,20 @@ public struct A
     public static int Main() { return 1; }
 }
 ";
-            CreateCompilationWithMscorlib(text).VerifyDiagnostics(
+            CreateCompilation(text).VerifyDiagnostics(
     // (4,7): error CS0573: 'A': cannot have instance property or field initializers in structs
     //     A a = new A();   // CS8036
     Diagnostic(ErrorCode.ERR_FieldInitializerInStruct, "a").WithArguments("A").WithLocation(4, 7),
     // (4,7): error CS0523: Struct member 'A.a' of type 'A' causes a cycle in the struct layout
     //     A a = new A();   // CS8036
     Diagnostic(ErrorCode.ERR_StructLayoutCycle, "a").WithArguments("A.a", "A").WithLocation(4, 7),
-    // (4,7): warning CS0414: The field 'A.a' is assigned but its value is never used
+    // (4,7): warning CS0169: The field 'A.a' is never used
     //     A a = new A();   // CS8036
-    Diagnostic(ErrorCode.WRN_UnreferencedFieldAssg, "a").WithArguments("A.a").WithLocation(4, 7)
+    Diagnostic(ErrorCode.WRN_UnreferencedField, "a").WithArguments("A.a").WithLocation(4, 7)
     );
         }
 
-        [WorkItem(1075325, "DevDiv"), WorkItem(343, "CodePlex")]
+        [WorkItem(1075325, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/1075325"), WorkItem(343, "CodePlex")]
         [Fact()]
         public void TestInitEventStruct()
         {
@@ -52,14 +56,14 @@ struct S {
     }
 }
 ";
-            CreateCompilationWithMscorlib(text).VerifyDiagnostics(
+            CreateCompilation(text).VerifyDiagnostics(
     // (3,25): error CS0573: 'S': cannot have instance property or field initializers in structs
     //     event System.Action E = null;
     Diagnostic(ErrorCode.ERR_FieldInitializerInStruct, "E").WithArguments("S").WithLocation(3, 25)
                 );
         }
 
-        [WorkItem(1075325, "DevDiv"), WorkItem(343, "CodePlex")]
+        [WorkItem(1075325, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/1075325"), WorkItem(343, "CodePlex")]
         [Fact()]
         public void TestStaticInitInStruct()
         {
@@ -79,23 +83,23 @@ struct S {
     }
 }
 ";
-            var comp = CreateCompilationWithMscorlib(text, options: TestOptions.DebugExe);
+            var comp = CreateCompilation(text, options: TestOptions.DebugExe);
 
             CompileAndVerify(comp, expectedOutput: "10 20 False").VerifyDiagnostics();
         }
 
         // Test constructor forwarding works for structs
-        [WorkItem(540896, "DevDiv")]
+        [WorkItem(540896, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/540896")]
         [Fact]
         public void TestConstructorStruct()
         {
             var text = @"
-struct  Foo
+struct  Goo
 {
-    public Foo(int x) : this(5, 6)
+    public Goo(int x) : this(5, 6)
     {
     }
-    public Foo(int x, int y) 
+    public Goo(int x, int y) 
     {
         m_x = x;
         m_y = y;
@@ -110,7 +114,7 @@ struct  Foo
         }
 
         // Calling struct default constructor in another constructor
-        [WorkItem(540896, "DevDiv")]
+        [WorkItem(540896, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/540896")]
         [Fact]
         public void TestConstructorStruct02()
         {
@@ -131,7 +135,7 @@ public struct Struct
         }
 
         // Test constructor forwarding works for structs
-        [WorkItem(540896, "DevDiv")]
+        [WorkItem(540896, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/540896")]
         [Fact]
         public void TestConstructorStruct03()
         {
@@ -182,8 +186,9 @@ class Program
         }
 
         // Overriding base System.Object methods on struct
-        [WorkItem(540990, "DevDiv")]
-        [Fact]
+        [WorkItem(20496, "https://github.com/dotnet/roslyn/issues/20496")]
+        [WorkItem(540990, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/540990")]
+        [ClrOnlyFact(ClrOnlyReason.MemberOrder)]
         public void TestOverridingBaseConstructorStruct()
         {
             var text = @"
@@ -270,7 +275,7 @@ S::ToString";
         }
 
         // Test constructor for generic struct
-        [WorkItem(540993, "DevDiv")]
+        [WorkItem(540993, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/540993")]
         [Fact]
         public void TestConstructorForGenericStruct()
         {
@@ -279,7 +284,7 @@ using System;
 struct C<T>
 {
     public int num;
-    public int Foo1()
+    public int Goo1()
     {
         return this.num;
     }
@@ -290,7 +295,7 @@ class Test
     {
         C<object> c;
         c.num = 1;
-        bool verify = c.Foo1() == 1;
+        bool verify = c.Goo1() == 1;
         Console.WriteLine(verify);
     }
 }
@@ -300,7 +305,7 @@ class Test
         }
 
         // Assign to decimal in struct constructor
-        [WorkItem(540994, "DevDiv")]
+        [WorkItem(540994, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/540994")]
         [Fact]
         public void TestAssigntoDecimalInStructConstructor()
         {
@@ -335,7 +340,7 @@ class Test
         [Fact]
         public void RetargetedSynthesizedStructConstructor()
         {
-            var oldMsCorLib = TestReferences.NetFx.v4_0_21006.mscorlib;
+            var oldMsCorLib = TestMetadata.Net40.mscorlib;
 
             var c1 = CSharpCompilation.Create("C1",
                 new[] { Parse(@"public struct S { }") },
@@ -361,7 +366,7 @@ class Test
             Assert.True(method.IsDefaultValueTypeConstructor());
 
             //TODO (tomat)
-            CompileAndVerify(c2, emitOptions: TestEmitters.RefEmitBug).VerifyIL("C.M", @"
+            CompileAndVerify(c2).VerifyIL("C.M", @"
 {
   // Code size       20 (0x14)
   .maxstack  1
@@ -439,9 +444,9 @@ public class C
 ";
 
             // Calls constructor (vs initobj), then initobj
-            var compilation = CreateCompilationWithCustomILSource(csharpSource, ilSource);
+            var compilation = CreateCompilationWithILAndMscorlib40(csharpSource, ilSource);
             // TODO (tomat)
-            CompileAndVerify(compilation, emitOptions: TestEmitters.RefEmitBug).VerifyIL("C.M", @"
+            CompileAndVerify(compilation).VerifyIL("C.M", @"
 {
   // Code size       35 (0x23)
   .maxstack  1
@@ -458,7 +463,7 @@ public class C
 }");
         }
 
-        [WorkItem(541309, "DevDiv")]
+        [WorkItem(541309, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/541309")]
         [Fact]
         public void PrivateParameterlessConstructorInMetadata()
         {
@@ -493,9 +498,9 @@ public class C
             // Uses initobj for both
             // CONSIDER: This is the dev10 behavior, but it seems like a bug.
             // Shouldn't there be an error for trying to call an inaccessible ctor?
-            var comp = CreateCompilationWithCustomILSource(csharpSource, ilSource);
+            var comp = CreateCompilationWithILAndMscorlib40(csharpSource, ilSource);
 
-            CompileAndVerify(comp, emitOptions: TestEmitters.RefEmitBug).VerifyIL("C.M", @"
+            CompileAndVerify(comp).VerifyIL("C.M", @"
 {
   // Code size       39 (0x27)
   .maxstack  1
@@ -514,7 +519,7 @@ public class C
 }");
         }
 
-        [WorkItem(543934, "DevDiv")]
+        [WorkItem(543934, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/543934")]
         [Fact]
         public void ObjectCreationExprStructTypeInstanceFieldAssign()
         {
@@ -532,13 +537,13 @@ public class TestClass
     }
 }
 ";
-            CreateCompilationWithMscorlib(csSource).VerifyDiagnostics(
+            CreateCompilation(csSource).VerifyDiagnostics(
                 // (13,9): error CS0131: The left-hand side of an assignment must be a variable, property or indexer
                 Diagnostic(ErrorCode.ERR_AssgLvalueExpected, "new TestStruct().IntI")
                 );
         }
 
-        [WorkItem(543896, "DevDiv")]
+        [WorkItem(543896, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/543896")]
         [Fact]
         public void ObjectCreationExprStructTypePropertyAssign()
         {
@@ -558,7 +563,7 @@ public class mem033
         new S().P = 1; // CS0131 
     }
 }";
-            CreateCompilationWithMscorlib(csSource).VerifyDiagnostics(
+            CreateCompilation(csSource).VerifyDiagnostics(
                 // (14,9): error CS0131: The left-hand side of an assignment must be a variable, property or indexer
                 //         new S().P = 1; // CS0131 
                 Diagnostic(ErrorCode.ERR_AssgLvalueExpected, "new S().P")
@@ -566,7 +571,7 @@ public class mem033
         }
 
 
-        [WorkItem(545498, "DevDiv")]
+        [WorkItem(545498, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/545498")]
         [Fact]
         public void StructMemberNullableTypeCausesCycle()
         {
@@ -576,7 +581,7 @@ public struct X
     public X? recursiveFld;
 }
 ";
-            CreateCompilationWithMscorlib(source).VerifyDiagnostics(
+            CreateCompilation(source, targetFramework: TargetFramework.Mscorlib45).VerifyDiagnostics(
                 // (4,15): error CS0523: Struct member 'X.recursiveFld' of type 'X?' causes a cycle in the struct layout
                 //     public X? recursiveFld;
                 Diagnostic(ErrorCode.ERR_StructLayoutCycle, "recursiveFld").WithArguments("X.recursiveFld", "X?")
@@ -584,7 +589,7 @@ public struct X
         }
 
         [Fact]
-        public void StructParameterlssCtorNotPublic()
+        public void StructParameterlessCtorNotPublic()
         {
             string source = @"
 public struct X
@@ -602,14 +607,33 @@ public struct X1
 }
 
 ";
-            CreateExperimentalCompilationWithMscorlib45(source).VerifyDiagnostics(
-    // (4,13): error CS8075: Parameterless struct constructors must be public
-    //     private X()
-    Diagnostic(ErrorCode.ERR_ParameterlessStructCtorsMustBePublic, "X").WithLocation(4, 13),
-    // (11,5): error CS8075: Parameterless struct constructors must be public
+            CreateCompilationWithMscorlib45(source).VerifyDiagnostics(
+    // (11,5): error CS0568: Structs cannot contain explicit parameterless constructors
     //     X1()
-    Diagnostic(ErrorCode.ERR_ParameterlessStructCtorsMustBePublic, "X1").WithLocation(11, 5)
+    Diagnostic(ErrorCode.ERR_StructsCantContainDefaultConstructor, "X1").WithLocation(11, 5),
+    // (4,13): error CS0568: Structs cannot contain explicit parameterless constructors
+    //     private X()
+    Diagnostic(ErrorCode.ERR_StructsCantContainDefaultConstructor, "X").WithLocation(4, 13)
                 );
+        }
+
+        [Fact]
+        public void StructNonAutoPropertyInitializer()
+        {
+            var text = @"struct S
+{
+    public int I { get { throw null; } set {} } = 9;
+}";
+
+            var comp = CreateCompilation(text);
+            comp.VerifyDiagnostics(
+            // (3,16): error CS8050: Only auto-implemented properties can have initializers.
+            //     public int I {get { throw null; } set {} } = 9;
+            Diagnostic(ErrorCode.ERR_InitializerOnNonAutoProperty, "I").WithArguments("S.I").WithLocation(3, 16),
+            // (3,16): error CS0573: 'S': cannot have instance property or field initializers in structs
+            //     public int I {get { throw null; } set {} } = 9;
+            Diagnostic(ErrorCode.ERR_FieldInitializerInStruct, "I").WithArguments("S").WithLocation(3, 16)
+);
         }
     }
 }

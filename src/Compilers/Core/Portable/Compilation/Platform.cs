@@ -1,4 +1,6 @@
-﻿// Copyright (c) Microsoft.  All Rights Reserved.  Licensed under the Apache License, Version 2.0.  See License.txt in the project root for license information.
+﻿// Licensed to the .NET Foundation under one or more agreements.
+// The .NET Foundation licenses this file to you under the MIT license.
+// See the LICENSE file in the project root for more information.
 
 namespace Microsoft.CodeAnalysis
 {
@@ -32,35 +34,29 @@ namespace Microsoft.CodeAnalysis
         /// <summary>
         /// Compiles your assembly to run on a computer that has an Advanced RISC Machine (ARM) processor.
         /// </summary>
-        Arm = 5
+        Arm = 5,
+
+        /// <summary>
+        /// Compiles your assembly to run on a computer that has an Advanced RISC Machine 64 bit (ARM64) processor.
+        /// </summary>
+        Arm64 = 6,
     };
 
     internal static partial class EnumBounds
     {
         internal static bool IsValid(this Platform value)
         {
-            return value >= Platform.AnyCpu && value <= Platform.Arm;
+            return value >= Platform.AnyCpu && value <= Platform.Arm64;
         }
 
         internal static bool Requires64Bit(this Platform value)
         {
-            return value == Platform.X64 || value == Platform.Itanium;
+            return value == Platform.X64 || value == Platform.Itanium || value == Platform.Arm64;
         }
 
         internal static bool Requires32Bit(this Platform value)
         {
             return value == Platform.X86;
-        }
-
-        /// <summary>
-        /// Gets a value indicating whether the options require the AMD instruction set.
-        /// </summary>
-        /// <value>
-        ///   <c>true</c> if the options require the AMD instruction set; otherwise, <c>false</c>.
-        /// </value>
-        internal static bool RequiresAmdInstructionSet(this Platform value)
-        {
-            return value == Platform.X64;
         }
     }
 }

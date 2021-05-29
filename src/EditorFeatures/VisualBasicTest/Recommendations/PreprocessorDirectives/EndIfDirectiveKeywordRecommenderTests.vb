@@ -1,23 +1,18 @@
-' Copyright (c) Microsoft.  All Rights Reserved.  Licensed under the Apache License, Version 2.0.  See License.txt in the project root for license information.
-
-Imports Microsoft.CodeAnalysis.Text
-Imports Microsoft.CodeAnalysis.VisualBasic
-Imports Microsoft.CodeAnalysis.VisualBasic.Symbols
-Imports Microsoft.CodeAnalysis.VisualBasic.Syntax
-Imports Roslyn.Test.Utilities
-Imports Xunit
+﻿' Licensed to the .NET Foundation under one or more agreements.
+' The .NET Foundation licenses this file to you under the MIT license.
+' See the LICENSE file in the project root for more information.
 
 Namespace Microsoft.CodeAnalysis.Editor.VisualBasic.UnitTests.Recommendations.PreprocessorDirectives
     Public Class EndIfDirectiveKeywordRecommenderTests
         <Fact>
         <Trait(Traits.Feature, Traits.Features.KeywordRecommending)>
-        Public Sub HashEndIfNotInFile()
+        Public Sub HashEndIfNotInFileTest()
             VerifyRecommendationsMissing(<File>|</File>, "#End If")
         End Sub
 
         <Fact>
         <Trait(Traits.Feature, Traits.Features.KeywordRecommending)>
-        Public Sub HashEndIfInFileAfterIf()
+        Public Sub HashEndIfInFileAfterIfTest()
             VerifyRecommendationsContain(<File>
 #If True Then
 |</File>, "#End If")
@@ -25,7 +20,7 @@ Namespace Microsoft.CodeAnalysis.Editor.VisualBasic.UnitTests.Recommendations.Pr
 
         <Fact>
         <Trait(Traits.Feature, Traits.Features.KeywordRecommending)>
-        Public Sub HashEndIfInFileAfterElseIf()
+        Public Sub HashEndIfInFileAfterElseIfTest()
             VerifyRecommendationsContain(<File>
 #If True Then
 #ElseIf True Then
@@ -34,7 +29,7 @@ Namespace Microsoft.CodeAnalysis.Editor.VisualBasic.UnitTests.Recommendations.Pr
 
         <Fact>
         <Trait(Traits.Feature, Traits.Features.KeywordRecommending)>
-        Public Sub HashEndIfNotInFileAfterElse1()
+        Public Sub HashEndIfNotInFileAfterElse1Test()
             VerifyRecommendationsContain(<File>
 #If True Then
 #Else
@@ -43,7 +38,7 @@ Namespace Microsoft.CodeAnalysis.Editor.VisualBasic.UnitTests.Recommendations.Pr
 
         <Fact>
         <Trait(Traits.Feature, Traits.Features.KeywordRecommending)>
-        Public Sub HashEndIfNotInFileAfterElse2()
+        Public Sub HashEndIfNotInFileAfterElse2Test()
             VerifyRecommendationsContain(<File>
 #If True Then
 #ElseIf True Then
@@ -53,17 +48,17 @@ Namespace Microsoft.CodeAnalysis.Editor.VisualBasic.UnitTests.Recommendations.Pr
 
         <Fact>
         <Trait(Traits.Feature, Traits.Features.KeywordRecommending)>
-        Public Sub IfAfterHashEndIf()
+        Public Sub IfAfterHashEndIfTest()
             VerifyRecommendationsContain(<File>
 #If True Then
 #ElseIf True Then
 #End |</File>, "If")
         End Sub
 
-        <WorkItem(957458)>
+        <WorkItem(957458, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/957458")>
         <Fact>
         <Trait(Traits.Feature, Traits.Features.KeywordRecommending)>
-        Public Sub NotIfWithEndPartiallyTyped()
+        Public Sub NotIfWithEndPartiallyTypedTest()
             VerifyRecommendationsMissing(<File>
 #If True Then
 #En |</File>, "If")

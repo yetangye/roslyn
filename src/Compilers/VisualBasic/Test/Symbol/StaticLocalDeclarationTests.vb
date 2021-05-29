@@ -1,4 +1,6 @@
-﻿' Copyright (c) Microsoft.  All Rights Reserved.  Licensed under the Apache License, Version 2.0.  See License.txt in the project root for license information.
+﻿' Licensed to the .NET Foundation under one or more agreements.
+' The .NET Foundation licenses this file to you under the MIT license.
+' See the LICENSE file in the project root for more information.
 
 Imports Microsoft.CodeAnalysis
 Imports Microsoft.CodeAnalysis.Text
@@ -15,7 +17,7 @@ Namespace Microsoft.CodeAnalysis.VisualBasic.UnitTests
 
         <WorkItem(15925, "DevDiv_Projects/Roslyn")>
         <Fact()>
-        Sub Valid_BasicParsingWithDim()
+        Public Sub Valid_BasicParsingWithDim()
             Dim compilationDef =
     <compilation name="StaticLocaltest">
         <file name="a.vb">
@@ -23,11 +25,11 @@ Imports System
 
 Module Module1
     Sub Main()
-        Foo()
-        Foo()
+        Goo()
+        Goo()
     End Sub
 
-    Sub Foo()
+    Sub Goo()
         Static Dim x As Integer = 1
         Console.WriteLine(x)
         x = x + 1
@@ -36,13 +38,13 @@ End Module
 </file>
     </compilation>
 
-            Dim compilation = CompilationUtils.CreateCompilationWithMscorlibAndVBRuntime(compilationDef)
+            Dim compilation = CompilationUtils.CreateCompilationWithMscorlib40AndVBRuntime(compilationDef)
             compilation.VerifyDiagnostics()
         End Sub
 
         <WorkItem(15925, "DevDiv_Projects/Roslyn")>
         <Fact()>
-        Sub Valid_BasicParsingWithoutDim()
+        Public Sub Valid_BasicParsingWithoutDim()
             Dim compilationDef =
     <compilation name="StaticLocaltest">
         <file name="a.vb">
@@ -50,11 +52,11 @@ Imports System
 
 Module Module1
     Sub Main()
-        Foo()
-        Foo()
+        Goo()
+        Goo()
     End Sub
 
-    Sub Foo()
+    Sub Goo()
         Static x As Integer = 1
         Console.WriteLine(x)
         x = x + 1
@@ -63,13 +65,13 @@ End Module
 </file>
     </compilation>
 
-            Dim compilation = CompilationUtils.CreateCompilationWithMscorlibAndVBRuntime(compilationDef)
+            Dim compilation = CompilationUtils.CreateCompilationWithMscorlib40AndVBRuntime(compilationDef)
             compilation.VerifyDiagnostics()
         End Sub
 
         <Fact>
         <WorkItem(15925, "DevDiv_Projects/Roslyn")>
-        Sub Error_StaticLocal_DuplicationDeclarations_InSameScopes()
+        Public Sub Error_StaticLocal_DuplicationDeclarations_InSameScopes()
             Dim compilationDef =
     <compilation name="StaticLocaltest">
         <file name="a.vb">
@@ -93,7 +95,7 @@ End Module
 
             'This should present a single error BC31401: Static local variable 'x' is already declared.
 
-            Dim compilation = CompilationUtils.CreateCompilationWithMscorlibAndVBRuntime(compilationDef)
+            Dim compilation = CompilationUtils.CreateCompilationWithMscorlib40AndVBRuntime(compilationDef)
 
             CompilationUtils.AssertTheseDiagnostics(compilation,
 <expected>
@@ -106,7 +108,7 @@ BC31401: Static local variable 'x' is already declared.
 
         <Fact>
         <WorkItem(15925, "DevDiv_Projects/Roslyn")>
-        Sub Error_StaticLocal_DuplicationDeclarationsConflictWithLocal1()
+        Public Sub Error_StaticLocal_DuplicationDeclarationsConflictWithLocal1()
             Dim compilationDef =
     <compilation name="StaticLocaltest">
         <file name="a.vb">
@@ -128,7 +130,7 @@ End Module
 </file>
     </compilation>
 
-            Dim compilation = CompilationUtils.CreateCompilationWithMscorlibAndVBRuntime(compilationDef)
+            Dim compilation = CompilationUtils.CreateCompilationWithMscorlib40AndVBRuntime(compilationDef)
             CompilationUtils.AssertTheseDiagnostics(compilation,
 <expected>
 BC30288: Local variable 'x' is already declared in the current block.
@@ -140,7 +142,7 @@ BC30288: Local variable 'x' is already declared in the current block.
 
         <Fact>
         <WorkItem(15925, "DevDiv_Projects/Roslyn")>
-        Sub Error_StaticLocal_DuplicationDeclarationsConflictWithLocal2()
+        Public Sub Error_StaticLocal_DuplicationDeclarationsConflictWithLocal2()
             Dim compilationDef =
     <compilation name="StaticLocaltest">
         <file name="a.vb">
@@ -162,7 +164,7 @@ BC30288: Local variable 'x' is already declared in the current block.
 </file>
     </compilation>
 
-            Dim compilation = CompilationUtils.CreateCompilationWithMscorlibAndVBRuntime(compilationDef)
+            Dim compilation = CompilationUtils.CreateCompilationWithMscorlib40AndVBRuntime(compilationDef)
             CompilationUtils.AssertTheseDiagnostics(compilation,
 <expected>
 BC30288: Local variable 'x' is already declared in the current block.
@@ -173,7 +175,7 @@ BC30288: Local variable 'x' is already declared in the current block.
 
         <WorkItem(15925, "DevDiv_Projects/Roslyn")>
         <Fact()>
-        Sub Error_StaticLocal_DuplicationDeclarations_InDifferentScopes_tryCatch()
+        Public Sub Error_StaticLocal_DuplicationDeclarations_InDifferentScopes_tryCatch()
             Dim compilationDef =
     <compilation name="StaticLocaltest">
         <file name="a.vb">
@@ -199,13 +201,13 @@ End Module
     </compilation>
 
             'This should present a single error BC31401: Static local variable 'x' is already declared.
-            Dim compilation = CompilationUtils.CreateCompilationWithMscorlibAndVBRuntime(compilationDef)
+            Dim compilation = CompilationUtils.CreateCompilationWithMscorlib40AndVBRuntime(compilationDef)
             compilation.VerifyDiagnostics(Diagnostic(ERRID.ERR_DuplicateLocalStatic1, "x").WithArguments("x"))
         End Sub
 
         <WorkItem(15925, "DevDiv_Projects/Roslyn")>
         <Fact()>
-        Sub Error_StaticLocal_DuplicationDeclarations_InDifferentScopesSelectCase()
+        Public Sub Error_StaticLocal_DuplicationDeclarations_InDifferentScopesSelectCase()
             Dim compilationDef =
     <compilation name="StaticLocaltest">
         <file name="a.vb">
@@ -229,13 +231,13 @@ End Module
 </file>
     </compilation>
 
-            Dim compilation = CompilationUtils.CreateCompilationWithMscorlibAndVBRuntime(compilationDef)
+            Dim compilation = CompilationUtils.CreateCompilationWithMscorlib40AndVBRuntime(compilationDef)
             compilation.VerifyDiagnostics(Diagnostic(ERRID.ERR_DuplicateLocalStatic1, "x").WithArguments("x"))
         End Sub
 
         <WorkItem(15925, "DevDiv_Projects/Roslyn")>
         <Fact()>
-        Sub Error_StaticLocal_DuplicationDeclarations_InDifferentScopes_If()
+        Public Sub Error_StaticLocal_DuplicationDeclarations_InDifferentScopes_If()
             Dim compilationDef =
     <compilation name="StaticLocaltest">
         <file name="a.vb">
@@ -256,13 +258,13 @@ Module Module1
 End Module    </file>
     </compilation>
 
-            Dim compilation = CompilationUtils.CreateCompilationWithMscorlibAndVBRuntime(compilationDef)
+            Dim compilation = CompilationUtils.CreateCompilationWithMscorlib40AndVBRuntime(compilationDef)
             compilation.VerifyDiagnostics(Diagnostic(ERRID.ERR_DuplicateLocalStatic1, "x").WithArguments("x"))
         End Sub
 
         <WorkItem(15925, "DevDiv_Projects/Roslyn")>
         <Fact()>
-        Sub Error_StaticLocal_DuplicationDeclarations_InDifferentScopes_For()
+        Public Sub Error_StaticLocal_DuplicationDeclarations_InDifferentScopes_For()
             'Show differences between static local and normal local
             Dim compilationDef =
     <compilation name="StaticLocaltest">
@@ -286,7 +288,7 @@ End Module
     </file>
     </compilation>
 
-            Dim compilation = CompilationUtils.CreateCompilationWithMscorlibAndVBRuntime(compilationDef)
+            Dim compilation = CompilationUtils.CreateCompilationWithMscorlib40AndVBRuntime(compilationDef)
             compilation.VerifyDiagnostics(Diagnostic(ERRID.ERR_BlockLocalShadowing1, "y").WithArguments("y"),
                                           Diagnostic(ERRID.ERR_BlockLocalShadowing1, "x").WithArguments("x"),
                                           Diagnostic(ERRID.ERR_DuplicateLocalStatic1, "x").WithArguments("x"))
@@ -302,13 +304,13 @@ End Module
 Module Module1
         Sub Main()
             Dim x as new UDTest()
-            x.Foo(of Integer)()
-            x.Foo(of Integer)()
+            x.Goo(of Integer)()
+            x.Goo(of Integer)()
         End Sub
 End Module
 
         Public Class UDTest
-            Public Sub Foo(of t)
+            Public Sub Goo(of t)
                 Static SLItem as integer = 1
                 SLItem +=1
             End Sub            
@@ -316,7 +318,7 @@ End Module
 </file>
         </compilation>
 
-            Dim compilation = CompilationUtils.CreateCompilationWithMscorlibAndVBRuntime(compilationDef)
+            Dim compilation = CompilationUtils.CreateCompilationWithMscorlib40AndVBRuntime(compilationDef)
             compilation.VerifyDiagnostics(Diagnostic(ERRID.ERR_BadStaticLocalInGenericMethod, "Static"))
         End Sub
 
@@ -331,13 +333,13 @@ End Module
 Module Module1
     Sub Main()
         Dim x As New UDTest()
-        x.Foo()
-        x.Foo()
+        x.Goo()
+        x.Goo()
     End Sub
 End Module
 
 Public Structure UDTest
-    Public Sub Foo()
+    Public Sub Goo()
         Static SLItem As Integer = 1
         SLItem += 1
     End Sub
@@ -345,7 +347,7 @@ End Structure
 </file>
         </compilation>
 
-            Dim compilation = CompilationUtils.CreateCompilationWithMscorlibAndVBRuntime(compilationDef)
+            Dim compilation = CompilationUtils.CreateCompilationWithMscorlib40AndVBRuntime(compilationDef)
             compilation.VerifyDiagnostics(Diagnostic(ERRID.ERR_BadStaticLocalInStruct, "Static"))
         End Sub
 
@@ -377,7 +379,7 @@ End Module
 </file>
     </compilation>
 
-            Dim compilation = CompilationUtils.CreateCompilationWithMscorlibAndVBRuntime(compilationDef)
+            Dim compilation = CompilationUtils.CreateCompilationWithMscorlib40AndVBRuntime(compilationDef)
             compilation.VerifyDiagnostics(Diagnostic(ERRID.ERR_BadLocalDimFlags1, "Public").WithArguments("Public"),
                                           Diagnostic(ERRID.ERR_BadLocalDimFlags1, "Private").WithArguments("Private"),
                                           Diagnostic(ERRID.ERR_BadLocalDimFlags1, "Protected").WithArguments("Protected"),
@@ -410,13 +412,13 @@ End Module
 </file>
     </compilation>
 
-            Dim compilation = CompilationUtils.CreateCompilationWithMscorlibAndVBRuntime(compilationDef)
+            Dim compilation = CompilationUtils.CreateCompilationWithMscorlib40AndVBRuntime(compilationDef)
             compilation.VerifyDiagnostics(Diagnostic(ERRID.ERR_BadDimFlags1, "Static").WithArguments("Static"))
         End Sub
 
         <WorkItem(15925, "DevDiv_Projects/Roslyn")>
         <Fact()>
-        Sub Error_TryingToAccessStaticLocalFromOutsideMethod()
+        Public Sub Error_TryingToAccessStaticLocalFromOutsideMethod()
             'trying to access SL from oUtside method not possible
             Dim compilationDef =
     <compilation name="StaticLocaltest">
@@ -444,7 +446,7 @@ Module Module1
 End Module</file>
     </compilation>
 
-            Dim compilation = CompilationUtils.CreateCompilationWithMscorlibAndVBRuntime(compilationDef)
+            Dim compilation = CompilationUtils.CreateCompilationWithMscorlib40AndVBRuntime(compilationDef)
             compilation.VerifyDiagnostics(Diagnostic(ERRID.ERR_VoidValue, "StaticLocalInSub"),
                                           Diagnostic(ERRID.ERR_VoidValue, "StaticLocalInSub2"))
         End Sub
@@ -476,7 +478,7 @@ End Module
 </file>
     </compilation>
 
-            Dim compilation = CompilationUtils.CreateCompilationWithMscorlibAndVBRuntime(compilationDef)
+            Dim compilation = CompilationUtils.CreateCompilationWithMscorlib40AndVBRuntime(compilationDef)
             compilation.VerifyDiagnostics(Diagnostic(ERRID.ERR_BlockLocalShadowing1, "sl1").WithArguments("sl1"),
                                           Diagnostic(ERRID.ERR_BinaryOperands3, "sl1 &= ""InCatch""").WithArguments("&", "System.Exception", "String"))
         End Sub
@@ -502,7 +504,7 @@ End Module
 </file>
     </compilation>
 
-            Dim compilation = CompilationUtils.CreateCompilationWithMscorlibAndVBRuntime(compilationDef)
+            Dim compilation = CompilationUtils.CreateCompilationWithMscorlib40AndVBRuntime(compilationDef)
             compilation.VerifyDiagnostics(Diagnostic(ERRID.ERR_InvalidUseOfKeyword, "as"),
                                           Diagnostic(ERRID.ERR_DuplicateSpecifier, "Static"))
         End Sub
@@ -530,7 +532,7 @@ End Class
 </file>
     </compilation>
 
-            Dim compilation = CompilationUtils.CreateCompilationWithMscorlibAndVBRuntime(compilationDef)
+            Dim compilation = CompilationUtils.CreateCompilationWithMscorlib40AndVBRuntime(compilationDef)
             compilation.VerifyDiagnostics(Diagnostic(ERRID.ERR_InvalidUseOfKeyword, "Static"))
         End Sub
 
@@ -563,7 +565,7 @@ End Module
 </file>
     </compilation>
 
-            Dim compilation = CompilationUtils.CreateCompilationWithMscorlibAndVBRuntime(compilationDef)
+            Dim compilation = CompilationUtils.CreateCompilationWithMscorlib40AndVBRuntime(compilationDef)
             compilation.VerifyDiagnostics(Diagnostic(ERRID.ERR_ExpectedExpression, ""),
                                           Diagnostic(ERRID.ERR_SubDisallowsStatement, "static x1 As Integer = 0"))
         End Sub
@@ -610,7 +612,7 @@ End Module
 </file>
     </compilation>
 
-            Dim compilation = CompilationUtils.CreateCompilationWithMscorlibAndVBRuntime(compilationDef)
+            Dim compilation = CompilationUtils.CreateCompilationWithMscorlib40AndVBRuntime(compilationDef)
             compilation.VerifyDiagnostics(Diagnostic(ERRID.ERR_StaticInLambda, "static"),
                                           Diagnostic(ERRID.ERR_StaticInLambda, "static"))
         End Sub
@@ -618,7 +620,7 @@ End Module
         <WorkItem(15925, "DevDiv_Projects/Roslyn")>
         <Fact()>
         Public Sub Error_StaticLocalInTryCatchBlockScope()
-            'The Use of Sttaic Locals within Try/Catch/Finally Blocks
+            'The Use of Static Locals within Try/Catch/Finally Blocks
 
             Dim compilationDef =
     <compilation name="StaticLocaltest">
@@ -646,14 +648,14 @@ Module Module1
 End Module</file>
     </compilation>
 
-            Dim compilation = CompilationUtils.CreateCompilationWithMscorlibAndVBRuntime(compilationDef)
+            Dim compilation = CompilationUtils.CreateCompilationWithMscorlib40AndVBRuntime(compilationDef)
             compilation.VerifyDiagnostics(Diagnostic(ERRID.ERR_NameNotDeclared1, "SL").WithArguments("SL"))
 
         End Sub
 
         <WorkItem(15925, "DevDiv_Projects/Roslyn")>
         <Fact()>
-        Sub Error_StaticLocal_SpecialType_ArgIterator()
+        Public Sub Error_StaticLocal_SpecialType_ArgIterator()
             Dim compilationDef =
         <compilation name="StaticLocaltest">
             <file name="a.vb">
@@ -661,24 +663,24 @@ Imports System
 
 Module Module1
     Sub Main()
-        Foo()
-        Foo()
+        Goo()
+        Goo()
     End Sub
 
-    Sub Foo()
+    Sub Goo()
         Static SLItem2 As ArgIterator
     End Sub
 End Module</file>
         </compilation>
 
-            Dim compilation = CompilationUtils.CreateCompilationWithMscorlibAndVBRuntime(compilationDef)
+            Dim compilation = CompilationUtils.CreateCompilationWithMscorlib40AndVBRuntime(compilationDef)
             compilation.VerifyDiagnostics(Diagnostic(ERRID.ERR_RestrictedType1, "ArgIterator").WithArguments("System.ArgIterator"),
                                           Diagnostic(ERRID.WRN_UnusedLocal, "SLItem2").WithArguments("SLItem2"))
         End Sub
 
         <WorkItem(15925, "DevDiv_Projects/Roslyn")>
         <Fact()>
-        Sub Error_StaticLocal_SpecialType_TypedReference()
+        Public Sub Error_StaticLocal_SpecialType_TypedReference()
             Dim compilationDef =
         <compilation name="StaticLocaltest">
             <file name="a.vb">
@@ -686,18 +688,18 @@ Imports System
 
 Module Module1
     Sub Main()
-        Foo()
-        Foo()
+        Goo()
+        Goo()
     End Sub
 
-    Sub Foo()
+    Sub Goo()
         Static SLItem2 As TypedReference = Nothing
     End Sub
 End Module
 </file>
         </compilation>
 
-            Dim compilation = CompilationUtils.CreateCompilationWithMscorlibAndVBRuntime(compilationDef)
+            Dim compilation = CompilationUtils.CreateCompilationWithMscorlib40AndVBRuntime(compilationDef)
             compilation.VerifyDiagnostics(Diagnostic(ERRID.ERR_RestrictedType1, "TypedReference").WithArguments("System.TypedReference"))
         End Sub
 
@@ -728,7 +730,7 @@ Module Module1
 End Module</file>
     </compilation>
 
-            Dim compilation = CompilationUtils.CreateCompilationWithMscorlibAndVBRuntime(compilationDef)
+            Dim compilation = CompilationUtils.CreateCompilationWithMscorlib40AndVBRuntime(compilationDef)
             compilation.VerifyDiagnostics(Diagnostic(ERRID.ERR_ExpectedQueryableSource, "{1, 2, 3}").WithArguments("Integer()"),
                                           Diagnostic(ERRID.ERR_IterationVariableShadowLocal1, "sl").WithArguments("sl"),
                                           Diagnostic(ERRID.ERR_IterationVariableShadowLocal1, "sl").WithArguments("sl"))

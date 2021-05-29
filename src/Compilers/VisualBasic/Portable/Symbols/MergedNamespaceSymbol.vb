@@ -1,10 +1,13 @@
-﻿' Copyright (c) Microsoft.  All Rights Reserved.  Licensed under the Apache License, Version 2.0.  See License.txt in the project root for license information.
+﻿' Licensed to the .NET Foundation under one or more agreements.
+' The .NET Foundation licenses this file to you under the MIT license.
+' See the LICENSE file in the project root for more information.
 
 Imports System.Collections.Generic
 Imports System.Collections.Immutable
 Imports System.Collections.ObjectModel
 Imports System.Threading
 Imports Microsoft.CodeAnalysis.Collections
+Imports Microsoft.CodeAnalysis.PooledObjects
 Imports Microsoft.CodeAnalysis.Text
 Imports Microsoft.CodeAnalysis.VisualBasic.Symbols
 Imports Microsoft.CodeAnalysis.VisualBasic.Syntax
@@ -74,9 +77,9 @@ Namespace Microsoft.CodeAnalysis.VisualBasic.Symbols
             ' module extent namespace will be another module extent namespace. This is basically no different than type members of namespaces,
             ' so it shouldn't be TOO unexpected.
 
-            Debug.Assert(namespacesToMerge.Count <> 0)
+            Debug.Assert(namespacesToMerge.Length <> 0)
 
-            If namespacesToMerge.Count = 1 Then
+            If namespacesToMerge.Length = 1 Then
                 Dim result = namespacesToMerge(0)
                 Return result
             Else
@@ -177,7 +180,7 @@ Namespace Microsoft.CodeAnalysis.VisualBasic.Symbols
 
         ' Constructor. Use static Create method to create instances.
         Private Sub New(containingNamespace As MergedNamespaceSymbol, namespacesToMerge As ImmutableArray(Of NamespaceSymbol))
-            Debug.Assert(namespacesToMerge.Distinct().Count() = namespacesToMerge.Length)
+            Debug.Assert(namespacesToMerge.Distinct().Length = namespacesToMerge.Length)
             Me._namespacesToMerge = namespacesToMerge
             Me._containingNamespace = containingNamespace
 
@@ -650,7 +653,6 @@ Namespace Microsoft.CodeAnalysis.VisualBasic.Symbols
                 ' of memory overhead) unless there is actual merging going on. 
                 Debug.Assert(namespaceArray.Count <> 0)
                 If namespaceArray.Count = 0 Then
-                    Debug.Assert(False)
                     namespaceArray.Free()
                     Return Me
                 End If
@@ -665,8 +667,7 @@ Namespace Microsoft.CodeAnalysis.VisualBasic.Symbols
                         Return result
                     End If
 
-                    Debug.Assert(False)
-                    Return Me
+                    Throw ExceptionUtilities.Unreachable
                 End If
 
                 Dim lookup = New SmallDictionary(Of NamespaceSymbol, Boolean)()

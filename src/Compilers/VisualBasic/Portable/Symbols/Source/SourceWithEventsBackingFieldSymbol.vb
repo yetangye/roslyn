@@ -1,7 +1,10 @@
-﻿' Copyright (c) Microsoft.  All Rights Reserved.  Licensed under the Apache License, Version 2.0.  See License.txt in the project root for license information.
+﻿' Licensed to the .NET Foundation under one or more agreements.
+' The .NET Foundation licenses this file to you under the MIT license.
+' See the LICENSE file in the project root for more information.
 
 Imports System.Collections.Immutable
 Imports System.Runtime.InteropServices
+Imports Microsoft.CodeAnalysis.PooledObjects
 Imports Microsoft.CodeAnalysis.Text
 Imports Microsoft.CodeAnalysis.VisualBasic.Symbols
 Imports Microsoft.CodeAnalysis.VisualBasic.Syntax
@@ -16,7 +19,7 @@ Namespace Microsoft.CodeAnalysis.VisualBasic.Symbols
     Friend NotInheritable Class SourceWithEventsBackingFieldSymbol
         Inherits SourceMemberFieldSymbol
 
-        Private m_property As SourcePropertySymbol
+        Private ReadOnly _property As SourcePropertySymbol
 
         Public Sub New([property] As SourcePropertySymbol,
                        syntaxRef As SyntaxReference,
@@ -27,12 +30,12 @@ Namespace Microsoft.CodeAnalysis.VisualBasic.Symbols
                        name,
                        SourceMemberFlags.AccessibilityPrivate Or If([property].IsShared, SourceMemberFlags.Shared, SourceMemberFlags.None))
 
-            m_property = [property]
+            _property = [property]
         End Sub
 
         Public Overrides ReadOnly Property AssociatedSymbol As Symbol
             Get
-                Return m_property
+                Return _property
             End Get
         End Property
 
@@ -50,14 +53,14 @@ Namespace Microsoft.CodeAnalysis.VisualBasic.Symbols
 
         Friend Overrides ReadOnly Property ImplicitlyDefinedBy(Optional membersInProgress As Dictionary(Of String, ArrayBuilder(Of Symbol)) = Nothing) As Symbol
             Get
-                Return m_property
+                Return _property
             End Get
         End Property
 
         Friend Overrides Sub AddSynthesizedAttributes(compilationState as ModuleCompilationState, ByRef attributes As ArrayBuilder(Of SynthesizedAttributeData))
             MyBase.AddSynthesizedAttributes(compilationState, attributes)
 
-            Dim compilation = m_property.DeclaringCompilation
+            Dim compilation = _property.DeclaringCompilation
 
             Debug.Assert(Not Me.ContainingType.IsImplicitlyDeclared)
 

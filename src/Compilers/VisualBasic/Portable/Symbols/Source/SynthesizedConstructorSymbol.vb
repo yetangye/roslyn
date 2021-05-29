@@ -1,6 +1,9 @@
-﻿' Copyright (c) Microsoft.  All Rights Reserved.  Licensed under the Apache License, Version 2.0.  See License.txt in the project root for license information.
+﻿' Licensed to the .NET Foundation under one or more agreements.
+' The .NET Foundation licenses this file to you under the MIT license.
+' See the LICENSE file in the project root for more information.
 
 Imports System.Collections.Immutable
+Imports Microsoft.CodeAnalysis.PooledObjects
 
 Namespace Microsoft.CodeAnalysis.VisualBasic.Symbols
 
@@ -27,7 +30,7 @@ Namespace Microsoft.CodeAnalysis.VisualBasic.Symbols
             isShared As Boolean,
             isDebuggable As Boolean,
             binder As Binder,
-            diagnostics As DiagnosticBag
+            diagnostics As BindingDiagnosticBag
         )
             MyBase.New(syntaxReference, container, isShared, binder, diagnostics)
             Me._debuggable = isDebuggable
@@ -60,7 +63,7 @@ Namespace Microsoft.CodeAnalysis.VisualBasic.Symbols
             ' although the containing type can be PE symbol, such a constructor doesn't 
             ' declare source locals And thus this method shouldn't be called.
             Dim containingType = DirectCast(Me.ContainingType, SourceMemberContainerTypeSymbol)
-            Return containingType.CalculateLocalSyntaxOffsetInSynthesizedConstructor(localPosition, localTree, IsShared)
+            Return containingType.CalculateSyntaxOffsetInSynthesizedConstructor(localPosition, localTree, IsShared)
         End Function
     End Class
 End Namespace

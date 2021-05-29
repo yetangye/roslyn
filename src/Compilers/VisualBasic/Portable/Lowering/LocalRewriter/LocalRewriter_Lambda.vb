@@ -1,4 +1,6 @@
-﻿' Copyright (c) Microsoft.  All Rights Reserved.  Licensed under the Apache License, Version 2.0.  See License.txt in the project root for license information.
+﻿' Licensed to the .NET Foundation under one or more agreements.
+' The .NET Foundation licenses this file to you under the MIT license.
+' See the LICENSE file in the project root for more information.
 
 Imports System.Diagnostics
 Imports System.Runtime.InteropServices
@@ -12,14 +14,14 @@ Namespace Microsoft.CodeAnalysis.VisualBasic
         Public Overrides Function VisitLambda(node As BoundLambda) As BoundNode
             ' we only make a note that lambdas are present
             ' they will be dealt with in a different rewriter.
-            Me.hasLambdas = True
+            Me._hasLambdas = True
 
-            Dim originalMethodOrLambda = Me.currentMethodOrLambda
-            Me.currentMethodOrLambda = node.LambdaSymbol
+            Dim originalMethodOrLambda = Me._currentMethodOrLambda
+            Me._currentMethodOrLambda = node.LambdaSymbol
 
             Dim result = MyBase.VisitLambda(node)
 
-            Me.currentMethodOrLambda = originalMethodOrLambda
+            Me._currentMethodOrLambda = originalMethodOrLambda
 
             Return result
         End Function

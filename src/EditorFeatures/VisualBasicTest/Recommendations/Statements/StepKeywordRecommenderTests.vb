@@ -1,23 +1,18 @@
-' Copyright (c) Microsoft.  All Rights Reserved.  Licensed under the Apache License, Version 2.0.  See License.txt in the project root for license information.
-
-Imports Microsoft.CodeAnalysis.Text
-Imports Microsoft.CodeAnalysis.VisualBasic
-Imports Microsoft.CodeAnalysis.VisualBasic.Symbols
-Imports Microsoft.CodeAnalysis.VisualBasic.Syntax
-Imports Roslyn.Test.Utilities
-Imports Xunit
+﻿' Licensed to the .NET Foundation under one or more agreements.
+' The .NET Foundation licenses this file to you under the MIT license.
+' See the LICENSE file in the project root for more information.
 
 Namespace Microsoft.CodeAnalysis.Editor.VisualBasic.UnitTests.Recommendations.Statements
     Public Class StepKeywordRecommenderTests
         <Fact>
         <Trait(Traits.Feature, Traits.Features.KeywordRecommending)>
-        Public Sub StepInForLoop()
+        Public Sub StepInForLoopTest()
             VerifyRecommendationsContain(<MethodBody>For i = 1 To 10 |</MethodBody>, "Step")
         End Sub
 
         <Fact>
         <Trait(Traits.Feature, Traits.Features.KeywordRecommending)>
-        Public Sub StepInForLoopAfterLineContinuation()
+        Public Sub StepInForLoopAfterLineContinuationTest()
             VerifyRecommendationsContain(
 <MethodBody>
     For i = 1 To 10 _
@@ -27,7 +22,16 @@ _
 
         <Fact>
         <Trait(Traits.Feature, Traits.Features.KeywordRecommending)>
-        Public Sub StepInForLoopNotAfterEOL()
+        Public Sub StepInForLoopAfterLineContinuationTestCommentsAfterLineContinuation()
+            VerifyRecommendationsContain(
+<MethodBody>
+    For i = 1 To 10 _ ' Test
+_
+|</MethodBody>, "Step")
+        End Sub
+        <Fact>
+        <Trait(Traits.Feature, Traits.Features.KeywordRecommending)>
+        Public Sub StepInForLoopNotAfterEOLTest()
             VerifyRecommendationsMissing(
 <MethodBody>
     For i = 1 To 10 
@@ -36,7 +40,7 @@ _
 
         <Fact>
         <Trait(Traits.Feature, Traits.Features.KeywordRecommending)>
-        Public Sub StepInForLoopNotAfterEOLWithLineContinuation()
+        Public Sub StepInForLoopNotAfterEOLWithLineContinuationTest()
             VerifyRecommendationsMissing(
 <MethodBody>
     For i = 1 To 10 _

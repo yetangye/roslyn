@@ -1,4 +1,6 @@
-' Copyright (c) Microsoft.  All Rights Reserved.  Licensed under the Apache License, Version 2.0.  See License.txt in the project root for license information.
+﻿' Licensed to the .NET Foundation under one or more agreements.
+' The .NET Foundation licenses this file to you under the MIT license.
+' See the LICENSE file in the project root for more information.
 
 Imports Microsoft.CodeAnalysis.Editor.VisualBasic.KeywordHighlighting
 
@@ -6,22 +8,22 @@ Namespace Microsoft.CodeAnalysis.Editor.VisualBasic.UnitTests.KeywordHighlightin
     Public Class EnumBlockHighlighterTests
         Inherits AbstractVisualBasicKeywordHighlighterTests
 
-        Friend Overrides Function CreateHighlighter() As IHighlighter
-            Return New EnumBlockHighlighter()
+        Friend Overrides Function GetHighlighterType() As Type
+            Return GetType(EnumBlockHighlighter)
         End Function
 
         <Fact, Trait(Traits.Feature, Traits.Features.KeywordHighlighting)>
-        Public Sub TestEnum1()
-            Test(<Text>
+        Public Async Function TestEnum1() As Task
+            Await TestAsync(<Text>
 {|Cursor:[|Enum|]|} E1
 [|End Enum|]</Text>)
-        End Sub
+        End Function
 
         <Fact, Trait(Traits.Feature, Traits.Features.KeywordHighlighting)>
-        Public Sub TestEnum2()
-            Test(<Text>
+        Public Async Function TestEnum2() As Task
+            Await TestAsync(<Text>
 [|Enum|] E1
 {|Cursor:[|End Enum|]|}</Text>)
-        End Sub
+        End Function
     End Class
 End Namespace

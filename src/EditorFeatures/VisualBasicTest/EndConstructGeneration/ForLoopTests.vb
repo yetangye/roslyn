@@ -1,183 +1,177 @@
-' Copyright (c) Microsoft.  All Rights Reserved.  Licensed under the Apache License, Version 2.0.  See License.txt in the project root for license information.
-
-Imports Microsoft.CodeAnalysis.Editor.VisualBasic.EndConstructGeneration
-Imports Microsoft.CodeAnalysis.Text
-Imports Microsoft.CodeAnalysis.VisualBasic
-Imports Microsoft.CodeAnalysis.VisualBasic.Symbols
-Imports Microsoft.CodeAnalysis.VisualBasic.Syntax
-Imports Microsoft.VisualStudio.Text
-Imports Roslyn.Test.EditorUtilities
-Imports Roslyn.Test.Utilities
+﻿' Licensed to the .NET Foundation under one or more agreements.
+' The .NET Foundation licenses this file to you under the MIT license.
+' See the LICENSE file in the project root for more information.
 
 Namespace Microsoft.CodeAnalysis.Editor.VisualBasic.UnitTests.EndConstructGeneration
+    <[UseExportProvider]>
     Public Class ForLoopTests
-        <Fact, Trait(Traits.Feature, Traits.Features.EndConstructGeneration)>
-        Public Sub VerifyForWithIndex()
+        <WpfFact, Trait(Traits.Feature, Traits.Features.EndConstructGeneration)>
+        Public Sub TestVerifyForWithIndex()
             VerifyStatementEndConstructApplied(
-                before:={"Class c1",
-                         "  Sub foo()",
-                         "    For i = 1 To 10",
-                         "  End Sub",
-                         "End Class"},
+                before:="Class c1
+  Sub goo()
+    For i = 1 To 10
+  End Sub
+End Class",
                 beforeCaret:={2, -1},
-                after:={"Class c1",
-                        "  Sub foo()",
-                        "    For i = 1 To 10",
-                        "",
-                        "    Next",
-                        "  End Sub",
-                        "End Class"},
+                after:="Class c1
+  Sub goo()
+    For i = 1 To 10
+
+    Next
+  End Sub
+End Class",
                 afterCaret:={3, -1})
         End Sub
 
-        <Fact, Trait(Traits.Feature, Traits.Features.EndConstructGeneration)>
-        Public Sub VerifyForEach()
+        <WpfFact, Trait(Traits.Feature, Traits.Features.EndConstructGeneration)>
+        Public Sub TestVerifyForEach()
             VerifyStatementEndConstructApplied(
-                before:={"Class c1",
-                         "  Sub foo()",
-                        "    For Each i In collection",
-                         "  End Sub",
-                         "End Class"},
+                before:="Class c1
+  Sub goo()
+    For Each i In collection
+  End Sub
+End Class",
                 beforeCaret:={2, -1},
-                after:={"Class c1",
-                        "  Sub foo()",
-                        "    For Each i In collection",
-                        "",
-                        "    Next",
-                        "  End Sub",
-                        "End Class"},
+                after:="Class c1
+  Sub goo()
+    For Each i In collection
+
+    Next
+  End Sub
+End Class",
                 afterCaret:={3, -1})
         End Sub
 
-        <Fact, Trait(Traits.Feature, Traits.Features.EndConstructGeneration), WorkItem(527481)>
+        <WpfFact, Trait(Traits.Feature, Traits.Features.EndConstructGeneration), WorkItem(527481, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/527481")>
         Public Sub VerifyIndexMatchedInner1()
             VerifyStatementEndConstructNotApplied(
-                text:={"Class c1",
-                       "  Sub foo()",
-                       "    For i = 1 To 10",
-                       "      For j = 1 To 10",
-                       "      Next j",
-                       "  End Sub",
-                       "End Class"},
+                text:="Class c1
+  Sub goo()
+    For i = 1 To 10
+      For j = 1 To 10
+      Next j
+  End Sub
+End Class",
                  caret:={3, -1})
         End Sub
 
-        <Fact, Trait(Traits.Feature, Traits.Features.EndConstructGeneration), WorkItem(527481)>
-        Public Sub VerifyIndexMatchedInner2()
+        <WpfFact, Trait(Traits.Feature, Traits.Features.EndConstructGeneration), WorkItem(527481, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/527481")>
+        Public Sub TestVerifyIndexMatchedInner2()
             VerifyStatementEndConstructApplied(
-                before:={"Class c1",
-                         "  Sub foo()",
-                         "    For i = 1 To 10",
-                         "      For j = 1 To 10",
-                         "      Next j",
-                         "  End Sub",
-                         "End Class"},
+                before:="Class c1
+  Sub goo()
+    For i = 1 To 10
+      For j = 1 To 10
+      Next j
+  End Sub
+End Class",
                 beforeCaret:={2, -1},
-                after:={"Class c1",
-                        "  Sub foo()",
-                        "    For i = 1 To 10",
-                        "",
-                        "    Next",
-                        "      For j = 1 To 10",
-                        "      Next j",
-                        "  End Sub",
-                        "End Class"},
+                after:="Class c1
+  Sub goo()
+    For i = 1 To 10
+
+    Next
+      For j = 1 To 10
+      Next j
+  End Sub
+End Class",
                 afterCaret:={3, -1})
         End Sub
 
-        <Fact, Trait(Traits.Feature, Traits.Features.EndConstructGeneration), WorkItem(527481)>
+        <WpfFact, Trait(Traits.Feature, Traits.Features.EndConstructGeneration), WorkItem(527481, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/527481")>
         Public Sub VerifyIndexSharedNext()
             VerifyStatementEndConstructNotApplied(
-                text:={"Class c1",
-                       "  Sub foo()",
-                       "    For i = 1 To 10",
-                       "      For j = 1 To 10",
-                       "    Next j, i",
-                       "  End Sub",
-                       "End Class"},
+                text:="Class c1
+  Sub goo()
+    For i = 1 To 10
+      For j = 1 To 10
+    Next j, i
+  End Sub
+End Class",
                  caret:={3, -1})
         End Sub
 
-        <Fact, Trait(Traits.Feature, Traits.Features.EndConstructGeneration)>
-        Public Sub VerifyNestedFor()
+        <WpfFact, Trait(Traits.Feature, Traits.Features.EndConstructGeneration)>
+        Public Sub TestVerifyNestedFor()
             VerifyStatementEndConstructApplied(
-                before:={"' NestedFor",
-                         "Class C",
-                         "    Sub s",
-                         "        For i = 1 to 10",
-                         "            For i = 1 to 10",
-                         "        Next",
-                         "    End sub",
-                         "End Class"},
+                before:="' NestedFor
+Class C
+    Sub s
+        For i = 1 to 10
+            For i = 1 to 10
+        Next
+    End sub
+End Class",
                 beforeCaret:={4, -1},
-                 after:={"' NestedFor",
-                         "Class C",
-                         "    Sub s",
-                         "        For i = 1 to 10",
-                         "            For i = 1 to 10",
-                         "",
-                         "            Next",
-                         "        Next",
-                         "    End sub",
-                         "End Class"},
+                 after:="' NestedFor
+Class C
+    Sub s
+        For i = 1 to 10
+            For i = 1 to 10
+
+            Next
+        Next
+    End sub
+End Class",
                 afterCaret:={5, -1})
         End Sub
 
-        <Fact, Trait(Traits.Feature, Traits.Features.EndConstructGeneration)>
-        Public Sub VerifyNestedForEach()
+        <WpfFact, Trait(Traits.Feature, Traits.Features.EndConstructGeneration)>
+        Public Sub TestVerifyNestedForEach()
             VerifyStatementEndConstructApplied(
-                before:={"Class C",
-                         "    function f(byval x as Integer,",
-                         "               byref y as string) as string",
-                         "        for each k in {1,2,3}",
-                         "            For each i in c",
-                         "        Next",
-                         "        return y",
-                         "    End Function",
-                         "End Class"},
+                before:="Class C
+    function f(byval x as Integer,
+               byref y as string) as string
+        for each k in {1,2,3}
+            For each i in c
+        Next
+        return y
+    End Function
+End Class",
                 beforeCaret:={4, -1},
-                 after:={"Class C",
-                         "    function f(byval x as Integer,",
-                         "               byref y as string) as string",
-                         "        for each k in {1,2,3}",
-                         "            For each i in c",
-                         "",
-                         "            Next",
-                         "        Next",
-                         "        return y",
-                         "    End Function",
-                         "End Class"},
+                 after:="Class C
+    function f(byval x as Integer,
+               byref y as string) as string
+        for each k in {1,2,3}
+            For each i in c
+
+            Next
+        Next
+        return y
+    End Function
+End Class",
                 afterCaret:={5, -1})
         End Sub
 
-        <Fact, Trait(Traits.Feature, Traits.Features.EndConstructGeneration)>
+        <WpfFact, Trait(Traits.Feature, Traits.Features.EndConstructGeneration)>
         Public Sub VerifyReCommitForEach()
             VerifyStatementEndConstructNotApplied(
-                text:={"Class C",
-                       "    Public Property p(byval x as Integer) as Integer",
-                       "        for each i in {1,2,3}",
-                       "        Next",
-                       "    End Property",
-                       "End Class"},
+                text:="Class C
+    Public Property p(byval x as Integer) as Integer
+        for each i in {1,2,3}
+        Next
+    End Property
+End Class",
                 caret:={2, -1})
         End Sub
 
-        <Fact, Trait(Traits.Feature, Traits.Features.EndConstructGeneration)>
+        <WpfFact, Trait(Traits.Feature, Traits.Features.EndConstructGeneration)>
         Public Sub VerifyForAtIncorrectLocation()
             VerifyStatementEndConstructNotApplied(
-                text:={"Class C",
-                       "    For i = 1 to 10"},
+                text:="Class C
+    For i = 1 to 10",
                 caret:={1, -1})
         End Sub
 
-        <Fact, Trait(Traits.Feature, Traits.Features.EndConstructGeneration)>
+        <WpfFact, Trait(Traits.Feature, Traits.Features.EndConstructGeneration)>
         Public Sub VerifyInvalidForSyntax()
             VerifyStatementEndConstructNotApplied(
-                text:={"Class C",
-                       "    Sub s",
-                       "        for For",
-                       "    End Sub",
-                       "End Class"},
+                text:="Class C
+    Sub s
+        for For
+    End Sub
+End Class",
                 caret:={2, -1})
         End Sub
 

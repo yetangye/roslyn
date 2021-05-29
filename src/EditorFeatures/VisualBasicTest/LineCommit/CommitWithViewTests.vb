@@ -1,23 +1,20 @@
-' Copyright (c) Microsoft.  All Rights Reserved.  Licensed under the Apache License, Version 2.0.  See License.txt in the project root for license information.
+﻿' Licensed to the .NET Foundation under one or more agreements.
+' The .NET Foundation licenses this file to you under the MIT license.
+' See the LICENSE file in the project root for more information.
 
-Imports System.Xml.Linq
 Imports Microsoft.CodeAnalysis
-Imports Microsoft.CodeAnalysis.Editor.Commands
 Imports Microsoft.CodeAnalysis.Editor.UnitTests.Extensions
-Imports Microsoft.CodeAnalysis.Editor.UnitTests.Workspaces
-Imports Microsoft.CodeAnalysis.Editor.VisualBasic.LineCommit
-Imports Microsoft.CodeAnalysis.Text
+Imports Microsoft.CodeAnalysis.Editor.UnitTests.Utilities
 Imports Microsoft.VisualStudio.Text
-Imports Microsoft.VisualStudio.Text.Operations
-Imports Moq
-Imports Roslyn.Test.Utilities
+Imports Microsoft.VisualStudio.Text.Editor.Commanding.Commands
 
 Namespace Microsoft.CodeAnalysis.Editor.VisualBasic.UnitTests.LineCommit
+    <[UseExportProvider]>
     Public Class CommitWithViewTests
-        <Fact>
+        <WpfFact>
         <Trait(Traits.Feature, Traits.Features.LineCommit)>
-        Public Sub CommitAfterTypingAndDownArrow()
-            Using testData = New CommitTestData(
+        Public Sub TestCommitAfterTypingAndDownArrow()
+            Using testData = CommitTestData.Create(
                 <Workspace>
                     <Project Language="Visual Basic" CommonReferences="true">
                         <Document>imports   $$
@@ -32,10 +29,10 @@ Namespace Microsoft.CodeAnalysis.Editor.VisualBasic.UnitTests.LineCommit
             End Using
         End Sub
 
-        <Fact>
+        <WpfFact>
         <Trait(Traits.Feature, Traits.Features.LineCommit)>
-        Public Sub DontCrashOnPastingCarriageReturnContainingString()
-            Using testData = New CommitTestData(
+        Public Sub TestDontCrashOnPastingCarriageReturnContainingString()
+            Using testData = CommitTestData.Create(
                 <Workspace>
                     <Project Language="Visual Basic" CommonReferences="true">
                         <Document>Module Module1
@@ -55,11 +52,11 @@ End Module
             End Using
         End Sub
 
-        <Fact>
+        <WpfFact>
         <Trait(Traits.Feature, Traits.Features.LineCommit)>
-        <WorkItem(539305)>
-        Public Sub CommitAfterTypingAndUpArrowInLambdaFooter()
-            Using testData = New CommitTestData(
+        <WorkItem(539305, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/539305")>
+        Public Sub TestCommitAfterTypingAndUpArrowInLambdaFooter()
+            Using testData = CommitTestData.Create(
                 <Workspace>
                     <Project Language="Visual Basic" CommonReferences="true">
                         <Document>
@@ -81,11 +78,11 @@ End Module
             End Using
         End Sub
 
-        <Fact>
+        <WpfFact>
         <Trait(Traits.Feature, Traits.Features.LineCommit)>
-        <WorkItem(539469)>
-        Public Sub CommitAfterTypingAndUpArrowInLambdaFooter2()
-            Using testData = New CommitTestData(
+        <WorkItem(539469, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/539469")>
+        Public Sub TestCommitAfterTypingAndUpArrowInLambdaFooter2()
+            Using testData = CommitTestData.Create(
                 <Workspace>
                     <Project Language="Visual Basic" CommonReferences="true">
                         <Document>
@@ -100,20 +97,22 @@ End Module
                     </Project>
                 </Workspace>)
 
+                Dim initialTextSnapshot = testData.Workspace.Documents.Single().GetTextBuffer().CurrentSnapshot
+
                 testData.EditorOperations.InsertText("    ")
                 testData.EditorOperations.MoveLineUp(extendSelection:=False)
 
                 ' The text should snap back to what it originally was
-                Dim originalText = testData.Workspace.Documents.Single().InitialTextSnapshot.GetLineFromLineNumber(5).GetText()
+                Dim originalText = initialTextSnapshot.GetLineFromLineNumber(5).GetText()
                 Assert.Equal(originalText, testData.Buffer.CurrentSnapshot.GetLineFromLineNumber(5).GetText())
             End Using
         End Sub
 
-        <Fact>
+        <WpfFact>
         <Trait(Traits.Feature, Traits.Features.LineCommit)>
-        <WorkItem(539457)>
-        Public Sub CommitAfterTypingAndUpArrowIntoBlankLine()
-            Using testData = New CommitTestData(
+        <WorkItem(539457, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/539457")>
+        Public Sub TestCommitAfterTypingAndUpArrowIntoBlankLine()
+            Using testData = CommitTestData.Create(
                 <Workspace>
                     <Project Language="Visual Basic" CommonReferences="true">
                         <Document>
@@ -134,11 +133,11 @@ End Module
             End Using
         End Sub
 
-        <Fact>
+        <WpfFact>
         <Trait(Traits.Feature, Traits.Features.LineCommit)>
-        <WorkItem(539411)>
-        Public Sub CommitAfterTypingInTrivia()
-            Using testData = New CommitTestData(
+        <WorkItem(539411, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/539411")>
+        Public Sub TestCommitAfterTypingInTrivia()
+            Using testData = CommitTestData.Create(
                 <Workspace>
                     <Project Language="Visual Basic" CommonReferences="true">
                         <Document>
@@ -149,25 +148,25 @@ $$</Document>
                     </Project>
                 </Workspace>)
 
-                testData.EditorOperations.InsertText("#const   foo=2.0d")
+                testData.EditorOperations.InsertText("#const   goo=2.0d")
                 testData.EditorOperations.MoveLineUp(extendSelection:=False)
                 testData.EditorOperations.MoveLineUp(extendSelection:=False)
 
-                Assert.Equal("#Const foo = 2D", testData.Buffer.CurrentSnapshot.Lines.Last().GetText().Trim())
+                Assert.Equal("#Const goo = 2D", testData.Buffer.CurrentSnapshot.Lines.Last().GetText().Trim())
             End Using
         End Sub
 
-        <Fact>
+        <WpfFact>
         <Trait(Traits.Feature, Traits.Features.LineCommit)>
-        <WorkItem(539599)>
-        <WorkItem(631913)>
-        Public Sub CommitAfterTypingInTrivia2()
-            Using testData = New CommitTestData(
+        <WorkItem(539599, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/539599")>
+        <WorkItem(631913, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/631913")>
+        Public Sub TestCommitAfterTypingInTrivia2()
+            Using testData = CommitTestData.Create(
                 <Workspace>
                     <Project Language="Visual Basic" CommonReferences="true">
                         <Document>
 Module M[|
-    dim foo = 1 + _
+    dim goo = 1 + _
         _$$
         3|]
 End Module
@@ -179,21 +178,21 @@ End Module
                 testData.EditorOperations.MoveLineUp(extendSelection:=False)
                 testData.EditorOperations.MoveLineUp(extendSelection:=False)
 
-                Assert.Equal("    Dim foo = 1 + _", testData.Buffer.CurrentSnapshot.GetLineFromLineNumber(2).GetText())
+                Assert.Equal("    Dim goo = 1 + _", testData.Buffer.CurrentSnapshot.GetLineFromLineNumber(2).GetText())
                 testData.AssertHadCommit(True)
             End Using
         End Sub
 
-        <Fact>
+        <WpfFact>
         <Trait(Traits.Feature, Traits.Features.LineCommit)>
-        <WorkItem(545355)>
-        Public Sub CommitAfterTypingAttributeOfType()
-            Using testData = New CommitTestData(
+        <WorkItem(545355, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/545355")>
+        Public Sub TestCommitAfterTypingAttributeOfType()
+            Using testData = CommitTestData.Create(
                 <Workspace>
                     <Project Language="Visual Basic" CommonReferences="true">
                         <Document>[|
 $$|]
-Class Foo
+Class Goo
 End Class
                         </Document>
                     </Project>
@@ -206,15 +205,15 @@ End Class
             End Using
         End Sub
 
-        <Fact>
+        <WpfFact>
         <Trait(Traits.Feature, Traits.Features.LineCommit)>
-        <WorkItem(545355)>
-        Public Sub CommitAfterTypingAttributeOfMethod()
-            Using testData = New CommitTestData(
+        <WorkItem(545355, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/545355")>
+        Public Sub TestCommitAfterTypingAttributeOfMethod()
+            Using testData = CommitTestData.Create(
                 <Workspace>
                     <Project Language="Visual Basic" CommonReferences="true">
                         <Document>
-Class Foo[|
+Class Goo[|
     $$|]
     Sub Bar()
     End Sub
@@ -230,15 +229,15 @@ End Class
             End Using
         End Sub
 
-        <Fact>
+        <WpfFact>
         <Trait(Traits.Feature, Traits.Features.LineCommit)>
-        <WorkItem(545355)>
-        Public Sub CommitAfterTypingInMethodNameAndThenMovingToAttribute()
-            Using testData = New CommitTestData(
+        <WorkItem(545355, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/545355")>
+        Public Sub TestCommitAfterTypingInMethodNameAndThenMovingToAttribute()
+            Using testData = CommitTestData.Create(
                 <Workspace>
                     <Project Language="Visual Basic" CommonReferences="true">
                         <Document><![CDATA[
-Class Foo[|
+Class Goo[|
     <ClsCompilant>
     Sub $$Bar()
     End Sub|]
@@ -247,21 +246,21 @@ End Class
                     </Project>
                 </Workspace>)
 
-                testData.EditorOperations.InsertText("Foo")
+                testData.EditorOperations.InsertText("Goo")
                 testData.EditorOperations.MoveLineUp(extendSelection:=False)
 
                 testData.AssertHadCommit(True)
             End Using
         End Sub
 
-        <Fact>
+        <WpfFact>
         <Trait(Traits.Feature, Traits.Features.LineCommit)>
-        Public Sub NoCommitDuringInlineRename()
-            Using testData = New CommitTestData(
+        Public Sub TestNoCommitDuringInlineRename()
+            Using testData = CommitTestData.Create(
                 <Workspace>
                     <Project Language="Visual Basic" CommonReferences="true">
                         <Document><![CDATA[
-Class Foo[|
+Class Goo[|
     <ClsCompilant>
     Sub $$Bar()
     End Sub|]
@@ -271,18 +270,18 @@ End Class
                 </Workspace>)
 
                 testData.StartInlineRenameSession()
-                testData.EditorOperations.InsertText("Foo")
+                testData.EditorOperations.InsertText("Goo")
                 testData.EditorOperations.MoveLineUp(extendSelection:=False)
 
                 testData.AssertHadCommit(False)
             End Using
         End Sub
 
-        <Fact>
+        <WpfFact>
         <Trait(Traits.Feature, Traits.Features.LineCommit)>
-        <WorkItem(539599)>
-        Public Sub CommitAfterLeavingStatementAfterLineContinuation()
-            Using testData = New CommitTestData(
+        <WorkItem(539599, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/539599")>
+        Public Sub TestCommitAfterLeavingStatementAfterLineContinuation()
+            Using testData = CommitTestData.Create(
                 <Workspace>
                     <Project Language="Visual Basic" CommonReferences="true">
                         <Document>
@@ -300,7 +299,9 @@ End Module
                 </Workspace>)
 
                 testData.EditorOperations.InsertText("_")
-                testData.CommandHandler.ExecuteCommand(New ReturnKeyCommandArgs(testData.View, testData.Buffer), Sub() testData.EditorOperations.InsertNewLine())
+                testData.CommandHandler.ExecuteCommand(New ReturnKeyCommandArgs(testData.View, testData.Buffer),
+                                                       Sub() testData.EditorOperations.InsertNewLine(),
+                                                       TestCommandExecutionContext.Create())
 
                 ' So far we should have had no commit
                 testData.AssertHadCommit(False)
@@ -310,11 +311,11 @@ End Module
             End Using
         End Sub
 
-        <Fact>
+        <WpfFact>
         <Trait(Traits.Feature, Traits.Features.LineCommit)>
-        <WorkItem(539318)>
-        Public Sub CommitAfterDeletingIndentationFixesIndentation()
-            Using testData = New CommitTestData(
+        <WorkItem(539318, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/539318")>
+        Public Sub TestCommitAfterDeletingIndentationFixesIndentation()
+            Using testData = CommitTestData.Create(
                 <Workspace>
                     <Project Language="Visual Basic" CommonReferences="true">
                         <Document>
@@ -329,6 +330,8 @@ End Module
                     </Project>
                 </Workspace>)
 
+                Dim initialTextSnapshot = testData.Workspace.Documents.Single().GetTextBuffer().CurrentSnapshot
+
                 testData.EditorOperations.Backspace()
                 testData.EditorOperations.Backspace()
                 testData.EditorOperations.Backspace()
@@ -339,14 +342,14 @@ End Module
                 testData.EditorOperations.MoveLineUp(extendSelection:=False)
                 testData.AssertHadCommit(True)
 
-                Assert.Equal(testData.Workspace.Documents.Single().InitialTextSnapshot.GetText(), testData.Workspace.Documents.Single().TextBuffer.CurrentSnapshot.GetText())
+                Assert.Equal(initialTextSnapshot.GetText(), testData.Workspace.Documents.Single().GetTextBuffer().CurrentSnapshot.GetText())
             End Using
         End Sub
 
-        <Fact>
+        <WpfFact>
         <Trait(Traits.Feature, Traits.Features.LineCommit)>
-        Public Sub CommitIfThenOnlyAfterStartingNewBlock()
-            Using testData = New CommitTestData(
+        Public Sub TestCommitIfThenOnlyAfterStartingNewBlock()
+            Using testData = CommitTestData.Create(
                 <Workspace>
                     <Project Language="Visual Basic" CommonReferences="true">
                         <Document>
@@ -369,10 +372,10 @@ End Module
             End Using
         End Sub
 
-        <Fact>
+        <WpfFact>
         <Trait(Traits.Feature, Traits.Features.LineCommit)>
-        Public Sub CommitEndIfOnlyAfterStartingNewBlock()
-            Using testData = New CommitTestData(
+        Public Sub TestCommitEndIfOnlyAfterStartingNewBlock()
+            Using testData = CommitTestData.Create(
                 <Workspace>
                     <Project Language="Visual Basic" CommonReferences="true">
                         <Document>
@@ -395,10 +398,10 @@ End Module
             End Using
         End Sub
 
-        <Fact>
+        <WpfFact>
         <Trait(Traits.Feature, Traits.Features.LineCommit)>
-        Public Sub CommitFullIfBlockAfterCommittingElseIf()
-            Using testData = New CommitTestData(
+        Public Sub TestCommitFullIfBlockAfterCommittingElseIf()
+            Using testData = CommitTestData.Create(
                 <Workspace>
                     <Project Language="Visual Basic" CommonReferences="true">
                         <Document>
@@ -421,10 +424,10 @@ End Module
             End Using
         End Sub
 
-        <Fact>
+        <WpfFact>
         <Trait(Traits.Feature, Traits.Features.LineCommit)>
-        Public Sub CommitFullIfBlockAfterCommittingEndIf()
-            Using testData = New CommitTestData(
+        Public Sub TestCommitFullIfBlockAfterCommittingEndIf()
+            Using testData = CommitTestData.Create(
                 <Workspace>
                     <Project Language="Visual Basic" CommonReferences="true">
                         <Document>
@@ -447,10 +450,10 @@ End Module
             End Using
         End Sub
 
-        <Fact>
+        <WpfFact>
         <Trait(Traits.Feature, Traits.Features.LineCommit)>
-        Public Sub CommitTryBlockAfterCommittingCatch()
-            Using testData = New CommitTestData(
+        Public Sub TestCommitTryBlockAfterCommittingCatch()
+            Using testData = CommitTestData.Create(
                 <Workspace>
                     <Project Language="Visual Basic" CommonReferences="true">
                         <Document>
@@ -473,10 +476,10 @@ End Module
             End Using
         End Sub
 
-        <Fact>
+        <WpfFact>
         <Trait(Traits.Feature, Traits.Features.LineCommit)>
-        Public Sub CommitTryBlockAfterCommittingFinally()
-            Using testData = New CommitTestData(
+        Public Sub TestCommitTryBlockAfterCommittingFinally()
+            Using testData = CommitTestData.Create(
                 <Workspace>
                     <Project Language="Visual Basic" CommonReferences="true">
                         <Document>
@@ -499,10 +502,10 @@ End Module
             End Using
         End Sub
 
-        <Fact>
+        <WpfFact>
         <Trait(Traits.Feature, Traits.Features.LineCommit)>
-        Public Sub CommitDoLoopBlockAfterCommittingLoop()
-            Using testData = New CommitTestData(
+        Public Sub TestCommitDoLoopBlockAfterCommittingLoop()
+            Using testData = CommitTestData.Create(
                 <Workspace>
                     <Project Language="Visual Basic" CommonReferences="true">
                         <Document>
@@ -525,15 +528,15 @@ End Module
             End Using
         End Sub
 
-        <Fact>
+        <WpfFact>
         <Trait(Traits.Feature, Traits.Features.LineCommit)>
-        Public Sub CommitEnumBlockAfterCommittingEndEnum()
-            Using testData = New CommitTestData(
+        Public Sub TestCommitEnumBlockAfterCommittingEndEnum()
+            Using testData = CommitTestData.Create(
                 <Workspace>
                     <Project Language="Visual Basic" CommonReferences="true">
                         <Document>
 Namespace Program[|
-    Enum Foo
+    Enum Goo
         Alpha
         Bravo
         Charlie
@@ -551,14 +554,14 @@ End Namespace
             End Using
         End Sub
 
-        <Fact>
+        <WpfFact>
         <Trait(Traits.Feature, Traits.Features.LineCommit)>
-        Public Sub CommitGetAccessorBlockAfterCommittingEndGet()
-            Using testData = New CommitTestData(
+        Public Sub TestCommitGetAccessorBlockAfterCommittingEndGet()
+            Using testData = CommitTestData.Create(
                 <Workspace>
                     <Project Language="Visual Basic" CommonReferences="true">
                         <Document>
-Class Foo
+Class Goo
     Public Property Bar As Integer[|
         Get
         $$|]
@@ -576,15 +579,15 @@ End Namespace
             End Using
         End Sub
 
-        <Fact>
+        <WpfFact>
         <Trait(Traits.Feature, Traits.Features.LineCommit)>
-        Public Sub CommitSyncLockBlockAfterCommittingEndSyncLock()
-            Using testData = New CommitTestData(
+        Public Sub TestCommitSyncLockBlockAfterCommittingEndSyncLock()
+            Using testData = CommitTestData.Create(
                 <Workspace>
                     <Project Language="Visual Basic" CommonReferences="true">
                         <Document>
-Class Foo
-    Sub Foo()[|
+Class Goo
+    Sub Goo()[|
         SyncLock Me
         Dim x = 42
         $$|]
@@ -602,11 +605,11 @@ End Class
             End Using
         End Sub
 
-        <Fact>
+        <WpfFact>
         <Trait(Traits.Feature, Traits.Features.LineCommit)>
-        <WorkItem(539613)>
-        Public Sub RelativeIndentationBug()
-            Using testData = New CommitTestData(
+        <WorkItem(539613, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/539613")>
+        Public Sub TestRelativeIndentationBug()
+            Using testData = CommitTestData.Create(
                 <Workspace>
                     <Project Language="Visual Basic" CommonReferences="true">
                         <Document>
@@ -619,7 +622,7 @@ Module Module1
                 Dim b = Sub()
                             Console.WriteLine()
                         End Sub
-            End Sub
+            End Function
     Sub Main()
     End Sub
 End Module
@@ -645,21 +648,21 @@ Module Module1
                 Dim b = Sub()
                             Console.WriteLine()
                         End Sub
-            End Sub
+            End Function
     Sub Main()
     End Sub
 End Module
 </Code>
-                Assert.Equal(expected.NormalizedValue, testData.Workspace.Documents.Single().TextBuffer.CurrentSnapshot.GetText())
+                Assert.Equal(expected.NormalizedValue, testData.Workspace.Documents.Single().GetTextBuffer().CurrentSnapshot.GetText())
             End Using
         End Sub
 
         <WorkItem(16493, "DevDiv_Projects/Roslyn")>
-        <WorkItem(539544)>
-        <Fact>
+        <WorkItem(539544, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/539544")>
+        <WpfFact>
         <Trait(Traits.Feature, Traits.Features.LineCommit)>
-        Public Sub BetterStartIndentation()
-            Using testData = New CommitTestData(
+        Public Sub TestBetterStartIndentation()
+            Using testData = CommitTestData.Create(
                 <Workspace>
                     <Project Language="Visual Basic" CommonReferences="true">
                         <Document>
@@ -708,15 +711,15 @@ Module Program
     End Sub
 End Module
 </Code>
-                Assert.Equal(expected.NormalizedValue, testData.Workspace.Documents.Single().TextBuffer.CurrentSnapshot.GetText())
+                Assert.Equal(expected.NormalizedValue, testData.Workspace.Documents.Single().GetTextBuffer().CurrentSnapshot.GetText())
             End Using
         End Sub
 
-        <Fact>
+        <WpfFact>
         <Trait(Traits.Feature, Traits.Features.LineCommit)>
-        <WorkItem(544104)>
-        Public Sub CommitAfterMoveDownAfterIfStatement()
-            Using testData = New CommitTestData(
+        <WorkItem(544104, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/544104")>
+        Public Sub TestCommitAfterMoveDownAfterIfStatement()
+            Using testData = CommitTestData.Create(
                 <Workspace>
                     <Project Language="Visual Basic" CommonReferences="true">
                         <Document>
@@ -739,14 +742,14 @@ End Class</Code>
                 testData.EditorOperations.MoveLineDown(extendSelection:=False)
 
                 ' The text should snap back to what it originally was
-                Assert.Equal(expected.NormalizedValue, testData.Workspace.Documents.Single().TextBuffer.CurrentSnapshot.GetText())
+                Assert.Equal(expected.NormalizedValue, testData.Workspace.Documents.Single().GetTextBuffer().CurrentSnapshot.GetText())
             End Using
         End Sub
 
-        <Fact>
+        <WpfFact>
         <Trait(Traits.Feature, Traits.Features.LineCommit)>
-        Public Sub CommitAfterXmlElementStartTag()
-            Using testData = New CommitTestData(
+        Public Sub TestCommitAfterXmlElementStartTag()
+            Using testData = CommitTestData.Create(
                 <Workspace>
                     <Project Language="Visual Basic" CommonReferences="true">
                         <Document>Class C
@@ -766,15 +769,15 @@ End Class</Code>
 
                 testData.EditorOperations.InsertNewLine()
 
-                Assert.Equal(expected.NormalizedValue, testData.Workspace.Documents.Single().TextBuffer.CurrentSnapshot.GetText())
+                Assert.Equal(expected.NormalizedValue, testData.Workspace.Documents.Single().GetTextBuffer().CurrentSnapshot.GetText())
             End Using
         End Sub
 
-        <Fact>
-        <WorkItem(545358)>
+        <WpfFact>
+        <WorkItem(545358, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/545358")>
         <Trait(Traits.Feature, Traits.Features.LineCommit)>
-        Public Sub CommitWithNextStatementWithMultipleControlVariables()
-            Using testData = New CommitTestData(
+        Public Sub TestCommitWithNextStatementWithMultipleControlVariables()
+            Using testData = CommitTestData.Create(
                 <Workspace>
                     <Project Language="Visual Basic" CommonReferences="true">
                         <Document>Module Program
@@ -802,15 +805,15 @@ End Module</Code>
 
                 testData.EditorOperations.InsertNewLine()
 
-                Assert.Equal(expected.NormalizedValue, testData.Workspace.Documents.Single().TextBuffer.CurrentSnapshot.GetText())
+                Assert.Equal(expected.NormalizedValue, testData.Workspace.Documents.Single().GetTextBuffer().CurrentSnapshot.GetText())
             End Using
         End Sub
 
-        <Fact>
-        <WorkItem(608438)>
+        <WpfFact>
+        <WorkItem(608438, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/608438")>
         <Trait(Traits.Feature, Traits.Features.LineCommit)>
-        Public Sub Bugfix_608438()
-            Using testData = New CommitTestData(
+        Public Sub TestBugfix_608438()
+            Using testData = CommitTestData.Create(
                 <Workspace>
                     <Project Language="Visual Basic" CommonReferences="true">
                         <Document>[|$$Imports System
@@ -830,15 +833,15 @@ End Module|]</Document>
                 Dim view = document.GetTextView()
                 view.Selection.Select(snapshotspan, isReversed:=False)
                 Dim selArgs = New FormatSelectionCommandArgs(view, document.GetTextBuffer())
-                testData.CommandHandler.ExecuteCommand(selArgs, Sub() Return)
+                testData.CommandHandler.ExecuteCommand(selArgs, Sub() Return, TestCommandExecutionContext.Create())
             End Using
         End Sub
 
-        <Fact>
+        <WpfFact>
         <Trait(Traits.Feature, Traits.Features.LineCommit)>
-        <WorkItem(924578)>
-        Public Sub MultiLineString1()
-            Using testData = New CommitTestData(
+        <WorkItem(924578, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/924578")>
+        Public Sub TestMultiLineString1()
+            Using testData = CommitTestData.Create(
                 <Workspace>
                     <Project Language="Visual Basic" CommonReferences="true">
                         <Document>
@@ -861,15 +864,15 @@ Class C
     End Sub
 End Class
 </Code>
-                Assert.Equal(expected.NormalizedValue, testData.Workspace.Documents.Single().TextBuffer.CurrentSnapshot.GetText())
+                Assert.Equal(expected.NormalizedValue, testData.Workspace.Documents.Single().GetTextBuffer().CurrentSnapshot.GetText())
             End Using
         End Sub
 
-        <Fact>
+        <WpfFact>
         <Trait(Traits.Feature, Traits.Features.LineCommit)>
-        <WorkItem(924578)>
-        Public Sub MultiLineString2()
-            Using testData = New CommitTestData(
+        <WorkItem(924578, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/924578")>
+        Public Sub TestMultiLineString2()
+            Using testData = CommitTestData.Create(
                 <Workspace>
                     <Project Language="Visual Basic" CommonReferences="true">
                         <Document>
@@ -892,15 +895,15 @@ Class C
     End Sub
 End Class
 </Code>
-                Assert.Equal(expected.NormalizedValue, testData.Workspace.Documents.Single().TextBuffer.CurrentSnapshot.GetText())
+                Assert.Equal(expected.NormalizedValue, testData.Workspace.Documents.Single().GetTextBuffer().CurrentSnapshot.GetText())
             End Using
         End Sub
 
-        <Fact>
+        <WpfFact>
         <Trait(Traits.Feature, Traits.Features.LineCommit)>
-        <WorkItem(924578)>
-        Public Sub MultiLineString3()
-            Using testData = New CommitTestData(
+        <WorkItem(924578, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/924578")>
+        Public Sub TestMultiLineString3()
+            Using testData = CommitTestData.Create(
                 <Workspace>
                     <Project Language="Visual Basic" CommonReferences="true">
                         <Document>
@@ -923,13 +926,13 @@ Class C
     End Sub
 End Class
 </Code>
-                Assert.Equal(expected.NormalizedValue, testData.Workspace.Documents.Single().TextBuffer.CurrentSnapshot.GetText())
+                Assert.Equal(expected.NormalizedValue, testData.Workspace.Documents.Single().GetTextBuffer().CurrentSnapshot.GetText())
             End Using
         End Sub
 
-        <Fact, Trait(Traits.Feature, Traits.Features.LineCommit)>
-        Public Sub EnableWarningDirective1()
-            Using testData = New CommitTestData(
+        <WpfFact, Trait(Traits.Feature, Traits.Features.LineCommit)>
+        Public Sub TestEnableWarningDirective1()
+            Using testData = CommitTestData.Create(
                 <Workspace>
                     <Project Language="Visual Basic" CommonReferences="true">
                         <Document>
@@ -947,13 +950,13 @@ End Class
 
 
 </Code>
-                Assert.Equal(expected.NormalizedValue, testData.Workspace.Documents.Single().TextBuffer.CurrentSnapshot.GetText())
+                Assert.Equal(expected.NormalizedValue, testData.Workspace.Documents.Single().GetTextBuffer().CurrentSnapshot.GetText())
             End Using
         End Sub
 
-        <Fact, Trait(Traits.Feature, Traits.Features.LineCommit)>
-        Public Sub EnableWarningDirective2()
-            Using testData = New CommitTestData(
+        <WpfFact, Trait(Traits.Feature, Traits.Features.LineCommit)>
+        Public Sub TestEnableWarningDirective2()
+            Using testData = CommitTestData.Create(
                 <Workspace>
                     <Project Language="Visual Basic" CommonReferences="true">
                         <Document>
@@ -971,13 +974,13 @@ End Class
 
 
 </Code>
-                Assert.Equal(expected.NormalizedValue, testData.Workspace.Documents.Single().TextBuffer.CurrentSnapshot.GetText())
+                Assert.Equal(expected.NormalizedValue, testData.Workspace.Documents.Single().GetTextBuffer().CurrentSnapshot.GetText())
             End Using
         End Sub
 
-        <Fact, Trait(Traits.Feature, Traits.Features.LineCommit)>
-        Public Sub DisableWarningDirective1()
-            Using testData = New CommitTestData(
+        <WpfFact, Trait(Traits.Feature, Traits.Features.LineCommit)>
+        Public Sub TestDisableWarningDirective1()
+            Using testData = CommitTestData.Create(
                 <Workspace>
                     <Project Language="Visual Basic" CommonReferences="true">
                         <Document>
@@ -1001,13 +1004,13 @@ Module Program
     End Sub
 End Module
 </Code>
-                Assert.Equal(expected.NormalizedValue, testData.Workspace.Documents.Single().TextBuffer.CurrentSnapshot.GetText())
+                Assert.Equal(expected.NormalizedValue, testData.Workspace.Documents.Single().GetTextBuffer().CurrentSnapshot.GetText())
             End Using
         End Sub
 
-        <Fact, Trait(Traits.Feature, Traits.Features.LineCommit)>
-        Public Sub DisableWarningDirective2()
-            Using testData = New CommitTestData(
+        <WpfFact, Trait(Traits.Feature, Traits.Features.LineCommit)>
+        Public Sub TestDisableWarningDirective2()
+            Using testData = CommitTestData.Create(
                 <Workspace>
                     <Project Language="Visual Basic" CommonReferences="true">
                         <Document>
@@ -1027,13 +1030,13 @@ Module M1
     'Comment
 End Module
 </Code>
-                Assert.Equal(expected.NormalizedValue, testData.Workspace.Documents.Single().TextBuffer.CurrentSnapshot.GetText())
+                Assert.Equal(expected.NormalizedValue, testData.Workspace.Documents.Single().GetTextBuffer().CurrentSnapshot.GetText())
             End Using
         End Sub
 
-        <Fact, Trait(Traits.Feature, Traits.Features.LineCommit)>
-        Public Sub IncompleteWarningDirective()
-            Using testData = New CommitTestData(
+        <WpfFact, Trait(Traits.Feature, Traits.Features.LineCommit)>
+        Public Sub TestIncompleteWarningDirective()
+            Using testData = CommitTestData.Create(
                 <Workspace>
                     <Project Language="Visual Basic" CommonReferences="true">
                         <Document>
@@ -1053,7 +1056,81 @@ Module M1
 
 End Module
 </Code>
-                Assert.Equal(expected.NormalizedValue, testData.Workspace.Documents.Single().TextBuffer.CurrentSnapshot.GetText())
+                Assert.Equal(expected.NormalizedValue, testData.Workspace.Documents.Single().GetTextBuffer().CurrentSnapshot.GetText())
+            End Using
+        End Sub
+
+        <WorkItem(3119, "https://github.com/dotnet/roslyn/issues/3119")>
+        <WpfFact, Trait(Traits.Feature, Traits.Features.LineCommit)>
+        Public Sub TestMissingThenInIf()
+            Using testData = CommitTestData.Create(
+                <Workspace>
+                    <Project Language="Visual Basic" CommonReferences="true">
+                        <Document>
+Class C
+    Sub M()
+        If True $$
+            M()
+        End If
+    End Sub
+End Class
+</Document>
+                    </Project>
+                </Workspace>)
+
+                testData.EditorOperations.InsertNewLine()
+                testData.EditorOperations.MoveLineDown(False)
+
+                Dim expected = <Code>
+Class C
+    Sub M()
+        If True Then
+
+            M()
+        End If
+    End Sub
+End Class
+</Code>
+                Assert.Equal(expected.NormalizedValue, testData.Workspace.Documents.Single().GetTextBuffer().CurrentSnapshot.GetText())
+            End Using
+        End Sub
+
+        <WorkItem(3119, "https://github.com/dotnet/roslyn/issues/3119")>
+        <WpfFact, Trait(Traits.Feature, Traits.Features.LineCommit)>
+        Public Sub TestMissingThenInElseIf()
+            Using testData = CommitTestData.Create(
+                <Workspace>
+                    <Project Language="Visual Basic" CommonReferences="true">
+                        <Document>
+Class C
+    Sub M()
+        If True Then
+            M()
+        ElseIf False $$
+            M()
+        End If
+    End Sub
+End Class
+</Document>
+                    </Project>
+                </Workspace>)
+
+                testData.EditorOperations.InsertNewLine()
+                testData.EditorOperations.MoveLineDown(False)
+
+                Dim expected = <Code>
+Class C
+    Sub M()
+        If True Then
+            M()
+        ElseIf False Then
+
+            M()
+        End If
+    End Sub
+End Class
+</Code>
+                Assert.Equal(expected.NormalizedValue, testData.Workspace.Documents.Single().GetTextBuffer().CurrentSnapshot.GetText())
             End Using
         End Sub
     End Class

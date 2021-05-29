@@ -1,4 +1,8 @@
-// Copyright (c) Microsoft.  All Rights Reserved.  Licensed under the Apache License, Version 2.0.  See License.txt in the project root for license information.
+﻿// Licensed to the .NET Foundation under one or more agreements.
+// The .NET Foundation licenses this file to you under the MIT license.
+// See the LICENSE file in the project root for more information.
+
+#nullable disable
 
 using Microsoft.CodeAnalysis.CSharp.Test.Utilities;
 using Microsoft.CodeAnalysis.ExpressionEvaluator;
@@ -10,12 +14,12 @@ using Roslyn.Test.Utilities;
 using System;
 using Xunit;
 
-namespace Microsoft.CodeAnalysis.CSharp.UnitTests
+namespace Microsoft.CodeAnalysis.CSharp.ExpressionEvaluator.UnitTests
 {
-    internal class AccessibilityTests : CSharpResultProviderTestBase
+    public class AccessibilityTests : CSharpResultProviderTestBase
     {
-        [WorkItem(889710)]
-        [Fact]
+        [WorkItem(889710, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/889710")]
+        [Fact(Skip = "https://github.com/dotnet/roslyn/issues/21084")]
         public void HideNonPublicMembersBaseClass()
         {
             var sourceA =
@@ -80,28 +84,27 @@ class C
 }";
             // Derived class in assembly with PDB,
             // base class in assembly without PDB.
-            var compilationA = CSharpTestBase.CreateCompilationWithMscorlib(sourceA, options: TestOptions.ReleaseDll);
+            var compilationA = CSharpTestBase.CreateCompilation(sourceA, options: TestOptions.ReleaseDll);
             var bytesA = compilationA.EmitToArray();
             var referenceA = MetadataReference.CreateFromImage(bytesA);
 
-            var compilationB = CSharpTestBase.CreateCompilationWithMscorlib(sourceB, options: TestOptions.DebugDll, references: new MetadataReference[] { referenceA });
+            var compilationB = CSharpTestBase.CreateCompilation(sourceB, options: TestOptions.DebugDll, references: new MetadataReference[] { referenceA });
             var bytesB = compilationB.EmitToArray();
             var assemblyA = ReflectionUtilities.Load(bytesA);
             var assemblyB = ReflectionUtilities.Load(bytesB);
-            DkmClrValue valueWithNonPublicHidden;
+            DkmClrValue value;
 
             using (ReflectionUtilities.LoadAssemblies(assemblyA, assemblyB))
             {
                 var runtime = new DkmClrRuntimeInstance(new[] { assemblyB });
                 var type = assemblyB.GetType("C", throwOnError: true);
-                valueWithNonPublicHidden = CreateDkmClrValue(
+                value = CreateDkmClrValue(
                     Activator.CreateInstance(type),
-                    runtime.GetType((TypeImpl)type),
-                    inspectionContext: CreateDkmInspectionContext(DkmEvaluationFlags.HideNonPublicMembers));
+                    runtime.GetType((TypeImpl)type));
             }
 
             var rootExpr = "new C()";
-            var evalResult = FormatResult(rootExpr, valueWithNonPublicHidden);
+            var evalResult = FormatResult(rootExpr, value, inspectionContext: CreateDkmInspectionContext(DkmEvaluationFlags.HideNonPublicMembers));
             Verify(evalResult,
                 EvalResult(rootExpr, "{C}", "C", rootExpr, DkmEvaluationResultFlags.Expandable));
 
@@ -176,8 +179,8 @@ class C
                 EvalResult("PAD", "null", "object", "(new C()).a.PAD"));
         }
 
-        [WorkItem(889710)]
-        [Fact]
+        [WorkItem(889710, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/889710")]
+        [Fact(Skip = "https://github.com/dotnet/roslyn/issues/21084")]
         public void HideNonPublicMembersDerivedClass()
         {
             var sourceA =
@@ -242,28 +245,27 @@ class C
 }";
             // Base class in assembly with PDB,
             // derived class in assembly without PDB.
-            var compilationA = CSharpTestBase.CreateCompilationWithMscorlib(sourceA, options: TestOptions.DebugDll);
+            var compilationA = CSharpTestBase.CreateCompilation(sourceA, options: TestOptions.DebugDll);
             var bytesA = compilationA.EmitToArray();
             var referenceA = MetadataReference.CreateFromImage(bytesA);
 
-            var compilationB = CSharpTestBase.CreateCompilationWithMscorlib(sourceB, options: TestOptions.ReleaseDll, references: new MetadataReference[] { referenceA });
+            var compilationB = CSharpTestBase.CreateCompilation(sourceB, options: TestOptions.ReleaseDll, references: new MetadataReference[] { referenceA });
             var bytesB = compilationB.EmitToArray();
             var assemblyA = ReflectionUtilities.Load(bytesA);
             var assemblyB = ReflectionUtilities.Load(bytesB);
-            DkmClrValue valueWithNonPublicHidden;
+            DkmClrValue value;
 
             using (ReflectionUtilities.LoadAssemblies(assemblyA, assemblyB))
             {
                 var runtime = new DkmClrRuntimeInstance(new[] { assemblyA });
                 var type = assemblyB.GetType("C", throwOnError: true);
-                valueWithNonPublicHidden = CreateDkmClrValue(
+                value = CreateDkmClrValue(
                     Activator.CreateInstance(type),
-                    runtime.GetType((TypeImpl)type),
-                    inspectionContext: CreateDkmInspectionContext(DkmEvaluationFlags.HideNonPublicMembers));
+                    runtime.GetType((TypeImpl)type));
             }
 
             var rootExpr = "new C()";
-            var evalResult = FormatResult(rootExpr, valueWithNonPublicHidden);
+            var evalResult = FormatResult(rootExpr, value, inspectionContext: CreateDkmInspectionContext(DkmEvaluationFlags.HideNonPublicMembers));
             Verify(evalResult,
                 EvalResult(rootExpr, "{C}", "C", rootExpr, DkmEvaluationResultFlags.Expandable));
 
@@ -360,9 +362,8 @@ class C
             var type = assembly.GetType("C");
             var value = CreateDkmClrValue(
                 Activator.CreateInstance(type),
-                runtime.GetType((TypeImpl)type),
-                inspectionContext: CreateDkmInspectionContext(DkmEvaluationFlags.HideNonPublicMembers));
-            var evalResult = FormatResult("o", value);
+                runtime.GetType((TypeImpl)type));
+            var evalResult = FormatResult("o", value, inspectionContext: CreateDkmInspectionContext(DkmEvaluationFlags.HideNonPublicMembers));
             Verify(evalResult,
                 EvalResult("o", "{C}", "C", "o", DkmEvaluationResultFlags.Expandable));
         }

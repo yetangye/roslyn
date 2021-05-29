@@ -1,4 +1,9 @@
-' Copyright (c) Microsoft.  All Rights Reserved.  Licensed under the Apache License, Version 2.0.  See License.txt in the project root for license information.
+﻿' Licensed to the .NET Foundation under one or more agreements.
+' The .NET Foundation licenses this file to you under the MIT license.
+' See the LICENSE file in the project root for more information.
+
+Imports System.Threading.Tasks
+Imports EnvDTE80
 
 Namespace Microsoft.VisualStudio.LanguageServices.UnitTests.CodeModel
     Public MustInherit Class AbstractCodeEventTests
@@ -52,6 +57,10 @@ Namespace Microsoft.VisualStudio.LanguageServices.UnitTests.CodeModel
             Return Sub(name) codeElement.Name = name
         End Function
 
+        Protected Overrides Function GetOverrideKind(codeElement As CodeEvent) As vsCMOverrideKind
+            Return codeElement.OverrideKind
+        End Function
+
         Protected Overrides Function GetParent(codeElement As EnvDTE80.CodeEvent) As Object
             Return codeElement.Parent
         End Function
@@ -68,13 +77,15 @@ Namespace Microsoft.VisualStudio.LanguageServices.UnitTests.CodeModel
             Return Sub(value) codeElement.Type = value
         End Function
 
-        Protected Sub TestIsPropertyStyleEvent(code As XElement, expected As Boolean)
-            Using state = CreateCodeModelTestState(GetWorkspaceDefinition(code))
-                Dim codeElement = state.GetCodeElementAtCursor(Of EnvDTE80.CodeEvent)()
-                Assert.NotNull(codeElement)
+        Protected Overrides Function AddAttribute(codeElement As EnvDTE80.CodeEvent, data As AttributeData) As EnvDTE.CodeAttribute
+            Return codeElement.AddAttribute(data.Name, data.Value, data.Position)
+        End Function
 
-                Assert.Equal(expected, codeElement.IsPropertyStyleEvent)
-            End Using
+        Protected Sub TestIsPropertyStyleEvent(code As XElement, expected As Boolean)
+            TestElement(code,
+                Sub(codeElement)
+                    Assert.Equal(expected, codeElement.IsPropertyStyleEvent)
+                End Sub)
         End Sub
 
     End Class

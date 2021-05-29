@@ -1,12 +1,14 @@
-﻿// Copyright (c) Microsoft.  All Rights Reserved.  Licensed under the Apache License, Version 2.0.  See License.txt in the project root for license information.
+﻿// Licensed to the .NET Foundation under one or more agreements.
+// The .NET Foundation licenses this file to you under the MIT license.
+// See the LICENSE file in the project root for more information.
+
+#nullable disable
 
 using System;
 using System.Collections.Generic;
-using System.Collections.Immutable;
 using System.Threading;
 using Microsoft.CodeAnalysis.Host;
 using Microsoft.CodeAnalysis.Text;
-using Roslyn.Utilities;
 
 namespace Microsoft.CodeAnalysis
 {
@@ -16,7 +18,7 @@ namespace Microsoft.CodeAnalysis
     /// </summary>
     public sealed class AdhocWorkspace : Workspace
     {
-        public AdhocWorkspace(HostServices host, string workspaceKind = "Custom")
+        public AdhocWorkspace(HostServices host, string workspaceKind = WorkspaceKind.Custom)
             : base(host, workspaceKind)
         {
         }
@@ -32,22 +34,16 @@ namespace Microsoft.CodeAnalysis
             return true;
         }
 
-        public override bool CanOpenDocuments
-        {
-            get
-            {
-                // enables simulation of having documents open.
-                return true;
-            }
-        }
+        /// <summary>
+        /// Returns true, signifiying that you can call the open and close document APIs to add the document into the open document list.
+        /// </summary>
+        public override bool CanOpenDocuments => true;
 
         /// <summary>
         /// Clears all projects and documents from the workspace.
         /// </summary>
         public new void ClearSolution()
-        {
-            base.ClearSolution();
-        }
+            => base.ClearSolution();
 
         /// <summary>
         /// Adds an entire solution to the workspace, replacing any existing solution.
@@ -56,10 +52,12 @@ namespace Microsoft.CodeAnalysis
         {
             if (solutionInfo == null)
             {
-                throw new ArgumentNullException("solutionInfo");
+                throw new ArgumentNullException(nameof(solutionInfo));
             }
 
             this.OnSolutionAdded(solutionInfo);
+
+            this.UpdateReferencesAfterAdd();
 
             return this.CurrentSolution;
         }
@@ -80,10 +78,12 @@ namespace Microsoft.CodeAnalysis
         {
             if (projectInfo == null)
             {
-                throw new ArgumentNullException("projectInfo");
+                throw new ArgumentNullException(nameof(projectInfo));
             }
 
             this.OnProjectAdded(projectInfo);
+
+            this.UpdateReferencesAfterAdd();
 
             return this.CurrentSolution.GetProject(projectInfo.Id);
         }
@@ -96,13 +96,15 @@ namespace Microsoft.CodeAnalysis
         {
             if (projectInfos == null)
             {
-                throw new ArgumentNullException("projectInfos");
+                throw new ArgumentNullException(nameof(projectInfos));
             }
 
             foreach (var info in projectInfos)
             {
                 this.OnProjectAdded(info);
             }
+
+            this.UpdateReferencesAfterAdd();
         }
 
         /// <summary>
@@ -112,17 +114,17 @@ namespace Microsoft.CodeAnalysis
         {
             if (projectId == null)
             {
-                throw new ArgumentNullException("projectId");
+                throw new ArgumentNullException(nameof(projectId));
             }
 
             if (name == null)
             {
-                throw new ArgumentNullException("name");
+                throw new ArgumentNullException(nameof(name));
             }
 
             if (text == null)
             {
-                throw new ArgumentNullException("text");
+                throw new ArgumentNullException(nameof(text));
             }
 
             var id = DocumentId.CreateNewId(projectId);
@@ -138,7 +140,7 @@ namespace Microsoft.CodeAnalysis
         {
             if (documentInfo == null)
             {
-                throw new ArgumentNullException("documentInfo");
+                throw new ArgumentNullException(nameof(documentInfo));
             }
 
             this.OnDocumentAdded(documentInfo);
@@ -154,7 +156,7 @@ namespace Microsoft.CodeAnalysis
             var doc = this.CurrentSolution.GetDocument(documentId);
             if (doc != null)
             {
-                var text = doc.GetTextAsync(CancellationToken.None).WaitAndGetResult(CancellationToken.None);
+                var text = doc.GetTextSynchronously(CancellationToken.None);
                 this.OnDocumentOpened(documentId, text.Container, activate);
             }
         }
@@ -167,8 +169,8 @@ namespace Microsoft.CodeAnalysis
             var doc = this.CurrentSolution.GetDocument(documentId);
             if (doc != null)
             {
-                var text = doc.GetTextAsync(CancellationToken.None).WaitAndGetResult(CancellationToken.None);
-                var version = doc.GetTextVersionAsync(CancellationToken.None).WaitAndGetResult(CancellationToken.None);
+                var text = doc.GetTextSynchronously(CancellationToken.None);
+                var version = doc.GetTextVersionSynchronously(CancellationToken.None);
                 var loader = TextLoader.From(TextAndVersion.Create(text, version, doc.FilePath));
                 this.OnDocumentClosed(documentId, loader);
             }
@@ -182,7 +184,7 @@ namespace Microsoft.CodeAnalysis
             var doc = this.CurrentSolution.GetAdditionalDocument(documentId);
             if (doc != null)
             {
-                var text = doc.GetTextAsync(CancellationToken.None).WaitAndGetResult(CancellationToken.None);
+                var text = doc.GetTextSynchronously(CancellationToken.None);
                 this.OnAdditionalDocumentOpened(documentId, text.Container, activate);
             }
         }
@@ -195,10 +197,38 @@ namespace Microsoft.CodeAnalysis
             var doc = this.CurrentSolution.GetAdditionalDocument(documentId);
             if (doc != null)
             {
-                var text = doc.GetTextAsync(CancellationToken.None).WaitAndGetResult(CancellationToken.None);
-                var version = doc.GetTextVersionAsync(CancellationToken.None).WaitAndGetResult(CancellationToken.None);
+                var text = doc.GetTextSynchronously(CancellationToken.None);
+                var version = doc.GetTextVersionSynchronously(CancellationToken.None);
                 var loader = TextLoader.From(TextAndVersion.Create(text, version, doc.FilePath));
                 this.OnAdditionalDocumentClosed(documentId, loader);
+            }
+        }
+
+        /// <summary>
+        /// Puts the specified analyzer config document into the open state.
+        /// </summary>
+        public override void OpenAnalyzerConfigDocument(DocumentId documentId, bool activate = true)
+        {
+            var doc = this.CurrentSolution.GetAnalyzerConfigDocument(documentId);
+            if (doc != null)
+            {
+                var text = doc.GetTextSynchronously(CancellationToken.None);
+                this.OnAnalyzerConfigDocumentOpened(documentId, text.Container, activate);
+            }
+        }
+
+        /// <summary>
+        /// Puts the specified analyzer config document into the closed state
+        /// </summary>
+        public override void CloseAnalyzerConfigDocument(DocumentId documentId)
+        {
+            var doc = this.CurrentSolution.GetAnalyzerConfigDocument(documentId);
+            if (doc != null)
+            {
+                var text = doc.GetTextSynchronously(CancellationToken.None);
+                var version = doc.GetTextVersionSynchronously(CancellationToken.None);
+                var loader = TextLoader.From(TextAndVersion.Create(text, version, doc.FilePath));
+                this.OnAnalyzerConfigDocumentClosed(documentId, loader);
             }
         }
     }

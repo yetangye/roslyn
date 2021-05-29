@@ -1,27 +1,35 @@
-﻿// Copyright (c) Microsoft.  All Rights Reserved.  Licensed under the Apache License, Version 2.0.  See License.txt in the project root for license information.
+﻿// Licensed to the .NET Foundation under one or more agreements.
+// The .NET Foundation licenses this file to you under the MIT license.
+// See the LICENSE file in the project root for more information.
+
+#nullable disable
 
 using System.Collections.Generic;
 using System.Collections.Immutable;
-using System.Diagnostics;
-using System.Globalization;
 using Microsoft.CodeAnalysis.Collections;
 using Microsoft.CodeAnalysis.CSharp.Syntax;
+using Microsoft.CodeAnalysis.PooledObjects;
 using Roslyn.Utilities;
+using System.Diagnostics;
+using System.Linq;
+using Microsoft.CodeAnalysis.CSharp.Symbols;
 
 namespace Microsoft.CodeAnalysis.CSharp
 {
     internal partial class MemberSemanticModel
     {
-        protected sealed class NodeMapBuilder : BoundTreeWalker
+        protected sealed class NodeMapBuilder : BoundTreeWalkerWithStackGuard
         {
-            private NodeMapBuilder(OrderPreservingMultiDictionary<CSharpSyntaxNode, BoundNode> map, CSharpSyntaxNode thisSyntaxNodeOnly)
+            private NodeMapBuilder(OrderPreservingMultiDictionary<SyntaxNode, BoundNode> map, SyntaxTree tree, SyntaxNode thisSyntaxNodeOnly)
             {
                 _map = map;
+                _tree = tree;
                 _thisSyntaxNodeOnly = thisSyntaxNodeOnly;
             }
 
-            private readonly OrderPreservingMultiDictionary<CSharpSyntaxNode, BoundNode> _map;
-            private readonly CSharpSyntaxNode _thisSyntaxNodeOnly;
+            private readonly OrderPreservingMultiDictionary<SyntaxNode, BoundNode> _map;
+            private readonly SyntaxTree _tree;
+            private readonly SyntaxNode _thisSyntaxNodeOnly;
 
             /// <summary>
             /// Walks the bound tree and adds all non compiler generated bound nodes whose syntax matches the given one
@@ -30,7 +38,7 @@ namespace Microsoft.CodeAnalysis.CSharp
             /// <param name="root">The root of the bound tree.</param>
             /// <param name="map">The cache.</param>
             /// <param name="node">The syntax node where to add bound nodes for.</param>
-            public static void AddToMap(BoundNode root, Dictionary<CSharpSyntaxNode, ImmutableArray<BoundNode>> map, CSharpSyntaxNode node = null)
+            public static void AddToMap(BoundNode root, Dictionary<SyntaxNode, ImmutableArray<BoundNode>> map, SyntaxTree tree, SyntaxNode node = null)
             {
                 Debug.Assert(node == null || root == null || !(root.Syntax is StatementSyntax), "individually added nodes are not supposed to be statements.");
 
@@ -40,8 +48,8 @@ namespace Microsoft.CodeAnalysis.CSharp
                     return;
                 }
 
-                var additionMap = OrderPreservingMultiDictionary<CSharpSyntaxNode, BoundNode>.GetInstance();
-                var builder = new NodeMapBuilder(additionMap, node);
+                var additionMap = OrderPreservingMultiDictionary<SyntaxNode, BoundNode>.GetInstance();
+                var builder = new NodeMapBuilder(additionMap, tree, node);
                 builder.Visit(root);
 
                 foreach (CSharpSyntaxNode key in additionMap.Keys)
@@ -66,7 +74,7 @@ namespace Microsoft.CodeAnalysis.CSharp
 
                         var existing = map[key];
                         var added = additionMap[key];
-                        FailFast.Assert(existing.Length == added.Length, "existing.Length == added.Length");
+                        Debug.Assert(existing.Length == added.Length, "existing.Length == added.Length");
                         for (int i = 0; i < existing.Length; i++)
                         {
                             // TODO: it would be great if we could check !ReferenceEquals(existing[i], added[i]) (DevDiv #11584).
@@ -76,36 +84,36 @@ namespace Microsoft.CodeAnalysis.CSharp
                             //      since nothing is cached for the statement syntax.
                             if (existing[i].Kind != added[i].Kind)
                             {
-                                FailFast.Assert(!(key is StatementSyntax), "!(key is StatementSyntax)");
+                                Debug.Assert(!(key is StatementSyntax), "!(key is StatementSyntax)");
 
                                 // This also seems to be happening when we get equivalent BoundTypeExpression and BoundTypeOrValueExpression nodes.
                                 if (existing[i].Kind == BoundKind.TypeExpression && added[i].Kind == BoundKind.TypeOrValueExpression)
                                 {
-                                    FailFast.Assert(
-                                        ((BoundTypeExpression)existing[i]).Type == ((BoundTypeOrValueExpression)added[i]).Type,
+                                    Debug.Assert(
+                                        TypeSymbol.Equals(((BoundTypeExpression)existing[i]).Type, ((BoundTypeOrValueExpression)added[i]).Type, TypeCompareKind.ConsiderEverything2),
                                         string.Format(
-                                            CultureInfo.InvariantCulture,
+                                            System.Globalization.CultureInfo.InvariantCulture,
                                             "((BoundTypeExpression)existing[{0}]).Type == ((BoundTypeOrValueExpression)added[{0}]).Type", i));
                                 }
                                 else if (existing[i].Kind == BoundKind.TypeOrValueExpression && added[i].Kind == BoundKind.TypeExpression)
                                 {
-                                    FailFast.Assert(
-                                        ((BoundTypeOrValueExpression)existing[i]).Type == ((BoundTypeExpression)added[i]).Type,
+                                    Debug.Assert(
+                                        TypeSymbol.Equals(((BoundTypeOrValueExpression)existing[i]).Type, ((BoundTypeExpression)added[i]).Type, TypeCompareKind.ConsiderEverything2),
                                         string.Format(
-                                            CultureInfo.InvariantCulture,
+                                            System.Globalization.CultureInfo.InvariantCulture,
                                             "((BoundTypeOrValueExpression)existing[{0}]).Type == ((BoundTypeExpression)added[{0}]).Type", i));
                                 }
                                 else
                                 {
-                                    FailFast.Assert(false, "New bound node does not match existing bound node");
+                                    Debug.Assert(false, "New bound node does not match existing bound node");
                                 }
                             }
                             else
                             {
-                                FailFast.Assert(
+                                Debug.Assert(
                                     (object)existing[i] == added[i] || !(key is StatementSyntax),
                                     string.Format(
-                                        CultureInfo.InvariantCulture,
+                                        System.Globalization.CultureInfo.InvariantCulture,
                                         "(object)existing[{0}] == added[{0}] || !(key is StatementSyntax)", i));
                             }
                         }
@@ -122,7 +130,12 @@ namespace Microsoft.CodeAnalysis.CSharp
 
             public override BoundNode Visit(BoundNode node)
             {
-                if (node == null)
+                // Do not cache bound nodes associated with a different syntax tree. We can get nodes like that 
+                // when semantic model binds complete simple program body. Semantic model is never asked about
+                // information for nodes associated with a different syntax tree, therefore, there is no advantage
+                // in putting the bound nodes in the map. SimpleProgramBodySemanticModelMergedBoundNodeCache facilitates
+                // reuse of bound nodes from other trees. 
+                if (node == null || node.SyntaxTree != _tree)
                 {
                     return null;
                 }
@@ -245,9 +258,24 @@ namespace Microsoft.CodeAnalysis.CSharp
                 return null;
             }
 
+            public override BoundNode VisitRangeVariable(BoundRangeVariable node)
+            {
+                return null;
+            }
+
+            public override BoundNode VisitAwaitableInfo(BoundAwaitableInfo node)
+            {
+                return null;
+            }
+
             public override BoundNode VisitBinaryOperator(BoundBinaryOperator node)
             {
                 throw ExceptionUtilities.Unreachable;
+            }
+
+            protected override bool ConvertInsufficientExecutionStackExceptionToCancelledByStackGuardException()
+            {
+                return false;
             }
         }
     }

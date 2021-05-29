@@ -1,4 +1,6 @@
-﻿' Copyright (c) Microsoft.  All Rights Reserved.  Licensed under the Apache License, Version 2.0.  See License.txt in the project root for license information.
+﻿' Licensed to the .NET Foundation under one or more agreements.
+' The .NET Foundation licenses this file to you under the MIT license.
+' See the LICENSE file in the project root for more information.
 
 Imports Microsoft.CodeAnalysis.Text
 Imports Microsoft.CodeAnalysis.VisualBasic.Symbols
@@ -13,7 +15,7 @@ Namespace Microsoft.CodeAnalysis.VisualBasic.UnitTests
         <Fact>
         Public Sub TestUpdateWithNull()
             ' create type parameter with constraint clause
-            Dim tp = SyntaxFactory.TypeParameter(Nothing, SyntaxFactory.Identifier("T"), SyntaxFactory.TypeParameterSingleConstraintClause(SyntaxFactory.TypeConstraint(SyntaxFactory.IdentifierName("IFoo"))))
+            Dim tp = SyntaxFactory.TypeParameter(Nothing, SyntaxFactory.Identifier("T"), SyntaxFactory.TypeParameterSingleConstraintClause(SyntaxFactory.TypeConstraint(SyntaxFactory.IdentifierName("IGoo"))))
 
             ' attempt to make variant w/o constraint clause (do not access property first)
             Dim tp2 = tp.WithTypeParameterConstraintClause(Nothing)
@@ -22,7 +24,7 @@ Namespace Microsoft.CodeAnalysis.VisualBasic.UnitTests
             Assert.Null(tp2.TypeParameterConstraintClause)
         End Sub
 
-        <Fact, WorkItem(546397, "DevDiv")>
+        <Fact, WorkItem(546397, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/546397")>
         Public Sub TestConstructClassBlock()
             Dim c = SyntaxFactory.ClassBlock(SyntaxFactory.ClassStatement("C").AddTypeParameterListParameters(SyntaxFactory.TypeParameter("T"))) _
                           .AddImplements(SyntaxFactory.ImplementsStatement(SyntaxFactory.ParseTypeName("X"), SyntaxFactory.ParseTypeName("Y")))
@@ -84,20 +86,20 @@ Namespace Microsoft.CodeAnalysis.VisualBasic.UnitTests
         ''' Bug 10283
         <Fact()>
         Public Sub Bug_10283()
-            Dim input = "Dim foo()"
+            Dim input = "Dim goo()"
             Dim node = VisualBasicSyntaxTree.ParseText(input)
             Dim arrayRankSpecifier = DirectCast(node.GetCompilationUnitRoot().Members(0), FieldDeclarationSyntax).Declarators(0).Names(0).ArrayRankSpecifiers(0)
             Assert.Equal(1, arrayRankSpecifier.Rank)
             Assert.Equal(0, arrayRankSpecifier.CommaTokens.Count)
 
-            input = "Dim foo(,,,)"
+            input = "Dim goo(,,,)"
             node = VisualBasicSyntaxTree.ParseText(input)
             arrayRankSpecifier = DirectCast(node.GetCompilationUnitRoot().Members(0), FieldDeclarationSyntax).Declarators(0).Names(0).ArrayRankSpecifiers(0)
             Assert.Equal(4, arrayRankSpecifier.Rank)
             Assert.Equal(3, arrayRankSpecifier.CommaTokens.Count)
         End Sub
 
-        <WorkItem(543310, "DevDiv")>
+        <WorkItem(543310, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/543310")>
         <Fact()>
         Public Sub SyntaxDotParseCompilationUnitContainingOnlyWhitespace()
             Dim node = SyntaxFactory.ParseCompilationUnit("  ")
@@ -107,7 +109,7 @@ Namespace Microsoft.CodeAnalysis.VisualBasic.UnitTests
             Assert.Equal("  ", node.GetLeadingTrivia().First().ToString())
         End Sub
 
-        <WorkItem(543310, "DevDiv")>
+        <WorkItem(543310, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/543310")>
         <Fact()>
         Public Sub SyntaxTreeDotParseCompilationUnitContainingOnlyWhitespace()
             Dim node = VisualBasicSyntaxTree.ParseText("  ").GetRoot()
@@ -117,7 +119,7 @@ Namespace Microsoft.CodeAnalysis.VisualBasic.UnitTests
             Assert.Equal("  ", node.GetLeadingTrivia().First().ToString())
         End Sub
 
-        <WorkItem(529624, "DevDiv")>
+        <WorkItem(529624, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/529624")>
         <Fact()>
         Public Sub SyntaxTreeIsHidden_Bug13776()
             Dim source = <![CDATA[
@@ -140,12 +142,12 @@ End Module
 
             Assert.Equal(LineVisibility.Visible, tree.GetLineVisibility(0))
             Assert.Equal(LineVisibility.Visible, tree.GetLineVisibility(source.Length - 2))
-            Assert.Equal(LineVisibility.Visible, tree.GetLineVisibility(source.IndexOf("a()")))
-            Assert.Equal(LineVisibility.Visible, tree.GetLineVisibility(source.IndexOf("b()")))
-            Assert.Equal(LineVisibility.Visible, tree.GetLineVisibility(source.IndexOf("c()")))
+            Assert.Equal(LineVisibility.Visible, tree.GetLineVisibility(source.IndexOf("a()", StringComparison.Ordinal)))
+            Assert.Equal(LineVisibility.Visible, tree.GetLineVisibility(source.IndexOf("b()", StringComparison.Ordinal)))
+            Assert.Equal(LineVisibility.Visible, tree.GetLineVisibility(source.IndexOf("c()", StringComparison.Ordinal)))
         End Sub
 
-        <WorkItem(546586, "DevDiv")>
+        <WorkItem(546586, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/546586")>
         <Fact()>
         Public Sub KindsWithSameNameAsTypeShouldNotDropKindWhenUpdating_Bug16244()
             Dim assignmentStatement = GeneratedTests.GenerateRedAddAssignmentStatement()
@@ -210,8 +212,8 @@ End Module
 
         End Sub
 
-        <Fact(), WorkItem(701158, "DevDiv")>
-        Sub FindTokenOnStartOfContinuedLine()
+        <Fact(), WorkItem(701158, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/701158")>
+        Public Sub FindTokenOnStartOfContinuedLine()
             Dim code =
                 <code>
                 Namespace a
@@ -224,6 +226,12 @@ End Module
             Dim tree = VisualBasicSyntaxTree.ParseText(text)
             Dim token = tree.GetRoot().FindToken(text.Lines.Item(3).Start)
             Assert.Equal(">", token.ToString())
+        End Sub
+
+        <Fact, WorkItem(7182, "https://github.com/dotnet/roslyn/issues/7182")>
+        Public Sub WhenTextContainsTrailingTrivia_SyntaxNode_ContainsSkippedText_ReturnsTrue()
+            Dim parsedTypeName = SyntaxFactory.ParseTypeName("System.Collections.Generic.List(Of Integer), mscorlib")
+            Assert.True(parsedTypeName.ContainsSkippedText)
         End Sub
     End Class
 End Namespace

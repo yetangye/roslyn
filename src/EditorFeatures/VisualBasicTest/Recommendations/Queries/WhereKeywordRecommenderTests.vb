@@ -1,63 +1,57 @@
-' Copyright (c) Microsoft.  All Rights Reserved.  Licensed under the Apache License, Version 2.0.  See License.txt in the project root for license information.
-
-Imports Microsoft.CodeAnalysis.Text
-Imports Microsoft.CodeAnalysis.VisualBasic
-Imports Microsoft.CodeAnalysis.VisualBasic.Completion.KeywordRecommenders.Expressions
-Imports Microsoft.CodeAnalysis.VisualBasic.Symbols
-Imports Microsoft.CodeAnalysis.VisualBasic.Syntax
-Imports Roslyn.Test.Utilities
-Imports Xunit
+﻿' Licensed to the .NET Foundation under one or more agreements.
+' The .NET Foundation licenses this file to you under the MIT license.
+' See the LICENSE file in the project root for more information.
 
 Namespace Microsoft.CodeAnalysis.Editor.VisualBasic.UnitTests.Recommendations.Queries
     Public Class WhereKeywordRecommenderTests
         <Fact, Trait(Traits.Feature, Traits.Features.KeywordRecommending)>
-        Public Sub WhereNotInStatement()
+        Public Sub WhereNotInStatementTest()
             VerifyRecommendationsMissing(<MethodBody>|</MethodBody>, "Where")
         End Sub
 
         <Fact, Trait(Traits.Feature, Traits.Features.KeywordRecommending)>
-        Public Sub WhereInQuery()
+        Public Sub WhereInQueryTest()
             VerifyRecommendationsContain(<MethodBody>Dim x = From y In z |</MethodBody>, "Where")
         End Sub
 
-        <WorkItem(543173)>
+        <WorkItem(543173, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/543173")>
         <Fact, Trait(Traits.Feature, Traits.Features.KeywordRecommending)>
-        Public Sub WhereAfterMultiLineFunctionLambdaExpr()
+        Public Sub WhereAfterMultiLineFunctionLambdaExprTest()
             VerifyRecommendationsContain(<MethodBody>Dim q2 = From i1 In arr Order By Function()
                                              Return 5
                                          End Function |</MethodBody>, "Where")
         End Sub
 
-        <WorkItem(543174)>
+        <WorkItem(543174, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/543174")>
         <Fact, Trait(Traits.Feature, Traits.Features.KeywordRecommending)>
-        Public Sub WhereAnonymousObjectCreationExpr()
+        Public Sub WhereAnonymousObjectCreationExprTest()
             VerifyRecommendationsContain(<MethodBody>Dim q2 = From i1 In arr Order By New With {.Key = 10} |</MethodBody>, "Where")
         End Sub
 
-        <WorkItem(543219)>
+        <WorkItem(543219, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/543219")>
         <Fact, Trait(Traits.Feature, Traits.Features.KeywordRecommending)>
-        Public Sub WhereAfterIntoClause()
+        Public Sub WhereAfterIntoClauseTest()
             VerifyRecommendationsContain(<MethodBody>Dim q1 = From i1 In arr Group By i1 Into Count |</MethodBody>, "Where")
         End Sub
 
-        <WorkItem(543232)>
+        <WorkItem(543232, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/543232")>
         <Fact, Trait(Traits.Feature, Traits.Features.KeywordRecommending)>
-        Public Sub WhereAfterNestedAggregateFromClause()
+        Public Sub WhereAfterNestedAggregateFromClauseTest()
             VerifyRecommendationsContain(<MethodBody>Dim q1 = Aggregate i1 In arr From i4 In arr |</MethodBody>, "Where")
         End Sub
 
-        <WorkItem(531545)>
+        <WorkItem(531545, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/531545")>
         <Fact, Trait(Traits.Feature, Traits.Features.KeywordRecommending)>
-        Public Sub WhereAfterEOL()
+        Public Sub WhereAfterEOLTest()
             VerifyRecommendationsContain(
 <MethodBody>
     Dim q1 = From i4 In arr 
 |</MethodBody>, "Where")
         End Sub
 
-        <WorkItem(531545)>
+        <WorkItem(531545, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/531545")>
         <Fact, Trait(Traits.Feature, Traits.Features.KeywordRecommending)>
-        Public Sub WhereMissingAfterTwoEOL()
+        Public Sub WhereMissingAfterTwoEOLTest()
             VerifyRecommendationsMissing(
 <MethodBody>
     Dim q1 = From i4 In arr 
@@ -65,9 +59,9 @@ Namespace Microsoft.CodeAnalysis.Editor.VisualBasic.UnitTests.Recommendations.Qu
 |</MethodBody>, "Where")
         End Sub
 
-        <WorkItem(531545)>
+        <WorkItem(531545, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/531545")>
         <Fact, Trait(Traits.Feature, Traits.Features.KeywordRecommending)>
-        Public Sub WhereMissingAfterTwoEOLWithLineContinuation()
+        Public Sub WhereMissingAfterTwoEOLWithLineContinuationTest()
             VerifyRecommendationsMissing(
 <MethodBody>
     Dim q1 = From i4 In arr _

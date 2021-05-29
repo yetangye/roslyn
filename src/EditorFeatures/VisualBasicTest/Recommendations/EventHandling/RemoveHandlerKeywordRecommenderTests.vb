@@ -1,33 +1,27 @@
-' Copyright (c) Microsoft.  All Rights Reserved.  Licensed under the Apache License, Version 2.0.  See License.txt in the project root for license information.
-
-Imports Microsoft.CodeAnalysis.Text
-Imports Microsoft.CodeAnalysis.VisualBasic
-Imports Microsoft.CodeAnalysis.VisualBasic.Symbols
-Imports Microsoft.CodeAnalysis.VisualBasic.Syntax
-Imports Roslyn.Test.Utilities
-Imports Xunit
+﻿' Licensed to the .NET Foundation under one or more agreements.
+' The .NET Foundation licenses this file to you under the MIT license.
+' See the LICENSE file in the project root for more information.
 
 Namespace Microsoft.CodeAnalysis.Editor.VisualBasic.UnitTests.Recommendations.EventHandling
     Public Class RemoveHandlerKeywordRecommenderTests
         <Fact>
         <Trait(Traits.Feature, Traits.Features.KeywordRecommending)>
-        Public Sub RemoveHandlerHelpText()
+        Public Sub RemoveHandlerHelpTextTest()
             VerifyRecommendationDescriptionTextIs(<MethodBody>|</MethodBody>, "RemoveHandler",
-                                                  <Text><![CDATA[
-RemoveHandler statement
-Removes the association between an event and an event handler or delegate at run time.
-RemoveHandler <event>, <handler>]]></Text>)
+$"{VBFeaturesResources.RemoveHandler_statement}
+{VBWorkspaceResources.Removes_the_association_between_an_event_and_an_event_handler_or_delegate_at_run_time}
+RemoveHandler {VBWorkspaceResources.event_}, {VBWorkspaceResources.handler}")
         End Sub
 
         <Fact>
         <Trait(Traits.Feature, Traits.Features.KeywordRecommending)>
-        Public Sub RemoveHandlerInMethodBody()
+        Public Sub RemoveHandlerInMethodBodyTest()
             VerifyRecommendationsContain(<MethodBody>|</MethodBody>, "RemoveHandler")
         End Sub
 
         <Fact>
         <Trait(Traits.Feature, Traits.Features.KeywordRecommending)>
-        Public Sub RemoveHandlerAfterStatement()
+        Public Sub RemoveHandlerAfterStatementTest()
             VerifyRecommendationsContain(<MethodBody>
 Dim x 
 |</MethodBody>, "RemoveHandler")
@@ -35,26 +29,26 @@ Dim x
 
         <Fact>
         <Trait(Traits.Feature, Traits.Features.KeywordRecommending)>
-        Public Sub RemoveHandlerMissingInClassBlock()
+        Public Sub RemoveHandlerMissingInClassBlockTest()
             VerifyRecommendationsMissing(<ClassDeclaration>|</ClassDeclaration>, "RemoveHandler")
         End Sub
 
         <Fact>
         <Trait(Traits.Feature, Traits.Features.KeywordRecommending)>
-        Public Sub RemoveHandlerInSingleLineLambda()
+        Public Sub RemoveHandlerInSingleLineLambdaTest()
             VerifyRecommendationsContain(<MethodBody>Dim x = Sub() |</MethodBody>, "RemoveHandler")
         End Sub
 
         <Fact>
         <Trait(Traits.Feature, Traits.Features.KeywordRecommending)>
-        Public Sub RemoveHandlerInSingleLineFunctionLambda()
+        Public Sub RemoveHandlerInSingleLineFunctionLambdaTest()
             VerifyRecommendationsMissing(<MethodBody>Dim x = Function() |</MethodBody>, "RemoveHandler")
         End Sub
 
         <Fact>
-        <WorkItem(808406)>
+        <WorkItem(808406, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/808406")>
         <Trait(Traits.Feature, Traits.Features.KeywordRecommending)>
-        Public Sub RemoveHandlerInCustomEvent()
+        Public Sub RemoveHandlerInCustomEventTest()
             Dim code = <File>
 Public Class Z
     Public Custom Event E As Action
@@ -66,9 +60,9 @@ End Class</File>
         End Sub
 
         <Fact>
-        <WorkItem(808406)>
+        <WorkItem(808406, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/808406")>
         <Trait(Traits.Feature, Traits.Features.KeywordRecommending)>
-        Public Sub NotRemoveHandlerInCustomEventWithRemoveHandler()
+        Public Sub NotRemoveHandlerInCustomEventWithRemoveHandlerTest()
             Dim code = <File>
 Public Class Z
     Public Custom Event E As Action

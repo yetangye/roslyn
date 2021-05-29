@@ -1,13 +1,19 @@
-// Copyright (c) Microsoft.  All Rights Reserved.  Licensed under the Apache License, Version 2.0.  See License.txt in the project root for license information.
+﻿// Licensed to the .NET Foundation under one or more agreements.
+// The .NET Foundation licenses this file to you under the MIT license.
+// See the LICENSE file in the project root for more information.
+
+#nullable disable
 
 using System;
 using System.Collections.ObjectModel;
 using System.Diagnostics;
 using Microsoft.VisualStudio.Debugger;
+using Microsoft.VisualStudio.Debugger.Clr;
 using Microsoft.VisualStudio.Debugger.Evaluation;
 using Microsoft.VisualStudio.Debugger.Evaluation.ClrCompilation;
 using Roslyn.Utilities;
 using Type = Microsoft.VisualStudio.Debugger.Metadata.Type;
+using TypeCode = Microsoft.VisualStudio.Debugger.Metadata.TypeCode;
 
 namespace Microsoft.CodeAnalysis.ExpressionEvaluator
 {
@@ -19,17 +25,17 @@ namespace Microsoft.CodeAnalysis.ExpressionEvaluator
         IncludeObjectId = 0x2,
     }
 
-    // This class provides implementation for the "displaying values as strings" aspect of the default (C#) Formatter component.
+    // This class provides implementation for the "displaying values as strings" aspect of the Formatter component.
     internal abstract partial class Formatter
     {
-        internal string GetValueString(DkmClrValue value, ObjectDisplayOptions options, GetValueFlags flags)
+        private string GetValueString(DkmClrValue value, DkmInspectionContext inspectionContext, ObjectDisplayOptions options, GetValueFlags flags)
         {
             if (value.IsError())
             {
                 return (string)value.HostObjectValue;
             }
 
-            if (UsesHexadecimalNumbers(value))
+            if (UsesHexadecimalNumbers(inspectionContext))
             {
                 options |= ObjectDisplayOptions.UseHexadecimalNumbers;
             }
@@ -51,6 +57,12 @@ namespace Microsoft.CodeAnalysis.ExpressionEvaluator
                 }
                 else if (lmrType.IsCharacter())
                 {
+                    // check if HostObjectValue is null, since any of these types might actually be a synthetic value as well.
+                    if (value.HostObjectValue == null)
+                    {
+                        return _hostValueNotFoundString;
+                    }
+
                     return IncludeObjectId(
                         value,
                         FormatLiteral((char)value.HostObjectValue, options | ObjectDisplayOptions.IncludeCodePoints),
@@ -60,7 +72,7 @@ namespace Microsoft.CodeAnalysis.ExpressionEvaluator
                 {
                     return IncludeObjectId(
                         value,
-                        FormatPrimitive(value, options & ~ObjectDisplayOptions.UseQuotes),
+                        FormatPrimitive(value, options & ~(ObjectDisplayOptions.UseQuotes | ObjectDisplayOptions.EscapeNonPrintableCharacters), inspectionContext),
                         flags);
                 }
             }
@@ -72,77 +84,139 @@ namespace Microsoft.CodeAnalysis.ExpressionEvaluator
             {
                 return IncludeObjectId(
                     value,
-                    GetEnumDisplayString(lmrType, value, options, (flags & GetValueFlags.IncludeTypeName) != 0),
+                    GetEnumDisplayString(lmrType, value, options, (flags & GetValueFlags.IncludeTypeName) != 0, inspectionContext),
                     flags);
             }
             else if (lmrType.IsArray)
             {
                 return IncludeObjectId(
                     value,
-                    GetArrayDisplayString(lmrType, value.ArrayDimensions, value.ArrayLowerBounds, options),
+                    GetArrayDisplayString(value.Type.AppDomain, lmrType, value.ArrayDimensions, value.ArrayLowerBounds, options),
                     flags);
             }
             else if (lmrType.IsPointer)
             {
                 // NOTE: the HostObjectValue will have a size corresponding to the process bitness
                 // and FormatPrimitive will adjust accordingly.
-                var tmp = FormatPrimitive(value, ObjectDisplayOptions.UseHexadecimalNumbers); // Always in hex.
+                var tmp = FormatPrimitive(value, ObjectDisplayOptions.UseHexadecimalNumbers, inspectionContext); // Always in hex.
                 Debug.Assert(tmp != null);
                 return tmp;
             }
             else if (lmrType.IsNullable())
             {
-                var nullableValue = value.GetNullableValue();
+                var nullableValue = value.GetNullableValue(inspectionContext);
                 // It should be impossible to nest nullables, so this recursion should introduce only a single extra stack frame.
                 return nullableValue == null
                     ? _nullString
-                    : GetValueString(nullableValue, ObjectDisplayOptions.None, GetValueFlags.IncludeTypeName);
+                    : GetValueString(nullableValue, inspectionContext, ObjectDisplayOptions.None, GetValueFlags.IncludeTypeName);
+            }
+            else if (lmrType.IsIntPtr())
+            {
+                // check if HostObjectValue is null, since any of these types might actually be a synthetic value as well.
+                if (value.HostObjectValue == null)
+                {
+                    return _hostValueNotFoundString;
+                }
+
+                if (IntPtr.Size == 8)
+                {
+                    var intPtr = ((IntPtr)value.HostObjectValue).ToInt64();
+                    return FormatPrimitiveObject(intPtr, ObjectDisplayOptions.UseHexadecimalNumbers);
+                }
+                else
+                {
+                    var intPtr = ((IntPtr)value.HostObjectValue).ToInt32();
+                    return FormatPrimitiveObject(intPtr, ObjectDisplayOptions.UseHexadecimalNumbers);
+                }
+            }
+            else if (lmrType.IsUIntPtr())
+            {
+                // check if HostObjectValue is null, since any of these types might actually be a synthetic value as well.
+                if (value.HostObjectValue == null)
+                {
+                    return _hostValueNotFoundString;
+                }
+
+                if (UIntPtr.Size == 8)
+                {
+                    var uIntPtr = ((UIntPtr)value.HostObjectValue).ToUInt64();
+                    return FormatPrimitiveObject(uIntPtr, ObjectDisplayOptions.UseHexadecimalNumbers);
+                }
+                else
+                {
+                    var uIntPtr = ((UIntPtr)value.HostObjectValue).ToUInt32();
+                    return FormatPrimitiveObject(uIntPtr, ObjectDisplayOptions.UseHexadecimalNumbers);
+                }
+            }
+            else
+            {
+                int cardinality;
+                if (lmrType.IsTupleCompatible(out cardinality) && (cardinality > 1))
+                {
+                    var values = ArrayBuilder<string>.GetInstance();
+                    if (value.TryGetTupleFieldValues(cardinality, values, inspectionContext))
+                    {
+                        return IncludeObjectId(
+                            value,
+                            GetTupleExpression(values.ToArrayAndFree()),
+                            flags);
+                    }
+                    values.Free();
+                }
             }
 
             // "value.EvaluateToString()" will check "Call string-conversion function on objects in variables windows"
             // (Tools > Options setting) and call "value.ToString()" if appropriate.
             return IncludeObjectId(
                 value,
-                string.Format(_defaultFormat, value.EvaluateToString() ?? value.InspectionContext.GetTypeName(value.Type)),
+                string.Format(_defaultFormat, value.EvaluateToString(inspectionContext) ?? inspectionContext.GetTypeName(value.Type, CustomTypeInfo: null, FormatSpecifiers: NoFormatSpecifiers)),
                 flags);
         }
 
         /// <summary>
         /// Gets the string representation of a character literal without including the numeric code point.
         /// </summary>
-        internal string GetValueStringForCharacter(DkmClrValue value, ObjectDisplayOptions options)
+        private string GetValueStringForCharacter(DkmClrValue value, DkmInspectionContext inspectionContext, ObjectDisplayOptions options)
         {
             Debug.Assert(value.Type.GetLmrType().IsCharacter());
-            if (UsesHexadecimalNumbers(value))
+            if (UsesHexadecimalNumbers(inspectionContext))
             {
                 options |= ObjectDisplayOptions.UseHexadecimalNumbers;
             }
+            // check if HostObjectValue is null, since any of these types might actually be a synthetic value as well.
+            if (value.HostObjectValue == null)
+            {
+                return _hostValueNotFoundString;
+            }
+
             var charTemp = FormatLiteral((char)value.HostObjectValue, options);
             Debug.Assert(charTemp != null);
             return charTemp;
         }
 
-        internal bool HasUnderlyingString(DkmClrValue value)
+        private bool HasUnderlyingString(DkmClrValue value, DkmInspectionContext inspectionContext)
         {
-            return GetUnderlyingString(value) != null;
+            return GetUnderlyingString(value, inspectionContext) != null;
         }
 
-        internal string GetUnderlyingString(DkmClrValue value)
+        private string GetUnderlyingString(DkmClrValue value, DkmInspectionContext inspectionContext)
         {
-            RawStringDataItem dataItem = value.GetDataItem<RawStringDataItem>();
+            var dataItem = value.GetDataItem<RawStringDataItem>();
             if (dataItem != null)
             {
                 return dataItem.RawString;
             }
 
-            string underlyingString = GetUnderlyingStringImpl(value);
+            string underlyingString = GetUnderlyingStringImpl(value, inspectionContext);
             dataItem = new RawStringDataItem(underlyingString);
             value.SetDataItem(DkmDataCreationDisposition.CreateNew, dataItem);
             return underlyingString;
         }
 
-        private string GetUnderlyingStringImpl(DkmClrValue value)
+        private string GetUnderlyingStringImpl(DkmClrValue value, DkmInspectionContext inspectionContext)
         {
+            Debug.Assert(!value.IsError());
+
             if (value.IsNull)
             {
                 return null;
@@ -156,8 +230,8 @@ namespace Microsoft.CodeAnalysis.ExpressionEvaluator
 
             if (lmrType.IsNullable())
             {
-                var nullableValue = value.GetNullableValue();
-                return nullableValue != null ? GetUnderlyingStringImpl(nullableValue) : null;
+                var nullableValue = value.GetNullableValue(inspectionContext);
+                return nullableValue != null ? GetUnderlyingStringImpl(nullableValue, inspectionContext) : null;
             }
 
             if (lmrType.IsString())
@@ -167,46 +241,43 @@ namespace Microsoft.CodeAnalysis.ExpressionEvaluator
             else if (!IsPredefinedType(lmrType))
             {
                 // Check for special cased non-primitives that have underlying strings
-                if (string.Equals(lmrType.FullName, "System.Data.SqlTypes.SqlString", StringComparison.Ordinal))
+                if (lmrType.IsType("System.Data.SqlTypes", "SqlString"))
                 {
-                    var fieldValue = value.GetFieldValue(InternalWellKnownMemberNames.SqlStringValue);
+                    var fieldValue = value.GetFieldValue(InternalWellKnownMemberNames.SqlStringValue, inspectionContext);
                     return fieldValue.HostObjectValue as string;
                 }
-
-                do
+                else if (lmrType.IsOrInheritsFrom("System.Xml.Linq", "XNode"))
                 {
-                    if (string.Equals(lmrType.FullName, "System.Xml.Linq.XNode", StringComparison.Ordinal))
-                    {
-                        return value.EvaluateToString();
-                    }
-
-                    lmrType = lmrType.BaseType;
+                    return value.EvaluateToString(inspectionContext);
                 }
-                while (lmrType != null);
             }
 
             return null;
         }
 
-#pragma warning disable RS0010
+#pragma warning disable CA1200 // Avoid using cref tags with a prefix
         /// <remarks>
         /// The corresponding native code is in EEUserStringBuilder::ErrTryAppendConstantEnum.
         /// The corresponding roslyn code is in 
         /// <see cref="M:Microsoft.CodeAnalysis.SymbolDisplay.AbstractSymbolDisplayVisitor`1.AddEnumConstantValue(Microsoft.CodeAnalysis.INamedTypeSymbol, System.Object, System.Boolean)"/>.
         /// NOTE: no curlies for enum values.
         /// </remarks>
-#pragma warning restore RS0010
-        private string GetEnumDisplayString(Type lmrType, DkmClrValue value, ObjectDisplayOptions options, bool includeTypeName)
+#pragma warning restore CA1200 // Avoid using cref tags with a prefix
+        private string GetEnumDisplayString(Type lmrType, DkmClrValue value, ObjectDisplayOptions options, bool includeTypeName, DkmInspectionContext inspectionContext)
         {
             Debug.Assert(lmrType.IsEnum);
             Debug.Assert(value != null);
 
             object underlyingValue = value.HostObjectValue;
-            Debug.Assert(underlyingValue != null);
+            // check if HostObjectValue is null, since any of these types might actually be a synthetic value as well.
+            if (underlyingValue == null)
+            {
+                return _hostValueNotFoundString;
+            }
 
             string displayString;
 
-            ArrayBuilder<EnumField> fields = ArrayBuilder<EnumField>.GetInstance();
+            var fields = ArrayBuilder<EnumField>.GetInstance();
             FillEnumFields(fields, lmrType);
             // We will normalize/extend all enum values to ulong to ensure that we are always comparing the full underlying value.
             ulong valueForComparison = ConvertEnumUnderlyingTypeToUInt64(underlyingValue, Type.GetTypeCode(lmrType));
@@ -221,7 +292,7 @@ namespace Microsoft.CodeAnalysis.ExpressionEvaluator
             }
             fields.Free();
 
-            return displayString ?? FormatPrimitive(value, options);
+            return displayString ?? FormatPrimitive(value, options, inspectionContext);
         }
 
         private static void FillEnumFields(ArrayBuilder<EnumField> fields, Type lmrType)
@@ -240,13 +311,14 @@ namespace Microsoft.CodeAnalysis.ExpressionEvaluator
             fields.Sort(EnumField.Comparer);
         }
 
-        internal static void FillUsedEnumFields(ArrayBuilder<EnumField> usedFields, ArrayBuilder<EnumField> fields, ulong underlyingValue)
+        protected static void FillUsedEnumFields(ArrayBuilder<EnumField> usedFields, ArrayBuilder<EnumField> fields, ulong underlyingValue)
         {
             var remaining = underlyingValue;
             foreach (var field in fields)
             {
                 var fieldValue = field.Value;
-                if (fieldValue == 0) continue; // Otherwise, we'd tack the zero flag onto everything.
+                if (fieldValue == 0)
+                    continue; // Otherwise, we'd tack the zero flag onto everything.
 
                 if ((remaining & fieldValue) == fieldValue)
                 {
@@ -254,7 +326,8 @@ namespace Microsoft.CodeAnalysis.ExpressionEvaluator
 
                     usedFields.Add(field);
 
-                    if (remaining == 0) break;
+                    if (remaining == 0)
+                        break;
                 }
             }
 
@@ -283,11 +356,11 @@ namespace Microsoft.CodeAnalysis.ExpressionEvaluator
             return false;
         }
 
-        private static bool UsesHexadecimalNumbers(DkmClrValue value)
+        private static bool UsesHexadecimalNumbers(DkmInspectionContext inspectionContext)
         {
-            Debug.Assert(value.InspectionContext != null);
+            Debug.Assert(inspectionContext != null);
 
-            return value.InspectionContext.Radix == 16;
+            return inspectionContext.Radix == 16;
         }
 
         /// <summary>
@@ -323,7 +396,7 @@ namespace Microsoft.CodeAnalysis.ExpressionEvaluator
             }
         }
 
-        internal string GetEditableValue(DkmClrValue value)
+        private string GetEditableValue(DkmClrValue value, DkmInspectionContext inspectionContext, DkmClrCustomTypeInfo customTypeInfo)
         {
             if (value.IsError())
             {
@@ -339,11 +412,11 @@ namespace Microsoft.CodeAnalysis.ExpressionEvaluator
 
             if (type.IsEnum)
             {
-                return this.GetValueString(value, ObjectDisplayOptions.None, GetValueFlags.IncludeTypeName);
+                return this.GetValueString(value, inspectionContext, ObjectDisplayOptions.None, GetValueFlags.IncludeTypeName);
             }
             else if (type.IsDecimal())
             {
-                return this.GetValueString(value, ObjectDisplayOptions.IncludeTypeSuffix, GetValueFlags.None);
+                return this.GetValueString(value, inspectionContext, ObjectDisplayOptions.IncludeTypeSuffix, GetValueFlags.None);
             }
             // The legacy EE didn't special-case strings or chars (when ",nq" was used,
             // you had to manually add quotes when editing) but it makes sense to
@@ -352,32 +425,35 @@ namespace Microsoft.CodeAnalysis.ExpressionEvaluator
             {
                 if (!value.IsNull)
                 {
-                    return this.GetValueString(value, ObjectDisplayOptions.UseQuotes, GetValueFlags.None);
+                    return this.GetValueString(value, inspectionContext, ObjectDisplayOptions.UseQuotes | ObjectDisplayOptions.EscapeNonPrintableCharacters, GetValueFlags.None);
                 }
             }
             else if (type.IsCharacter())
             {
-                return this.GetValueStringForCharacter(value, ObjectDisplayOptions.UseQuotes);
+                return this.GetValueStringForCharacter(value, inspectionContext, ObjectDisplayOptions.UseQuotes | ObjectDisplayOptions.EscapeNonPrintableCharacters);
             }
 
             return null;
         }
 
-        internal string FormatPrimitive(DkmClrValue value, ObjectDisplayOptions options)
+        private string FormatPrimitive(DkmClrValue value, ObjectDisplayOptions options, DkmInspectionContext inspectionContext)
         {
             Debug.Assert(value != null);
+            // check if HostObjectValue is null, since any of these types might actually be a synthetic value as well.
+            if (value.HostObjectValue == null)
+            {
+                return _hostValueNotFoundString;
+            }
 
+            // DateTime is primitive in VB but not in C#.
             object obj;
             if (value.Type.GetLmrType().IsDateTime())
             {
-                DkmClrValue dateDataValue = value.GetFieldValue(DateTimeUtilities.DateTimeDateDataFieldName);
-                Debug.Assert(dateDataValue.HostObjectValue != null);
-
-                obj = DateTimeUtilities.ToDateTime((ulong)dateDataValue.HostObjectValue);
+                var dateDataValue = value.GetPropertyValue("Ticks", inspectionContext);
+                obj = new DateTime((long)dateDataValue.HostObjectValue);
             }
             else
             {
-                Debug.Assert(value.HostObjectValue != null);
                 obj = value.HostObjectValue;
             }
 
@@ -394,17 +470,19 @@ namespace Microsoft.CodeAnalysis.ExpressionEvaluator
 
         #region Language-specific value formatting behavior
 
-        internal abstract string GetArrayDisplayString(Type lmrType, ReadOnlyCollection<int> sizes, ReadOnlyCollection<int> lowerBounds, ObjectDisplayOptions options);
+        internal abstract string GetArrayDisplayString(DkmClrAppDomain appDomain, Type lmrType, ReadOnlyCollection<int> sizes, ReadOnlyCollection<int> lowerBounds, ObjectDisplayOptions options);
 
-        internal abstract string GetArrayIndexExpression(int[] indices);
+        internal abstract string GetArrayIndexExpression(string[] indices);
 
-        internal abstract string GetCastExpression(string argument, string type, bool parenthesizeArgument = false /* ignored in Visual Basic */, bool parenthesizeEntireExpression = false /* ignored in Visual Basic */);
+        internal abstract string GetCastExpression(string argument, string type, DkmClrCastExpressionOptions options);
 
         internal abstract string GetNamesForFlagsEnumValue(ArrayBuilder<EnumField> fields, object value, ulong underlyingValue, ObjectDisplayOptions options, Type typeToDisplayOpt);
 
         internal abstract string GetNameForEnumValue(ArrayBuilder<EnumField> fields, object value, ulong underlyingValue, ObjectDisplayOptions options, Type typeToDisplayOpt);
 
-        internal abstract string GetObjectCreationExpression(string type, string arguments);
+        internal abstract string GetObjectCreationExpression(string type, string[] arguments);
+
+        internal abstract string GetTupleExpression(string[] values);
 
         internal abstract string FormatLiteral(char c, ObjectDisplayOptions options);
 

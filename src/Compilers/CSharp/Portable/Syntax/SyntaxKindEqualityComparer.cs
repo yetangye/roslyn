@@ -1,4 +1,6 @@
-﻿// Copyright (c) Microsoft.  All Rights Reserved.  Licensed under the Apache License, Version 2.0.  See License.txt in the project root for license information.
+﻿// Licensed to the .NET Foundation under one or more agreements.
+// The .NET Foundation licenses this file to you under the MIT license.
+// See the LICENSE file in the project root for more information.
 
 using System.Collections.Generic;
 
@@ -26,6 +28,6 @@ namespace Microsoft.CodeAnalysis.CSharp
         /// PERF: The framework specializes EqualityComparer for enums, but only if the underlying type is System.Int32
         /// Since SyntaxKind's underlying type is System.UInt16, ObjectEqualityComparer will be chosen instead.
         /// </remarks>
-        public static readonly IEqualityComparer<SyntaxKind> EqualityComparer = new SyntaxKindEqualityComparer();
+        public static IEqualityComparer<SyntaxKind> EqualityComparer { get; } = new SyntaxKindEqualityComparer();
     }
 }

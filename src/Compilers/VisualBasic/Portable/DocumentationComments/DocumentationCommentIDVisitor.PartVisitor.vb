@@ -1,4 +1,6 @@
-﻿' Copyright (c) Microsoft.  All Rights Reserved.  Licensed under the Apache License, Version 2.0.  See License.txt in the project root for license information.
+﻿' Licensed to the .NET Foundation under one or more agreements.
+' The .NET Foundation licenses this file to you under the MIT license.
+' See the LICENSE file in the project root for more information.
 
 Imports System.Collections.Immutable
 Imports System.Text
@@ -11,7 +13,7 @@ Namespace Microsoft.CodeAnalysis.VisualBasic
 
             Public Shared ReadOnly Instance As New PartVisitor(inParameterOrReturnType:=False)
 
-            Private Shared ReadOnly ParameterOrReturnTypeInstance As New PartVisitor(inParameterOrReturnType:=True)
+            Private Shared ReadOnly s_parameterOrReturnTypeInstance As New PartVisitor(inParameterOrReturnType:=True)
 
             Private ReadOnly _inParameterOrReturnType As Boolean
 
@@ -23,7 +25,7 @@ Namespace Microsoft.CodeAnalysis.VisualBasic
                 Visit(symbol.ElementType, builder)
 
                 ' Rank-one arrays are displayed different than rectangular arrays
-                If symbol.Rank = 1 Then
+                If symbol.IsSZArray Then
                     builder.Append("[]")
                 Else
                     builder.Append("[0:")
@@ -78,12 +80,12 @@ Namespace Microsoft.CodeAnalysis.VisualBasic
                 End If
 
                 If symbol.Parameters.Any() Then
-                    ParameterOrReturnTypeInstance.VisitParameters(symbol.Parameters, builder)
+                    s_parameterOrReturnTypeInstance.VisitParameters(symbol.Parameters, builder)
                 End If
 
                 If symbol.MethodKind = MethodKind.Conversion Then
                     builder.Append("~"c)
-                    ParameterOrReturnTypeInstance.Visit(symbol.ReturnType, builder)
+                    s_parameterOrReturnTypeInstance.Visit(symbol.ReturnType, builder)
                 End If
 
                 Return Nothing
@@ -95,7 +97,7 @@ Namespace Microsoft.CodeAnalysis.VisualBasic
                 builder.Append(symbol.MetadataName)
 
                 If symbol.Parameters.Any() Then
-                    ParameterOrReturnTypeInstance.VisitParameters(symbol.Parameters, builder)
+                    s_parameterOrReturnTypeInstance.VisitParameters(symbol.Parameters, builder)
                 End If
 
                 Return Nothing
@@ -127,6 +129,10 @@ Namespace Microsoft.CodeAnalysis.VisualBasic
             End Function
 
             Public Overrides Function VisitNamedType(symbol As NamedTypeSymbol, builder As StringBuilder) As Object
+                If symbol.IsTupleType Then
+                    Return VisitNamedType(DirectCast(symbol, TupleTypeSymbol).UnderlyingNamedType, builder)
+                End If
+
                 If symbol.ContainingSymbol IsNot Nothing AndAlso symbol.ContainingSymbol.Name.Length <> 0 Then
                     Visit(symbol.ContainingSymbol, builder)
                     builder.Append("."c)
@@ -137,7 +143,7 @@ Namespace Microsoft.CodeAnalysis.VisualBasic
                 If symbol.Arity <> 0 Then
                     ' Special case: dev11 treats types instances of the declaring type in the parameter list
                     ' (And return type, for conversions) as constructed with its own type parameters.
-                    If Not _inParameterOrReturnType AndAlso symbol = symbol.ConstructedFrom Then
+                    If Not _inParameterOrReturnType AndAlso TypeSymbol.Equals(symbol, symbol.ConstructedFrom, TypeCompareKind.ConsiderEverything) Then
                         builder.Append(MetadataHelpers.GenericTypeNameManglingChar)
                         builder.Append(symbol.Arity)
                     Else

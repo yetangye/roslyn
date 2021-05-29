@@ -1,17 +1,19 @@
-﻿' Copyright (c) Microsoft.  All Rights Reserved.  Licensed under the Apache License, Version 2.0.  See License.txt in the project root for license information.
+﻿' Licensed to the .NET Foundation under one or more agreements.
+' The .NET Foundation licenses this file to you under the MIT license.
+' See the LICENSE file in the project root for more information.
 
 Imports System.Reflection.Metadata.Ecma335
+Imports Microsoft.CodeAnalysis.ExpressionEvaluator
+Imports Microsoft.CodeAnalysis.PooledObjects
 Imports Microsoft.CodeAnalysis.VisualBasic.Symbols
 Imports Microsoft.CodeAnalysis.VisualBasic.Symbols.Metadata.PE
-Imports Microsoft.CodeAnalysis.ExpressionEvaluator
 Imports Microsoft.CodeAnalysis.VisualBasic.UnitTests
 Imports Microsoft.VisualStudio.Debugger.Evaluation
 Imports Roslyn.Test.Utilities
 Imports Xunit
 
-Namespace Microsoft.CodeAnalysis.VisualBasic.ExpressionEvaluator
+Namespace Microsoft.CodeAnalysis.VisualBasic.ExpressionEvaluator.UnitTests
 
-    '// TODO: ref/out
     '// TODO: constructors
     '// TODO: keyword identifiers
     '// TODO: containing type and parameter types that are nested types
@@ -22,13 +24,12 @@ Namespace Microsoft.CodeAnalysis.VisualBasic.ExpressionEvaluator
     '// TODO: string argument values
     '// TODO: string argument values requiring quotes
     '// TODO: argument flags == names only, types only, values only
-    '// TODO: params Argument values
     '// TODO: generic class/method with 2 or more type parameters
     '// TODO: generic argument type that is not from a referenced assembly
     Public Class InstructionDecoderTests : Inherits ExpressionCompilerTestBase
 
         <Fact>
-        Sub GetNameArgumentCounts()
+        Public Sub GetNameArgumentCounts()
             Dim source = "
 Imports System
 Module Module1
@@ -54,7 +55,7 @@ End Module"
         End Sub
 
         <Fact>
-        Sub GetNameNullable()
+        Public Sub GetNameNullable()
             Dim source = "
 Imports System
 Module Module1
@@ -74,7 +75,7 @@ End Module"
         End Sub
 
         <Fact>
-        Sub GetNameGenerics()
+        Public Sub GetNameGenerics()
             Dim source = "
 Imports System
 Class Class1(Of T)
@@ -112,7 +113,7 @@ End Class"
         End Sub
 
         <Fact>
-        Sub GetNameNullTypeArguments()
+        Public Sub GetNameNullTypeArguments()
             Dim source = "
 Imports System
 Class Class1(Of T)
@@ -134,7 +135,7 @@ End Class"
         End Sub
 
         <Fact>
-        Sub GetNameGenericArgumentTypeNotInReferences()
+        Public Sub GetNameGenericArgumentTypeNotInReferences()
             Dim source = "
 Class Class1
 End Class"
@@ -146,7 +147,7 @@ End Class"
         End Sub
 
         <Fact>
-        Sub GetNameAsync()
+        Public Sub GetNameAsync()
             Dim source = "
 Imports System.Threading.Tasks
 Module Module1
@@ -163,8 +164,8 @@ End Module"
                 GetName(source, "Module1.VB$StateMachine_0_M.MoveNext", DkmVariableInfoFlags.Names Or DkmVariableInfoFlags.Types))
         End Sub
 
-        <Fact, WorkItem(1107977)>
-        Sub GetNameGenericAsync()
+        <Fact, WorkItem(1107977, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/1107977")>
+        Public Sub GetNameGenericAsync()
             Dim source = "
 Imports System.Threading.Tasks
 Class C
@@ -180,7 +181,7 @@ End Class"
         End Sub
 
         <Fact>
-        Sub GetNameIterator()
+        Public Sub GetNameIterator()
             Dim source = "
 Imports System.Collections.Generic
 Module Module1
@@ -198,7 +199,7 @@ End Module"
         End Sub
 
         <Fact>
-        Sub GetNameLambda()
+        Public Sub GetNameLambda()
             Dim source = "
 Module Module1
     Sub M()
@@ -207,12 +208,12 @@ Module Module1
 End Module"
 
             Assert.Equal(
-                "Module1.<closure>.<lambda0-1>()",
-                GetName(source, "Module1._Closure$__._Lambda$__0-1", DkmVariableInfoFlags.Names Or DkmVariableInfoFlags.Types))
+                "Module1.<closure>.<lambda0-0>()",
+                GetName(source, "Module1._Closure$__._Lambda$__0-0", DkmVariableInfoFlags.Names Or DkmVariableInfoFlags.Types))
         End Sub
 
         <Fact>
-        Sub GetNameGenericLambda()
+        Public Sub GetNameGenericLambda()
             Dim source = "
 Imports System
 Class Class1(Of T)
@@ -222,12 +223,12 @@ Class Class1(Of T)
 End Class"
 
             Assert.Equal(
-                "Class1(Of System.Exception).<closure>.<lambda1-1>(System.ArgumentException u2)",
-                GetName(source, "Class1._Closure$__1._Lambda$__1-1", DkmVariableInfoFlags.Names Or DkmVariableInfoFlags.Types, typeArguments:={GetType(Exception), GetType(ArgumentException)}))
+                "Class1(Of System.Exception).<closure>.<lambda1-0>(System.ArgumentException u2)",
+                GetName(source, "Class1._Closure$__1._Lambda$__1-0", DkmVariableInfoFlags.Names Or DkmVariableInfoFlags.Types, typeArguments:={GetType(Exception), GetType(ArgumentException)}))
         End Sub
 
         <Fact>
-        Sub GetNameOptionalParameter()
+        Public Sub GetNameOptionalParameter()
             Dim source = "
 Module Module1
     Function M(Optional d As Date = #1/1/1970#) As Integer
@@ -245,7 +246,7 @@ End Module"
         End Sub
 
         <Fact>
-        Sub GetNameProperties()
+        Public Sub GetNameProperties()
             Dim source = "
 Class Class1
     Property P As Integer
@@ -282,7 +283,7 @@ End Class"
         End Sub
 
         <Fact>
-        Sub GetNameInterfaceImplementation()
+        Public Sub GetNameInterfaceImplementation()
             Dim source = "
 Imports System
 Class C : Implements IDisposable
@@ -296,7 +297,7 @@ End Class"
         End Sub
 
         <Fact>
-        Sub GetNameExtensionMethod()
+        Public Sub GetNameExtensionMethod()
             Dim source = "
 Imports System.Runtime.CompilerServices
 Module Extensions
@@ -311,7 +312,7 @@ End Module"
         End Sub
 
         <Fact>
-        Sub GetNameArgumentFlagsNone()
+        Public Sub GetNameArgumentFlagsNone()
             Dim source = "
 Module Module1
     Sub M1()
@@ -329,8 +330,71 @@ End Module"
                 GetName(source, "Module1.M2", DkmVariableInfoFlags.None))
         End Sub
 
+        <Fact, WorkItem(1107978, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/1107978")>
+        Public Sub GetNameRefAndOutParameters()
+            Dim source = "
+Imports System.Runtime.InteropServices
+Class C
+    Shared Sub M(ByRef x As Integer, <Out> ByRef y As Integer)
+        y = x
+    End Sub
+End Class"
+
+            Assert.Equal(
+                "C.M",
+                GetName(source, "C.M", DkmVariableInfoFlags.None))
+
+            Assert.Equal(
+                "C.M(1, 2)",
+                GetName(source, "C.M", DkmVariableInfoFlags.None, argumentValues:={"1", "2"}))
+
+            Assert.Equal(
+                "C.M(Integer, Integer)",
+                GetName(source, "C.M", DkmVariableInfoFlags.Types))
+
+            Assert.Equal(
+                "C.M(x, y)",
+                GetName(source, "C.M", DkmVariableInfoFlags.Names))
+
+            Assert.Equal(
+                "C.M(Integer x, Integer y)",
+                GetName(source, "C.M", DkmVariableInfoFlags.Types Or DkmVariableInfoFlags.Names))
+        End Sub
+
         <Fact>
-        Sub GetReturnTypeNamePrimitive()
+        Public Sub GetNameParamsParameters()
+            Dim source = "
+Class C
+    Shared Sub M(ParamArray x() As Integer)
+    End Sub
+End Class"
+
+            Assert.Equal(
+                "C.M(Integer() x)",
+                GetName(source, "C.M", DkmVariableInfoFlags.Types Or DkmVariableInfoFlags.Names))
+        End Sub
+
+        <Fact, WorkItem(1154945, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/1154945")>
+        Public Sub GetNameIncorrectNumberOfArgumentValues()
+            Dim source = "
+Class C
+    Sub M(x As Integer, y As Integer)
+    End Sub
+End Class"
+            Dim expected = "C.M(Integer x, Integer y)"
+
+            Assert.Equal(expected,
+                GetName(source, "C.M", DkmVariableInfoFlags.Types Or DkmVariableInfoFlags.Names, argumentValues:={}))
+
+            Assert.Equal(expected,
+                GetName(source, "C.M", DkmVariableInfoFlags.Types Or DkmVariableInfoFlags.Names, argumentValues:={"1"}))
+
+            Assert.Equal(expected,
+                GetName(source, "C.M", DkmVariableInfoFlags.Types Or DkmVariableInfoFlags.Names, argumentValues:={"1", "2", "3"}))
+        End Sub
+
+        <Fact>
+        Public Sub GetReturnTypeNamePrimitive()
             Dim source = "
 Class C
     Function M1() As UInteger
@@ -342,7 +406,7 @@ End Class"
         End Sub
 
         <Fact>
-        Sub GetReturnTypeNameNested()
+        Public Sub GetReturnTypeNameNested()
             Dim source = "
 Class C
     Function M1() As N.D.E
@@ -360,7 +424,7 @@ End Namespace"
         End Sub
 
         <Fact>
-        Sub GetReturnTypeNameGenericOfPrimitive()
+        Public Sub GetReturnTypeNameGenericOfPrimitive()
             Dim source = "
 Imports System
 Class C
@@ -373,7 +437,7 @@ End Class"
         End Sub
 
         <Fact>
-        Sub GetReturnTypeNameGenericOfNested()
+        Public Sub GetReturnTypeNameGenericOfNested()
             Dim source = "
 Imports System
 Class C
@@ -388,7 +452,7 @@ End Class"
         End Sub
 
         <Fact>
-        Sub GetReturnTypeNameGenericOfGeneric()
+        Public Sub GetReturnTypeNameGenericOfGeneric()
             Dim source = "
 Imports System
 Class C
@@ -416,7 +480,6 @@ End Class"
             Dim includeParameterNames = argumentFlags.Includes(DkmVariableInfoFlags.Names)
             Dim builder As ArrayBuilder(Of String) = Nothing
             If argumentValues IsNot Nothing Then
-                Assert.InRange(argumentValues.Length, 1, Integer.MaxValue)
                 builder = ArrayBuilder(Of String).GetInstance()
                 builder.AddRange(argumentValues)
             End If
@@ -438,7 +501,7 @@ End Class"
         End Function
 
         Private Function GetConstructedMethod(source As String, methodName As String, serializedTypeArgumentNames() As String, instructionDecoder As VisualBasicInstructionDecoder) As MethodSymbol
-            Dim compilation = CreateCompilationWithReferences(
+            Dim compilation = CreateEmptyCompilationWithReferences(
                 {VisualBasicSyntaxTree.ParseText(source)},
                 references:={MscorlibRef_v4_0_30316_17626, MsvbRef_v4_0_30319_17929},
                 options:=TestOptions.DebugDll,
@@ -454,12 +517,11 @@ End Class"
             ' async/ iterator "MoveNext" methods to the original source method.
             Dim method As MethodSymbol = compilation.GetSourceMethod(
                 DirectCast(frame.ContainingModule, PEModuleSymbol).Module.GetModuleVersionIdOrThrow(),
-                MetadataTokens.GetToken(frame.Handle))
+                frame.Handle)
             If serializedTypeArgumentNames IsNot Nothing Then
                 Assert.NotEmpty(serializedTypeArgumentNames)
                 Dim typeParameters = instructionDecoder.GetAllTypeParameters(method)
                 Assert.NotEmpty(typeParameters)
-                Dim typeNameDecoder = New EETypeNameDecoder(compilation, DirectCast(method.ContainingModule, PEModuleSymbol))
                 ' Use the same helper method as the FrameDecoder to get the TypeSymbols for the
                 ' generic type arguments (rather than using EETypeNameDecoder directly).
                 Dim typeArgumentSymbols = instructionDecoder.GetTypeSymbols(compilation, method, serializedTypeArgumentNames)

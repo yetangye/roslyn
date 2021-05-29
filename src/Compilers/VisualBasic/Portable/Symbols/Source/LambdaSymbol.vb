@@ -1,4 +1,6 @@
-﻿' Copyright (c) Microsoft.  All Rights Reserved.  Licensed under the Apache License, Version 2.0.  See License.txt in the project root for license information.
+﻿' Licensed to the .NET Foundation under one or more agreements.
+' The .NET Foundation licenses this file to you under the MIT license.
+' See the LICENSE file in the project root for more information.
 
 Imports System.Collections.Immutable
 Imports System.Runtime.InteropServices
@@ -41,8 +43,8 @@ Namespace Microsoft.CodeAnalysis.VisualBasic.Symbols
         ''' </summary>
         Friend Shared ReadOnly ErrorRecoveryInferenceError As TypeSymbol = New ErrorTypeSymbol()
 
-        Private ReadOnly m_SyntaxNode As VisualBasicSyntaxNode
-        Private ReadOnly m_Parameters As ImmutableArray(Of ParameterSymbol)
+        Private ReadOnly _syntaxNode As SyntaxNode
+        Private ReadOnly _parameters As ImmutableArray(Of ParameterSymbol)
 
         ''' <summary>
         ''' Can mutate for a query lambda from ReturnTypePendingDelegate 
@@ -51,10 +53,10 @@ Namespace Microsoft.CodeAnalysis.VisualBasic.Symbols
         Protected m_ReturnType As TypeSymbol
 
         ' The binder associated with the block containing this lambda
-        Private ReadOnly m_Binder As Binder
+        Private ReadOnly _binder As Binder
 
         Protected Sub New(
-            syntaxNode As VisualBasicSyntaxNode,
+            syntaxNode As SyntaxNode,
             parameters As ImmutableArray(Of BoundLambdaParameterSymbol),
             returnType As TypeSymbol,
             binder As Binder
@@ -62,10 +64,10 @@ Namespace Microsoft.CodeAnalysis.VisualBasic.Symbols
             Debug.Assert(syntaxNode IsNot Nothing)
             Debug.Assert(returnType IsNot Nothing)
 
-            m_SyntaxNode = syntaxNode
-            m_Parameters = StaticCast(Of ParameterSymbol).From(parameters)
+            _syntaxNode = syntaxNode
+            _parameters = StaticCast(Of ParameterSymbol).From(parameters)
             m_ReturnType = returnType
-            m_Binder = binder
+            _binder = binder
 
             For Each param In parameters
                 param.SetLambdaSymbol(Me)
@@ -76,7 +78,7 @@ Namespace Microsoft.CodeAnalysis.VisualBasic.Symbols
 
         Friend NotOverridable Overrides ReadOnly Property IsQueryLambdaMethod As Boolean
             Get
-                Return SynthesizedKind = SynthesizedLambdaKind.QueryLambda
+                Return SynthesizedKind.IsQueryLambda
             End Get
         End Property
 
@@ -110,13 +112,13 @@ Namespace Microsoft.CodeAnalysis.VisualBasic.Symbols
 
         Public Overrides ReadOnly Property ContainingSymbol As Symbol
             Get
-                Return m_Binder.ContainingMember
+                Return _binder.ContainingMember
             End Get
         End Property
 
         Friend ReadOnly Property ContainingBinder As Binder
             Get
-                Return m_Binder
+                Return _binder
             End Get
         End Property
 
@@ -243,15 +245,21 @@ Namespace Microsoft.CodeAnalysis.VisualBasic.Symbols
             End Get
         End Property
 
+        Public NotOverridable Overrides ReadOnly Property IsInitOnly As Boolean
+            Get
+                Return False
+            End Get
+        End Property
+
         Public Overrides ReadOnly Property Locations As ImmutableArray(Of Location)
             Get
-                Return ImmutableArray.Create(m_SyntaxNode.GetLocation())
+                Return ImmutableArray.Create(_syntaxNode.GetLocation())
             End Get
         End Property
 
         Public Overrides ReadOnly Property DeclaringSyntaxReferences As ImmutableArray(Of SyntaxReference)
             Get
-                Return ImmutableArray.Create(m_SyntaxNode.GetReference())
+                Return ImmutableArray.Create(_syntaxNode.GetReference())
             End Get
         End Property
 
@@ -275,7 +283,13 @@ Namespace Microsoft.CodeAnalysis.VisualBasic.Symbols
 
         Public Overrides ReadOnly Property Parameters As ImmutableArray(Of ParameterSymbol)
             Get
-                Return m_Parameters
+                Return _parameters
+            End Get
+        End Property
+
+        Public Overrides ReadOnly Property ReturnsByRef As Boolean
+            Get
+                Return False
             End Get
         End Property
 
@@ -291,9 +305,15 @@ Namespace Microsoft.CodeAnalysis.VisualBasic.Symbols
             End Get
         End Property
 
-        Friend Overrides ReadOnly Property Syntax As VisualBasicSyntaxNode
+        Public Overrides ReadOnly Property RefCustomModifiers As ImmutableArray(Of CustomModifier)
             Get
-                Return m_SyntaxNode
+                Return ImmutableArray(Of CustomModifier).Empty
+            End Get
+        End Property
+
+        Friend Overrides ReadOnly Property Syntax As SyntaxNode
+            Get
+                Return _syntaxNode
             End Get
         End Property
 
@@ -338,16 +358,16 @@ Namespace Microsoft.CodeAnalysis.VisualBasic.Symbols
             Dim symbol = TryCast(obj, LambdaSymbol)
 
             Return symbol IsNot Nothing AndAlso
-                symbol.m_SyntaxNode Is Me.m_SyntaxNode AndAlso
+                symbol._syntaxNode Is Me._syntaxNode AndAlso
                 Equals(symbol.ContainingSymbol, Me.ContainingSymbol) AndAlso
                 MethodSignatureComparer.AllAspectsSignatureComparer.Equals(symbol, Me)
         End Function
 
         Public Overrides Function GetHashCode() As Integer
-            Dim hc As Integer = Hash.Combine(Me.Syntax.GetHashCode(), Me.m_Parameters.Length)
+            Dim hc As Integer = Hash.Combine(Me.Syntax.GetHashCode(), Me._parameters.Length)
             hc = Hash.Combine(hc, Me.ReturnType.GetHashCode())
-            For i = 0 To Me.m_Parameters.Length - 1
-                hc = Hash.Combine(hc, Me.m_Parameters(i).Type.GetHashCode())
+            For i = 0 To Me._parameters.Length - 1
+                hc = Hash.Combine(hc, Me._parameters(i).Type.GetHashCode())
             Next
             Return hc
         End Function

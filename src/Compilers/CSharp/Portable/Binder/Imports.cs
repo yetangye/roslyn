@@ -1,12 +1,19 @@
-﻿// Copyright (c) Microsoft.  All Rights Reserved.  Licensed under the Apache License, Version 2.0.  See License.txt in the project root for license information.
+﻿// Licensed to the .NET Foundation under one or more agreements.
+// The .NET Foundation licenses this file to you under the MIT license.
+// See the LICENSE file in the project root for more information.
 
+#nullable disable
+
+using System;
 using System.Collections.Generic;
 using System.Collections.Immutable;
 using System.Diagnostics;
 using System.Linq;
 using System.Threading;
+using Microsoft.CodeAnalysis.Collections;
 using Microsoft.CodeAnalysis.CSharp.Symbols;
 using Microsoft.CodeAnalysis.CSharp.Syntax;
+using Microsoft.CodeAnalysis.PooledObjects;
 using Roslyn.Utilities;
 
 namespace Microsoft.CodeAnalysis.CSharp
@@ -14,10 +21,15 @@ namespace Microsoft.CodeAnalysis.CSharp
     /// <summary>
     /// Represents symbols imported to the binding scope via using namespace, using alias, and extern alias.
     /// </summary>
+    [DebuggerDisplay("{GetDebuggerDisplay(),nq}")]
     internal sealed class Imports
     {
-        internal static readonly Imports Empty = new Imports(null, null,
-            ImmutableArray<NamespaceOrTypeAndUsingDirective>.Empty, ImmutableArray<AliasAndExternAliasDirective>.Empty, null);
+        internal static readonly Imports Empty = new Imports(
+            null,
+            ImmutableDictionary<string, AliasAndUsingDirective>.Empty,
+            ImmutableArray<NamespaceOrTypeAndUsingDirective>.Empty,
+            ImmutableArray<AliasAndExternAliasDirective>.Empty,
+            null);
 
         private readonly CSharpCompilation _compilation;
         private readonly DiagnosticBag _diagnostics;
@@ -25,18 +37,20 @@ namespace Microsoft.CodeAnalysis.CSharp
         // completion state that tracks whether validation was done/not done/currently in process. 
         private SymbolCompletionState _state;
 
-        public readonly Dictionary<string, AliasAndUsingDirective> UsingAliases;
+        public readonly ImmutableDictionary<string, AliasAndUsingDirective> UsingAliases;
         public readonly ImmutableArray<NamespaceOrTypeAndUsingDirective> Usings;
         public readonly ImmutableArray<AliasAndExternAliasDirective> ExternAliases;
 
         private Imports(
             CSharpCompilation compilation,
-            Dictionary<string, AliasAndUsingDirective> usingAliases,
+            ImmutableDictionary<string, AliasAndUsingDirective> usingAliases,
             ImmutableArray<NamespaceOrTypeAndUsingDirective> usings,
             ImmutableArray<AliasAndExternAliasDirective> externs,
             DiagnosticBag diagnostics)
         {
-            Debug.Assert(!usings.IsDefault && !externs.IsDefault);
+            Debug.Assert(usingAliases != null);
+            Debug.Assert(!usings.IsDefault);
+            Debug.Assert(!externs.IsDefault);
 
             _compilation = compilation;
             this.UsingAliases = usingAliases;
@@ -45,20 +59,29 @@ namespace Microsoft.CodeAnalysis.CSharp
             this.ExternAliases = externs;
         }
 
+        internal string GetDebuggerDisplay()
+        {
+            return string.Join("; ",
+                UsingAliases.OrderBy(x => x.Value.UsingDirective.Location.SourceSpan.Start).Select(ua => $"{ua.Key} = {ua.Value.Alias.Target}").Concat(
+                Usings.Select(u => u.NamespaceOrType.ToString())).Concat(
+                ExternAliases.Select(ea => $"extern alias {ea.Alias.Name}")));
+
+        }
+
         public static Imports FromSyntax(
             CSharpSyntaxNode declarationSyntax,
             InContainerBinder binder,
-            ConsList<Symbol> basesBeingResolved,
+            ConsList<TypeSymbol> basesBeingResolved,
             bool inUsing)
         {
             SyntaxList<UsingDirectiveSyntax> usingDirectives;
             SyntaxList<ExternAliasDirectiveSyntax> externAliasDirectives;
             if (declarationSyntax.Kind() == SyntaxKind.CompilationUnit)
             {
-                var compilation = (CompilationUnitSyntax)declarationSyntax;
+                var compilationUnit = (CompilationUnitSyntax)declarationSyntax;
                 // using directives are not in scope within using directives
-                usingDirectives = inUsing ? default(SyntaxList<UsingDirectiveSyntax>) : compilation.Usings;
-                externAliasDirectives = compilation.Externs;
+                usingDirectives = inUsing ? default(SyntaxList<UsingDirectiveSyntax>) : compilationUnit.Usings;
+                externAliasDirectives = compilationUnit.Externs;
             }
             else if (declarationSyntax.Kind() == SyntaxKind.NamespaceDeclaration)
             {
@@ -79,53 +102,70 @@ namespace Microsoft.CodeAnalysis.CSharp
 
             // define all of the extern aliases first. They may used by the target of a using
 
-            // using Bar=Foo::Bar;
-            // using Foo::Baz;
-            // extern alias Foo;
+            // using Bar=Goo::Bar;
+            // using Goo::Baz;
+            // extern alias Goo;
 
             var diagnostics = new DiagnosticBag();
 
+            var compilation = binder.Compilation;
+
             var externAliases = BuildExternAliases(externAliasDirectives, binder, diagnostics);
             var usings = ArrayBuilder<NamespaceOrTypeAndUsingDirective>.GetInstance();
-            Dictionary<string, AliasAndUsingDirective> usingAliases = null;
-
+            ImmutableDictionary<string, AliasAndUsingDirective>.Builder usingAliases = null;
             if (usingDirectives.Count > 0)
             {
                 // A binder that contains the extern aliases but not the usings. The resolution of the target of a using directive or alias 
                 // should not make use of other peer usings.
-                InContainerBinder usingsBinder;
-                if (binder.Container.IsSubmissionClass)
+                Binder usingsBinder;
+                if (declarationSyntax.SyntaxTree.Options.Kind != SourceCodeKind.Regular)
                 {
-                    // Top-level usings in interactive code are resolved in the context of global namespace, w/o extern aliases:
-                    usingsBinder = new InContainerBinder(binder.Compilation.GlobalNamespace, new BuckStopsHereBinder(binder.Compilation));
+                    usingsBinder = compilation.GetBinderFactory(declarationSyntax.SyntaxTree).GetImportsBinder(declarationSyntax, inUsing: true);
                 }
                 else
                 {
-                    usingsBinder = new InContainerBinder(binder.Container, binder.Next,
-                        new Imports(binder.Compilation, null, ImmutableArray<NamespaceOrTypeAndUsingDirective>.Empty, externAliases, null));
+                    var imports = externAliases.Length == 0
+                        ? Empty
+                        : new Imports(
+                            compilation,
+                            ImmutableDictionary<string, AliasAndUsingDirective>.Empty,
+                            ImmutableArray<NamespaceOrTypeAndUsingDirective>.Empty,
+                            externAliases,
+                            diagnostics: null);
+                    usingsBinder = new InContainerBinder(binder.Container, binder.Next, imports);
                 }
 
-                var uniqueUsings = new HashSet<NamespaceOrTypeSymbol>();
+                var uniqueUsings = SpecializedSymbolCollections.GetPooledSymbolHashSetInstance<NamespaceOrTypeSymbol>();
 
                 foreach (var usingDirective in usingDirectives)
                 {
-                    binder.Compilation.RecordImport(usingDirective);
+                    compilation.RecordImport(usingDirective);
 
                     if (usingDirective.Alias != null)
                     {
-                        if (usingDirective.StaticKeyword != default(SyntaxToken))
+                        SyntaxToken identifier = usingDirective.Alias.Name.Identifier;
+                        Location location = usingDirective.Alias.Name.Location;
+
+                        if (identifier.ContextualKind() == SyntaxKind.GlobalKeyword)
                         {
-                            diagnostics.Add(ErrorCode.ERR_NoAliasHere, usingDirective.Alias.Name.Location);
+                            diagnostics.Add(ErrorCode.WRN_GlobalAliasDefn, location);
                         }
 
-                        string identifierValueText = usingDirective.Alias.Name.Identifier.ValueText;
+                        if (usingDirective.StaticKeyword != default(SyntaxToken))
+                        {
+                            diagnostics.Add(ErrorCode.ERR_NoAliasHere, location);
+                        }
+
+                        SourceMemberContainerTypeSymbol.ReportTypeNamedRecord(identifier.Text, compilation, diagnostics, location);
+
+                        string identifierValueText = identifier.ValueText;
                         if (usingAliases != null && usingAliases.ContainsKey(identifierValueText))
                         {
                             // Suppress diagnostics if we're already broken.
                             if (!usingDirective.Name.IsMissing)
                             {
                                 // The using alias '{0}' appeared previously in this namespace
-                                diagnostics.Add(ErrorCode.ERR_DuplicateAlias, usingDirective.Alias.Name.Location, identifierValueText);
+                                diagnostics.Add(ErrorCode.ERR_DuplicateAlias, location, identifierValueText);
                             }
                         }
                         else
@@ -143,12 +183,12 @@ namespace Microsoft.CodeAnalysis.CSharp
 
                             if (usingAliases == null)
                             {
-                                usingAliases = new Dictionary<string, AliasAndUsingDirective>();
+                                usingAliases = ImmutableDictionary.CreateBuilder<string, AliasAndUsingDirective>();
                             }
 
                             // construct the alias sym with the binder for which we are building imports. That
                             // way the alias target can make use of extern alias definitions.
-                            usingAliases.Add(identifierValueText, new AliasAndUsingDirective(new AliasSymbol(usingsBinder, usingDirective), usingDirective));
+                            usingAliases.Add(identifierValueText, new AliasAndUsingDirective(new AliasSymbol(usingsBinder, usingDirective.Name, usingDirective.Alias), usingDirective));
                         }
                     }
                     else
@@ -159,21 +199,26 @@ namespace Microsoft.CodeAnalysis.CSharp
                             continue;
                         }
 
-                        var imported = usingsBinder.BindNamespaceOrTypeSymbol(usingDirective.Name, diagnostics, basesBeingResolved);
+                        var directiveDiagnostics = BindingDiagnosticBag.GetInstance();
+
+                        var declarationBinder = usingsBinder.WithAdditionalFlags(BinderFlags.SuppressConstraintChecks);
+                        var imported = declarationBinder.BindNamespaceOrTypeSymbol(usingDirective.Name, directiveDiagnostics, basesBeingResolved).NamespaceOrTypeSymbol;
+
                         if (imported.Kind == SymbolKind.Namespace)
                         {
+                            Debug.Assert(directiveDiagnostics.DependenciesBag.IsEmpty());
+
                             if (usingDirective.StaticKeyword != default(SyntaxToken))
                             {
                                 diagnostics.Add(ErrorCode.ERR_BadUsingType, usingDirective.Name.Location, imported);
                             }
-                            else if (uniqueUsings.Contains(imported))
+                            else if (!uniqueUsings.Add(imported))
                             {
                                 diagnostics.Add(ErrorCode.WRN_DuplicateUsing, usingDirective.Name.Location, imported);
                             }
                             else
                             {
-                                uniqueUsings.Add(imported);
-                                usings.Add(new NamespaceOrTypeAndUsingDirective(imported, usingDirective));
+                                usings.Add(new NamespaceOrTypeAndUsingDirective(imported, usingDirective, dependencies: default));
                             }
                         }
                         else if (imported.Kind == SymbolKind.NamedType)
@@ -191,8 +236,10 @@ namespace Microsoft.CodeAnalysis.CSharp
                                 }
                                 else
                                 {
+                                    declarationBinder.ReportDiagnosticsIfObsolete(diagnostics, importedType, usingDirective.Name, hasBaseReceiver: false);
+
                                     uniqueUsings.Add(importedType);
-                                    usings.Add(new NamespaceOrTypeAndUsingDirective(importedType, usingDirective));
+                                    usings.Add(new NamespaceOrTypeAndUsingDirective(importedType, usingDirective, directiveDiagnostics.DependenciesBag.ToImmutableArray()));
                                 }
                             }
                         }
@@ -206,8 +253,13 @@ namespace Microsoft.CodeAnalysis.CSharp
                                 imported.GetKindText(),
                                 MessageID.IDS_SK_TYPE_OR_NAMESPACE.Localize());
                         }
+
+                        diagnostics.AddRange(directiveDiagnostics.DiagnosticBag);
+                        directiveDiagnostics.Free();
                     }
                 }
+
+                uniqueUsings.Free();
             }
 
             if (diagnostics.IsEmptyWithoutResolution)
@@ -215,24 +267,31 @@ namespace Microsoft.CodeAnalysis.CSharp
                 diagnostics = null;
             }
 
-            return new Imports(binder.Compilation, usingAliases, usings.ToImmutableAndFree(), externAliases, diagnostics);
+            return new Imports(compilation, usingAliases.ToImmutableDictionaryOrEmpty(), usings.ToImmutableAndFree(), externAliases, diagnostics);
         }
 
         public static Imports FromGlobalUsings(CSharpCompilation compilation)
         {
             var usings = compilation.Options.Usings;
+
+            if (usings.Length == 0 && compilation.PreviousSubmission == null)
+            {
+                return Empty;
+            }
+
             var diagnostics = new DiagnosticBag();
             var usingsBinder = new InContainerBinder(compilation.GlobalNamespace, new BuckStopsHereBinder(compilation));
             var boundUsings = ArrayBuilder<NamespaceOrTypeAndUsingDirective>.GetInstance();
+            var uniqueUsings = PooledHashSet<NamespaceOrTypeSymbol>.GetInstance();
 
-            foreach (string ns in usings)
+            foreach (string @using in usings)
             {
-                if (!ns.IsValidClrNamespaceName())
+                if (!@using.IsValidClrNamespaceName())
                 {
                     continue;
                 }
 
-                string[] identifiers = ns.Split('.');
+                string[] identifiers = @using.Split('.');
                 NameSyntax qualifiedName = SyntaxFactory.IdentifierName(identifiers[0]);
 
                 for (int j = 1; j < identifiers.Length; j++)
@@ -240,7 +299,16 @@ namespace Microsoft.CodeAnalysis.CSharp
                     qualifiedName = SyntaxFactory.QualifiedName(left: qualifiedName, right: SyntaxFactory.IdentifierName(identifiers[j]));
                 }
 
-                boundUsings.Add(new NamespaceOrTypeAndUsingDirective(usingsBinder.BindNamespaceOrTypeSymbol(qualifiedName, diagnostics), null));
+                var directiveDiagnostics = BindingDiagnosticBag.GetInstance();
+
+                var imported = usingsBinder.BindNamespaceOrTypeSymbol(qualifiedName, directiveDiagnostics).NamespaceOrTypeSymbol;
+                if (uniqueUsings.Add(imported))
+                {
+                    boundUsings.Add(new NamespaceOrTypeAndUsingDirective(imported, null, dependencies: directiveDiagnostics.DependenciesBag.ToImmutableArray()));
+                }
+
+                diagnostics.AddRange(directiveDiagnostics.DiagnosticBag);
+                directiveDiagnostics.Free();
             }
 
             if (diagnostics.IsEmptyWithoutResolution)
@@ -248,16 +316,169 @@ namespace Microsoft.CodeAnalysis.CSharp
                 diagnostics = null;
             }
 
-            return new Imports(compilation, null, boundUsings.ToImmutableAndFree(), ImmutableArray<AliasAndExternAliasDirective>.Empty, diagnostics);
+            var previousSubmissionImports = compilation.PreviousSubmission?.GlobalImports;
+            if (previousSubmissionImports != null)
+            {
+                // Currently, only usings are supported.
+                Debug.Assert(previousSubmissionImports.UsingAliases.IsEmpty);
+                Debug.Assert(previousSubmissionImports.ExternAliases.IsEmpty);
+
+                var expandedImports = ExpandPreviousSubmissionImports(previousSubmissionImports, compilation);
+
+                foreach (var previousUsing in expandedImports.Usings)
+                {
+                    if (uniqueUsings.Add(previousUsing.NamespaceOrType))
+                    {
+                        boundUsings.Add(previousUsing);
+                    }
+                }
+            }
+
+            uniqueUsings.Free();
+
+            if (boundUsings.Count == 0)
+            {
+                boundUsings.Free();
+                return Empty;
+            }
+
+            return new Imports(compilation, ImmutableDictionary<string, AliasAndUsingDirective>.Empty, boundUsings.ToImmutableAndFree(), ImmutableArray<AliasAndExternAliasDirective>.Empty, diagnostics);
+        }
+
+        // TODO (https://github.com/dotnet/roslyn/issues/5517): skip namespace expansion if references haven't changed.
+        internal static Imports ExpandPreviousSubmissionImports(Imports previousSubmissionImports, CSharpCompilation newSubmission)
+        {
+            if (previousSubmissionImports == Empty)
+            {
+                return Empty;
+            }
+
+            Debug.Assert(previousSubmissionImports != null);
+            Debug.Assert(previousSubmissionImports._compilation.IsSubmission);
+            Debug.Assert(newSubmission.IsSubmission);
+
+            var expandedGlobalNamespace = newSubmission.GlobalNamespace;
+
+            var expandedAliases = ImmutableDictionary<string, AliasAndUsingDirective>.Empty;
+            if (!previousSubmissionImports.UsingAliases.IsEmpty)
+            {
+                var expandedAliasesBuilder = ImmutableDictionary.CreateBuilder<string, AliasAndUsingDirective>();
+                foreach (var pair in previousSubmissionImports.UsingAliases)
+                {
+                    var name = pair.Key;
+                    var directive = pair.Value;
+                    expandedAliasesBuilder.Add(name, new AliasAndUsingDirective(directive.Alias.ToNewSubmission(newSubmission), directive.UsingDirective));
+                }
+                expandedAliases = expandedAliasesBuilder.ToImmutable();
+            }
+
+            var expandedUsings = ImmutableArray<NamespaceOrTypeAndUsingDirective>.Empty;
+            if (!previousSubmissionImports.Usings.IsEmpty)
+            {
+                var expandedUsingsBuilder = ArrayBuilder<NamespaceOrTypeAndUsingDirective>.GetInstance(previousSubmissionImports.Usings.Length);
+                foreach (var previousUsing in previousSubmissionImports.Usings)
+                {
+                    var previousTarget = previousUsing.NamespaceOrType;
+                    if (previousTarget.IsType)
+                    {
+                        expandedUsingsBuilder.Add(previousUsing);
+                    }
+                    else
+                    {
+                        var expandedNamespace = ExpandPreviousSubmissionNamespace((NamespaceSymbol)previousTarget, expandedGlobalNamespace);
+                        expandedUsingsBuilder.Add(new NamespaceOrTypeAndUsingDirective(expandedNamespace, previousUsing.UsingDirective, dependencies: default));
+                    }
+                }
+                expandedUsings = expandedUsingsBuilder.ToImmutableAndFree();
+            }
+
+            return new Imports(
+                newSubmission,
+                expandedAliases,
+                expandedUsings,
+                previousSubmissionImports.ExternAliases,
+                diagnostics: null);
+        }
+
+        internal static NamespaceSymbol ExpandPreviousSubmissionNamespace(NamespaceSymbol originalNamespace, NamespaceSymbol expandedGlobalNamespace)
+        {
+            // Soft assert: we'll still do the right thing if it fails.
+            Debug.Assert(!originalNamespace.IsGlobalNamespace, "Global using to global namespace");
+
+            // Hard assert: we depend on this.
+            Debug.Assert(expandedGlobalNamespace.IsGlobalNamespace, "Global namespace required");
+
+            var nameParts = ArrayBuilder<string>.GetInstance();
+            var curr = originalNamespace;
+            while (!curr.IsGlobalNamespace)
+            {
+                nameParts.Add(curr.Name);
+                curr = curr.ContainingNamespace;
+            }
+
+            var expandedNamespace = expandedGlobalNamespace;
+            for (int i = nameParts.Count - 1; i >= 0; i--)
+            {
+                // Note, the name may have become ambiguous (e.g. if a type with the same name
+                // is now in scope), but we're not rebinding - we're just expanding to the
+                // current contents of the same namespace.
+                expandedNamespace = expandedNamespace.GetMembers(nameParts[i]).OfType<NamespaceSymbol>().Single();
+            }
+            nameParts.Free();
+
+            return expandedNamespace;
         }
 
         public static Imports FromCustomDebugInfo(
             CSharpCompilation compilation,
-            Dictionary<string, AliasAndUsingDirective> usingAliases,
+            ImmutableDictionary<string, AliasAndUsingDirective> usingAliases,
             ImmutableArray<NamespaceOrTypeAndUsingDirective> usings,
             ImmutableArray<AliasAndExternAliasDirective> externs)
         {
-            return new Imports(compilation, usingAliases, usings, externs, null);
+            return new Imports(compilation, usingAliases, usings, externs, diagnostics: null);
+        }
+
+        /// <remarks>
+        /// Does not preserve diagnostics.
+        /// </remarks>
+        internal Imports Concat(Imports otherImports)
+        {
+            Debug.Assert(otherImports != null);
+
+            if (this == Empty)
+            {
+                return otherImports;
+            }
+
+            if (otherImports == Empty)
+            {
+                return this;
+            }
+
+            Debug.Assert(_compilation == otherImports._compilation);
+
+            var usingAliases = this.UsingAliases.SetItems(otherImports.UsingAliases); // NB: SetItems, rather than AddRange
+            var usings = this.Usings.AddRange(otherImports.Usings).Distinct(UsingTargetComparer.Instance);
+            var externAliases = ConcatExternAliases(this.ExternAliases, otherImports.ExternAliases);
+
+            return new Imports(_compilation, usingAliases, usings, externAliases, diagnostics: null);
+        }
+
+        private static ImmutableArray<AliasAndExternAliasDirective> ConcatExternAliases(ImmutableArray<AliasAndExternAliasDirective> externs1, ImmutableArray<AliasAndExternAliasDirective> externs2)
+        {
+            if (externs1.Length == 0)
+            {
+                return externs2;
+            }
+
+            if (externs2.Length == 0)
+            {
+                return externs1;
+            }
+
+            var replacedExternAliases = PooledHashSet<string>.GetInstance();
+            replacedExternAliases.AddAll(externs2.Select(e => e.Alias.Name));
+            return externs1.WhereAsArray((e, replacedExternAliases) => !replacedExternAliases.Contains(e.Alias.Name), replacedExternAliases).AddRange(externs2);
         }
 
         private static ImmutableArray<AliasAndExternAliasDirective> BuildExternAliases(
@@ -303,9 +524,15 @@ namespace Microsoft.CodeAnalysis.CSharp
 
         private void MarkImportDirective(CSharpSyntaxNode directive, bool callerIsSemanticModel)
         {
-            if (directive != null && _compilation != null && !callerIsSemanticModel)
+            MarkImportDirective(_compilation, directive, callerIsSemanticModel);
+        }
+
+        private static void MarkImportDirective(CSharpCompilation compilation, CSharpSyntaxNode directive, bool callerIsSemanticModel)
+        {
+            Debug.Assert(compilation != null); // If any directives are used, then there must be a compilation.
+            if (directive != null && !callerIsSemanticModel)
             {
-                _compilation.MarkImportDirectiveAsUsed(directive);
+                compilation.MarkImportDirectiveAsUsed(directive);
             }
         }
 
@@ -349,42 +576,97 @@ namespace Microsoft.CodeAnalysis.CSharp
 
         private void Validate()
         {
-            DiagnosticBag semanticDiagnostics = _compilation.SemanticDiagnostics;
-
-            if (UsingAliases != null)
+            if (this == Empty)
             {
-                // Check constraints within named aliases.
+                return;
+            }
 
-                // Force resolution of named aliases.
-                foreach (var alias in UsingAliases.Values)
+            DiagnosticBag semanticDiagnostics = _compilation.DeclarationDiagnostics;
+
+            // Check constraints within named aliases.
+            var diagnostics = BindingDiagnosticBag.GetInstance();
+
+            // Force resolution of named aliases.
+            foreach (var (_, alias) in UsingAliases)
+            {
+                NamespaceOrTypeSymbol target = alias.Alias.GetAliasTarget(basesBeingResolved: null);
+
+                diagnostics.Clear();
+                diagnostics.AddRange(alias.Alias.AliasTargetDiagnostics);
+
+                alias.Alias.CheckConstraints(diagnostics);
+
+                semanticDiagnostics.AddRange(diagnostics.DiagnosticBag);
+                recordImportDependencies(alias.UsingDirective, target);
+            }
+
+            var corLibrary = _compilation.SourceAssembly.CorLibrary;
+            var conversions = new TypeConversions(corLibrary);
+            foreach (var @using in Usings)
+            {
+                diagnostics.Clear();
+                diagnostics.AddDependencies(@using.Dependencies);
+
+                NamespaceOrTypeSymbol target = @using.NamespaceOrType;
+
+                // Check if `using static` directives meet constraints.
+                UsingDirectiveSyntax usingDirective = @using.UsingDirective;
+                if (target.IsType)
                 {
-                    alias.Alias.GetAliasTarget(basesBeingResolved: null);
-                    semanticDiagnostics.AddRange(alias.Alias.AliasTargetDiagnostics);
+                    var typeSymbol = (TypeSymbol)target;
+                    var location = usingDirective?.Name.Location ?? NoLocation.Singleton;
+                    typeSymbol.CheckAllConstraints(_compilation, conversions, location, diagnostics);
                 }
 
-                foreach (var alias in UsingAliases.Values)
-                {
-                    alias.Alias.CheckConstraints(semanticDiagnostics);
-                }
+                semanticDiagnostics.AddRange(diagnostics.DiagnosticBag);
+                recordImportDependencies(usingDirective, target);
             }
 
             // Force resolution of extern aliases.
             foreach (var alias in ExternAliases)
             {
-                alias.Alias.GetAliasTarget(null);
-                semanticDiagnostics.AddRange(alias.Alias.AliasTargetDiagnostics);
+                var target = (NamespaceSymbol)alias.Alias.GetAliasTarget(null);
+                Debug.Assert(target.IsGlobalNamespace);
+
+                semanticDiagnostics.AddRange(alias.Alias.AliasTargetDiagnostics.DiagnosticBag);
+
+                if (!Compilation.ReportUnusedImportsInTree(alias.ExternAliasDirective.SyntaxTree))
+                {
+                    diagnostics.Clear();
+                    diagnostics.AddAssembliesUsedByNamespaceReference(target);
+                    _compilation.AddUsedAssemblies(diagnostics.DependenciesBag);
+                }
             }
 
             if (_diagnostics != null && !_diagnostics.IsEmptyWithoutResolution)
             {
                 semanticDiagnostics.AddRange(_diagnostics.AsEnumerable());
             }
+
+            diagnostics.Free();
+
+            void recordImportDependencies(UsingDirectiveSyntax usingDirective, NamespaceOrTypeSymbol target)
+            {
+                if (usingDirective is object && Compilation.ReportUnusedImportsInTree(usingDirective.SyntaxTree))
+                {
+                    _compilation.RecordImportDependencies(usingDirective, diagnostics.DependenciesBag.ToImmutableArray());
+                }
+                else
+                {
+                    if (target.IsNamespace)
+                    {
+                        diagnostics.AddAssembliesUsedByNamespaceReference((NamespaceSymbol)target);
+                    }
+
+                    _compilation.AddUsedAssemblies(diagnostics.DependenciesBag);
+                }
+            }
         }
 
         internal bool IsUsingAlias(string name, bool callerIsSemanticModel)
         {
             AliasAndUsingDirective node;
-            if (this.UsingAliases != null && this.UsingAliases.TryGetValue(name, out node))
+            if (this.UsingAliases.TryGetValue(name, out node))
             {
                 // This method is called by InContainerBinder.LookupSymbolsInSingleBinder to see if
                 // there's a conflict between an alias and a member.  As a conflict may cause a
@@ -402,16 +684,16 @@ namespace Microsoft.CodeAnalysis.CSharp
             LookupResult result,
             string name,
             int arity,
-            ConsList<Symbol> basesBeingResolved,
+            ConsList<TypeSymbol> basesBeingResolved,
             LookupOptions options,
             bool diagnose,
-            ref HashSet<DiagnosticInfo> useSiteDiagnostics)
+            ref CompoundUseSiteInfo<AssemblySymbol> useSiteInfo)
         {
-            LookupSymbolInAliases(originalBinder, result, name, arity, basesBeingResolved, options, diagnose, ref useSiteDiagnostics);
+            LookupSymbolInAliases(originalBinder, result, name, arity, basesBeingResolved, options, diagnose, ref useSiteInfo);
 
             if (!result.IsMultiViable && (options & LookupOptions.NamespaceAliasesOnly) == 0)
             {
-                LookupSymbolInUsings(this.Usings, originalBinder, result, name, arity, basesBeingResolved, options, diagnose, ref useSiteDiagnostics);
+                LookupSymbolInUsings(this.Usings, originalBinder, result, name, arity, basesBeingResolved, options, diagnose, ref useSiteInfo);
             }
         }
 
@@ -420,19 +702,19 @@ namespace Microsoft.CodeAnalysis.CSharp
             LookupResult result,
             string name,
             int arity,
-            ConsList<Symbol> basesBeingResolved,
+            ConsList<TypeSymbol> basesBeingResolved,
             LookupOptions options,
             bool diagnose,
-            ref HashSet<DiagnosticInfo> useSiteDiagnostics)
+            ref CompoundUseSiteInfo<AssemblySymbol> useSiteInfo)
         {
             bool callerIsSemanticModel = originalBinder.IsSemanticModelBinder;
 
             AliasAndUsingDirective alias;
-            if (this.UsingAliases != null && this.UsingAliases.TryGetValue(name, out alias))
+            if (this.UsingAliases.TryGetValue(name, out alias))
             {
                 // Found a match in our list of normal aliases.  Mark the alias as being seen so that
                 // it won't be reported to the user as something that can be removed.
-                var res = originalBinder.CheckViability(alias.Alias, arity, options, null, diagnose, ref useSiteDiagnostics, basesBeingResolved);
+                var res = originalBinder.CheckViability(alias.Alias, arity, options, null, diagnose, ref useSiteInfo, basesBeingResolved);
                 if (res.Kind == LookupResultKind.Viable)
                 {
                     MarkImportDirective(alias.UsingDirective, callerIsSemanticModel);
@@ -448,7 +730,7 @@ namespace Microsoft.CodeAnalysis.CSharp
                     // Found a match in our list of extern aliases.  Mark the extern alias as being
                     // seen so that it won't be reported to the user as something that can be
                     // removed.
-                    var res = originalBinder.CheckViability(a.Alias, arity, options, null, diagnose, ref useSiteDiagnostics, basesBeingResolved);
+                    var res = originalBinder.CheckViability(a.Alias, arity, options, null, diagnose, ref useSiteInfo, basesBeingResolved);
                     if (res.Kind == LookupResultKind.Viable)
                     {
                         MarkImportDirective(a.ExternAliasDirective, callerIsSemanticModel);
@@ -459,17 +741,22 @@ namespace Microsoft.CodeAnalysis.CSharp
             }
         }
 
-        internal void LookupSymbolInUsings(
+        internal static void LookupSymbolInUsings(
             ImmutableArray<NamespaceOrTypeAndUsingDirective> usings,
             Binder originalBinder,
             LookupResult result,
             string name,
             int arity,
-            ConsList<Symbol> basesBeingResolved,
+            ConsList<TypeSymbol> basesBeingResolved,
             LookupOptions options,
             bool diagnose,
-            ref HashSet<DiagnosticInfo> useSiteDiagnostics)
+            ref CompoundUseSiteInfo<AssemblySymbol> useSiteInfo)
         {
+            if (originalBinder.Flags.Includes(BinderFlags.InScriptUsing))
+            {
+                return;
+            }
+
             bool callerIsSemanticModel = originalBinder.IsSemanticModelBinder;
 
             foreach (var typeOrNamespace in usings)
@@ -477,43 +764,18 @@ namespace Microsoft.CodeAnalysis.CSharp
                 ImmutableArray<Symbol> candidates = Binder.GetCandidateMembers(typeOrNamespace.NamespaceOrType, name, options, originalBinder: originalBinder);
                 foreach (Symbol symbol in candidates)
                 {
-                    switch (symbol.Kind)
+                    if (!IsValidLookupCandidateInUsings(symbol))
                     {
-                        // lookup via "using namespace" ignores namespaces inside
-                        case SymbolKind.Namespace:
-                            continue;
-
-                        // lookup via "using static" ignores extension methods and non-static methods
-                        case SymbolKind.Method:
-                            if (!symbol.IsStatic || ((MethodSymbol)symbol).IsExtensionMethod)
-                            {
-                                continue;
-                            }
-
-                            break;
-
-                        // types are considered static members for purposes of "using static" feature
-                        // regardless of whether they are declared with "static" modifier or not
-                        case SymbolKind.NamedType:
-                            break;
-
-                        // lookup via "using static" ignores non-static members
-                        default:
-                            if (!symbol.IsStatic)
-                            {
-                                continue;
-                            }
-
-                            break;
+                        continue;
                     }
 
                     // Found a match in our list of normal using directives.  Mark the directive
                     // as being seen so that it won't be reported to the user as something that
                     // can be removed.
-                    var res = originalBinder.CheckViability(symbol, arity, options, null, diagnose, ref useSiteDiagnostics, basesBeingResolved);
+                    var res = originalBinder.CheckViability(symbol, arity, options, null, diagnose, ref useSiteInfo, basesBeingResolved);
                     if (res.Kind == LookupResultKind.Viable)
                     {
-                        MarkImportDirective(typeOrNamespace.UsingDirective, callerIsSemanticModel);
+                        MarkImportDirective(originalBinder.Compilation, typeOrNamespace.UsingDirective, callerIsSemanticModel);
                     }
 
                     result.MergeEqual(res);
@@ -521,14 +783,57 @@ namespace Microsoft.CodeAnalysis.CSharp
             }
         }
 
+        private static bool IsValidLookupCandidateInUsings(Symbol symbol)
+        {
+            switch (symbol.Kind)
+            {
+                // lookup via "using namespace" ignores namespaces inside
+                case SymbolKind.Namespace:
+                    return false;
+
+                // lookup via "using static" ignores extension methods and non-static methods
+                case SymbolKind.Method:
+                    if (!symbol.IsStatic || ((MethodSymbol)symbol).IsExtensionMethod)
+                    {
+                        return false;
+                    }
+
+                    break;
+
+                // types are considered static members for purposes of "using static" feature
+                // regardless of whether they are declared with "static" modifier or not
+                case SymbolKind.NamedType:
+                    break;
+
+                // lookup via "using static" ignores non-static members
+                default:
+                    if (!symbol.IsStatic)
+                    {
+                        return false;
+                    }
+
+                    break;
+            }
+
+            return true;
+        }
+
         internal void LookupExtensionMethodsInUsings(
             ArrayBuilder<MethodSymbol> methods,
             string name,
             int arity,
             LookupOptions options,
-            bool callerIsSemanticModel)
+            Binder originalBinder)
         {
+            var binderFlags = originalBinder.Flags;
+            if (binderFlags.Includes(BinderFlags.InScriptUsing))
+            {
+                return;
+            }
+
             Debug.Assert(methods.Count == 0);
+
+            bool callerIsSemanticModel = binderFlags.Includes(BinderFlags.SemanticModel);
 
             // We need to avoid collecting multiple candidates for an extension method imported both through a namespace and a static class
             // We will look for duplicates only if both of the following flags are set to true
@@ -573,15 +878,7 @@ namespace Microsoft.CodeAnalysis.CSharp
 
             if (seenNamespaceWithExtensionMethods && seenStaticClassWithExtensionMethods)
             {
-                var methodsNoDuplicates = ArrayBuilder<MethodSymbol>.GetInstance();
-                methodsNoDuplicates.AddRange(methods.Distinct());
-                if (methodsNoDuplicates.Count < methods.Count)
-                {
-                    methods.Clear();
-                    methods.AddRange(methodsNoDuplicates);
-                }
-
-                methodsNoDuplicates.Free();
+                methods.RemoveDuplicates();
             }
         }
 
@@ -590,38 +887,45 @@ namespace Microsoft.CodeAnalysis.CSharp
         // SemanticModel.LookupNames/LookupSymbols work and do not count as usages of the directives
         // when the actual code is bound.
 
-        internal void AddLookupSymbolsInfoInAliases(Binder binder, LookupSymbolsInfo result, LookupOptions options)
+        internal void AddLookupSymbolsInfo(LookupSymbolsInfo result, LookupOptions options, Binder originalBinder)
         {
-            if (this.UsingAliases != null)
+            AddLookupSymbolsInfoInAliases(result, options, originalBinder);
+
+            // Add types within namespaces imported through usings, but don't add nested namespaces.
+            LookupOptions usingOptions = (options & ~(LookupOptions.NamespaceAliasesOnly | LookupOptions.NamespacesOrTypesOnly)) | LookupOptions.MustNotBeNamespace;
+            AddLookupSymbolsInfoInUsings(this.Usings, result, usingOptions, originalBinder);
+        }
+
+        internal void AddLookupSymbolsInfoInAliases(LookupSymbolsInfo result, LookupOptions options, Binder originalBinder)
+        {
+            foreach (var (_, usingAlias) in this.UsingAliases)
             {
-                foreach (var usingAlias in this.UsingAliases.Values)
-                {
-                    var usingAliasSymbol = usingAlias.Alias;
-                    var usingAliasTargetSymbol = usingAliasSymbol.GetAliasTarget(basesBeingResolved: null);
-                    if (binder.CanAddLookupSymbolInfo(usingAliasTargetSymbol, options, null))
-                    {
-                        result.AddSymbol(usingAliasSymbol, usingAliasSymbol.Name, 0);
-                    }
-                }
+                AddAliasSymbolToResult(result, usingAlias.Alias, options, originalBinder);
             }
 
-            if (this.ExternAliases != null)
+            foreach (var externAlias in this.ExternAliases)
             {
-                foreach (var externAlias in this.ExternAliases)
-                {
-                    var externAliasSymbol = externAlias.Alias;
-                    var externAliasTargetSymbol = externAliasSymbol.GetAliasTarget(basesBeingResolved: null);
-                    if (binder.CanAddLookupSymbolInfo(externAliasTargetSymbol, options, null))
-                    {
-                        result.AddSymbol(externAliasSymbol, externAliasSymbol.Name, 0);
-                    }
-                }
+                AddAliasSymbolToResult(result, externAlias.Alias, options, originalBinder);
             }
         }
 
-        internal static void AddLookupSymbolsInfoInUsings(
-            ImmutableArray<NamespaceOrTypeAndUsingDirective> usings, Binder binder, LookupSymbolsInfo result, LookupOptions options)
+        private static void AddAliasSymbolToResult(LookupSymbolsInfo result, AliasSymbol aliasSymbol, LookupOptions options, Binder originalBinder)
         {
+            var targetSymbol = aliasSymbol.GetAliasTarget(basesBeingResolved: null);
+            if (originalBinder.CanAddLookupSymbolInfo(targetSymbol, options, result, accessThroughType: null, aliasSymbol: aliasSymbol))
+            {
+                result.AddSymbol(aliasSymbol, aliasSymbol.Name, 0);
+            }
+        }
+
+        private static void AddLookupSymbolsInfoInUsings(
+            ImmutableArray<NamespaceOrTypeAndUsingDirective> usings, LookupSymbolsInfo result, LookupOptions options, Binder originalBinder)
+        {
+            if (originalBinder.Flags.Includes(BinderFlags.InScriptUsing))
+            {
+                return;
+            }
+
             Debug.Assert(!options.CanConsiderNamespaces());
 
             // look in all using namespaces
@@ -629,11 +933,28 @@ namespace Microsoft.CodeAnalysis.CSharp
             {
                 foreach (var member in namespaceSymbol.NamespaceOrType.GetMembersUnordered())
                 {
-                    if (binder.CanAddLookupSymbolInfo(member, options, null))
+                    if (IsValidLookupCandidateInUsings(member) && originalBinder.CanAddLookupSymbolInfo(member, options, result, null))
                     {
                         result.AddSymbol(member, member.Name, member.GetArity());
                     }
                 }
+            }
+        }
+
+        private class UsingTargetComparer : IEqualityComparer<NamespaceOrTypeAndUsingDirective>
+        {
+            public static readonly IEqualityComparer<NamespaceOrTypeAndUsingDirective> Instance = new UsingTargetComparer();
+
+            private UsingTargetComparer() { }
+
+            bool IEqualityComparer<NamespaceOrTypeAndUsingDirective>.Equals(NamespaceOrTypeAndUsingDirective x, NamespaceOrTypeAndUsingDirective y)
+            {
+                return x.NamespaceOrType.Equals(y.NamespaceOrType);
+            }
+
+            int IEqualityComparer<NamespaceOrTypeAndUsingDirective>.GetHashCode(NamespaceOrTypeAndUsingDirective obj)
+            {
+                return obj.NamespaceOrType.GetHashCode();
             }
         }
     }

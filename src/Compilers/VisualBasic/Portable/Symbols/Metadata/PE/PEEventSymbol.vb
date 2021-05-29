@@ -1,4 +1,6 @@
-﻿' Copyright (c) Microsoft.  All Rights Reserved.  Licensed under the Apache License, Version 2.0.  See License.txt in the project root for license information.
+﻿' Licensed to the .NET Foundation under one or more agreements.
+' The .NET Foundation licenses this file to you under the MIT license.
+' See the LICENSE file in the project root for more information.
 
 Imports System
 Imports System.Collections.Immutable
@@ -6,6 +8,7 @@ Imports System.Globalization
 Imports System.Threading
 Imports System.Reflection
 Imports System.Reflection.Metadata
+Imports Microsoft.CodeAnalysis.PooledObjects
 Imports Microsoft.CodeAnalysis.Text
 Imports Microsoft.CodeAnalysis.VisualBasic.Symbols
 Imports Microsoft.CodeAnalysis.VisualBasic.Syntax
@@ -19,24 +22,24 @@ Namespace Microsoft.CodeAnalysis.VisualBasic.Symbols.Metadata.PE
     Friend NotInheritable Class PEEventSymbol
         Inherits EventSymbol
 
-        Private ReadOnly m_name As String
-        Private ReadOnly m_flags As EventAttributes
-        Private ReadOnly m_containingType As PENamedTypeSymbol
-        Private ReadOnly m_handle As EventDefinitionHandle
-        Private ReadOnly m_eventType As TypeSymbol
-        Private ReadOnly m_addMethod As PEMethodSymbol
-        Private ReadOnly m_removeMethod As PEMethodSymbol
+        Private ReadOnly _name As String
+        Private ReadOnly _flags As EventAttributes
+        Private ReadOnly _containingType As PENamedTypeSymbol
+        Private ReadOnly _handle As EventDefinitionHandle
+        Private ReadOnly _eventType As TypeSymbol
+        Private ReadOnly _addMethod As PEMethodSymbol
+        Private ReadOnly _removeMethod As PEMethodSymbol
 
-        Private ReadOnly m_raiseMethod As PEMethodSymbol
+        Private ReadOnly _raiseMethod As PEMethodSymbol
 
-        Private m_lazyCustomAttributes As ImmutableArray(Of VisualBasicAttributeData)
-        Private m_lazyDocComment As Tuple(Of CultureInfo, String)
-        Private m_lazyUseSiteErrorInfo As DiagnosticInfo = ErrorFactory.EmptyErrorInfo ' Indicates unknown state. 
-        Private m_lazyObsoleteAttributeData As ObsoleteAttributeData = ObsoleteAttributeData.Uninitialized
+        Private _lazyCustomAttributes As ImmutableArray(Of VisualBasicAttributeData)
+        Private _lazyDocComment As Tuple(Of CultureInfo, String)
+        Private _lazyCachedUseSiteInfo As CachedUseSiteInfo(Of AssemblySymbol) = CachedUseSiteInfo(Of AssemblySymbol).Uninitialized ' Indicates unknown state. 
+        Private _lazyObsoleteAttributeData As ObsoleteAttributeData = ObsoleteAttributeData.Uninitialized
 
         ' Distinct accessibility value to represent unset.
-        Private Const UnsetAccessibility As Integer = -1
-        Private m_lazyDeclaredAccessibility As Integer = UnsetAccessibility
+        Private Const s_unsetAccessibility As Integer = -1
+        Private _lazyDeclaredAccessibility As Integer = s_unsetAccessibility
 
         Friend Sub New(moduleSymbol As PEModuleSymbol,
                        containingType As PENamedTypeSymbol,
@@ -51,45 +54,46 @@ Namespace Microsoft.CodeAnalysis.VisualBasic.Symbols.Metadata.PE
             Debug.Assert(addMethod IsNot Nothing)
             Debug.Assert(removeMethod IsNot Nothing)
 
-            Me.m_containingType = containingType
+            Me._containingType = containingType
 
             Dim [module] = moduleSymbol.Module
-            Dim eventType As Handle
+            Dim eventType As EntityHandle
 
             Try
-                [module].GetEventDefPropsOrThrow(handle, Me.m_name, Me.m_flags, eventType)
+                [module].GetEventDefPropsOrThrow(handle, Me._name, Me._flags, eventType)
             Catch mrEx As BadImageFormatException
-                If Me.m_name Is Nothing Then
-                    Me.m_name = String.Empty
+                If Me._name Is Nothing Then
+                    Me._name = String.Empty
                 End If
 
-                m_lazyUseSiteErrorInfo = ErrorFactory.ErrorInfo(ERRID.ERR_UnsupportedEvent1, Me)
+                _lazyCachedUseSiteInfo.Initialize(ErrorFactory.ErrorInfo(ERRID.ERR_UnsupportedEvent1, Me))
 
                 If eventType.IsNil Then
-                    Me.m_eventType = New UnsupportedMetadataTypeSymbol(mrEx)
+                    Me._eventType = New UnsupportedMetadataTypeSymbol(mrEx)
                 End If
             End Try
 
-            Me.m_addMethod = addMethod
-            Me.m_removeMethod = removeMethod
-            Me.m_raiseMethod = raiseMethod
-            Me.m_handle = handle
+            Me._addMethod = addMethod
+            Me._removeMethod = removeMethod
+            Me._raiseMethod = raiseMethod
+            Me._handle = handle
 
-            If m_eventType Is Nothing Then
+            If _eventType Is Nothing Then
                 Dim metadataDecoder = New MetadataDecoder(moduleSymbol, containingType)
-                Me.m_eventType = MetadataDecoder.GetTypeOfToken(eventType)
+                Me._eventType = metadataDecoder.GetTypeOfToken(eventType)
+                _eventType = TupleTypeDecoder.DecodeTupleTypesIfApplicable(_eventType, handle, moduleSymbol)
             End If
 
-            If Me.m_addMethod IsNot Nothing Then
-                Me.m_addMethod.SetAssociatedEvent(Me, MethodKind.EventAdd)
+            If Me._addMethod IsNot Nothing Then
+                Me._addMethod.SetAssociatedEvent(Me, MethodKind.EventAdd)
             End If
 
-            If Me.m_removeMethod IsNot Nothing Then
-                Me.m_removeMethod.SetAssociatedEvent(Me, MethodKind.EventRemove)
+            If Me._removeMethod IsNot Nothing Then
+                Me._removeMethod.SetAssociatedEvent(Me, MethodKind.EventRemove)
             End If
 
-            If Me.m_raiseMethod IsNot Nothing Then
-                Me.m_raiseMethod.SetAssociatedEvent(Me, MethodKind.EventRaise)
+            If Me._raiseMethod IsNot Nothing Then
+                Me._raiseMethod.SetAssociatedEvent(Me, MethodKind.EventRaise)
             End If
         End Sub
 
@@ -101,63 +105,63 @@ Namespace Microsoft.CodeAnalysis.VisualBasic.Symbols.Metadata.PE
                 ' and the remove method takes an EventRegistrationToken
                 ' as a parameter.
                 Return _
-                    m_addMethod.ReturnType = evt AndAlso
-                    m_addMethod.ParameterCount = 1 AndAlso
-                    m_removeMethod.ParameterCount = 1 AndAlso
-                    m_removeMethod.Parameters(0).Type = evt
+                    TypeSymbol.Equals(_addMethod.ReturnType, evt, TypeCompareKind.ConsiderEverything) AndAlso
+                    _addMethod.ParameterCount = 1 AndAlso
+                    _removeMethod.ParameterCount = 1 AndAlso
+                    TypeSymbol.Equals(_removeMethod.Parameters(0).Type, evt, TypeCompareKind.ConsiderEverything)
             End Get
         End Property
 
         Public Overrides ReadOnly Property ContainingSymbol As Symbol
             Get
-                Return m_containingType
+                Return _containingType
             End Get
         End Property
 
         Public Overrides ReadOnly Property ContainingType As NamedTypeSymbol
             Get
-                Return m_containingType
+                Return _containingType
             End Get
         End Property
 
         Public Overrides ReadOnly Property Name As String
             Get
-                Return m_name
+                Return _name
             End Get
         End Property
 
         Friend ReadOnly Property EventFlags As EventAttributes
             Get
-                Return m_flags
+                Return _flags
             End Get
         End Property
 
         Friend Overrides ReadOnly Property HasSpecialName As Boolean
             Get
-                Return (m_flags And EventAttributes.SpecialName) <> 0
+                Return (_flags And EventAttributes.SpecialName) <> 0
             End Get
         End Property
 
         Friend Overrides ReadOnly Property HasRuntimeSpecialName As Boolean
             Get
-                Return (m_flags And EventAttributes.RTSpecialName) <> 0
+                Return (_flags And EventAttributes.RTSpecialName) <> 0
             End Get
         End Property
 
         Friend ReadOnly Property Handle As EventDefinitionHandle
             Get
-                Return m_handle
+                Return _handle
             End Get
         End Property
 
         Public Overrides ReadOnly Property DeclaredAccessibility As Accessibility
             Get
-                If Me.m_lazyDeclaredAccessibility = UnsetAccessibility Then
-                    Dim accessibility As accessibility = PEPropertyOrEventHelpers.GetDeclaredAccessibilityFromAccessors(Me.AddMethod, Me.RemoveMethod)
-                    Interlocked.CompareExchange(Me.m_lazyDeclaredAccessibility, DirectCast(accessibility, Integer), UnsetAccessibility)
+                If Me._lazyDeclaredAccessibility = s_unsetAccessibility Then
+                    Dim accessibility As Accessibility = PEPropertyOrEventHelpers.GetDeclaredAccessibilityFromAccessors(Me.AddMethod, Me.RemoveMethod)
+                    Interlocked.CompareExchange(Me._lazyDeclaredAccessibility, DirectCast(accessibility, Integer), s_unsetAccessibility)
                 End If
 
-                Return DirectCast(Me.m_lazyDeclaredAccessibility, Accessibility)
+                Return DirectCast(Me._lazyDeclaredAccessibility, Accessibility)
             End Get
         End Property
 
@@ -198,25 +202,25 @@ Namespace Microsoft.CodeAnalysis.VisualBasic.Symbols.Metadata.PE
 
         Public Overrides ReadOnly Property Type As TypeSymbol
             Get
-                Return Me.m_eventType
+                Return Me._eventType
             End Get
         End Property
 
         Public Overrides ReadOnly Property AddMethod As MethodSymbol
             Get
-                Return Me.m_addMethod
+                Return Me._addMethod
             End Get
         End Property
 
         Public Overrides ReadOnly Property RemoveMethod As MethodSymbol
             Get
-                Return Me.m_removeMethod
+                Return Me._removeMethod
             End Get
         End Property
 
         Public Overrides ReadOnly Property RaiseMethod As MethodSymbol
             Get
-                Return Me.m_raiseMethod
+                Return Me._raiseMethod
             End Get
         End Property
 
@@ -228,7 +232,7 @@ Namespace Microsoft.CodeAnalysis.VisualBasic.Symbols.Metadata.PE
 
         Public Overrides ReadOnly Property Locations As ImmutableArray(Of Location)
             Get
-                Return m_containingType.Locations
+                Return _containingType.Locations
             End Get
         End Property
 
@@ -240,17 +244,17 @@ Namespace Microsoft.CodeAnalysis.VisualBasic.Symbols.Metadata.PE
 
         Friend Overrides ReadOnly Property ObsoleteAttributeData As ObsoleteAttributeData
             Get
-                ObsoleteAttributeHelpers.InitializeObsoleteDataFromMetadata(m_lazyObsoleteAttributeData, m_handle, DirectCast(ContainingModule, PEModuleSymbol))
-                Return m_lazyObsoleteAttributeData
+                ObsoleteAttributeHelpers.InitializeObsoleteDataFromMetadata(_lazyObsoleteAttributeData, _handle, DirectCast(ContainingModule, PEModuleSymbol))
+                Return _lazyObsoleteAttributeData
             End Get
         End Property
 
         Public Overrides Function GetAttributes() As ImmutableArray(Of VisualBasicAttributeData)
-            If m_lazyCustomAttributes.IsDefault Then
+            If _lazyCustomAttributes.IsDefault Then
                 Dim containingPEModuleSymbol = DirectCast(ContainingModule(), PEModuleSymbol)
-                containingPEModuleSymbol.LoadCustomAttributes(m_handle, m_lazyCustomAttributes)
+                containingPEModuleSymbol.LoadCustomAttributes(_handle, _lazyCustomAttributes)
             End If
-            Return m_lazyCustomAttributes
+            Return _lazyCustomAttributes
         End Function
 
         Friend Overrides Function GetCustomAttributesToEmit(compilationState As ModuleCompilationState) As IEnumerable(Of VisualBasicAttributeData)
@@ -275,15 +279,17 @@ Namespace Microsoft.CodeAnalysis.VisualBasic.Symbols.Metadata.PE
         End Property
 
         Public Overrides Function GetDocumentationCommentXml(Optional preferredCulture As CultureInfo = Nothing, Optional expandIncludes As Boolean = False, Optional cancellationToken As CancellationToken = Nothing) As String
-            Return PEDocumentationCommentUtils.GetDocumentationComment(Me, m_containingType.ContainingPEModule, preferredCulture, cancellationToken, m_lazyDocComment)
+            Return PEDocumentationCommentUtils.GetDocumentationComment(Me, _containingType.ContainingPEModule, preferredCulture, cancellationToken, _lazyDocComment)
         End Function
 
-        Friend Overrides Function GetUseSiteErrorInfo() As DiagnosticInfo
-            If m_lazyUseSiteErrorInfo Is ErrorFactory.EmptyErrorInfo Then
-                m_lazyUseSiteErrorInfo = CalculateUseSiteErrorInfo()
+        Friend Overrides Function GetUseSiteInfo() As UseSiteInfo(Of AssemblySymbol)
+            Dim primaryDependency As AssemblySymbol = Me.PrimaryDependency
+
+            If Not _lazyCachedUseSiteInfo.IsInitialized Then
+                _lazyCachedUseSiteInfo.Initialize(primaryDependency, CalculateUseSiteInfo())
             End If
 
-            Return m_lazyUseSiteErrorInfo
+            Return _lazyCachedUseSiteInfo.ToUseSiteInfo(primaryDependency)
         End Function
 
         ''' <remarks>

@@ -1,6 +1,10 @@
-' Copyright (c) Microsoft.  All Rights Reserved.  Licensed under the Apache License, Version 2.0.  See License.txt in the project root for license information.
+﻿' Licensed to the .NET Foundation under one or more agreements.
+' The .NET Foundation licenses this file to you under the MIT license.
+' See the LICENSE file in the project root for more information.
 
+Imports System.Threading.Tasks
 Imports Microsoft.CodeAnalysis
+Imports Microsoft.CodeAnalysis.Test.Utilities
 Imports Microsoft.VisualStudio.LanguageServices.CSharp.CodeModel.Extenders
 Imports Microsoft.VisualStudio.LanguageServices.CSharp.CodeModel.Interop
 Imports Roslyn.Test.Utilities
@@ -11,8 +15,8 @@ Namespace Microsoft.VisualStudio.LanguageServices.UnitTests.CodeModel.CSharp
 
 #Region "GetStartPoint() tests"
 
-        <ConditionalFact(GetType(x86)), Trait(Traits.Feature, Traits.Features.CodeModel)>
-        Public Sub GetStartPoint()
+        <WpfFact, Trait(Traits.Feature, Traits.Features.CodeModel)>
+        Public Sub TestGetStartPoint1()
             Dim code =
 <Code>
 class C
@@ -53,8 +57,70 @@ class C
                      TextPoint(line:=3, lineOffset:=5, absoluteOffset:=15, lineLength:=16)))
         End Sub
 
-        <ConditionalFact(GetType(x86)), Trait(Traits.Feature, Traits.Features.CodeModel)>
-        Public Sub GetStartPoint_Attribute()
+        <WpfFact, Trait(Traits.Feature, Traits.Features.CodeModel)>
+        Public Sub TestAutoPropGetStartPoint1()
+            Dim code =
+<Code>
+class C
+{
+    public int $$P => 0;
+}
+</Code>
+
+            TestElement(
+                code,
+                Sub(prop)
+                    Dim getter = prop.Getter
+                    Dim textPointGetter = Function(part As EnvDTE.vsCMPart)
+                                              Return getter.GetStartPoint(part)
+                                          End Function
+
+                    Part(EnvDTE.vsCMPart.vsCMPartAttributes, ThrowsNotImplementedException)(textPointGetter)
+                    Part(EnvDTE.vsCMPart.vsCMPartAttributesWithDelimiter, ThrowsNotImplementedException)(textPointGetter)
+                    Part(EnvDTE.vsCMPart.vsCMPartBody, TextPoint(line:=3, lineOffset:=21, absoluteOffset:=31, lineLength:=22))(textPointGetter)
+                    Part(EnvDTE.vsCMPart.vsCMPartBodyWithDelimiter, ThrowsNotImplementedException)(textPointGetter)
+                    Part(EnvDTE.vsCMPart.vsCMPartHeader, ThrowsNotImplementedException)(textPointGetter)
+                    Part(EnvDTE.vsCMPart.vsCMPartHeaderWithAttributes, ThrowsNotImplementedException)(textPointGetter)
+                    Part(EnvDTE.vsCMPart.vsCMPartName, ThrowsNotImplementedException)(textPointGetter)
+                    Part(EnvDTE.vsCMPart.vsCMPartNavigate, ThrowsNotImplementedException)(textPointGetter)
+                    Part(EnvDTE.vsCMPart.vsCMPartWhole, TextPoint(line:=3, lineOffset:=18, absoluteOffset:=28, lineLength:=22))(textPointGetter)
+                    Part(EnvDTE.vsCMPart.vsCMPartWholeWithAttributes, ThrowsNotImplementedException)(textPointGetter)
+                End Sub)
+        End Sub
+
+        <WpfFact, Trait(Traits.Feature, Traits.Features.CodeModel)>
+        Public Sub TestAutoPropGetEndPoint1()
+            Dim code =
+<Code>
+class C
+{
+    public int $$P => 0;
+}
+</Code>
+
+            TestElement(
+                code,
+                Sub(prop)
+                    Dim getter = prop.Getter
+                    Dim textPointGetter = Function(part As EnvDTE.vsCMPart)
+                                              Return getter.GetEndPoint(part)
+                                          End Function
+
+                    Part(EnvDTE.vsCMPart.vsCMPartAttributes, ThrowsNotImplementedException)(textPointGetter)
+                    Part(EnvDTE.vsCMPart.vsCMPartAttributesWithDelimiter, ThrowsNotImplementedException)(textPointGetter)
+                    Part(EnvDTE.vsCMPart.vsCMPartBody, TextPoint(line:=3, lineOffset:=22, absoluteOffset:=32, lineLength:=22))(textPointGetter)
+                    Part(EnvDTE.vsCMPart.vsCMPartBodyWithDelimiter, ThrowsNotImplementedException)(textPointGetter)
+                    Part(EnvDTE.vsCMPart.vsCMPartHeader, ThrowsNotImplementedException)(textPointGetter)
+                    Part(EnvDTE.vsCMPart.vsCMPartHeaderWithAttributes, ThrowsNotImplementedException)(textPointGetter)
+                    Part(EnvDTE.vsCMPart.vsCMPartName, ThrowsNotImplementedException)(textPointGetter)
+                    Part(EnvDTE.vsCMPart.vsCMPartNavigate, ThrowsNotImplementedException)(textPointGetter)
+                    Part(EnvDTE.vsCMPart.vsCMPartWhole, TextPoint(line:=3, lineOffset:=22, absoluteOffset:=32, lineLength:=22))(textPointGetter)
+                    Part(EnvDTE.vsCMPart.vsCMPartWholeWithAttributes, ThrowsNotImplementedException)(textPointGetter)
+                End Sub)
+        End Sub
+
+        <WpfFact, Trait(Traits.Feature, Traits.Features.CodeModel)>
+        Public Sub TestGetStartPoint_Attribute()
             Dim code =
 <Code>
 class C
@@ -96,8 +162,8 @@ class C
                      TextPoint(line:=3, lineOffset:=5, absoluteOffset:=15, lineLength:=31)))
         End Sub
 
-        <ConditionalFact(GetType(x86)), Trait(Traits.Feature, Traits.Features.CodeModel)>
-        Public Sub GetStartPoint_AutoProperty()
+        <WpfFact, Trait(Traits.Feature, Traits.Features.CodeModel)>
+        Public Sub TestGetStartPoint_AutoProperty()
             Dim code =
 <Code>
 class C
@@ -129,8 +195,8 @@ class C
                      TextPoint(line:=3, lineOffset:=5, absoluteOffset:=15, lineLength:=30)))
         End Sub
 
-        <ConditionalFact(GetType(x86)), Trait(Traits.Feature, Traits.Features.CodeModel)>
-        Public Sub GetStartPoint_AutoProperty_Attribute()
+        <WpfFact, Trait(Traits.Feature, Traits.Features.CodeModel)>
+        Public Sub TestGetStartPoint_AutoProperty_Attribute()
             Dim code =
 <Code>
 class C
@@ -163,8 +229,8 @@ class C
                      TextPoint(line:=3, lineOffset:=5, absoluteOffset:=15, lineLength:=31)))
         End Sub
 
-        <ConditionalFact(GetType(x86)), Trait(Traits.Feature, Traits.Features.CodeModel)>
-        Public Sub GetStartPoint_Indexer()
+        <WpfFact, Trait(Traits.Feature, Traits.Features.CodeModel)>
+        Public Sub TestGetStartPoint_Indexer()
             Dim code =
 <Code>
 class C
@@ -205,8 +271,8 @@ class C
                      TextPoint(line:=3, lineOffset:=5, absoluteOffset:=15, lineLength:=30)))
         End Sub
 
-        <ConditionalFact(GetType(x86)), Trait(Traits.Feature, Traits.Features.CodeModel)>
-        Public Sub GetStartPoint_Indexer_Attribute()
+        <WpfFact, Trait(Traits.Feature, Traits.Features.CodeModel)>
+        Public Sub TestGetStartPoint_Indexer_Attribute()
             Dim code =
 <Code>
 class C
@@ -248,12 +314,75 @@ class C
                      TextPoint(line:=3, lineOffset:=5, absoluteOffset:=15, lineLength:=31)))
         End Sub
 
+        <WorkItem(2437, "https://github.com/dotnet/roslyn/issues/2437")>
+        <WpfFact, Trait(Traits.Feature, Traits.Features.CodeModel)>
+        Public Sub TestGetStartPoint_ExplicitlyImplementedIndexer()
+            Dim code =
+<Code>
+interface I1
+{
+    int this[int i]
+    { get;set; }
+}
+
+class C1 : I1
+{
+    int $$I1.this[int i]
+    {
+        get
+        {
+            return 0;
+        }
+
+        set
+        {
+        }
+    }
+}
+</Code>
+
+            TestGetStartPoint(code,
+                Part(EnvDTE.vsCMPart.vsCMPartWholeWithAttributes,
+                     TextPoint(line:=9, lineOffset:=5, absoluteOffset:=76, lineLength:=22)))
+        End Sub
+
+        <WorkItem(2437, "https://github.com/dotnet/roslyn/issues/2437")>
+        <WpfFact, Trait(Traits.Feature, Traits.Features.CodeModel)>
+        Public Sub TestGetStartPoint_ExplicitlyImplementedProperty()
+            Dim code =
+<Code>
+interface I1
+{
+    int Prop1 { get; set; }
+}
+
+class C1 : I1
+{
+    int $$I1.Prop1
+    {
+        get
+        {
+            return 0;
+        }
+
+        set
+        {
+        }
+    }
+}
+</Code>
+
+            TestGetStartPoint(code,
+                Part(EnvDTE.vsCMPart.vsCMPartWholeWithAttributes,
+                     TextPoint(line:=8, lineOffset:=5, absoluteOffset:=67, lineLength:=16)))
+        End Sub
+
 #End Region
 
 #Region "GetEndPoint() tests"
 
-        <ConditionalFact(GetType(x86)), Trait(Traits.Feature, Traits.Features.CodeModel)>
-        Public Sub GetEndPoint()
+        <WpfFact, Trait(Traits.Feature, Traits.Features.CodeModel)>
+        Public Sub TestGetEndPoint1()
             Dim code =
 <Code>
 class C
@@ -294,8 +423,8 @@ class C
                      TextPoint(line:=12, lineOffset:=6, absoluteOffset:=136, lineLength:=5)))
         End Sub
 
-        <ConditionalFact(GetType(x86)), Trait(Traits.Feature, Traits.Features.CodeModel)>
-        Public Sub GetEndPoint_Attribute()
+        <WpfFact, Trait(Traits.Feature, Traits.Features.CodeModel)>
+        Public Sub TestGetEndPoint_Attribute()
             Dim code =
 <Code>
 class C
@@ -337,8 +466,8 @@ class C
                      TextPoint(line:=13, lineOffset:=6, absoluteOffset:=168, lineLength:=5)))
         End Sub
 
-        <ConditionalFact(GetType(x86)), Trait(Traits.Feature, Traits.Features.CodeModel)>
-        Public Sub GetEndPoint_AutoProperty()
+        <WpfFact, Trait(Traits.Feature, Traits.Features.CodeModel)>
+        Public Sub TestGetEndPoint_AutoProperty()
             Dim code =
 <Code>
 class C
@@ -370,8 +499,8 @@ class C
                      TextPoint(line:=3, lineOffset:=31, absoluteOffset:=41, lineLength:=30)))
         End Sub
 
-        <ConditionalFact(GetType(x86)), Trait(Traits.Feature, Traits.Features.CodeModel)>
-        Public Sub GetEndPoint_AutoProperty_Attribute()
+        <WpfFact, Trait(Traits.Feature, Traits.Features.CodeModel)>
+        Public Sub TestGetEndPoint_AutoProperty_Attribute()
             Dim code =
 <Code>
 class C
@@ -404,8 +533,8 @@ class C
                      TextPoint(line:=4, lineOffset:=31, absoluteOffset:=73, lineLength:=30)))
         End Sub
 
-        <ConditionalFact(GetType(x86)), Trait(Traits.Feature, Traits.Features.CodeModel)>
-        Public Sub GetEndPoint_Indexer()
+        <WpfFact, Trait(Traits.Feature, Traits.Features.CodeModel)>
+        Public Sub TestGetEndPoint_Indexer()
             Dim code =
 <Code>
 class C
@@ -446,8 +575,8 @@ class C
                      TextPoint(line:=12, lineOffset:=6, absoluteOffset:=150, lineLength:=5)))
         End Sub
 
-        <ConditionalFact(GetType(x86)), Trait(Traits.Feature, Traits.Features.CodeModel)>
-        Public Sub GetEndPoint_Indexer_Attribute()
+        <WpfFact, Trait(Traits.Feature, Traits.Features.CodeModel)>
+        Public Sub TestGetEndPoint_Indexer_Attribute()
             Dim code =
 <Code>
 class C
@@ -489,12 +618,75 @@ class C
                      TextPoint(line:=13, lineOffset:=6, absoluteOffset:=182, lineLength:=5)))
         End Sub
 
+        <WorkItem(2437, "https://github.com/dotnet/roslyn/issues/2437")>
+        <WpfFact, Trait(Traits.Feature, Traits.Features.CodeModel)>
+        Public Sub TestGetEndPoint_ExplicitlyImplementedProperty()
+            Dim code =
+<Code>
+interface I1
+{
+    int Prop1 { get; set; }
+}
+
+class C1 : I1
+{
+    int $$I1.Prop1
+    {
+        get
+        {
+            return 0;
+        }
+
+        set
+        {
+        }
+    }
+}
+</Code>
+
+            TestGetEndPoint(code,
+                Part(EnvDTE.vsCMPart.vsCMPartWholeWithAttributes,
+                     TextPoint(line:=18, lineOffset:=6, absoluteOffset:=178, lineLength:=5)))
+        End Sub
+
+        <WorkItem(2437, "https://github.com/dotnet/roslyn/issues/2437")>
+        <WpfFact, Trait(Traits.Feature, Traits.Features.CodeModel)>
+        Public Sub TestGetEndPoint_ExplicitlyImplementedIndexer()
+            Dim code =
+<Code>
+interface I1
+{
+    int this[int i]
+    { get;set; }
+}
+
+class C1 : I1
+{
+    int $$I1.this[int i]
+    {
+        get
+        {
+            return 0;
+        }
+
+        set
+        {
+        }
+    }
+}
+</Code>
+
+            TestGetEndPoint(code,
+                Part(EnvDTE.vsCMPart.vsCMPartWholeWithAttributes,
+                     TextPoint(line:=19, lineOffset:=6, absoluteOffset:=193, lineLength:=5)))
+        End Sub
+
 #End Region
 
 #Region "FullName tests"
 
-        <ConditionalFact(GetType(x86)), Trait(Traits.Feature, Traits.Features.CodeModel)>
-        Public Sub FullName1()
+        <WpfFact, Trait(Traits.Feature, Traits.Features.CodeModel)>
+        Public Sub TestFullName1()
             Dim code =
 <Code>
 class C
@@ -515,8 +707,8 @@ class C
             TestFullName(code, "C.P")
         End Sub
 
-        <ConditionalFact(GetType(x86)), Trait(Traits.Feature, Traits.Features.CodeModel)>
-        Public Sub FullName2()
+        <WpfFact, Trait(Traits.Feature, Traits.Features.CodeModel)>
+        Public Sub TestFullName2()
             Dim code =
 <Code>
 class C
@@ -528,8 +720,8 @@ class C
             TestFullName(code, "C.P")
         End Sub
 
-        <ConditionalFact(GetType(x86)), Trait(Traits.Feature, Traits.Features.CodeModel)>
-        Public Sub FullName3()
+        <WpfFact, Trait(Traits.Feature, Traits.Features.CodeModel)>
+        Public Sub TestFullName3()
             Dim code =
 <Code>
 class C
@@ -541,12 +733,71 @@ class C
             TestFullName(code, "C.this")
         End Sub
 
+        <WorkItem(2437, "https://github.com/dotnet/roslyn/issues/2437")>
+        <WpfFact, Trait(Traits.Feature, Traits.Features.CodeModel)>
+        Public Sub TestFullName_ExplicitlyImplementedProperty()
+            Dim code =
+<Code>
+interface I1
+{
+    int Prop1 { get; set; }
+}
+
+class C1 : I1
+{
+    int $$I1.Prop1
+    {
+        get
+        {
+            return 0;
+        }
+
+        set
+        {
+        }
+    }
+}
+</Code>
+
+            TestFullName(code, "C1.I1.Prop1")
+        End Sub
+
+        <WorkItem(2437, "https://github.com/dotnet/roslyn/issues/2437")>
+        <WpfFact, Trait(Traits.Feature, Traits.Features.CodeModel)>
+        Public Sub TestFullName_ExplicitlyImplementedIndexer()
+            Dim code =
+<Code>
+interface I1
+{
+    int this[int i]
+    { get;set; }
+}
+
+class C1 : I1
+{
+    int $$I1.this[int i]
+    {
+        get
+        {
+            return 0;
+        }
+
+        set
+        {
+        }
+    }
+}
+</Code>
+
+            TestFullName(code, "C1.I1.this")
+        End Sub
+
 #End Region
 
 #Region "IsDefault tests"
 
-        <ConditionalFact(GetType(x86)), Trait(Traits.Feature, Traits.Features.CodeModel)>
-        Public Sub IsDefault1()
+        <WpfFact, Trait(Traits.Feature, Traits.Features.CodeModel)>
+        Public Sub TestIsDefault1()
             Dim code =
 <Code>
 class C
@@ -567,10 +818,12 @@ class C
             TestIsDefault(code, True)
         End Sub
 
-        <ConditionalFact(GetType(x86)), Trait(Traits.Feature, Traits.Features.CodeModel)>
-        Public Sub IsDefault2()
+        <WpfFact, Trait(Traits.Feature, Traits.Features.CodeModel)>
+        Public Sub TestIsDefault2()
             Dim code =
 <Code>
+class C
+{
     public int $$P
     {
         get
@@ -580,13 +833,14 @@ class C
         set
         {
         }
+}
 </Code>
 
             TestIsDefault(code, False)
         End Sub
 
-        <ConditionalFact(GetType(x86)), Trait(Traits.Feature, Traits.Features.CodeModel)>
-        Public Sub IsDefault3()
+        <WpfFact, Trait(Traits.Feature, Traits.Features.CodeModel)>
+        Public Sub TestIsDefault3()
             Dim code =
 <Code>
 class C
@@ -602,8 +856,8 @@ class C
 
 #Region "Name tests"
 
-        <ConditionalFact(GetType(x86)), Trait(Traits.Feature, Traits.Features.CodeModel)>
-        Public Sub Name1()
+        <WpfFact, Trait(Traits.Feature, Traits.Features.CodeModel)>
+        Public Sub TestName1()
             Dim code =
 <Code>
 class C
@@ -624,8 +878,8 @@ class C
             TestName(code, "P")
         End Sub
 
-        <ConditionalFact(GetType(x86)), Trait(Traits.Feature, Traits.Features.CodeModel)>
-        Public Sub Name2()
+        <WpfFact, Trait(Traits.Feature, Traits.Features.CodeModel)>
+        Public Sub TestName2()
             Dim code =
 <Code>
 class C
@@ -637,8 +891,8 @@ class C
             TestName(code, "P")
         End Sub
 
-        <ConditionalFact(GetType(x86)), Trait(Traits.Feature, Traits.Features.CodeModel)>
-        Public Sub Name3()
+        <WpfFact, Trait(Traits.Feature, Traits.Features.CodeModel)>
+        Public Sub TestName3()
             Dim code =
 <Code>
 class C
@@ -650,12 +904,71 @@ class C
             TestName(code, "this")
         End Sub
 
+        <WorkItem(2437, "https://github.com/dotnet/roslyn/issues/2437")>
+        <WpfFact, Trait(Traits.Feature, Traits.Features.CodeModel)>
+        Public Sub TestName_ExplicitlyImplementedProperty()
+            Dim code =
+<Code>
+interface I1
+{
+    int Prop1 { get; set; }
+}
+
+class C1 : I1
+{
+    int $$I1.Prop1
+    {
+        get
+        {
+            return 0;
+        }
+
+        set
+        {
+        }
+    }
+}
+</Code>
+
+            TestName(code, "I1.Prop1")
+        End Sub
+
+        <WorkItem(2437, "https://github.com/dotnet/roslyn/issues/2437")>
+        <WpfFact, Trait(Traits.Feature, Traits.Features.CodeModel)>
+        Public Sub TestName_ExplicitlyImplementedIndexer()
+            Dim code =
+<Code>
+interface I1
+{
+    int this[int i]
+    { get;set; }
+}
+
+class C1 : I1
+{
+    int $$I1.this[int i]
+    {
+        get
+        {
+            return 0;
+        }
+
+        set
+        {
+        }
+    }
+}
+</Code>
+
+            TestName(code, "I1.this")
+        End Sub
+
 #End Region
 
 #Region "Prototype tests"
 
-        <ConditionalFact(GetType(x86)), Trait(Traits.Feature, Traits.Features.CodeModel)>
-        Public Sub Prototype_ClassName1()
+        <WpfFact, Trait(Traits.Feature, Traits.Features.CodeModel)>
+        Public Sub TestPrototype_ClassName1()
             Dim code =
 <Code>
 namespace N
@@ -670,8 +983,8 @@ namespace N
             TestPrototype(code, EnvDTE.vsCMPrototype.vsCMPrototypeClassName, "C.this[int index]")
         End Sub
 
-        <ConditionalFact(GetType(x86)), Trait(Traits.Feature, Traits.Features.CodeModel)>
-        Public Sub Prototype_ClassName2()
+        <WpfFact, Trait(Traits.Feature, Traits.Features.CodeModel)>
+        Public Sub TestPrototype_ClassName2()
             Dim code =
 <Code>
 namespace N
@@ -686,8 +999,8 @@ namespace N
             TestPrototype(code, EnvDTE.vsCMPrototype.vsCMPrototypeClassName, "C.P")
         End Sub
 
-        <ConditionalFact(GetType(x86)), Trait(Traits.Feature, Traits.Features.CodeModel)>
-        Public Sub Prototype_FullName1()
+        <WpfFact, Trait(Traits.Feature, Traits.Features.CodeModel)>
+        Public Sub TestPrototype_FullName1()
             Dim code =
 <Code>
 namespace N
@@ -702,8 +1015,8 @@ namespace N
             TestPrototype(code, EnvDTE.vsCMPrototype.vsCMPrototypeFullname, "N.C.this[int index]")
         End Sub
 
-        <ConditionalFact(GetType(x86)), Trait(Traits.Feature, Traits.Features.CodeModel)>
-        Public Sub Prototype_FullName2()
+        <WpfFact, Trait(Traits.Feature, Traits.Features.CodeModel)>
+        Public Sub TestPrototype_FullName2()
             Dim code =
 <Code>
 namespace N
@@ -722,8 +1035,8 @@ namespace N
 
 #Region "Type tests"
 
-        <ConditionalFact(GetType(x86)), Trait(Traits.Feature, Traits.Features.CodeModel)>
-        Public Sub Type1()
+        <WpfFact, Trait(Traits.Feature, Traits.Features.CodeModel)>
+        Public Sub TestType1()
             Dim code =
 <Code>
 class C
@@ -754,8 +1067,8 @@ class C
 
 #Region "OverrideKind tests"
 
-        <ConditionalFact(GetType(x86)), Trait(Traits.Feature, Traits.Features.CodeModel)>
-        Public Sub OverrideKind1()
+        <WpfFact, Trait(Traits.Feature, Traits.Features.CodeModel)>
+        Public Sub TestOverrideKind_None()
             Dim code =
 <Code>
 class C
@@ -776,8 +1089,8 @@ class C
             TestOverrideKind(code, EnvDTE80.vsCMOverrideKind.vsCMOverrideKindNone)
         End Sub
 
-        <ConditionalFact(GetType(x86)), Trait(Traits.Feature, Traits.Features.CodeModel)>
-        Public Sub OverrideKind2()
+        <WpfFact, Trait(Traits.Feature, Traits.Features.CodeModel)>
+        Public Sub TestOverrideKind_Abstract()
             Dim code =
 <Code>
 abstract class C
@@ -793,12 +1106,114 @@ abstract class C
             TestOverrideKind(code, EnvDTE80.vsCMOverrideKind.vsCMOverrideKindAbstract)
         End Sub
 
+        <WpfFact, Trait(Traits.Feature, Traits.Features.CodeModel)>
+        Public Sub TestOverrideKind_Virtual()
+            Dim code =
+<Code>
+class C
+{
+    public virtual int $$P
+    {
+        get
+        {
+            return default(int);
+        }
+        set
+        {
+        }
+    }
+}
+</Code>
+
+            TestOverrideKind(code, EnvDTE80.vsCMOverrideKind.vsCMOverrideKindVirtual)
+        End Sub
+
+        <WpfFact, Trait(Traits.Feature, Traits.Features.CodeModel)>
+        Public Sub TestOverrideKind_Override()
+            Dim code =
+<Code>
+abstract class B
+{
+    public abstract int P { get; set; }
+}
+
+class C : B
+{
+    public override int $$P
+    {
+        get { return default(int); }
+        set { }
+    }
+}
+</Code>
+
+            TestOverrideKind(code, EnvDTE80.vsCMOverrideKind.vsCMOverrideKindOverride)
+        End Sub
+
+        <WpfFact, Trait(Traits.Feature, Traits.Features.CodeModel)>
+        Public Sub TestOverrideKind_Sealed()
+            Dim code =
+<Code>
+abstract class B
+{
+    public abstract int P { get; set; }
+}
+
+class C : B
+{
+    public override sealed int $$P
+    {
+        get { return default(int); }
+        set { }
+    }
+}
+</Code>
+
+            TestOverrideKind(code, EnvDTE80.vsCMOverrideKind.vsCMOverrideKindOverride Or EnvDTE80.vsCMOverrideKind.vsCMOverrideKindSealed)
+        End Sub
+
+        <WpfFact, Trait(Traits.Feature, Traits.Features.CodeModel)>
+        Public Sub TestOverrideKind_New()
+            Dim code =
+<Code>
+abstract class B
+{
+    public int P { get; set; }
+}
+
+class C : B
+{
+    public new int $$P { get; set; }
+}
+</Code>
+
+            TestOverrideKind(code, EnvDTE80.vsCMOverrideKind.vsCMOverrideKindNew)
+        End Sub
+
+        <WpfFact, Trait(Traits.Feature, Traits.Features.CodeModel)>
+        Public Sub TestOverrideKind_Override_ExpressionBody()
+            Dim code =
+<Code>
+abstract class A
+{
+    public abstract int P { get; }
+}
+
+class C : A
+{
+    public override int $$P => 42;
+}
+</Code>
+
+            TestOverrideKind(code, EnvDTE80.vsCMOverrideKind.vsCMOverrideKindOverride)
+        End Sub
+
 #End Region
 
 #Region "ReadWrite tests"
 
-        <ConditionalFact(GetType(x86)), Trait(Traits.Feature, Traits.Features.CodeModel)>
-        Public Sub ReadWrite1()
+        <WpfFact, Trait(Traits.Feature, Traits.Features.CodeModel)>
+        Public Sub TestReadWrite_GetSet()
             Dim code =
 <Code>
 class C
@@ -819,8 +1234,8 @@ class C
             TestReadWrite(code, EnvDTE80.vsCMPropertyKind.vsCMPropertyKindReadWrite)
         End Sub
 
-        <ConditionalFact(GetType(x86)), Trait(Traits.Feature, Traits.Features.CodeModel)>
-        Public Sub ReadWrite2()
+        <WpfFact, Trait(Traits.Feature, Traits.Features.CodeModel)>
+        Public Sub TestReadWrite_Get()
             Dim code =
 <Code>
 class C
@@ -838,8 +1253,8 @@ class C
             TestReadWrite(code, EnvDTE80.vsCMPropertyKind.vsCMPropertyKindReadOnly)
         End Sub
 
-        <ConditionalFact(GetType(x86)), Trait(Traits.Feature, Traits.Features.CodeModel)>
-        Public Sub ReadWrite3()
+        <WpfFact, Trait(Traits.Feature, Traits.Features.CodeModel)>
+        Public Sub TestReadWrite_Set()
             Dim code =
 <Code>
 class C
@@ -856,8 +1271,8 @@ class C
             TestReadWrite(code, EnvDTE80.vsCMPropertyKind.vsCMPropertyKindWriteOnly)
         End Sub
 
-        <ConditionalFact(GetType(x86)), Trait(Traits.Feature, Traits.Features.CodeModel)>
-        Public Sub ReadWrite4()
+        <WpfFact, Trait(Traits.Feature, Traits.Features.CodeModel)>
+        Public Sub TestReadWrite_GetSet_AutoProperty()
             Dim code =
 <Code>
 class C
@@ -869,12 +1284,38 @@ class C
             TestReadWrite(code, EnvDTE80.vsCMPropertyKind.vsCMPropertyKindReadWrite)
         End Sub
 
+        <WpfFact, Trait(Traits.Feature, Traits.Features.CodeModel)>
+        Public Sub TestReadWrite_Get_AutoProperty()
+            Dim code =
+<Code>
+class C
+{
+    public int $$P { get; }
+}
+</Code>
+
+            TestReadWrite(code, EnvDTE80.vsCMPropertyKind.vsCMPropertyKindReadOnly)
+        End Sub
+
+        <WpfFact, Trait(Traits.Feature, Traits.Features.CodeModel)>
+        Public Sub TestReadWrite_Get_ExpressionBody()
+            Dim code =
+<Code>
+class C
+{
+    public int $$P => 42;
+}
+</Code>
+
+            TestReadWrite(code, EnvDTE80.vsCMPropertyKind.vsCMPropertyKindReadOnly)
+        End Sub
+
 #End Region
 
 #Region "Set OverrideKind tests"
 
-        <ConditionalFact(GetType(x86)), Trait(Traits.Feature, Traits.Features.CodeModel)>
-        Public Sub SetOverrideKind1()
+        <WpfFact, Trait(Traits.Feature, Traits.Features.CodeModel)>
+        Public Async Function TestSetOverrideKind_NoneToAbstract() As Task
             Dim code =
 <Code>
 abstract class C
@@ -903,11 +1344,11 @@ abstract class C
 }
 </Code>
 
-            TestSetOverrideKind(code, expected, EnvDTE80.vsCMOverrideKind.vsCMOverrideKindAbstract)
-        End Sub
+            Await TestSetOverrideKind(code, expected, EnvDTE80.vsCMOverrideKind.vsCMOverrideKindAbstract)
+        End Function
 
-        <ConditionalFact(GetType(x86)), Trait(Traits.Feature, Traits.Features.CodeModel)>
-        Public Sub SetOverrideKind2()
+        <WpfFact, Trait(Traits.Feature, Traits.Features.CodeModel)>
+        Public Async Function TestSetOverrideKind_AbstractToNone() As Task
             Dim code =
 <Code>
 abstract class C
@@ -935,15 +1376,35 @@ abstract class C
 }
 </Code>
 
-            TestSetOverrideKind(code, expected, EnvDTE80.vsCMOverrideKind.vsCMOverrideKindNone)
-        End Sub
+            Await TestSetOverrideKind(code, expected, EnvDTE80.vsCMOverrideKind.vsCMOverrideKindNone)
+        End Function
+
+        <WpfFact, Trait(Traits.Feature, Traits.Features.CodeModel)>
+        Public Async Function TestSetOverrideKind_NoneToOverride_ExpressionBody() As Task
+            Dim code =
+<Code>
+class C
+{
+    public int $$P => 42;
+}
+</Code>
+            Dim expected =
+<Code>
+class C
+{
+    public override int P => 42;
+}
+</Code>
+
+            Await TestSetOverrideKind(code, expected, EnvDTE80.vsCMOverrideKind.vsCMOverrideKindOverride)
+        End Function
 
 #End Region
 
 #Region "Set IsDefault tests"
 
-        <ConditionalFact(GetType(x86)), Trait(Traits.Feature, Traits.Features.CodeModel)>
-        Public Sub SetIsDefault1()
+        <WpfFact, Trait(Traits.Feature, Traits.Features.CodeModel)>
+        Public Async Function TestSetIsDefault1() As Task
             Dim code =
 <Code>
 abstract class C
@@ -978,15 +1439,15 @@ abstract class C
 }
 </Code>
 
-            TestSetIsDefault(code, expected, True, ThrowsInvalidOperationException(Of Boolean))
-        End Sub
+            Await TestSetIsDefault(code, expected, True, ThrowsInvalidOperationException(Of Boolean))
+        End Function
 
 #End Region
 
 #Region "Set Type tests"
 
-        <ConditionalFact(GetType(x86)), Trait(Traits.Feature, Traits.Features.CodeModel)>
-        Public Sub SetType1()
+        <WpfFact, Trait(Traits.Feature, Traits.Features.CodeModel)>
+        Public Async Function TestSetType1() As Task
             Dim code =
 <Code>
 class C
@@ -1003,11 +1464,11 @@ class C
 }
 </Code>
 
-            TestSetTypeProp(code, expected, "string")
-        End Sub
+            Await TestSetTypeProp(code, expected, "string")
+        End Function
 
-        <ConditionalFact(GetType(x86)), Trait(Traits.Feature, Traits.Features.CodeModel)>
-        Public Sub SetType2()
+        <WpfFact, Trait(Traits.Feature, Traits.Features.CodeModel)>
+        Public Async Function TestSetType2() As Task
             Dim code =
 <Code>
 class C
@@ -1024,15 +1485,15 @@ class C
 }
 </Code>
 
-            TestSetTypeProp(code, expected, "System.String")
-        End Sub
+            Await TestSetTypeProp(code, expected, "System.String")
+        End Function
 
 #End Region
 
 #Region "AutoImplementedPropertyExtender"
 
-        <ConditionalFact(GetType(x86)), Trait(Traits.Feature, Traits.Features.CodeModel)>
-        Sub AutoImplementedPropertyExtender_IsAutoImplemented1()
+        <WpfFact, Trait(Traits.Feature, Traits.Features.CodeModel)>
+        Public Sub TestAutoImplementedPropertyExtender_IsAutoImplemented1()
             Dim code =
 <Code>
 public class C
@@ -1044,8 +1505,8 @@ public class C
             TestAutoImplementedPropertyExtender_IsAutoImplemented(code, True)
         End Sub
 
-        <ConditionalFact(GetType(x86)), Trait(Traits.Feature, Traits.Features.CodeModel)>
-        Sub AutoImplementedPropertyExtender_IsAutoImplemented2()
+        <WpfFact, Trait(Traits.Feature, Traits.Features.CodeModel)>
+        Public Sub TestAutoImplementedPropertyExtender_IsAutoImplemented2()
             Dim code =
 <Code>
 public class C
@@ -1061,8 +1522,8 @@ public class C
             TestAutoImplementedPropertyExtender_IsAutoImplemented(code, False)
         End Sub
 
-        <ConditionalFact(GetType(x86)), Trait(Traits.Feature, Traits.Features.CodeModel)>
-        Sub AutoImplementedPropertyExtender_IsAutoImplemented3()
+        <WpfFact, Trait(Traits.Feature, Traits.Features.CodeModel)>
+        Public Sub TestAutoImplementedPropertyExtender_IsAutoImplemented3()
             Dim code =
 <Code>
 public interface I
@@ -1075,6 +1536,149 @@ public interface I
         End Sub
 
 #End Region
+
+#Region "Parameter name tests"
+
+        <WorkItem(1147885, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/1147885")>
+        <WpfFact, Trait(Traits.Feature, Traits.Features.CodeModel)>
+        Public Sub TestParameterNameWithEscapeCharacters()
+            Dim code =
+<Code>
+class Program
+{
+    public int $$this[int @int]
+    {
+        get { return @int; }
+        set { }
+    }
+}
+</Code>
+
+            TestAllParameterNames(code, "@int")
+        End Sub
+
+#End Region
+
+#Region "AddAttribute tests"
+
+        <WpfFact, Trait(Traits.Feature, Traits.Features.CodeModel)>
+        Public Async Function TestAddAttribute1() As Task
+            Dim code =
+<Code>
+using System;
+
+class C
+{
+    public int $$P
+    {
+        get { return default(int); }
+        set { }
+    }
+}
+</Code>
+
+            Dim expected =
+<Code>
+using System;
+
+class C
+{
+    [Serializable()]
+    public int P
+    {
+        get { return default(int); }
+        set { }
+    }
+}
+</Code>
+            Await TestAddAttribute(code, expected, New AttributeData With {.Name = "Serializable"})
+        End Function
+
+        <WpfFact, Trait(Traits.Feature, Traits.Features.CodeModel)>
+        Public Async Function TestAddAttribute2() As Task
+            Dim code =
+<Code>
+using System;
+
+class C
+{
+    [Serializable]
+    public int $$P
+    {
+        get { return default(int); }
+        set { }
+    }
+}
+</Code>
+
+            Dim expected =
+<Code>
+using System;
+
+class C
+{
+    [Serializable]
+    [CLSCompliant(true)]
+    public int P
+    {
+        get { return default(int); }
+        set { }
+    }
+}
+</Code>
+            Await TestAddAttribute(code, expected, New AttributeData With {.Name = "CLSCompliant", .Value = "true", .Position = 1})
+        End Function
+
+        <WorkItem(2825, "https://github.com/dotnet/roslyn/issues/2825")>
+        <WpfFact, Trait(Traits.Feature, Traits.Features.CodeModel)>
+        Public Async Function TestAddAttribute_BelowDocComment() As Task
+            Dim code =
+<Code>
+using System;
+
+class C
+{
+    /// &lt;summary&gt;&lt;/summary&gt;
+    public int $$P
+    {
+        get { return default(int); }
+        set { }
+    }
+}
+</Code>
+
+            Dim expected =
+<Code>
+using System;
+
+class C
+{
+    /// &lt;summary&gt;&lt;/summary&gt;
+    [CLSCompliant(true)]
+    public int P
+    {
+        get { return default(int); }
+        set { }
+    }
+}
+</Code>
+            Await TestAddAttribute(code, expected, New AttributeData With {.Name = "CLSCompliant", .Value = "true"})
+        End Function
+
+#End Region
+
+        <WpfFact, Trait(Traits.Feature, Traits.Features.CodeModel)>
+        Public Sub TestTypeDescriptor_GetProperties()
+            Dim code =
+<Code>
+class C
+{
+    int $$P { get { return 42; } }
+}
+</Code>
+
+            TestPropertyDescriptors(Of EnvDTE80.CodeProperty2)(code)
+        End Sub
 
         Private Function GetAutoImplementedPropertyExtender(codeElement As EnvDTE80.CodeProperty2) As ICSAutoImplementedPropertyExtender
             Return CType(codeElement.Extender(ExtenderNames.AutoImplementedProperty), ICSAutoImplementedPropertyExtender)

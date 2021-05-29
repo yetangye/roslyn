@@ -1,133 +1,134 @@
-' Copyright (c) Microsoft.  All Rights Reserved.  Licensed under the Apache License, Version 2.0.  See License.txt in the project root for license information.
+﻿' Licensed to the .NET Foundation under one or more agreements.
+' The .NET Foundation licenses this file to you under the MIT license.
+' See the LICENSE file in the project root for more information.
 
 Imports System.Threading
 Imports Microsoft.CodeAnalysis
 Imports Microsoft.CodeAnalysis.Editor.UnitTests.Workspaces
-Imports Microsoft.CodeAnalysis.Editor.VisualBasic
 Imports Microsoft.CodeAnalysis.Editor.VisualBasic.EndConstructGeneration
-Imports Microsoft.CodeAnalysis.Text
 Imports Microsoft.VisualStudio.Text
 Imports Microsoft.VisualStudio.Text.Editor
 Imports Microsoft.VisualStudio.Text.Operations
-Imports Roslyn.Test.Utilities
 
 Namespace Microsoft.CodeAnalysis.Editor.VisualBasic.UnitTests.EndConstructGeneration
+    <[UseExportProvider]>
     Public Class MiscellaneousTests
-        <Fact, Trait(Traits.Feature, Traits.Features.EndConstructGeneration)>
+        <WpfFact, Trait(Traits.Feature, Traits.Features.EndConstructGeneration)>
         Public Sub DoesNothingOnEmptyFile()
             VerifyStatementEndConstructNotApplied(
-                text:={""},
+                text:="",
                 caret:={0, -1})
         End Sub
 
-        <Fact, Trait(Traits.Feature, Traits.Features.EndConstructGeneration)>
+        <WpfFact, Trait(Traits.Feature, Traits.Features.EndConstructGeneration)>
         Public Sub DoesNothingOnFileWithNoStatement()
             VerifyStatementEndConstructNotApplied(
-                text:={"'Foo", ""},
+                text:="'Goo
+",
                 caret:={0, -1})
         End Sub
 
-        <Fact, Trait(Traits.Feature, Traits.Features.EndConstructGeneration)>
+        <WpfFact, Trait(Traits.Feature, Traits.Features.EndConstructGeneration)>
         Public Sub VerifyLineContinuationMark()
             VerifyStatementEndConstructNotApplied(
-                text:={"Class C",
-                       "    function f(byval x as Integer,",
-                       "               byref y as string) as string",
-                       "        for i = 1 to 10 _",
-                       "        return y",
-                       "    End Function",
-                       "End Class"},
+                text:="Class C
+    function f(byval x as Integer,
+               byref y as string) as string
+        for i = 1 to 10 _
+        return y
+    End Function
+End Class",
                 caret:={3, -1})
         End Sub
 
-        <Fact, Trait(Traits.Feature, Traits.Features.EndConstructGeneration)>
+        <WpfFact, Trait(Traits.Feature, Traits.Features.EndConstructGeneration)>
         Public Sub VerifyImplicitLineContinuation()
             VerifyStatementEndConstructNotApplied(
-                text:={"Class C",
-                       "    function f() as string",
-                       "        While 1 +",
-                       "        return y",
-                       "    End Function",
-                       "End Class"},
+                text:="Class C
+    function f() as string
+        While 1 +
+        return y
+    End Function
+End Class",
                 caret:={2, -1})
         End Sub
 
-        <Fact, Trait(Traits.Feature, Traits.Features.EndConstructGeneration)>
-        Public Sub VerifyNestedDo()
+        <WpfFact, Trait(Traits.Feature, Traits.Features.EndConstructGeneration)>
+        Public Sub TestVerifyNestedDo()
             VerifyStatementEndConstructApplied(
-                before:={"Class C",
-                         "        function f() as string",
-                         "            for i = 1 to 10"},
+                before:="Class C
+        function f() as string
+            for i = 1 to 10",
                 beforeCaret:={2, -1},
-                 after:={"Class C",
-                         "        function f() as string",
-                         "            for i = 1 to 10",
-                         "",
-                         "            Next"},
+                 after:="Class C
+        function f() as string
+            for i = 1 to 10
+
+            Next",
                 afterCaret:={3, -1})
         End Sub
 
-        <Fact, Trait(Traits.Feature, Traits.Features.EndConstructGeneration)>
-        Public Sub VerifyMultilinesChar()
+        <WpfFact, Trait(Traits.Feature, Traits.Features.EndConstructGeneration)>
+        Public Sub TestVerifyMultilinesChar()
             VerifyStatementEndConstructApplied(
-                before:={"Class C",
-                         "    sub s",
-                         "        do :do",
-                         "        Loop",
-                         "    End sub",
-                         "End Class"},
+                before:="Class C
+    sub s
+        do :do
+        Loop
+    End sub
+End Class",
                 beforeCaret:={2, -1},
-                 after:={"Class C",
-                         "    sub s",
-                         "        do :do",
-                         "",
-                         "            Loop",
-                         "        Loop",
-                         "    End sub",
-                         "End Class"},
+                 after:="Class C
+    sub s
+        do :do
+
+            Loop
+        Loop
+    End sub
+End Class",
                 afterCaret:={3, -1})
         End Sub
 
-        <Fact, Trait(Traits.Feature, Traits.Features.EndConstructGeneration)>
-        Public Sub VerifyInlineComments()
+        <WpfFact, Trait(Traits.Feature, Traits.Features.EndConstructGeneration)>
+        Public Sub TestVerifyInlineComments()
             VerifyStatementEndConstructApplied(
-                before:={"Class C",
-                         "    sub s",
-                         "        If true then 'here",
-                         "    End sub",
-                         "End Class"},
+                before:="Class C
+    sub s
+        If true then 'here
+    End sub
+End Class",
                 beforeCaret:={2, -1},
-                 after:={"Class C",
-                         "    sub s",
-                         "        If true then 'here",
-                         "",
-                         "        End If",
-                         "    End sub",
-                         "End Class"},
+                 after:="Class C
+    sub s
+        If true then 'here
+
+        End If
+    End sub
+End Class",
                 afterCaret:={3, -1})
         End Sub
 
-        <Fact, Trait(Traits.Feature, Traits.Features.EndConstructGeneration)>
+        <WpfFact, Trait(Traits.Feature, Traits.Features.EndConstructGeneration)>
         Public Sub VerifyNotAppliedWithJunkAtEndOfLine()
             ' Try this without a newline at the end of the file
             VerifyStatementEndConstructNotApplied(
-                text:={"Class C End Class"},
+                text:="Class C End Class",
                 caret:={0, "Class C".Length})
         End Sub
 
-        <Fact, Trait(Traits.Feature, Traits.Features.EndConstructGeneration)>
+        <WpfFact, Trait(Traits.Feature, Traits.Features.EndConstructGeneration)>
         Public Sub VerifyNotAppliedWithJunkAtEndOfLine2()
             ' Try this with a newline at the end of the file
             VerifyStatementEndConstructNotApplied(
-                text:={"Class C End Class",
-                       ""},
+                text:="Class C End Class
+",
                 caret:={0, "Class C".Length})
         End Sub
 
-        <Fact, Trait(Traits.Feature, Traits.Features.EndConstructGeneration)>
-        <WorkItem(539727)>
+        <WpfFact, Trait(Traits.Feature, Traits.Features.EndConstructGeneration)>
+        <WorkItem(539727, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/539727")>
         Public Sub DeletesSelectedText()
-            Using workspace = VisualBasicWorkspaceFactory.CreateWorkspaceFromLines("Interface IFoo ~~")
+            Using workspace = TestWorkspace.CreateVisualBasic("Interface IGoo ~~")
                 Dim textView = workspace.Documents.Single().GetTextView()
                 Dim subjectBuffer = workspace.Documents.First().GetTextBuffer()
 

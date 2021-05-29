@@ -1,4 +1,8 @@
-// Copyright (c) Microsoft.  All Rights Reserved.  Licensed under the Apache License, Version 2.0.  See License.txt in the project root for license information.
+﻿// Licensed to the .NET Foundation under one or more agreements.
+// The .NET Foundation licenses this file to you under the MIT license.
+// See the LICENSE file in the project root for more information.
+
+#nullable disable
 
 using System;
 using System.Collections.Generic;
@@ -45,9 +49,9 @@ namespace Microsoft.CodeAnalysis.ExpressionEvaluator
             get { return (TypeImpl)this.Field.FieldType; }
         }
 
-        public override System.Reflection.MemberTypes MemberType
+        public override MemberTypes MemberType
         {
-            get { return this.Field.MemberType; }
+            get { return (MemberTypes)this.Field.MemberType; }
         }
 
         public override int MetadataToken
@@ -110,7 +114,7 @@ namespace Microsoft.CodeAnalysis.ExpressionEvaluator
             throw new NotImplementedException();
         }
 
-        public override void SetValue(object obj, object value, System.Reflection.BindingFlags invokeAttr, Binder binder, CultureInfo culture)
+        public override void SetValue(object obj, object value, BindingFlags invokeAttr, Binder binder, CultureInfo culture)
         {
             throw new NotImplementedException();
         }

@@ -1,8 +1,10 @@
-' Copyright (c) Microsoft.  All Rights Reserved.  Licensed under the Apache License, Version 2.0.  See License.txt in the project root for license information.
+﻿' Licensed to the .NET Foundation under one or more agreements.
+' The .NET Foundation licenses this file to you under the MIT license.
+' See the LICENSE file in the project root for more information.
 
 Imports Microsoft.CodeAnalysis
+Imports Microsoft.CodeAnalysis.Test.Utilities
 Imports Microsoft.VisualStudio.LanguageServices.Implementation.SolutionExplorer
-Imports Roslyn.Test.Utilities
 
 Namespace Microsoft.VisualStudio.LanguageServices.UnitTests.SolutionExplorer
     Public Class DiagnosticDescriptorComparerTests
@@ -28,7 +30,7 @@ Namespace Microsoft.VisualStudio.LanguageServices.UnitTests.SolutionExplorer
                 DiagnosticSeverity.Warning,
                 True)
 
-            Dim comparer = New DiagnosticItemSource.DiagnosticDescriptorComparer()
+            Dim comparer = New LegacyDiagnosticItemSource.DiagnosticDescriptorComparer()
 
             Dim result = comparer.Compare(x, y)
 
@@ -57,7 +59,7 @@ Namespace Microsoft.VisualStudio.LanguageServices.UnitTests.SolutionExplorer
                 DiagnosticSeverity.Warning,
                 True)
 
-            Dim comparer = New DiagnosticItemSource.DiagnosticDescriptorComparer()
+            Dim comparer = New LegacyDiagnosticItemSource.DiagnosticDescriptorComparer()
 
             Dim result = comparer.Compare(x, y)
 
@@ -65,7 +67,7 @@ Namespace Microsoft.VisualStudio.LanguageServices.UnitTests.SolutionExplorer
         End Sub
 
         <Fact, Trait(Traits.Feature, Traits.Features.Diagnostics)>
-        Public Sub MessateFormat()
+        Public Sub MessageFormat()
             Const id As String = "TST0001"
             Const description As String = "A description"
             Const category As String = "Test"
@@ -86,7 +88,7 @@ Namespace Microsoft.VisualStudio.LanguageServices.UnitTests.SolutionExplorer
                 DiagnosticSeverity.Warning,
                 True)
 
-            Dim comparer = New DiagnosticItemSource.DiagnosticDescriptorComparer()
+            Dim comparer = New LegacyDiagnosticItemSource.DiagnosticDescriptorComparer()
 
             Dim result = comparer.Compare(x, y)
 

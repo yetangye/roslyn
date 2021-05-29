@@ -1,23 +1,18 @@
-' Copyright (c) Microsoft.  All Rights Reserved.  Licensed under the Apache License, Version 2.0.  See License.txt in the project root for license information.
-
-Imports Microsoft.CodeAnalysis.Text
-Imports Microsoft.CodeAnalysis.VisualBasic
-Imports Microsoft.CodeAnalysis.VisualBasic.Symbols
-Imports Microsoft.CodeAnalysis.VisualBasic.Syntax
-Imports Roslyn.Test.Utilities
-Imports Xunit
+﻿' Licensed to the .NET Foundation under one or more agreements.
+' The .NET Foundation licenses this file to you under the MIT license.
+' See the LICENSE file in the project root for more information.
 
 Namespace Microsoft.CodeAnalysis.Editor.VisualBasic.UnitTests.Recommendations.Declarations
     Public Class StructureKeywordRecommenderTests
         <Fact>
         <Trait(Traits.Feature, Traits.Features.KeywordRecommending)>
-        Public Sub StructureInClassDeclaration()
+        Public Sub StructureInClassDeclarationTest()
             VerifyRecommendationsContain(<ClassDeclaration>|</ClassDeclaration>, "Structure")
         End Sub
 
-        <Fact, WorkItem(530727)>
+        <Fact, WorkItem(530727, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/530727")>
         <Trait(Traits.Feature, Traits.Features.KeywordRecommending)>
-        Public Sub StructureFollowsStructure()
+        Public Sub StructureFollowsStructureTest()
             Dim code =
 <File>
 Structure S
@@ -27,9 +22,9 @@ End Structure
             VerifyRecommendationsContain(code, "Structure")
         End Sub
 
-        <Fact, WorkItem(530727)>
+        <Fact, WorkItem(530727, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/530727")>
         <Trait(Traits.Feature, Traits.Features.KeywordRecommending)>
-        Public Sub StructureFollowsStructureWithinClass()
+        Public Sub StructureFollowsStructureWithinClassTest()
             Dim code =
 <File>
 Class C
@@ -43,25 +38,25 @@ End Class
 
         <Fact>
         <Trait(Traits.Feature, Traits.Features.KeywordRecommending)>
-        Public Sub StructureNotInMethodDeclaration()
+        Public Sub StructureNotInMethodDeclarationTest()
             VerifyRecommendationsMissing(<MethodBody>|</MethodBody>, "Structure")
         End Sub
 
         <Fact>
         <Trait(Traits.Feature, Traits.Features.KeywordRecommending)>
-        Public Sub StructureInNamespace()
+        Public Sub StructureInNamespaceTest()
             VerifyRecommendationsContain(<NamespaceDeclaration>|</NamespaceDeclaration>, "Structure")
         End Sub
 
         <Fact>
         <Trait(Traits.Feature, Traits.Features.KeywordRecommending)>
-        Public Sub StructureInInterface()
+        Public Sub StructureInInterfaceTest()
             VerifyRecommendationsContain(<InterfaceDeclaration>|</InterfaceDeclaration>, "Structure")
         End Sub
 
-        <Fact, WorkItem(530727)>
+        <Fact, WorkItem(530727, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/530727")>
         <Trait(Traits.Feature, Traits.Features.KeywordRecommending)>
-        Public Sub StructureFollowsMismatchedEnd()
+        Public Sub StructureFollowsMismatchedEndTest()
             Dim code =
 <File>
 Interface I1
@@ -74,203 +69,209 @@ End Interface
 
         <Fact>
         <Trait(Traits.Feature, Traits.Features.KeywordRecommending)>
-        Public Sub StructureNotInEnum()
+        Public Sub StructureNotInEnumTest()
             VerifyRecommendationsMissing(<EnumDeclaration>|</EnumDeclaration>, "Structure")
         End Sub
 
         <Fact>
         <Trait(Traits.Feature, Traits.Features.KeywordRecommending)>
-        Public Sub StructureInStructure()
+        Public Sub StructureInStructureTest()
             VerifyRecommendationsContain(<StructureDeclaration>|</StructureDeclaration>, "Structure")
         End Sub
 
         <Fact>
         <Trait(Traits.Feature, Traits.Features.KeywordRecommending)>
-        Public Sub StructureInModule()
+        Public Sub StructureInModuleTest()
             VerifyRecommendationsContain(<ModuleDeclaration>|</ModuleDeclaration>, "Structure")
         End Sub
 
         <Fact>
         <Trait(Traits.Feature, Traits.Features.KeywordRecommending)>
-        Public Sub StructureAfterPartial()
+        Public Sub StructureAfterPartialTest()
             VerifyRecommendationsContain(<File>Partial |</File>, "Structure")
         End Sub
 
         <Fact>
         <Trait(Traits.Feature, Traits.Features.KeywordRecommending)>
-        Public Sub StructureAfterPublicInFile()
+        Public Sub StructureAfterPublicInFileTest()
             VerifyRecommendationsContain(<File>Public |</File>, "Structure")
         End Sub
 
         <Fact>
         <Trait(Traits.Feature, Traits.Features.KeywordRecommending)>
-        Public Sub StructureAfterPublicInClassDeclaration()
+        Public Sub StructureAfterPublicInClassDeclarationTest()
             VerifyRecommendationsContain(<ClassDeclaration>Public |</ClassDeclaration>, "Structure")
         End Sub
 
         <Fact>
         <Trait(Traits.Feature, Traits.Features.KeywordRecommending)>
-        Public Sub StructureMissingAfterProtectedInFile()
+        Public Sub StructureMissingAfterProtectedInFileTest()
             VerifyRecommendationsMissing(<File>Protected |</File>, "Structure")
         End Sub
 
         <Fact>
         <Trait(Traits.Feature, Traits.Features.KeywordRecommending)>
-        Public Sub StructureExistsAfterProtectedInClassDeclaration()
+        Public Sub StructureExistsAfterProtectedInClassDeclarationTest()
             VerifyRecommendationsContain(<ClassDeclaration>Protected |</ClassDeclaration>, "Structure")
         End Sub
 
         <Fact>
         <Trait(Traits.Feature, Traits.Features.KeywordRecommending)>
-        Public Sub StructureAfterFriendInFile()
+        Public Sub StructureAfterFriendInFileTest()
             VerifyRecommendationsContain(<File>Friend |</File>, "Structure")
         End Sub
 
         <Fact>
         <Trait(Traits.Feature, Traits.Features.KeywordRecommending)>
-        Public Sub StructureAfterFriendInClassDeclaration()
+        Public Sub StructureAfterFriendInClassDeclarationTest()
             VerifyRecommendationsContain(<ClassDeclaration>Friend |</ClassDeclaration>, "Structure")
         End Sub
 
         <Fact>
         <Trait(Traits.Feature, Traits.Features.KeywordRecommending)>
-        Public Sub StructureNotAfterPrivateInFile()
+        Public Sub StructureNotAfterPrivateInFileTest()
             VerifyRecommendationsMissing(<File>Private |</File>, "Structure")
         End Sub
 
         <Fact>
         <Trait(Traits.Feature, Traits.Features.KeywordRecommending)>
-        Public Sub StructureAfterPrivateInNestedClass()
+        Public Sub StructureAfterPrivateInNestedClassTest()
             VerifyRecommendationsContain(<ClassDeclaration>Private |</ClassDeclaration>, "Structure")
         End Sub
 
         <Fact>
         <Trait(Traits.Feature, Traits.Features.KeywordRecommending)>
-        Public Sub StructureNotAfterPrivateInNamespace()
+        Public Sub StructureNotAfterPrivateInNamespaceTest()
             VerifyRecommendationsMissing(<File>
-Namespace Foo
+Namespace Goo
     Private |
 End Namespace</File>, "Structure")
         End Sub
 
         <Fact>
         <Trait(Traits.Feature, Traits.Features.KeywordRecommending)>
-        Public Sub StructureNotAfterProtectedFriendInFile()
+        Public Sub StructureNotAfterProtectedFriendInFileTest()
             VerifyRecommendationsMissing(<File>Protected Friend |</File>, "Structure")
         End Sub
 
         <Fact>
         <Trait(Traits.Feature, Traits.Features.KeywordRecommending)>
-        Public Sub StructureAfterProtectedFriendInClass()
+        Public Sub StructureAfterProtectedFriendInClassTest()
             VerifyRecommendationsContain(<ClassDeclaration>Protected Friend |</ClassDeclaration>, "Structure")
         End Sub
 
         <Fact>
         <Trait(Traits.Feature, Traits.Features.KeywordRecommending)>
-        Public Sub StructureNotAfterOverloads()
+        Public Sub StructureNotAfterOverloadsTest()
             VerifyRecommendationsMissing(<ClassDeclaration>Overloads |</ClassDeclaration>, "Structure")
         End Sub
 
         <Fact>
         <Trait(Traits.Feature, Traits.Features.KeywordRecommending)>
-        Public Sub StructureNotAfterOverrides()
+        Public Sub StructureNotAfterOverridesTest()
             VerifyRecommendationsMissing(<ClassDeclaration>Overrides |</ClassDeclaration>, "Structure")
         End Sub
 
         <Fact>
         <Trait(Traits.Feature, Traits.Features.KeywordRecommending)>
-        Public Sub StructureNotAfterOverridable()
+        Public Sub StructureNotAfterOverridableTest()
             VerifyRecommendationsMissing(<ClassDeclaration>Overridable |</ClassDeclaration>, "Structure")
         End Sub
 
         <Fact>
         <Trait(Traits.Feature, Traits.Features.KeywordRecommending)>
-        Public Sub StructureNotAfterNotOverridable()
+        Public Sub StructureNotAfterNotOverridableTest()
             VerifyRecommendationsMissing(<ClassDeclaration>NotOverridable |</ClassDeclaration>, "Structure")
         End Sub
 
         <Fact>
         <Trait(Traits.Feature, Traits.Features.KeywordRecommending)>
-        Public Sub StructureNotAfterMustOverride()
+        Public Sub StructureNotAfterMustOverrideTest()
             VerifyRecommendationsMissing(<ClassDeclaration>MustOverride |</ClassDeclaration>, "Structure")
         End Sub
 
         <Fact>
         <Trait(Traits.Feature, Traits.Features.KeywordRecommending)>
-        Public Sub StructureNotAfterMustOverrideOverrides()
+        Public Sub StructureNotAfterMustOverrideOverridesTest()
             VerifyRecommendationsMissing(<ClassDeclaration>MustOverride Overrides |</ClassDeclaration>, "Structure")
         End Sub
 
         <Fact>
         <Trait(Traits.Feature, Traits.Features.KeywordRecommending)>
-        Public Sub StructureNotAfterNotOverridableOverrides()
+        Public Sub StructureNotAfterNotOverridableOverridesTest()
             VerifyRecommendationsMissing(<ClassDeclaration>NotOverridable Overrides |</ClassDeclaration>, "Structure")
         End Sub
 
         <Fact>
         <Trait(Traits.Feature, Traits.Features.KeywordRecommending)>
-        Public Sub StructureNotAfterConst()
+        Public Sub StructureNotAfterConstTest()
             VerifyRecommendationsMissing(<ClassDeclaration>Const |</ClassDeclaration>, "Structure")
         End Sub
 
         <Fact>
         <Trait(Traits.Feature, Traits.Features.KeywordRecommending)>
-        Public Sub StructureNotAfterDefault()
+        Public Sub StructureNotAfterDefaultTest()
             VerifyRecommendationsMissing(<ClassDeclaration>Default |</ClassDeclaration>, "Structure")
         End Sub
 
         <Fact>
         <Trait(Traits.Feature, Traits.Features.KeywordRecommending)>
-        Public Sub StructureNotAfterMustInherit()
+        Public Sub StructureNotAfterMustInheritTest()
             VerifyRecommendationsMissing(<ClassDeclaration>MustInherit |</ClassDeclaration>, "Structure")
         End Sub
 
         <Fact>
         <Trait(Traits.Feature, Traits.Features.KeywordRecommending)>
-        Public Sub StructureNotAfterNotInheritable()
+        Public Sub StructureNotAfterNotInheritableTest()
             VerifyRecommendationsMissing(<ClassDeclaration>NotInheritable |</ClassDeclaration>, "Structure")
         End Sub
 
         <Fact>
         <Trait(Traits.Feature, Traits.Features.KeywordRecommending)>
-        Public Sub StructureNotAfterNarrowing()
+        Public Sub StructureNotAfterNarrowingTest()
             VerifyRecommendationsMissing(<ClassDeclaration>Narrowing |</ClassDeclaration>, "Structure")
         End Sub
 
         <Fact>
         <Trait(Traits.Feature, Traits.Features.KeywordRecommending)>
-        Public Sub StructureNotAfterWidening()
+        Public Sub StructureNotAfterWideningTest()
             VerifyRecommendationsMissing(<ClassDeclaration>Widening |</ClassDeclaration>, "Structure")
         End Sub
 
         <Fact>
         <Trait(Traits.Feature, Traits.Features.KeywordRecommending)>
-        Public Sub StructureNotAfterReadOnly()
+        Public Sub StructureNotAfterReadOnlyTest()
             VerifyRecommendationsMissing(<ClassDeclaration>ReadOnly |</ClassDeclaration>, "Structure")
         End Sub
 
         <Fact>
         <Trait(Traits.Feature, Traits.Features.KeywordRecommending)>
-        Public Sub StructureNotAfterWriteOnly()
+        Public Sub StructureNotAfterWriteOnlyTest()
             VerifyRecommendationsMissing(<ClassDeclaration>WriteOnly |</ClassDeclaration>, "Structure")
         End Sub
 
         <Fact>
         <Trait(Traits.Feature, Traits.Features.KeywordRecommending)>
-        Public Sub StructureNotAfterCustom()
+        Public Sub StructureNotAfterCustomTest()
             VerifyRecommendationsMissing(<ClassDeclaration>Custom |</ClassDeclaration>, "Structure")
         End Sub
 
         <Fact>
         <Trait(Traits.Feature, Traits.Features.KeywordRecommending)>
-        Public Sub StructureNotAfterShared()
+        Public Sub StructureNotAfterSharedTest()
             VerifyRecommendationsMissing(<ClassDeclaration>Shared |</ClassDeclaration>, "Structure")
         End Sub
 
-        <WorkItem(547254)>
+        <WorkItem(547254, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/547254")>
         <Fact, Trait(Traits.Feature, Traits.Features.KeywordRecommending)>
-        Public Sub NotAfterAsync()
+        Public Sub NotAfterAsyncTest()
             VerifyRecommendationsMissing(<ClassDeclaration>Async |</ClassDeclaration>, "Structure")
+        End Sub
+
+        <WorkItem(20837, "https://github.com/dotnet/roslyn/issues/20837")>
+        <Fact, Trait(Traits.Feature, Traits.Features.KeywordRecommending)>
+        Public Sub AfterAttribute()
+            VerifyRecommendationsContain(<File>&lt;AttributeApplication&gt; |</File>, "Structure")
         End Sub
     End Class
 End Namespace

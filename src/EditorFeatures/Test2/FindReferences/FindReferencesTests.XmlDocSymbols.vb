@@ -1,9 +1,14 @@
-' Copyright (c) Microsoft.  All Rights Reserved.  Licensed under the Apache License, Version 2.0.  See License.txt in the project root for license information.
+﻿' Licensed to the .NET Foundation under one or more agreements.
+' The .NET Foundation licenses this file to you under the MIT license.
+' See the LICENSE file in the project root for more information.
+
+Imports System.Threading.Tasks
+Imports Microsoft.CodeAnalysis.Remote.Testing
 
 Namespace Microsoft.CodeAnalysis.Editor.UnitTests.FindReferences
     Partial Public Class FindReferencesTests
-        <Fact, Trait(Traits.Feature, Traits.Features.FindReferences)>
-        Public Sub TestException1()
+        <WpfTheory, CombinatorialData, Trait(Traits.Feature, Traits.Features.FindReferences)>
+        Public Async Function TestException1(kind As TestKind, host As TestHost) As Task
             Dim input =
 <Workspace>
     <Project Language="C#" CommonReferences="true">
@@ -21,11 +26,11 @@ Namespace Microsoft.CodeAnalysis.Editor.UnitTests.FindReferences
         </Document>
     </Project>
 </Workspace>
-            Test(input)
-        End Sub
+            Await TestAPIAndFeature(input, kind, host)
+        End Function
 
-        <Fact, Trait(Traits.Feature, Traits.Features.FindReferences)>
-        Public Sub TestException1_VisualBasic()
+        <WpfTheory, CombinatorialData, Trait(Traits.Feature, Traits.Features.FindReferences)>
+        Public Async Function TestException1_VisualBasic(kind As TestKind, host As TestHost) As Task
             Dim input =
 <Workspace>
     <Project Language="Visual Basic" CommonReferences="true">
@@ -36,16 +41,16 @@ Namespace Microsoft.CodeAnalysis.Editor.UnitTests.FindReferences
         Class Program
             ''' <exception cref="[|$$EClass|]"></exception>
             Shared Sub Main(args As String())
-            End Sub
+            End Function
         End Class]]>
         </Document>
     </Project>
 </Workspace>
-            Test(input)
-        End Sub
+            Await TestAPIAndFeature(input, kind, host)
+        End Function
 
-        <Fact, Trait(Traits.Feature, Traits.Features.FindReferences)>
-        Public Sub TestException2()
+        <WpfTheory, CombinatorialData, Trait(Traits.Feature, Traits.Features.FindReferences)>
+        Public Async Function TestException2(kind As TestKind, host As TestHost) As Task
             Dim input =
 <Workspace>
     <Project Language="C#" CommonReferences="true">
@@ -67,11 +72,11 @@ Namespace Microsoft.CodeAnalysis.Editor.UnitTests.FindReferences
         </Document>
     </Project>
 </Workspace>
-            Test(input)
-        End Sub
+            Await TestAPIAndFeature(input, kind, host)
+        End Function
 
-        <Fact, Trait(Traits.Feature, Traits.Features.FindReferences)>
-        Public Sub TestException2_VisualBasic()
+        <WpfTheory, CombinatorialData, Trait(Traits.Feature, Traits.Features.FindReferences)>
+        Public Async Function TestException2_VisualBasic(kind As TestKind, host As TestHost) As Task
             Dim input =
 <Workspace>
     <Project Language="Visual Basic" CommonReferences="true">
@@ -89,11 +94,11 @@ Namespace Microsoft.CodeAnalysis.Editor.UnitTests.FindReferences
         </Document>
     </Project>
 </Workspace>
-            Test(input)
-        End Sub
+            Await TestAPIAndFeature(input, kind, host)
+        End Function
 
-        <Fact, Trait(Traits.Feature, Traits.Features.FindReferences)>
-        Public Sub TestException3()
+        <WpfTheory, CombinatorialData, Trait(Traits.Feature, Traits.Features.FindReferences)>
+        Public Async Function TestException3(kind As TestKind, host As TestHost) As Task
             Dim input =
 <Workspace>
     <Project Language="C#" CommonReferences="true">
@@ -124,11 +129,11 @@ Namespace Microsoft.CodeAnalysis.Editor.UnitTests.FindReferences
         </Document>
     </Project>
 </Workspace>
-            Test(input)
-        End Sub
+            Await TestAPIAndFeature(input, kind, host)
+        End Function
 
-        <Fact, Trait(Traits.Feature, Traits.Features.FindReferences)>
-        Public Sub TestException3_VisualBasic()
+        <WpfTheory, CombinatorialData, Trait(Traits.Feature, Traits.Features.FindReferences)>
+        Public Async Function TestException3_VisualBasic(kind As TestKind, host As TestHost) As Task
             Dim input =
 <Workspace>
     <Project Language="Visual Basic" CommonReferences="true">
@@ -154,11 +159,11 @@ Namespace Microsoft.CodeAnalysis.Editor.UnitTests.FindReferences
         ]]></Document>
     </Project>
 </Workspace>
-            Test(input)
-        End Sub
+            Await TestAPIAndFeature(input, kind, host)
+        End Function
 
-        <Fact, Trait(Traits.Feature, Traits.Features.FindReferences)>
-        Public Sub TestException3_Inverse()
+        <WpfTheory, CombinatorialData, Trait(Traits.Feature, Traits.Features.FindReferences)>
+        Public Async Function TestException3_Inverse(kind As TestKind, host As TestHost) As Task
             Dim input =
 <Workspace>
     <Project Language="C#" CommonReferences="true">
@@ -189,11 +194,11 @@ Namespace Microsoft.CodeAnalysis.Editor.UnitTests.FindReferences
         </Document>
     </Project>
 </Workspace>
-            Test(input)
-        End Sub
+            Await TestAPIAndFeature(input, kind, host)
+        End Function
 
-        <Fact, Trait(Traits.Feature, Traits.Features.FindReferences)>
-        Public Sub TestException3_Inverse_VisualBasic()
+        <WpfTheory, CombinatorialData, Trait(Traits.Feature, Traits.Features.FindReferences)>
+        Public Async Function TestException3_Inverse_VisualBasic(kind As TestKind, host As TestHost) As Task
             Dim input =
 <Workspace>
     <Project Language="Visual Basic" CommonReferences="true">
@@ -219,11 +224,11 @@ Namespace Microsoft.CodeAnalysis.Editor.UnitTests.FindReferences
         ]]></Document>
     </Project>
 </Workspace>
-            Test(input)
-        End Sub
+            Await TestAPIAndFeature(input, kind, host)
+        End Function
 
-        <Fact, Trait(Traits.Feature, Traits.Features.FindReferences)>
-        Public Sub TestCrefConstructor1()
+        <WpfTheory, CombinatorialData, Trait(Traits.Feature, Traits.Features.FindReferences)>
+        Public Async Function TestCrefConstructor1(kind As TestKind, host As TestHost) As Task
             Dim input =
 <Workspace>
     <Project Language="C#" CommonReferences="true">
@@ -252,12 +257,12 @@ Namespace Microsoft.CodeAnalysis.Editor.UnitTests.FindReferences
         </Document>
     </Project>
 </Workspace>
-            Test(input)
-        End Sub
+            Await TestAPIAndFeature(input, kind, host)
+        End Function
 
-        <WorkItem(769369)>
-        <Fact, Trait(Traits.Feature, Traits.Features.FindReferences)>
-        Public Sub TestCrefConstructor1_VisualBasic()
+        <WorkItem(769369, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/769369")>
+        <WpfTheory, CombinatorialData, Trait(Traits.Feature, Traits.Features.FindReferences)>
+        Public Async Function TestCrefConstructor1_VisualBasic(kind As TestKind, host As TestHost) As Task
             Dim input =
 <Workspace>
     <Project Language="Visual Basic" CommonReferences="true">
@@ -282,11 +287,11 @@ Namespace Microsoft.CodeAnalysis.Editor.UnitTests.FindReferences
         </Document>
     </Project>
 </Workspace>
-            Test(input)
-        End Sub
+            Await TestAPIAndFeature(input, kind, host)
+        End Function
 
-        <Fact, Trait(Traits.Feature, Traits.Features.FindReferences)>
-        Public Sub TestCrefConstructor2()
+        <WpfTheory, CombinatorialData, Trait(Traits.Feature, Traits.Features.FindReferences)>
+        Public Async Function TestCrefConstructor2(kind As TestKind, host As TestHost) As Task
             Dim input =
 <Workspace>
     <Project Language="C#" CommonReferences="true">
@@ -312,11 +317,12 @@ Namespace Microsoft.CodeAnalysis.Editor.UnitTests.FindReferences
         </Document>
     </Project>
 </Workspace>
-            Test(input)
-        End Sub
+            Await TestAPIAndFeature(input, kind, host)
+        End Function
 
-        <Fact(Skip:="769477"), Trait(Traits.Feature, Traits.Features.FindReferences)>
-        Public Sub TestCrefConstructor2_VisualBasic()
+        <WpfTheory(Skip:="https://github.com/dotnet/roslyn/issues/34104"), CombinatorialData, Trait(Traits.Feature, Traits.Features.FindReferences)>
+        <WorkItem(34104, "https://github.com/dotnet/roslyn/issues/34104")>
+        Public Async Function TestCrefConstructor2_VisualBasic(kind As TestKind, host As TestHost) As Task
             Dim input =
 <Workspace>
     <Project Language="Visual Basic" CommonReferences="true">
@@ -341,11 +347,11 @@ Namespace Microsoft.CodeAnalysis.Editor.UnitTests.FindReferences
         </Document>
     </Project>
 </Workspace>
-            Test(input)
-        End Sub
+            Await TestAPIAndFeature(input, kind, host)
+        End Function
 
-        <Fact, Trait(Traits.Feature, Traits.Features.FindReferences)>
-        Public Sub TestParam1()
+        <WpfTheory, CombinatorialData, Trait(Traits.Feature, Traits.Features.FindReferences)>
+        Public Async Function TestParam1(kind As TestKind, host As TestHost) As Task
             Dim input =
 <Workspace>
     <Project Language="C#" CommonReferences="true">
@@ -361,16 +367,16 @@ Namespace Microsoft.CodeAnalysis.Editor.UnitTests.FindReferences
                 /// 
                 /// </summary>
                 /// <param name="[|x|]"></param>
-                static void Foo(int {|Definition:$$x|}) { [|x|] = 1; }  
+                static void Goo(int {|Definition:$$x|}) { [|x|] = 1; }  
             }]]>
         </Document>
     </Project>
 </Workspace>
-            Test(input)
-        End Sub
+            Await TestAPIAndFeature(input, kind, host)
+        End Function
 
-        <Fact, Trait(Traits.Feature, Traits.Features.FindReferences)>
-        Public Sub TestParam1_VisualBasic()
+        <WpfTheory, CombinatorialData, Trait(Traits.Feature, Traits.Features.FindReferences)>
+        Public Async Function TestParam1_VisualBasic(kind As TestKind, host As TestHost) As Task
             Dim input =
 <Workspace>
     <Project Language="Visual Basic" CommonReferences="true">
@@ -383,18 +389,18 @@ Namespace Microsoft.CodeAnalysis.Editor.UnitTests.FindReferences
                 ''' 
                 ''' </summary>
                 ''' <param name="[|x|]"></param>
-                Shared Sub Foo({|Definition:$$x|} As Integer) 
+                Shared Sub Goo({|Definition:$$x|} As Integer) 
                     [|x|] = 1
                 End Sub  
             End Class]]>
         </Document>
     </Project>
 </Workspace>
-            Test(input)
-        End Sub
+            Await TestAPIAndFeature(input, kind, host)
+        End Function
 
-        <Fact, Trait(Traits.Feature, Traits.Features.FindReferences)>
-        Public Sub TestParam2()
+        <WpfTheory, CombinatorialData, Trait(Traits.Feature, Traits.Features.FindReferences)>
+        Public Async Function TestParam2(kind As TestKind, host As TestHost) As Task
             Dim input =
 <Workspace>
     <Project Language="C#" CommonReferences="true">
@@ -410,16 +416,16 @@ Namespace Microsoft.CodeAnalysis.Editor.UnitTests.FindReferences
                 /// 
                 /// </summary>
                 /// <param name="[|$$x|]"></param>
-                static void Foo(int {|Definition:x|}) { [|x|] = 1; }  
+                static void Goo(int {|Definition:x|}) { [|x|] = 1; }  
             }]]>
         </Document>
     </Project>
 </Workspace>
-            Test(input)
-        End Sub
+            Await TestAPIAndFeature(input, kind, host)
+        End Function
 
-        <Fact, Trait(Traits.Feature, Traits.Features.FindReferences)>
-        Public Sub TestParam2_VisualBasic()
+        <WpfTheory, CombinatorialData, Trait(Traits.Feature, Traits.Features.FindReferences)>
+        Public Async Function TestParam2_VisualBasic(kind As TestKind, host As TestHost) As Task
             Dim input =
 <Workspace>
     <Project Language="Visual Basic" CommonReferences="true">
@@ -432,18 +438,18 @@ Namespace Microsoft.CodeAnalysis.Editor.UnitTests.FindReferences
                 ''' 
                 ''' </summary>
                 ''' <param name="[|$$x|]"></param>
-                Shared Sub Foo({|Definition:x|} As Integer) 
+                Shared Sub Goo({|Definition:x|} As Integer) 
                     [|x|] = 1
                 End Sub  
             End Class]]>
         </Document>
     </Project>
 </Workspace>
-            Test(input)
-        End Sub
+            Await TestAPIAndFeature(input, kind, host)
+        End Function
 
-        <Fact(Skip:="Bug 640274"), Trait(Traits.Feature, Traits.Features.FindReferences)>
-        Public Sub TestParam3()
+        <WpfTheory, CombinatorialData, Trait(Traits.Feature, Traits.Features.FindReferences)>
+        Public Async Function TestParam3(kind As TestKind, host As TestHost) As Task
             Dim input =
 <Workspace>
     <Project Language="C#" CommonReferences="true">
@@ -458,17 +464,17 @@ Namespace Microsoft.CodeAnalysis.Editor.UnitTests.FindReferences
                 /// <summary>
                 /// 
                 /// </summary>
-                /// <param name="[|@if|]"></param>
-                static void Foo(int {|Definition:$$@if|}) { }
+                /// <param name="[|if|]"></param>
+                static void Goo(int {|Definition:$$@if|}) { }
             }]]>
         </Document>
     </Project>
 </Workspace>
-            Test(input)
-        End Sub
+            Await TestAPIAndFeature(input, kind, host)
+        End Function
 
-        <Fact(Skip:="Bug 640274"), Trait(Traits.Feature, Traits.Features.FindReferences)>
-        Public Sub TestParam3_VisualBasic()
+        <WpfTheory, CombinatorialData, Trait(Traits.Feature, Traits.Features.FindReferences)>
+        Public Async Function TestParam3_VisualBasic(kind As TestKind, host As TestHost) As Task
             Dim input =
 <Workspace>
     <Project Language="Visual Basic" CommonReferences="true">
@@ -480,18 +486,18 @@ Namespace Microsoft.CodeAnalysis.Editor.UnitTests.FindReferences
                 ''' <summary>
                 ''' 
                 ''' </summary>
-                ''' <param name="[|@if|]"></param>
-                Shared Sub Foo({|Definition:$$[if]|} As Integer)
+                ''' <param name="[|if|]"></param>
+                Shared Sub Goo({|Definition:$$[if]|} As Integer)
                 End Sub
             End Class]]>
         </Document>
     </Project>
 </Workspace>
-            Test(input)
-        End Sub
+            Await TestAPIAndFeature(input, kind, host)
+        End Function
 
-        <Fact, Trait(Traits.Feature, Traits.Features.FindReferences)>
-        Public Sub TestParamRef1()
+        <WpfTheory, CombinatorialData, Trait(Traits.Feature, Traits.Features.FindReferences)>
+        Public Async Function TestParamRef1(kind As TestKind, host As TestHost) As Task
             Dim input =
 <Workspace>
     <Project Language="C#" CommonReferences="true">
@@ -509,16 +515,16 @@ Namespace Microsoft.CodeAnalysis.Editor.UnitTests.FindReferences
                 /// <param name="[|x|]"></param>
                 /// <param name="y"></param>
                 /// <param name="@if"></param>
-                static void Foo(int {|Definition:x|}, int y, out int @if) { @if = 2; [|x|] = 1; }
+                static void Goo(int {|Definition:x|}, int y, out int @if) { @if = 2; [|x|] = 1; }
             }]]>
         </Document>
     </Project>
 </Workspace>
-            Test(input)
-        End Sub
+            Await TestAPIAndFeature(input, kind, host)
+        End Function
 
-        <Fact, Trait(Traits.Feature, Traits.Features.FindReferences)>
-        Public Sub TestParamRef1_VisualBasic()
+        <WpfTheory, CombinatorialData, Trait(Traits.Feature, Traits.Features.FindReferences)>
+        Public Async Function TestParamRef1_VisualBasic(kind As TestKind, host As TestHost) As Task
             Dim input =
 <Workspace>
     <Project Language="Visual Basic" CommonReferences="true">
@@ -533,7 +539,7 @@ Namespace Microsoft.CodeAnalysis.Editor.UnitTests.FindReferences
                 ''' <param name="[|x|]"></param>
                 ''' <param name="y"></param>
                 ''' <param name="[if]"></param>
-                Shared Sub Foo({|Definition:x|} As Integer, y As Integer, ByRef [if] As Integer) 
+                Shared Sub Goo({|Definition:x|} As Integer, y As Integer, ByRef [if] As Integer) 
                     [if] = 2 
                     [|x|] = 1
                 End Sub
@@ -541,11 +547,11 @@ Namespace Microsoft.CodeAnalysis.Editor.UnitTests.FindReferences
         </Document>
     </Project>
 </Workspace>
-            Test(input)
-        End Sub
+            Await TestAPIAndFeature(input, kind, host)
+        End Function
 
-        <Fact, Trait(Traits.Feature, Traits.Features.FindReferences)>
-        Public Sub TestPermission()
+        <WpfTheory, CombinatorialData, Trait(Traits.Feature, Traits.Features.FindReferences)>
+        Public Async Function TestPermission(kind As TestKind, host As TestHost) As Task
             Dim input =
 <Workspace>
     <Project Language="C#" CommonReferences="true">
@@ -557,16 +563,16 @@ Namespace Microsoft.CodeAnalysis.Editor.UnitTests.FindReferences
                     System.[|Security|].PermissionSet x;
                 }
                 /// <permission cref="System.[|$$Security|].PermissionSet"></permission>  
-                static void Foo(int x, int y, out int @if) { @if = 2; }
+                static void Goo(int x, int y, out int @if) { @if = 2; }
             }]]>
         </Document>
     </Project>
 </Workspace>
-            Test(input)
-        End Sub
+            Await TestAPIAndFeature(input, kind, host)
+        End Function
 
-        <Fact, Trait(Traits.Feature, Traits.Features.FindReferences)>
-        Public Sub TestPermission_VisualBasic()
+        <WpfTheory, CombinatorialData, Trait(Traits.Feature, Traits.Features.FindReferences)>
+        Public Async Function TestPermission_VisualBasic(kind As TestKind, host As TestHost) As Task
             Dim input =
 <Workspace>
     <Project Language="Visual Basic" CommonReferences="true">
@@ -576,18 +582,18 @@ Namespace Microsoft.CodeAnalysis.Editor.UnitTests.FindReferences
                     Dim x As System.[|Security|].PermissionSet
                 End Sub
                 ''' <permission cref="System.[|$$Security|].PermissionSet"></permission>  
-                Shared Sub Foo(x As Integer, y As Integer, ByRef [if] As Integer) 
+                Shared Sub Goo(x As Integer, y As Integer, ByRef [if] As Integer) 
                     [if] = 2
                 End Sub
             End Class]]>
         </Document>
     </Project>
 </Workspace>
-            Test(input)
-        End Sub
+            Await TestAPIAndFeature(input, kind, host)
+        End Function
 
-        <Fact, Trait(Traits.Feature, Traits.Features.FindReferences)>
-        Public Sub TestTypeParameters1()
+        <WpfTheory, CombinatorialData, Trait(Traits.Feature, Traits.Features.FindReferences)>
+        Public Async Function TestTypeParameters1(kind As TestKind, host As TestHost) As Task
             Dim input =
 <Workspace>
     <Project Language="C#" CommonReferences="true">
@@ -597,22 +603,22 @@ Namespace Microsoft.CodeAnalysis.Editor.UnitTests.FindReferences
             class Generic<T>
             {   
                 public Generic() { }
-                public T Foo(T x) { return x; }    
+                public T Goo(T x) { return x; }    
                 /// <summary>
                 /// <typeparam name="[|$$U|]"></typeparam>
                 /// </summary>
                 /// <param name="x"></param>
                 /// <returns></returns>
-                public [|U|] Foo<{|Definition:U|}>([|U|] x) {return x; }
+                public [|U|] Goo<{|Definition:U|}>([|U|] x) {return x; }
             }]]>
         </Document>
     </Project>
 </Workspace>
-            Test(input)
-        End Sub
+            Await TestAPIAndFeature(input, kind, host)
+        End Function
 
-        <Fact, Trait(Traits.Feature, Traits.Features.FindReferences)>
-        Public Sub TestTypeParameters1_VisualBasic()
+        <WpfTheory, CombinatorialData, Trait(Traits.Feature, Traits.Features.FindReferences)>
+        Public Async Function TestTypeParameters1_VisualBasic(kind As TestKind, host As TestHost) As Task
             Dim input =
 <Workspace>
     <Project Language="Visual Basic" CommonReferences="true">
@@ -622,7 +628,7 @@ Namespace Microsoft.CodeAnalysis.Editor.UnitTests.FindReferences
             Class Generic(Of T)
                 Public Sub New()
                 End Sub
-                Public Function Foo(x As T) As T 
+                Public Function Goo(x As T) As T 
                     Return x
                 End Function    
                 ''' <summary>
@@ -630,18 +636,18 @@ Namespace Microsoft.CodeAnalysis.Editor.UnitTests.FindReferences
                 ''' </summary>
                 ''' <param name="x"></param>
                 ''' <returns></returns>
-                Public Function Foo(Of {|Definition:U|})(x As [|U|]) As [|U|] 
+                Public Function Goo(Of {|Definition:U|})(x As [|U|]) As [|U|] 
                     Return x
                 End Function
             End Class]]>
         </Document>
     </Project>
 </Workspace>
-            Test(input)
-        End Sub
+            Await TestAPIAndFeature(input, kind, host)
+        End Function
 
-        <Fact, Trait(Traits.Feature, Traits.Features.FindReferences)>
-        Public Sub TestTypeParameters2()
+        <WpfTheory, CombinatorialData, Trait(Traits.Feature, Traits.Features.FindReferences)>
+        Public Async Function TestTypeParameters2(kind As TestKind, host As TestHost) As Task
             Dim input =
 <Workspace>
     <Project Language="C#" CommonReferences="true">
@@ -656,16 +662,16 @@ Namespace Microsoft.CodeAnalysis.Editor.UnitTests.FindReferences
                 /// </summary>
                 /// <param name="x"></param>
                 /// <returns></returns>
-                public [|$$T|] Foo([|T|] x) { return x; }    
+                public [|$$T|] Goo([|T|] x) { return x; }    
             }]]>
         </Document>
     </Project>
 </Workspace>
-            Test(input)
-        End Sub
+            Await TestAPIAndFeature(input, kind, host)
+        End Function
 
-        <Fact, Trait(Traits.Feature, Traits.Features.FindReferences)>
-        Public Sub TestTypeParameters2_VisualBasic()
+        <WpfTheory, CombinatorialData, Trait(Traits.Feature, Traits.Features.FindReferences)>
+        Public Async Function TestTypeParameters2_VisualBasic(kind As TestKind, host As TestHost) As Task
             Dim input =
 <Workspace>
     <Project Language="Visual Basic" CommonReferences="true">
@@ -680,18 +686,18 @@ Namespace Microsoft.CodeAnalysis.Editor.UnitTests.FindReferences
                 ''' </summary>
                 ''' <param name="x"></param>
                 ''' <returns></returns>
-                Public Function Foo(x As [|T|]) As [|$$T|] 
+                Public Function Goo(x As [|T|]) As [|$$T|] 
                     Return x
                 End Function    
             End Class]]>
         </Document>
     </Project>
 </Workspace>
-            Test(input)
-        End Sub
+            Await TestAPIAndFeature(input, kind, host)
+        End Function
 
-        <Fact, Trait(Traits.Feature, Traits.Features.FindReferences)>
-        Public Sub TestTypeParametersInCref()
+        <WpfTheory, CombinatorialData, Trait(Traits.Feature, Traits.Features.FindReferences)>
+        Public Async Function TestTypeParametersInCref(kind As TestKind, host As TestHost) As Task
             Dim input =
 <Workspace>
     <Project Language="C#" CommonReferences="true">
@@ -700,19 +706,19 @@ Namespace Microsoft.CodeAnalysis.Editor.UnitTests.FindReferences
             class Tester<{|Definition:T|}>
             {
                 /// <summary>
-                /// <see cref="Tester{T}.Foo(T)"/>
+                /// <see cref="Tester{T}.Goo(T)"/>
                 /// </summary>
                 /// <param name="x"></param>
-                public static void Foo([|$$T|] x) { }
+                public static void Goo([|$$T|] x) { }
             }]]>
         </Document>
     </Project>
 </Workspace>
-            Test(input)
-        End Sub
+            Await TestAPIAndFeature(input, kind, host)
+        End Function
 
-        <Fact, Trait(Traits.Feature, Traits.Features.FindReferences)>
-        Public Sub TestTypeParametersInCref_VisualBasic()
+        <WpfTheory, CombinatorialData, Trait(Traits.Feature, Traits.Features.FindReferences)>
+        Public Async Function TestTypeParametersInCref_VisualBasic(kind As TestKind, host As TestHost) As Task
             Dim input =
 <Workspace>
     <Project Language="Visual Basic" CommonReferences="true">
@@ -720,20 +726,20 @@ Namespace Microsoft.CodeAnalysis.Editor.UnitTests.FindReferences
             Imports System
             Class Tester(Of {|Definition:T|})
                 ''' <summary>
-                ''' <see cref="Tester(Of T).Foo(T)"/>
+                ''' <see cref="Tester(Of T).Goo(T)"/>
                 ''' </summary>
                 ''' <param name="x"></param>
-                Public Shared Sub Foo(x As [|$$T|]) 
+                Public Shared Sub Goo(x As [|$$T|]) 
                 End Sub
             End Class]]>
         </Document>
     </Project>
 </Workspace>
-            Test(input)
-        End Sub
+            Await TestAPIAndFeature(input, kind, host)
+        End Function
 
-        <Fact, Trait(Traits.Feature, Traits.Features.FindReferences)>
-        Public Sub TestMethodParametersInCref()
+        <WpfTheory, CombinatorialData, Trait(Traits.Feature, Traits.Features.FindReferences)>
+        Public Async Function TestMethodParametersInCref(kind As TestKind, host As TestHost) As Task
             Dim input =
 <Workspace>
     <Project Language="C#" CommonReferences="true">
@@ -742,20 +748,20 @@ Namespace Microsoft.CodeAnalysis.Editor.UnitTests.FindReferences
             class {|Definition:Tester|}
             {
                 /// <summary>
-                /// <seealso cref="[|Tester|].Foo([|Tester|])"/>
+                /// <seealso cref="[|Tester|].Goo([|Tester|])"/>
                 /// </summary>
                 /// <param name="x"></param>
-                public static void Foo(int x) { }
-                public static void Foo([|$$Tester|] x) { }
+                public static void Goo(int x) { }
+                public static void Goo([|$$Tester|] x) { }
             }]]>
         </Document>
     </Project>
 </Workspace>
-            Test(input)
-        End Sub
+            Await TestAPIAndFeature(input, kind, host)
+        End Function
 
-        <Fact, Trait(Traits.Feature, Traits.Features.FindReferences)>
-        Public Sub TestMethodParametersInCref_VisualBasic()
+        <WpfTheory, CombinatorialData, Trait(Traits.Feature, Traits.Features.FindReferences)>
+        Public Async Function TestMethodParametersInCref_VisualBasic(kind As TestKind, host As TestHost) As Task
             Dim input =
 <Workspace>
     <Project Language="Visual Basic" CommonReferences="true">
@@ -763,22 +769,22 @@ Namespace Microsoft.CodeAnalysis.Editor.UnitTests.FindReferences
             Imports System
             Class {|Definition:Tester|}
                 ''' <summary>
-                ''' <seealso cref="[|Tester|].Foo([|Tester|])"/>
+                ''' <seealso cref="[|Tester|].Goo([|Tester|])"/>
                 ''' </summary>
                 ''' <param name="x"></param>
-                Public Shared Sub Foo(x As Integer)
+                Public Shared Sub Goo(x As Integer)
                 End Sub
-                Public Shared Sub Foo(x As [|$$Tester|]) 
+                Public Shared Sub Goo(x As [|$$Tester|]) 
                 End Sub
             End Class]]>
         </Document>
     </Project>
 </Workspace>
-            Test(input)
-        End Sub
+            Await TestAPIAndFeature(input, kind, host)
+        End Function
 
-        <Fact, Trait(Traits.Feature, Traits.Features.FindReferences)>
-        Public Sub TestFieldInCref()
+        <WpfTheory, CombinatorialData, Trait(Traits.Feature, Traits.Features.FindReferences)>
+        Public Async Function TestFieldInCref(kind As TestKind, host As TestHost) As Task
             Dim input =
 <Workspace>
     <Project Language="C#" CommonReferences="true">
@@ -807,11 +813,11 @@ Namespace Microsoft.CodeAnalysis.Editor.UnitTests.FindReferences
         </Document>
     </Project>
 </Workspace>
-            Test(input)
-        End Sub
+            Await TestAPIAndFeature(input, kind, host)
+        End Function
 
-        <Fact, Trait(Traits.Feature, Traits.Features.FindReferences)>
-        Public Sub TestFieldInCref_VisualBasic()
+        <WpfTheory, CombinatorialData, Trait(Traits.Feature, Traits.Features.FindReferences)>
+        Public Async Function TestFieldInCref_VisualBasic(kind As TestKind, host As TestHost) As Task
             Dim input =
 <Workspace>
     <Project Language="Visual Basic" CommonReferences="true">
@@ -836,11 +842,11 @@ Namespace Microsoft.CodeAnalysis.Editor.UnitTests.FindReferences
         </Document>
     </Project>
 </Workspace>
-            Test(input)
-        End Sub
+            Await TestAPIAndFeature(input, kind, host)
+        End Function
 
-        <Fact, Trait(Traits.Feature, Traits.Features.FindReferences)>
-        Public Sub TestSpecialTypeSimpleNameInCref()
+        <WpfTheory, CombinatorialData, Trait(Traits.Feature, Traits.Features.FindReferences)>
+        Public Async Function TestSpecialTypeSimpleNameInCref(kind As TestKind, host As TestHost) As Task
             Dim input =
 <Workspace>
     <Project Language="C#" CommonReferences="true">
@@ -857,16 +863,16 @@ Namespace Microsoft.CodeAnalysis.Editor.UnitTests.FindReferences
                 /// </summary>
                 /// <returns>int</returns>
                 /// <value>int</value>
-                public static [|$$int|] Foo() { return 1; } // Invoke FAR on int here
+                public static [|$$int|] Goo() { return 1; } // Invoke FAR on int here
             }]]>
         </Document>
     </Project>
 </Workspace>
-            Test(input)
-        End Sub
+            Await TestAPIAndFeature(input, kind, host)
+        End Function
 
-        <Fact(), Trait(Traits.Feature, Traits.Features.FindReferences)>
-        Public Sub TestSpecialTypeSimpleNameInCref_VisualBasic()
+        <WpfTheory, CombinatorialData, Trait(Traits.Feature, Traits.Features.FindReferences)>
+        Public Async Function TestSpecialTypeSimpleNameInCref_VisualBasic(kind As TestKind, host As TestHost) As Task
             Dim input =
 <Workspace>
     <Project Language="Visual Basic" CommonReferences="true">
@@ -880,18 +886,19 @@ Namespace Microsoft.CodeAnalysis.Editor.UnitTests.FindReferences
                 ''' <summary>
                 ''' <see cref="[|Integer|]"/> 
                 ''' </summary>
-                Public Shared Function Foo() As [|$$Integer|] 
+                Public Shared Function Goo() As [|$$Integer|] 
                     Return 1 ' Invoke FAR on Integer here
                 End Function
             End Class]]>
         </Document>
     </Project>
 </Workspace>
-            Test(input)
-        End Sub
+            Await TestAPIAndFeature(input, kind, host)
+        End Function
 
-        <Fact(Skip:="Bug 640502"), Trait(Traits.Feature, Traits.Features.FindReferences)>
-        Public Sub TestInterfaceInCref1()
+        <WpfTheory, CombinatorialData, Trait(Traits.Feature, Traits.Features.FindReferences)>
+        <WorkItem(640502, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/640502")>
+        Public Async Function TestInterfaceInCref1(kind As TestKind, host As TestHost) As Task
             Dim input =
 <Workspace>
     <Project Language="C#" CommonReferences="true">
@@ -899,57 +906,58 @@ Namespace Microsoft.CodeAnalysis.Editor.UnitTests.FindReferences
             using System;
             interface I
             {
-                void {|Definition:Foo|}();
+                void {|Definition:Goo|}();
             }
             abstract class C
             {
                 public abstract void Boo();
-                public void {|Definition:Foo|}() { }
+                public void {|Definition:Goo|}() { }
             }
             class A : C, I
             {
                 /// <summary>
-                /// <seealso cref="[|Foo|]()"/>
+                /// <seealso cref="I.[|Goo|]()"/>
                 /// </summary>
-                public override void Boo() { [|$$Foo|](); }
+                public override void Boo() { [|$$Goo|](); }
             }]]>
         </Document>
     </Project>
 </Workspace>
-            Test(input)
-        End Sub
+            Await TestAPIAndFeature(input, kind, host)
+        End Function
 
-        <Fact(Skip:="Bug 640502"), Trait(Traits.Feature, Traits.Features.FindReferences)>
-        Public Sub TestInterfaceInCref1_VisualBasic()
+        <WpfTheory, CombinatorialData, Trait(Traits.Feature, Traits.Features.FindReferences)>
+        <WorkItem(640502, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/640502")>
+        Public Async Function TestInterfaceInCref1_VisualBasic(kind As TestKind, host As TestHost) As Task
             Dim input =
 <Workspace>
     <Project Language="Visual Basic" CommonReferences="true">
         <Document><![CDATA[
             Imports System
             Interface I
-                Sub {|Definition:Foo|}()
+                Sub Goo()
             End Interface
-            Abstract Class C
+            MustInherit Class C
                 Public MustOverride Sub Boo()
-                Public Sub {|Definition:Foo|}() 
+                Public Sub {|Definition:Goo|}() 
                 End Sub
             End Class
             Class A : Inherits C : Implements I
                 ''' <summary>
-                ''' <seealso cref="[|Foo|]()"/>
+                ''' <seealso cref="I.Goo()"/>
                 ''' </summary>
-                Public Overrides Sub Boo() Implements I.[|Foo|]
-                    [|$$Foo|]()
+                Public Overrides Sub Boo() Implements I.Goo
+                    [|$$Goo|]()
                 End Sub
             End Class]]>
         </Document>
     </Project>
 </Workspace>
-            Test(input)
-        End Sub
+            Await TestAPIAndFeature(input, kind, host)
+        End Function
 
-        <Fact, Trait(Traits.Feature, Traits.Features.FindReferences)>
-        Public Sub TestInterfaceInCref2()
+        <WpfTheory, CombinatorialData, Trait(Traits.Feature, Traits.Features.FindReferences)>
+        Public Async Function TestInterfaceInCref2(kind As TestKind, host As TestHost) As Task
             Dim input =
 <Workspace>
     <Project Language="C#" CommonReferences="true">
@@ -957,53 +965,53 @@ Namespace Microsoft.CodeAnalysis.Editor.UnitTests.FindReferences
             using System;
             interface I
             {
-                void {|Definition:Foo|}();
+                void {|Definition:Goo|}();
             }
             abstract class C
             {
-                public abstract void {|Definition:Foo|}();
+                public abstract void {|Definition:Goo|}();
             }
             class A : C, I
             {
                 /// <summary>
-                /// <seealso cref="[|Foo|]()"/>
+                /// <seealso cref="[|Goo|]()"/>
                 /// </summary>
-                public override void {|Definition:$$Foo|}() {  } 
+                public override void {|Definition:$$Goo|}() {  } 
             }]]>
         </Document>
     </Project>
 </Workspace>
-            Test(input)
-        End Sub
+            Await TestAPIAndFeature(input, kind, host)
+        End Function
 
-        <Fact, Trait(Traits.Feature, Traits.Features.FindReferences)>
-        Public Sub TestInterfaceInCref2_VisualBasic()
+        <WpfTheory, CombinatorialData, Trait(Traits.Feature, Traits.Features.FindReferences)>
+        Public Async Function TestInterfaceInCref2_VisualBasic(kind As TestKind, host As TestHost) As Task
             Dim input =
 <Workspace>
     <Project Language="Visual Basic" CommonReferences="true">
         <Document><![CDATA[
             Imports System
             Interface I
-                Sub {|Definition:Foo|}()
+                Sub {|Definition:Goo|}()
             End Interface
             MustInherit Class C
-                Public MustOverride Sub {|Definition:Foo|}()
+                Public MustOverride Sub {|Definition:Goo|}()
             End Class
             Class A : Inherits C : Implements I
                 ''' <summary>
-                ''' <seealso cref="[|Foo|]()"/>
+                ''' <seealso cref="[|Goo|]()"/>
                 ''' </summary>
-                Public Overrides Sub {|Definition:$$Foo|}() Implements I.[|Foo|]
+                Public Overrides Sub {|Definition:$$Goo|}() Implements I.[|Goo|]
                 End Sub 
             End Class]]>
         </Document>
     </Project>
 </Workspace>
-            Test(input)
-        End Sub
+            Await TestAPIAndFeature(input, kind, host)
+        End Function
 
-        <Fact, Trait(Traits.Feature, Traits.Features.FindReferences)>
-        Public Sub TestInterfaceInCref3()
+        <WpfTheory, CombinatorialData, Trait(Traits.Feature, Traits.Features.FindReferences)>
+        Public Async Function TestInterfaceInCref3(kind As TestKind, host As TestHost) As Task
             Dim input =
 <Workspace>
     <Project Language="C#" CommonReferences="true">
@@ -1011,62 +1019,62 @@ Namespace Microsoft.CodeAnalysis.Editor.UnitTests.FindReferences
             using System;
             interface I
             {
-                void {|Definition:Foo|}();
+                void {|Definition:Goo|}();
             }
             abstract class C
             {
-                public abstract void Foo();
+                public abstract void Goo();
             }
             class A : C, I
             {
                 /// <summary>
-                /// <seealso cref="Foo()"/>
+                /// <seealso cref="Goo()"/>
                 /// </summary>
-                public override void Foo() {  } 
+                public override void Goo() {  } 
                 /// <summary>
-                /// <see cref="I.[|$$Foo|]()"/>
+                /// <see cref="I.[|$$Goo|]()"/>
                 /// </summary>
-                void I.{|Definition:Foo|}() { }
+                void I.{|Definition:Goo|}() { }
             }]]>
         </Document>
     </Project>
 </Workspace>
-            Test(input)
-        End Sub
+            Await TestAPIAndFeature(input, kind, host)
+        End Function
 
-        <Fact, Trait(Traits.Feature, Traits.Features.FindReferences)>
-        Public Sub TestInterfaceInCref3_VisualBasic()
+        <WpfTheory, CombinatorialData, Trait(Traits.Feature, Traits.Features.FindReferences)>
+        Public Async Function TestInterfaceInCref3_VisualBasic(kind As TestKind, host As TestHost) As Task
             Dim input =
 <Workspace>
     <Project Language="Visual Basic" CommonReferences="true">
         <Document><![CDATA[
             Imports System
             Interface I
-                Sub {|Definition:Foo|}()
+                Sub {|Definition:Goo|}()
             End Interface
             MustInherit Class C
-                Public MustOverride Sub Foo()
+                Public MustOverride Sub Goo()
             End Class
             Class A : Inherits C : Implements I
                 ''' <summary>
-                ''' <seealso cref="Foo()"/>
+                ''' <seealso cref="Goo()"/>
                 ''' </summary>
-                Public Overrides Sub Foo()
+                Public Overrides Sub Goo()
                 End Sub 
                 ''' <summary>
-                ''' <see cref="I.[|$$Foo|]()"/>
+                ''' <see cref="I.[|$$Goo|]()"/>
                 ''' </summary>
-                Public Sub {|Definition:FooImpl|}() Implements I.[|Foo|]
+                Public Sub {|Definition:GooImpl|}() Implements I.[|Goo|]
                 End Sub
             End Class]]>
         </Document>
     </Project>
 </Workspace>
-            Test(input)
-        End Sub
+            Await TestAPIAndFeature(input, kind, host)
+        End Function
 
-        <Fact, Trait(Traits.Feature, Traits.Features.FindReferences)>
-        Public Sub TestInheritanceInCref1()
+        <WpfTheory, CombinatorialData, Trait(Traits.Feature, Traits.Features.FindReferences)>
+        Public Async Function TestInheritanceInCref1(kind As TestKind, host As TestHost) As Task
             Dim input =
 <Workspace>
     <Project Language="C#" CommonReferences="true">
@@ -1092,12 +1100,12 @@ Namespace Microsoft.CodeAnalysis.Editor.UnitTests.FindReferences
         </Document>
     </Project>
 </Workspace>
-            Test(input)
-        End Sub
+            Await TestAPIAndFeature(input, kind, host)
+        End Function
 
-        <WorkItem(769369)>
-        <Fact, Trait(Traits.Feature, Traits.Features.FindReferences)>
-        Public Sub TestInheritanceInCref1_VisualBasic()
+        <WorkItem(769369, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/769369")>
+        <WpfTheory, CombinatorialData, Trait(Traits.Feature, Traits.Features.FindReferences)>
+        Public Async Function TestInheritanceInCref1_VisualBasic(kind As TestKind, host As TestHost) As Task
             Dim input =
 <Workspace>
     <Project Language="Visual Basic" CommonReferences="true">
@@ -1119,11 +1127,11 @@ Namespace Microsoft.CodeAnalysis.Editor.UnitTests.FindReferences
         </Document>
     </Project>
 </Workspace>
-            Test(input)
-        End Sub
+            Await TestAPIAndFeature(input, kind, host)
+        End Function
 
-        <Fact, Trait(Traits.Feature, Traits.Features.FindReferences)>
-        Public Sub TestOverloadingInCref()
+        <WpfTheory, CombinatorialData, Trait(Traits.Feature, Traits.Features.FindReferences)>
+        Public Async Function TestOverloadingInCref(kind As TestKind, host As TestHost) As Task
             Dim input =
 <Workspace>
     <Project Language="C#" CommonReferences="true">
@@ -1141,11 +1149,11 @@ Namespace Microsoft.CodeAnalysis.Editor.UnitTests.FindReferences
         </Document>
     </Project>
 </Workspace>
-            Test(input)
-        End Sub
+            Await TestAPIAndFeature(input, kind, host)
+        End Function
 
-        <Fact, Trait(Traits.Feature, Traits.Features.FindReferences)>
-        Public Sub TestOverloadingInCref_VisualBasic()
+        <WpfTheory, CombinatorialData, Trait(Traits.Feature, Traits.Features.FindReferences)>
+        Public Async Function TestOverloadingInCref_VisualBasic(kind As TestKind, host As TestHost) As Task
             Dim input =
 <Workspace>
     <Project Language="Visual Basic" CommonReferences="true">
@@ -1164,11 +1172,11 @@ Namespace Microsoft.CodeAnalysis.Editor.UnitTests.FindReferences
         </Document>
     </Project>
 </Workspace>
-            Test(input)
-        End Sub
+            Await TestAPIAndFeature(input, kind, host)
+        End Function
 
-        <Fact, Trait(Traits.Feature, Traits.Features.FindReferences)>
-        Public Sub TestInheritanceInCref()
+        <WpfTheory, CombinatorialData, Trait(Traits.Feature, Traits.Features.FindReferences)>
+        Public Async Function TestInheritanceInCref(kind As TestKind, host As TestHost) As Task
             Dim input =
 <Workspace>
     <Project Language="C#" CommonReferences="true">
@@ -1190,11 +1198,11 @@ class Q : P
         </Document>
     </Project>
 </Workspace>
-            Test(input)
-        End Sub
+            Await TestAPIAndFeature(input, kind, host)
+        End Function
 
-        <Fact(), Trait(Traits.Feature, Traits.Features.FindReferences)>
-        Public Sub TestInheritanceInCref_VisualBasic()
+        <WpfTheory, CombinatorialData, Trait(Traits.Feature, Traits.Features.FindReferences)>
+        Public Async Function TestInheritanceInCref_VisualBasic(kind As TestKind, host As TestHost) As Task
             Dim input =
 <Workspace>
     <Project Language="Visual Basic" CommonReferences="true">
@@ -1213,11 +1221,11 @@ End Class]]>
         </Document>
     </Project>
 </Workspace>
-            Test(input)
-        End Sub
+            Await TestAPIAndFeature(input, kind, host)
+        End Function
 
-        <Fact, Trait(Traits.Feature, Traits.Features.FindReferences)>
-        Public Sub TestConstructorInCref()
+        <WpfTheory, CombinatorialData, Trait(Traits.Feature, Traits.Features.FindReferences)>
+        Public Async Function TestConstructorInCref(kind As TestKind, host As TestHost) As Task
             Dim input =
 <Workspace>
     <Project Language="C#" CommonReferences="true">
@@ -1235,12 +1243,12 @@ End Class]]>
         </Document>
     </Project>
 </Workspace>
-            Test(input)
-        End Sub
+            Await TestAPIAndFeature(input, kind, host)
+        End Function
 
-        <WorkItem(769369)>
-        <Fact, Trait(Traits.Feature, Traits.Features.FindReferences)>
-        Public Sub TestConstructorInCref_VisualBasic()
+        <WorkItem(769369, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/769369")>
+        <WpfTheory, CombinatorialData, Trait(Traits.Feature, Traits.Features.FindReferences)>
+        Public Async Function TestConstructorInCref_VisualBasic(kind As TestKind, host As TestHost) As Task
             Dim input =
 <Workspace>
     <Project Language="Visual Basic" CommonReferences="true">
@@ -1259,11 +1267,11 @@ End Class]]>
         </Document>
     </Project>
 </Workspace>
-            Test(input)
-        End Sub
+            Await TestAPIAndFeature(input, kind, host)
+        End Function
 
-        <Fact, Trait(Traits.Feature, Traits.Features.FindReferences)>
-        Public Sub TestDelegateInCref()
+        <WpfTheory, CombinatorialData, Trait(Traits.Feature, Traits.Features.FindReferences)>
+        Public Async Function TestDelegateInCref(kind As TestKind, host As TestHost) As Task
             Dim input =
 <Workspace>
     <Project Language="C#" CommonReferences="true">
@@ -1283,11 +1291,11 @@ End Class]]>
         </Document>
     </Project>
 </Workspace>
-            Test(input)
-        End Sub
+            Await TestAPIAndFeature(input, kind, host)
+        End Function
 
-        <Fact, Trait(Traits.Feature, Traits.Features.FindReferences)>
-        Public Sub TestDelegateInCref_VisualBasic()
+        <WpfTheory, CombinatorialData, Trait(Traits.Feature, Traits.Features.FindReferences)>
+        Public Async Function TestDelegateInCref_VisualBasic(kind As TestKind, host As TestHost) As Task
             Dim input =
 <Workspace>
     <Project Language="Visual Basic" CommonReferences="true">
@@ -1307,11 +1315,11 @@ End Class]]>
         </Document>
     </Project>
 </Workspace>
-            Test(input)
-        End Sub
+            Await TestAPIAndFeature(input, kind, host)
+        End Function
 
-        <Fact, Trait(Traits.Feature, Traits.Features.FindReferences)>
-        Public Sub TestScopeInCref()
+        <WpfTheory, CombinatorialData, Trait(Traits.Feature, Traits.Features.FindReferences)>
+        Public Async Function TestScopeInCref(kind As TestKind, host As TestHost) As Task
             Dim input =
 <Workspace>
     <Project Language="C#" CommonReferences="true">
@@ -1337,11 +1345,11 @@ End Class]]>
         </Document>
     </Project>
 </Workspace>
-            Test(input)
-        End Sub
+            Await TestAPIAndFeature(input, kind, host)
+        End Function
 
-        <Fact, Trait(Traits.Feature, Traits.Features.FindReferences)>
-        Public Sub TestScopeInCref_VisualBasic()
+        <WpfTheory, CombinatorialData, Trait(Traits.Feature, Traits.Features.FindReferences)>
+        Public Async Function TestScopeInCref_VisualBasic(kind As TestKind, host As TestHost) As Task
             Dim input =
 <Workspace>
     <Project Language="Visual Basic" CommonReferences="true">
@@ -1362,129 +1370,11 @@ End Class]]>
         </Document>
     </Project>
 </Workspace>
-            Test(input)
-        End Sub
+            Await TestAPIAndFeature(input, kind, host)
+        End Function
 
-        <Fact(Skip:="641100"), Trait(Traits.Feature, Traits.Features.FindReferences)>
-        Public Sub TestOperatorInCref1()
-            Dim input =
-<Workspace>
-    <Project Language="C#" CommonReferences="true">
-        <Document><![CDATA[
-                using System;
-                class Test
-                {
-                    /// <summary>
-                    /// <see cref="[|operator|] !"/>
-                    /// <see cref="[|operator|] +"/>
-                    /// <see cref="[|$$operator|]"/>
-                    /// </summary>
-                    /// <param name="t"></param>
-                    /// <returns></returns>
-                    public static Test {|Definition:operator|} !(Test t)
-                    {
-                        return new Test();
-                    }
-                    public static int {|Definition:operator|} +(Test t1, Test t2)
-                    {
-                        return 1;
-                    }
-                }]]>
-        </Document>
-    </Project>
-</Workspace>
-            Test(input)
-        End Sub
-
-        <Fact(Skip:="641100"), Trait(Traits.Feature, Traits.Features.FindReferences)>
-        Public Sub TestOperatorInCref1_VisualBasic()
-            Dim input =
-<Workspace>
-    <Project Language="Visual Basic" CommonReferences="true">
-        <Document><![CDATA[
-                Imports System
-                Class Test
-                    ''' <summary>
-                    ''' <see cref="[|Operator|] Not"/>
-                    ''' <see cref="[|Operator|] +"/>
-                    ''' <see cref="[|$$Operator|]"/>
-                    ''' </summary>
-                    ''' <param name="t"></param>
-                    ''' <returns></returns>
-                    Public Shared {|Definition:Operator|} Not(t As Test) As Test
-                        Return New Test()
-                    End Operator
-                    Public Shared {|Definition:Operator|} +(t1 As Test, t2 As Test) As Integer
-                        Return 1
-                    End Operator
-                End Class]]>
-        </Document>
-    </Project>
-</Workspace>
-            Test(input)
-        End Sub
-
-        <Fact(Skip:="641100"), Trait(Traits.Feature, Traits.Features.FindReferences)>
-        Public Sub TestOperatorInCref2()
-            Dim input =
-<Workspace>
-    <Project Language="C#" CommonReferences="true">
-        <Document><![CDATA[
-                using System;
-                class Test
-                {
-                    /// <summary>
-                    /// <see cref="[|$$operator|] !"/>
-                    /// <see cref="operator +"/>
-                    /// <see cref="[|operator|]"/>
-                    /// </summary>
-                    /// <param name="t"></param>
-                    /// <returns></returns>
-                    public static Test {|Definition:operator|} !(Test t)
-                    {
-                        return new Test();
-                    }
-                    public static int operator +(Test t1, Test t2)
-                    {
-                        return 1;
-                    }
-                }]]>
-        </Document>
-    </Project>
-</Workspace>
-            Test(input)
-        End Sub
-
-        <Fact(Skip:="641100"), Trait(Traits.Feature, Traits.Features.FindReferences)>
-        Public Sub TestOperatorInCref2_VisualBasic()
-            Dim input =
-<Workspace>
-    <Project Language="Visual Basic" CommonReferences="true">
-        <Document><![CDATA[
-                Imports System
-                Class Test
-                    ''' <summary>
-                    ''' <see cref="[|$$Operator|] Not"/>
-                    ''' <see cref="Operator +"/>
-                    ''' <see cref="[|Operator|]"/>
-                    ''' </summary>
-                    ''' <param name="t"></param>
-                    ''' <returns></returns>
-                    Public Shared {|Definition:Operator|} Not(t As Test) As Test
-                        Return New Test()
-                    End Operator
-                    Public Shared Operator +(t1 As Test, t2 As Test) As Integer
-                        Return 1
-                    End Operator
-                End Class]]>
-        </Document>
-    </Project>
-</Workspace>
-            Test(input)
-        End Sub
-
-        <Fact(Skip:="641100"), Trait(Traits.Feature, Traits.Features.FindReferences)>
-        Public Sub TestOperatorInCref3()
+        <WpfTheory, CombinatorialData, Trait(Traits.Feature, Traits.Features.FindReferences)>
+        Public Async Function TestOperatorInCref(kind As TestKind, host As TestHost) As Task
             Dim input =
 <Workspace>
     <Project Language="C#" CommonReferences="true">
@@ -1494,9 +1384,7 @@ End Class]]>
                 {
                     /// <summary>
                     /// <see cref="operator !"/>
-                    /// <see cref="[|$$operator|] +"/>
-                    /// <see cref="[|operator|](Test,Test)"/>
-                    /// <see cref="[|operator|]"/>
+                    /// <see cref="operator [|+|]"/>
                     /// </summary>
                     /// <param name="t"></param>
                     /// <returns></returns>
@@ -1504,7 +1392,7 @@ End Class]]>
                     {
                         return new Test();
                     }
-                    public static int {|Definition:operator|} +(Test t1, Test t2)
+                    public static int operator {|Definition:$$+|}(Test t1, Test t2)
                     {
                         return 1;
                     }
@@ -1512,11 +1400,11 @@ End Class]]>
         </Document>
     </Project>
 </Workspace>
-            Test(input)
-        End Sub
+            Await TestAPIAndFeature(input, kind, host)
+        End Function
 
-        <Fact(Skip:="641100"), Trait(Traits.Feature, Traits.Features.FindReferences)>
-        Public Sub TestOperatorInCref3_VisualBasic()
+        <WpfTheory, CombinatorialData, Trait(Traits.Feature, Traits.Features.FindReferences)>
+        Public Async Function TestOperatorInCrefVisualBasic(kind As TestKind, host As TestHost) As Task
             Dim input =
 <Workspace>
     <Project Language="Visual Basic" CommonReferences="true">
@@ -1524,28 +1412,26 @@ End Class]]>
                 Imports System
                 Class Test
                     ''' <summary>
-                    ''' <see cref="Operator Not"/>
-                    ''' <see cref="[|$$Operator|] +"/>
-                    ''' <see cref="[|Operator|](Test,Test)"/>
-                    ''' <see cref="[|Operator|]"/>
+                    ''' <see cref="Operator Not(Test)"/>
+                    ''' <see cref="Operator [|+|](Test, Test)"/>
                     ''' </summary>
                     ''' <param name="t"></param>
                     ''' <returns></returns>
                     Public Shared Operator Not(t As Test) As Test
                         Return New Test()
                     End Operator
-                    Public Shared {|Definition:Operator|} +(t1 As Test, t2 As Test) As Integer
+                    Public Shared Operator {|Definition:$$+|}(t1 As Test, t2 As Test) As Integer
                         Return 1
                     End Operator
                 End Class]]>
         </Document>
     </Project>
 </Workspace>
-            Test(input)
-        End Sub
+            Await TestAPIAndFeature(input, kind, host)
+        End Function
 
-        <Fact, Trait(Traits.Feature, Traits.Features.FindReferences)>
-        Public Sub TestIndexInCref1()
+        <WpfTheory, CombinatorialData, Trait(Traits.Feature, Traits.Features.FindReferences)>
+        Public Async Function TestIndexInCref1(kind As TestKind, host As TestHost) As Task
             Dim input =
 <Workspace>
     <Project Language="C#" CommonReferences="true">
@@ -1570,11 +1456,11 @@ End Class]]>
         </Document>
     </Project>
 </Workspace>
-            Test(input)
-        End Sub
+            Await TestAPIAndFeature(input, kind, host)
+        End Function
 
-        <Fact, Trait(Traits.Feature, Traits.Features.FindReferences)>
-        Public Sub TestIndexInCref1_VisualBasic()
+        <WpfTheory, CombinatorialData, Trait(Traits.Feature, Traits.Features.FindReferences)>
+        Public Async Function TestIndexInCref1_VisualBasic(kind As TestKind, host As TestHost) As Task
             Dim input =
 <Workspace>
     <Project Language="Visual Basic" CommonReferences="true">
@@ -1600,11 +1486,11 @@ End Class]]>
         </Document>
     </Project>
 </Workspace>
-            Test(input)
-        End Sub
+            Await TestAPIAndFeature(input, kind, host)
+        End Function
 
-        <Fact, Trait(Traits.Feature, Traits.Features.FindReferences)>
-        Public Sub TestIndexInCref2()
+        <WpfTheory, CombinatorialData, Trait(Traits.Feature, Traits.Features.FindReferences)>
+        Public Async Function TestIndexInCref2(kind As TestKind, host As TestHost) As Task
             Dim input =
 <Workspace>
     <Project Language="C#" CommonReferences="true">
@@ -1629,11 +1515,11 @@ End Class]]>
         </Document>
     </Project>
 </Workspace>
-            Test(input)
-        End Sub
+            Await TestAPIAndFeature(input, kind, host)
+        End Function
 
-        <Fact, Trait(Traits.Feature, Traits.Features.FindReferences)>
-        Public Sub TestIndexInCref2_VisualBasic()
+        <WpfTheory, CombinatorialData, Trait(Traits.Feature, Traits.Features.FindReferences)>
+        Public Async Function TestIndexInCref2_VisualBasic(kind As TestKind, host As TestHost) As Task
             Dim input =
 <Workspace>
     <Project Language="Visual Basic" CommonReferences="true">
@@ -1659,11 +1545,11 @@ End Class]]>
         </Document>
     </Project>
 </Workspace>
-            Test(input)
-        End Sub
+            Await TestAPIAndFeature(input, kind, host)
+        End Function
 
-        <Fact, Trait(Traits.Feature, Traits.Features.FindReferences)>
-        Public Sub TestIndexInCref3()
+        <WpfTheory, CombinatorialData, Trait(Traits.Feature, Traits.Features.FindReferences)>
+        Public Async Function TestIndexInCref3(kind As TestKind, host As TestHost) As Task
             Dim input =
 <Workspace>
     <Project Language="C#" CommonReferences="true">
@@ -1694,11 +1580,12 @@ End Class]]>
         </Document>
     </Project>
 </Workspace>
-            Test(input)
-        End Sub
+            Await TestAPIAndFeature(input, kind, host)
+        End Function
 
-        <Fact(Skip:="783135"), Trait(Traits.Feature, Traits.Features.FindReferences)>
-        Public Sub TestIndexInCref3_VisualBasic()
+        <WpfTheory(Skip:="https://github.com/dotnet/roslyn/issues/7288"), CombinatorialData, Trait(Traits.Feature, Traits.Features.FindReferences)>
+        <WorkItem(7288, "https://github.com/dotnet/roslyn/issues/7288")>
+        Public Async Function TestIndexInCref3_VisualBasic(kind As TestKind, host As TestHost) As Task
             Dim input =
 <Workspace>
     <Project Language="Visual Basic" CommonReferences="true">
@@ -1727,7 +1614,34 @@ End Class]]>
         </Document>
     </Project>
 </Workspace>
-            Test(input)
-        End Sub
+            Await TestAPIAndFeature(input, kind, host)
+        End Function
+
+        <WpfTheory, CombinatorialData, Trait(Traits.Feature, Traits.Features.FindReferences)>
+        Public Async Function TestCrefReferenceInSourceGeneratedDocument(kind As TestKind) As Task
+            Dim input =
+<Workspace>
+    <Project Language="C#" CommonReferences="true">
+        <Document><![CDATA[
+        using System;
+        class {|Definition:$$EClass|} : Exception { }
+        }]]>
+        </Document>
+        <DocumentFromSourceGenerator><![CDATA[
+
+        class Program
+        {
+            /// <exception cref="[|EClass|]"></exception>
+            static void Main(string[] pargs)
+            {
+
+            }
+        }
+
+        ]]></DocumentFromSourceGenerator>
+    </Project>
+</Workspace>
+            Await TestAPIAndFeature(input, kind, TestHost.InProcess) ' TODO: support out of proc in tests: https://github.com/dotnet/roslyn/issues/50494
+        End Function
     End Class
 End Namespace

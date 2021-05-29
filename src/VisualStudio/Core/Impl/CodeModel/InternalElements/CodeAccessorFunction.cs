@@ -1,4 +1,8 @@
-// Copyright (c) Microsoft.  All Rights Reserved.  Licensed under the Apache License, Version 2.0.  See License.txt in the project root for license information.
+﻿// Licensed to the .NET Foundation under one or more agreements.
+// The .NET Foundation licenses this file to you under the MIT license.
+// See the LICENSE file in the project root for more information.
+
+#nullable disable
 
 using System.Diagnostics;
 using System.Runtime.InteropServices;
@@ -10,7 +14,7 @@ using Microsoft.VisualStudio.LanguageServices.Implementation.Utilities;
 namespace Microsoft.VisualStudio.LanguageServices.Implementation.CodeModel.InternalElements
 {
     [ComVisible(true)]
-    [ComDefaultInterface(typeof(EnvDTE.CodeFunction))]
+    [ComDefaultInterface(typeof(EnvDTE80.CodeFunction2))]
     public sealed partial class CodeAccessorFunction : AbstractCodeElement, EnvDTE.CodeFunction, EnvDTE80.CodeFunction2
     {
         internal static EnvDTE.CodeFunction Create(CodeModelState state, AbstractCodeMember parent, MethodKind kind)
@@ -35,67 +39,44 @@ namespace Microsoft.VisualStudio.LanguageServices.Implementation.CodeModel.Inter
             _kind = kind;
         }
 
-        private AbstractCodeMember ParentMember
-        {
-            get { return _parentHandle.Value; }
-        }
+        private AbstractCodeMember ParentMember => _parentHandle.Value;
 
         private bool IsPropertyAccessor()
-        {
-            return _kind == MethodKind.PropertyGet || _kind == MethodKind.PropertySet;
-        }
+            => _kind == MethodKind.PropertyGet || _kind == MethodKind.PropertySet;
 
-        internal override SyntaxNode LookupNode()
+        internal override bool TryLookupNode(out SyntaxNode node)
         {
+            node = null;
+
             var parentNode = _parentHandle.Value.LookupNode();
             if (parentNode == null)
             {
-                throw Exceptions.ThrowEFail();
+                return false;
             }
 
-            SyntaxNode accessorNode;
-            if (!CodeModelService.TryGetAccessorNode(parentNode, _kind, out accessorNode))
-            {
-                throw Exceptions.ThrowEFail();
-            }
-
-            return accessorNode;
+            return CodeModelService.TryGetAutoPropertyExpressionBody(parentNode, out node) ||
+                   CodeModelService.TryGetAccessorNode(parentNode, _kind, out node);
         }
 
         public override EnvDTE.vsCMElement Kind
-        {
-            get { return EnvDTE.vsCMElement.vsCMElementFunction; }
-        }
+            => EnvDTE.vsCMElement.vsCMElementFunction;
 
-        public override object Parent
-        {
-            get { return _parentHandle.Value; }
-        }
+        public override object Parent => _parentHandle.Value;
 
         public override EnvDTE.CodeElements Children
-        {
-            get { return EmptyCollection.Create(this.State, this); }
-        }
+            => EmptyCollection.Create(this.State, this);
 
         protected override string GetName()
-        {
-            return this.ParentMember.Name;
-        }
+            => this.ParentMember.Name;
 
         protected override void SetName(string value)
-        {
-            this.ParentMember.Name = value;
-        }
+            => this.ParentMember.Name = value;
 
         protected override string GetFullName()
-        {
-            return this.ParentMember.FullName;
-        }
+            => this.ParentMember.FullName;
 
         public EnvDTE.CodeElements Attributes
-        {
-            get { return EmptyCollection.Create(this.State, this); }
-        }
+            => AttributeCollection.Create(this.State, this);
 
         public EnvDTE.vsCMAccess Access
         {
@@ -154,20 +135,12 @@ namespace Microsoft.VisualStudio.LanguageServices.Implementation.CodeModel.Inter
         {
             get
             {
-                // TODO: What does VB do here? Handle EventRaise...
-                switch (_kind)
+                if (!(LookupSymbol() is IMethodSymbol methodSymbol))
                 {
-                    case MethodKind.PropertyGet:
-                    case MethodKind.EventRemove:
-                        return EnvDTE.vsCMFunction.vsCMFunctionPropertyGet;
-
-                    case MethodKind.PropertySet:
-                    case MethodKind.EventAdd:
-                        return EnvDTE.vsCMFunction.vsCMFunctionPropertySet;
-
-                    default:
-                        throw Exceptions.ThrowEUnexpected();
+                    throw Exceptions.ThrowEUnexpected();
                 }
+
+                return CodeModelService.GetFunctionKind(methodSymbol);
             }
         }
 
@@ -213,10 +186,7 @@ namespace Microsoft.VisualStudio.LanguageServices.Implementation.CodeModel.Inter
             }
         }
 
-        public bool IsOverloaded
-        {
-            get { return false; }
-        }
+        public bool IsOverloaded => false;
 
         public bool IsShared
         {
@@ -273,12 +243,7 @@ namespace Microsoft.VisualStudio.LanguageServices.Implementation.CodeModel.Inter
         }
 
         public EnvDTE.CodeElements Overloads
-        {
-            get
-            {
-                throw Exceptions.ThrowEFail();
-            }
-        }
+            => throw Exceptions.ThrowEFail();
 
         public EnvDTE.CodeElements Parameters
         {

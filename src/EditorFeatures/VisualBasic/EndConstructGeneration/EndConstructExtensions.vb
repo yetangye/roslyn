@@ -1,4 +1,6 @@
-' Copyright (c) Microsoft.  All Rights Reserved.  Licensed under the Apache License, Version 2.0.  See License.txt in the project root for license information.
+﻿' Licensed to the .NET Foundation under one or more agreements.
+' The .NET Foundation licenses this file to you under the MIT license.
+' See the LICENSE file in the project root for more information.
 
 Imports System.Runtime.CompilerServices
 Imports System.Text
@@ -9,7 +11,7 @@ Namespace Microsoft.CodeAnalysis.Editor.VisualBasic.EndConstructGeneration
         <Extension()>
         Public Function GetAligningWhitespace(snapshot As ITextSnapshot, position As Integer) As String
             If snapshot Is Nothing Then
-                Throw New ArgumentNullException("snapshot")
+                Throw New ArgumentNullException(NameOf(snapshot))
             End If
             Dim line = snapshot.GetLineFromPosition(position)
             Dim precedingText = snapshot.GetText(Span.FromBounds(line.Start, position))

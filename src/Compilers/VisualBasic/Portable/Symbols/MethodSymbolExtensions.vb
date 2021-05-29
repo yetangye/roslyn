@@ -1,4 +1,6 @@
-﻿' Copyright (c) Microsoft.  All Rights Reserved.  Licensed under the Apache License, Version 2.0.  See License.txt in the project root for license information.
+﻿' Licensed to the .NET Foundation under one or more agreements.
+' The .NET Foundation licenses this file to you under the MIT license.
+' See the LICENSE file in the project root for more information.
 
 Imports System
 Imports System.Collections.Immutable
@@ -28,7 +30,7 @@ Namespace Microsoft.CodeAnalysis.VisualBasic.Symbols
                 If param.IsParamArray AndAlso parameterIndex = parameterCount - 1 Then
                     ' ParamArray may be ignored only if the type is an array of rank = 1
                     Dim type = param.Type
-                    If Not type.IsArrayType OrElse DirectCast(type, ArrayTypeSymbol).Rank <> 1 Then
+                    If Not type.IsArrayType OrElse Not DirectCast(type, ArrayTypeSymbol).IsSZArray Then
                         Return False
                     End If
 
@@ -86,6 +88,15 @@ Namespace Microsoft.CodeAnalysis.VisualBasic.Symbols
             End Select
 
             Return False
+        End Function
+
+        ''' <summary>
+        ''' Returns a constructed method symbol if 'method' is generic, otherwise just returns 'method'
+        ''' </summary>
+        <Extension()>
+        Friend Function ConstructIfGeneric(method As MethodSymbol, typeArguments As ImmutableArray(Of TypeSymbol)) As MethodSymbol
+            Debug.Assert(method.IsGenericMethod() = (typeArguments.Length > 0))
+            Return If(method.IsGenericMethod(), method.Construct(typeArguments), method)
         End Function
 
     End Module

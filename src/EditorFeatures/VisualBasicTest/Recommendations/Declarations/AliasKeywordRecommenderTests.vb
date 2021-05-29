@@ -1,51 +1,53 @@
-' Copyright (c) Microsoft.  All Rights Reserved.  Licensed under the Apache License, Version 2.0.  See License.txt in the project root for license information.
-
-Imports Microsoft.CodeAnalysis.Text
-Imports Microsoft.CodeAnalysis.VisualBasic
-Imports Microsoft.CodeAnalysis.VisualBasic.Symbols
-Imports Microsoft.CodeAnalysis.VisualBasic.Syntax
-Imports Roslyn.Test.Utilities
-Imports Xunit
+﻿' Licensed to the .NET Foundation under one or more agreements.
+' The .NET Foundation licenses this file to you under the MIT license.
+' See the LICENSE file in the project root for more information.
 
 Namespace Microsoft.CodeAnalysis.Editor.VisualBasic.UnitTests.Recommendations.Declarations
     Public Class AliasKeywordRecommenderTests
         <Fact>
         <Trait(Traits.Feature, Traits.Features.KeywordRecommending)>
-        Public Sub AliasAfterLibNameInSub()
-            VerifyRecommendationsAreExactly(<ClassDeclaration>Declare Sub foo Lib "Foo" |</ClassDeclaration>, "Alias")
+        Public Sub AliasAfterLibNameInSubTest()
+            VerifyRecommendationsAreExactly(<ClassDeclaration>Declare Sub goo Lib "Goo" |</ClassDeclaration>, "Alias")
         End Sub
 
         <Fact>
         <Trait(Traits.Feature, Traits.Features.KeywordRecommending)>
-        Public Sub AliasAfterLibNameInFunction()
-            VerifyRecommendationsAreExactly(<ClassDeclaration>Declare Function foo Lib "Foo" |</ClassDeclaration>, "Alias")
+        Public Sub AliasAfterLibNameInFunctionTest()
+            VerifyRecommendationsAreExactly(<ClassDeclaration>Declare Function goo Lib "Goo" |</ClassDeclaration>, "Alias")
         End Sub
 
         <Fact>
         <Trait(Traits.Feature, Traits.Features.KeywordRecommending)>
-        Public Sub AliasNotAfterLibKeyword()
-            VerifyRecommendationsAreExactly(<ClassDeclaration>Declare Sub foo Lib |</ClassDeclaration>, {})
+        Public Sub AliasNotAfterLibKeywordTest()
+            VerifyRecommendationsAreExactly(<ClassDeclaration>Declare Sub goo Lib |</ClassDeclaration>, Array.Empty(Of String)())
         End Sub
 
         <Fact>
         <Trait(Traits.Feature, Traits.Features.KeywordRecommending)>
-        Public Sub NothingAfterBrokenAlias()
-            VerifyRecommendationsAreExactly(<ClassDeclaration>Declare Sub foo Lib "Foo" Alais |</ClassDeclaration>, {})
+        Public Sub NothingAfterBrokenAliasTest()
+            VerifyRecommendationsAreExactly(<ClassDeclaration>Declare Sub goo Lib "Goo" Alais |</ClassDeclaration>, Array.Empty(Of String)())
         End Sub
 
-        <WorkItem(530953)>
+        <WorkItem(530953, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/530953")>
         <Fact, Trait(Traits.Feature, Traits.Features.KeywordRecommending)>
-        Public Sub NoAliasAfterEol()
+        Public Sub NoAliasAfterEolTest()
             VerifyRecommendationsMissing(
-<ClassDeclaration>Declare Function foo Lib "Foo" 
+<ClassDeclaration>Declare Function goo Lib "Goo" 
     |</ClassDeclaration>, "Alias")
         End Sub
 
-        <WorkItem(530953)>
+        <WorkItem(530953, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/530953")>
         <Fact, Trait(Traits.Feature, Traits.Features.KeywordRecommending)>
-        Public Sub AliasAfterExplicitLineContinuation()
+        Public Sub AliasAfterExplicitLineContinuationTest()
             VerifyRecommendationsAreExactly(
-<ClassDeclaration>Declare Function foo Lib "Foo" _
+<ClassDeclaration>Declare Function goo Lib "Goo" _
+|</ClassDeclaration>, "Alias")
+        End Sub
+        <WorkItem(530953, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/530953")>
+        <Fact, Trait(Traits.Feature, Traits.Features.KeywordRecommending)>
+        Public Sub AliasAfterExplicitLineContinuationTestCommentsAfterLineContinuation()
+            VerifyRecommendationsAreExactly(
+<ClassDeclaration>Declare Function goo Lib "Goo" _ ' Test
 |</ClassDeclaration>, "Alias")
         End Sub
     End Class

@@ -1,14 +1,17 @@
-' Copyright (c) Microsoft.  All Rights Reserved.  Licensed under the Apache License, Version 2.0.  See License.txt in the project root for license information.
+﻿' Licensed to the .NET Foundation under one or more agreements.
+' The .NET Foundation licenses this file to you under the MIT license.
+' See the LICENSE file in the project root for more information.
 
 Imports Microsoft.CodeAnalysis.Editor.UnitTests.Extensions
 Imports Microsoft.VisualStudio.Text.Projection
 
 Namespace Microsoft.CodeAnalysis.Editor.UnitTests.IntelliSense
+    <[UseExportProvider]>
     Public Class CSharpCompletionCommandHandlerTests_Projections
 
-        <Fact, Trait(Traits.Feature, Traits.Features.Completion)>
-        Public Sub TestSimpleWithJustSubjectBuffer()
-            Using state = TestState.CreateCSharpTestState(
+        <WpfTheory, CombinatorialData, Trait(Traits.Feature, Traits.Features.Completion)>
+        Public Async Function TestSimpleWithJustSubjectBuffer(showCompletionInArgumentLists As Boolean) As Task
+            Using state = TestStateFactory.CreateCSharpTestState(
                 <Document><![CDATA[
 using System;
 
@@ -23,123 +26,119 @@ public override void Execute() {
 #line default
 #line hidden
 }
-}]]></Document>)
+}]]></Document>, showCompletionInArgumentLists:=showCompletionInArgumentLists)
 
                 state.SendTypeChars(".Curr")
-                state.AssertSelectedCompletionItem(displayText:="CurrentDomain")
+                Await state.AssertSelectedCompletionItem(displayText:="CurrentDomain")
                 state.SendTab()
-                Assert.Contains("__o = AppDomain.CurrentDomain", state.GetLineTextFromCaretPosition())
+                Assert.Contains("__o = AppDomain.CurrentDomain", state.GetLineTextFromCaretPosition(), StringComparison.Ordinal)
             End Using
-        End Sub
+        End Function
 
-        <Fact, Trait(Traits.Feature, Traits.Features.Completion)>
-        Public Sub TestAfterDot()
-            Using state = TestState.CreateCSharpTestState(
+        <WpfTheory, CombinatorialData, Trait(Traits.Feature, Traits.Features.Completion)>
+        Public Async Function TestAfterDot(showCompletionInArgumentLists As Boolean) As Task
+            Using state = TestStateFactory.CreateCSharpTestState(
                 <Document><![CDATA[
 {|S2:
 class C
 {
-    void Foo()
+    void Goo()
     {
         System$$
     }
 }
-|}]]></Document>)
+|}]]></Document>, showCompletionInArgumentLists:=showCompletionInArgumentLists)
                 Dim subjectDocument = state.Workspace.Documents.First()
                 Dim firstProjection = state.Workspace.CreateProjectionBufferDocument(
                     <Document>
 {|S1: &lt;html&gt;@|}
 {|S2:|}
-                    </Document>.NormalizedValue, {subjectDocument}, LanguageNames.CSharp, options:=ProjectionBufferOptions.WritableLiteralSpans)
+                    </Document>.NormalizedValue, {subjectDocument}, options:=ProjectionBufferOptions.WritableLiteralSpans)
 
                 Dim topProjectionBuffer = state.Workspace.CreateProjectionBufferDocument(
                 <Document>
 {|S1:|}
 {|S2:&lt;/html&gt;|}
-                              </Document>.NormalizedValue, {firstProjection}, LanguageNames.CSharp, options:=ProjectionBufferOptions.WritableLiteralSpans)
-
+                              </Document>.NormalizedValue, {firstProjection}, options:=ProjectionBufferOptions.WritableLiteralSpans)
 
                 Dim view = topProjectionBuffer.GetTextView()
                 Dim buffer = subjectDocument.GetTextBuffer()
 
                 state.SendTypeCharsToSpecificViewAndBuffer(".", view, buffer)
-                state.AssertCompletionSession()
+                Await state.AssertCompletionSession(view)
 
                 state.SendTypeCharsToSpecificViewAndBuffer("Cons", view, buffer)
-                state.AssertSelectedCompletionItem(displayText:="Console")
+                Await state.AssertSelectedCompletionItem(displayText:="Console", projectionsView:=view)
             End Using
-        End Sub
+        End Function
 
-        <Fact, Trait(Traits.Feature, Traits.Features.Completion)>
-        Public Sub TestInObjectCreationExpression()
-            Using state = TestState.CreateCSharpTestState(
+        <WpfTheory, CombinatorialData, Trait(Traits.Feature, Traits.Features.Completion)>
+        Public Async Function TestInObjectCreationExpression(showCompletionInArgumentLists As Boolean) As Task
+            Using state = TestStateFactory.CreateCSharpTestState(
                 <Document><![CDATA[
 {|S2:
 class C
 {
-    void Foo()
+    void Goo()
     {
         string s = new$$
     }
 }
-|}]]></Document>)
+|}]]></Document>, showCompletionInArgumentLists:=showCompletionInArgumentLists)
                 Dim subjectDocument = state.Workspace.Documents.First()
                 Dim firstProjection = state.Workspace.CreateProjectionBufferDocument(
                     <Document>
 {|S1: &lt;html&gt;@|}
 {|S2:|}
-                    </Document>.NormalizedValue, {subjectDocument}, LanguageNames.CSharp, options:=ProjectionBufferOptions.WritableLiteralSpans)
+                    </Document>.NormalizedValue, {subjectDocument}, options:=ProjectionBufferOptions.WritableLiteralSpans)
 
                 Dim topProjectionBuffer = state.Workspace.CreateProjectionBufferDocument(
                 <Document>
 {|S1:|}
 {|S2:&lt;/html&gt;|}
-                              </Document>.NormalizedValue, {firstProjection}, LanguageNames.CSharp, options:=ProjectionBufferOptions.WritableLiteralSpans)
-
+                              </Document>.NormalizedValue, {firstProjection}, options:=ProjectionBufferOptions.WritableLiteralSpans)
 
                 Dim view = topProjectionBuffer.GetTextView()
                 Dim buffer = subjectDocument.GetTextBuffer()
 
                 state.SendTypeCharsToSpecificViewAndBuffer(" ", view, buffer)
-                state.AssertSelectedCompletionItem(displayText:="string", isHardSelected:=True)
+                Await state.AssertSelectedCompletionItem(displayText:="string", isHardSelected:=True, projectionsView:=view)
             End Using
-        End Sub
+        End Function
 
-        <WorkItem(771761)>
-        <Fact, Trait(Traits.Feature, Traits.Features.Completion)>
-        Public Sub TestRegionCompletionCommitFormatting()
-            Using state = TestState.CreateCSharpTestState(
+        <WorkItem(771761, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/771761")>
+        <WpfTheory, CombinatorialData, Trait(Traits.Feature, Traits.Features.Completion)>
+        Public Async Function TestRegionCompletionCommitFormatting(showCompletionInArgumentLists As Boolean) As Task
+            Using state = TestStateFactory.CreateCSharpTestState(
                 <Document><![CDATA[
 {|S2:
 class C
 {
-    void Foo()
+    void Goo()
     {
         $$
     }
 }
-|}]]></Document>)
+|}]]></Document>, showCompletionInArgumentLists:=showCompletionInArgumentLists)
                 Dim subjectDocument = state.Workspace.Documents.First()
                 Dim firstProjection = state.Workspace.CreateProjectionBufferDocument(
                     <Document>
 {|S1: &lt;html&gt;@|}
 {|S2:|}
-                    </Document>.NormalizedValue, {subjectDocument}, LanguageNames.CSharp, options:=ProjectionBufferOptions.WritableLiteralSpans)
+                    </Document>.NormalizedValue, {subjectDocument}, options:=ProjectionBufferOptions.WritableLiteralSpans)
 
                 Dim topProjectionBuffer = state.Workspace.CreateProjectionBufferDocument(
                 <Document>
 {|S1:|}
 {|S2:&lt;/html&gt;|}
-                              </Document>.NormalizedValue, {firstProjection}, LanguageNames.CSharp, options:=ProjectionBufferOptions.WritableLiteralSpans)
-
+                              </Document>.NormalizedValue, {firstProjection}, options:=ProjectionBufferOptions.WritableLiteralSpans)
 
                 Dim view = topProjectionBuffer.GetTextView()
                 Dim buffer = subjectDocument.GetTextBuffer()
 
                 state.SendTypeCharsToSpecificViewAndBuffer("#reg", view, buffer)
-                state.AssertSelectedCompletionItem(displayText:="region", shouldFormatOnCommit:=True)
-
+                Await state.AssertSelectedCompletionItem(displayText:="region", shouldFormatOnCommit:=True, projectionsView:=view)
             End Using
-        End Sub
+        End Function
     End Class
 End Namespace

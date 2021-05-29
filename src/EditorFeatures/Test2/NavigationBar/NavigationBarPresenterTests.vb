@@ -1,27 +1,19 @@
-' Copyright (c) Microsoft.  All Rights Reserved.  Licensed under the Apache License, Version 2.0.  See License.txt in the project root for license information.
+﻿' Licensed to the .NET Foundation under one or more agreements.
+' The .NET Foundation licenses this file to you under the MIT license.
+' See the LICENSE file in the project root for more information.
 
-Imports Microsoft.CodeAnalysis.Shared.TestHooks
+Imports System.Threading.Tasks
 Imports Microsoft.CodeAnalysis.Editor.UnitTests.Workspaces
-Imports Microsoft.VisualStudio.Text
+Imports Microsoft.CodeAnalysis.Shared.TestHooks
 Imports Microsoft.VisualStudio.Composition
-Imports System.ComponentModel.Composition
+Imports Microsoft.VisualStudio.Text
 
 Namespace Microsoft.CodeAnalysis.Editor.UnitTests.NavigationBar
+    <[UseExportProvider]>
     Public Class NavigationBarControllerTests
-        Friend ReadOnly ExportProvider As ExportProvider = MinimalTestExportProvider.CreateExportProvider(
-            TestExportProvider.EntireAssemblyCatalogWithCSharpAndVisualBasic.WithPart(GetType(NavigationBarWaiter)))
-
-        <Export(GetType(IAsynchronousOperationListener))>
-        <Export(GetType(IAsynchronousOperationWaiter))>
-        <Export(GetType(NavigationBarWaiter))>
-        <Feature(FeatureAttribute.NavigationBar)>
-        Private Class NavigationBarWaiter
-            Inherits AsynchronousOperationListener
-        End Class
-
-        <Fact, Trait(Traits.Feature, Traits.Features.NavigationBar), WorkItem(544957)>
-        Sub DoNotRecomputeAfterFullRecompute()
-            Using workspace = TestWorkspaceFactory.CreateWorkspace(
+        <WpfFact, Trait(Traits.Feature, Traits.Features.NavigationBar), WorkItem(544957, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/544957")>
+        Public Sub TestDoNotRecomputeAfterFullRecompute()
+            Using workspace = TestWorkspace.Create(
                 <Workspace>
                     <Project Language="C#" CommonReferences="true">
                         <Document>class C { }</Document>
@@ -34,7 +26,7 @@ Namespace Microsoft.CodeAnalysis.Editor.UnitTests.NavigationBar
                 Dim mockPresenter As New MockNavigationBarPresenter(document.GetTextView(), Sub() presentItemsCalled = True)
 
                 Dim controllerFactory = workspace.GetService(Of INavigationBarControllerFactoryService)()
-                Dim controller = controllerFactory.CreateController(mockPresenter, document.TextBuffer)
+                Dim controller = controllerFactory.CreateController(mockPresenter, document.GetTextBuffer())
 
                 ' The first time this is called, we should get various calls as a part of the
                 ' present
@@ -52,17 +44,17 @@ Namespace Microsoft.CodeAnalysis.Editor.UnitTests.NavigationBar
             End Using
         End Sub
 
-        <Fact, Trait(Traits.Feature, Traits.Features.NavigationBar), WorkItem(544957)>
-        Sub ProjectionBuffersWork()
-            Using workspace = TestWorkspaceFactory.CreateWorkspace(
+        <WpfFact(Skip:="https://github.com/dotnet/roslyn/issues/24754"), Trait(Traits.Feature, Traits.Features.NavigationBar), WorkItem(544957, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/544957")>
+        Public Async Function ProjectionBuffersWork() As Task
+            Using workspace = TestWorkspace.Create(
                 <Workspace>
                     <Project Language="C#" CommonReferences="true">
                         <Document>{|Document:class C { $$ }|}</Document>
                     </Project>
-                </Workspace>, exportProvider:=ExportProvider)
+                </Workspace>, composition:=EditorTestCompositions.EditorFeatures)
 
                 Dim subjectDocument = workspace.Documents.Single()
-                Dim projectedDocument = workspace.CreateProjectionBufferDocument("LEADING TEXT {|Document:|} TRAILING TEXT", {subjectDocument}, LanguageNames.CSharp)
+                Dim projectedDocument = workspace.CreateProjectionBufferDocument("LEADING TEXT {|Document:|} TRAILING TEXT", {subjectDocument})
                 Dim view = projectedDocument.GetTextView()
                 view.Caret.MoveTo(New SnapshotPoint(view.TextSnapshot, projectedDocument.CursorPosition.Value))
 
@@ -73,19 +65,18 @@ Namespace Microsoft.CodeAnalysis.Editor.UnitTests.NavigationBar
                 ' present
 
                 Dim controllerFactory = workspace.GetService(Of INavigationBarControllerFactoryService)()
-                Dim controller = controllerFactory.CreateController(mockPresenter, subjectDocument.TextBuffer)
+                Dim controller = controllerFactory.CreateController(mockPresenter, subjectDocument.GetTextBuffer())
 
-                workspace.ExportProvider.GetExportedValues(Of IAsynchronousOperationWaiter) _
-                    .Select(Function(waiter) waiter.CreateWaitTask()) _
-                    .PumpingWaitAll()
+                Dim provider = workspace.ExportProvider.GetExportedValue(Of IAsynchronousOperationListenerProvider)
+                Await provider.WaitAllDispatcherOperationAndTasksAsync(workspace, FeatureAttribute.Workspace, FeatureAttribute.NavigationBar)
 
                 Assert.True(presentItemsCalled)
             End Using
-        End Sub
+        End Function
 
-        <Fact, Trait(Traits.Feature, Traits.Features.NavigationBar)>
-        Sub TestNavigationBarInCSharpLinkedFiles()
-            Using workspace = TestWorkspaceFactory.CreateWorkspace(
+        <WpfFact, Trait(Traits.Feature, Traits.Features.NavigationBar)>
+        Public Sub TestNavigationBarInCSharpLinkedFiles()
+            Using workspace = TestWorkspace.Create(
                 <Workspace>
                     <Project Language="C#" CommonReferences="true" AssemblyName="CSProj" PreprocessorSymbols="Proj1">
                         <Document FilePath="C.cs">
@@ -103,7 +94,7 @@ class C
                     <Project Language="C#" CommonReferences="true" PreprocessorSymbols="Proj2">
                         <Document IsLinkFile="true" LinkAssemblyName="CSProj" LinkFilePath="C.cs"/>
                     </Project>
-                </Workspace>, exportProvider:=ExportProvider)
+                </Workspace>, composition:=EditorTestCompositions.EditorFeatures)
 
                 Dim baseDocument = workspace.Documents.Single(Function(d) Not d.IsLinkFile)
                 Dim linkDocument = workspace.Documents.Single(Function(d) d.IsLinkFile)
@@ -124,7 +115,7 @@ class C
                     End Sub)
 
                 Dim controllerFactory = workspace.GetService(Of INavigationBarControllerFactoryService)()
-                Dim controller = controllerFactory.CreateController(mockPresenter, baseDocument.TextBuffer)
+                Dim controller = controllerFactory.CreateController(mockPresenter, baseDocument.GetTextBuffer())
 
                 memberName = Nothing
                 mockPresenter.RaiseDropDownFocused()
@@ -140,9 +131,9 @@ class C
             End Using
         End Sub
 
-        <Fact, Trait(Traits.Feature, Traits.Features.NavigationBar)>
-        Sub TestNavigationBarInVisualBasicLinkedFiles()
-            Using workspace = TestWorkspaceFactory.CreateWorkspace(
+        <WpfFact, Trait(Traits.Feature, Traits.Features.NavigationBar)>
+        Public Sub TestNavigationBarInVisualBasicLinkedFiles()
+            Using workspace = TestWorkspace.Create(
                 <Workspace>
                     <Project Language="Visual Basic" CommonReferences="true" AssemblyName="VBProj" PreprocessorSymbols="Proj1=True">
                         <Document FilePath="C.vb">
@@ -161,7 +152,7 @@ End Class
                     <Project Language="Visual Basic" CommonReferences="true" PreprocessorSymbols="Proj2=True">
                         <Document IsLinkFile="true" LinkAssemblyName="VBProj" LinkFilePath="C.vb"/>
                     </Project>
-                </Workspace>, exportProvider:=ExportProvider)
+                </Workspace>, composition:=EditorTestCompositions.EditorFeatures)
 
                 Dim baseDocument = workspace.Documents.Single(Function(d) Not d.IsLinkFile)
                 Dim linkDocument = workspace.Documents.Single(Function(d) d.IsLinkFile)
@@ -182,7 +173,7 @@ End Class
                     End Sub)
 
                 Dim controllerFactory = workspace.GetService(Of INavigationBarControllerFactoryService)()
-                Dim controller = controllerFactory.CreateController(mockPresenter, baseDocument.TextBuffer)
+                Dim controller = controllerFactory.CreateController(mockPresenter, baseDocument.GetTextBuffer())
 
                 memberNames = Nothing
                 mockPresenter.RaiseDropDownFocused()
@@ -200,9 +191,9 @@ End Class
             End Using
         End Sub
 
-        <Fact, Trait(Traits.Feature, Traits.Features.NavigationBar)>
-        Sub TestProjectItemsAreSortedCSharp()
-            Using workspace = TestWorkspaceFactory.CreateWorkspace(
+        <WpfFact, Trait(Traits.Feature, Traits.Features.NavigationBar)>
+        Public Sub TestProjectItemsAreSortedCSharp()
+            Using workspace = TestWorkspace.Create(
                 <Workspace>
                     <Project Language="C#" CommonReferences="true" AssemblyName="BProj">
                         <Document FilePath="C.cs">
@@ -217,7 +208,7 @@ class C
                     <Project Language="C#" CommonReferences="true" AssemblyName="CProj">
                         <Document IsLinkFile="true" LinkAssemblyName="BProj" LinkFilePath="C.cs"/>
                     </Project>
-                </Workspace>, exportProvider:=ExportProvider)
+                </Workspace>, composition:=EditorTestCompositions.EditorFeatures)
 
                 Dim baseDocument = workspace.Documents.Single(Function(d) Not d.IsLinkFile)
                 Dim expectedProjectNames As New List(Of String) From {"AProj", "BProj", "CProj"}
@@ -236,16 +227,16 @@ class C
                     End Sub)
 
                 Dim controllerFactory = workspace.GetService(Of INavigationBarControllerFactoryService)()
-                Dim controller = controllerFactory.CreateController(mockPresenter, baseDocument.TextBuffer)
+                Dim controller = controllerFactory.CreateController(mockPresenter, baseDocument.GetTextBuffer())
 
                 mockPresenter.RaiseDropDownFocused()
                 Assert.True(actualProjectNames.SequenceEqual(expectedProjectNames))
             End Using
         End Sub
 
-        <Fact, Trait(Traits.Feature, Traits.Features.NavigationBar)>
-        Sub TestProjectItemsAreSortedVisualBasic()
-            Using workspace = TestWorkspaceFactory.CreateWorkspace(
+        <WpfFact, Trait(Traits.Feature, Traits.Features.NavigationBar)>
+        Public Sub TestProjectItemsAreSortedVisualBasic()
+            Using workspace = TestWorkspace.Create(
                 <Workspace>
                     <Project Language="Visual Basic" CommonReferences="true" AssemblyName="VBProj">
                         <Document FilePath="C.vb">
@@ -256,7 +247,7 @@ End Class
                     <Project Language="Visual Basic" CommonReferences="true" AssemblyName="VB-Proj1">
                         <Document IsLinkFile="true" LinkAssemblyName="VBProj" LinkFilePath="C.vb"/>
                     </Project>
-                </Workspace>, exportProvider:=ExportProvider)
+                </Workspace>, composition:=EditorTestCompositions.EditorFeatures)
 
                 Dim baseDocument = workspace.Documents.Single(Function(d) Not d.IsLinkFile)
                 Dim expectedProjectNames As New List(Of String) From {"VBProj", "VB-Proj1"}
@@ -275,16 +266,16 @@ End Class
                     End Sub)
 
                 Dim controllerFactory = workspace.GetService(Of INavigationBarControllerFactoryService)()
-                Dim controller = controllerFactory.CreateController(mockPresenter, baseDocument.TextBuffer)
+                Dim controller = controllerFactory.CreateController(mockPresenter, baseDocument.GetTextBuffer())
 
                 mockPresenter.RaiseDropDownFocused()
                 Assert.True(actualProjectNames.SequenceEqual(expectedProjectNames))
             End Using
         End Sub
 
-        <Fact, Trait(Traits.Feature, Traits.Features.NavigationBar)>
-        Sub TestNavigationBarRefreshesAfterProjectRename()
-            Using workspace = TestWorkspaceFactory.CreateWorkspace(
+        <WpfFact, Trait(Traits.Feature, Traits.Features.NavigationBar)>
+        Public Async Function TestNavigationBarRefreshesAfterProjectRename() As Task
+            Using workspace = TestWorkspace.Create(
                 <Workspace>
                     <Project Language="Visual Basic" CommonReferences="true" AssemblyName="VBProj">
                         <Document FilePath="C.vb">
@@ -293,7 +284,7 @@ Class C
 End Class
                         </Document>
                     </Project>
-                </Workspace>, exportProvider:=ExportProvider)
+                </Workspace>, composition:=EditorTestCompositions.EditorFeatures)
 
                 Dim document = workspace.Documents.Single()
 
@@ -310,22 +301,25 @@ End Class
                     End Sub)
 
                 Dim controllerFactory = workspace.GetService(Of INavigationBarControllerFactoryService)()
-                Dim controller = controllerFactory.CreateController(mockPresenter, document.TextBuffer)
+                Dim controller = controllerFactory.CreateController(mockPresenter, document.GetTextBuffer())
+                controller.SetWorkspace(workspace)
 
                 mockPresenter.RaiseDropDownFocused()
                 Assert.Equal("VBProj", projectName)
 
                 workspace.OnProjectNameChanged(workspace.Projects.Single().Id, "VBProj2", "VBProj2.vbproj")
 
-                workspace.ExportProvider.GetExports(Of IAsynchronousOperationWaiter, FeatureMetadata)().Where(Function(l) l.Metadata.FeatureName = FeatureAttribute.Workspace).Single().Value.CreateWaitTask().PumpingWait()
-                workspace.ExportProvider.GetExports(Of IAsynchronousOperationWaiter, FeatureMetadata)().Where(Function(l) l.Metadata.FeatureName = FeatureAttribute.NavigationBar).Single().Value.CreateWaitTask().PumpingWait()
+                Dim listenerProvider = workspace.ExportProvider.GetExportedValue(Of AsynchronousOperationListenerProvider)()
+                Dim workspaceWaiter = listenerProvider.GetWaiter(FeatureAttribute.Workspace)
+                Dim navigationBarWaiter = listenerProvider.GetWaiter(FeatureAttribute.NavigationBar)
 
-                workspace.ExportProvider.GetExportedValues(Of IAsynchronousOperationWaiter) _
-                    .Select(Function(waiter) waiter.CreateWaitTask()) _
-                    .PumpingWaitAll()
+                Await workspaceWaiter.ExpeditedWaitAsync()
+                Await navigationBarWaiter.ExpeditedWaitAsync()
+
+                Await listenerProvider.WaitAllDispatcherOperationAndTasksAsync(workspace, FeatureAttribute.Workspace, FeatureAttribute.NavigationBar)
 
                 Assert.Equal("VBProj2", projectName)
             End Using
-        End Sub
+        End Function
     End Class
 End Namespace

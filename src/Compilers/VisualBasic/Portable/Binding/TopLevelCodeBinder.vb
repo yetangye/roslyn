@@ -1,15 +1,8 @@
-﻿' Copyright (c) Microsoft.  All Rights Reserved.  Licensed under the Apache License, Version 2.0.  See License.txt in the project root for license information.
+﻿' Licensed to the .NET Foundation under one or more agreements.
+' The .NET Foundation licenses this file to you under the MIT license.
+' See the LICENSE file in the project root for more information.
 
-Imports System.Collections.Concurrent
-Imports System.Collections.Generic
-Imports System.Runtime.InteropServices
-Imports System.Threading
-Imports Microsoft.CodeAnalysis.RuntimeMembers
-Imports Microsoft.CodeAnalysis.Text
 Imports Microsoft.CodeAnalysis.VisualBasic.Symbols
-Imports Microsoft.CodeAnalysis.VisualBasic.Syntax
-Imports Roslyn.Utilities
-Imports TypeKind = Microsoft.CodeAnalysis.TypeKind
 
 Namespace Microsoft.CodeAnalysis.VisualBasic
 
@@ -22,9 +15,9 @@ Namespace Microsoft.CodeAnalysis.VisualBasic
         ''' <summary>
         ''' Create binder for binding the body of a method. 
         ''' </summary>
-        Public Sub New(scriptConstructor As MethodSymbol, containingBinder As Binder)
-            MyBase.New(scriptConstructor, scriptConstructor.Syntax, containingBinder)
-            Debug.Assert(scriptConstructor.ContainingType.IsScriptClass AndAlso scriptConstructor.MethodKind = MethodKind.Constructor)
+        Public Sub New(scriptInitializer As MethodSymbol, containingBinder As Binder)
+            MyBase.New(scriptInitializer, scriptInitializer.Syntax, containingBinder)
+            Debug.Assert(scriptInitializer.ContainingType.IsScriptClass)
         End Sub
 
         Public Overrides Function GetLocalForFunctionValue() As LocalSymbol

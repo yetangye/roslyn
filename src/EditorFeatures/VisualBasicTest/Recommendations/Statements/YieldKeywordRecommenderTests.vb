@@ -1,16 +1,17 @@
-' Copyright (c) Microsoft.  All Rights Reserved.  Licensed under the Apache License, Version 2.0.  See License.txt in the project root for license information.
+﻿' Licensed to the .NET Foundation under one or more agreements.
+' The .NET Foundation licenses this file to you under the MIT license.
+' See the LICENSE file in the project root for more information.
 
-Imports Microsoft.CodeAnalysis.Text
 Namespace Microsoft.CodeAnalysis.Editor.VisualBasic.UnitTests.Recommendations.Statements
     Public Class YieldKeywordRecommenderTests
 
         <Fact, Trait(Traits.Feature, Traits.Features.KeywordRecommending)>
-        Public Sub InMethodBody()
+        Public Sub InMethodBodyTest()
             VerifyRecommendationsContain(<MethodBody>|</MethodBody>, "Yield")
         End Sub
 
         <Fact, Trait(Traits.Feature, Traits.Features.KeywordRecommending)>
-        Public Sub InLambdaBody()
+        Public Sub InLambdaBodyTest()
             Dim code =
 <MethodBody>
 Dim f = Function()
@@ -22,7 +23,7 @@ Dim f = Function()
         End Sub
 
         <Fact, Trait(Traits.Feature, Traits.Features.KeywordRecommending)>
-        Public Sub NotInExpression()
+        Public Sub NotInExpressionTest()
             Dim code =
 <MethodBody>
 Dim f = |
@@ -30,6 +31,5 @@ Dim f = |
 
             VerifyRecommendationsMissing(code, "Yield")
         End Sub
-
     End Class
 End Namespace

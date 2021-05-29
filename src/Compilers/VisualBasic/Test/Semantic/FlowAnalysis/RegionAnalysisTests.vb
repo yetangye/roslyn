@@ -1,15 +1,11 @@
-﻿' Copyright (c) Microsoft.  All Rights Reserved.  Licensed under the Apache License, Version 2.0.  See License.txt in the project root for license information.
+﻿' Licensed to the .NET Foundation under one or more agreements.
+' The .NET Foundation licenses this file to you under the MIT license.
+' See the LICENSE file in the project root for more information.
 
-Imports System
-Imports System.Collections.Generic
-Imports System.Linq
-Imports System.Xml.Linq
-Imports Microsoft.CodeAnalysis.Text
-Imports Microsoft.CodeAnalysis.VisualBasic.Symbols
+Imports Microsoft.CodeAnalysis.Test.Utilities
 Imports Microsoft.CodeAnalysis.VisualBasic.Syntax
 
 Imports Roslyn.Test.Utilities
-Imports Xunit
 
 Namespace Microsoft.CodeAnalysis.VisualBasic.UnitTests
     Partial Public Class FlowAnalysisTests
@@ -17,7 +13,7 @@ Namespace Microsoft.CodeAnalysis.VisualBasic.UnitTests
 
         <Fact()>
         Public Sub NullArgsToFlowAnalysisMethods()
-            Dim compilation = CreateCompilationWithMscorlib(
+            Dim compilation = CreateCompilationWithMscorlib40(
         <compilation name="TestEntryPoints01">
             <file name="a.b">
 class C 
@@ -86,14 +82,16 @@ End Class
       </compilation>)
 
             Assert.True(analysis.Succeeded)
-            Assert.Equal(Nothing, GetSymbolNamesSortedAndJoined(analysis.AlwaysAssigned))
-            Assert.Equal("s", GetSymbolNamesSortedAndJoined(analysis.DataFlowsIn))
-            Assert.Equal("s", GetSymbolNamesSortedAndJoined(analysis.DataFlowsOut))
-            Assert.Equal("s", GetSymbolNamesSortedAndJoined(analysis.ReadInside))
-            Assert.Equal("s", GetSymbolNamesSortedAndJoined(analysis.WrittenInside))
+            Assert.Equal(Nothing, GetSymbolNamesJoined(analysis.AlwaysAssigned))
+            Assert.Equal("s", GetSymbolNamesJoined(analysis.DataFlowsIn))
+            Assert.Equal("s", GetSymbolNamesJoined(analysis.DataFlowsOut))
+            Assert.Equal("args, s", GetSymbolNamesJoined(analysis.DefinitelyAssignedOnEntry))
+            Assert.Equal("args, s", GetSymbolNamesJoined(analysis.DefinitelyAssignedOnExit))
+            Assert.Equal("s", GetSymbolNamesJoined(analysis.ReadInside))
+            Assert.Equal("s", GetSymbolNamesJoined(analysis.WrittenInside))
         End Sub
 
-        <WorkItem(768095, "DevDiv")>
+        <WorkItem(768095, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/768095")>
         <Fact()>
         Public Sub Bug768095()
             Dim analysis = CompileAndAnalyzeDataFlow(
@@ -117,7 +115,7 @@ End Class
             Assert.False(analysis.Succeeded)
         End Sub
 
-        <WorkItem(531223, "DevDiv")>
+        <WorkItem(531223, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/531223")>
         <Fact()>
         Public Sub Bug17780a()
             Dim analysis = CompileAndAnalyzeDataFlow(
@@ -133,7 +131,7 @@ End Class
             Assert.False(analysis.Succeeded)
         End Sub
 
-        <WorkItem(531223, "DevDiv")>
+        <WorkItem(531223, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/531223")>
         <Fact()>
         Public Sub Bug17780b()
             ' TODO: Rewrite the test when Yield is supported
@@ -153,7 +151,7 @@ Friend Class SourceFileScope
             Assert.True(analysis.Succeeded)
         End Sub
 
-        <WorkItem(543362, "DevDiv")>
+        <WorkItem(543362, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/543362")>
         <Fact()>
         Public Sub Bug11067()
             Dim analysis = CompileAndAnalyzeDataFlow(
@@ -169,7 +167,7 @@ End Class
             Assert.True(analysis.Succeeded)
         End Sub
 
-        <WorkItem(529967, "DevDiv")>
+        <WorkItem(529967, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/529967")>
         <Fact()>
         Public Sub Bug14894a()
             Dim analysis = CompileAndAnalyzeDataFlow(
@@ -185,15 +183,17 @@ End Module
 </file>
       </compilation>)
             Assert.True(analysis.Succeeded)
-            Assert.Equal("o3", GetSymbolNamesSortedAndJoined(analysis.ReadInside))
-            Assert.Equal(Nothing, GetSymbolNamesSortedAndJoined(analysis.ReadOutside))
-            Assert.Equal("args, o3", GetSymbolNamesSortedAndJoined(analysis.WrittenOutside))
-            Assert.Equal("col1", GetSymbolNamesSortedAndJoined(analysis.WrittenInside))
-            Assert.Equal("o3", GetSymbolNamesSortedAndJoined(analysis.DataFlowsIn))
-            Assert.Equal(Nothing, GetSymbolNamesSortedAndJoined(analysis.DataFlowsOut))
+            Assert.Equal("o3", GetSymbolNamesJoined(analysis.ReadInside))
+            Assert.Equal(Nothing, GetSymbolNamesJoined(analysis.ReadOutside))
+            Assert.Equal("args, o3", GetSymbolNamesJoined(analysis.WrittenOutside))
+            Assert.Equal("col1", GetSymbolNamesJoined(analysis.WrittenInside))
+            Assert.Equal("o3", GetSymbolNamesJoined(analysis.DataFlowsIn))
+            Assert.Equal(Nothing, GetSymbolNamesJoined(analysis.DataFlowsOut))
+            Assert.Equal("args, o3", GetSymbolNamesJoined(analysis.DefinitelyAssignedOnEntry))
+            Assert.Equal("args, o3, col1", GetSymbolNamesJoined(analysis.DefinitelyAssignedOnExit))
         End Sub
 
-        <WorkItem(529967, "DevDiv")>
+        <WorkItem(529967, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/529967")>
         <Fact()>
         Public Sub Bug14894b()
             Dim analysis = CompileAndAnalyzeDataFlow(
@@ -209,10 +209,12 @@ End Module
 </file>
       </compilation>)
             Assert.True(analysis.Succeeded)
-            Assert.Equal("o3", GetSymbolNamesSortedAndJoined(analysis.DataFlowsIn))
+            Assert.Equal("o3", GetSymbolNamesJoined(analysis.DataFlowsIn))
+            Assert.Equal("args, o3", GetSymbolNamesJoined(analysis.DefinitelyAssignedOnEntry))
+            Assert.Equal("args, o3", GetSymbolNamesJoined(analysis.DefinitelyAssignedOnExit))
         End Sub
 
-        <WorkItem(544602, "DevDiv")>
+        <WorkItem(544602, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/544602")>
         <Fact()>
         Public Sub Bug13053a()
             Dim analysis = CompileAndAnalyzeDataFlow(
@@ -229,7 +231,7 @@ End Class
             Assert.True(analysis.Succeeded)
         End Sub
 
-        <WorkItem(545069, "DevDiv")>
+        <WorkItem(545069, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/545069")>
         <Fact()>
         Public Sub ParameterNameAsAnInvalidRegion()
             Dim analysis = CompileAndAnalyzeDataFlow(
@@ -245,7 +247,7 @@ End Module
             Assert.False(analysis.Succeeded)
         End Sub
 
-        <WorkItem(545443, "DevDiv")>
+        <WorkItem(545443, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/545443")>
         <Fact()>
         Public Sub XmlNameInsideEndTag()
             Dim analysis = CompileAndAnalyzeDataFlow(
@@ -261,7 +263,7 @@ End Module
             Assert.False(analysis.Succeeded)
         End Sub
 
-        <WorkItem(545077, "DevDiv")>
+        <WorkItem(545077, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/545077")>
         <Fact()>
         Public Sub ExpressionsInAttributeValues()
             Dim analysis = CompileAndAnalyzeDataFlow(
@@ -279,7 +281,7 @@ Imports System.Reflection
             Assert.False(analysis.Succeeded)
         End Sub
 
-        <WorkItem(545077, "DevDiv")>
+        <WorkItem(545077, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/545077")>
         <Fact()>
         Public Sub ExpressionsInAttributeValues2()
             Dim analysis = CompileAndAnalyzeDataFlow(
@@ -321,7 +323,7 @@ End Class
             Assert.False(analysis.Succeeded)
         End Sub
 
-        <WorkItem(545432, "DevDiv")>
+        <WorkItem(545432, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/545432")>
         <Fact()>
         Public Sub LowerBoundOfArrayDefinitionSize()
             Dim analysis = CompileAndAnalyzeDataFlow(
@@ -337,7 +339,7 @@ End Class
             Assert.False(analysis.Succeeded)
         End Sub
 
-        <WorkItem(544602, "DevDiv")>
+        <WorkItem(544602, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/544602")>
         <Fact()>
         Public Sub Bug13053b()
             Dim analysis = CompileAndAnalyzeDataFlow(
@@ -354,7 +356,7 @@ End Class
             Assert.True(analysis.Succeeded)
         End Sub
 
-        <WorkItem(679765, "DevDiv")>
+        <WorkItem(679765, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/679765")>
         <Fact()>
         Public Sub Bug679765a()
             Dim analysis = CompileAndAnalyzeDataFlow(
@@ -371,7 +373,7 @@ End Class
             Assert.True(analysis.Succeeded)
         End Sub
 
-        <WorkItem(679765, "DevDiv")>
+        <WorkItem(679765, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/679765")>
         <Fact()>
         Public Sub Bug679765b()
             Dim analysis = CompileAndAnalyzeDataFlow(
@@ -388,7 +390,7 @@ End Class
             Assert.True(analysis.Succeeded)
         End Sub
 
-        <WorkItem(679765, "DevDiv")>
+        <WorkItem(679765, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/679765")>
         <Fact()>
         Public Sub Bug679765c()
             Dim analysis = CompileAndAnalyzeDataFlow(
@@ -405,7 +407,7 @@ End Class
             Assert.True(analysis.Succeeded)
         End Sub
 
-        <WorkItem(543570, "DevDiv")>
+        <WorkItem(543570, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/543570")>
         <Fact()>
         Public Sub Bug11428()
             Dim analysis = CompileAndAnalyzeDataFlow(
@@ -416,13 +418,13 @@ Module Program
     End Sub
 End Module
 Class C
-    Public Sub Foo()
+    Public Sub Goo()
     End Sub
 End Class
 Class M
     Inherits C
     Public r As Double
-    Public Overrides Sub Foo()
+    Public Overrides Sub Goo()
         Return [|MyBase.Total|] * r
     End Sub
 End Class
@@ -431,7 +433,7 @@ End Class
             Assert.True(analysis.Succeeded)
         End Sub
 
-        <WorkItem(543581, "DevDiv")>
+        <WorkItem(543581, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/543581")>
         <Fact()>
         Public Sub Bug11440a()
             Dim analysis = CompileAndAnalyzeDataFlow(
@@ -454,18 +456,20 @@ End Module
       </compilation>)
 
             Assert.True(analysis.Succeeded)
-            Assert.Equal(Nothing, GetSymbolNamesSortedAndJoined(analysis.AlwaysAssigned))
-            Assert.Equal(Nothing, GetSymbolNamesSortedAndJoined(analysis.Captured))
-            Assert.Equal("arg1, arg2", GetSymbolNamesSortedAndJoined(analysis.DataFlowsIn))
-            Assert.Equal(Nothing, GetSymbolNamesSortedAndJoined(analysis.DataFlowsOut))
-            Assert.Equal("arg1, arg2", GetSymbolNamesSortedAndJoined(analysis.ReadInside))
-            Assert.Equal("arg, arg1", GetSymbolNamesSortedAndJoined(analysis.ReadOutside))
-            Assert.Equal(Nothing, GetSymbolNamesSortedAndJoined(analysis.VariablesDeclared))
-            Assert.Equal(Nothing, GetSymbolNamesSortedAndJoined(analysis.WrittenInside))
-            Assert.Equal("arg, arg1, arg2, args, lambda", GetSymbolNamesSortedAndJoined(analysis.WrittenOutside))
+            Assert.Equal(Nothing, GetSymbolNamesJoined(analysis.AlwaysAssigned))
+            Assert.Equal(Nothing, GetSymbolNamesJoined(analysis.Captured))
+            Assert.Equal("arg1, arg2", GetSymbolNamesJoined(analysis.DataFlowsIn))
+            Assert.Equal(Nothing, GetSymbolNamesJoined(analysis.DataFlowsOut))
+            Assert.Equal("args, lambda, arg, arg1", GetSymbolNamesJoined(analysis.DefinitelyAssignedOnEntry))
+            Assert.Equal("args, lambda, arg, arg1", GetSymbolNamesJoined(analysis.DefinitelyAssignedOnExit))
+            Assert.Equal("arg1, arg2", GetSymbolNamesJoined(analysis.ReadInside))
+            Assert.Equal("arg, arg1", GetSymbolNamesJoined(analysis.ReadOutside))
+            Assert.Equal(Nothing, GetSymbolNamesJoined(analysis.VariablesDeclared))
+            Assert.Equal(Nothing, GetSymbolNamesJoined(analysis.WrittenInside))
+            Assert.Equal("args, lambda, arg, arg1, arg2", GetSymbolNamesJoined(analysis.WrittenOutside))
         End Sub
 
-        <WorkItem(543581, "DevDiv")>
+        <WorkItem(543581, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/543581")>
         <Fact()>
         Public Sub Bug11440b()
             Dim analysis = CompileAndAnalyzeDataFlow(
@@ -484,25 +488,27 @@ End Module
       </compilation>)
 
             Assert.True(analysis.Succeeded)
-            Assert.Equal(Nothing, GetSymbolNamesSortedAndJoined(analysis.AlwaysAssigned))
-            Assert.Equal(Nothing, GetSymbolNamesSortedAndJoined(analysis.Captured))
-            Assert.Equal("arg2", GetSymbolNamesSortedAndJoined(analysis.DataFlowsIn))
-            Assert.Equal(Nothing, GetSymbolNamesSortedAndJoined(analysis.DataFlowsOut))
-            Assert.Equal("arg2", GetSymbolNamesSortedAndJoined(analysis.ReadInside))
-            Assert.Equal(Nothing, GetSymbolNamesSortedAndJoined(analysis.ReadOutside))
-            Assert.Equal(Nothing, GetSymbolNamesSortedAndJoined(analysis.VariablesDeclared))
-            Assert.Equal(Nothing, GetSymbolNamesSortedAndJoined(analysis.WrittenInside))
-            Assert.Equal("arg2, args, y", GetSymbolNamesSortedAndJoined(analysis.WrittenOutside))
+            Assert.Equal(Nothing, GetSymbolNamesJoined(analysis.AlwaysAssigned))
+            Assert.Equal(Nothing, GetSymbolNamesJoined(analysis.Captured))
+            Assert.Equal("arg2", GetSymbolNamesJoined(analysis.DataFlowsIn))
+            Assert.Equal(Nothing, GetSymbolNamesJoined(analysis.DataFlowsOut))
+            Assert.Equal("args", GetSymbolNamesJoined(analysis.DefinitelyAssignedOnEntry))
+            Assert.Equal("args", GetSymbolNamesJoined(analysis.DefinitelyAssignedOnExit))
+            Assert.Equal("arg2", GetSymbolNamesJoined(analysis.ReadInside))
+            Assert.Equal(Nothing, GetSymbolNamesJoined(analysis.ReadOutside))
+            Assert.Equal(Nothing, GetSymbolNamesJoined(analysis.VariablesDeclared))
+            Assert.Equal(Nothing, GetSymbolNamesJoined(analysis.WrittenInside))
+            Assert.Equal("args, arg2, y", GetSymbolNamesJoined(analysis.WrittenOutside))
         End Sub
 
-        <WorkItem(544330, "DevDiv")>
+        <WorkItem(544330, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/544330")>
         <Fact()>
         Public Sub Bug12609()
             Dim analysis = CompileAndAnalyzeDataFlow(
       <compilation name="Bug12609">
           <file name="a.b">
 Class A    
-    Sub Foo(Optional i As Integer = [|1|])
+    Sub Goo(Optional i As Integer = [|1|])
     End Sub
 End Class
           </file>
@@ -510,14 +516,14 @@ End Class
             Assert.False(analysis.Succeeded)
         End Sub
 
-        <WorkItem(542231, "DevDiv")>
+        <WorkItem(542231, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/542231")>
         <Fact()>
         Public Sub TestUnreachableRegion()
             Dim analysis = CompileAndAnalyzeDataFlow(
       <compilation>
           <file name="a.b">
 Class A    
-    Sub Foo()
+    Sub Goo()
         Dim i As Integer
         Return
         [| i = i + 1 |]
@@ -528,18 +534,20 @@ End Class
       </compilation>)
 
             Assert.True(analysis.Succeeded)
-            Assert.Equal(Nothing, GetSymbolNamesSortedAndJoined(analysis.DataFlowsIn))
-            Assert.Equal(Nothing, GetSymbolNamesSortedAndJoined(analysis.DataFlowsOut))
+            Assert.Equal(Nothing, GetSymbolNamesJoined(analysis.DataFlowsIn))
+            Assert.Equal(Nothing, GetSymbolNamesJoined(analysis.DataFlowsOut))
+            Assert.Equal(Nothing, GetSymbolNamesJoined(analysis.DefinitelyAssignedOnEntry))
+            Assert.Equal(Nothing, GetSymbolNamesJoined(analysis.DefinitelyAssignedOnExit))
         End Sub
 
-        <WorkItem(542231, "DevDiv")>
+        <WorkItem(542231, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/542231")>
         <Fact()>
         Public Sub TestUnreachableRegion2()
             Dim analysis = CompileAndAnalyzeDataFlow(
       <compilation>
           <file name="a.b">
 Class A    
-    Sub Foo()
+    Sub Goo()
         Dim i As Integer = 0
         Dim j As Integer = 0
         Dim k As Integer = 0
@@ -570,18 +578,20 @@ End Class
       </compilation>)
 
             Assert.True(analysis.Succeeded)
-            Assert.Equal("j, l", GetSymbolNamesSortedAndJoined(analysis.DataFlowsIn))
-            Assert.Equal("i, k", GetSymbolNamesSortedAndJoined(analysis.DataFlowsOut))
+            Assert.Equal("j, l", GetSymbolNamesJoined(analysis.DataFlowsIn))
+            Assert.Equal("i, k", GetSymbolNamesJoined(analysis.DataFlowsOut))
+            Assert.Equal(Nothing, GetSymbolNamesJoined(analysis.DefinitelyAssignedOnEntry))
+            Assert.Equal("Me, i, j, k, l", GetSymbolNamesJoined(analysis.DefinitelyAssignedOnExit))
         End Sub
 
-        <WorkItem(542231, "DevDiv")>
+        <WorkItem(542231, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/542231")>
         <Fact()>
         Public Sub TestUnreachableRegionInExpression()
             Dim analysis = CompileAndAnalyzeDataFlow(
       <compilation>
           <file name="a.b">
 Class A    
-    Function Foo() As Boolean
+    Function Goo() As Boolean
         Dim i As Boolean = True
         Dim j As Boolean = False
         dim ext as external = new external
@@ -589,21 +599,21 @@ Class A
     End Function 
 End Class
           </file>
-      </compilation>, customIL)
+      </compilation>, s_customIL)
 
             Assert.True(analysis.Succeeded)
-            Assert.Equal(Nothing, GetSymbolNamesSortedAndJoined(analysis.DataFlowsIn))
-            Assert.Equal(Nothing, GetSymbolNamesSortedAndJoined(analysis.DataFlowsOut))
+            Assert.Equal(Nothing, GetSymbolNamesJoined(analysis.DataFlowsIn))
+            Assert.Equal(Nothing, GetSymbolNamesJoined(analysis.DataFlowsOut))
         End Sub
 
-        <WorkItem(545445, "DevDiv")>
+        <WorkItem(545445, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/545445")>
         <Fact()>
         Public Sub ExpressionInside()
             Dim analysis = CompileAndAnalyzeDataFlow(
       <compilation name="Bug12609">
           <file name="a.b">
 Class A    
-    Sub Foo()
+    Sub Goo()
         Dim outputAuthoringDocument = &lt;?xml version=[|"1.0"|]?&gt;
               &lt;wix:Wix&gt;
                   &lt;wix:Fragment&gt;
@@ -618,14 +628,14 @@ End Class
             Assert.False(analysis.Succeeded)
         End Sub
 
-        <WorkItem(544201, "DevDiv")>
+        <WorkItem(544201, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/544201")>
         <Fact()>
         Public Sub Bug12423a()
             Dim analysis = CompileAndAnalyzeDataFlow(
       <compilation name="Bug12423a">
           <file name="a.b">
 Class A    
-    Sub Foo()
+    Sub Goo()
         Dim x = { [| New B (abc) |] }
     End Sub
 End Class
@@ -638,14 +648,14 @@ End Class
             Assert.True(analysis.Succeeded)
         End Sub
 
-        <WorkItem(544201, "DevDiv")>
+        <WorkItem(544201, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/544201")>
         <Fact()>
         Public Sub Bug12423b()
             Dim analysis = CompileAndAnalyzeDataFlow(
       <compilation name="Bug12423b">
           <file name="a.b">
 Class A    
-    Sub Foo(i As Integer)
+    Sub Goo(i As Integer)
         Dim x = New B([| i |] ) { New B (abc) }
     End Sub
 End Class
@@ -662,7 +672,7 @@ End Class
         Public Sub TestDataFlowForValueTypes()
 
             ' WARNING: test matches the same test in C# (TestDataFlowForValueTypes)
-            '          Keep the two tests in synch!
+            '          Keep the two tests in sync!
 
             Dim analysis = CompileAndAnalyzeDataFlow(
       <compilation name="TestDataFlowForValueTypes">
@@ -716,18 +726,20 @@ End Enum
 </file>
       </compilation>)
 
-            Assert.Equal(Nothing, GetSymbolNamesSortedAndJoined(analysis.AlwaysAssigned))
-            Assert.Equal(Nothing, GetSymbolNamesSortedAndJoined(analysis.Captured))
-            Assert.Equal("c, d, e, f", GetSymbolNamesSortedAndJoined(analysis.DataFlowsIn))
-            Assert.Equal(Nothing, GetSymbolNamesSortedAndJoined(analysis.DataFlowsOut))
-            Assert.Equal("a, b, c, d, e, f", GetSymbolNamesSortedAndJoined(analysis.ReadInside))
-            Assert.Equal(Nothing, GetSymbolNamesSortedAndJoined(analysis.ReadOutside))
-            Assert.Equal(Nothing, GetSymbolNamesSortedAndJoined(analysis.VariablesDeclared))
-            Assert.Equal(Nothing, GetSymbolNamesSortedAndJoined(analysis.WrittenInside))
-            Assert.Equal(Nothing, GetSymbolNamesSortedAndJoined(analysis.WrittenOutside))
+            Assert.Equal(Nothing, GetSymbolNamesJoined(analysis.AlwaysAssigned))
+            Assert.Equal(Nothing, GetSymbolNamesJoined(analysis.Captured))
+            Assert.Equal("c, d, e, f", GetSymbolNamesJoined(analysis.DataFlowsIn))
+            Assert.Equal(Nothing, GetSymbolNamesJoined(analysis.DataFlowsOut))
+            Assert.Equal(Nothing, GetSymbolNamesJoined(analysis.DefinitelyAssignedOnEntry))
+            Assert.Equal(Nothing, GetSymbolNamesJoined(analysis.DefinitelyAssignedOnExit))
+            Assert.Equal("a, b, c, d, e, f", GetSymbolNamesJoined(analysis.ReadInside))
+            Assert.Equal(Nothing, GetSymbolNamesJoined(analysis.ReadOutside))
+            Assert.Equal(Nothing, GetSymbolNamesJoined(analysis.VariablesDeclared))
+            Assert.Equal(Nothing, GetSymbolNamesJoined(analysis.WrittenInside))
+            Assert.Equal(Nothing, GetSymbolNamesJoined(analysis.WrittenOutside))
         End Sub
 
-        <WorkItem(768094, "DevDiv")>
+        <WorkItem(768094, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/768094")>
         <Fact()>
         Public Sub Bug768094a()
             Dim program =
@@ -780,7 +792,7 @@ end class
             Assert.Equal(0, analysis.EntryPoints.Count())
         End Sub
 
-        <WorkItem(768094, "DevDiv")>
+        <WorkItem(768094, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/768094")>
         <Fact()>
         Public Sub Bug768094b()
             Dim program =
@@ -923,7 +935,7 @@ End Namespace
             Dim comp = CompileAndGetModelAndSpan(program, startNodes, endNodes, Nothing, Nothing,
                                                  parseOptions:=
                                                     VisualBasicParseOptions.Default.WithPreprocessorSymbols(
-                                                        KeyValuePair.Create("SQLITE_DEBUG", CObj(True))))
+                                                        KeyValuePairUtil.Create("SQLITE_DEBUG", CObj(True))))
 
             Assert.Equal(4, startNodes.Count)
             Assert.Equal(SyntaxKind.DictionaryAccessExpression, startNodes(2).Kind)
@@ -935,7 +947,7 @@ End Namespace
             analysis = model.AnalyzeDataFlow(expr.Name) ' NO THROW
         End Sub
 
-        <WorkItem(768094, "DevDiv")>
+        <WorkItem(768094, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/768094")>
         <Fact()>
         Public Sub Bug768094c()
             Dim program =
@@ -963,7 +975,7 @@ End Class
             Dim analysis = model.AnalyzeDataFlow(expr) ' NO THROW
         End Sub
 
-        <WorkItem(768094, "DevDiv")>
+        <WorkItem(768094, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/768094")>
         <Fact()>
         Public Sub Bug768094d()
             Dim program =
@@ -1068,7 +1080,7 @@ end class
             Assert.True(analysis.EndPointIsReachable)
         End Sub
 
-        <WorkItem(543320, "DevDiv")>
+        <WorkItem(543320, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/543320")>
         <Fact()>
         Public Sub Bug10987()
             Dim analysis = CompileAndAnalyzeDataFlow(
@@ -1082,14 +1094,16 @@ End Class
 </file>
       </compilation>)
 
-            Assert.Equal(Nothing, GetSymbolNamesSortedAndJoined(analysis.VariablesDeclared))
-            Assert.Equal(Nothing, GetSymbolNamesSortedAndJoined(analysis.AlwaysAssigned))
-            Assert.Equal(Nothing, GetSymbolNamesSortedAndJoined(analysis.DataFlowsIn))
-            Assert.Equal(Nothing, GetSymbolNamesSortedAndJoined(analysis.DataFlowsOut))
-            Assert.Equal(Nothing, GetSymbolNamesSortedAndJoined(analysis.ReadInside))
-            Assert.Equal(Nothing, GetSymbolNamesSortedAndJoined(analysis.WrittenInside))
-            Assert.Equal(Nothing, GetSymbolNamesSortedAndJoined(analysis.ReadOutside))
-            Assert.Equal("y", GetSymbolNamesSortedAndJoined(analysis.WrittenOutside))
+            Assert.Equal(Nothing, GetSymbolNamesJoined(analysis.VariablesDeclared))
+            Assert.Equal(Nothing, GetSymbolNamesJoined(analysis.AlwaysAssigned))
+            Assert.Equal(Nothing, GetSymbolNamesJoined(analysis.DataFlowsIn))
+            Assert.Equal(Nothing, GetSymbolNamesJoined(analysis.DataFlowsOut))
+            Assert.Equal(Nothing, GetSymbolNamesJoined(analysis.DefinitelyAssignedOnEntry))
+            Assert.Equal(Nothing, GetSymbolNamesJoined(analysis.DefinitelyAssignedOnExit))
+            Assert.Equal(Nothing, GetSymbolNamesJoined(analysis.ReadInside))
+            Assert.Equal(Nothing, GetSymbolNamesJoined(analysis.WrittenInside))
+            Assert.Equal(Nothing, GetSymbolNamesJoined(analysis.ReadOutside))
+            Assert.Equal("y", GetSymbolNamesJoined(analysis.WrittenOutside))
         End Sub
 
         <Fact()>
@@ -1107,7 +1121,7 @@ End Module
   </file>
       </compilation>)
 
-            Assert.Equal("x", GetSymbolNamesSortedAndJoined(dataFlowAnalysis.DataFlowsIn))
+            Assert.Equal("x", GetSymbolNamesJoined(dataFlowAnalysis.DataFlowsIn))
         End Sub
 
         <Fact()>
@@ -1140,17 +1154,21 @@ End Class
         </file>
       </compilation>)
 
-            Assert.Equal(Nothing, GetSymbolNamesSortedAndJoined(analysis.AlwaysAssigned))
-            Assert.Equal(Nothing, GetSymbolNamesSortedAndJoined(analysis.Captured))
-            Assert.Equal("s", GetSymbolNamesSortedAndJoined(analysis.DataFlowsIn))
-            Assert.Equal(Nothing, GetSymbolNamesSortedAndJoined(analysis.DataFlowsOut))
-            Assert.Equal("s", GetSymbolNamesSortedAndJoined(analysis.ReadInside))
-            Assert.Equal("s", GetSymbolNamesSortedAndJoined(analysis.ReadOutside))
-            Assert.Equal(Nothing, GetSymbolNamesSortedAndJoined(analysis.WrittenInside))
-            Assert.Equal("args, s, t", GetSymbolNamesSortedAndJoined(analysis.WrittenOutside))
+            Assert.Equal(Nothing, GetSymbolNamesJoined(analysis.AlwaysAssigned))
+            Assert.Equal(Nothing, GetSymbolNamesJoined(analysis.Captured))
+            Assert.Equal(Nothing, GetSymbolNamesJoined(analysis.CapturedInside))
+            Assert.Equal(Nothing, GetSymbolNamesJoined(analysis.CapturedOutside))
+            Assert.Equal("s", GetSymbolNamesJoined(analysis.DataFlowsIn))
+            Assert.Equal(Nothing, GetSymbolNamesJoined(analysis.DataFlowsOut))
+            Assert.Equal("args", GetSymbolNamesJoined(analysis.DefinitelyAssignedOnEntry))
+            Assert.Equal("args", GetSymbolNamesJoined(analysis.DefinitelyAssignedOnExit))
+            Assert.Equal("s", GetSymbolNamesJoined(analysis.ReadInside))
+            Assert.Equal("s", GetSymbolNamesJoined(analysis.ReadOutside))
+            Assert.Equal(Nothing, GetSymbolNamesJoined(analysis.WrittenInside))
+            Assert.Equal("args, s, t", GetSymbolNamesJoined(analysis.WrittenOutside))
         End Sub
 
-        <WorkItem(542789, "DevDiv")>
+        <WorkItem(542789, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/542789")>
         <Fact()>
         Public Sub Bug10172()
             Dim analysis = CompileAndAnalyzeControlAndDataFlow(
@@ -1172,9 +1190,43 @@ End Module
 
             Assert.True(analysis.Item1.Succeeded)
             Assert.True(analysis.Item2.Succeeded)
+            Assert.Equal(Nothing, GetSymbolNamesJoined(analysis.Item2.Captured))
+            Assert.Equal(Nothing, GetSymbolNamesJoined(analysis.Item2.CapturedInside))
+            Assert.Equal(Nothing, GetSymbolNamesJoined(analysis.Item2.CapturedOutside))
         End Sub
 
-        <WorkItem(543645, "DevDiv")>
+        <WorkItem(1312, "https://github.com/dotnet/roslyn/issues/1312")>
+        <Fact()>
+        Public Sub Bug1312()
+            Dim analysis = CompileAndAnalyzeDataFlow(
+      <compilation name="Bug10172">
+          <file name="a.b">
+Imports System
+Imports System.Collections.Generic
+Imports System.Linq
+Class C
+    Function Z(f As Func(Of Integer)) As Integer
+        Return 1
+    End Function
+
+    Sub F()
+        Dim result1 = From a In {1}
+                    From b In {2}
+                    Where Z(Function() a+b)
+                    Select a
+        Dim result2 = From c In {1}
+                    From d In {2}
+                    Where Z(Function() [|c|]+d) > 0
+                    Select c
+    End Sub
+End Class</file>
+      </compilation>)
+            Assert.Equal("Me, c", GetSymbolNamesJoined(analysis.Captured))
+            Assert.Equal("c", GetSymbolNamesJoined(analysis.CapturedInside))
+            Assert.Equal("Me", GetSymbolNamesJoined(analysis.CapturedOutside))
+        End Sub
+
+        <WorkItem(543645, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/543645")>
         <Fact()>
         Public Sub Bug11526()
             Dim analysis = CompileAndAnalyzeControlAndDataFlow(
@@ -1201,7 +1253,7 @@ End Module
             Assert.True(analysis.Item2.Succeeded)
         End Sub
 
-        <WorkItem(543111, "DevDiv")>
+        <WorkItem(543111, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/543111")>
         <Fact()>
         Public Sub Bug10683a()
             Dim analysis = CompileAndAnalyzeDataFlow(
@@ -1241,9 +1293,11 @@ End Module
             Dim dataFlowAnalysis = analysis.Item2
             Assert.Equal(0, controlFlowAnalysis.ExitPoints.Count())
             Assert.Equal(0, controlFlowAnalysis.EntryPoints.Count())
-            Assert.Equal("x", GetSymbolNamesSortedAndJoined(dataFlowAnalysis.AlwaysAssigned))
-            Assert.Equal("x", GetSymbolNamesSortedAndJoined(dataFlowAnalysis.WrittenInside))
-            Assert.Equal("x, y", GetSymbolNamesSortedAndJoined(dataFlowAnalysis.VariablesDeclared))
+            Assert.Equal("x", GetSymbolNamesJoined(dataFlowAnalysis.AlwaysAssigned))
+            Assert.Equal("x", GetSymbolNamesJoined(dataFlowAnalysis.WrittenInside))
+            Assert.Equal("x, y", GetSymbolNamesJoined(dataFlowAnalysis.VariablesDeclared))
+            Assert.Equal("args", GetSymbolNamesJoined(dataFlowAnalysis.DefinitelyAssignedOnEntry))
+            Assert.Equal("args, x", GetSymbolNamesJoined(dataFlowAnalysis.DefinitelyAssignedOnExit))
             Assert.True(controlFlowAnalysis.EndPointIsReachable)
         End Sub
 
@@ -1265,7 +1319,9 @@ End Module
       </compilation>)
             Dim controlFlowAnalysis = analysis.Item1
             Dim dataFlowAnalysis = analysis.Item2
-            Assert.Equal(Nothing, GetSymbolNamesSortedAndJoined(dataFlowAnalysis.VariablesDeclared))
+            Assert.Equal(Nothing, GetSymbolNamesJoined(dataFlowAnalysis.VariablesDeclared))
+            Assert.Equal(Nothing, GetSymbolNamesJoined(dataFlowAnalysis.DefinitelyAssignedOnEntry))
+            Assert.Equal(Nothing, GetSymbolNamesJoined(dataFlowAnalysis.DefinitelyAssignedOnExit))
         End Sub
 
         <Fact()>
@@ -1284,9 +1340,11 @@ End Module
             Dim dataFlowAnalysis = analysis.Item2
             Assert.Equal(0, controlFlowAnalysis.ExitPoints.Count())
             Assert.Equal(0, controlFlowAnalysis.EntryPoints.Count())
-            Assert.Equal("x", GetSymbolNamesSortedAndJoined(dataFlowAnalysis.AlwaysAssigned))
-            Assert.Equal("x", GetSymbolNamesSortedAndJoined(dataFlowAnalysis.WrittenInside))
-            Assert.Equal("x, y", GetSymbolNamesSortedAndJoined(dataFlowAnalysis.VariablesDeclared))
+            Assert.Equal("x", GetSymbolNamesJoined(dataFlowAnalysis.AlwaysAssigned))
+            Assert.Equal("x", GetSymbolNamesJoined(dataFlowAnalysis.WrittenInside))
+            Assert.Equal("x, y", GetSymbolNamesJoined(dataFlowAnalysis.VariablesDeclared))
+            Assert.Equal("args", GetSymbolNamesJoined(dataFlowAnalysis.DefinitelyAssignedOnEntry))
+            Assert.Equal("args, x", GetSymbolNamesJoined(dataFlowAnalysis.DefinitelyAssignedOnExit))
             Assert.True(controlFlowAnalysis.EndPointIsReachable)
         End Sub
 
@@ -1307,9 +1365,11 @@ End Module
             Dim dataFlowAnalysis = analysis.Item2
             Assert.Equal(0, controlFlowAnalysis.ExitPoints.Count())
             Assert.Equal(0, controlFlowAnalysis.EntryPoints.Count())
-            Assert.Equal(Nothing, GetSymbolNamesSortedAndJoined(dataFlowAnalysis.AlwaysAssigned))
-            Assert.Equal("x", GetSymbolNamesSortedAndJoined(dataFlowAnalysis.WrittenInside))
-            Assert.Equal("x, y", GetSymbolNamesSortedAndJoined(dataFlowAnalysis.VariablesDeclared))
+            Assert.Equal(Nothing, GetSymbolNamesJoined(dataFlowAnalysis.AlwaysAssigned))
+            Assert.Equal("x", GetSymbolNamesJoined(dataFlowAnalysis.WrittenInside))
+            Assert.Equal("x, y", GetSymbolNamesJoined(dataFlowAnalysis.VariablesDeclared))
+            Assert.Equal("args, b", GetSymbolNamesJoined(dataFlowAnalysis.DefinitelyAssignedOnEntry))
+            Assert.Equal("args, b", GetSymbolNamesJoined(dataFlowAnalysis.DefinitelyAssignedOnExit))
             Assert.True(controlFlowAnalysis.EndPointIsReachable)
         End Sub
 
@@ -1329,9 +1389,11 @@ End Module
             Dim dataFlowAnalysis = analysis.Item2
             Assert.Equal(0, controlFlowAnalysis.ExitPoints.Count())
             Assert.Equal(0, controlFlowAnalysis.EntryPoints.Count())
-            Assert.Equal("x", GetSymbolNamesSortedAndJoined(dataFlowAnalysis.AlwaysAssigned))
-            Assert.Equal("x, x", GetSymbolNamesSortedAndJoined(dataFlowAnalysis.WrittenInside))
-            Assert.Equal("x, x", GetSymbolNamesSortedAndJoined(dataFlowAnalysis.VariablesDeclared))
+            Assert.Equal("x", GetSymbolNamesJoined(dataFlowAnalysis.AlwaysAssigned))
+            Assert.Equal("x, x", GetSymbolNamesJoined(dataFlowAnalysis.WrittenInside))
+            Assert.Equal("x, x", GetSymbolNamesJoined(dataFlowAnalysis.VariablesDeclared))
+            Assert.Equal("args", GetSymbolNamesJoined(dataFlowAnalysis.DefinitelyAssignedOnEntry))
+            Assert.Equal("args, x", GetSymbolNamesJoined(dataFlowAnalysis.DefinitelyAssignedOnExit))
             Assert.True(controlFlowAnalysis.EndPointIsReachable)
         End Sub
 
@@ -1352,37 +1414,43 @@ End Module
             Dim dataFlowAnalysis = analysis.Item2
             Assert.Equal(0, controlFlowAnalysis.ExitPoints.Count())
             Assert.Equal(0, controlFlowAnalysis.EntryPoints.Count())
-            Assert.Equal(Nothing, GetSymbolNamesSortedAndJoined(dataFlowAnalysis.AlwaysAssigned))
-            Assert.Equal("x, x", GetSymbolNamesSortedAndJoined(dataFlowAnalysis.WrittenInside))
-            Assert.Equal("x, x", GetSymbolNamesSortedAndJoined(dataFlowAnalysis.VariablesDeclared))
+            Assert.Equal(Nothing, GetSymbolNamesJoined(dataFlowAnalysis.AlwaysAssigned))
+            Assert.Equal("x, x", GetSymbolNamesJoined(dataFlowAnalysis.WrittenInside))
+            Assert.Equal("x, x", GetSymbolNamesJoined(dataFlowAnalysis.VariablesDeclared))
+            Assert.Equal("args, b", GetSymbolNamesJoined(dataFlowAnalysis.DefinitelyAssignedOnEntry))
+            Assert.Equal("args, b", GetSymbolNamesJoined(dataFlowAnalysis.DefinitelyAssignedOnExit))
             Assert.True(controlFlowAnalysis.EndPointIsReachable)
         End Sub
 
-        <WorkItem(540454, "DevDiv")>
+        <WorkItem(540454, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/540454")>
         <Fact()>
         Public Sub TestDataFlowAnalysisWithErrorsInStaticContext()
             Dim analysis = CompileAndAnalyzeControlAndDataFlow(
       <compilation name="TestDataFlowAnalysisWithErrorsInStaticContext">
           <file name="a.b">
 Class C
-    Sub Foo()
+    Sub Goo()
     End Sub
     Shared Sub Bar()
         [|
-        Foo() |]
+        Goo() |]
     End Sub
 End Class  </file>
       </compilation>)
             Dim dataFlowAnalysis = analysis.Item2
-            Assert.Equal(Nothing, GetSymbolNamesSortedAndJoined(dataFlowAnalysis.AlwaysAssigned))
-            Assert.Equal(Nothing, GetSymbolNamesSortedAndJoined(dataFlowAnalysis.Captured))
-            Assert.Equal(Nothing, GetSymbolNamesSortedAndJoined(dataFlowAnalysis.DataFlowsIn))
-            Assert.Equal(Nothing, GetSymbolNamesSortedAndJoined(dataFlowAnalysis.DataFlowsOut))
-            Assert.Equal(Nothing, GetSymbolNamesSortedAndJoined(dataFlowAnalysis.ReadInside))
-            Assert.Equal(Nothing, GetSymbolNamesSortedAndJoined(dataFlowAnalysis.ReadOutside))
-            Assert.Equal(Nothing, GetSymbolNamesSortedAndJoined(dataFlowAnalysis.VariablesDeclared))
-            Assert.Equal(Nothing, GetSymbolNamesSortedAndJoined(dataFlowAnalysis.WrittenInside))
-            Assert.Equal(Nothing, GetSymbolNamesSortedAndJoined(dataFlowAnalysis.WrittenOutside))
+            Assert.Equal(Nothing, GetSymbolNamesJoined(dataFlowAnalysis.AlwaysAssigned))
+            Assert.Equal(Nothing, GetSymbolNamesJoined(dataFlowAnalysis.Captured))
+            Assert.Equal(Nothing, GetSymbolNamesJoined(dataFlowAnalysis.CapturedInside))
+            Assert.Equal(Nothing, GetSymbolNamesJoined(dataFlowAnalysis.CapturedOutside))
+            Assert.Equal(Nothing, GetSymbolNamesJoined(dataFlowAnalysis.DataFlowsIn))
+            Assert.Equal(Nothing, GetSymbolNamesJoined(dataFlowAnalysis.DataFlowsOut))
+            Assert.Equal(Nothing, GetSymbolNamesJoined(dataFlowAnalysis.DefinitelyAssignedOnEntry))
+            Assert.Equal(Nothing, GetSymbolNamesJoined(dataFlowAnalysis.DefinitelyAssignedOnExit))
+            Assert.Equal(Nothing, GetSymbolNamesJoined(dataFlowAnalysis.ReadInside))
+            Assert.Equal(Nothing, GetSymbolNamesJoined(dataFlowAnalysis.ReadOutside))
+            Assert.Equal(Nothing, GetSymbolNamesJoined(dataFlowAnalysis.VariablesDeclared))
+            Assert.Equal(Nothing, GetSymbolNamesJoined(dataFlowAnalysis.WrittenInside))
+            Assert.Equal(Nothing, GetSymbolNamesJoined(dataFlowAnalysis.WrittenOutside))
         End Sub
 
         <Fact()>
@@ -1391,9 +1459,9 @@ End Class  </file>
       <compilation name="TestImplicitReturnVariable">
           <file name="a.b">
 Module Program
-    Function Foo() As Integer
+    Function Goo() As Integer
         [|
-        Foo = 1
+        Goo = 1
         |]
     End Function
 End Module
@@ -1403,9 +1471,11 @@ End Module
             Dim dataFlowAnalysis = analysis.Item2
             Assert.Equal(0, controlFlowAnalysis.ExitPoints.Count())
             Assert.Equal(0, controlFlowAnalysis.EntryPoints.Count())
-            Assert.Equal("Foo", GetSymbolNamesSortedAndJoined(dataFlowAnalysis.AlwaysAssigned))
-            Assert.Equal("Foo", GetSymbolNamesSortedAndJoined(dataFlowAnalysis.WrittenInside))
-            Assert.Equal(Nothing, GetSymbolNamesSortedAndJoined(dataFlowAnalysis.VariablesDeclared))
+            Assert.Equal("Goo", GetSymbolNamesJoined(dataFlowAnalysis.AlwaysAssigned))
+            Assert.Equal("Goo", GetSymbolNamesJoined(dataFlowAnalysis.WrittenInside))
+            Assert.Equal(Nothing, GetSymbolNamesJoined(dataFlowAnalysis.VariablesDeclared))
+            Assert.Equal(Nothing, GetSymbolNamesJoined(dataFlowAnalysis.DefinitelyAssignedOnEntry))
+            Assert.Equal("Goo", GetSymbolNamesJoined(dataFlowAnalysis.DefinitelyAssignedOnExit))
             Assert.True(controlFlowAnalysis.EndPointIsReachable)
         End Sub
 
@@ -1428,7 +1498,9 @@ class C
     end sub
 end class</file>
       </compilation>)
-            Assert.Equal("b, x, y, z", GetSymbolNamesSortedAndJoined(analysis.VariablesDeclared))
+            Assert.Equal("b, x, y, z", GetSymbolNamesJoined(analysis.VariablesDeclared))
+            Assert.Equal("Me, x", GetSymbolNamesJoined(analysis.DefinitelyAssignedOnEntry))
+            Assert.Equal("Me, x, y, z", GetSymbolNamesJoined(analysis.DefinitelyAssignedOnExit))
         End Sub
 
         <Fact()>
@@ -1439,7 +1511,7 @@ end class</file>
 Imports System
 
 Module Program
-    Function Foo() As Integer
+    Function Goo() As Integer
         Dim x, y, z
         [|
         If True
@@ -1455,9 +1527,11 @@ Module Program
 End Module
   </file>
       </compilation>)
-            Assert.Equal(Nothing, GetSymbolNamesSortedAndJoined(analysis.VariablesDeclared))
-            Assert.Equal("x", GetSymbolNamesSortedAndJoined(analysis.AlwaysAssigned))
-            Assert.Equal("x", GetSymbolNamesSortedAndJoined(analysis.DataFlowsOut))
+            Assert.Equal(Nothing, GetSymbolNamesJoined(analysis.VariablesDeclared))
+            Assert.Equal("x", GetSymbolNamesJoined(analysis.AlwaysAssigned))
+            Assert.Equal("x", GetSymbolNamesJoined(analysis.DataFlowsOut))
+            Assert.Equal(Nothing, GetSymbolNamesJoined(analysis.DefinitelyAssignedOnEntry))
+            Assert.Equal("x", GetSymbolNamesJoined(analysis.DefinitelyAssignedOnExit))
         End Sub
 
         <Fact()>
@@ -1468,7 +1542,7 @@ End Module
 Imports System
 
 Module Program
-    Function Foo() As Integer
+    Function Goo() As Integer
         Dim x, y, z
         Dim b As Boolean = True
         [|
@@ -1485,9 +1559,11 @@ Module Program
 End Module
   </file>
       </compilation>)
-            Assert.Equal(Nothing, GetSymbolNamesSortedAndJoined(analysis.VariablesDeclared))
-            Assert.Equal(Nothing, GetSymbolNamesSortedAndJoined(analysis.AlwaysAssigned))
-            Assert.Equal("x, y, z", GetSymbolNamesSortedAndJoined(analysis.DataFlowsOut))
+            Assert.Equal(Nothing, GetSymbolNamesJoined(analysis.VariablesDeclared))
+            Assert.Equal(Nothing, GetSymbolNamesJoined(analysis.AlwaysAssigned))
+            Assert.Equal("x, y, z", GetSymbolNamesJoined(analysis.DataFlowsOut))
+            Assert.Equal("b", GetSymbolNamesJoined(analysis.DefinitelyAssignedOnEntry))
+            Assert.Equal("b", GetSymbolNamesJoined(analysis.DefinitelyAssignedOnExit))
         End Sub
 
         <Fact()>
@@ -1497,7 +1573,7 @@ End Module
           <file name="a.b">
 Imports System
 Module Program
-    Function Foo() As Integer
+    Function Goo() As Integer
         Dim x, y
         If True Then x = 1 Else If True Then Return 1 Else [|Return 1|]
         Return x + y
@@ -1518,7 +1594,7 @@ End Module
           <file name="a.b">
 Imports System
 Module Program
-    Function Foo() As Integer
+    Function Goo() As Integer
         Dim x, y
         If True Then x = 1 Else [|If True Then Return 1 Else Return 1|]
         Return x + y
@@ -1539,7 +1615,7 @@ End Module
           <file name="a.b">
 Imports System
 Module Program
-    Function Foo() As Integer
+    Function Goo() As Integer
         Dim x, y
         [|If True Then x = 1 Else If True Then Return 1 Else Return 1|]
         Return x + y
@@ -1561,7 +1637,7 @@ End Module
 Imports System
 
 Module Program
-    Function Foo() As Integer
+    Function Goo() As Integer
         Dim x, y
         [|If True Then x = 1 Else y = 1|]
         Dim z = x + y
@@ -1569,11 +1645,13 @@ Module Program
 End Module
   </file>
       </compilation>)
-            Assert.Equal("x", GetSymbolNamesSortedAndJoined(analysis.AlwaysAssigned))
-            Assert.Equal(Nothing, GetSymbolNamesSortedAndJoined(analysis.DataFlowsIn))
-            Assert.Equal("x", GetSymbolNamesSortedAndJoined(analysis.DataFlowsOut))
-            Assert.Equal(Nothing, GetSymbolNamesSortedAndJoined(analysis.ReadInside))
-            Assert.Equal("x, y", GetSymbolNamesSortedAndJoined(analysis.WrittenInside))
+            Assert.Equal("x", GetSymbolNamesJoined(analysis.AlwaysAssigned))
+            Assert.Equal(Nothing, GetSymbolNamesJoined(analysis.DataFlowsIn))
+            Assert.Equal("x", GetSymbolNamesJoined(analysis.DataFlowsOut))
+            Assert.Equal(Nothing, GetSymbolNamesJoined(analysis.DefinitelyAssignedOnEntry))
+            Assert.Equal("x", GetSymbolNamesJoined(analysis.DefinitelyAssignedOnExit))
+            Assert.Equal(Nothing, GetSymbolNamesJoined(analysis.ReadInside))
+            Assert.Equal("x, y", GetSymbolNamesJoined(analysis.WrittenInside))
         End Sub
 
         <Fact()>
@@ -1584,7 +1662,7 @@ End Module
 Imports System
 
 Module Program
-    Function Foo() As Integer
+    Function Goo() As Integer
         Dim b As Boolean = True
         Dim x, y
         [|If b Then x = 1 Else y = 1|]
@@ -1593,11 +1671,13 @@ Module Program
 End Module
   </file>
       </compilation>)
-            Assert.Equal(Nothing, GetSymbolNamesSortedAndJoined(analysis.AlwaysAssigned))
-            Assert.Equal("b", GetSymbolNamesSortedAndJoined(analysis.DataFlowsIn))
-            Assert.Equal("x, y", GetSymbolNamesSortedAndJoined(analysis.DataFlowsOut))
-            Assert.Equal("b", GetSymbolNamesSortedAndJoined(analysis.ReadInside))
-            Assert.Equal("x, y", GetSymbolNamesSortedAndJoined(analysis.WrittenInside))
+            Assert.Equal(Nothing, GetSymbolNamesJoined(analysis.AlwaysAssigned))
+            Assert.Equal("b", GetSymbolNamesJoined(analysis.DataFlowsIn))
+            Assert.Equal("x, y", GetSymbolNamesJoined(analysis.DataFlowsOut))
+            Assert.Equal("b", GetSymbolNamesJoined(analysis.DefinitelyAssignedOnEntry))
+            Assert.Equal("b", GetSymbolNamesJoined(analysis.DefinitelyAssignedOnExit))
+            Assert.Equal("b", GetSymbolNamesJoined(analysis.ReadInside))
+            Assert.Equal("x, y", GetSymbolNamesJoined(analysis.WrittenInside))
         End Sub
 
         <Fact()>
@@ -1608,7 +1688,7 @@ End Module
 Imports System
 
 Module Program
-    Function Foo() As Integer
+    Function Goo() As Integer
         Dim x, y
         If True Then [|x = 1|] Else y = 1
         Dim z = x + y
@@ -1616,11 +1696,13 @@ Module Program
 End Module
   </file>
       </compilation>)
-            Assert.Equal("x", GetSymbolNamesSortedAndJoined(analysis.AlwaysAssigned))
-            Assert.Equal(Nothing, GetSymbolNamesSortedAndJoined(analysis.DataFlowsIn))
-            Assert.Equal("x", GetSymbolNamesSortedAndJoined(analysis.DataFlowsOut))
-            Assert.Equal(Nothing, GetSymbolNamesSortedAndJoined(analysis.ReadInside))
-            Assert.Equal("x", GetSymbolNamesSortedAndJoined(analysis.WrittenInside))
+            Assert.Equal("x", GetSymbolNamesJoined(analysis.AlwaysAssigned))
+            Assert.Equal(Nothing, GetSymbolNamesJoined(analysis.DataFlowsIn))
+            Assert.Equal("x", GetSymbolNamesJoined(analysis.DataFlowsOut))
+            Assert.Equal(Nothing, GetSymbolNamesJoined(analysis.DefinitelyAssignedOnEntry))
+            Assert.Equal("x", GetSymbolNamesJoined(analysis.DefinitelyAssignedOnExit))
+            Assert.Equal(Nothing, GetSymbolNamesJoined(analysis.ReadInside))
+            Assert.Equal("x", GetSymbolNamesJoined(analysis.WrittenInside))
         End Sub
 
         <Fact()>
@@ -1631,7 +1713,7 @@ End Module
 Imports System
 
 Module Program
-    Function Foo() As Integer
+    Function Goo() As Integer
         Dim x, y, z
         If True Then x = 1 Else [|y = 1|]
         Dim z = x + y
@@ -1639,11 +1721,13 @@ Module Program
 End Module
   </file>
       </compilation>)
-            Assert.Equal("y", GetSymbolNamesSortedAndJoined(analysis.AlwaysAssigned))
-            Assert.Equal(Nothing, GetSymbolNamesSortedAndJoined(analysis.DataFlowsIn))
-            Assert.Equal(Nothing, GetSymbolNamesSortedAndJoined(analysis.DataFlowsOut)) '' else clause is unreachable
-            Assert.Equal(Nothing, GetSymbolNamesSortedAndJoined(analysis.ReadInside))
-            Assert.Equal("y", GetSymbolNamesSortedAndJoined(analysis.WrittenInside))
+            Assert.Equal("y", GetSymbolNamesJoined(analysis.AlwaysAssigned))
+            Assert.Equal(Nothing, GetSymbolNamesJoined(analysis.DataFlowsIn))
+            Assert.Equal(Nothing, GetSymbolNamesJoined(analysis.DataFlowsOut)) '' else clause is unreachable
+            Assert.Equal(Nothing, GetSymbolNamesJoined(analysis.DefinitelyAssignedOnEntry))
+            Assert.Equal(Nothing, GetSymbolNamesJoined(analysis.DefinitelyAssignedOnExit))
+            Assert.Equal(Nothing, GetSymbolNamesJoined(analysis.ReadInside))
+            Assert.Equal("y", GetSymbolNamesJoined(analysis.WrittenInside))
         End Sub
 
         <Fact()>
@@ -1654,7 +1738,7 @@ End Module
 Imports System
 
 Module Program
-    Function Foo() As Integer
+    Function Goo() As Integer
         Dim b As Boolean = True
         Dim x, y, z
         If b Then x = 1 Else [|y = 1|]
@@ -1663,11 +1747,13 @@ Module Program
 End Module
   </file>
       </compilation>)
-            Assert.Equal("y", GetSymbolNamesSortedAndJoined(analysis.AlwaysAssigned))
-            Assert.Equal(Nothing, GetSymbolNamesSortedAndJoined(analysis.DataFlowsIn))
-            Assert.Equal("y", GetSymbolNamesSortedAndJoined(analysis.DataFlowsOut))
-            Assert.Equal(Nothing, GetSymbolNamesSortedAndJoined(analysis.ReadInside))
-            Assert.Equal("y", GetSymbolNamesSortedAndJoined(analysis.WrittenInside))
+            Assert.Equal("y", GetSymbolNamesJoined(analysis.AlwaysAssigned))
+            Assert.Equal(Nothing, GetSymbolNamesJoined(analysis.DataFlowsIn))
+            Assert.Equal("y", GetSymbolNamesJoined(analysis.DataFlowsOut))
+            Assert.Equal("b", GetSymbolNamesJoined(analysis.DefinitelyAssignedOnEntry))
+            Assert.Equal("b, y", GetSymbolNamesJoined(analysis.DefinitelyAssignedOnExit))
+            Assert.Equal(Nothing, GetSymbolNamesJoined(analysis.ReadInside))
+            Assert.Equal("y", GetSymbolNamesJoined(analysis.WrittenInside))
         End Sub
 
         <Fact()>
@@ -1678,7 +1764,7 @@ End Module
 Imports System
 
 Module Program
-    Function Foo() As Integer
+    Function Goo() As Integer
         Dim x, y, z
         If True Then x = 1 Else If True Then y = 1 Else [|z = 1|]
         Dim zz = z + x + y
@@ -1686,11 +1772,13 @@ Module Program
 End Module
   </file>
       </compilation>)
-            Assert.Equal("z", GetSymbolNamesSortedAndJoined(analysis.AlwaysAssigned))
-            Assert.Equal(Nothing, GetSymbolNamesSortedAndJoined(analysis.DataFlowsIn))
-            Assert.Equal(Nothing, GetSymbolNamesSortedAndJoined(analysis.DataFlowsOut))  ''  else clause is unreachable
-            Assert.Equal(Nothing, GetSymbolNamesSortedAndJoined(analysis.ReadInside))
-            Assert.Equal("z", GetSymbolNamesSortedAndJoined(analysis.WrittenInside))
+            Assert.Equal("z", GetSymbolNamesJoined(analysis.AlwaysAssigned))
+            Assert.Equal(Nothing, GetSymbolNamesJoined(analysis.DataFlowsIn))
+            Assert.Equal(Nothing, GetSymbolNamesJoined(analysis.DataFlowsOut))  ''  else clause is unreachable
+            Assert.Equal(Nothing, GetSymbolNamesJoined(analysis.DefinitelyAssignedOnEntry))
+            Assert.Equal(Nothing, GetSymbolNamesJoined(analysis.DefinitelyAssignedOnExit))
+            Assert.Equal(Nothing, GetSymbolNamesJoined(analysis.ReadInside))
+            Assert.Equal("z", GetSymbolNamesJoined(analysis.WrittenInside))
         End Sub
 
         <Fact()>
@@ -1701,7 +1789,7 @@ End Module
 Imports System
 
 Module Program
-    Function Foo() As Integer
+    Function Goo() As Integer
         Dim b As Boolean = True
         Dim x, y, z
         If b Then x = 1 Else If b Then y = 1 Else [|z = 1|]
@@ -1710,11 +1798,13 @@ Module Program
 End Module
   </file>
       </compilation>)
-            Assert.Equal("z", GetSymbolNamesSortedAndJoined(analysis.AlwaysAssigned))
-            Assert.Equal(Nothing, GetSymbolNamesSortedAndJoined(analysis.DataFlowsIn))
-            Assert.Equal("z", GetSymbolNamesSortedAndJoined(analysis.DataFlowsOut))
-            Assert.Equal(Nothing, GetSymbolNamesSortedAndJoined(analysis.ReadInside))
-            Assert.Equal("z", GetSymbolNamesSortedAndJoined(analysis.WrittenInside))
+            Assert.Equal("z", GetSymbolNamesJoined(analysis.AlwaysAssigned))
+            Assert.Equal(Nothing, GetSymbolNamesJoined(analysis.DataFlowsIn))
+            Assert.Equal("z", GetSymbolNamesJoined(analysis.DataFlowsOut))
+            Assert.Equal("b", GetSymbolNamesJoined(analysis.DefinitelyAssignedOnEntry))
+            Assert.Equal("b, z", GetSymbolNamesJoined(analysis.DefinitelyAssignedOnExit))
+            Assert.Equal(Nothing, GetSymbolNamesJoined(analysis.ReadInside))
+            Assert.Equal("z", GetSymbolNamesJoined(analysis.WrittenInside))
         End Sub
 
         <Fact()>
@@ -1725,7 +1815,7 @@ End Module
 Imports System
 
 Module Program
-    Function Foo() As Integer
+    Function Goo() As Integer
         Dim x, y, z
         If True Then x = 1 Else [|If True Then y = 1 Else y = 1|]
         Dim zz = z + x + y
@@ -1733,11 +1823,13 @@ Module Program
 End Module
   </file>
       </compilation>)
-            Assert.Equal("y", GetSymbolNamesSortedAndJoined(analysis.AlwaysAssigned))
-            Assert.Equal(Nothing, GetSymbolNamesSortedAndJoined(analysis.DataFlowsIn))
-            Assert.Equal(Nothing, GetSymbolNamesSortedAndJoined(analysis.DataFlowsOut))
-            Assert.Equal(Nothing, GetSymbolNamesSortedAndJoined(analysis.ReadInside))
-            Assert.Equal("y", GetSymbolNamesSortedAndJoined(analysis.WrittenInside))
+            Assert.Equal("y", GetSymbolNamesJoined(analysis.AlwaysAssigned))
+            Assert.Equal(Nothing, GetSymbolNamesJoined(analysis.DataFlowsIn))
+            Assert.Equal(Nothing, GetSymbolNamesJoined(analysis.DataFlowsOut))
+            Assert.Equal(Nothing, GetSymbolNamesJoined(analysis.DefinitelyAssignedOnEntry))
+            Assert.Equal(Nothing, GetSymbolNamesJoined(analysis.DefinitelyAssignedOnExit))
+            Assert.Equal(Nothing, GetSymbolNamesJoined(analysis.ReadInside))
+            Assert.Equal("y", GetSymbolNamesJoined(analysis.WrittenInside))
         End Sub
 
         <Fact()>
@@ -1748,7 +1840,7 @@ End Module
 Imports System
 
 Module Program
-    Function Foo() As Integer
+    Function Goo() As Integer
         Dim b As Boolean = True
         Dim x, y, z
         If b Then x = 1 Else [|If b Then y = 1 Else y = 1|]
@@ -1757,11 +1849,13 @@ Module Program
 End Module
   </file>
       </compilation>)
-            Assert.Equal("y", GetSymbolNamesSortedAndJoined(analysis.AlwaysAssigned))
-            Assert.Equal("b", GetSymbolNamesSortedAndJoined(analysis.DataFlowsIn))
-            Assert.Equal("y", GetSymbolNamesSortedAndJoined(analysis.DataFlowsOut))
-            Assert.Equal("b", GetSymbolNamesSortedAndJoined(analysis.ReadInside))
-            Assert.Equal("y", GetSymbolNamesSortedAndJoined(analysis.WrittenInside))
+            Assert.Equal("y", GetSymbolNamesJoined(analysis.AlwaysAssigned))
+            Assert.Equal("b", GetSymbolNamesJoined(analysis.DataFlowsIn))
+            Assert.Equal("y", GetSymbolNamesJoined(analysis.DataFlowsOut))
+            Assert.Equal("b", GetSymbolNamesJoined(analysis.DefinitelyAssignedOnEntry))
+            Assert.Equal("b, y", GetSymbolNamesJoined(analysis.DefinitelyAssignedOnExit))
+            Assert.Equal("b", GetSymbolNamesJoined(analysis.ReadInside))
+            Assert.Equal("y", GetSymbolNamesJoined(analysis.WrittenInside))
         End Sub
 
         <Fact()>
@@ -1778,10 +1872,12 @@ class C
     end sub
 end class</file>
       </compilation>)
-            Assert.Equal("x, y, z", GetSymbolNamesSortedAndJoined(analysis.VariablesDeclared))
-            Assert.Equal(Nothing, GetSymbolNamesSortedAndJoined(analysis.DataFlowsOut))
-            Assert.Equal(Nothing, GetSymbolNamesSortedAndJoined(analysis.DataFlowsIn))
-            Assert.Equal("x, z", GetSymbolNamesSortedAndJoined(analysis.AlwaysAssigned))
+            Assert.Equal("x, y, z", GetSymbolNamesJoined(analysis.VariablesDeclared))
+            Assert.Equal(Nothing, GetSymbolNamesJoined(analysis.DataFlowsOut))
+            Assert.Equal(Nothing, GetSymbolNamesJoined(analysis.DataFlowsIn))
+            Assert.Equal("Me, x", GetSymbolNamesJoined(analysis.DefinitelyAssignedOnEntry))
+            Assert.Equal("Me, x, x, z", GetSymbolNamesJoined(analysis.DefinitelyAssignedOnExit))
+            Assert.Equal("x, z", GetSymbolNamesJoined(analysis.AlwaysAssigned))
         End Sub
 
         <Fact()>
@@ -1803,7 +1899,9 @@ class C
     end sub
 end class</file>
       </compilation>)
-            Assert.Equal("a, b, c, x, y, z", GetSymbolNamesSortedAndJoined(analysis.VariablesDeclared))
+            Assert.Equal("a, b, x, y, z, c", GetSymbolNamesJoined(analysis.VariablesDeclared))
+            Assert.Equal("Me, x", GetSymbolNamesJoined(analysis.DefinitelyAssignedOnEntry))
+            Assert.Equal("Me, x, y, z", GetSymbolNamesJoined(analysis.DefinitelyAssignedOnExit))
         End Sub
 
         <Fact()>
@@ -1827,7 +1925,9 @@ class C
     End Sub
 end class</file>
       </compilation>)
-            Assert.Equal("y", GetSymbolNamesSortedAndJoined(analysis.AlwaysAssigned))
+            Assert.Equal("y", GetSymbolNamesJoined(analysis.AlwaysAssigned))
+            Assert.Equal("Me, x", GetSymbolNamesJoined(analysis.DefinitelyAssignedOnEntry))
+            Assert.Equal(Nothing, GetSymbolNamesJoined(analysis.DefinitelyAssignedOnExit))
         End Sub
 
         <Fact()>
@@ -1845,26 +1945,28 @@ Module Program
     Sub Main(args As String())
         Dim o as object = 1
 [|
-        foo(o)
+        goo(o)
 |]
     End Sub
 
-    Sub foo(x As String)
+    Sub goo(x As String)
 
     End Sub
 
-    Sub foo(Byref x As Integer)
+    Sub goo(Byref x As Integer)
 
     End Sub
 End Module
 </file>
       </compilation>)
-            Assert.Equal("o", GetSymbolNamesSortedAndJoined(analysis.DataFlowsIn))
-            Assert.Equal(Nothing, GetSymbolNamesSortedAndJoined(analysis.DataFlowsOut))
-            Assert.Equal("o", GetSymbolNamesSortedAndJoined(analysis.ReadInside))
-            Assert.Equal(Nothing, GetSymbolNamesSortedAndJoined(analysis.ReadOutside))
-            Assert.Equal("o", GetSymbolNamesSortedAndJoined(analysis.WrittenInside))
-            Assert.Equal("args, o", GetSymbolNamesSortedAndJoined(analysis.WrittenOutside))
+            Assert.Equal("o", GetSymbolNamesJoined(analysis.DataFlowsIn))
+            Assert.Equal(Nothing, GetSymbolNamesJoined(analysis.DataFlowsOut))
+            Assert.Equal("args, o", GetSymbolNamesJoined(analysis.DefinitelyAssignedOnEntry))
+            Assert.Equal("args, o", GetSymbolNamesJoined(analysis.DefinitelyAssignedOnExit))
+            Assert.Equal("o", GetSymbolNamesJoined(analysis.ReadInside))
+            Assert.Equal(Nothing, GetSymbolNamesJoined(analysis.ReadOutside))
+            Assert.Equal("o", GetSymbolNamesJoined(analysis.WrittenInside))
+            Assert.Equal("args, o", GetSymbolNamesJoined(analysis.WrittenOutside))
         End Sub
 
         <Fact()>
@@ -1883,26 +1985,28 @@ Class Program
         Dim o as object = 1
         Dim oo as object = new Program
 [|
-        oo.foo(o)
+        oo.goo(o)
 |]
     End Sub
 
-    Sub foo(x As String)
+    Sub goo(x As String)
 
     End Sub
 
-    Sub foo(Byref x As Integer)
+    Sub goo(Byref x As Integer)
 
     End Sub
 End Class
 </file>
       </compilation>)
-            Assert.Equal("o, oo", GetSymbolNamesSortedAndJoined(analysis.DataFlowsIn))
-            Assert.Equal(Nothing, GetSymbolNamesSortedAndJoined(analysis.DataFlowsOut))
-            Assert.Equal("o, oo", GetSymbolNamesSortedAndJoined(analysis.ReadInside))
-            Assert.Equal(Nothing, GetSymbolNamesSortedAndJoined(analysis.ReadOutside))
-            Assert.Equal("o", GetSymbolNamesSortedAndJoined(analysis.WrittenInside))
-            Assert.Equal("args, o, oo", GetSymbolNamesSortedAndJoined(analysis.WrittenOutside))
+            Assert.Equal("o, oo", GetSymbolNamesJoined(analysis.DataFlowsIn))
+            Assert.Equal(Nothing, GetSymbolNamesJoined(analysis.DataFlowsOut))
+            Assert.Equal("args, o, oo", GetSymbolNamesJoined(analysis.DefinitelyAssignedOnEntry))
+            Assert.Equal("args, o, oo", GetSymbolNamesJoined(analysis.DefinitelyAssignedOnExit))
+            Assert.Equal("o, oo", GetSymbolNamesJoined(analysis.ReadInside))
+            Assert.Equal(Nothing, GetSymbolNamesJoined(analysis.ReadOutside))
+            Assert.Equal("o", GetSymbolNamesJoined(analysis.WrittenInside))
+            Assert.Equal("args, o, oo", GetSymbolNamesJoined(analysis.WrittenOutside))
         End Sub
 
         <Fact()>
@@ -1924,22 +2028,24 @@ Module Program
 |]
     End Sub
 
-    Sub foo(x As String)
+    Sub goo(x As String)
 
     End Sub
 
-    Sub foo(Byref x As Integer)
+    Sub goo(Byref x As Integer)
 
     End Sub
 End Module
 </file>
       </compilation>)
-            Assert.Equal("o", GetSymbolNamesSortedAndJoined(analysis.DataFlowsIn))
-            Assert.Equal(Nothing, GetSymbolNamesSortedAndJoined(analysis.DataFlowsOut))
-            Assert.Equal("o", GetSymbolNamesSortedAndJoined(analysis.ReadInside))
-            Assert.Equal(Nothing, GetSymbolNamesSortedAndJoined(analysis.ReadOutside))
-            Assert.Equal("oo", GetSymbolNamesSortedAndJoined(analysis.WrittenInside))
-            Assert.Equal("args, o", GetSymbolNamesSortedAndJoined(analysis.WrittenOutside))
+            Assert.Equal("o", GetSymbolNamesJoined(analysis.DataFlowsIn))
+            Assert.Equal(Nothing, GetSymbolNamesJoined(analysis.DataFlowsOut))
+            Assert.Equal("args, o", GetSymbolNamesJoined(analysis.DefinitelyAssignedOnEntry))
+            Assert.Equal("args, o, oo", GetSymbolNamesJoined(analysis.DefinitelyAssignedOnExit))
+            Assert.Equal("o", GetSymbolNamesJoined(analysis.ReadInside))
+            Assert.Equal(Nothing, GetSymbolNamesJoined(analysis.ReadOutside))
+            Assert.Equal("oo", GetSymbolNamesJoined(analysis.WrittenInside))
+            Assert.Equal("args, o", GetSymbolNamesJoined(analysis.WrittenOutside))
         End Sub
 
         <Fact()>
@@ -1958,13 +2064,15 @@ class C
     end sub
 end class</file>
       </compilation>)
-            Assert.Equal("j", GetSymbolNamesSortedAndJoined(analysis.VariablesDeclared))
-            Assert.Equal("i", GetSymbolNamesSortedAndJoined(analysis.DataFlowsIn))
-            Assert.Equal("j", GetSymbolNamesSortedAndJoined(analysis.DataFlowsOut))
-            Assert.Equal("i, j", GetSymbolNamesSortedAndJoined(analysis.ReadInside))
-            Assert.Equal("i, j", GetSymbolNamesSortedAndJoined(analysis.ReadOutside))
-            Assert.Equal("j", GetSymbolNamesSortedAndJoined(analysis.WrittenInside))
-            Assert.Equal("i, Me", GetSymbolNamesSortedAndJoined(analysis.WrittenOutside))
+            Assert.Equal("j", GetSymbolNamesJoined(analysis.VariablesDeclared))
+            Assert.Equal("i", GetSymbolNamesJoined(analysis.DataFlowsIn))
+            Assert.Equal("j", GetSymbolNamesJoined(analysis.DataFlowsOut))
+            Assert.Equal("Me, i", GetSymbolNamesJoined(analysis.DefinitelyAssignedOnEntry))
+            Assert.Equal("Me, i, j", GetSymbolNamesJoined(analysis.DefinitelyAssignedOnExit))
+            Assert.Equal("i, j", GetSymbolNamesJoined(analysis.ReadInside))
+            Assert.Equal("i, j", GetSymbolNamesJoined(analysis.ReadOutside))
+            Assert.Equal("j", GetSymbolNamesJoined(analysis.WrittenInside))
+            Assert.Equal("Me, i", GetSymbolNamesJoined(analysis.WrittenOutside))
         End Sub
 
         <Fact()>
@@ -1982,7 +2090,9 @@ class C
     end sub
 end class</file>
       </compilation>)
-            Assert.Equal("a, x", GetSymbolNamesSortedAndJoined(analysis.DataFlowsIn))
+            Assert.Equal("x, a", GetSymbolNamesJoined(analysis.DataFlowsIn))
+            Assert.Equal("Me, x, a, y", GetSymbolNamesJoined(analysis.DefinitelyAssignedOnEntry))
+            Assert.Equal("Me, x, a, y, b", GetSymbolNamesJoined(analysis.DefinitelyAssignedOnExit))
         End Sub
 
         <Fact()>
@@ -2003,7 +2113,7 @@ class Program
 end class
             </file>
       </compilation>)
-            Assert.Equal("Me", GetSymbolNamesSortedAndJoined(analysis.DataFlowsIn))
+            Assert.Equal("Me", GetSymbolNamesJoined(analysis.DataFlowsIn))
         End Sub
 
         <Fact()>
@@ -2022,7 +2132,9 @@ class Program
 end class
             </file>
       </compilation>)
-            Assert.Equal("x, y", GetSymbolNamesSortedAndJoined(analysis.DataFlowsIn))
+            Assert.Equal("x, y", GetSymbolNamesJoined(analysis.DataFlowsIn))
+            Assert.Equal("args, x, y", GetSymbolNamesJoined(analysis.DefinitelyAssignedOnEntry))
+            Assert.Equal("args, x, y, z", GetSymbolNamesJoined(analysis.DefinitelyAssignedOnExit))
         End Sub
 
         <Fact()>
@@ -2043,7 +2155,9 @@ class C
     end sub
 end class</file>
       </compilation>)
-            Assert.Equal("x, y", GetSymbolNamesSortedAndJoined(analysis.DataFlowsOut))
+            Assert.Equal("x, y", GetSymbolNamesJoined(analysis.DataFlowsOut))
+            Assert.Equal("Me, x, a", GetSymbolNamesJoined(analysis.DefinitelyAssignedOnEntry))
+            Assert.Equal("Me, x, a", GetSymbolNamesJoined(analysis.DefinitelyAssignedOnExit))
         End Sub
 
         <Fact()>
@@ -2062,7 +2176,9 @@ class Program
     end sub
 end class</file>
       </compilation>)
-            Assert.Equal("i, s", GetSymbolNamesSortedAndJoined(analysis.DataFlowsOut))
+            Assert.Equal("s, i", GetSymbolNamesJoined(analysis.DataFlowsOut))
+            Assert.Equal("Me, args", GetSymbolNamesJoined(analysis.DefinitelyAssignedOnEntry))
+            Assert.Equal("Me, args, s, i, b", GetSymbolNamesJoined(analysis.DefinitelyAssignedOnExit))
         End Sub
 
         <Fact()>
@@ -2083,7 +2199,9 @@ module Program
     end sub
 end module</file>
       </compilation>)
-            Assert.Equal(Nothing, GetSymbolNamesSortedAndJoined(analysis.DataFlowsOut))
+            Assert.Equal(Nothing, GetSymbolNamesJoined(analysis.DataFlowsOut))
+            Assert.Equal("builder", GetSymbolNamesJoined(analysis.DefinitelyAssignedOnEntry))
+            Assert.Equal("builder", GetSymbolNamesJoined(analysis.DefinitelyAssignedOnExit))
         End Sub
 
         <Fact()>
@@ -2105,15 +2223,19 @@ End Class
             Assert.Equal(0, controlFlowAnalysisResults.ExitPoints.Count())
             Assert.Equal(True, controlFlowAnalysisResults.StartPointIsReachable)
             Assert.Equal(True, controlFlowAnalysisResults.EndPointIsReachable)
-            Assert.Equal(Nothing, GetSymbolNamesSortedAndJoined(dataFlowAnalysisResults.VariablesDeclared))
-            Assert.Equal("x", GetSymbolNamesSortedAndJoined(dataFlowAnalysisResults.AlwaysAssigned))
-            Assert.Equal(Nothing, GetSymbolNamesSortedAndJoined(dataFlowAnalysisResults.DataFlowsIn))
-            Assert.Equal("x", GetSymbolNamesSortedAndJoined(dataFlowAnalysisResults.DataFlowsOut))
-            Assert.Equal(Nothing, GetSymbolNamesSortedAndJoined(dataFlowAnalysisResults.ReadInside))
-            Assert.Equal("x", GetSymbolNamesSortedAndJoined(dataFlowAnalysisResults.ReadOutside))
-            Assert.Equal("x", GetSymbolNamesSortedAndJoined(dataFlowAnalysisResults.WrittenInside))
-            Assert.Equal("Me, x", GetSymbolNamesSortedAndJoined(dataFlowAnalysisResults.WrittenOutside))
-            Assert.Equal(Nothing, GetSymbolNamesSortedAndJoined(dataFlowAnalysisResults.Captured))
+            Assert.Equal(Nothing, GetSymbolNamesJoined(dataFlowAnalysisResults.VariablesDeclared))
+            Assert.Equal("x", GetSymbolNamesJoined(dataFlowAnalysisResults.AlwaysAssigned))
+            Assert.Equal(Nothing, GetSymbolNamesJoined(dataFlowAnalysisResults.DataFlowsIn))
+            Assert.Equal("x", GetSymbolNamesJoined(dataFlowAnalysisResults.DataFlowsOut))
+            Assert.Equal("Me, x", GetSymbolNamesJoined(dataFlowAnalysisResults.DefinitelyAssignedOnEntry))
+            Assert.Equal("Me, x", GetSymbolNamesJoined(dataFlowAnalysisResults.DefinitelyAssignedOnExit))
+            Assert.Equal(Nothing, GetSymbolNamesJoined(dataFlowAnalysisResults.ReadInside))
+            Assert.Equal("x", GetSymbolNamesJoined(dataFlowAnalysisResults.ReadOutside))
+            Assert.Equal("x", GetSymbolNamesJoined(dataFlowAnalysisResults.WrittenInside))
+            Assert.Equal("Me, x", GetSymbolNamesJoined(dataFlowAnalysisResults.WrittenOutside))
+            Assert.Equal(Nothing, GetSymbolNamesJoined(dataFlowAnalysisResults.Captured))
+            Assert.Equal(Nothing, GetSymbolNamesJoined(dataFlowAnalysisResults.CapturedInside))
+            Assert.Equal(Nothing, GetSymbolNamesJoined(dataFlowAnalysisResults.CapturedOutside))
         End Sub
 
         <Fact()>
@@ -2138,15 +2260,19 @@ End Class
             Assert.Equal(0, controlFlowAnalysisResults.ExitPoints.Count())
             Assert.Equal(True, controlFlowAnalysisResults.StartPointIsReachable)
             Assert.Equal(True, controlFlowAnalysisResults.EndPointIsReachable)
-            Assert.Equal(Nothing, GetSymbolNamesSortedAndJoined(dataFlowAnalysisResults.VariablesDeclared))
-            Assert.Equal("i", GetSymbolNamesSortedAndJoined(dataFlowAnalysisResults.AlwaysAssigned))
-            Assert.Equal("i", GetSymbolNamesSortedAndJoined(dataFlowAnalysisResults.DataFlowsIn))
-            Assert.Equal("i", GetSymbolNamesSortedAndJoined(dataFlowAnalysisResults.DataFlowsOut))
-            Assert.Equal("i", GetSymbolNamesSortedAndJoined(dataFlowAnalysisResults.ReadInside))
-            Assert.Equal("b", GetSymbolNamesSortedAndJoined(dataFlowAnalysisResults.ReadOutside))
-            Assert.Equal("i", GetSymbolNamesSortedAndJoined(dataFlowAnalysisResults.WrittenInside))
-            Assert.Equal("b, i, Me", GetSymbolNamesSortedAndJoined(dataFlowAnalysisResults.WrittenOutside))
-            Assert.Equal(Nothing, GetSymbolNamesSortedAndJoined(dataFlowAnalysisResults.Captured))
+            Assert.Equal(Nothing, GetSymbolNamesJoined(dataFlowAnalysisResults.VariablesDeclared))
+            Assert.Equal("i", GetSymbolNamesJoined(dataFlowAnalysisResults.AlwaysAssigned))
+            Assert.Equal("i", GetSymbolNamesJoined(dataFlowAnalysisResults.DataFlowsIn))
+            Assert.Equal("i", GetSymbolNamesJoined(dataFlowAnalysisResults.DataFlowsOut))
+            Assert.Equal("Me, b, i", GetSymbolNamesJoined(dataFlowAnalysisResults.DefinitelyAssignedOnEntry))
+            Assert.Equal("Me, b, i", GetSymbolNamesJoined(dataFlowAnalysisResults.DefinitelyAssignedOnExit))
+            Assert.Equal("i", GetSymbolNamesJoined(dataFlowAnalysisResults.ReadInside))
+            Assert.Equal("b", GetSymbolNamesJoined(dataFlowAnalysisResults.ReadOutside))
+            Assert.Equal("i", GetSymbolNamesJoined(dataFlowAnalysisResults.WrittenInside))
+            Assert.Equal("Me, b, i", GetSymbolNamesJoined(dataFlowAnalysisResults.WrittenOutside))
+            Assert.Equal(Nothing, GetSymbolNamesJoined(dataFlowAnalysisResults.Captured))
+            Assert.Equal(Nothing, GetSymbolNamesJoined(dataFlowAnalysisResults.CapturedInside))
+            Assert.Equal(Nothing, GetSymbolNamesJoined(dataFlowAnalysisResults.CapturedOutside))
         End Sub
 
         <Fact()>
@@ -2166,7 +2292,9 @@ class Program
     end sub
 end class</file>
       </compilation>)
-            Assert.Equal("i", GetSymbolNamesSortedAndJoined(analysis.DataFlowsOut))
+            Assert.Equal("i", GetSymbolNamesJoined(analysis.DataFlowsOut))
+            Assert.Equal("Me, b", GetSymbolNamesJoined(analysis.DefinitelyAssignedOnEntry))
+            Assert.Equal(Nothing, GetSymbolNamesJoined(analysis.DefinitelyAssignedOnExit))
         End Sub
 
         <Fact()>
@@ -2188,7 +2316,9 @@ Class Program
 End Class
 </file>
       </compilation>)
-            Assert.Equal("i", GetSymbolNamesSortedAndJoined(analysis.DataFlowsOut))
+            Assert.Equal("i", GetSymbolNamesJoined(analysis.DataFlowsOut))
+            Assert.Equal("Me, i", GetSymbolNamesJoined(analysis.DefinitelyAssignedOnEntry))
+            Assert.Equal("Me, i", GetSymbolNamesJoined(analysis.DefinitelyAssignedOnExit))
         End Sub
 
         <Fact()>
@@ -2206,10 +2336,12 @@ class Program
     end sub
 end class</file>
       </compilation>)
-            Assert.Equal(Nothing, GetSymbolNamesSortedAndJoined(analysis.DataFlowsOut))
+            Assert.Equal(Nothing, GetSymbolNamesJoined(analysis.DataFlowsOut))
+            Assert.Equal("Me, args", GetSymbolNamesJoined(analysis.DefinitelyAssignedOnEntry))
+            Assert.Equal("Me, args, i, s", GetSymbolNamesJoined(analysis.DefinitelyAssignedOnExit))
         End Sub
 
-        <WorkItem(543492, "DevDiv")>
+        <WorkItem(543492, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/543492")>
         <Fact()>
         Public Sub MeAndMyBaseReference1()
             Dim analysis = CompileAndAnalyzeDataFlow(
@@ -2227,11 +2359,13 @@ Public Class MyClass : Inherits BaseClass
 End Class
     </file>
 </compilation>)
-            Assert.Equal("Me", GetSymbolNamesSortedAndJoined(analysis.WrittenOutside))
-            Assert.Equal("Me", GetSymbolNamesSortedAndJoined(analysis.DataFlowsIn))
+            Assert.Equal("Me", GetSymbolNamesJoined(analysis.WrittenOutside))
+            Assert.Equal("Me", GetSymbolNamesJoined(analysis.DataFlowsIn))
+            Assert.Equal("Me", GetSymbolNamesJoined(analysis.DefinitelyAssignedOnEntry))
+            Assert.Equal("Me", GetSymbolNamesJoined(analysis.DefinitelyAssignedOnExit))
         End Sub
 
-        <WorkItem(543492, "DevDiv")>
+        <WorkItem(543492, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/543492")>
         <Fact()>
         Public Sub MeAndMyBaseReference2()
             Dim analysis = CompileAndAnalyzeDataFlow(
@@ -2253,8 +2387,10 @@ Public Class MyClass1 : Inherits BaseClass
 End Class
     </file>
 </compilation>)
-            Assert.Equal("f, Me", GetSymbolNamesSortedAndJoined(analysis.WrittenOutside))
-            Assert.Equal("Me", GetSymbolNamesSortedAndJoined(analysis.DataFlowsIn))
+            Assert.Equal("Me, f", GetSymbolNamesJoined(analysis.WrittenOutside))
+            Assert.Equal("Me", GetSymbolNamesJoined(analysis.DataFlowsIn))
+            Assert.Equal("Me, f", GetSymbolNamesJoined(analysis.DefinitelyAssignedOnEntry))
+            Assert.Equal("Me, f", GetSymbolNamesJoined(analysis.DefinitelyAssignedOnExit))
         End Sub
 
         <Fact()>
@@ -2275,7 +2411,9 @@ class C
     end sub
 end class</file>
 </compilation>)
-            Assert.Equal("x, y", GetSymbolNamesSortedAndJoined(analysis.DataFlowsOut))
+            Assert.Equal("x, y", GetSymbolNamesJoined(analysis.DataFlowsOut))
+            Assert.Equal("Me, x, a, tmp", GetSymbolNamesJoined(analysis.DefinitelyAssignedOnEntry))
+            Assert.Equal("Me, x, a, y, tmp", GetSymbolNamesJoined(analysis.DefinitelyAssignedOnExit))
         End Sub
 
         <Fact()>
@@ -2302,7 +2440,9 @@ class C
     end sub
 end class</file>
       </compilation>)
-            Assert.Equal("a, x", GetSymbolNamesSortedAndJoined(analysis.AlwaysAssigned))
+            Assert.Equal("x, a", GetSymbolNamesJoined(analysis.AlwaysAssigned))
+            Assert.Equal("Me, x, a, y", GetSymbolNamesJoined(analysis.DefinitelyAssignedOnEntry))
+            Assert.Equal("Me, x, a, y", GetSymbolNamesJoined(analysis.DefinitelyAssignedOnExit))
         End Sub
 
         <Fact()>
@@ -2320,7 +2460,7 @@ module C
     end sub
 end module</file>
       </compilation>)
-            Assert.Equal(Nothing, GetSymbolNamesSortedAndJoined(analysis.AlwaysAssigned))
+            Assert.Equal(Nothing, GetSymbolNamesJoined(analysis.AlwaysAssigned))
         End Sub
 
         <Fact()>
@@ -2338,7 +2478,9 @@ module C
     end sub
 end module</file>
       </compilation>)
-            Assert.Equal(Nothing, GetSymbolNamesSortedAndJoined(analysis.WrittenInside))
+            Assert.Equal(Nothing, GetSymbolNamesJoined(analysis.WrittenInside))
+            Assert.Equal("args", GetSymbolNamesJoined(analysis.DefinitelyAssignedOnEntry))
+            Assert.Equal("args", GetSymbolNamesJoined(analysis.DefinitelyAssignedOnExit))
         End Sub
 
         <Fact()>
@@ -2357,7 +2499,9 @@ module C
     end sub
 end module</file>
       </compilation>)
-            Assert.Equal(Nothing, GetSymbolNamesSortedAndJoined(analysis.WrittenInside))
+            Assert.Equal(Nothing, GetSymbolNamesJoined(analysis.WrittenInside))
+            Assert.Equal("args", GetSymbolNamesJoined(analysis.DefinitelyAssignedOnEntry))
+            Assert.Equal("args", GetSymbolNamesJoined(analysis.DefinitelyAssignedOnExit))
         End Sub
 
         <Fact()>
@@ -2376,7 +2520,9 @@ module C
     end sub
 end module</file>
       </compilation>)
-            Assert.Equal(Nothing, GetSymbolNamesSortedAndJoined(analysis.AlwaysAssigned))
+            Assert.Equal(Nothing, GetSymbolNamesJoined(analysis.AlwaysAssigned))
+            Assert.Equal("args", GetSymbolNamesJoined(analysis.DefinitelyAssignedOnEntry))
+            Assert.Equal("args", GetSymbolNamesJoined(analysis.DefinitelyAssignedOnExit))
         End Sub
 
         <Fact()>
@@ -2394,7 +2540,7 @@ class C
     end sub
 end class</file>
       </compilation>)
-            Assert.Equal("b", GetSymbolNamesSortedAndJoined(analysis.AlwaysAssigned))
+            Assert.Equal("b", GetSymbolNamesJoined(analysis.AlwaysAssigned))
         End Sub
 
         <Fact()>
@@ -2411,7 +2557,9 @@ class C
     end sub
 end class</file>
       </compilation>)
-            Assert.Equal("a", GetSymbolNamesSortedAndJoined(analysis.AlwaysAssigned))
+            Assert.Equal("a", GetSymbolNamesJoined(analysis.AlwaysAssigned))
+            Assert.Equal("Me, x", GetSymbolNamesJoined(analysis.DefinitelyAssignedOnEntry))
+            Assert.Equal("Me, x, a", GetSymbolNamesJoined(analysis.DefinitelyAssignedOnExit))
         End Sub
 
         <Fact()>
@@ -2437,10 +2585,12 @@ class C
     end sub
 end class</file>
       </compilation>)
-            Assert.Equal("c, d", GetSymbolNamesSortedAndJoined(analysis.ReadInside))
-            Assert.Equal("d, e, f", GetSymbolNamesSortedAndJoined(analysis.WrittenInside))
-            Assert.Equal("a, e, g, x", GetSymbolNamesSortedAndJoined(analysis.ReadOutside))
-            Assert.Equal("a, b, c, g, h, i, Me, x", GetSymbolNamesSortedAndJoined(analysis.WrittenOutside))
+            Assert.Equal("c, d", GetSymbolNamesJoined(analysis.ReadInside))
+            Assert.Equal("d, e, f", GetSymbolNamesJoined(analysis.WrittenInside))
+            Assert.Equal("x, a, e, g", GetSymbolNamesJoined(analysis.ReadOutside))
+            Assert.Equal("Me, x, a, b, c, g, h, i", GetSymbolNamesJoined(analysis.WrittenOutside))
+            Assert.Equal("Me, x, a, b, c", GetSymbolNamesJoined(analysis.DefinitelyAssignedOnEntry))
+            Assert.Equal("Me, x, a, b, c, d, e, f", GetSymbolNamesJoined(analysis.DefinitelyAssignedOnExit))
         End Sub
 
         <Fact()>
@@ -2467,15 +2617,19 @@ End Class
             Assert.Equal(0, controlFlowAnalysisResults.ExitPoints.Count())
             Assert.Equal(True, controlFlowAnalysisResults.StartPointIsReachable)
             Assert.Equal(True, controlFlowAnalysisResults.EndPointIsReachable)
-            Assert.Equal("a", GetSymbolNamesSortedAndJoined(dataFlowAnalysisResults.VariablesDeclared))
-            Assert.Equal(Nothing, GetSymbolNamesSortedAndJoined(dataFlowAnalysisResults.AlwaysAssigned))
-            Assert.Equal("Me", GetSymbolNamesSortedAndJoined(dataFlowAnalysisResults.DataFlowsIn))
-            Assert.Equal(Nothing, GetSymbolNamesSortedAndJoined(dataFlowAnalysisResults.DataFlowsOut))
-            Assert.Equal("a, Me", GetSymbolNamesSortedAndJoined(dataFlowAnalysisResults.ReadInside))
-            Assert.Equal(Nothing, GetSymbolNamesSortedAndJoined(dataFlowAnalysisResults.ReadOutside))
-            Assert.Equal("a", GetSymbolNamesSortedAndJoined(dataFlowAnalysisResults.WrittenInside))
-            Assert.Equal("Me, x", GetSymbolNamesSortedAndJoined(dataFlowAnalysisResults.WrittenOutside))
-            Assert.Equal(Nothing, GetSymbolNamesSortedAndJoined(dataFlowAnalysisResults.Captured))
+            Assert.Equal("a", GetSymbolNamesJoined(dataFlowAnalysisResults.VariablesDeclared))
+            Assert.Equal(Nothing, GetSymbolNamesJoined(dataFlowAnalysisResults.AlwaysAssigned))
+            Assert.Equal("Me", GetSymbolNamesJoined(dataFlowAnalysisResults.DataFlowsIn))
+            Assert.Equal(Nothing, GetSymbolNamesJoined(dataFlowAnalysisResults.DataFlowsOut))
+            Assert.Equal("Me, x", GetSymbolNamesJoined(dataFlowAnalysisResults.DefinitelyAssignedOnEntry))
+            Assert.Equal("Me, x, a", GetSymbolNamesJoined(dataFlowAnalysisResults.DefinitelyAssignedOnExit))
+            Assert.Equal("Me, a", GetSymbolNamesJoined(dataFlowAnalysisResults.ReadInside))
+            Assert.Equal(Nothing, GetSymbolNamesJoined(dataFlowAnalysisResults.ReadOutside))
+            Assert.Equal("a", GetSymbolNamesJoined(dataFlowAnalysisResults.WrittenInside))
+            Assert.Equal("Me, x", GetSymbolNamesJoined(dataFlowAnalysisResults.WrittenOutside))
+            Assert.Equal(Nothing, GetSymbolNamesJoined(dataFlowAnalysisResults.Captured))
+            Assert.Equal(Nothing, GetSymbolNamesJoined(dataFlowAnalysisResults.CapturedInside))
+            Assert.Equal(Nothing, GetSymbolNamesJoined(dataFlowAnalysisResults.CapturedOutside))
         End Sub
 
         <Fact()>
@@ -2489,6 +2643,8 @@ End Class
                 captured:={},
                 dataFlowsIn:={"x"},
                 dataFlowsOut:={},
+                definitelyAssignedOnEntry:={"x"},
+                definitelyAssignedOnExit:={"x"},
                 readInside:={"x"},
                 readOutside:={},
                 variablesDeclared:={},
@@ -2508,6 +2664,8 @@ End Class
                 captured:={},
                 dataFlowsIn:={},
                 dataFlowsOut:={"x"},
+                definitelyAssignedOnEntry:={"x"},
+                definitelyAssignedOnExit:={"x"},
                 readInside:={},
                 readOutside:={"x"},
                 variablesDeclared:={},
@@ -2515,7 +2673,7 @@ End Class
                 writtenOutside:={"x"})
         End Sub
 
-        <WorkItem(542156, "DevDiv")>
+        <WorkItem(542156, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/542156")>
         <Fact()>
         Public Sub TestRedimImplicitDataFlow()
             VerifyReDimDataFlowAnalysis(
@@ -2527,6 +2685,8 @@ End Class
                 captured:={},
                 dataFlowsIn:={},
                 dataFlowsOut:={"x"},
+                definitelyAssignedOnEntry:={},
+                definitelyAssignedOnExit:={"x"},
                 readInside:={},
                 readOutside:={"x"},
                 variablesDeclared:={},
@@ -2534,7 +2694,7 @@ End Class
                 writtenOutside:={"y"})
         End Sub
 
-        <WorkItem(542156, "DevDiv")>
+        <WorkItem(542156, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/542156")>
         <Fact()>
         Public Sub TestRedimMultipleImplicitDataFlow()
             VerifyReDimDataFlowAnalysis(
@@ -2547,6 +2707,8 @@ End Class
                 captured:={},
                 dataFlowsIn:={"z"},
                 dataFlowsOut:={"x"},
+                definitelyAssignedOnEntry:={},
+                definitelyAssignedOnExit:={"x", "y"},
                 readInside:={"z"},
                 readOutside:={"x", "z"},
                 variablesDeclared:={},
@@ -2569,8 +2731,10 @@ class C
     end sub
 end class
 </file>
-      </compilation>, customIL)
-            Assert.Equal("a, c", GetSymbolNamesSortedAndJoined(analysis.AlwaysAssigned))
+      </compilation>, s_customIL)
+            Assert.Equal("a, c", GetSymbolNamesJoined(analysis.AlwaysAssigned))
+            Assert.Equal("Me, x, ext", GetSymbolNamesJoined(analysis.DefinitelyAssignedOnEntry))
+            Assert.Equal("Me, x, ext, a, c", GetSymbolNamesJoined(analysis.DefinitelyAssignedOnExit))
         End Sub
 
         <Fact()>
@@ -2586,8 +2750,10 @@ class C
     end sub
 end class
 </file>
-      </compilation>, customIL)
-            Assert.Equal("a, c", GetSymbolNamesSortedAndJoined(analysis.AlwaysAssigned))
+      </compilation>, s_customIL)
+            Assert.Equal("a, c", GetSymbolNamesJoined(analysis.AlwaysAssigned))
+            Assert.Equal("Me, x, ext", GetSymbolNamesJoined(analysis.DefinitelyAssignedOnEntry))
+            Assert.Equal("Me, x, ext, a, c", GetSymbolNamesJoined(analysis.DefinitelyAssignedOnExit))
         End Sub
 
         <Fact()>
@@ -2611,14 +2777,16 @@ end class
             Assert.Equal(0, controlFlowAnalysisResults.ExitPoints.Count())
             Assert.True(controlFlowAnalysisResults.StartPointIsReachable)
             Assert.True(controlFlowAnalysisResults.EndPointIsReachable)
-            Assert.Equal("x", GetSymbolNamesSortedAndJoined(dataFlowAnalysisResults.VariablesDeclared))
-            Assert.Equal("x", GetSymbolNamesSortedAndJoined(dataFlowAnalysisResults.AlwaysAssigned))
-            Assert.Equal(Nothing, GetSymbolNamesSortedAndJoined(dataFlowAnalysisResults.DataFlowsIn))
-            Assert.Equal(Nothing, GetSymbolNamesSortedAndJoined(dataFlowAnalysisResults.DataFlowsOut))
-            Assert.Equal("x", GetSymbolNamesSortedAndJoined(dataFlowAnalysisResults.ReadInside))
-            Assert.Equal(Nothing, GetSymbolNamesSortedAndJoined(dataFlowAnalysisResults.ReadOutside))
-            Assert.Equal("x", GetSymbolNamesSortedAndJoined(dataFlowAnalysisResults.WrittenInside))
-            Assert.Equal(Nothing, GetSymbolNamesSortedAndJoined(dataFlowAnalysisResults.WrittenOutside))
+            Assert.Equal("x", GetSymbolNamesJoined(dataFlowAnalysisResults.VariablesDeclared))
+            Assert.Equal("x", GetSymbolNamesJoined(dataFlowAnalysisResults.AlwaysAssigned))
+            Assert.Equal(Nothing, GetSymbolNamesJoined(dataFlowAnalysisResults.DataFlowsIn))
+            Assert.Equal(Nothing, GetSymbolNamesJoined(dataFlowAnalysisResults.DataFlowsOut))
+            Assert.Equal(Nothing, GetSymbolNamesJoined(dataFlowAnalysisResults.DefinitelyAssignedOnEntry))
+            Assert.Equal("x", GetSymbolNamesJoined(dataFlowAnalysisResults.DefinitelyAssignedOnExit))
+            Assert.Equal("x", GetSymbolNamesJoined(dataFlowAnalysisResults.ReadInside))
+            Assert.Equal(Nothing, GetSymbolNamesJoined(dataFlowAnalysisResults.ReadOutside))
+            Assert.Equal("x", GetSymbolNamesJoined(dataFlowAnalysisResults.WrittenInside))
+            Assert.Equal(Nothing, GetSymbolNamesJoined(dataFlowAnalysisResults.WrittenOutside))
         End Sub
 
         <Fact()>
@@ -2637,21 +2805,23 @@ class C
     end sub
 end class
             </file>
-      </compilation>, customIL)
+      </compilation>, s_customIL)
             Dim controlFlowAnalysisResults = analysisResults.Item1
             Dim dataFlowAnalysisResults = analysisResults.Item2
             Assert.Equal(0, controlFlowAnalysisResults.EntryPoints.Count())
             Assert.Equal(0, controlFlowAnalysisResults.ExitPoints.Count())
             Assert.True(controlFlowAnalysisResults.StartPointIsReachable)
             Assert.True(controlFlowAnalysisResults.EndPointIsReachable)
-            Assert.Equal(Nothing, GetSymbolNamesSortedAndJoined(dataFlowAnalysisResults.VariablesDeclared))
-            Assert.Equal("y", GetSymbolNamesSortedAndJoined(dataFlowAnalysisResults.AlwaysAssigned))
-            Assert.Equal(Nothing, GetSymbolNamesSortedAndJoined(dataFlowAnalysisResults.DataFlowsIn))
-            Assert.Equal(Nothing, GetSymbolNamesSortedAndJoined(dataFlowAnalysisResults.DataFlowsOut))
-            Assert.Equal("ext", GetSymbolNamesSortedAndJoined(dataFlowAnalysisResults.ReadInside))
-            Assert.Equal(Nothing, GetSymbolNamesSortedAndJoined(dataFlowAnalysisResults.ReadOutside))
-            Assert.Equal("x, y", GetSymbolNamesSortedAndJoined(dataFlowAnalysisResults.WrittenInside))
-            Assert.Equal("ext", GetSymbolNamesSortedAndJoined(dataFlowAnalysisResults.WrittenOutside))
+            Assert.Equal(Nothing, GetSymbolNamesJoined(dataFlowAnalysisResults.VariablesDeclared))
+            Assert.Equal("y", GetSymbolNamesJoined(dataFlowAnalysisResults.AlwaysAssigned))
+            Assert.Equal(Nothing, GetSymbolNamesJoined(dataFlowAnalysisResults.DataFlowsIn))
+            Assert.Equal(Nothing, GetSymbolNamesJoined(dataFlowAnalysisResults.DataFlowsOut))
+            Assert.Equal("ext", GetSymbolNamesJoined(dataFlowAnalysisResults.DefinitelyAssignedOnEntry))
+            Assert.Equal("y, ext", GetSymbolNamesJoined(dataFlowAnalysisResults.DefinitelyAssignedOnExit))
+            Assert.Equal("ext", GetSymbolNamesJoined(dataFlowAnalysisResults.ReadInside))
+            Assert.Equal(Nothing, GetSymbolNamesJoined(dataFlowAnalysisResults.ReadOutside))
+            Assert.Equal("x, y", GetSymbolNamesJoined(dataFlowAnalysisResults.WrittenInside))
+            Assert.Equal("ext", GetSymbolNamesJoined(dataFlowAnalysisResults.WrittenOutside))
         End Sub
 
         <Fact()>
@@ -2674,14 +2844,16 @@ end class
             </file>
       </compilation>)
             Dim dataFlowAnalysisResults = analysisResults.Item2
-            Assert.Equal("z", GetSymbolNamesSortedAndJoined(dataFlowAnalysisResults.VariablesDeclared))
-            Assert.Equal("y, z", GetSymbolNamesSortedAndJoined(dataFlowAnalysisResults.AlwaysAssigned))
-            Assert.Equal("x", GetSymbolNamesSortedAndJoined(dataFlowAnalysisResults.DataFlowsIn))
-            Assert.Equal("y", GetSymbolNamesSortedAndJoined(dataFlowAnalysisResults.DataFlowsOut))
-            Assert.Equal("x, y", GetSymbolNamesSortedAndJoined(dataFlowAnalysisResults.ReadInside))
-            Assert.Equal("y", GetSymbolNamesSortedAndJoined(dataFlowAnalysisResults.ReadOutside))
-            Assert.Equal("y, z", GetSymbolNamesSortedAndJoined(dataFlowAnalysisResults.WrittenInside))
-            Assert.Equal("x, y", GetSymbolNamesSortedAndJoined(dataFlowAnalysisResults.WrittenOutside))
+            Assert.Equal("z", GetSymbolNamesJoined(dataFlowAnalysisResults.VariablesDeclared))
+            Assert.Equal("y, z", GetSymbolNamesJoined(dataFlowAnalysisResults.AlwaysAssigned))
+            Assert.Equal("x", GetSymbolNamesJoined(dataFlowAnalysisResults.DataFlowsIn))
+            Assert.Equal("y", GetSymbolNamesJoined(dataFlowAnalysisResults.DataFlowsOut))
+            Assert.Equal("x", GetSymbolNamesJoined(dataFlowAnalysisResults.DefinitelyAssignedOnEntry))
+            Assert.Equal("x, y, z", GetSymbolNamesJoined(dataFlowAnalysisResults.DefinitelyAssignedOnExit))
+            Assert.Equal("x, y", GetSymbolNamesJoined(dataFlowAnalysisResults.ReadInside))
+            Assert.Equal("y", GetSymbolNamesJoined(dataFlowAnalysisResults.ReadOutside))
+            Assert.Equal("y, z", GetSymbolNamesJoined(dataFlowAnalysisResults.WrittenInside))
+            Assert.Equal("x, y", GetSymbolNamesJoined(dataFlowAnalysisResults.WrittenOutside))
         End Sub
 
         <Fact()>
@@ -2697,20 +2869,22 @@ class C
 end class
             </file>
       </compilation>)
-            Assert.Equal(Nothing, GetSymbolNamesSortedAndJoined(dataFlowAnalysisResults.VariablesDeclared))
-            Assert.Equal(Nothing, GetSymbolNamesSortedAndJoined(dataFlowAnalysisResults.AlwaysAssigned))
-            Assert.Equal("x", GetSymbolNamesSortedAndJoined(dataFlowAnalysisResults.DataFlowsIn))
-            Assert.Equal(Nothing, GetSymbolNamesSortedAndJoined(dataFlowAnalysisResults.DataFlowsOut))
-            Assert.Equal("x", GetSymbolNamesSortedAndJoined(dataFlowAnalysisResults.ReadInside))
-            Assert.Equal("x", GetSymbolNamesSortedAndJoined(dataFlowAnalysisResults.ReadOutside))
-            Assert.Equal(Nothing, GetSymbolNamesSortedAndJoined(dataFlowAnalysisResults.WrittenInside))
-            Assert.Equal("x, y", GetSymbolNamesSortedAndJoined(dataFlowAnalysisResults.WrittenOutside))
+            Assert.Equal(Nothing, GetSymbolNamesJoined(dataFlowAnalysisResults.VariablesDeclared))
+            Assert.Equal(Nothing, GetSymbolNamesJoined(dataFlowAnalysisResults.AlwaysAssigned))
+            Assert.Equal("x", GetSymbolNamesJoined(dataFlowAnalysisResults.DataFlowsIn))
+            Assert.Equal(Nothing, GetSymbolNamesJoined(dataFlowAnalysisResults.DataFlowsOut))
+            Assert.Equal("x", GetSymbolNamesJoined(dataFlowAnalysisResults.DefinitelyAssignedOnEntry))
+            Assert.Equal("x", GetSymbolNamesJoined(dataFlowAnalysisResults.DefinitelyAssignedOnExit))
+            Assert.Equal("x", GetSymbolNamesJoined(dataFlowAnalysisResults.ReadInside))
+            Assert.Equal("x", GetSymbolNamesJoined(dataFlowAnalysisResults.ReadOutside))
+            Assert.Equal(Nothing, GetSymbolNamesJoined(dataFlowAnalysisResults.WrittenInside))
+            Assert.Equal("x, y", GetSymbolNamesJoined(dataFlowAnalysisResults.WrittenOutside))
         End Sub
 
         <Fact()>
-        Public Sub TestAssinmentExpressionAsBranchOfTernaryOperator()
+        Public Sub TestAssignmentExpressionAsBranchOfTernaryOperator()
             Dim dataFlowAnalysisResults = CompileAndAnalyzeDataFlow(
-      <compilation name="TestAssinmentExpressionAsBranchOfTernaryOperator">
+      <compilation>
           <file name="a.b">
 class C
     shared sub Main()
@@ -2720,16 +2894,18 @@ class C
     end sub
 end class
             </file>
-      </compilation>, customIL)
+      </compilation>, s_customIL)
 
-            Assert.Equal(Nothing, GetSymbolNamesSortedAndJoined(dataFlowAnalysisResults.VariablesDeclared))
-            Assert.Equal("x", GetSymbolNamesSortedAndJoined(dataFlowAnalysisResults.AlwaysAssigned))
-            Assert.Equal("ext", GetSymbolNamesSortedAndJoined(dataFlowAnalysisResults.DataFlowsIn))
-            Assert.Equal(Nothing, GetSymbolNamesSortedAndJoined(dataFlowAnalysisResults.DataFlowsOut))
-            Assert.Equal("ext", GetSymbolNamesSortedAndJoined(dataFlowAnalysisResults.ReadInside))
-            Assert.Equal("x", GetSymbolNamesSortedAndJoined(dataFlowAnalysisResults.ReadOutside))
-            Assert.Equal("x", GetSymbolNamesSortedAndJoined(dataFlowAnalysisResults.WrittenInside))
-            Assert.Equal("ext, y", GetSymbolNamesSortedAndJoined(dataFlowAnalysisResults.WrittenOutside))
+            Assert.Equal(Nothing, GetSymbolNamesJoined(dataFlowAnalysisResults.VariablesDeclared))
+            Assert.Equal("x", GetSymbolNamesJoined(dataFlowAnalysisResults.AlwaysAssigned))
+            Assert.Equal("ext", GetSymbolNamesJoined(dataFlowAnalysisResults.DataFlowsIn))
+            Assert.Equal(Nothing, GetSymbolNamesJoined(dataFlowAnalysisResults.DataFlowsOut))
+            Assert.Equal("ext", GetSymbolNamesJoined(dataFlowAnalysisResults.DefinitelyAssignedOnEntry))
+            Assert.Equal("x, ext", GetSymbolNamesJoined(dataFlowAnalysisResults.DefinitelyAssignedOnExit))
+            Assert.Equal("ext", GetSymbolNamesJoined(dataFlowAnalysisResults.ReadInside))
+            Assert.Equal("x", GetSymbolNamesJoined(dataFlowAnalysisResults.ReadOutside))
+            Assert.Equal("x", GetSymbolNamesJoined(dataFlowAnalysisResults.WrittenInside))
+            Assert.Equal("ext, y", GetSymbolNamesJoined(dataFlowAnalysisResults.WrittenOutside))
         End Sub
 
         <Fact()>
@@ -2745,11 +2921,13 @@ class C
     end sub
 end class
             </file>
-      </compilation>, customIL)
-            Assert.Equal("x", GetSymbolNamesSortedAndJoined(dataFlowAnalysisResults.AlwaysAssigned))
-            Assert.Equal("ext", GetSymbolNamesSortedAndJoined(dataFlowAnalysisResults.DataFlowsIn))
-            Assert.Equal("ext", GetSymbolNamesSortedAndJoined(dataFlowAnalysisResults.ReadInside))
-            Assert.Equal("x", GetSymbolNamesSortedAndJoined(dataFlowAnalysisResults.WrittenInside))
+      </compilation>, s_customIL)
+            Assert.Equal("x", GetSymbolNamesJoined(dataFlowAnalysisResults.AlwaysAssigned))
+            Assert.Equal("ext", GetSymbolNamesJoined(dataFlowAnalysisResults.DataFlowsIn))
+            Assert.Equal("ext", GetSymbolNamesJoined(dataFlowAnalysisResults.DefinitelyAssignedOnEntry))
+            Assert.Equal("x, ext", GetSymbolNamesJoined(dataFlowAnalysisResults.DefinitelyAssignedOnExit))
+            Assert.Equal("ext", GetSymbolNamesJoined(dataFlowAnalysisResults.ReadInside))
+            Assert.Equal("x", GetSymbolNamesJoined(dataFlowAnalysisResults.WrittenInside))
         End Sub
 
         <Fact()>
@@ -2765,12 +2943,14 @@ class C
     end sub
 end class
             </file>
-      </compilation>, customIL)
+      </compilation>, s_customIL)
 
-            Assert.Equal("y", GetSymbolNamesSortedAndJoined(dataFlowAnalysisResults.AlwaysAssigned))
-            Assert.Equal("ext", GetSymbolNamesSortedAndJoined(dataFlowAnalysisResults.DataFlowsIn))
-            Assert.Equal("ext", GetSymbolNamesSortedAndJoined(dataFlowAnalysisResults.ReadInside))
-            Assert.Equal("y", GetSymbolNamesSortedAndJoined(dataFlowAnalysisResults.WrittenInside))
+            Assert.Equal("y", GetSymbolNamesJoined(dataFlowAnalysisResults.AlwaysAssigned))
+            Assert.Equal("ext", GetSymbolNamesJoined(dataFlowAnalysisResults.DataFlowsIn))
+            Assert.Equal("x, ext", GetSymbolNamesJoined(dataFlowAnalysisResults.DefinitelyAssignedOnEntry))
+            Assert.Equal("x, y, ext", GetSymbolNamesJoined(dataFlowAnalysisResults.DefinitelyAssignedOnExit))
+            Assert.Equal("ext", GetSymbolNamesJoined(dataFlowAnalysisResults.ReadInside))
+            Assert.Equal("y", GetSymbolNamesJoined(dataFlowAnalysisResults.WrittenInside))
         End Sub
 
         <Fact()>
@@ -2786,11 +2966,13 @@ class C
     end sub
 end class
             </file>
-      </compilation>, customIL)
-            Assert.Equal("z", GetSymbolNamesSortedAndJoined(dataFlowAnalysisResults.AlwaysAssigned))
-            Assert.Equal("ext", GetSymbolNamesSortedAndJoined(dataFlowAnalysisResults.DataFlowsIn))
-            Assert.Equal("ext", GetSymbolNamesSortedAndJoined(dataFlowAnalysisResults.ReadInside))
-            Assert.Equal("z", GetSymbolNamesSortedAndJoined(dataFlowAnalysisResults.WrittenInside))
+      </compilation>, s_customIL)
+            Assert.Equal("z", GetSymbolNamesJoined(dataFlowAnalysisResults.AlwaysAssigned))
+            Assert.Equal("ext", GetSymbolNamesJoined(dataFlowAnalysisResults.DataFlowsIn))
+            Assert.Equal("x, ext", GetSymbolNamesJoined(dataFlowAnalysisResults.DefinitelyAssignedOnEntry))
+            Assert.Equal("x, z, ext", GetSymbolNamesJoined(dataFlowAnalysisResults.DefinitelyAssignedOnExit))
+            Assert.Equal("ext", GetSymbolNamesJoined(dataFlowAnalysisResults.ReadInside))
+            Assert.Equal("z", GetSymbolNamesJoined(dataFlowAnalysisResults.WrittenInside))
         End Sub
 
         <Fact()>
@@ -2806,11 +2988,13 @@ class C
     end sub
 end class
             </file>
-      </compilation>, customIL)
-            Assert.Equal("x", GetSymbolNamesSortedAndJoined(dataFlowAnalysisResults.AlwaysAssigned))
-            Assert.Equal("ext", GetSymbolNamesSortedAndJoined(dataFlowAnalysisResults.DataFlowsIn))
-            Assert.Equal("ext", GetSymbolNamesSortedAndJoined(dataFlowAnalysisResults.ReadInside))
-            Assert.Equal("x, y, z", GetSymbolNamesSortedAndJoined(dataFlowAnalysisResults.WrittenInside))
+      </compilation>, s_customIL)
+            Assert.Equal("x", GetSymbolNamesJoined(dataFlowAnalysisResults.AlwaysAssigned))
+            Assert.Equal("ext", GetSymbolNamesJoined(dataFlowAnalysisResults.DataFlowsIn))
+            Assert.Equal("ext", GetSymbolNamesJoined(dataFlowAnalysisResults.DefinitelyAssignedOnEntry))
+            Assert.Equal("x, ext", GetSymbolNamesJoined(dataFlowAnalysisResults.DefinitelyAssignedOnExit))
+            Assert.Equal("ext", GetSymbolNamesJoined(dataFlowAnalysisResults.ReadInside))
+            Assert.Equal("x, y, z", GetSymbolNamesJoined(dataFlowAnalysisResults.WrittenInside))
         End Sub
 
         <Fact()>
@@ -2826,12 +3010,14 @@ class C
     end sub
 end class
             </file>
-      </compilation>, customIL)
+      </compilation>, s_customIL)
 
-            Assert.Equal("x, y", GetSymbolNamesSortedAndJoined(dataFlowAnalysisResults.AlwaysAssigned))
-            Assert.Equal("ext", GetSymbolNamesSortedAndJoined(dataFlowAnalysisResults.DataFlowsIn))
-            Assert.Equal("ext", GetSymbolNamesSortedAndJoined(dataFlowAnalysisResults.ReadInside))
-            Assert.Equal("x, y", GetSymbolNamesSortedAndJoined(dataFlowAnalysisResults.WrittenInside))
+            Assert.Equal("x, y", GetSymbolNamesJoined(dataFlowAnalysisResults.AlwaysAssigned))
+            Assert.Equal("ext", GetSymbolNamesJoined(dataFlowAnalysisResults.DataFlowsIn))
+            Assert.Equal("ext", GetSymbolNamesJoined(dataFlowAnalysisResults.DefinitelyAssignedOnEntry))
+            Assert.Equal("x, y, ext", GetSymbolNamesJoined(dataFlowAnalysisResults.DefinitelyAssignedOnExit))
+            Assert.Equal("ext", GetSymbolNamesJoined(dataFlowAnalysisResults.ReadInside))
+            Assert.Equal("x, y", GetSymbolNamesJoined(dataFlowAnalysisResults.WrittenInside))
         End Sub
 
 #End Region
@@ -2856,14 +3042,16 @@ end class
             Assert.Equal(0, controlFlowAnalysisResults.ExitPoints.Count())
             Assert.True(controlFlowAnalysisResults.StartPointIsReachable)
             Assert.True(controlFlowAnalysisResults.EndPointIsReachable)
-            Assert.Equal("x", GetSymbolNamesSortedAndJoined(dataFlowAnalysisResults.VariablesDeclared))
-            Assert.Equal("x", GetSymbolNamesSortedAndJoined(dataFlowAnalysisResults.AlwaysAssigned))
-            Assert.Equal(Nothing, GetSymbolNamesSortedAndJoined(dataFlowAnalysisResults.DataFlowsIn))
-            Assert.Equal(Nothing, GetSymbolNamesSortedAndJoined(dataFlowAnalysisResults.DataFlowsOut))
-            Assert.Equal("x", GetSymbolNamesSortedAndJoined(dataFlowAnalysisResults.ReadInside))
-            Assert.Equal(Nothing, GetSymbolNamesSortedAndJoined(dataFlowAnalysisResults.ReadOutside))
-            Assert.Equal("x", GetSymbolNamesSortedAndJoined(dataFlowAnalysisResults.WrittenInside))
-            Assert.Equal(Nothing, GetSymbolNamesSortedAndJoined(dataFlowAnalysisResults.WrittenOutside))
+            Assert.Equal("x", GetSymbolNamesJoined(dataFlowAnalysisResults.VariablesDeclared))
+            Assert.Equal("x", GetSymbolNamesJoined(dataFlowAnalysisResults.AlwaysAssigned))
+            Assert.Equal(Nothing, GetSymbolNamesJoined(dataFlowAnalysisResults.DataFlowsIn))
+            Assert.Equal(Nothing, GetSymbolNamesJoined(dataFlowAnalysisResults.DataFlowsOut))
+            Assert.Equal(Nothing, GetSymbolNamesJoined(dataFlowAnalysisResults.DefinitelyAssignedOnEntry))
+            Assert.Equal("x", GetSymbolNamesJoined(dataFlowAnalysisResults.DefinitelyAssignedOnExit))
+            Assert.Equal("x", GetSymbolNamesJoined(dataFlowAnalysisResults.ReadInside))
+            Assert.Equal(Nothing, GetSymbolNamesJoined(dataFlowAnalysisResults.ReadOutside))
+            Assert.Equal("x", GetSymbolNamesJoined(dataFlowAnalysisResults.WrittenInside))
+            Assert.Equal(Nothing, GetSymbolNamesJoined(dataFlowAnalysisResults.WrittenOutside))
         End Sub
 
         <Fact()>
@@ -2893,14 +3081,16 @@ end class
             Assert.Equal(0, controlFlowAnalysisResults.ExitPoints.Count())
             Assert.True(controlFlowAnalysisResults.StartPointIsReachable)
             Assert.True(controlFlowAnalysisResults.EndPointIsReachable)
-            Assert.Equal(Nothing, GetSymbolNamesSortedAndJoined(dataFlowAnalysisResults.VariablesDeclared))
-            Assert.Equal("y", GetSymbolNamesSortedAndJoined(dataFlowAnalysisResults.AlwaysAssigned))
-            Assert.Equal("x", GetSymbolNamesSortedAndJoined(dataFlowAnalysisResults.DataFlowsIn))
-            Assert.Equal("y", GetSymbolNamesSortedAndJoined(dataFlowAnalysisResults.DataFlowsOut))
-            Assert.Equal("x", GetSymbolNamesSortedAndJoined(dataFlowAnalysisResults.ReadInside))
-            Assert.Equal("y", GetSymbolNamesSortedAndJoined(dataFlowAnalysisResults.ReadOutside))
-            Assert.Equal("y", GetSymbolNamesSortedAndJoined(dataFlowAnalysisResults.WrittenInside))
-            Assert.Equal("x, y", GetSymbolNamesSortedAndJoined(dataFlowAnalysisResults.WrittenOutside))
+            Assert.Equal(Nothing, GetSymbolNamesJoined(dataFlowAnalysisResults.VariablesDeclared))
+            Assert.Equal("y", GetSymbolNamesJoined(dataFlowAnalysisResults.AlwaysAssigned))
+            Assert.Equal("x", GetSymbolNamesJoined(dataFlowAnalysisResults.DataFlowsIn))
+            Assert.Equal("y", GetSymbolNamesJoined(dataFlowAnalysisResults.DataFlowsOut))
+            Assert.Equal("x", GetSymbolNamesJoined(dataFlowAnalysisResults.DefinitelyAssignedOnEntry))
+            Assert.Equal("x, y", GetSymbolNamesJoined(dataFlowAnalysisResults.DefinitelyAssignedOnExit))
+            Assert.Equal("x", GetSymbolNamesJoined(dataFlowAnalysisResults.ReadInside))
+            Assert.Equal("y", GetSymbolNamesJoined(dataFlowAnalysisResults.ReadOutside))
+            Assert.Equal("y", GetSymbolNamesJoined(dataFlowAnalysisResults.WrittenInside))
+            Assert.Equal("x, y", GetSymbolNamesJoined(dataFlowAnalysisResults.WrittenOutside))
         End Sub
 
         <Fact()>
@@ -2928,14 +3118,16 @@ end class
             Assert.Equal(0, controlFlowAnalysisResults.ExitPoints.Count())
             Assert.True(controlFlowAnalysisResults.StartPointIsReachable)
             Assert.True(controlFlowAnalysisResults.EndPointIsReachable)
-            Assert.Equal(Nothing, GetSymbolNamesSortedAndJoined(dataFlowAnalysisResults.VariablesDeclared))
-            Assert.Equal("y", GetSymbolNamesSortedAndJoined(dataFlowAnalysisResults.AlwaysAssigned))
-            Assert.Equal("x", GetSymbolNamesSortedAndJoined(dataFlowAnalysisResults.DataFlowsIn))
-            Assert.Equal("y", GetSymbolNamesSortedAndJoined(dataFlowAnalysisResults.DataFlowsOut))
-            Assert.Equal("x", GetSymbolNamesSortedAndJoined(dataFlowAnalysisResults.ReadInside))
-            Assert.Equal("y", GetSymbolNamesSortedAndJoined(dataFlowAnalysisResults.ReadOutside))
-            Assert.Equal("y", GetSymbolNamesSortedAndJoined(dataFlowAnalysisResults.WrittenInside))
-            Assert.Equal("x, y", GetSymbolNamesSortedAndJoined(dataFlowAnalysisResults.WrittenOutside))
+            Assert.Equal(Nothing, GetSymbolNamesJoined(dataFlowAnalysisResults.VariablesDeclared))
+            Assert.Equal("y", GetSymbolNamesJoined(dataFlowAnalysisResults.AlwaysAssigned))
+            Assert.Equal("x", GetSymbolNamesJoined(dataFlowAnalysisResults.DataFlowsIn))
+            Assert.Equal("y", GetSymbolNamesJoined(dataFlowAnalysisResults.DataFlowsOut))
+            Assert.Equal("x", GetSymbolNamesJoined(dataFlowAnalysisResults.DefinitelyAssignedOnEntry))
+            Assert.Equal("x, y", GetSymbolNamesJoined(dataFlowAnalysisResults.DefinitelyAssignedOnExit))
+            Assert.Equal("x", GetSymbolNamesJoined(dataFlowAnalysisResults.ReadInside))
+            Assert.Equal("y", GetSymbolNamesJoined(dataFlowAnalysisResults.ReadOutside))
+            Assert.Equal("y", GetSymbolNamesJoined(dataFlowAnalysisResults.WrittenInside))
+            Assert.Equal("x, y", GetSymbolNamesJoined(dataFlowAnalysisResults.WrittenOutside))
         End Sub
 
         <Fact()>
@@ -2963,14 +3155,16 @@ end class
             Assert.Equal(0, controlFlowAnalysisResults.ExitPoints.Count())
             Assert.True(controlFlowAnalysisResults.StartPointIsReachable)
             Assert.True(controlFlowAnalysisResults.EndPointIsReachable)
-            Assert.Equal(Nothing, GetSymbolNamesSortedAndJoined(dataFlowAnalysisResults.VariablesDeclared))
-            Assert.Equal(Nothing, GetSymbolNamesSortedAndJoined(dataFlowAnalysisResults.AlwaysAssigned))
-            Assert.Equal("x", GetSymbolNamesSortedAndJoined(dataFlowAnalysisResults.DataFlowsIn))
-            Assert.Equal("y", GetSymbolNamesSortedAndJoined(dataFlowAnalysisResults.DataFlowsOut))
-            Assert.Equal("x", GetSymbolNamesSortedAndJoined(dataFlowAnalysisResults.ReadInside))
-            Assert.Equal("y", GetSymbolNamesSortedAndJoined(dataFlowAnalysisResults.ReadOutside))
-            Assert.Equal("y", GetSymbolNamesSortedAndJoined(dataFlowAnalysisResults.WrittenInside))
-            Assert.Equal("x, y", GetSymbolNamesSortedAndJoined(dataFlowAnalysisResults.WrittenOutside))
+            Assert.Equal(Nothing, GetSymbolNamesJoined(dataFlowAnalysisResults.VariablesDeclared))
+            Assert.Equal(Nothing, GetSymbolNamesJoined(dataFlowAnalysisResults.AlwaysAssigned))
+            Assert.Equal("x", GetSymbolNamesJoined(dataFlowAnalysisResults.DataFlowsIn))
+            Assert.Equal("y", GetSymbolNamesJoined(dataFlowAnalysisResults.DataFlowsOut))
+            Assert.Equal("x", GetSymbolNamesJoined(dataFlowAnalysisResults.DefinitelyAssignedOnEntry))
+            Assert.Equal("x", GetSymbolNamesJoined(dataFlowAnalysisResults.DefinitelyAssignedOnExit))
+            Assert.Equal("x", GetSymbolNamesJoined(dataFlowAnalysisResults.ReadInside))
+            Assert.Equal("y", GetSymbolNamesJoined(dataFlowAnalysisResults.ReadOutside))
+            Assert.Equal("y", GetSymbolNamesJoined(dataFlowAnalysisResults.WrittenInside))
+            Assert.Equal("x, y", GetSymbolNamesJoined(dataFlowAnalysisResults.WrittenOutside))
         End Sub
 
         <Fact()>
@@ -2987,14 +3181,16 @@ x |]
 end class
             </file>
       </compilation>)
-            Assert.Equal(Nothing, GetSymbolNamesSortedAndJoined(dataFlowAnalysisResults.VariablesDeclared))
-            Assert.Equal(Nothing, GetSymbolNamesSortedAndJoined(dataFlowAnalysisResults.AlwaysAssigned))
-            Assert.Equal("x", GetSymbolNamesSortedAndJoined(dataFlowAnalysisResults.DataFlowsIn))
-            Assert.Equal(Nothing, GetSymbolNamesSortedAndJoined(dataFlowAnalysisResults.DataFlowsOut))
-            Assert.Equal("x", GetSymbolNamesSortedAndJoined(dataFlowAnalysisResults.ReadInside))
-            Assert.Equal("x", GetSymbolNamesSortedAndJoined(dataFlowAnalysisResults.ReadOutside))
-            Assert.Equal(Nothing, GetSymbolNamesSortedAndJoined(dataFlowAnalysisResults.WrittenInside))
-            Assert.Equal("x, y", GetSymbolNamesSortedAndJoined(dataFlowAnalysisResults.WrittenOutside))
+            Assert.Equal(Nothing, GetSymbolNamesJoined(dataFlowAnalysisResults.VariablesDeclared))
+            Assert.Equal(Nothing, GetSymbolNamesJoined(dataFlowAnalysisResults.AlwaysAssigned))
+            Assert.Equal("x", GetSymbolNamesJoined(dataFlowAnalysisResults.DataFlowsIn))
+            Assert.Equal(Nothing, GetSymbolNamesJoined(dataFlowAnalysisResults.DataFlowsOut))
+            Assert.Equal("x", GetSymbolNamesJoined(dataFlowAnalysisResults.DefinitelyAssignedOnEntry))
+            Assert.Equal("x", GetSymbolNamesJoined(dataFlowAnalysisResults.DefinitelyAssignedOnExit))
+            Assert.Equal("x", GetSymbolNamesJoined(dataFlowAnalysisResults.ReadInside))
+            Assert.Equal("x", GetSymbolNamesJoined(dataFlowAnalysisResults.ReadOutside))
+            Assert.Equal(Nothing, GetSymbolNamesJoined(dataFlowAnalysisResults.WrittenInside))
+            Assert.Equal("x, y", GetSymbolNamesJoined(dataFlowAnalysisResults.WrittenOutside))
         End Sub
 
         <Fact()>
@@ -3011,14 +3207,16 @@ end class
             </file>
       </compilation>)
 
-            Assert.Equal(Nothing, GetSymbolNamesSortedAndJoined(dataFlowAnalysisResults.VariablesDeclared))
-            Assert.Equal(Nothing, GetSymbolNamesSortedAndJoined(dataFlowAnalysisResults.AlwaysAssigned)) ' In C# '=' is an assignment while in VB it is a comparison.
-            Assert.Equal("x", GetSymbolNamesSortedAndJoined(dataFlowAnalysisResults.DataFlowsIn))
-            Assert.Equal(Nothing, GetSymbolNamesSortedAndJoined(dataFlowAnalysisResults.DataFlowsOut)) 'C# flows out because this is an assignement expression.  In VB this is an equality test.
-            Assert.Equal("x", GetSymbolNamesSortedAndJoined(dataFlowAnalysisResults.ReadInside))
-            Assert.Equal("x", GetSymbolNamesSortedAndJoined(dataFlowAnalysisResults.ReadOutside))
-            Assert.Equal(Nothing, GetSymbolNamesSortedAndJoined(dataFlowAnalysisResults.WrittenInside)) 'C# this is an assignment. In VB, this is a comparison so no assignment.
-            Assert.Equal("x, y", GetSymbolNamesSortedAndJoined(dataFlowAnalysisResults.WrittenOutside))
+            Assert.Equal(Nothing, GetSymbolNamesJoined(dataFlowAnalysisResults.VariablesDeclared))
+            Assert.Equal(Nothing, GetSymbolNamesJoined(dataFlowAnalysisResults.AlwaysAssigned)) ' In C# '=' is an assignment while in VB it is a comparison.
+            Assert.Equal("x", GetSymbolNamesJoined(dataFlowAnalysisResults.DataFlowsIn))
+            Assert.Equal(Nothing, GetSymbolNamesJoined(dataFlowAnalysisResults.DataFlowsOut)) 'C# flows out because this is an assignment expression.  In VB this is an equality test.
+            Assert.Equal("x", GetSymbolNamesJoined(dataFlowAnalysisResults.DefinitelyAssignedOnEntry))
+            Assert.Equal("x", GetSymbolNamesJoined(dataFlowAnalysisResults.DefinitelyAssignedOnExit))
+            Assert.Equal("x", GetSymbolNamesJoined(dataFlowAnalysisResults.ReadInside))
+            Assert.Equal("x", GetSymbolNamesJoined(dataFlowAnalysisResults.ReadOutside))
+            Assert.Equal(Nothing, GetSymbolNamesJoined(dataFlowAnalysisResults.WrittenInside)) 'C# this is an assignment. In VB, this is a comparison so no assignment.
+            Assert.Equal("x, y", GetSymbolNamesJoined(dataFlowAnalysisResults.WrittenOutside))
         End Sub
 
         <Fact()>
@@ -3030,14 +3228,14 @@ class C
     shared sub Main()
         dim x as integer = 0
 [|
-        Foo(
+        Goo(
 x 
 )
 |]
       System.Console.WriteLine(x)
     end sub
 
-    shared sub Foo(byref x as integer)
+    shared sub Goo(byref x as integer)
     end sub
 end class
             </file>
@@ -3048,17 +3246,19 @@ end class
             Assert.Equal(0, controlFlowAnalysisResults.ExitPoints.Count())
             Assert.True(controlFlowAnalysisResults.StartPointIsReachable)
             Assert.True(controlFlowAnalysisResults.EndPointIsReachable)
-            Assert.Equal(Nothing, GetSymbolNamesSortedAndJoined(dataFlowAnalysisResults.VariablesDeclared))
-            Assert.Equal(Nothing, GetSymbolNamesSortedAndJoined(dataFlowAnalysisResults.AlwaysAssigned))
-            Assert.Equal("x", GetSymbolNamesSortedAndJoined(dataFlowAnalysisResults.DataFlowsIn))
-            Assert.Equal("x", GetSymbolNamesSortedAndJoined(dataFlowAnalysisResults.DataFlowsOut))
-            Assert.Equal("x", GetSymbolNamesSortedAndJoined(dataFlowAnalysisResults.ReadInside))
-            Assert.Equal("x", GetSymbolNamesSortedAndJoined(dataFlowAnalysisResults.ReadOutside))
-            Assert.Equal("x", GetSymbolNamesSortedAndJoined(dataFlowAnalysisResults.WrittenInside))
-            Assert.Equal("x", GetSymbolNamesSortedAndJoined(dataFlowAnalysisResults.WrittenOutside))
+            Assert.Equal(Nothing, GetSymbolNamesJoined(dataFlowAnalysisResults.VariablesDeclared))
+            Assert.Equal(Nothing, GetSymbolNamesJoined(dataFlowAnalysisResults.AlwaysAssigned))
+            Assert.Equal("x", GetSymbolNamesJoined(dataFlowAnalysisResults.DataFlowsIn))
+            Assert.Equal("x", GetSymbolNamesJoined(dataFlowAnalysisResults.DataFlowsOut))
+            Assert.Equal("x", GetSymbolNamesJoined(dataFlowAnalysisResults.DefinitelyAssignedOnEntry))
+            Assert.Equal("x", GetSymbolNamesJoined(dataFlowAnalysisResults.DefinitelyAssignedOnExit))
+            Assert.Equal("x", GetSymbolNamesJoined(dataFlowAnalysisResults.ReadInside))
+            Assert.Equal("x", GetSymbolNamesJoined(dataFlowAnalysisResults.ReadOutside))
+            Assert.Equal("x", GetSymbolNamesJoined(dataFlowAnalysisResults.WrittenInside))
+            Assert.Equal("x", GetSymbolNamesJoined(dataFlowAnalysisResults.WrittenOutside))
         End Sub
 
-        <WorkItem(541891, "DevDiv")>
+        <WorkItem(541891, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/541891")>
         <Fact()>
         Public Sub TestRefArgumentSelection02()
             Dim dataFlowAnalysisResults = CompileAndAnalyzeDataFlow(
@@ -3067,10 +3267,10 @@ end class
 class C
      Sub Main()
         Dim x As UInteger
-        System.Console.WriteLine([|Foo(x)|])
+        System.Console.WriteLine([|Goo(x)|])
     End Sub
 
-    Function Foo(ByRef x As ULong)
+    Function Goo(ByRef x As ULong)
         x = 123
         Return x + 1
     End Function
@@ -3078,17 +3278,19 @@ end class
             </file>
       </compilation>)
 
-            Assert.Equal(Nothing, GetSymbolNamesSortedAndJoined(dataFlowAnalysisResults.VariablesDeclared))
-            Assert.Equal(Nothing, GetSymbolNamesSortedAndJoined(dataFlowAnalysisResults.AlwaysAssigned))
-            Assert.Equal("Me, x", GetSymbolNamesSortedAndJoined(dataFlowAnalysisResults.DataFlowsIn))
-            Assert.Equal(Nothing, GetSymbolNamesSortedAndJoined(dataFlowAnalysisResults.DataFlowsOut))
-            Assert.Equal("Me, x", GetSymbolNamesSortedAndJoined(dataFlowAnalysisResults.ReadInside))
-            Assert.Equal("x", GetSymbolNamesSortedAndJoined(dataFlowAnalysisResults.WrittenInside))
-            Assert.Equal(Nothing, GetSymbolNamesSortedAndJoined(dataFlowAnalysisResults.ReadOutside))
-            Assert.Equal("Me", GetSymbolNamesSortedAndJoined(dataFlowAnalysisResults.WrittenOutside))
+            Assert.Equal(Nothing, GetSymbolNamesJoined(dataFlowAnalysisResults.VariablesDeclared))
+            Assert.Equal(Nothing, GetSymbolNamesJoined(dataFlowAnalysisResults.AlwaysAssigned))
+            Assert.Equal("Me, x", GetSymbolNamesJoined(dataFlowAnalysisResults.DataFlowsIn))
+            Assert.Equal(Nothing, GetSymbolNamesJoined(dataFlowAnalysisResults.DataFlowsOut))
+            Assert.Equal("Me", GetSymbolNamesJoined(dataFlowAnalysisResults.DefinitelyAssignedOnEntry))
+            Assert.Equal("Me, x", GetSymbolNamesJoined(dataFlowAnalysisResults.DefinitelyAssignedOnExit))
+            Assert.Equal("Me, x", GetSymbolNamesJoined(dataFlowAnalysisResults.ReadInside))
+            Assert.Equal("x", GetSymbolNamesJoined(dataFlowAnalysisResults.WrittenInside))
+            Assert.Equal(Nothing, GetSymbolNamesJoined(dataFlowAnalysisResults.ReadOutside))
+            Assert.Equal("Me", GetSymbolNamesJoined(dataFlowAnalysisResults.WrittenOutside))
         End Sub
 
-        <WorkItem(541891, "DevDiv")>
+        <WorkItem(541891, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/541891")>
         <Fact()>
         Public Sub TestRefArgumentSelection02a()
             Dim dataFlowAnalysisResults = CompileAndAnalyzeDataFlow(
@@ -3097,10 +3299,10 @@ end class
 class C
      Sub Main()
         Dim x As UInteger
-        System.Console.WriteLine(Foo([|x|]))
+        System.Console.WriteLine(Goo([|x|]))
     End Sub
 
-    Function Foo(ByRef x As ULong)
+    Function Goo(ByRef x As ULong)
         x = 123
         Return x + 1
     End Function
@@ -3108,20 +3310,22 @@ end class
             </file>
       </compilation>)
 
-            Assert.Equal(Nothing, GetSymbolNamesSortedAndJoined(dataFlowAnalysisResults.VariablesDeclared))
-            Assert.Equal(Nothing, GetSymbolNamesSortedAndJoined(dataFlowAnalysisResults.AlwaysAssigned))
-            Assert.Equal("x", GetSymbolNamesSortedAndJoined(dataFlowAnalysisResults.DataFlowsIn))
-            Assert.Equal(Nothing, GetSymbolNamesSortedAndJoined(dataFlowAnalysisResults.DataFlowsOut))
-            Assert.Equal("x", GetSymbolNamesSortedAndJoined(dataFlowAnalysisResults.ReadInside))
-            Assert.Equal(Nothing, GetSymbolNamesSortedAndJoined(dataFlowAnalysisResults.WrittenInside))
-            Assert.Equal("Me", GetSymbolNamesSortedAndJoined(dataFlowAnalysisResults.ReadOutside))
-            Assert.Equal("Me, x", GetSymbolNamesSortedAndJoined(dataFlowAnalysisResults.WrittenOutside))
+            Assert.Equal(Nothing, GetSymbolNamesJoined(dataFlowAnalysisResults.VariablesDeclared))
+            Assert.Equal(Nothing, GetSymbolNamesJoined(dataFlowAnalysisResults.AlwaysAssigned))
+            Assert.Equal("x", GetSymbolNamesJoined(dataFlowAnalysisResults.DataFlowsIn))
+            Assert.Equal(Nothing, GetSymbolNamesJoined(dataFlowAnalysisResults.DataFlowsOut))
+            Assert.Equal("Me", GetSymbolNamesJoined(dataFlowAnalysisResults.DefinitelyAssignedOnEntry))
+            Assert.Equal("Me", GetSymbolNamesJoined(dataFlowAnalysisResults.DefinitelyAssignedOnExit))
+            Assert.Equal("x", GetSymbolNamesJoined(dataFlowAnalysisResults.ReadInside))
+            Assert.Equal(Nothing, GetSymbolNamesJoined(dataFlowAnalysisResults.WrittenInside))
+            Assert.Equal("Me", GetSymbolNamesJoined(dataFlowAnalysisResults.ReadOutside))
+            Assert.Equal("Me, x", GetSymbolNamesJoined(dataFlowAnalysisResults.WrittenOutside))
         End Sub
 
         <Fact()>
-        Public Sub TestCompoundAsseignmentTargetSelection01()
+        Public Sub TestCompoundAssignmentTargetSelection01()
             Dim dataFlowAnalysisResults = CompileAndAnalyzeDataFlow(
-      <compilation name="TestCompoundAsseignmentTargetSelection01">
+      <compilation name="TestCompoundAssignmentTargetSelection01">
           <file name="a.b">
 class C
      Sub Main()
@@ -3132,20 +3336,22 @@ end class
             </file>
       </compilation>)
 
-            Assert.Equal(Nothing, GetSymbolNamesSortedAndJoined(dataFlowAnalysisResults.VariablesDeclared))
-            Assert.Equal(Nothing, GetSymbolNamesSortedAndJoined(dataFlowAnalysisResults.AlwaysAssigned))
-            Assert.Equal("x", GetSymbolNamesSortedAndJoined(dataFlowAnalysisResults.DataFlowsIn))
-            Assert.Equal(Nothing, GetSymbolNamesSortedAndJoined(dataFlowAnalysisResults.DataFlowsOut))
-            Assert.Equal("x", GetSymbolNamesSortedAndJoined(dataFlowAnalysisResults.ReadInside))
-            Assert.Equal(Nothing, GetSymbolNamesSortedAndJoined(dataFlowAnalysisResults.WrittenInside))
-            Assert.Equal(Nothing, GetSymbolNamesSortedAndJoined(dataFlowAnalysisResults.ReadOutside))
-            Assert.Equal("Me, x", GetSymbolNamesSortedAndJoined(dataFlowAnalysisResults.WrittenOutside))
+            Assert.Equal(Nothing, GetSymbolNamesJoined(dataFlowAnalysisResults.VariablesDeclared))
+            Assert.Equal(Nothing, GetSymbolNamesJoined(dataFlowAnalysisResults.AlwaysAssigned))
+            Assert.Equal("x", GetSymbolNamesJoined(dataFlowAnalysisResults.DataFlowsIn))
+            Assert.Equal(Nothing, GetSymbolNamesJoined(dataFlowAnalysisResults.DataFlowsOut))
+            Assert.Equal("Me, x", GetSymbolNamesJoined(dataFlowAnalysisResults.DefinitelyAssignedOnEntry))
+            Assert.Equal("Me, x", GetSymbolNamesJoined(dataFlowAnalysisResults.DefinitelyAssignedOnExit))
+            Assert.Equal("x", GetSymbolNamesJoined(dataFlowAnalysisResults.ReadInside))
+            Assert.Equal(Nothing, GetSymbolNamesJoined(dataFlowAnalysisResults.WrittenInside))
+            Assert.Equal(Nothing, GetSymbolNamesJoined(dataFlowAnalysisResults.ReadOutside))
+            Assert.Equal("Me, x", GetSymbolNamesJoined(dataFlowAnalysisResults.WrittenOutside))
         End Sub
 
         <Fact()>
-        Public Sub TestCompoundAsseignmentTargetSelection02()
+        Public Sub TestCompoundAssignmentTargetSelection02()
             Dim dataFlowAnalysisResults = CompileAndAnalyzeDataFlow(
-      <compilation name="TestCompoundAsseignmentTargetSelection02">
+      <compilation name="TestCompoundAssignmentTargetSelection02">
           <file name="a.b">
 class C
      Sub Main()
@@ -3156,20 +3362,22 @@ end class
             </file>
       </compilation>)
 
-            Assert.Equal(Nothing, GetSymbolNamesSortedAndJoined(dataFlowAnalysisResults.VariablesDeclared))
-            Assert.Equal("x", GetSymbolNamesSortedAndJoined(dataFlowAnalysisResults.AlwaysAssigned))
-            Assert.Equal("x", GetSymbolNamesSortedAndJoined(dataFlowAnalysisResults.DataFlowsIn))
-            Assert.Equal(Nothing, GetSymbolNamesSortedAndJoined(dataFlowAnalysisResults.DataFlowsOut))
-            Assert.Equal("x", GetSymbolNamesSortedAndJoined(dataFlowAnalysisResults.ReadInside))
-            Assert.Equal("x", GetSymbolNamesSortedAndJoined(dataFlowAnalysisResults.WrittenInside))
-            Assert.Equal(Nothing, GetSymbolNamesSortedAndJoined(dataFlowAnalysisResults.ReadOutside))
-            Assert.Equal("Me, x", GetSymbolNamesSortedAndJoined(dataFlowAnalysisResults.WrittenOutside))
+            Assert.Equal(Nothing, GetSymbolNamesJoined(dataFlowAnalysisResults.VariablesDeclared))
+            Assert.Equal("x", GetSymbolNamesJoined(dataFlowAnalysisResults.AlwaysAssigned))
+            Assert.Equal("x", GetSymbolNamesJoined(dataFlowAnalysisResults.DataFlowsIn))
+            Assert.Equal(Nothing, GetSymbolNamesJoined(dataFlowAnalysisResults.DataFlowsOut))
+            Assert.Equal("Me, x", GetSymbolNamesJoined(dataFlowAnalysisResults.DefinitelyAssignedOnEntry))
+            Assert.Equal("Me, x", GetSymbolNamesJoined(dataFlowAnalysisResults.DefinitelyAssignedOnExit))
+            Assert.Equal("x", GetSymbolNamesJoined(dataFlowAnalysisResults.ReadInside))
+            Assert.Equal("x", GetSymbolNamesJoined(dataFlowAnalysisResults.WrittenInside))
+            Assert.Equal(Nothing, GetSymbolNamesJoined(dataFlowAnalysisResults.ReadOutside))
+            Assert.Equal("Me, x", GetSymbolNamesJoined(dataFlowAnalysisResults.WrittenOutside))
         End Sub
 
         <Fact()>
-        Public Sub TestCompoundAsseignmentTargetSelection03()
+        Public Sub TestCompoundAssignmentTargetSelection03()
             Dim dataFlowAnalysisResults = CompileAndAnalyzeDataFlow(
-      <compilation name="TestCompoundAsseignmentTargetSelection03">
+      <compilation name="TestCompoundAssignmentTargetSelection03">
           <file name="a.b">
 Imports System
 Module M1
@@ -3195,17 +3403,19 @@ End Module
             </file>
       </compilation>)
 
-            Assert.Equal("ex, flocal, slocal", GetSymbolNamesSortedAndJoined(dataFlowAnalysisResults.VariablesDeclared))
-            Assert.Equal("local01, slocal", GetSymbolNamesSortedAndJoined(dataFlowAnalysisResults.AlwaysAssigned))
-            Assert.Equal("ary, local01, local02", GetSymbolNamesSortedAndJoined(dataFlowAnalysisResults.DataFlowsIn))
-            Assert.Equal(Nothing, GetSymbolNamesSortedAndJoined(dataFlowAnalysisResults.DataFlowsOut))
-            Assert.Equal("ary, flocal, local01, local02, slocal", GetSymbolNamesSortedAndJoined(dataFlowAnalysisResults.ReadInside))
-            Assert.Equal("ex, flocal, local01, local02, slocal", GetSymbolNamesSortedAndJoined(dataFlowAnalysisResults.WrittenInside))
-            Assert.Equal(Nothing, GetSymbolNamesSortedAndJoined(dataFlowAnalysisResults.ReadOutside))
-            Assert.Equal("ary, local01, local02", GetSymbolNamesSortedAndJoined(dataFlowAnalysisResults.WrittenOutside))
+            Assert.Equal("flocal, ex, slocal", GetSymbolNamesJoined(dataFlowAnalysisResults.VariablesDeclared))
+            Assert.Equal("local01, slocal", GetSymbolNamesJoined(dataFlowAnalysisResults.AlwaysAssigned))
+            Assert.Equal("ary, local01, local02", GetSymbolNamesJoined(dataFlowAnalysisResults.DataFlowsIn))
+            Assert.Equal(Nothing, GetSymbolNamesJoined(dataFlowAnalysisResults.DataFlowsOut))
+            Assert.Equal("ary, local01, local02", GetSymbolNamesJoined(dataFlowAnalysisResults.DefinitelyAssignedOnEntry))
+            Assert.Equal("ary, local01, local02, slocal", GetSymbolNamesJoined(dataFlowAnalysisResults.DefinitelyAssignedOnExit))
+            Assert.Equal("ary, local01, local02, flocal, slocal", GetSymbolNamesJoined(dataFlowAnalysisResults.ReadInside))
+            Assert.Equal("local01, local02, flocal, ex, slocal", GetSymbolNamesJoined(dataFlowAnalysisResults.WrittenInside))
+            Assert.Equal(Nothing, GetSymbolNamesJoined(dataFlowAnalysisResults.ReadOutside))
+            Assert.Equal("ary, local01, local02", GetSymbolNamesJoined(dataFlowAnalysisResults.WrittenOutside))
         End Sub
 
-        <WorkItem(541891, "DevDiv")>
+        <WorkItem(541891, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/541891")>
         <Fact()>
         Public Sub TestRefArgumentSelection03()
             Dim dataFlowAnalysisResults = CompileAndAnalyzeDataFlow(
@@ -3215,10 +3425,10 @@ class C
      Sub Main()
         Dim x As ULong
 
-        System.Console.WriteLine([|Foo(x)|])
+        System.Console.WriteLine([|Goo(x)|])
     End Sub
 
-    Function Foo(ByRef x As ULong)
+    Function Goo(ByRef x As ULong)
         x = 123
         Return x + 1
     End Function
@@ -3226,14 +3436,16 @@ end class
             </file>
       </compilation>)
 
-            Assert.Equal(Nothing, GetSymbolNamesSortedAndJoined(dataFlowAnalysisResults.VariablesDeclared))
-            Assert.Equal(Nothing, GetSymbolNamesSortedAndJoined(dataFlowAnalysisResults.AlwaysAssigned))
-            Assert.Equal("Me, x", GetSymbolNamesSortedAndJoined(dataFlowAnalysisResults.DataFlowsIn))
-            Assert.Equal(Nothing, GetSymbolNamesSortedAndJoined(dataFlowAnalysisResults.DataFlowsOut))
-            Assert.Equal("Me, x", GetSymbolNamesSortedAndJoined(dataFlowAnalysisResults.ReadInside))
-            Assert.Equal("x", GetSymbolNamesSortedAndJoined(dataFlowAnalysisResults.WrittenInside))
-            Assert.Equal(Nothing, GetSymbolNamesSortedAndJoined(dataFlowAnalysisResults.ReadOutside))
-            Assert.Equal("Me", GetSymbolNamesSortedAndJoined(dataFlowAnalysisResults.WrittenOutside))
+            Assert.Equal(Nothing, GetSymbolNamesJoined(dataFlowAnalysisResults.VariablesDeclared))
+            Assert.Equal(Nothing, GetSymbolNamesJoined(dataFlowAnalysisResults.AlwaysAssigned))
+            Assert.Equal("Me, x", GetSymbolNamesJoined(dataFlowAnalysisResults.DataFlowsIn))
+            Assert.Equal(Nothing, GetSymbolNamesJoined(dataFlowAnalysisResults.DataFlowsOut))
+            Assert.Equal("Me", GetSymbolNamesJoined(dataFlowAnalysisResults.DefinitelyAssignedOnEntry))
+            Assert.Equal("Me, x", GetSymbolNamesJoined(dataFlowAnalysisResults.DefinitelyAssignedOnExit))
+            Assert.Equal("Me, x", GetSymbolNamesJoined(dataFlowAnalysisResults.ReadInside))
+            Assert.Equal("x", GetSymbolNamesJoined(dataFlowAnalysisResults.WrittenInside))
+            Assert.Equal(Nothing, GetSymbolNamesJoined(dataFlowAnalysisResults.ReadOutside))
+            Assert.Equal("Me", GetSymbolNamesJoined(dataFlowAnalysisResults.WrittenOutside))
         End Sub
 
         <Fact()>
@@ -3245,11 +3457,11 @@ class C
     shared sub Main()
         dim x as integer = 1, y as integer = 1
 [|
-        Foo(x)
+        Goo(x)
 |]
     end sub
 
-    shared sub Foo(int x) 
+    shared sub Goo(int x) 
     end sub
 end class
             </file>
@@ -3260,14 +3472,16 @@ end class
             Assert.Equal(0, controlFlowAnalysisResults.ExitPoints.Count())
             Assert.True(controlFlowAnalysisResults.StartPointIsReachable)
             Assert.True(controlFlowAnalysisResults.EndPointIsReachable)
-            Assert.Equal(Nothing, GetSymbolNamesSortedAndJoined(dataFlowAnalysisResults.VariablesDeclared))
-            Assert.Equal(Nothing, GetSymbolNamesSortedAndJoined(dataFlowAnalysisResults.AlwaysAssigned))
-            Assert.Equal("x", GetSymbolNamesSortedAndJoined(dataFlowAnalysisResults.DataFlowsIn))
-            Assert.Equal(Nothing, GetSymbolNamesSortedAndJoined(dataFlowAnalysisResults.DataFlowsOut))
-            Assert.Equal("x", GetSymbolNamesSortedAndJoined(dataFlowAnalysisResults.ReadInside)) ' Sees Me beng read
-            Assert.Equal(Nothing, GetSymbolNamesSortedAndJoined(dataFlowAnalysisResults.ReadOutside))
-            Assert.Equal(Nothing, GetSymbolNamesSortedAndJoined(dataFlowAnalysisResults.WrittenInside))
-            Assert.Equal("x, y", GetSymbolNamesSortedAndJoined(dataFlowAnalysisResults.WrittenOutside))
+            Assert.Equal(Nothing, GetSymbolNamesJoined(dataFlowAnalysisResults.VariablesDeclared))
+            Assert.Equal(Nothing, GetSymbolNamesJoined(dataFlowAnalysisResults.AlwaysAssigned))
+            Assert.Equal("x", GetSymbolNamesJoined(dataFlowAnalysisResults.DataFlowsIn))
+            Assert.Equal(Nothing, GetSymbolNamesJoined(dataFlowAnalysisResults.DataFlowsOut))
+            Assert.Equal("x, y", GetSymbolNamesJoined(dataFlowAnalysisResults.DefinitelyAssignedOnEntry))
+            Assert.Equal("x, y", GetSymbolNamesJoined(dataFlowAnalysisResults.DefinitelyAssignedOnExit))
+            Assert.Equal("x", GetSymbolNamesJoined(dataFlowAnalysisResults.ReadInside)) ' Sees Me beng read
+            Assert.Equal(Nothing, GetSymbolNamesJoined(dataFlowAnalysisResults.ReadOutside))
+            Assert.Equal(Nothing, GetSymbolNamesJoined(dataFlowAnalysisResults.WrittenInside))
+            Assert.Equal("x, y", GetSymbolNamesJoined(dataFlowAnalysisResults.WrittenOutside))
         End Sub
 
         <Fact()>
@@ -3281,12 +3495,12 @@ class C
 [|
         x = y
         y = 2
-        Foo(y, 2) ' VB does not support expression assignment F(x = y, y = 2)
+        Goo(y, 2) ' VB does not support expression assignment F(x = y, y = 2)
 |]
         dim z as integer = x + y
     }
 
-    shared sub Foo(int x, int y)
+    shared sub Goo(int x, int y)
     end sub
 }
             </file>
@@ -3297,14 +3511,16 @@ class C
             Assert.Equal(0, controlFlowAnalysisResults.ExitPoints.Count())
             Assert.True(controlFlowAnalysisResults.StartPointIsReachable)
             Assert.True(controlFlowAnalysisResults.EndPointIsReachable)
-            Assert.Equal(Nothing, GetSymbolNamesSortedAndJoined(dataFlowAnalysisResults.VariablesDeclared))
-            Assert.Equal("x, y", GetSymbolNamesSortedAndJoined(dataFlowAnalysisResults.AlwaysAssigned))
-            Assert.Equal("y", GetSymbolNamesSortedAndJoined(dataFlowAnalysisResults.DataFlowsIn))
-            Assert.Equal("x, y", GetSymbolNamesSortedAndJoined(dataFlowAnalysisResults.DataFlowsOut))
-            Assert.Equal("y", GetSymbolNamesSortedAndJoined(dataFlowAnalysisResults.ReadInside)) ' Sees Me being read
-            Assert.Equal("x, y", GetSymbolNamesSortedAndJoined(dataFlowAnalysisResults.ReadOutside))
-            Assert.Equal("x, y", GetSymbolNamesSortedAndJoined(dataFlowAnalysisResults.WrittenInside))
-            Assert.Equal("x, y, z", GetSymbolNamesSortedAndJoined(dataFlowAnalysisResults.WrittenOutside))
+            Assert.Equal(Nothing, GetSymbolNamesJoined(dataFlowAnalysisResults.VariablesDeclared))
+            Assert.Equal("x, y", GetSymbolNamesJoined(dataFlowAnalysisResults.AlwaysAssigned))
+            Assert.Equal("y", GetSymbolNamesJoined(dataFlowAnalysisResults.DataFlowsIn))
+            Assert.Equal("x, y", GetSymbolNamesJoined(dataFlowAnalysisResults.DataFlowsOut))
+            Assert.Equal("x, y", GetSymbolNamesJoined(dataFlowAnalysisResults.DefinitelyAssignedOnEntry))
+            Assert.Equal("x, y", GetSymbolNamesJoined(dataFlowAnalysisResults.DefinitelyAssignedOnExit))
+            Assert.Equal("y", GetSymbolNamesJoined(dataFlowAnalysisResults.ReadInside)) ' Sees Me being read
+            Assert.Equal("x, y", GetSymbolNamesJoined(dataFlowAnalysisResults.ReadOutside))
+            Assert.Equal("x, y", GetSymbolNamesJoined(dataFlowAnalysisResults.WrittenInside))
+            Assert.Equal("x, y, z", GetSymbolNamesJoined(dataFlowAnalysisResults.WrittenOutside))
         End Sub
 
         <Fact>
@@ -3330,18 +3546,22 @@ End Class
             Assert.Equal(0, controlFlowAnalysisResults.ExitPoints.Count())
             Assert.Equal(True, controlFlowAnalysisResults.StartPointIsReachable)
             Assert.Equal(True, controlFlowAnalysisResults.EndPointIsReachable)
-            Assert.Equal(Nothing, GetSymbolNamesSortedAndJoined(dataFlowAnalysisResults.VariablesDeclared))
-            Assert.Equal(Nothing, GetSymbolNamesSortedAndJoined(dataFlowAnalysisResults.AlwaysAssigned))
-            Assert.Equal("y", GetSymbolNamesSortedAndJoined(dataFlowAnalysisResults.DataFlowsIn))
-            Assert.Equal(Nothing, GetSymbolNamesSortedAndJoined(dataFlowAnalysisResults.DataFlowsOut))
-            Assert.Equal("y", GetSymbolNamesSortedAndJoined(dataFlowAnalysisResults.ReadInside))
-            Assert.Equal(Nothing, GetSymbolNamesSortedAndJoined(dataFlowAnalysisResults.ReadOutside))
-            Assert.Equal(Nothing, GetSymbolNamesSortedAndJoined(dataFlowAnalysisResults.WrittenInside))
-            Assert.Equal("args, Me, y", GetSymbolNamesSortedAndJoined(dataFlowAnalysisResults.WrittenOutside))
-            Assert.Equal(Nothing, GetSymbolNamesSortedAndJoined(dataFlowAnalysisResults.Captured))
+            Assert.Equal(Nothing, GetSymbolNamesJoined(dataFlowAnalysisResults.VariablesDeclared))
+            Assert.Equal(Nothing, GetSymbolNamesJoined(dataFlowAnalysisResults.AlwaysAssigned))
+            Assert.Equal("y", GetSymbolNamesJoined(dataFlowAnalysisResults.DataFlowsIn))
+            Assert.Equal(Nothing, GetSymbolNamesJoined(dataFlowAnalysisResults.DataFlowsOut))
+            Assert.Equal("Me, args, y", GetSymbolNamesJoined(dataFlowAnalysisResults.DefinitelyAssignedOnEntry))
+            Assert.Equal("Me, args, y", GetSymbolNamesJoined(dataFlowAnalysisResults.DefinitelyAssignedOnExit))
+            Assert.Equal("y", GetSymbolNamesJoined(dataFlowAnalysisResults.ReadInside))
+            Assert.Equal(Nothing, GetSymbolNamesJoined(dataFlowAnalysisResults.ReadOutside))
+            Assert.Equal(Nothing, GetSymbolNamesJoined(dataFlowAnalysisResults.WrittenInside))
+            Assert.Equal("Me, args, y", GetSymbolNamesJoined(dataFlowAnalysisResults.WrittenOutside))
+            Assert.Equal(Nothing, GetSymbolNamesJoined(dataFlowAnalysisResults.Captured))
+            Assert.Equal(Nothing, GetSymbolNamesJoined(dataFlowAnalysisResults.CapturedInside))
+            Assert.Equal(Nothing, GetSymbolNamesJoined(dataFlowAnalysisResults.CapturedOutside))
         End Sub
 
-        <Fact, WorkItem(538979, "DevDiv")>
+        <Fact, WorkItem(538979, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/538979")>
         Public Sub AssertFromInvalidLocalDeclaration()
             Dim analysisResults = CompileAndAnalyzeControlAndDataFlow(
       <compilation name="AssertFromInvalidLocalDeclaration">
@@ -3366,17 +3586,19 @@ end class
             Assert.Equal(0, controlFlowAnalysisResults.ExitPoints.Count())
             Assert.True(controlFlowAnalysisResults.StartPointIsReachable)
             Assert.True(controlFlowAnalysisResults.EndPointIsReachable)
-            Assert.Equal("v", GetSymbolNamesSortedAndJoined(dataFlowAnalysisResults.VariablesDeclared))
-            Assert.Equal("v", GetSymbolNamesSortedAndJoined(dataFlowAnalysisResults.AlwaysAssigned))
-            Assert.Equal(Nothing, GetSymbolNamesSortedAndJoined(dataFlowAnalysisResults.DataFlowsIn))
-            Assert.Equal("v", GetSymbolNamesSortedAndJoined(dataFlowAnalysisResults.DataFlowsOut))
-            Assert.Equal(Nothing, GetSymbolNamesSortedAndJoined(dataFlowAnalysisResults.ReadInside))
-            Assert.Equal("v", GetSymbolNamesSortedAndJoined(dataFlowAnalysisResults.ReadOutside))
-            Assert.Equal("v", GetSymbolNamesSortedAndJoined(dataFlowAnalysisResults.WrittenInside))
-            Assert.Equal("b", GetSymbolNamesSortedAndJoined(dataFlowAnalysisResults.WrittenOutside))
+            Assert.Equal("v", GetSymbolNamesJoined(dataFlowAnalysisResults.VariablesDeclared))
+            Assert.Equal("v", GetSymbolNamesJoined(dataFlowAnalysisResults.AlwaysAssigned))
+            Assert.Equal(Nothing, GetSymbolNamesJoined(dataFlowAnalysisResults.DataFlowsIn))
+            Assert.Equal("v", GetSymbolNamesJoined(dataFlowAnalysisResults.DataFlowsOut))
+            Assert.Equal(Nothing, GetSymbolNamesJoined(dataFlowAnalysisResults.DefinitelyAssignedOnEntry))
+            Assert.Equal("v", GetSymbolNamesJoined(dataFlowAnalysisResults.DefinitelyAssignedOnExit))
+            Assert.Equal(Nothing, GetSymbolNamesJoined(dataFlowAnalysisResults.ReadInside))
+            Assert.Equal("v", GetSymbolNamesJoined(dataFlowAnalysisResults.ReadOutside))
+            Assert.Equal("v", GetSymbolNamesJoined(dataFlowAnalysisResults.WrittenInside))
+            Assert.Equal("b", GetSymbolNamesJoined(dataFlowAnalysisResults.WrittenOutside))
         End Sub
 
-        <Fact(), WorkItem(538979, "DevDiv")>
+        <Fact(), WorkItem(538979, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/538979")>
         Public Sub AssertFromInvalidKeywordAsExpr()
             Dim analysisResults = CompileAndAnalyzeControlAndDataFlow(
       <compilation name="AssertFromInvalidKeywordAsExpr">
@@ -3401,7 +3623,7 @@ end class
             Assert.False(controlFlowAnalysisResults.EndPointIsReachable)
         End Sub
 
-        <WorkItem(539286, "DevDiv")>
+        <WorkItem(539286, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/539286")>
         <Fact()>
         Public Sub RegionAnalysisInFieldInitializers_Simple()
 
@@ -3420,23 +3642,27 @@ End Class
             </file>
 </compilation>)
 
-            Assert.Equal(Nothing, GetSymbolNamesSortedAndJoined(dataResults1.AlwaysAssigned))
-            Assert.Equal(Nothing, GetSymbolNamesSortedAndJoined(dataResults1.Captured))
-            Assert.Equal("Me", GetSymbolNamesSortedAndJoined(dataResults1.DataFlowsIn))
-            Assert.Equal(Nothing, GetSymbolNamesSortedAndJoined(dataResults1.DataFlowsOut))
-            Assert.Equal("Me", GetSymbolNamesSortedAndJoined(dataResults1.ReadInside))
-            Assert.Equal(Nothing, GetSymbolNamesSortedAndJoined(dataResults1.ReadOutside))
-            Assert.Equal(Nothing, GetSymbolNamesSortedAndJoined(dataResults1.WrittenInside))
-            Assert.Equal("Me", GetSymbolNamesSortedAndJoined(dataResults1.WrittenOutside))
+            Assert.Equal(Nothing, GetSymbolNamesJoined(dataResults1.AlwaysAssigned))
+            Assert.Equal(Nothing, GetSymbolNamesJoined(dataResults1.Captured))
+            Assert.Equal(Nothing, GetSymbolNamesJoined(dataResults1.CapturedInside))
+            Assert.Equal(Nothing, GetSymbolNamesJoined(dataResults1.CapturedOutside))
+            Assert.Equal("Me", GetSymbolNamesJoined(dataResults1.DataFlowsIn))
+            Assert.Equal(Nothing, GetSymbolNamesJoined(dataResults1.DataFlowsOut))
+            Assert.Equal("Me", GetSymbolNamesJoined(dataResults1.DefinitelyAssignedOnEntry))
+            Assert.Equal("Me", GetSymbolNamesJoined(dataResults1.DefinitelyAssignedOnExit))
+            Assert.Equal("Me", GetSymbolNamesJoined(dataResults1.ReadInside))
+            Assert.Equal(Nothing, GetSymbolNamesJoined(dataResults1.ReadOutside))
+            Assert.Equal(Nothing, GetSymbolNamesJoined(dataResults1.WrittenInside))
+            Assert.Equal("Me", GetSymbolNamesJoined(dataResults1.WrittenOutside))
 
         End Sub
 
-        <WorkItem(539286, "DevDiv")>
+        <WorkItem(539286, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/539286")>
         <Fact()>
-        Public Sub RegionAnalysisInPtopertyInitializers_Simple()
+        Public Sub RegionAnalysisInPropertyInitializers_Simple()
 
             Dim dataResults1 = CompileAndAnalyzeDataFlow(
-<compilation name="RegionAnalysisInPtopertyInitializers_Simple">
+<compilation>
     <file name="a.b">
 Class Class1
     Public Shared A As Integer = 10
@@ -3450,18 +3676,22 @@ End Class
             </file>
 </compilation>)
 
-            Assert.Equal(Nothing, GetSymbolNamesSortedAndJoined(dataResults1.AlwaysAssigned))
-            Assert.Equal(Nothing, GetSymbolNamesSortedAndJoined(dataResults1.Captured))
-            Assert.Equal("Me", GetSymbolNamesSortedAndJoined(dataResults1.DataFlowsIn))
-            Assert.Equal(Nothing, GetSymbolNamesSortedAndJoined(dataResults1.DataFlowsOut))
-            Assert.Equal("Me", GetSymbolNamesSortedAndJoined(dataResults1.ReadInside))
-            Assert.Equal(Nothing, GetSymbolNamesSortedAndJoined(dataResults1.ReadOutside))
-            Assert.Equal(Nothing, GetSymbolNamesSortedAndJoined(dataResults1.WrittenInside))
-            Assert.Equal("Me", GetSymbolNamesSortedAndJoined(dataResults1.WrittenOutside))
+            Assert.Equal(Nothing, GetSymbolNamesJoined(dataResults1.AlwaysAssigned))
+            Assert.Equal(Nothing, GetSymbolNamesJoined(dataResults1.Captured))
+            Assert.Equal(Nothing, GetSymbolNamesJoined(dataResults1.CapturedInside))
+            Assert.Equal(Nothing, GetSymbolNamesJoined(dataResults1.CapturedOutside))
+            Assert.Equal("Me", GetSymbolNamesJoined(dataResults1.DataFlowsIn))
+            Assert.Equal(Nothing, GetSymbolNamesJoined(dataResults1.DataFlowsOut))
+            Assert.Equal("Me", GetSymbolNamesJoined(dataResults1.DefinitelyAssignedOnEntry))
+            Assert.Equal("Me", GetSymbolNamesJoined(dataResults1.DefinitelyAssignedOnExit))
+            Assert.Equal("Me", GetSymbolNamesJoined(dataResults1.ReadInside))
+            Assert.Equal(Nothing, GetSymbolNamesJoined(dataResults1.ReadOutside))
+            Assert.Equal(Nothing, GetSymbolNamesJoined(dataResults1.WrittenInside))
+            Assert.Equal("Me", GetSymbolNamesJoined(dataResults1.WrittenOutside))
 
         End Sub
 
-        <WorkItem(539286, "DevDiv")>
+        <WorkItem(539286, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/539286")>
         <Fact()>
         Public Sub RegionAnalysisInFieldInitializers_WithMyBase()
             Dim source =
@@ -3491,18 +3721,22 @@ End Class
                 </compilation>
 
             Dim dataResults1 = CompileAndAnalyzeDataFlow(source)
-            Assert.Equal(Nothing, GetSymbolNamesSortedAndJoined(dataResults1.AlwaysAssigned))
-            Assert.Equal("Me", GetSymbolNamesSortedAndJoined(dataResults1.Captured))
-            Assert.Equal("Me", GetSymbolNamesSortedAndJoined(dataResults1.DataFlowsIn))
-            Assert.Equal(Nothing, GetSymbolNamesSortedAndJoined(dataResults1.DataFlowsOut))
-            Assert.Equal("Me", GetSymbolNamesSortedAndJoined(dataResults1.ReadInside))
-            Assert.Equal(Nothing, GetSymbolNamesSortedAndJoined(dataResults1.ReadOutside))
-            Assert.Equal(Nothing, GetSymbolNamesSortedAndJoined(dataResults1.WrittenInside))
-            Assert.Equal("Me", GetSymbolNamesSortedAndJoined(dataResults1.WrittenOutside))
+            Assert.Equal(Nothing, GetSymbolNamesJoined(dataResults1.AlwaysAssigned))
+            Assert.Equal("Me", GetSymbolNamesJoined(dataResults1.Captured))
+            Assert.Equal("Me", GetSymbolNamesJoined(dataResults1.CapturedInside))
+            Assert.Equal(Nothing, GetSymbolNamesJoined(dataResults1.CapturedOutside))
+            Assert.Equal("Me", GetSymbolNamesJoined(dataResults1.DataFlowsIn))
+            Assert.Equal(Nothing, GetSymbolNamesJoined(dataResults1.DataFlowsOut))
+            Assert.Equal("Me", GetSymbolNamesJoined(dataResults1.DefinitelyAssignedOnEntry))
+            Assert.Equal("Me", GetSymbolNamesJoined(dataResults1.DefinitelyAssignedOnExit))
+            Assert.Equal("Me", GetSymbolNamesJoined(dataResults1.ReadInside))
+            Assert.Equal(Nothing, GetSymbolNamesJoined(dataResults1.ReadOutside))
+            Assert.Equal(Nothing, GetSymbolNamesJoined(dataResults1.WrittenInside))
+            Assert.Equal("Me", GetSymbolNamesJoined(dataResults1.WrittenOutside))
 
         End Sub
 
-        <WorkItem(539286, "DevDiv")>
+        <WorkItem(539286, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/539286")>
         <Fact()>
         Public Sub RegionAnalysisInFieldInitializers_Lambda()
 
@@ -3518,12 +3752,12 @@ Class Class1
                  Dim b As Integer = 2
                  [|
                  b = 3
-                 Dim c As Integer = 1 + a + b + Me.Foo() |]
+                 Dim c As Integer = 1 + a + b + Me.Goo() |]
                  Return c
              End Function
     End Sub
 
-    Public Function Foo() As Integer
+    Public Function Goo() As Integer
         Return Nothing
     End Function
 End Class
@@ -3541,11 +3775,11 @@ Class Class1
             Dim b As Integer = 2
             [|
             b = 3
-            Dim c As Integer = 1 + a + b + Me.Foo() |]
+            Dim c As Integer = 1 + a + b + Me.Goo() |]
             Return c
         End Function
 
-    Public Function Foo() As Integer
+    Public Function Goo() As Integer
         Return Nothing
     End Function
 End Class
@@ -3558,26 +3792,31 @@ End Class
             Dim controlResults2 = results2.Item1
             Dim dataResults2 = results2.Item2
 
-            Assert.Equal(GetSymbolNamesSortedAndJoined(dataResults1.AlwaysAssigned),
-                GetSymbolNamesSortedAndJoined(dataResults2.AlwaysAssigned))
-            Assert.Equal(GetSymbolNamesSortedAndJoined(dataResults1.Captured),
-                GetSymbolNamesSortedAndJoined(dataResults2.Captured))
-            Assert.Equal(GetSymbolNamesSortedAndJoined(dataResults1.DataFlowsIn),
-                GetSymbolNamesSortedAndJoined(dataResults2.DataFlowsIn))
-            Assert.Equal(GetSymbolNamesSortedAndJoined(dataResults1.DataFlowsOut),
-                GetSymbolNamesSortedAndJoined(dataResults2.DataFlowsOut))
-            Assert.Equal(GetSymbolNamesSortedAndJoined(dataResults1.ReadInside),
-                GetSymbolNamesSortedAndJoined(dataResults2.ReadInside))
-            Assert.Equal(GetSymbolNamesSortedAndJoined(dataResults1.ReadOutside),
-                GetSymbolNamesSortedAndJoined(dataResults2.ReadOutside))
-            Assert.Equal(GetSymbolNamesSortedAndJoined(dataResults1.WrittenInside),
-                GetSymbolNamesSortedAndJoined(dataResults2.WrittenInside))
-            Assert.Equal(GetSymbolNamesSortedAndJoined(dataResults1.WrittenOutside),
-                String.Join(", ", New String() {"f"}.Concat((dataResults2.WrittenOutside).Select(Function(s) s.Name)).OrderBy(Function(name) name)))
+            Assert.Equal(GetSymbolNamesJoined(dataResults1.AlwaysAssigned),
+                GetSymbolNamesJoined(dataResults2.AlwaysAssigned))
+            Assert.Equal(GetSymbolNamesJoined(dataResults1.Captured),
+                GetSymbolNamesJoined(dataResults2.Captured))
+            Assert.Equal(GetSymbolNamesJoined(dataResults1.CapturedInside),
+                 GetSymbolNamesJoined(dataResults2.CapturedInside))
+            Assert.Equal(GetSymbolNamesJoined(dataResults1.CapturedOutside),
+                 GetSymbolNamesJoined(dataResults2.CapturedOutside))
+            Assert.Equal(GetSymbolNamesJoined(dataResults1.DataFlowsIn),
+                GetSymbolNamesJoined(dataResults2.DataFlowsIn))
+            Assert.Equal(GetSymbolNamesJoined(dataResults1.DataFlowsOut),
+                GetSymbolNamesJoined(dataResults2.DataFlowsOut))
+            Assert.Equal(GetSymbolNamesJoined(dataResults1.ReadInside),
+                GetSymbolNamesJoined(dataResults2.ReadInside))
+            Assert.Equal(GetSymbolNamesJoined(dataResults1.ReadOutside),
+                GetSymbolNamesJoined(dataResults2.ReadOutside))
+            Assert.Equal(GetSymbolNamesJoined(dataResults1.WrittenInside),
+                GetSymbolNamesJoined(dataResults2.WrittenInside))
+            Assert.True(dataResults1.WrittenOutside.Any(Function(ByVal s) s.Name = "f"))
+            Assert.False(dataResults2.WrittenOutside.Any(Function(ByVal s) s.Name = "f"))
+            Assert.Equal(GetSymbolNamesJoined(dataResults1.WrittenOutside.Where(Function(ByVal s) s.Name <> "f")), GetSymbolNamesJoined(dataResults2.WrittenOutside))
 
         End Sub
 
-        <WorkItem(539286, "DevDiv")>
+        <WorkItem(539286, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/539286")>
         <Fact()>
         Public Sub RegionAnalysisInFieldInitializers_NestedLambdaAndTwoConstructors()
 
@@ -3597,14 +3836,14 @@ Class Class1(Of T)
                     Dim ttx As T = tx
                     [|
                     b = 3
-                    Dim c As Integer = Foo() + p + pp + a + b + a_outer |]
+                    Dim c As Integer = Goo() + p + pp + a + b + a_outer |]
                     Return c
                 End Function
                 Return ff(Nothing, p)
             End Function
     End Sub
 
-    Public Function Foo() As Integer
+    Public Function Goo() As Integer
         Return Nothing
     End Function
 
@@ -3631,13 +3870,13 @@ Class Class1(Of T)
                 Dim ttx As T = tx
                 [|
                 b = 3
-                Dim c As Integer = Foo() + p + pp + a + b + a_outer |]
+                Dim c As Integer = Goo() + p + pp + a + b + a_outer |]
                 Return c
             End Function
             Return ff(Nothing, p)
         End Function
 
-    Public Function Foo() As Integer
+    Public Function Goo() As Integer
         Return Nothing
     End Function
 
@@ -3655,26 +3894,30 @@ End Class
             Dim controlResults2 = results2.Item1
             Dim dataResults2 = results2.Item2
 
-            Assert.Equal(GetSymbolNamesSortedAndJoined(dataResults1.AlwaysAssigned),
-                GetSymbolNamesSortedAndJoined(dataResults2.AlwaysAssigned))
-            Assert.Equal(GetSymbolNamesSortedAndJoined(dataResults1.Captured),
-                GetSymbolNamesSortedAndJoined(dataResults2.Captured))
-            Assert.Equal(GetSymbolNamesSortedAndJoined(dataResults1.DataFlowsIn),
-                GetSymbolNamesSortedAndJoined(dataResults2.DataFlowsIn))
-            Assert.Equal(GetSymbolNamesSortedAndJoined(dataResults1.DataFlowsOut),
-                GetSymbolNamesSortedAndJoined(dataResults2.DataFlowsOut))
-            Assert.Equal(GetSymbolNamesSortedAndJoined(dataResults1.ReadInside),
-                GetSymbolNamesSortedAndJoined(dataResults2.ReadInside))
-            Assert.Equal(GetSymbolNamesSortedAndJoined(dataResults1.ReadOutside),
-                GetSymbolNamesSortedAndJoined(dataResults2.ReadOutside))
-            Assert.Equal(GetSymbolNamesSortedAndJoined(dataResults1.WrittenInside),
-                GetSymbolNamesSortedAndJoined(dataResults2.WrittenInside))
-            Assert.Equal(GetSymbolNamesSortedAndJoined(dataResults1.WrittenOutside),
-                String.Join(", ", New String() {"f"}.Concat((dataResults2.WrittenOutside).Select(Function(s) s.Name)).OrderBy(Function(name) name)))
+            Assert.Equal(GetSymbolNamesJoined(dataResults1.AlwaysAssigned),
+                GetSymbolNamesJoined(dataResults2.AlwaysAssigned))
+            Assert.Equal(GetSymbolNamesJoined(dataResults1.Captured),
+                GetSymbolNamesJoined(dataResults2.Captured))
+            Assert.Equal(GetSymbolNamesJoined(dataResults1.CapturedInside),
+                 GetSymbolNamesJoined(dataResults2.CapturedInside))
+            Assert.Equal(GetSymbolNamesJoined(dataResults1.CapturedOutside),
+                 GetSymbolNamesJoined(dataResults2.CapturedOutside))
+            Assert.Equal(GetSymbolNamesJoined(dataResults1.DataFlowsIn),
+                GetSymbolNamesJoined(dataResults2.DataFlowsIn))
+            Assert.Equal(GetSymbolNamesJoined(dataResults1.DataFlowsOut),
+                GetSymbolNamesJoined(dataResults2.DataFlowsOut))
+            Assert.Equal(GetSymbolNamesJoined(dataResults1.ReadInside),
+                GetSymbolNamesJoined(dataResults2.ReadInside))
+            Assert.Equal(GetSymbolNamesJoined(dataResults1.ReadOutside),
+                GetSymbolNamesJoined(dataResults2.ReadOutside))
+            Assert.Equal(GetSymbolNamesJoined(dataResults1.WrittenInside),
+                GetSymbolNamesJoined(dataResults2.WrittenInside))
+            Assert.Equal(GetSymbolNamesJoined(dataResults1.WrittenOutside.Where(Function(x) x.Name <> "f")),
+                         GetSymbolNamesJoined(dataResults2.WrittenOutside))
 
         End Sub
 
-        <WorkItem(539197, "DevDiv")>
+        <WorkItem(539197, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/539197")>
         <Fact()>
         Public Sub ByRefParameterNotInAppropriateCollections1()
             ' ByRef parameters are not considered assigned
@@ -3701,17 +3944,19 @@ End Class
             Assert.Equal(0, controlFlowAnalysisResults.ExitPoints.Count())
             Assert.True(controlFlowAnalysisResults.StartPointIsReachable)
             Assert.True(controlFlowAnalysisResults.EndPointIsReachable)
-            Assert.Equal("t1", GetSymbolNamesSortedAndJoined(dataFlowAnalysisResults.VariablesDeclared))
-            Assert.Equal("t", GetSymbolNamesSortedAndJoined(dataFlowAnalysisResults.AlwaysAssigned))
-            Assert.Equal("Me", GetSymbolNamesSortedAndJoined(dataFlowAnalysisResults.DataFlowsIn))
-            Assert.Equal("t, t1", GetSymbolNamesSortedAndJoined(dataFlowAnalysisResults.DataFlowsOut))
-            Assert.Equal("Me, t1", GetSymbolNamesSortedAndJoined(dataFlowAnalysisResults.ReadInside))
-            Assert.Equal("t, t1", GetSymbolNamesSortedAndJoined(dataFlowAnalysisResults.ReadOutside))
-            Assert.Equal("t, t1", GetSymbolNamesSortedAndJoined(dataFlowAnalysisResults.WrittenInside))
-            Assert.Equal("Me, t, t1", GetSymbolNamesSortedAndJoined(dataFlowAnalysisResults.WrittenOutside))
+            Assert.Equal("t1", GetSymbolNamesJoined(dataFlowAnalysisResults.VariablesDeclared))
+            Assert.Equal("t", GetSymbolNamesJoined(dataFlowAnalysisResults.AlwaysAssigned))
+            Assert.Equal("Me", GetSymbolNamesJoined(dataFlowAnalysisResults.DataFlowsIn))
+            Assert.Equal("t, t1", GetSymbolNamesJoined(dataFlowAnalysisResults.DataFlowsOut))
+            Assert.Equal("Me, t", GetSymbolNamesJoined(dataFlowAnalysisResults.DefinitelyAssignedOnEntry))
+            Assert.Equal("Me, t, t1", GetSymbolNamesJoined(dataFlowAnalysisResults.DefinitelyAssignedOnExit))
+            Assert.Equal("Me, t1", GetSymbolNamesJoined(dataFlowAnalysisResults.ReadInside))
+            Assert.Equal("t, t1", GetSymbolNamesJoined(dataFlowAnalysisResults.ReadOutside))
+            Assert.Equal("t, t1", GetSymbolNamesJoined(dataFlowAnalysisResults.WrittenInside))
+            Assert.Equal("Me, t, t1", GetSymbolNamesJoined(dataFlowAnalysisResults.WrittenOutside))
         End Sub
 
-        <WorkItem(539197, "DevDiv")>
+        <WorkItem(539197, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/539197")>
         <Fact()>
         Public Sub ByRefParameterNotInAppropriateCollections2()
             ' ByRef parameters are not considered assigned
@@ -3740,17 +3985,19 @@ End Class
             Assert.Equal(0, controlFlowAnalysisResults.ExitPoints.Count())
             Assert.True(controlFlowAnalysisResults.StartPointIsReachable)
             Assert.True(controlFlowAnalysisResults.EndPointIsReachable)
-            Assert.Equal("t1", GetSymbolNamesSortedAndJoined(dataFlowAnalysisResults.VariablesDeclared))
-            Assert.Equal("t1", GetSymbolNamesSortedAndJoined(dataFlowAnalysisResults.AlwaysAssigned))
-            Assert.Equal("Me, t", GetSymbolNamesSortedAndJoined(dataFlowAnalysisResults.DataFlowsIn))
-            Assert.Equal("t, t1", GetSymbolNamesSortedAndJoined(dataFlowAnalysisResults.DataFlowsOut))
-            Assert.Equal("Me, t", GetSymbolNamesSortedAndJoined(dataFlowAnalysisResults.ReadInside))
-            Assert.Equal("t, t1", GetSymbolNamesSortedAndJoined(dataFlowAnalysisResults.ReadOutside))
-            Assert.Equal("t, t1", GetSymbolNamesSortedAndJoined(dataFlowAnalysisResults.WrittenInside))
-            Assert.Equal("Me, t, t1", GetSymbolNamesSortedAndJoined(dataFlowAnalysisResults.WrittenOutside))
+            Assert.Equal("t1", GetSymbolNamesJoined(dataFlowAnalysisResults.VariablesDeclared))
+            Assert.Equal("t1", GetSymbolNamesJoined(dataFlowAnalysisResults.AlwaysAssigned))
+            Assert.Equal("Me, t", GetSymbolNamesJoined(dataFlowAnalysisResults.DataFlowsIn))
+            Assert.Equal("t, t1", GetSymbolNamesJoined(dataFlowAnalysisResults.DataFlowsOut))
+            Assert.Equal("Me, t", GetSymbolNamesJoined(dataFlowAnalysisResults.DefinitelyAssignedOnEntry))
+            Assert.Equal("Me, t, t1", GetSymbolNamesJoined(dataFlowAnalysisResults.DefinitelyAssignedOnExit))
+            Assert.Equal("Me, t", GetSymbolNamesJoined(dataFlowAnalysisResults.ReadInside))
+            Assert.Equal("t, t1", GetSymbolNamesJoined(dataFlowAnalysisResults.ReadOutside))
+            Assert.Equal("t, t1", GetSymbolNamesJoined(dataFlowAnalysisResults.WrittenInside))
+            Assert.Equal("Me, t, t1", GetSymbolNamesJoined(dataFlowAnalysisResults.WrittenOutside))
         End Sub
 
-        Private Shared customIL As XCData = <![CDATA[
+        Private Shared ReadOnly s_customIL As XCData = <![CDATA[
 .class public auto ansi beforefieldinit External
        extends [mscorlib]System.Object
 {
@@ -3787,9 +4034,9 @@ End Class
 ]]>
 
         <Fact()>
-        Public Sub TestOutParameterAlwaysAsigned()
+        Public Sub TestOutParameterAlwaysAssigned()
             Dim dataFlowAnalysisResults = CompileAndAnalyzeDataFlow(
-      <compilation name="TestOutParameterAlwaysAsigned">
+      <compilation>
           <file name="a.b">
 class C
     shared sub Main()
@@ -3799,16 +4046,18 @@ class C
     end sub
 end class
             </file>
-      </compilation>, customIL)
+      </compilation>, s_customIL)
 
-            Assert.Equal(Nothing, GetSymbolNamesSortedAndJoined(dataFlowAnalysisResults.VariablesDeclared))
-            Assert.Equal("b", GetSymbolNamesSortedAndJoined(dataFlowAnalysisResults.AlwaysAssigned))  ' NOTE: always assigned
-            Assert.Equal("ext", GetSymbolNamesSortedAndJoined(dataFlowAnalysisResults.DataFlowsIn))
-            Assert.Equal(Nothing, GetSymbolNamesSortedAndJoined(dataFlowAnalysisResults.DataFlowsOut))
-            Assert.Equal("ext", GetSymbolNamesSortedAndJoined(dataFlowAnalysisResults.ReadInside))
-            Assert.Equal("b", GetSymbolNamesSortedAndJoined(dataFlowAnalysisResults.WrittenInside))
-            Assert.Equal(Nothing, GetSymbolNamesSortedAndJoined(dataFlowAnalysisResults.ReadOutside))
-            Assert.Equal("b, ext, zz", GetSymbolNamesSortedAndJoined(dataFlowAnalysisResults.WrittenOutside))
+            Assert.Equal(Nothing, GetSymbolNamesJoined(dataFlowAnalysisResults.VariablesDeclared))
+            Assert.Equal("b", GetSymbolNamesJoined(dataFlowAnalysisResults.AlwaysAssigned))  ' NOTE: always assigned
+            Assert.Equal("ext", GetSymbolNamesJoined(dataFlowAnalysisResults.DataFlowsIn))
+            Assert.Equal(Nothing, GetSymbolNamesJoined(dataFlowAnalysisResults.DataFlowsOut))
+            Assert.Equal("b, ext", GetSymbolNamesJoined(dataFlowAnalysisResults.DefinitelyAssignedOnEntry))
+            Assert.Equal("b, ext", GetSymbolNamesJoined(dataFlowAnalysisResults.DefinitelyAssignedOnExit))
+            Assert.Equal("ext", GetSymbolNamesJoined(dataFlowAnalysisResults.ReadInside))
+            Assert.Equal("b", GetSymbolNamesJoined(dataFlowAnalysisResults.WrittenInside))
+            Assert.Equal(Nothing, GetSymbolNamesJoined(dataFlowAnalysisResults.ReadOutside))
+            Assert.Equal("b, ext, zz", GetSymbolNamesJoined(dataFlowAnalysisResults.WrittenOutside))
         End Sub
 
         <Fact()>
@@ -3824,12 +4073,14 @@ Class A
     End Function
 End Class
             </file>
-</compilation>, customIL)
+</compilation>, s_customIL)
 
-            Assert.Equal("x", GetSymbolNamesSortedAndJoined(dataFlowAnalysisResults.AlwaysAssigned))
-            Assert.Equal("ext", GetSymbolNamesSortedAndJoined(dataFlowAnalysisResults.DataFlowsIn))
-            Assert.Equal("ext", GetSymbolNamesSortedAndJoined(dataFlowAnalysisResults.ReadInside))
-            Assert.Equal("x", GetSymbolNamesSortedAndJoined(dataFlowAnalysisResults.WrittenInside))
+            Assert.Equal("x", GetSymbolNamesJoined(dataFlowAnalysisResults.AlwaysAssigned))
+            Assert.Equal("ext", GetSymbolNamesJoined(dataFlowAnalysisResults.DataFlowsIn))
+            Assert.Equal("Me, ext, x", GetSymbolNamesJoined(dataFlowAnalysisResults.DefinitelyAssignedOnEntry))
+            Assert.Equal("Me, ext, x", GetSymbolNamesJoined(dataFlowAnalysisResults.DefinitelyAssignedOnExit))
+            Assert.Equal("ext", GetSymbolNamesJoined(dataFlowAnalysisResults.ReadInside))
+            Assert.Equal("x", GetSymbolNamesJoined(dataFlowAnalysisResults.WrittenInside))
         End Sub
 
         <Fact()>
@@ -3845,12 +4096,14 @@ Class A
     End Function
 End Class
             </file>
-</compilation>, customIL)
+</compilation>, s_customIL)
 
-            Assert.Equal("x", GetSymbolNamesSortedAndJoined(dataFlowAnalysisResults.AlwaysAssigned))
-            Assert.Equal("ext", GetSymbolNamesSortedAndJoined(dataFlowAnalysisResults.DataFlowsIn))
-            Assert.Equal("ext", GetSymbolNamesSortedAndJoined(dataFlowAnalysisResults.ReadInside))
-            Assert.Equal("x", GetSymbolNamesSortedAndJoined(dataFlowAnalysisResults.WrittenInside))
+            Assert.Equal("x", GetSymbolNamesJoined(dataFlowAnalysisResults.AlwaysAssigned))
+            Assert.Equal("ext", GetSymbolNamesJoined(dataFlowAnalysisResults.DataFlowsIn))
+            Assert.Equal("Me, ext, x", GetSymbolNamesJoined(dataFlowAnalysisResults.DefinitelyAssignedOnEntry))
+            Assert.Equal("Me, ext, x", GetSymbolNamesJoined(dataFlowAnalysisResults.DefinitelyAssignedOnExit))
+            Assert.Equal("ext", GetSymbolNamesJoined(dataFlowAnalysisResults.ReadInside))
+            Assert.Equal("x", GetSymbolNamesJoined(dataFlowAnalysisResults.WrittenInside))
         End Sub
 
         <Fact()>
@@ -3866,12 +4119,14 @@ Class A
     End Function
 End Class
             </file>
-</compilation>, customIL)
+</compilation>, s_customIL)
 
-            Assert.Equal(Nothing, GetSymbolNamesSortedAndJoined(dataFlowAnalysisResults.AlwaysAssigned))
-            Assert.Equal("ext", GetSymbolNamesSortedAndJoined(dataFlowAnalysisResults.DataFlowsIn))
-            Assert.Equal("ext", GetSymbolNamesSortedAndJoined(dataFlowAnalysisResults.ReadInside))
-            Assert.Equal("x", GetSymbolNamesSortedAndJoined(dataFlowAnalysisResults.WrittenInside))
+            Assert.Equal(Nothing, GetSymbolNamesJoined(dataFlowAnalysisResults.AlwaysAssigned))
+            Assert.Equal("ext", GetSymbolNamesJoined(dataFlowAnalysisResults.DataFlowsIn))
+            Assert.Equal("Me, ext, x", GetSymbolNamesJoined(dataFlowAnalysisResults.DefinitelyAssignedOnEntry))
+            Assert.Equal("Me, ext, x", GetSymbolNamesJoined(dataFlowAnalysisResults.DefinitelyAssignedOnExit))
+            Assert.Equal("ext", GetSymbolNamesJoined(dataFlowAnalysisResults.ReadInside))
+            Assert.Equal("x", GetSymbolNamesJoined(dataFlowAnalysisResults.WrittenInside))
         End Sub
 
         <Fact()>
@@ -3888,12 +4143,14 @@ Class A
     End Function
 End Class
             </file>
-</compilation>, customIL)
+</compilation>, s_customIL)
 
-            Assert.Equal("xx", GetSymbolNamesSortedAndJoined(dataFlowAnalysisResults.AlwaysAssigned))
-            Assert.Equal("ext", GetSymbolNamesSortedAndJoined(dataFlowAnalysisResults.DataFlowsIn))
-            Assert.Equal("ext", GetSymbolNamesSortedAndJoined(dataFlowAnalysisResults.ReadInside))
-            Assert.Equal("x, xx", GetSymbolNamesSortedAndJoined(dataFlowAnalysisResults.WrittenInside))
+            Assert.Equal("xx", GetSymbolNamesJoined(dataFlowAnalysisResults.AlwaysAssigned))
+            Assert.Equal("ext", GetSymbolNamesJoined(dataFlowAnalysisResults.DataFlowsIn))
+            Assert.Equal("Me, ext, x, xx", GetSymbolNamesJoined(dataFlowAnalysisResults.DefinitelyAssignedOnEntry))
+            Assert.Equal("Me, ext, x, xx", GetSymbolNamesJoined(dataFlowAnalysisResults.DefinitelyAssignedOnExit))
+            Assert.Equal("ext", GetSymbolNamesJoined(dataFlowAnalysisResults.ReadInside))
+            Assert.Equal("x, xx", GetSymbolNamesJoined(dataFlowAnalysisResults.WrittenInside))
         End Sub
 
         <Fact()>
@@ -3910,12 +4167,14 @@ Class A
     End Function
 End Class
             </file>
-</compilation>, customIL)
+</compilation>, s_customIL)
 
-            Assert.Equal("xx", GetSymbolNamesSortedAndJoined(dataFlowAnalysisResults.AlwaysAssigned))
-            Assert.Equal("ext", GetSymbolNamesSortedAndJoined(dataFlowAnalysisResults.DataFlowsIn))
-            Assert.Equal("ext", GetSymbolNamesSortedAndJoined(dataFlowAnalysisResults.ReadInside))
-            Assert.Equal("xx", GetSymbolNamesSortedAndJoined(dataFlowAnalysisResults.WrittenInside))
+            Assert.Equal("xx", GetSymbolNamesJoined(dataFlowAnalysisResults.AlwaysAssigned))
+            Assert.Equal("ext", GetSymbolNamesJoined(dataFlowAnalysisResults.DataFlowsIn))
+            Assert.Equal("Me, ext, x, xx", GetSymbolNamesJoined(dataFlowAnalysisResults.DefinitelyAssignedOnEntry))
+            Assert.Equal("Me, ext, x, xx", GetSymbolNamesJoined(dataFlowAnalysisResults.DefinitelyAssignedOnExit))
+            Assert.Equal("ext", GetSymbolNamesJoined(dataFlowAnalysisResults.ReadInside))
+            Assert.Equal("xx", GetSymbolNamesJoined(dataFlowAnalysisResults.WrittenInside))
         End Sub
 
         <Fact()>
@@ -3931,12 +4190,14 @@ Class A
     End Sub
 End Class
             </file>
-</compilation>, customIL)
+</compilation>, s_customIL)
 
-            Assert.Equal("x", GetSymbolNamesSortedAndJoined(dataFlowAnalysisResults.AlwaysAssigned))
-            Assert.Equal("ext", GetSymbolNamesSortedAndJoined(dataFlowAnalysisResults.DataFlowsIn))
-            Assert.Equal("ext", GetSymbolNamesSortedAndJoined(dataFlowAnalysisResults.ReadInside))
-            Assert.Equal("x", GetSymbolNamesSortedAndJoined(dataFlowAnalysisResults.WrittenInside))
+            Assert.Equal("x", GetSymbolNamesJoined(dataFlowAnalysisResults.AlwaysAssigned))
+            Assert.Equal("ext", GetSymbolNamesJoined(dataFlowAnalysisResults.DataFlowsIn))
+            Assert.Equal("Me, ext, x", GetSymbolNamesJoined(dataFlowAnalysisResults.DefinitelyAssignedOnEntry))
+            Assert.Equal("Me, ext, x", GetSymbolNamesJoined(dataFlowAnalysisResults.DefinitelyAssignedOnExit))
+            Assert.Equal("ext", GetSymbolNamesJoined(dataFlowAnalysisResults.ReadInside))
+            Assert.Equal("x", GetSymbolNamesJoined(dataFlowAnalysisResults.WrittenInside))
         End Sub
 
         <Fact()>
@@ -3957,14 +4218,16 @@ End Class
             </file>
 </compilation>)
 
-            Assert.Equal(Nothing, GetSymbolNamesSortedAndJoined(dataFlowAnalysisResults.VariablesDeclared))
-            Assert.Equal(Nothing, GetSymbolNamesSortedAndJoined(dataFlowAnalysisResults.AlwaysAssigned))
-            Assert.Equal("Me, x", GetSymbolNamesSortedAndJoined(dataFlowAnalysisResults.DataFlowsIn))
-            Assert.Equal(Nothing, GetSymbolNamesSortedAndJoined(dataFlowAnalysisResults.DataFlowsOut))
-            Assert.Equal("Me, x", GetSymbolNamesSortedAndJoined(dataFlowAnalysisResults.ReadInside))
-            Assert.Equal("Me, y", GetSymbolNamesSortedAndJoined(dataFlowAnalysisResults.ReadOutside))
-            Assert.Equal("x", GetSymbolNamesSortedAndJoined(dataFlowAnalysisResults.WrittenInside))
-            Assert.Equal("Me, x, y, z", GetSymbolNamesSortedAndJoined(dataFlowAnalysisResults.WrittenOutside))
+            Assert.Equal(Nothing, GetSymbolNamesJoined(dataFlowAnalysisResults.VariablesDeclared))
+            Assert.Equal(Nothing, GetSymbolNamesJoined(dataFlowAnalysisResults.AlwaysAssigned))
+            Assert.Equal("Me, x", GetSymbolNamesJoined(dataFlowAnalysisResults.DataFlowsIn))
+            Assert.Equal(Nothing, GetSymbolNamesJoined(dataFlowAnalysisResults.DataFlowsOut))
+            Assert.Equal("Me, x, y", GetSymbolNamesJoined(dataFlowAnalysisResults.DefinitelyAssignedOnEntry))
+            Assert.Equal("Me, x, y", GetSymbolNamesJoined(dataFlowAnalysisResults.DefinitelyAssignedOnExit))
+            Assert.Equal("Me, x", GetSymbolNamesJoined(dataFlowAnalysisResults.ReadInside))
+            Assert.Equal("Me, y", GetSymbolNamesJoined(dataFlowAnalysisResults.ReadOutside))
+            Assert.Equal("x", GetSymbolNamesJoined(dataFlowAnalysisResults.WrittenInside))
+            Assert.Equal("Me, x, y, z", GetSymbolNamesJoined(dataFlowAnalysisResults.WrittenOutside))
         End Sub
 
         <Fact()>
@@ -3985,14 +4248,16 @@ End Class
             </file>
 </compilation>)
 
-            Assert.Equal(Nothing, GetSymbolNamesSortedAndJoined(dataFlowAnalysisResults.VariablesDeclared))
-            Assert.Equal(Nothing, GetSymbolNamesSortedAndJoined(dataFlowAnalysisResults.AlwaysAssigned))
-            Assert.Equal("y", GetSymbolNamesSortedAndJoined(dataFlowAnalysisResults.DataFlowsIn))
-            Assert.Equal(Nothing, GetSymbolNamesSortedAndJoined(dataFlowAnalysisResults.DataFlowsOut))
-            Assert.Equal("y", GetSymbolNamesSortedAndJoined(dataFlowAnalysisResults.ReadInside))
-            Assert.Equal("x", GetSymbolNamesSortedAndJoined(dataFlowAnalysisResults.ReadOutside))
-            Assert.Equal(Nothing, GetSymbolNamesSortedAndJoined(dataFlowAnalysisResults.WrittenInside))
-            Assert.Equal("Me, y, z", GetSymbolNamesSortedAndJoined(dataFlowAnalysisResults.WrittenOutside))
+            Assert.Equal(Nothing, GetSymbolNamesJoined(dataFlowAnalysisResults.VariablesDeclared))
+            Assert.Equal(Nothing, GetSymbolNamesJoined(dataFlowAnalysisResults.AlwaysAssigned))
+            Assert.Equal("y", GetSymbolNamesJoined(dataFlowAnalysisResults.DataFlowsIn))
+            Assert.Equal(Nothing, GetSymbolNamesJoined(dataFlowAnalysisResults.DataFlowsOut))
+            Assert.Equal("Me, y", GetSymbolNamesJoined(dataFlowAnalysisResults.DefinitelyAssignedOnEntry))
+            Assert.Equal("Me, y", GetSymbolNamesJoined(dataFlowAnalysisResults.DefinitelyAssignedOnExit))
+            Assert.Equal("y", GetSymbolNamesJoined(dataFlowAnalysisResults.ReadInside))
+            Assert.Equal("x", GetSymbolNamesJoined(dataFlowAnalysisResults.ReadOutside))
+            Assert.Equal(Nothing, GetSymbolNamesJoined(dataFlowAnalysisResults.WrittenInside))
+            Assert.Equal("Me, y, z", GetSymbolNamesJoined(dataFlowAnalysisResults.WrittenOutside))
         End Sub
 
         <Fact()>
@@ -4014,11 +4279,13 @@ End Class
             </file>
 </compilation>
 
-            Dim dataFlowAnalysisResults = CompileAndAnalyzeDataFlow(source, customIL)
-            Assert.Equal("x", GetSymbolNamesSortedAndJoined(dataFlowAnalysisResults.AlwaysAssigned))
-            Assert.Equal("ext", GetSymbolNamesSortedAndJoined(dataFlowAnalysisResults.DataFlowsIn))
-            Assert.Equal("ext", GetSymbolNamesSortedAndJoined(dataFlowAnalysisResults.ReadInside))
-            Assert.Equal("x", GetSymbolNamesSortedAndJoined(dataFlowAnalysisResults.WrittenInside))
+            Dim dataFlowAnalysisResults = CompileAndAnalyzeDataFlow(source, s_customIL)
+            Assert.Equal("x", GetSymbolNamesJoined(dataFlowAnalysisResults.AlwaysAssigned))
+            Assert.Equal("ext", GetSymbolNamesJoined(dataFlowAnalysisResults.DataFlowsIn))
+            Assert.Equal("Me, ext, x, y", GetSymbolNamesJoined(dataFlowAnalysisResults.DefinitelyAssignedOnEntry))
+            Assert.Equal("Me, ext, x, y", GetSymbolNamesJoined(dataFlowAnalysisResults.DefinitelyAssignedOnExit))
+            Assert.Equal("ext", GetSymbolNamesJoined(dataFlowAnalysisResults.ReadInside))
+            Assert.Equal("x", GetSymbolNamesJoined(dataFlowAnalysisResults.WrittenInside))
         End Sub
 
         <Fact()>
@@ -4040,11 +4307,13 @@ End Class
             </file>
 </compilation>
 
-            Dim dataFlowAnalysisResults = CompileAndAnalyzeDataFlow(source, customIL)
-            Assert.Equal("y", GetSymbolNamesSortedAndJoined(dataFlowAnalysisResults.AlwaysAssigned))
-            Assert.Equal("ext", GetSymbolNamesSortedAndJoined(dataFlowAnalysisResults.DataFlowsIn))
-            Assert.Equal("ext", GetSymbolNamesSortedAndJoined(dataFlowAnalysisResults.ReadInside))
-            Assert.Equal("y", GetSymbolNamesSortedAndJoined(dataFlowAnalysisResults.WrittenInside))
+            Dim dataFlowAnalysisResults = CompileAndAnalyzeDataFlow(source, s_customIL)
+            Assert.Equal("y", GetSymbolNamesJoined(dataFlowAnalysisResults.AlwaysAssigned))
+            Assert.Equal("ext", GetSymbolNamesJoined(dataFlowAnalysisResults.DataFlowsIn))
+            Assert.Equal("Me, ext, x, y", GetSymbolNamesJoined(dataFlowAnalysisResults.DefinitelyAssignedOnEntry))
+            Assert.Equal("Me, ext, x, y", GetSymbolNamesJoined(dataFlowAnalysisResults.DefinitelyAssignedOnExit))
+            Assert.Equal("ext", GetSymbolNamesJoined(dataFlowAnalysisResults.ReadInside))
+            Assert.Equal("y", GetSymbolNamesJoined(dataFlowAnalysisResults.WrittenInside))
         End Sub
 
         <Fact()>
@@ -4066,11 +4335,13 @@ End Class
             </file>
 </compilation>
 
-            Dim dataFlowAnalysisResults = CompileAndAnalyzeDataFlow(source, customIL)
-            Assert.Equal("x", GetSymbolNamesSortedAndJoined(dataFlowAnalysisResults.AlwaysAssigned))
-            Assert.Equal("ext", GetSymbolNamesSortedAndJoined(dataFlowAnalysisResults.DataFlowsIn))
-            Assert.Equal("ext", GetSymbolNamesSortedAndJoined(dataFlowAnalysisResults.ReadInside))
-            Assert.Equal("x, y", GetSymbolNamesSortedAndJoined(dataFlowAnalysisResults.WrittenInside))
+            Dim dataFlowAnalysisResults = CompileAndAnalyzeDataFlow(source, s_customIL)
+            Assert.Equal("x", GetSymbolNamesJoined(dataFlowAnalysisResults.AlwaysAssigned))
+            Assert.Equal("ext", GetSymbolNamesJoined(dataFlowAnalysisResults.DataFlowsIn))
+            Assert.Equal("Me, ext, x, y", GetSymbolNamesJoined(dataFlowAnalysisResults.DefinitelyAssignedOnEntry))
+            Assert.Equal("Me, ext, x, y", GetSymbolNamesJoined(dataFlowAnalysisResults.DefinitelyAssignedOnExit))
+            Assert.Equal("ext", GetSymbolNamesJoined(dataFlowAnalysisResults.ReadInside))
+            Assert.Equal("x, y", GetSymbolNamesJoined(dataFlowAnalysisResults.WrittenInside))
         End Sub
 
         <Fact()>
@@ -4092,11 +4363,13 @@ End Class
             </file>
 </compilation>
 
-            Dim dataFlowAnalysisResults = CompileAndAnalyzeDataFlow(source, customIL)
-            Assert.Equal("x", GetSymbolNamesSortedAndJoined(dataFlowAnalysisResults.AlwaysAssigned))
-            Assert.Equal("ext", GetSymbolNamesSortedAndJoined(dataFlowAnalysisResults.DataFlowsIn))
-            Assert.Equal("ext", GetSymbolNamesSortedAndJoined(dataFlowAnalysisResults.ReadInside))
-            Assert.Equal("x, y", GetSymbolNamesSortedAndJoined(dataFlowAnalysisResults.WrittenInside))
+            Dim dataFlowAnalysisResults = CompileAndAnalyzeDataFlow(source, s_customIL)
+            Assert.Equal("x", GetSymbolNamesJoined(dataFlowAnalysisResults.AlwaysAssigned))
+            Assert.Equal("ext", GetSymbolNamesJoined(dataFlowAnalysisResults.DataFlowsIn))
+            Assert.Equal("Me, ext, x, y", GetSymbolNamesJoined(dataFlowAnalysisResults.DefinitelyAssignedOnEntry))
+            Assert.Equal("Me, ext, x, y", GetSymbolNamesJoined(dataFlowAnalysisResults.DefinitelyAssignedOnExit))
+            Assert.Equal("ext", GetSymbolNamesJoined(dataFlowAnalysisResults.ReadInside))
+            Assert.Equal("x, y", GetSymbolNamesJoined(dataFlowAnalysisResults.WrittenInside))
         End Sub
 
         <Fact()>
@@ -4117,10 +4390,12 @@ End Class
             </file>
 </compilation>)
 
-            Assert.Equal(Nothing, GetSymbolNamesSortedAndJoined(dataFlowAnalysisResults.AlwaysAssigned))
-            Assert.Equal("Me, x", GetSymbolNamesSortedAndJoined(dataFlowAnalysisResults.DataFlowsIn))
-            Assert.Equal("Me, x", GetSymbolNamesSortedAndJoined(dataFlowAnalysisResults.ReadInside))
-            Assert.Equal("x", GetSymbolNamesSortedAndJoined(dataFlowAnalysisResults.WrittenInside))
+            Assert.Equal(Nothing, GetSymbolNamesJoined(dataFlowAnalysisResults.AlwaysAssigned))
+            Assert.Equal("Me, x", GetSymbolNamesJoined(dataFlowAnalysisResults.DataFlowsIn))
+            Assert.Equal("Me, x, y", GetSymbolNamesJoined(dataFlowAnalysisResults.DefinitelyAssignedOnEntry))
+            Assert.Equal("Me, x, y", GetSymbolNamesJoined(dataFlowAnalysisResults.DefinitelyAssignedOnExit))
+            Assert.Equal("Me, x", GetSymbolNamesJoined(dataFlowAnalysisResults.ReadInside))
+            Assert.Equal("x", GetSymbolNamesJoined(dataFlowAnalysisResults.WrittenInside))
         End Sub
 
         <Fact()>
@@ -4141,10 +4416,12 @@ End Class
             </file>
 </compilation>)
 
-            Assert.Equal(Nothing, GetSymbolNamesSortedAndJoined(dataFlowAnalysisResults.AlwaysAssigned))
-            Assert.Equal("y", GetSymbolNamesSortedAndJoined(dataFlowAnalysisResults.DataFlowsIn))
-            Assert.Equal("y", GetSymbolNamesSortedAndJoined(dataFlowAnalysisResults.ReadInside))
-            Assert.Equal(Nothing, GetSymbolNamesSortedAndJoined(dataFlowAnalysisResults.WrittenInside))
+            Assert.Equal(Nothing, GetSymbolNamesJoined(dataFlowAnalysisResults.AlwaysAssigned))
+            Assert.Equal("y", GetSymbolNamesJoined(dataFlowAnalysisResults.DataFlowsIn))
+            Assert.Equal("Me, y", GetSymbolNamesJoined(dataFlowAnalysisResults.DefinitelyAssignedOnEntry))
+            Assert.Equal("Me, y", GetSymbolNamesJoined(dataFlowAnalysisResults.DefinitelyAssignedOnExit))
+            Assert.Equal("y", GetSymbolNamesJoined(dataFlowAnalysisResults.ReadInside))
+            Assert.Equal(Nothing, GetSymbolNamesJoined(dataFlowAnalysisResults.WrittenInside))
         End Sub
 
         <Fact()>
@@ -4166,11 +4443,13 @@ End Class
             </file>
 </compilation>
 
-            Dim dataFlowAnalysisResults = CompileAndAnalyzeDataFlow(source, customIL)
-            Assert.Equal("x", GetSymbolNamesSortedAndJoined(dataFlowAnalysisResults.AlwaysAssigned))
-            Assert.Equal("ext", GetSymbolNamesSortedAndJoined(dataFlowAnalysisResults.DataFlowsIn))
-            Assert.Equal("ext", GetSymbolNamesSortedAndJoined(dataFlowAnalysisResults.ReadInside))
-            Assert.Equal("x", GetSymbolNamesSortedAndJoined(dataFlowAnalysisResults.WrittenInside))
+            Dim dataFlowAnalysisResults = CompileAndAnalyzeDataFlow(source, s_customIL)
+            Assert.Equal("x", GetSymbolNamesJoined(dataFlowAnalysisResults.AlwaysAssigned))
+            Assert.Equal("ext", GetSymbolNamesJoined(dataFlowAnalysisResults.DataFlowsIn))
+            Assert.Equal("Me, ext, x, y", GetSymbolNamesJoined(dataFlowAnalysisResults.DefinitelyAssignedOnEntry))
+            Assert.Equal("Me, ext, x, y", GetSymbolNamesJoined(dataFlowAnalysisResults.DefinitelyAssignedOnExit))
+            Assert.Equal("ext", GetSymbolNamesJoined(dataFlowAnalysisResults.ReadInside))
+            Assert.Equal("x", GetSymbolNamesJoined(dataFlowAnalysisResults.WrittenInside))
         End Sub
 
         <Fact()>
@@ -4192,11 +4471,13 @@ End Class
             </file>
 </compilation>
 
-            Dim dataFlowAnalysisResults = CompileAndAnalyzeDataFlow(source, customIL)
-            Assert.Equal("y", GetSymbolNamesSortedAndJoined(dataFlowAnalysisResults.AlwaysAssigned))
-            Assert.Equal("ext", GetSymbolNamesSortedAndJoined(dataFlowAnalysisResults.DataFlowsIn))
-            Assert.Equal("ext", GetSymbolNamesSortedAndJoined(dataFlowAnalysisResults.ReadInside))
-            Assert.Equal("y", GetSymbolNamesSortedAndJoined(dataFlowAnalysisResults.WrittenInside))
+            Dim dataFlowAnalysisResults = CompileAndAnalyzeDataFlow(source, s_customIL)
+            Assert.Equal("y", GetSymbolNamesJoined(dataFlowAnalysisResults.AlwaysAssigned))
+            Assert.Equal("ext", GetSymbolNamesJoined(dataFlowAnalysisResults.DataFlowsIn))
+            Assert.Equal("Me, ext, x, y", GetSymbolNamesJoined(dataFlowAnalysisResults.DefinitelyAssignedOnEntry))
+            Assert.Equal("Me, ext, x, y", GetSymbolNamesJoined(dataFlowAnalysisResults.DefinitelyAssignedOnExit))
+            Assert.Equal("ext", GetSymbolNamesJoined(dataFlowAnalysisResults.ReadInside))
+            Assert.Equal("y", GetSymbolNamesJoined(dataFlowAnalysisResults.WrittenInside))
         End Sub
 
         <Fact()>
@@ -4218,11 +4499,13 @@ End Class
             </file>
 </compilation>
 
-            Dim dataFlowAnalysisResults = CompileAndAnalyzeDataFlow(source, customIL)
-            Assert.Equal("x", GetSymbolNamesSortedAndJoined(dataFlowAnalysisResults.AlwaysAssigned))
-            Assert.Equal("ext", GetSymbolNamesSortedAndJoined(dataFlowAnalysisResults.DataFlowsIn))
-            Assert.Equal("ext", GetSymbolNamesSortedAndJoined(dataFlowAnalysisResults.ReadInside))
-            Assert.Equal("x, y", GetSymbolNamesSortedAndJoined(dataFlowAnalysisResults.WrittenInside))
+            Dim dataFlowAnalysisResults = CompileAndAnalyzeDataFlow(source, s_customIL)
+            Assert.Equal("x", GetSymbolNamesJoined(dataFlowAnalysisResults.AlwaysAssigned))
+            Assert.Equal("ext", GetSymbolNamesJoined(dataFlowAnalysisResults.DataFlowsIn))
+            Assert.Equal("Me, ext, x, y", GetSymbolNamesJoined(dataFlowAnalysisResults.DefinitelyAssignedOnEntry))
+            Assert.Equal("Me, ext, x, y", GetSymbolNamesJoined(dataFlowAnalysisResults.DefinitelyAssignedOnExit))
+            Assert.Equal("ext", GetSymbolNamesJoined(dataFlowAnalysisResults.ReadInside))
+            Assert.Equal("x, y", GetSymbolNamesJoined(dataFlowAnalysisResults.WrittenInside))
         End Sub
 
         <Fact()>
@@ -4244,14 +4527,16 @@ End Class
             </file>
 </compilation>
 
-            Dim dataFlowAnalysisResults = CompileAndAnalyzeDataFlow(source, customIL)
-            Assert.Equal("x", GetSymbolNamesSortedAndJoined(dataFlowAnalysisResults.AlwaysAssigned))
-            Assert.Equal("ext", GetSymbolNamesSortedAndJoined(dataFlowAnalysisResults.DataFlowsIn))
-            Assert.Equal("ext", GetSymbolNamesSortedAndJoined(dataFlowAnalysisResults.ReadInside))
-            Assert.Equal("x, y", GetSymbolNamesSortedAndJoined(dataFlowAnalysisResults.WrittenInside))
+            Dim dataFlowAnalysisResults = CompileAndAnalyzeDataFlow(source, s_customIL)
+            Assert.Equal("x", GetSymbolNamesJoined(dataFlowAnalysisResults.AlwaysAssigned))
+            Assert.Equal("ext", GetSymbolNamesJoined(dataFlowAnalysisResults.DataFlowsIn))
+            Assert.Equal("Me, ext, x, y", GetSymbolNamesJoined(dataFlowAnalysisResults.DefinitelyAssignedOnEntry))
+            Assert.Equal("Me, ext, x, y", GetSymbolNamesJoined(dataFlowAnalysisResults.DefinitelyAssignedOnExit))
+            Assert.Equal("ext", GetSymbolNamesJoined(dataFlowAnalysisResults.ReadInside))
+            Assert.Equal("x, y", GetSymbolNamesJoined(dataFlowAnalysisResults.WrittenInside))
         End Sub
 
-        <WorkItem(541005, "DevDiv")>
+        <WorkItem(541005, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/541005")>
         <Fact()>
         Public Sub TestMultipleLocalsInitializedByAsNew1()
             Dim dataFlowAnalysis = CompileAndAnalyzeDataFlow(
@@ -4270,13 +4555,13 @@ Module Program
 End Module
   </file>
       </compilation>)
-            Assert.Equal(Nothing, GetSymbolNamesSortedAndJoined(dataFlowAnalysis.AlwaysAssigned))
-            Assert.Equal(Nothing, GetSymbolNamesSortedAndJoined(dataFlowAnalysis.WrittenInside))
-            Assert.Equal(Nothing, GetSymbolNamesSortedAndJoined(dataFlowAnalysis.VariablesDeclared))
-            Assert.Equal("a, args, x, y, z", GetSymbolNamesSortedAndJoined(dataFlowAnalysis.WrittenOutside))
+            Assert.Equal(Nothing, GetSymbolNamesJoined(dataFlowAnalysis.AlwaysAssigned))
+            Assert.Equal(Nothing, GetSymbolNamesJoined(dataFlowAnalysis.WrittenInside))
+            Assert.Equal(Nothing, GetSymbolNamesJoined(dataFlowAnalysis.VariablesDeclared))
+            Assert.Equal("args, a, x, y, z", GetSymbolNamesJoined(dataFlowAnalysis.WrittenOutside))
         End Sub
 
-        <WorkItem(541005, "DevDiv")>
+        <WorkItem(541005, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/541005")>
         <Fact()>
         Public Sub TestMultipleLocalsInitializedByAsNew2()
             Dim analysis = CompileAndAnalyzeControlAndDataFlow(
@@ -4299,15 +4584,15 @@ End Module
             Dim dataFlowAnalysis = analysis.Item2
             Assert.Equal(0, controlFlowAnalysis.ExitPoints.Count())
             Assert.Equal(0, controlFlowAnalysis.EntryPoints.Count())
-            Assert.Equal("x, y, z", GetSymbolNamesSortedAndJoined(dataFlowAnalysis.AlwaysAssigned))
-            Assert.Equal("x, y, z", GetSymbolNamesSortedAndJoined(dataFlowAnalysis.WrittenInside))
-            Assert.Equal("x, y, z", GetSymbolNamesSortedAndJoined(dataFlowAnalysis.VariablesDeclared))
-            Assert.Equal("a, args", GetSymbolNamesSortedAndJoined(dataFlowAnalysis.WrittenOutside))
+            Assert.Equal("x, y, z", GetSymbolNamesJoined(dataFlowAnalysis.AlwaysAssigned))
+            Assert.Equal("x, y, z", GetSymbolNamesJoined(dataFlowAnalysis.WrittenInside))
+            Assert.Equal("x, y, z", GetSymbolNamesJoined(dataFlowAnalysis.VariablesDeclared))
+            Assert.Equal("args, a", GetSymbolNamesJoined(dataFlowAnalysis.WrittenOutside))
             Assert.True(controlFlowAnalysis.StartPointIsReachable)
             Assert.True(controlFlowAnalysis.EndPointIsReachable)
         End Sub
 
-        <WorkItem(528623, "DevDiv")>
+        <WorkItem(528623, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/528623")>
         <Fact()>
         Public Sub TestElementAccess01()
             Dim analysis = CompileAndAnalyzeControlAndDataFlow(
@@ -4331,14 +4616,16 @@ End Class
 
             Dim dataFlowAnalysis = analysis.Item2
             Assert.True(dataFlowAnalysis.Succeeded)
-            Assert.Equal(Nothing, GetSymbolNamesSortedAndJoined(dataFlowAnalysis.VariablesDeclared))
-            Assert.Equal(Nothing, GetSymbolNamesSortedAndJoined(dataFlowAnalysis.AlwaysAssigned))
-            Assert.Equal("p, v", GetSymbolNamesSortedAndJoined(dataFlowAnalysis.DataFlowsIn))
-            Assert.Equal(Nothing, GetSymbolNamesSortedAndJoined(dataFlowAnalysis.DataFlowsOut))
-            Assert.Equal("p, v", GetSymbolNamesSortedAndJoined(dataFlowAnalysis.ReadInside))
-            Assert.Equal(Nothing, GetSymbolNamesSortedAndJoined(dataFlowAnalysis.WrittenInside))
-            Assert.Equal("v", GetSymbolNamesSortedAndJoined(dataFlowAnalysis.ReadOutside))
-            Assert.Equal("Me, p, v", GetSymbolNamesSortedAndJoined(dataFlowAnalysis.WrittenOutside))
+            Assert.Equal(Nothing, GetSymbolNamesJoined(dataFlowAnalysis.VariablesDeclared))
+            Assert.Equal(Nothing, GetSymbolNamesJoined(dataFlowAnalysis.AlwaysAssigned))
+            Assert.Equal("p, v", GetSymbolNamesJoined(dataFlowAnalysis.DataFlowsIn))
+            Assert.Equal(Nothing, GetSymbolNamesJoined(dataFlowAnalysis.DataFlowsOut))
+            Assert.Equal("Me, p, v", GetSymbolNamesJoined(dataFlowAnalysis.DefinitelyAssignedOnEntry))
+            Assert.Equal("Me, p, v", GetSymbolNamesJoined(dataFlowAnalysis.DefinitelyAssignedOnExit))
+            Assert.Equal("p, v", GetSymbolNamesJoined(dataFlowAnalysis.ReadInside))
+            Assert.Equal(Nothing, GetSymbolNamesJoined(dataFlowAnalysis.WrittenInside))
+            Assert.Equal("v", GetSymbolNamesJoined(dataFlowAnalysis.ReadOutside))
+            Assert.Equal("Me, p, v", GetSymbolNamesJoined(dataFlowAnalysis.WrittenOutside))
 
         End Sub
 
@@ -4363,17 +4650,19 @@ End Enum
 ]]></file>
         </compilation>)
 
-            Assert.Equal("s", GetSymbolNamesSortedAndJoined(dataFlowAnalysisResults.VariablesDeclared))
-            Assert.Equal(Nothing, GetSymbolNamesSortedAndJoined(dataFlowAnalysisResults.AlwaysAssigned))
-            Assert.Equal(Nothing, GetSymbolNamesSortedAndJoined(dataFlowAnalysisResults.DataFlowsIn))
-            Assert.Equal("s", GetSymbolNamesSortedAndJoined(dataFlowAnalysisResults.DataFlowsOut))
-            Assert.Equal(Nothing, GetSymbolNamesSortedAndJoined(dataFlowAnalysisResults.ReadInside))
-            Assert.Equal("s", GetSymbolNamesSortedAndJoined(dataFlowAnalysisResults.ReadOutside))
-            Assert.Equal(Nothing, GetSymbolNamesSortedAndJoined(dataFlowAnalysisResults.WrittenInside))
-            Assert.Equal("args, ex, Me", GetSymbolNamesSortedAndJoined(dataFlowAnalysisResults.WrittenOutside))
+            Assert.Equal("s", GetSymbolNamesJoined(dataFlowAnalysisResults.VariablesDeclared))
+            Assert.Equal(Nothing, GetSymbolNamesJoined(dataFlowAnalysisResults.AlwaysAssigned))
+            Assert.Equal(Nothing, GetSymbolNamesJoined(dataFlowAnalysisResults.DataFlowsIn))
+            Assert.Equal("s", GetSymbolNamesJoined(dataFlowAnalysisResults.DataFlowsOut))
+            Assert.Equal("Me, args", GetSymbolNamesJoined(dataFlowAnalysisResults.DefinitelyAssignedOnEntry))
+            Assert.Equal("Me, args", GetSymbolNamesJoined(dataFlowAnalysisResults.DefinitelyAssignedOnExit))
+            Assert.Equal(Nothing, GetSymbolNamesJoined(dataFlowAnalysisResults.ReadInside))
+            Assert.Equal("s", GetSymbolNamesJoined(dataFlowAnalysisResults.ReadOutside))
+            Assert.Equal(Nothing, GetSymbolNamesJoined(dataFlowAnalysisResults.WrittenInside))
+            Assert.Equal("Me, args, ex", GetSymbolNamesJoined(dataFlowAnalysisResults.WrittenOutside))
         End Sub
 
-        <WorkItem(542565, "DevDiv")>
+        <WorkItem(542565, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/542565")>
         <Fact()>
         Public Sub IdentifierNameInForStatement()
             Dim dataFlowResults = CompileAndAnalyzeDataFlow(
@@ -4391,13 +4680,13 @@ End Module
             Assert.True(dataFlowResults.Succeeded)
         End Sub
 
-        <WorkItem(528860, "DevDiv")>
+        <WorkItem(528860, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/528860")>
         <Fact()>
         Public Sub IdentifierNameInMemberAccessExpr()
             Dim dataFlowResults = CompileAndAnalyzeDataFlow(
    <compilation>
        <file name="a.vb">
-Public Class Foo
+Public Class Goo
     Sub M()
         Dim c As C = New C()
         Dim n1 = c.[|M|]
@@ -4409,7 +4698,7 @@ End Class
             Assert.False(dataFlowResults.Succeeded)
         End Sub
 
-        <WorkItem(528860, "DevDiv")>
+        <WorkItem(528860, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/528860")>
         <Fact()>
         Public Sub IdentifierNameInMemberAccessExpr2()
             Dim dataFlowResults = CompileAndAnalyzeDataFlow(
@@ -4427,7 +4716,7 @@ End Class
             Assert.False(dataFlowResults.Succeeded)
         End Sub
 
-        <WorkItem(542860, "DevDiv")>
+        <WorkItem(542860, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/542860")>
         <Fact()>
         Public Sub IdentifierNameSyntax()
             Dim dataFlowResults = CompileAndAnalyzeDataFlow(
@@ -4445,7 +4734,7 @@ End Class
             Assert.True(dataFlowResults.Succeeded)
         End Sub
 
-        <WorkItem(542860, "DevDiv")>
+        <WorkItem(542860, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/542860")>
         <Fact()>
         Public Sub IdentifierNameSyntax2()
             Dim dataFlowResults = CompileAndAnalyzeDataFlow(
@@ -4454,9 +4743,9 @@ End Class
 Imports Microsoft.VisualBasic
 Public Class C
     Sub M()
-        Dim n1 = [|Foo|](85)
+        Dim n1 = [|Goo|](85)
         End Sub
-    Function Foo(i As Integer) As Integer
+    Function Goo(i As Integer) As Integer
         Return i
     End Function
 End Class
@@ -4466,7 +4755,7 @@ End Class
             Assert.True(dataFlowResults.Succeeded)
         End Sub
 
-        <WorkItem(542860, "DevDiv")>
+        <WorkItem(542860, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/542860")>
         <Fact()>
         Public Sub IdentifierNameSyntax3()
             Dim dataFlowResults = CompileAndAnalyzeDataFlow(
@@ -4475,9 +4764,9 @@ End Class
 Imports Microsoft.VisualBasic
 Public Class C
     Sub M()
-        Dim n1 = [|Foo|](85)
+        Dim n1 = [|Goo|](85)
   End Sub
-    ReadOnly Property Foo(i As Integer) As Integer
+    ReadOnly Property Goo(i As Integer) As Integer
         Get
             Return i
         End Get
@@ -4489,7 +4778,7 @@ End Class
             Assert.True(dataFlowResults.Succeeded)
         End Sub
 
-        <WorkItem(543369, "DevDiv")>
+        <WorkItem(543369, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/543369")>
         <Fact()>
         Public Sub PredefinedTypeIncompleteSub()
             Dim dataFlowResults = CompileAndAnalyzeDataFlow(
@@ -4505,7 +4794,7 @@ End Class
             Assert.False(dataFlowResults.Succeeded)
         End Sub
 
-        <WorkItem(543369, "DevDiv")>
+        <WorkItem(543369, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/543369")>
         <Fact()>
         Public Sub PredefinedType2()
             Dim dataFlowResults = CompileAndAnalyzeDataFlow(
@@ -4523,10 +4812,10 @@ End Class
             Assert.False(dataFlowResults.Succeeded)
         End Sub
 
-        <WorkItem(543461, "DevDiv")>
+        <WorkItem(543461, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/543461")>
         <Fact()>
         Public Sub CollectionInitSyntax()
-            Dim compilation = CreateCompilationWithMscorlibAndVBRuntime(
+            Dim compilation = CreateCompilationWithMscorlib40AndVBRuntime(
    <compilation>
        <file name="a.vb">
 Module Program
@@ -4539,16 +4828,16 @@ End Module
 
             Dim tree = compilation.SyntaxTrees.First()
             Dim model = compilation.GetSemanticModel(tree)
-            Dim exprSyntaxNode = DirectCast(tree.GetCompilationUnitRoot().FindToken(tree.GetRoot.ToFullString().IndexOf("{4, 5}")).Parent, CollectionInitializerSyntax)
+            Dim exprSyntaxNode = DirectCast(tree.GetCompilationUnitRoot().FindToken(tree.GetRoot.ToFullString().IndexOf("{4, 5}", StringComparison.Ordinal)).Parent, CollectionInitializerSyntax)
             Dim analysis = model.AnalyzeDataFlow(exprSyntaxNode)
 
             Assert.False(analysis.Succeeded)
         End Sub
 
-        <WorkItem(543461, "DevDiv")>
+        <WorkItem(543461, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/543461")>
         <Fact()>
         Public Sub CollectionInitSyntax2()
-            Dim compilation = CreateCompilationWithMscorlibAndVBRuntime(
+            Dim compilation = CreateCompilationWithMscorlib40AndVBRuntime(
    <compilation>
        <file name="a.vb">
 Imports System.Collections.Generic
@@ -4562,16 +4851,16 @@ End Module
 
             Dim tree = compilation.SyntaxTrees.First()
             Dim model = compilation.GetSemanticModel(tree)
-            Dim exprSyntaxNode = DirectCast(tree.GetCompilationUnitRoot().FindToken(tree.GetRoot.ToFullString().IndexOf("{4, 5}")).Parent, CollectionInitializerSyntax)
+            Dim exprSyntaxNode = DirectCast(tree.GetCompilationUnitRoot().FindToken(tree.GetRoot.ToFullString().IndexOf("{4, 5}", StringComparison.Ordinal)).Parent, CollectionInitializerSyntax)
             Dim analysis = model.AnalyzeDataFlow(exprSyntaxNode)
 
             Assert.False(analysis.Succeeded)
         End Sub
 
-        <WorkItem(543461, "DevDiv")>
+        <WorkItem(543461, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/543461")>
         <Fact()>
         Public Sub CollectionInitSyntax3()
-            Dim compilation = CreateCompilationWithMscorlibAndVBRuntime(
+            Dim compilation = CreateCompilationWithMscorlib40AndVBRuntime(
    <compilation>
        <file name="a.vb">
 Imports System.Collections.Generic
@@ -4585,16 +4874,16 @@ End Module
 
             Dim tree = compilation.SyntaxTrees.First()
             Dim model = compilation.GetSemanticModel(tree)
-            Dim exprSyntaxNode = DirectCast(tree.GetCompilationUnitRoot().FindToken(tree.GetRoot.ToFullString().IndexOf("{4, 5}")).Parent, CollectionInitializerSyntax)
+            Dim exprSyntaxNode = DirectCast(tree.GetCompilationUnitRoot().FindToken(tree.GetRoot.ToFullString().IndexOf("{4, 5}", StringComparison.Ordinal)).Parent, CollectionInitializerSyntax)
             Dim analysis = model.AnalyzeDataFlow(exprSyntaxNode)
 
             Assert.True(analysis.Succeeded)
         End Sub
 
-        <WorkItem(543509, "DevDiv")>
+        <WorkItem(543509, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/543509")>
         <Fact()>
         Public Sub IfStatementSyntax()
-            Dim compilation = CreateCompilationWithMscorlibAndVBRuntime(
+            Dim compilation = CreateCompilationWithMscorlib40AndVBRuntime(
    <compilation>
        <file name="a.vb">
 Module Program
@@ -4610,7 +4899,7 @@ End Module
 
             Dim tree = compilation.SyntaxTrees.First()
             Dim model = compilation.GetSemanticModel(tree)
-            Dim stmtSyntaxNode = DirectCast(tree.GetCompilationUnitRoot().FindToken(tree.GetRoot.ToFullString().IndexOf("If False")).Parent, IfStatementSyntax)
+            Dim stmtSyntaxNode = DirectCast(tree.GetCompilationUnitRoot().FindToken(tree.GetRoot.ToFullString().IndexOf("If False", StringComparison.Ordinal)).Parent, IfStatementSyntax)
             Dim analysis = model.AnalyzeControlFlow(stmtSyntaxNode, stmtSyntaxNode)
 
             Assert.False(analysis.Succeeded)
@@ -4618,7 +4907,7 @@ End Module
 
         <Fact()>
         Public Sub ElseStatementSyntax()
-            Dim compilation = CreateCompilationWithMscorlibAndVBRuntime(
+            Dim compilation = CreateCompilationWithMscorlib40AndVBRuntime(
    <compilation>
        <file name="a.vb">
 Module Program
@@ -4636,7 +4925,7 @@ End Module
 
             Dim tree = compilation.SyntaxTrees.First()
             Dim model = compilation.GetSemanticModel(tree)
-            Dim stmtSyntaxNode = DirectCast(tree.GetCompilationUnitRoot().FindToken(tree.GetRoot.ToFullString().IndexOf("Else")).Parent, ElseStatementSyntax)
+            Dim stmtSyntaxNode = DirectCast(tree.GetCompilationUnitRoot().FindToken(tree.GetRoot.ToFullString().IndexOf("Else", StringComparison.Ordinal)).Parent, ElseStatementSyntax)
             Dim analysis = model.AnalyzeControlFlow(stmtSyntaxNode, stmtSyntaxNode)
 
             Assert.False(analysis.Succeeded)
@@ -4644,7 +4933,7 @@ End Module
 
         <Fact()>
         Public Sub WithStatementSyntax()
-            Dim compilation = CreateCompilationWithMscorlibAndVBRuntime(
+            Dim compilation = CreateCompilationWithMscorlib40AndVBRuntime(
    <compilation>
        <file name="a.vb">
 Module Program
@@ -4658,16 +4947,16 @@ End Module
 
             Dim tree = compilation.SyntaxTrees.First()
             Dim model = compilation.GetSemanticModel(tree)
-            Dim stmtSyntaxNode = DirectCast(tree.GetCompilationUnitRoot().FindToken(tree.GetRoot.ToFullString().IndexOf("With New Object()")).Parent, WithStatementSyntax)
+            Dim stmtSyntaxNode = DirectCast(tree.GetCompilationUnitRoot().FindToken(tree.GetRoot.ToFullString().IndexOf("With New Object()", StringComparison.Ordinal)).Parent, WithStatementSyntax)
             Dim analysis = model.AnalyzeControlFlow(stmtSyntaxNode, stmtSyntaxNode)
 
             Assert.False(analysis.Succeeded)
         End Sub
 
-        <WorkItem(757796, "DevDiv")>
+        <WorkItem(757796, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/757796")>
         <Fact()>
         Public Sub Bug757796()
-            Dim compilation = CreateCompilationWithMscorlibAndVBRuntime(
+            Dim compilation = CreateCompilationWithMscorlib40AndVBRuntime(
    <compilation>
        <file name="a.vb">
 Imports System
@@ -4685,7 +4974,7 @@ End Module  </file>
 
             Dim tree = compilation.SyntaxTrees.First()
             Dim model = compilation.GetSemanticModel(tree)
-            Dim withStatement = DirectCast(tree.GetCompilationUnitRoot().FindToken(tree.GetRoot.ToFullString().IndexOf("With tableauEmission(t)")).Parent, WithStatementSyntax)
+            Dim withStatement = DirectCast(tree.GetCompilationUnitRoot().FindToken(tree.GetRoot.ToFullString().IndexOf("With tableauEmission(t)", StringComparison.Ordinal)).Parent, WithStatementSyntax)
             Dim tableauEmissionNode = DirectCast(withStatement.Expression, Microsoft.CodeAnalysis.VisualBasic.Syntax.InvocationExpressionSyntax).Expression
             Dim analysis = model.AnalyzeDataFlow(tableauEmissionNode)
 
@@ -4694,7 +4983,7 @@ End Module  </file>
 
         <Fact()>
         Public Sub TryStatementSyntax()
-            Dim compilation = CreateCompilationWithMscorlibAndVBRuntime(
+            Dim compilation = CreateCompilationWithMscorlib40AndVBRuntime(
    <compilation>
        <file name="a.vb">
 Module Program
@@ -4710,7 +4999,7 @@ End Module
 
             Dim tree = compilation.SyntaxTrees.First()
             Dim model = compilation.GetSemanticModel(tree)
-            Dim stmtSyntaxNode = DirectCast(tree.GetCompilationUnitRoot().FindToken(tree.GetRoot.ToFullString().IndexOf("Try")).Parent, TryStatementSyntax)
+            Dim stmtSyntaxNode = DirectCast(tree.GetCompilationUnitRoot().FindToken(tree.GetRoot.ToFullString().IndexOf("Try", StringComparison.Ordinal)).Parent, TryStatementSyntax)
             Dim analysis = model.AnalyzeControlFlow(stmtSyntaxNode, stmtSyntaxNode)
 
             Assert.False(analysis.Succeeded)
@@ -4718,7 +5007,7 @@ End Module
 
         <Fact()>
         Public Sub CatchStatementSyntax()
-            Dim compilation = CreateCompilationWithMscorlibAndVBRuntime(
+            Dim compilation = CreateCompilationWithMscorlib40AndVBRuntime(
    <compilation>
        <file name="a.vb">
 Module Program
@@ -4734,7 +5023,7 @@ End Module
 
             Dim tree = compilation.SyntaxTrees.First()
             Dim model = compilation.GetSemanticModel(tree)
-            Dim stmtSyntaxNode = DirectCast(tree.GetCompilationUnitRoot().FindToken(tree.GetRoot.ToFullString().IndexOf("Catch e As Exception")).Parent, CatchStatementSyntax)
+            Dim stmtSyntaxNode = DirectCast(tree.GetCompilationUnitRoot().FindToken(tree.GetRoot.ToFullString().IndexOf("Catch e As Exception", StringComparison.Ordinal)).Parent, CatchStatementSyntax)
             Dim analysis = model.AnalyzeControlFlow(stmtSyntaxNode, stmtSyntaxNode)
 
             Assert.False(analysis.Succeeded)
@@ -4742,7 +5031,7 @@ End Module
 
         <Fact()>
         Public Sub FinallyStatementSyntax()
-            Dim compilation = CreateCompilationWithMscorlibAndVBRuntime(
+            Dim compilation = CreateCompilationWithMscorlib40AndVBRuntime(
    <compilation>
        <file name="a.vb">
 Module Program
@@ -4758,16 +5047,16 @@ End Module
 
             Dim tree = compilation.SyntaxTrees.First()
             Dim model = compilation.GetSemanticModel(tree)
-            Dim stmtSyntaxNode = DirectCast(tree.GetCompilationUnitRoot().FindToken(tree.GetRoot.ToFullString().IndexOf("Finally")).Parent, FinallyStatementSyntax)
+            Dim stmtSyntaxNode = DirectCast(tree.GetCompilationUnitRoot().FindToken(tree.GetRoot.ToFullString().IndexOf("Finally", StringComparison.Ordinal)).Parent, FinallyStatementSyntax)
             Dim analysis = model.AnalyzeControlFlow(stmtSyntaxNode, stmtSyntaxNode)
 
             Assert.False(analysis.Succeeded)
         End Sub
 
-        <WorkItem(543722, "DevDiv")>
+        <WorkItem(543722, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/543722")>
         <Fact()>
         Public Sub SyncLockStatementSyntax()
-            Dim compilation = CreateCompilationWithMscorlibAndVBRuntime(
+            Dim compilation = CreateCompilationWithMscorlib40AndVBRuntime(
    <compilation>
        <file name="a.vb">
 Module Program
@@ -4781,16 +5070,16 @@ End Module
 
             Dim tree = compilation.SyntaxTrees.First()
             Dim model = compilation.GetSemanticModel(tree)
-            Dim stmtSyntaxNode = DirectCast(tree.GetCompilationUnitRoot().FindToken(tree.GetRoot.ToFullString().IndexOf("SyncLock New With {.x = 0}")).Parent, SyncLockStatementSyntax)
+            Dim stmtSyntaxNode = DirectCast(tree.GetCompilationUnitRoot().FindToken(tree.GetRoot.ToFullString().IndexOf("SyncLock New With {.x = 0}", StringComparison.Ordinal)).Parent, SyncLockStatementSyntax)
             Dim analysis = model.AnalyzeControlFlow(stmtSyntaxNode, stmtSyntaxNode)
 
             Assert.False(analysis.Succeeded)
         End Sub
 
-        <WorkItem(543736, "DevDiv")>
+        <WorkItem(543736, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/543736")>
         <Fact()>
         Public Sub WhileStatementSyntax()
-            Dim compilation = CreateCompilationWithMscorlibAndVBRuntime(
+            Dim compilation = CreateCompilationWithMscorlib40AndVBRuntime(
    <compilation>
        <file name="a.vb">
 Module Program
@@ -4804,7 +5093,7 @@ End Module
 
             Dim tree = compilation.SyntaxTrees.First()
             Dim model = compilation.GetSemanticModel(tree)
-            Dim stmtSyntaxNode = DirectCast(tree.GetCompilationUnitRoot().FindToken(tree.GetRoot.ToFullString().IndexOf("While True")).Parent, WhileStatementSyntax)
+            Dim stmtSyntaxNode = DirectCast(tree.GetCompilationUnitRoot().FindToken(tree.GetRoot.ToFullString().IndexOf("While True", StringComparison.Ordinal)).Parent, WhileStatementSyntax)
             Dim analysis = model.AnalyzeControlFlow(stmtSyntaxNode, stmtSyntaxNode)
 
             Assert.False(analysis.Succeeded)
@@ -4812,7 +5101,7 @@ End Module
 
         <Fact()>
         Public Sub UsingStatementSyntax()
-            Dim compilation = CreateCompilationWithMscorlibAndVBRuntime(
+            Dim compilation = CreateCompilationWithMscorlib40AndVBRuntime(
    <compilation>
        <file name="a.vb">
 Imports System.IO
@@ -4827,16 +5116,16 @@ End Module
 
             Dim tree = compilation.SyntaxTrees.First()
             Dim model = compilation.GetSemanticModel(tree)
-            Dim stmtSyntaxNode = DirectCast(tree.GetCompilationUnitRoot().FindToken(tree.GetRoot.ToFullString().IndexOf("Using mem = New MemoryStream()")).Parent, UsingStatementSyntax)
+            Dim stmtSyntaxNode = DirectCast(tree.GetCompilationUnitRoot().FindToken(tree.GetRoot.ToFullString().IndexOf("Using mem = New MemoryStream()", StringComparison.Ordinal)).Parent, UsingStatementSyntax)
             Dim analysis = model.AnalyzeControlFlow(stmtSyntaxNode, stmtSyntaxNode)
 
             Assert.False(analysis.Succeeded)
         End Sub
 
-        <WorkItem(545449, "DevDiv")>
+        <WorkItem(545449, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/545449")>
         <Fact()>
         Public Sub LoopWhileStatementSyntax()
-            Dim compilation = CreateCompilationWithMscorlibAndVBRuntime(
+            Dim compilation = CreateCompilationWithMscorlib40AndVBRuntime(
    <compilation>
        <file name="a.vb">
 Imports System.IO
@@ -4855,7 +5144,7 @@ End Module
 
             Dim tree = compilation.SyntaxTrees.First()
             Dim model = compilation.GetSemanticModel(tree)
-            Dim stmtSyntaxNode = DirectCast(tree.GetCompilationUnitRoot().FindToken(tree.GetRoot.ToFullString().IndexOf("Loop While Me.backwardBranchChanged")).Parent, LoopStatementSyntax)
+            Dim stmtSyntaxNode = DirectCast(tree.GetCompilationUnitRoot().FindToken(tree.GetRoot.ToFullString().IndexOf("Loop While Me.backwardBranchChanged", StringComparison.Ordinal)).Parent, LoopStatementSyntax)
             Dim analysis = model.AnalyzeControlFlow(stmtSyntaxNode)
 
             Assert.False(analysis.Succeeded)
@@ -4863,11 +5152,11 @@ End Module
 
         <Fact()>
         Public Sub SelectStatementSyntax()
-            Dim compilation = CreateCompilationWithMscorlibAndVBRuntime(
+            Dim compilation = CreateCompilationWithMscorlib40AndVBRuntime(
    <compilation>
        <file name="a.vb">
 Class Frame
-    Sub Foo()
+    Sub Goo()
         Select Case 1 + 2 + 3
             Case 1
             Case 2
@@ -4879,7 +5168,7 @@ End Class
 
             Dim tree = compilation.SyntaxTrees.First()
             Dim model = compilation.GetSemanticModel(tree)
-            Dim stmtSyntaxNode = DirectCast(tree.GetCompilationUnitRoot().FindToken(tree.GetRoot.ToFullString().IndexOf("Select Case 1 + 2 + 3")).Parent, SelectStatementSyntax)
+            Dim stmtSyntaxNode = DirectCast(tree.GetCompilationUnitRoot().FindToken(tree.GetRoot.ToFullString().IndexOf("Select Case 1 + 2 + 3", StringComparison.Ordinal)).Parent, SelectStatementSyntax)
             Dim analysis = model.AnalyzeControlFlow(stmtSyntaxNode, stmtSyntaxNode)
 
             Assert.False(analysis.Succeeded)
@@ -4887,11 +5176,11 @@ End Class
 
         <Fact()>
         Public Sub CaseStatementSyntax()
-            Dim compilation = CreateCompilationWithMscorlibAndVBRuntime(
+            Dim compilation = CreateCompilationWithMscorlib40AndVBRuntime(
    <compilation>
        <file name="a.vb">
 Class Frame
-    Sub Foo()
+    Sub Goo()
         Select Case 1 + 2 + 3
             Case 1
             Case 2
@@ -4903,7 +5192,7 @@ End Class
 
             Dim tree = compilation.SyntaxTrees.First()
             Dim model = compilation.GetSemanticModel(tree)
-            Dim selectSyntaxNode = DirectCast(tree.GetCompilationUnitRoot().FindToken(tree.GetRoot.ToFullString().IndexOf("Select Case 1 + 2 + 3")).Parent, SelectStatementSyntax)
+            Dim selectSyntaxNode = DirectCast(tree.GetCompilationUnitRoot().FindToken(tree.GetRoot.ToFullString().IndexOf("Select Case 1 + 2 + 3", StringComparison.Ordinal)).Parent, SelectStatementSyntax)
             Dim stmtSyntaxNode = DirectCast(selectSyntaxNode.Parent, SelectBlockSyntax).CaseBlocks(0).CaseStatement
             Dim analysis = model.AnalyzeControlFlow(stmtSyntaxNode, stmtSyntaxNode)
 
@@ -4912,11 +5201,11 @@ End Class
 
         <Fact()>
         Public Sub DoStatementSyntax()
-            Dim compilation = CreateCompilationWithMscorlibAndVBRuntime(
+            Dim compilation = CreateCompilationWithMscorlib40AndVBRuntime(
    <compilation>
        <file name="a.vb">
 Class Frame
-    Sub Foo()
+    Sub Goo()
         Do
             Exit Do
         Loop
@@ -4927,7 +5216,7 @@ End Class
 
             Dim tree = compilation.SyntaxTrees.First()
             Dim model = compilation.GetSemanticModel(tree)
-            Dim stmtSyntaxNode = DirectCast(tree.GetCompilationUnitRoot().FindToken(tree.GetRoot.ToFullString().IndexOf("Do")).Parent, DoStatementSyntax)
+            Dim stmtSyntaxNode = DirectCast(tree.GetCompilationUnitRoot().FindToken(tree.GetRoot.ToFullString().IndexOf("Do", StringComparison.Ordinal)).Parent, DoStatementSyntax)
             Dim analysis = model.AnalyzeControlFlow(stmtSyntaxNode, stmtSyntaxNode)
 
             Assert.False(analysis.Succeeded)
@@ -4935,11 +5224,11 @@ End Class
 
         <Fact()>
         Public Sub ForStatementSyntax()
-            Dim compilation = CreateCompilationWithMscorlibAndVBRuntime(
+            Dim compilation = CreateCompilationWithMscorlib40AndVBRuntime(
    <compilation>
        <file name="a.vb">
 Class Frame
-    Sub Foo()
+    Sub Goo()
         For i = 0 To 1
         Next
     End Sub
@@ -4949,7 +5238,7 @@ End Class
 
             Dim tree = compilation.SyntaxTrees.First()
             Dim model = compilation.GetSemanticModel(tree)
-            Dim stmtSyntaxNode = DirectCast(tree.GetCompilationUnitRoot().FindToken(tree.GetRoot.ToFullString().IndexOf("For i = 0 To 1")).Parent, ForStatementSyntax)
+            Dim stmtSyntaxNode = DirectCast(tree.GetCompilationUnitRoot().FindToken(tree.GetRoot.ToFullString().IndexOf("For i = 0 To 1", StringComparison.Ordinal)).Parent, ForStatementSyntax)
             Dim analysis = model.AnalyzeControlFlow(stmtSyntaxNode, stmtSyntaxNode)
 
             Assert.False(analysis.Succeeded)
@@ -4957,11 +5246,11 @@ End Class
 
         <Fact()>
         Public Sub ForEachStatementSyntax()
-            Dim compilation = CreateCompilationWithMscorlibAndVBRuntime(
+            Dim compilation = CreateCompilationWithMscorlib40AndVBRuntime(
    <compilation>
        <file name="a.vb">
 Class Frame
-    Sub Foo()
+    Sub Goo()
         For Each c In ""
         Next
     End Sub
@@ -4971,13 +5260,13 @@ End Class
 
             Dim tree = compilation.SyntaxTrees.First()
             Dim model = compilation.GetSemanticModel(tree)
-            Dim stmtSyntaxNode = DirectCast(tree.GetCompilationUnitRoot().FindToken(tree.GetRoot.ToFullString().IndexOf("For Each c In """"")).Parent, ForEachStatementSyntax)
+            Dim stmtSyntaxNode = DirectCast(tree.GetCompilationUnitRoot().FindToken(tree.GetRoot.ToFullString().IndexOf("For Each c In """"", StringComparison.Ordinal)).Parent, ForEachStatementSyntax)
             Dim analysis = model.AnalyzeControlFlow(stmtSyntaxNode, stmtSyntaxNode)
 
             Assert.False(analysis.Succeeded)
         End Sub
 
-        <WorkItem(543548, "DevDiv")>
+        <WorkItem(543548, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/543548")>
         <Fact()>
         Public Sub NamespaceIdentifierNameInMemberAccess()
             Dim dataFlowResults = CompileAndAnalyzeDataFlow(
@@ -5001,7 +5290,7 @@ End Module
             Assert.False(dataFlowResults.Succeeded)
         End Sub
 
-        <WorkItem(543548, "DevDiv")>
+        <WorkItem(543548, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/543548")>
         <Fact()>
         Public Sub NamespaceIdentifierNameInMemberAccess2()
             Dim dataFlowResults = CompileAndAnalyzeDataFlow(
@@ -5025,7 +5314,7 @@ End Module
             Assert.False(dataFlowResults.Succeeded)
         End Sub
 
-        <WorkItem(543548, "DevDiv")>
+        <WorkItem(543548, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/543548")>
         <Fact()>
         Public Sub NamespaceIdentifierNameInMemberAccess3()
             Dim dataFlowResults = CompileAndAnalyzeDataFlow(
@@ -5052,7 +5341,7 @@ End Module
             Assert.False(dataFlowResults.Succeeded)
         End Sub
 
-        <WorkItem(543548, "DevDiv")>
+        <WorkItem(543548, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/543548")>
         <Fact()>
         Public Sub NamespaceIdentifierNameInMemberAccess4()
             Dim dataFlowResults = CompileAndAnalyzeDataFlow(
@@ -5079,7 +5368,7 @@ End Module
             Assert.False(dataFlowResults.Succeeded)
         End Sub
 
-        <WorkItem(543695, "DevDiv")>
+        <WorkItem(543695, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/543695")>
         <Fact()>
         Public Sub NamespaceIdentifierNameInMemberAccess5()
             Dim dataFlowResults = CompileAndAnalyzeDataFlow(
@@ -5098,7 +5387,7 @@ End Module
             Assert.False(dataFlowResults.Succeeded)
         End Sub
 
-        <WorkItem(543695, "DevDiv")>
+        <WorkItem(543695, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/543695")>
         <Fact()>
         Public Sub NamespaceIdentifierNameInMemberAccess6()
             Dim dataFlowResults = CompileAndAnalyzeDataFlow(
@@ -5115,7 +5404,7 @@ End Module
             Assert.False(dataFlowResults.Succeeded)
         End Sub
 
-        <WorkItem(543695, "DevDiv")>
+        <WorkItem(543695, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/543695")>
         <Fact()>
         Public Sub NamespaceIdentifierNameInMemberAccess7()
             Dim dataFlowResults = CompileAndAnalyzeDataFlow(
@@ -5138,7 +5427,7 @@ End Module
             Assert.False(dataFlowResults.Succeeded)
         End Sub
 
-        <WorkItem(543695, "DevDiv")>
+        <WorkItem(543695, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/543695")>
         <Fact()>
         Public Sub NamespaceIdentifierNameInMemberAccess8()
             Dim dataFlowResults = CompileAndAnalyzeDataFlow(
@@ -5161,7 +5450,7 @@ End Module
             Assert.False(dataFlowResults.Succeeded)
         End Sub
 
-        <WorkItem(545080, "DevDiv")>
+        <WorkItem(545080, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/545080")>
         <Fact()>
         Public Sub NamespaceIdentifierNameInMemberAccess9()
             Dim dataFlowResults = CompileAndAnalyzeDataFlow(
@@ -5191,7 +5480,7 @@ End Class
             Assert.False(dataFlowResults.Succeeded)
         End Sub
 
-        <WorkItem(545080, "DevDiv")>
+        <WorkItem(545080, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/545080")>
         <Fact()>
         Public Sub NamespaceIdentifierNameInMemberAccess10()
             Dim dataFlowResults = CompileAndAnalyzeDataFlow(
@@ -5238,16 +5527,20 @@ End Module
     </file>
 </compilation>)
 
-            Assert.Equal("p", GetSymbolNamesSortedAndJoined(analysisResult.VariablesDeclared))
-            Assert.Equal(Nothing, GetSymbolNamesSortedAndJoined(analysisResult.AlwaysAssigned))
-            Assert.Equal("local", GetSymbolNamesSortedAndJoined(analysisResult.Captured))
-            Assert.Equal("constLocal, local", GetSymbolNamesSortedAndJoined(analysisResult.DataFlowsIn))
-            Assert.Equal(Nothing, GetSymbolNamesSortedAndJoined(analysisResult.DataFlowsOut))
-            Assert.Equal("constLocal, local, p", GetSymbolNamesSortedAndJoined(analysisResult.ReadInside))
+            Assert.Equal("p", GetSymbolNamesJoined(analysisResult.VariablesDeclared))
+            Assert.Equal(Nothing, GetSymbolNamesJoined(analysisResult.AlwaysAssigned))
+            Assert.Equal("local", GetSymbolNamesJoined(analysisResult.Captured))
+            Assert.Equal("local", GetSymbolNamesJoined(analysisResult.CapturedInside))
+            Assert.Equal(Nothing, GetSymbolNamesJoined(analysisResult.CapturedOutside))
+            Assert.Equal("local, constLocal", GetSymbolNamesJoined(analysisResult.DataFlowsIn))
+            Assert.Equal(Nothing, GetSymbolNamesJoined(analysisResult.DataFlowsOut))
+            Assert.Equal("local, constLocal, f", GetSymbolNamesJoined(analysisResult.DefinitelyAssignedOnEntry))
+            Assert.Equal("local, constLocal, f", GetSymbolNamesJoined(analysisResult.DefinitelyAssignedOnExit))
+            Assert.Equal("local, constLocal, p", GetSymbolNamesJoined(analysisResult.ReadInside))
             ' WHY
-            Assert.Equal("p", GetSymbolNamesSortedAndJoined(analysisResult.WrittenInside))
-            Assert.Equal("f", GetSymbolNamesSortedAndJoined(analysisResult.ReadOutside))
-            Assert.Equal("constLocal, f, local", GetSymbolNamesSortedAndJoined(analysisResult.WrittenOutside))
+            Assert.Equal("p", GetSymbolNamesJoined(analysisResult.WrittenInside))
+            Assert.Equal("f", GetSymbolNamesJoined(analysisResult.ReadOutside))
+            Assert.Equal("local, constLocal, f", GetSymbolNamesJoined(analysisResult.WrittenOutside))
 
         End Sub
 
@@ -5273,19 +5566,23 @@ End Class
     </file>
 </compilation>)
 
-            Assert.Equal(Nothing, GetSymbolNamesSortedAndJoined(analysisResult.VariablesDeclared))
-            Assert.Equal(Nothing, GetSymbolNamesSortedAndJoined(analysisResult.AlwaysAssigned))
-            Assert.Equal("local, mp", GetSymbolNamesSortedAndJoined(analysisResult.Captured))
-            Assert.Equal("constLocal, mp", GetSymbolNamesSortedAndJoined(analysisResult.DataFlowsIn))
-            Assert.Equal("local", GetSymbolNamesSortedAndJoined(analysisResult.DataFlowsOut))
-            Assert.Equal("constLocal, mp", GetSymbolNamesSortedAndJoined(analysisResult.ReadInside))
-            Assert.Equal("local", GetSymbolNamesSortedAndJoined(analysisResult.WrittenInside))
-            Assert.Equal("lf, local", GetSymbolNamesSortedAndJoined(analysisResult.ReadOutside))
-            Assert.Equal("constLocal, lf, local, Me, mp", GetSymbolNamesSortedAndJoined(analysisResult.WrittenOutside))
+            Assert.Equal(Nothing, GetSymbolNamesJoined(analysisResult.VariablesDeclared))
+            Assert.Equal(Nothing, GetSymbolNamesJoined(analysisResult.AlwaysAssigned))
+            Assert.Equal("mp, local", GetSymbolNamesJoined(analysisResult.Captured))
+            Assert.Equal("mp, local", GetSymbolNamesJoined(analysisResult.CapturedInside))
+            Assert.Equal(Nothing, GetSymbolNamesJoined(analysisResult.CapturedOutside))
+            Assert.Equal("mp, constLocal", GetSymbolNamesJoined(analysisResult.DataFlowsIn))
+            Assert.Equal("Me, mp, local, constLocal, lf", GetSymbolNamesJoined(analysisResult.DefinitelyAssignedOnEntry))
+            Assert.Equal("Me, mp, local, constLocal, lf", GetSymbolNamesJoined(analysisResult.DefinitelyAssignedOnExit))
+            Assert.Equal("local", GetSymbolNamesJoined(analysisResult.DataFlowsOut))
+            Assert.Equal("mp, constLocal", GetSymbolNamesJoined(analysisResult.ReadInside))
+            Assert.Equal("local", GetSymbolNamesJoined(analysisResult.WrittenInside))
+            Assert.Equal("local, lf", GetSymbolNamesJoined(analysisResult.ReadOutside))
+            Assert.Equal("Me, mp, local, constLocal, lf", GetSymbolNamesJoined(analysisResult.WrittenOutside))
 
         End Sub
 
-        <WorkItem(543701, "DevDiv")>
+        <WorkItem(543701, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/543701")>
         <Fact()>
         Public Sub LiteralExprInVarDeclInsideSingleLineLambda()
             Dim dataFlowResults = CompileAndAnalyzeDataFlow(
@@ -5302,7 +5599,7 @@ End Module
             Assert.True(dataFlowResults.Succeeded)
         End Sub
 
-        <WorkItem(543702, "DevDiv")>
+        <WorkItem(543702, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/543702")>
         <Fact()>
         Public Sub LiteralExprInsideEnumMemberDecl()
             Dim dataFlowResults = CompileAndAnalyzeDataFlow(
@@ -5361,17 +5658,17 @@ End Class
     </file>
 </compilation>)
 
-            Assert.Null(GetSymbolNamesSortedAndJoined(dataFlowAnalysisResults.VariablesDeclared))
-            Assert.Null(GetSymbolNamesSortedAndJoined(dataFlowAnalysisResults.AlwaysAssigned))
-            Assert.Null(GetSymbolNamesSortedAndJoined(dataFlowAnalysisResults.DataFlowsIn))
-            Assert.Null(GetSymbolNamesSortedAndJoined(dataFlowAnalysisResults.DataFlowsOut))
-            Assert.Null(GetSymbolNamesSortedAndJoined(dataFlowAnalysisResults.ReadInside))
-            Assert.Null(GetSymbolNamesSortedAndJoined(dataFlowAnalysisResults.ReadOutside))
-            Assert.Null(GetSymbolNamesSortedAndJoined(dataFlowAnalysisResults.WrittenInside))
-            Assert.Equal("x", GetSymbolNamesSortedAndJoined(dataFlowAnalysisResults.WrittenOutside))
+            Assert.Null(GetSymbolNamesJoined(dataFlowAnalysisResults.VariablesDeclared))
+            Assert.Null(GetSymbolNamesJoined(dataFlowAnalysisResults.AlwaysAssigned))
+            Assert.Null(GetSymbolNamesJoined(dataFlowAnalysisResults.DataFlowsIn))
+            Assert.Null(GetSymbolNamesJoined(dataFlowAnalysisResults.DataFlowsOut))
+            Assert.Null(GetSymbolNamesJoined(dataFlowAnalysisResults.ReadInside))
+            Assert.Null(GetSymbolNamesJoined(dataFlowAnalysisResults.ReadOutside))
+            Assert.Null(GetSymbolNamesJoined(dataFlowAnalysisResults.WrittenInside))
+            Assert.Equal("x", GetSymbolNamesJoined(dataFlowAnalysisResults.WrittenOutside))
         End Sub
 
-        <WorkItem(544298, "DevDiv")>
+        <WorkItem(544298, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/544298")>
         <Fact()>
         Public Sub ObjectInitializersLocalsAccessed1_OnlyImplicitReceiverRegion1()
             Dim dataFlowAnalysisResults = CompileAndAnalyzeDataFlow(
@@ -5397,7 +5694,7 @@ End Class
             Assert.False(dataFlowAnalysisResults.Succeeded)
         End Sub
 
-        <WorkItem(544298, "DevDiv")>
+        <WorkItem(544298, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/544298")>
         <Fact()>
         Public Sub ObjectInitializersLocalsAccessed1_OnlyImplicitReceiverRegion2()
             Dim dataFlowAnalysisResults = CompileAndAnalyzeDataFlow(
@@ -5423,7 +5720,7 @@ End Class
             Assert.False(dataFlowAnalysisResults.Succeeded)
         End Sub
 
-        <WorkItem(544298, "DevDiv")>
+        <WorkItem(544298, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/544298")>
         <Fact()>
         Public Sub ObjectInitializersLocalsAccessed1_DeclAndImplicitReceiverRegion()
             Dim dataFlowAnalysisResults = CompileAndAnalyzeDataFlow(
@@ -5447,18 +5744,20 @@ End Class
 </compilation>)
 
             Assert.True(dataFlowAnalysisResults.Succeeded)
-            Assert.Equal("x, y", GetSymbolNamesSortedAndJoined(dataFlowAnalysisResults.VariablesDeclared))
-            Assert.Equal("x, y", GetSymbolNamesSortedAndJoined(dataFlowAnalysisResults.AlwaysAssigned))
-            Assert.Equal(Nothing, GetSymbolNamesSortedAndJoined(dataFlowAnalysisResults.Captured))
-            Assert.Equal(Nothing, GetSymbolNamesSortedAndJoined(dataFlowAnalysisResults.DataFlowsIn))
-            Assert.Equal(Nothing, GetSymbolNamesSortedAndJoined(dataFlowAnalysisResults.DataFlowsOut))
-            Assert.Equal("x, y", GetSymbolNamesSortedAndJoined(dataFlowAnalysisResults.ReadInside))
-            Assert.Equal(Nothing, GetSymbolNamesSortedAndJoined(dataFlowAnalysisResults.ReadOutside))
-            Assert.Equal("x, y", GetSymbolNamesSortedAndJoined(dataFlowAnalysisResults.WrittenInside))
-            Assert.Equal(Nothing, GetSymbolNamesSortedAndJoined(dataFlowAnalysisResults.WrittenOutside))
+            Assert.Equal("x, y", GetSymbolNamesJoined(dataFlowAnalysisResults.VariablesDeclared))
+            Assert.Equal("x, y", GetSymbolNamesJoined(dataFlowAnalysisResults.AlwaysAssigned))
+            Assert.Equal(Nothing, GetSymbolNamesJoined(dataFlowAnalysisResults.Captured))
+            Assert.Equal(Nothing, GetSymbolNamesJoined(dataFlowAnalysisResults.CapturedInside))
+            Assert.Equal(Nothing, GetSymbolNamesJoined(dataFlowAnalysisResults.CapturedOutside))
+            Assert.Equal(Nothing, GetSymbolNamesJoined(dataFlowAnalysisResults.DataFlowsIn))
+            Assert.Equal(Nothing, GetSymbolNamesJoined(dataFlowAnalysisResults.DataFlowsOut))
+            Assert.Equal("x, y", GetSymbolNamesJoined(dataFlowAnalysisResults.ReadInside))
+            Assert.Equal(Nothing, GetSymbolNamesJoined(dataFlowAnalysisResults.ReadOutside))
+            Assert.Equal("x, y", GetSymbolNamesJoined(dataFlowAnalysisResults.WrittenInside))
+            Assert.Equal(Nothing, GetSymbolNamesJoined(dataFlowAnalysisResults.WrittenOutside))
         End Sub
 
-        <WorkItem(544298, "DevDiv")>
+        <WorkItem(544298, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/544298")>
         <Fact()>
         Public Sub ObjectInitializersLocalsAccessed1_ValidRegion1()
             Dim dataFlowAnalysisResults = CompileAndAnalyzeDataFlow(
@@ -5489,18 +5788,20 @@ End Class
 </compilation>)
 
             Assert.True(dataFlowAnalysisResults.Succeeded)
-            Assert.Null(GetSymbolNamesSortedAndJoined(dataFlowAnalysisResults.VariablesDeclared))
-            Assert.Null(GetSymbolNamesSortedAndJoined(dataFlowAnalysisResults.AlwaysAssigned))
-            Assert.Equal(Nothing, GetSymbolNamesSortedAndJoined(dataFlowAnalysisResults.Captured))
-            Assert.Equal("x", GetSymbolNamesSortedAndJoined(dataFlowAnalysisResults.DataFlowsIn))
-            Assert.Equal(Nothing, GetSymbolNamesSortedAndJoined(dataFlowAnalysisResults.DataFlowsOut))
-            Assert.Equal("x", GetSymbolNamesSortedAndJoined(dataFlowAnalysisResults.ReadInside))
-            Assert.Equal("x, y", GetSymbolNamesSortedAndJoined(dataFlowAnalysisResults.ReadOutside))
-            Assert.Equal(Nothing, GetSymbolNamesSortedAndJoined(dataFlowAnalysisResults.WrittenInside))
-            Assert.Equal("x, y", GetSymbolNamesSortedAndJoined(dataFlowAnalysisResults.WrittenOutside))
+            Assert.Null(GetSymbolNamesJoined(dataFlowAnalysisResults.VariablesDeclared))
+            Assert.Null(GetSymbolNamesJoined(dataFlowAnalysisResults.AlwaysAssigned))
+            Assert.Equal(Nothing, GetSymbolNamesJoined(dataFlowAnalysisResults.Captured))
+            Assert.Equal(Nothing, GetSymbolNamesJoined(dataFlowAnalysisResults.CapturedInside))
+            Assert.Equal(Nothing, GetSymbolNamesJoined(dataFlowAnalysisResults.CapturedOutside))
+            Assert.Equal("x", GetSymbolNamesJoined(dataFlowAnalysisResults.DataFlowsIn))
+            Assert.Equal(Nothing, GetSymbolNamesJoined(dataFlowAnalysisResults.DataFlowsOut))
+            Assert.Equal("x", GetSymbolNamesJoined(dataFlowAnalysisResults.ReadInside))
+            Assert.Equal("x, y", GetSymbolNamesJoined(dataFlowAnalysisResults.ReadOutside))
+            Assert.Equal(Nothing, GetSymbolNamesJoined(dataFlowAnalysisResults.WrittenInside))
+            Assert.Equal("x, y", GetSymbolNamesJoined(dataFlowAnalysisResults.WrittenOutside))
         End Sub
 
-        <WorkItem(544298, "DevDiv")>
+        <WorkItem(544298, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/544298")>
         <Fact()>
         Public Sub ObjectInitializersLocalsAccessed1_ValidRegion2()
             Dim dataFlowAnalysisResults = CompileAndAnalyzeDataFlow(
@@ -5530,18 +5831,20 @@ End Class
 </compilation>)
 
             Assert.True(dataFlowAnalysisResults.Succeeded)
-            Assert.Null(GetSymbolNamesSortedAndJoined(dataFlowAnalysisResults.VariablesDeclared))
-            Assert.Null(GetSymbolNamesSortedAndJoined(dataFlowAnalysisResults.AlwaysAssigned))
-            Assert.Equal(Nothing, GetSymbolNamesSortedAndJoined(dataFlowAnalysisResults.Captured))
-            Assert.Equal("x", GetSymbolNamesSortedAndJoined(dataFlowAnalysisResults.DataFlowsIn))
-            Assert.Equal(Nothing, GetSymbolNamesSortedAndJoined(dataFlowAnalysisResults.DataFlowsOut))
-            Assert.Equal("x", GetSymbolNamesSortedAndJoined(dataFlowAnalysisResults.ReadInside))
-            Assert.Equal(Nothing, GetSymbolNamesSortedAndJoined(dataFlowAnalysisResults.ReadOutside))
-            Assert.Equal(Nothing, GetSymbolNamesSortedAndJoined(dataFlowAnalysisResults.WrittenInside))
-            Assert.Equal("x, y", GetSymbolNamesSortedAndJoined(dataFlowAnalysisResults.WrittenOutside))
+            Assert.Null(GetSymbolNamesJoined(dataFlowAnalysisResults.VariablesDeclared))
+            Assert.Null(GetSymbolNamesJoined(dataFlowAnalysisResults.AlwaysAssigned))
+            Assert.Equal(Nothing, GetSymbolNamesJoined(dataFlowAnalysisResults.Captured))
+            Assert.Equal(Nothing, GetSymbolNamesJoined(dataFlowAnalysisResults.CapturedInside))
+            Assert.Equal(Nothing, GetSymbolNamesJoined(dataFlowAnalysisResults.CapturedOutside))
+            Assert.Equal("x", GetSymbolNamesJoined(dataFlowAnalysisResults.DataFlowsIn))
+            Assert.Equal(Nothing, GetSymbolNamesJoined(dataFlowAnalysisResults.DataFlowsOut))
+            Assert.Equal("x", GetSymbolNamesJoined(dataFlowAnalysisResults.ReadInside))
+            Assert.Equal(Nothing, GetSymbolNamesJoined(dataFlowAnalysisResults.ReadOutside))
+            Assert.Equal(Nothing, GetSymbolNamesJoined(dataFlowAnalysisResults.WrittenInside))
+            Assert.Equal("x, y", GetSymbolNamesJoined(dataFlowAnalysisResults.WrittenOutside))
         End Sub
 
-        <WorkItem(544298, "DevDiv")>
+        <WorkItem(544298, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/544298")>
         <Fact()>
         Public Sub ObjectInitializersLocalsAccessed1_InvalidRegion3()
             Dim dataFlowAnalysisResults = CompileAndAnalyzeDataFlow(
@@ -5573,7 +5876,7 @@ End Class
             Assert.False(dataFlowAnalysisResults.Succeeded)
         End Sub
 
-        <WorkItem(531226, "DevDiv")>
+        <WorkItem(531226, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/531226")>
         <Fact()>
         Public Sub DisableConstantLiteralRegion()
             Dim dataFlowAnalysisResults = CompileAndAnalyzeDataFlow(
@@ -5592,7 +5895,7 @@ End Class
             Assert.False(dataFlowAnalysisResults.Succeeded)
         End Sub
 
-        <WorkItem(531226, "DevDiv")>
+        <WorkItem(531226, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/531226")>
         <Fact()>
         Public Sub WithStatement_LValueExpression()
             Dim dataFlowAnalysisResults = CompileAndAnalyzeDataFlow(
@@ -5619,14 +5922,14 @@ End Class
 </compilation>)
 
             Assert.True(dataFlowAnalysisResults.Succeeded)
-            Assert.Equal(Nothing, GetSymbolNamesSortedAndJoined(dataFlowAnalysisResults.VariablesDeclared))
-            Assert.Equal(Nothing, GetSymbolNamesSortedAndJoined(dataFlowAnalysisResults.AlwaysAssigned))
-            Assert.Equal(Nothing, GetSymbolNamesSortedAndJoined(dataFlowAnalysisResults.DataFlowsIn))
-            Assert.Equal(Nothing, GetSymbolNamesSortedAndJoined(dataFlowAnalysisResults.ReadInside))
-            Assert.Equal(Nothing, GetSymbolNamesSortedAndJoined(dataFlowAnalysisResults.WrittenInside))
+            Assert.Equal(Nothing, GetSymbolNamesJoined(dataFlowAnalysisResults.VariablesDeclared))
+            Assert.Equal(Nothing, GetSymbolNamesJoined(dataFlowAnalysisResults.AlwaysAssigned))
+            Assert.Equal(Nothing, GetSymbolNamesJoined(dataFlowAnalysisResults.DataFlowsIn))
+            Assert.Equal(Nothing, GetSymbolNamesJoined(dataFlowAnalysisResults.ReadInside))
+            Assert.Equal(Nothing, GetSymbolNamesJoined(dataFlowAnalysisResults.WrittenInside))
         End Sub
 
-        <WorkItem(531226, "DevDiv")>
+        <WorkItem(531226, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/531226")>
         <Fact()>
         Public Sub WithStatement_LValueExpression2()
             Dim dataFlowAnalysisResults = CompileAndAnalyzeDataFlow(
@@ -5652,7 +5955,7 @@ End Class
             Assert.False(dataFlowAnalysisResults.Succeeded)
         End Sub
 
-        <WorkItem(531226, "DevDiv")>
+        <WorkItem(531226, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/531226")>
         <Fact()>
         Public Sub WithStatement_LValueExpression3()
             Dim dataFlowAnalysisResults = CompileAndAnalyzeDataFlow(
@@ -5676,14 +5979,14 @@ End Class
 </compilation>)
 
             Assert.True(dataFlowAnalysisResults.Succeeded)
-            Assert.Equal(Nothing, GetSymbolNamesSortedAndJoined(dataFlowAnalysisResults.VariablesDeclared))
-            Assert.Equal(Nothing, GetSymbolNamesSortedAndJoined(dataFlowAnalysisResults.AlwaysAssigned))
-            Assert.Equal("arr", GetSymbolNamesSortedAndJoined(dataFlowAnalysisResults.DataFlowsIn))
-            Assert.Equal("arr", GetSymbolNamesSortedAndJoined(dataFlowAnalysisResults.ReadInside))
-            Assert.Equal(Nothing, GetSymbolNamesSortedAndJoined(dataFlowAnalysisResults.WrittenInside))
+            Assert.Equal(Nothing, GetSymbolNamesJoined(dataFlowAnalysisResults.VariablesDeclared))
+            Assert.Equal(Nothing, GetSymbolNamesJoined(dataFlowAnalysisResults.AlwaysAssigned))
+            Assert.Equal("arr", GetSymbolNamesJoined(dataFlowAnalysisResults.DataFlowsIn))
+            Assert.Equal("arr", GetSymbolNamesJoined(dataFlowAnalysisResults.ReadInside))
+            Assert.Equal(Nothing, GetSymbolNamesJoined(dataFlowAnalysisResults.WrittenInside))
         End Sub
 
-        <WorkItem(531226, "DevDiv")>
+        <WorkItem(531226, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/531226")>
         <Fact()>
         Public Sub WithStatement_LValueExpression4()
             Dim dataFlowAnalysisResults = CompileAndAnalyzeDataFlow(
@@ -5709,7 +6012,7 @@ End Class
             Assert.False(dataFlowAnalysisResults.Succeeded)
         End Sub
 
-        <WorkItem(544298, "DevDiv")>
+        <WorkItem(544298, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/544298")>
         <Fact()>
         Public Sub ObjectInitializersLocalsAccessed1a_ObjectInitializer()
             Dim dataFlowAnalysisResults = CompileAndAnalyzeDataFlow(
@@ -5735,18 +6038,20 @@ End Class
     </file>
 </compilation>)
 
-            Assert.Equal(Nothing, GetSymbolNamesSortedAndJoined(dataFlowAnalysisResults.VariablesDeclared))
-            Assert.Equal(Nothing, GetSymbolNamesSortedAndJoined(dataFlowAnalysisResults.AlwaysAssigned))
-            Assert.Equal(Nothing, GetSymbolNamesSortedAndJoined(dataFlowAnalysisResults.Captured))
-            Assert.Equal(Nothing, GetSymbolNamesSortedAndJoined(dataFlowAnalysisResults.DataFlowsIn))
-            Assert.Equal(Nothing, GetSymbolNamesSortedAndJoined(dataFlowAnalysisResults.DataFlowsOut))
-            Assert.Equal(Nothing, GetSymbolNamesSortedAndJoined(dataFlowAnalysisResults.ReadInside))
-            Assert.Equal(Nothing, GetSymbolNamesSortedAndJoined(dataFlowAnalysisResults.ReadOutside))
-            Assert.Equal(Nothing, GetSymbolNamesSortedAndJoined(dataFlowAnalysisResults.WrittenInside))
-            Assert.Equal("o", GetSymbolNamesSortedAndJoined(dataFlowAnalysisResults.WrittenOutside))
+            Assert.Equal(Nothing, GetSymbolNamesJoined(dataFlowAnalysisResults.VariablesDeclared))
+            Assert.Equal(Nothing, GetSymbolNamesJoined(dataFlowAnalysisResults.AlwaysAssigned))
+            Assert.Equal(Nothing, GetSymbolNamesJoined(dataFlowAnalysisResults.Captured))
+            Assert.Equal(Nothing, GetSymbolNamesJoined(dataFlowAnalysisResults.CapturedInside))
+            Assert.Equal(Nothing, GetSymbolNamesJoined(dataFlowAnalysisResults.CapturedOutside))
+            Assert.Equal(Nothing, GetSymbolNamesJoined(dataFlowAnalysisResults.DataFlowsIn))
+            Assert.Equal(Nothing, GetSymbolNamesJoined(dataFlowAnalysisResults.DataFlowsOut))
+            Assert.Equal(Nothing, GetSymbolNamesJoined(dataFlowAnalysisResults.ReadInside))
+            Assert.Equal(Nothing, GetSymbolNamesJoined(dataFlowAnalysisResults.ReadOutside))
+            Assert.Equal(Nothing, GetSymbolNamesJoined(dataFlowAnalysisResults.WrittenInside))
+            Assert.Equal("o", GetSymbolNamesJoined(dataFlowAnalysisResults.WrittenOutside))
         End Sub
 
-        <WorkItem(544298, "DevDiv")>
+        <WorkItem(544298, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/544298")>
         <Fact()>
         Public Sub ObjectInitializersLocalsAccessed1a_ObjectInitializer2()
             Dim dataFlowAnalysisResults = CompileAndAnalyzeDataFlow(
@@ -5772,18 +6077,20 @@ End Class
     </file>
 </compilation>)
 
-            Assert.Equal(Nothing, GetSymbolNamesSortedAndJoined(dataFlowAnalysisResults.VariablesDeclared))
-            Assert.Equal(Nothing, GetSymbolNamesSortedAndJoined(dataFlowAnalysisResults.AlwaysAssigned))
-            Assert.Equal(Nothing, GetSymbolNamesSortedAndJoined(dataFlowAnalysisResults.Captured))
-            Assert.Equal(Nothing, GetSymbolNamesSortedAndJoined(dataFlowAnalysisResults.DataFlowsIn))
-            Assert.Equal(Nothing, GetSymbolNamesSortedAndJoined(dataFlowAnalysisResults.DataFlowsOut))
-            Assert.Equal(Nothing, GetSymbolNamesSortedAndJoined(dataFlowAnalysisResults.ReadInside))
-            Assert.Equal(Nothing, GetSymbolNamesSortedAndJoined(dataFlowAnalysisResults.ReadOutside))
-            Assert.Equal(Nothing, GetSymbolNamesSortedAndJoined(dataFlowAnalysisResults.WrittenInside))
-            Assert.Equal("o", GetSymbolNamesSortedAndJoined(dataFlowAnalysisResults.WrittenOutside))
+            Assert.Equal(Nothing, GetSymbolNamesJoined(dataFlowAnalysisResults.VariablesDeclared))
+            Assert.Equal(Nothing, GetSymbolNamesJoined(dataFlowAnalysisResults.AlwaysAssigned))
+            Assert.Equal(Nothing, GetSymbolNamesJoined(dataFlowAnalysisResults.Captured))
+            Assert.Equal(Nothing, GetSymbolNamesJoined(dataFlowAnalysisResults.CapturedInside))
+            Assert.Equal(Nothing, GetSymbolNamesJoined(dataFlowAnalysisResults.CapturedOutside))
+            Assert.Equal(Nothing, GetSymbolNamesJoined(dataFlowAnalysisResults.DataFlowsIn))
+            Assert.Equal(Nothing, GetSymbolNamesJoined(dataFlowAnalysisResults.DataFlowsOut))
+            Assert.Equal(Nothing, GetSymbolNamesJoined(dataFlowAnalysisResults.ReadInside))
+            Assert.Equal(Nothing, GetSymbolNamesJoined(dataFlowAnalysisResults.ReadOutside))
+            Assert.Equal(Nothing, GetSymbolNamesJoined(dataFlowAnalysisResults.WrittenInside))
+            Assert.Equal("o", GetSymbolNamesJoined(dataFlowAnalysisResults.WrittenOutside))
         End Sub
 
-        <WorkItem(544298, "DevDiv")>
+        <WorkItem(544298, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/544298")>
         <Fact()>
         Public Sub ObjectInitializersLocalsAccessed1b()
             Dim dataFlowAnalysisResults = CompileAndAnalyzeDataFlow(
@@ -5810,18 +6117,20 @@ End Class
     </file>
 </compilation>)
 
-            Assert.Null(GetSymbolNamesSortedAndJoined(dataFlowAnalysisResults.VariablesDeclared))
-            Assert.Null(GetSymbolNamesSortedAndJoined(dataFlowAnalysisResults.AlwaysAssigned))
-            Assert.Equal(Nothing, GetSymbolNamesSortedAndJoined(dataFlowAnalysisResults.Captured))
-            Assert.Equal("o", GetSymbolNamesSortedAndJoined(dataFlowAnalysisResults.DataFlowsIn))
-            Assert.Null(GetSymbolNamesSortedAndJoined(dataFlowAnalysisResults.DataFlowsOut))
-            Assert.Equal("o", GetSymbolNamesSortedAndJoined(dataFlowAnalysisResults.ReadInside))
-            Assert.Null(GetSymbolNamesSortedAndJoined(dataFlowAnalysisResults.ReadOutside))
-            Assert.Null(GetSymbolNamesSortedAndJoined(dataFlowAnalysisResults.WrittenInside))
-            Assert.Equal("o", GetSymbolNamesSortedAndJoined(dataFlowAnalysisResults.WrittenOutside))
+            Assert.Null(GetSymbolNamesJoined(dataFlowAnalysisResults.VariablesDeclared))
+            Assert.Null(GetSymbolNamesJoined(dataFlowAnalysisResults.AlwaysAssigned))
+            Assert.Equal(Nothing, GetSymbolNamesJoined(dataFlowAnalysisResults.Captured))
+            Assert.Equal(Nothing, GetSymbolNamesJoined(dataFlowAnalysisResults.CapturedInside))
+            Assert.Equal(Nothing, GetSymbolNamesJoined(dataFlowAnalysisResults.CapturedOutside))
+            Assert.Equal("o", GetSymbolNamesJoined(dataFlowAnalysisResults.DataFlowsIn))
+            Assert.Null(GetSymbolNamesJoined(dataFlowAnalysisResults.DataFlowsOut))
+            Assert.Equal("o", GetSymbolNamesJoined(dataFlowAnalysisResults.ReadInside))
+            Assert.Null(GetSymbolNamesJoined(dataFlowAnalysisResults.ReadOutside))
+            Assert.Null(GetSymbolNamesJoined(dataFlowAnalysisResults.WrittenInside))
+            Assert.Equal("o", GetSymbolNamesJoined(dataFlowAnalysisResults.WrittenOutside))
         End Sub
 
-        <WorkItem(544298, "DevDiv")>
+        <WorkItem(544298, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/544298")>
         <Fact()>
         Public Sub ObjectInitializersLocalsAccessed1bb()
             Dim dataFlowAnalysisResults = CompileAndAnalyzeDataFlow(
@@ -5846,18 +6155,20 @@ End Class
     </file>
 </compilation>)
 
-            Assert.Null(GetSymbolNamesSortedAndJoined(dataFlowAnalysisResults.VariablesDeclared))
-            Assert.Null(GetSymbolNamesSortedAndJoined(dataFlowAnalysisResults.AlwaysAssigned))
-            Assert.Equal(Nothing, GetSymbolNamesSortedAndJoined(dataFlowAnalysisResults.Captured))
-            Assert.Equal("o", GetSymbolNamesSortedAndJoined(dataFlowAnalysisResults.DataFlowsIn))
-            Assert.Null(GetSymbolNamesSortedAndJoined(dataFlowAnalysisResults.DataFlowsOut))
-            Assert.Equal("o", GetSymbolNamesSortedAndJoined(dataFlowAnalysisResults.ReadInside))
-            Assert.Null(GetSymbolNamesSortedAndJoined(dataFlowAnalysisResults.ReadOutside))
-            Assert.Null(GetSymbolNamesSortedAndJoined(dataFlowAnalysisResults.WrittenInside))
-            Assert.Equal("o", GetSymbolNamesSortedAndJoined(dataFlowAnalysisResults.WrittenOutside))
+            Assert.Null(GetSymbolNamesJoined(dataFlowAnalysisResults.VariablesDeclared))
+            Assert.Null(GetSymbolNamesJoined(dataFlowAnalysisResults.AlwaysAssigned))
+            Assert.Equal(Nothing, GetSymbolNamesJoined(dataFlowAnalysisResults.Captured))
+            Assert.Equal(Nothing, GetSymbolNamesJoined(dataFlowAnalysisResults.CapturedInside))
+            Assert.Equal(Nothing, GetSymbolNamesJoined(dataFlowAnalysisResults.CapturedOutside))
+            Assert.Equal("o", GetSymbolNamesJoined(dataFlowAnalysisResults.DataFlowsIn))
+            Assert.Null(GetSymbolNamesJoined(dataFlowAnalysisResults.DataFlowsOut))
+            Assert.Equal("o", GetSymbolNamesJoined(dataFlowAnalysisResults.ReadInside))
+            Assert.Null(GetSymbolNamesJoined(dataFlowAnalysisResults.ReadOutside))
+            Assert.Null(GetSymbolNamesJoined(dataFlowAnalysisResults.WrittenInside))
+            Assert.Equal("o", GetSymbolNamesJoined(dataFlowAnalysisResults.WrittenOutside))
         End Sub
 
-        <WorkItem(544298, "DevDiv")>
+        <WorkItem(544298, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/544298")>
         <Fact()>
         Public Sub ObjectInitializers_StructWithFieldAccessesInLambda1()
             Dim dataFlowAnalysisResults = CompileAndAnalyzeDataFlow(
@@ -5893,7 +6204,7 @@ End Structure
             Assert.False(dataFlowAnalysisResults.Succeeded)
         End Sub
 
-        <WorkItem(544298, "DevDiv")>
+        <WorkItem(544298, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/544298")>
         <Fact()>
         Public Sub ObjectInitializers_StructWithFieldAccessesInLambda2()
             Dim dataFlowAnalysisResults = CompileAndAnalyzeDataFlow(
@@ -5929,18 +6240,20 @@ End Structure
 </compilation>)
 
             Assert.True(dataFlowAnalysisResults.Succeeded)
-            Assert.Equal(Nothing, GetSymbolNamesSortedAndJoined(dataFlowAnalysisResults.VariablesDeclared))
-            Assert.Equal(Nothing, GetSymbolNamesSortedAndJoined(dataFlowAnalysisResults.AlwaysAssigned))
-            Assert.Equal("a, b", GetSymbolNamesSortedAndJoined(dataFlowAnalysisResults.Captured))
-            Assert.Equal("a", GetSymbolNamesSortedAndJoined(dataFlowAnalysisResults.DataFlowsIn))
-            Assert.Equal(Nothing, GetSymbolNamesSortedAndJoined(dataFlowAnalysisResults.DataFlowsOut))
-            Assert.Equal("a", GetSymbolNamesSortedAndJoined(dataFlowAnalysisResults.ReadInside))
-            Assert.Equal("a, b", GetSymbolNamesSortedAndJoined(dataFlowAnalysisResults.ReadOutside))
-            Assert.Equal("a, b", GetSymbolNamesSortedAndJoined(dataFlowAnalysisResults.WrittenInside))
-            Assert.Equal("a, b", GetSymbolNamesSortedAndJoined(dataFlowAnalysisResults.WrittenOutside))
+            Assert.Equal(Nothing, GetSymbolNamesJoined(dataFlowAnalysisResults.VariablesDeclared))
+            Assert.Equal(Nothing, GetSymbolNamesJoined(dataFlowAnalysisResults.AlwaysAssigned))
+            Assert.Equal("a, b", GetSymbolNamesJoined(dataFlowAnalysisResults.Captured))
+            Assert.Equal("a, b", GetSymbolNamesJoined(dataFlowAnalysisResults.CapturedInside))
+            Assert.Equal("a, b", GetSymbolNamesJoined(dataFlowAnalysisResults.CapturedOutside))
+            Assert.Equal("a", GetSymbolNamesJoined(dataFlowAnalysisResults.DataFlowsIn))
+            Assert.Equal(Nothing, GetSymbolNamesJoined(dataFlowAnalysisResults.DataFlowsOut))
+            Assert.Equal("a", GetSymbolNamesJoined(dataFlowAnalysisResults.ReadInside))
+            Assert.Equal("a, b", GetSymbolNamesJoined(dataFlowAnalysisResults.ReadOutside))
+            Assert.Equal("a, b", GetSymbolNamesJoined(dataFlowAnalysisResults.WrittenInside))
+            Assert.Equal("a, b", GetSymbolNamesJoined(dataFlowAnalysisResults.WrittenOutside))
         End Sub
 
-        <WorkItem(544298, "DevDiv")>
+        <WorkItem(544298, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/544298")>
         <Fact()>
         Public Sub ObjectInitializers_StructWithFieldAccessesInLambda3()
             Dim dataFlowAnalysisResults = CompileAndAnalyzeDataFlow(
@@ -5978,18 +6291,20 @@ End Structure
 </compilation>)
 
             Assert.True(dataFlowAnalysisResults.Succeeded)
-            Assert.Equal(Nothing, GetSymbolNamesSortedAndJoined(dataFlowAnalysisResults.VariablesDeclared))
-            Assert.Equal(Nothing, GetSymbolNamesSortedAndJoined(dataFlowAnalysisResults.AlwaysAssigned))
-            Assert.Equal("a, b", GetSymbolNamesSortedAndJoined(dataFlowAnalysisResults.Captured))
-            Assert.Equal("a", GetSymbolNamesSortedAndJoined(dataFlowAnalysisResults.DataFlowsIn))
-            Assert.Equal(Nothing, GetSymbolNamesSortedAndJoined(dataFlowAnalysisResults.DataFlowsOut))
-            Assert.Equal("a", GetSymbolNamesSortedAndJoined(dataFlowAnalysisResults.ReadInside))
-            Assert.Equal("a, b, Me", GetSymbolNamesSortedAndJoined(dataFlowAnalysisResults.ReadOutside))
-            Assert.Equal("a, b", GetSymbolNamesSortedAndJoined(dataFlowAnalysisResults.WrittenInside))
-            Assert.Equal("a, b, i, l, Me", GetSymbolNamesSortedAndJoined(dataFlowAnalysisResults.WrittenOutside))
+            Assert.Equal(Nothing, GetSymbolNamesJoined(dataFlowAnalysisResults.VariablesDeclared))
+            Assert.Equal(Nothing, GetSymbolNamesJoined(dataFlowAnalysisResults.AlwaysAssigned))
+            Assert.Equal("a, b", GetSymbolNamesJoined(dataFlowAnalysisResults.Captured))
+            Assert.Equal("a, b", GetSymbolNamesJoined(dataFlowAnalysisResults.CapturedInside))
+            Assert.Equal("a, b", GetSymbolNamesJoined(dataFlowAnalysisResults.CapturedOutside))
+            Assert.Equal("a", GetSymbolNamesJoined(dataFlowAnalysisResults.DataFlowsIn))
+            Assert.Equal(Nothing, GetSymbolNamesJoined(dataFlowAnalysisResults.DataFlowsOut))
+            Assert.Equal("a", GetSymbolNamesJoined(dataFlowAnalysisResults.ReadInside))
+            Assert.Equal("Me, a, b", GetSymbolNamesJoined(dataFlowAnalysisResults.ReadOutside))
+            Assert.Equal("a, b", GetSymbolNamesJoined(dataFlowAnalysisResults.WrittenInside))
+            Assert.Equal("Me, i, l, a, b", GetSymbolNamesJoined(dataFlowAnalysisResults.WrittenOutside))
         End Sub
 
-        <WorkItem(544298, "DevDiv")>
+        <WorkItem(544298, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/544298")>
         <Fact()>
         Public Sub ObjectInitializers_StructWithFieldAccessesInLambda4()
             Dim dataFlowAnalysisResults = CompileAndAnalyzeDataFlow(
@@ -6023,18 +6338,20 @@ End Structure
 </compilation>)
 
             Assert.True(dataFlowAnalysisResults.Succeeded)
-            Assert.Equal(Nothing, GetSymbolNamesSortedAndJoined(dataFlowAnalysisResults.VariablesDeclared))
-            Assert.Equal(Nothing, GetSymbolNamesSortedAndJoined(dataFlowAnalysisResults.AlwaysAssigned))
-            Assert.Equal("a, b", GetSymbolNamesSortedAndJoined(dataFlowAnalysisResults.Captured))
-            Assert.Equal(Nothing, GetSymbolNamesSortedAndJoined(dataFlowAnalysisResults.DataFlowsIn))
-            Assert.Equal(Nothing, GetSymbolNamesSortedAndJoined(dataFlowAnalysisResults.DataFlowsOut))
-            Assert.Equal(Nothing, GetSymbolNamesSortedAndJoined(dataFlowAnalysisResults.ReadInside))
-            Assert.Equal("a, b, Me", GetSymbolNamesSortedAndJoined(dataFlowAnalysisResults.ReadOutside))
-            Assert.Equal("a, b", GetSymbolNamesSortedAndJoined(dataFlowAnalysisResults.WrittenInside))
-            Assert.Equal("a, b, i, Me", GetSymbolNamesSortedAndJoined(dataFlowAnalysisResults.WrittenOutside))
+            Assert.Equal(Nothing, GetSymbolNamesJoined(dataFlowAnalysisResults.VariablesDeclared))
+            Assert.Equal(Nothing, GetSymbolNamesJoined(dataFlowAnalysisResults.AlwaysAssigned))
+            Assert.Equal("a, b", GetSymbolNamesJoined(dataFlowAnalysisResults.Captured))
+            Assert.Equal("a, b", GetSymbolNamesJoined(dataFlowAnalysisResults.CapturedInside))
+            Assert.Equal("a, b", GetSymbolNamesJoined(dataFlowAnalysisResults.CapturedOutside))
+            Assert.Equal(Nothing, GetSymbolNamesJoined(dataFlowAnalysisResults.DataFlowsIn))
+            Assert.Equal(Nothing, GetSymbolNamesJoined(dataFlowAnalysisResults.DataFlowsOut))
+            Assert.Equal(Nothing, GetSymbolNamesJoined(dataFlowAnalysisResults.ReadInside))
+            Assert.Equal("Me, a, b", GetSymbolNamesJoined(dataFlowAnalysisResults.ReadOutside))
+            Assert.Equal("a, b", GetSymbolNamesJoined(dataFlowAnalysisResults.WrittenInside))
+            Assert.Equal("Me, i, a, b", GetSymbolNamesJoined(dataFlowAnalysisResults.WrittenOutside))
         End Sub
 
-        <WorkItem(544298, "DevDiv")>
+        <WorkItem(544298, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/544298")>
         <Fact()>
         Public Sub ObjectInitializers_StructWithFieldAccessesInLambda5()
             Dim dataFlowAnalysisResults = CompileAndAnalyzeDataFlow(
@@ -6067,18 +6384,20 @@ End Structure
 </compilation>)
 
             Assert.True(dataFlowAnalysisResults.Succeeded)
-            Assert.Equal(Nothing, GetSymbolNamesSortedAndJoined(dataFlowAnalysisResults.VariablesDeclared))
-            Assert.Equal(Nothing, GetSymbolNamesSortedAndJoined(dataFlowAnalysisResults.AlwaysAssigned))
-            Assert.Equal("a, b", GetSymbolNamesSortedAndJoined(dataFlowAnalysisResults.Captured))
-            Assert.Equal(Nothing, GetSymbolNamesSortedAndJoined(dataFlowAnalysisResults.DataFlowsIn))
-            Assert.Equal(Nothing, GetSymbolNamesSortedAndJoined(dataFlowAnalysisResults.DataFlowsOut))
-            Assert.Equal(Nothing, GetSymbolNamesSortedAndJoined(dataFlowAnalysisResults.ReadInside))
-            Assert.Equal("a, Me", GetSymbolNamesSortedAndJoined(dataFlowAnalysisResults.ReadOutside))
-            Assert.Equal("b", GetSymbolNamesSortedAndJoined(dataFlowAnalysisResults.WrittenInside))
-            Assert.Equal("a, b, i, Me", GetSymbolNamesSortedAndJoined(dataFlowAnalysisResults.WrittenOutside))
+            Assert.Equal(Nothing, GetSymbolNamesJoined(dataFlowAnalysisResults.VariablesDeclared))
+            Assert.Equal(Nothing, GetSymbolNamesJoined(dataFlowAnalysisResults.AlwaysAssigned))
+            Assert.Equal("a, b", GetSymbolNamesJoined(dataFlowAnalysisResults.Captured))
+            Assert.Equal("b", GetSymbolNamesJoined(dataFlowAnalysisResults.CapturedInside))
+            Assert.Equal("a", GetSymbolNamesJoined(dataFlowAnalysisResults.CapturedOutside))
+            Assert.Equal(Nothing, GetSymbolNamesJoined(dataFlowAnalysisResults.DataFlowsIn))
+            Assert.Equal(Nothing, GetSymbolNamesJoined(dataFlowAnalysisResults.DataFlowsOut))
+            Assert.Equal(Nothing, GetSymbolNamesJoined(dataFlowAnalysisResults.ReadInside))
+            Assert.Equal("Me, a", GetSymbolNamesJoined(dataFlowAnalysisResults.ReadOutside))
+            Assert.Equal("b", GetSymbolNamesJoined(dataFlowAnalysisResults.WrittenInside))
+            Assert.Equal("Me, i, a, b", GetSymbolNamesJoined(dataFlowAnalysisResults.WrittenOutside))
         End Sub
 
-        <WorkItem(544298, "DevDiv")>
+        <WorkItem(544298, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/544298")>
         <Fact()>
         Public Sub ObjectInitializers_StructWithFieldAccessesInLambda6()
             Dim dataFlowAnalysisResults = CompileAndAnalyzeDataFlow(
@@ -6111,18 +6430,20 @@ End Structure
 </compilation>)
 
             Assert.True(dataFlowAnalysisResults.Succeeded)
-            Assert.Equal(Nothing, GetSymbolNamesSortedAndJoined(dataFlowAnalysisResults.VariablesDeclared))
-            Assert.Equal(Nothing, GetSymbolNamesSortedAndJoined(dataFlowAnalysisResults.AlwaysAssigned))
-            Assert.Equal("b", GetSymbolNamesSortedAndJoined(dataFlowAnalysisResults.Captured))
-            Assert.Equal(Nothing, GetSymbolNamesSortedAndJoined(dataFlowAnalysisResults.DataFlowsIn))
-            Assert.Equal("b", GetSymbolNamesSortedAndJoined(dataFlowAnalysisResults.DataFlowsOut))
-            Assert.Equal(Nothing, GetSymbolNamesSortedAndJoined(dataFlowAnalysisResults.ReadInside))
-            Assert.Equal("a, b, Me", GetSymbolNamesSortedAndJoined(dataFlowAnalysisResults.ReadOutside))
-            Assert.Equal("b", GetSymbolNamesSortedAndJoined(dataFlowAnalysisResults.WrittenInside))
-            Assert.Equal("a, b, i, Me", GetSymbolNamesSortedAndJoined(dataFlowAnalysisResults.WrittenOutside))
+            Assert.Equal(Nothing, GetSymbolNamesJoined(dataFlowAnalysisResults.VariablesDeclared))
+            Assert.Equal(Nothing, GetSymbolNamesJoined(dataFlowAnalysisResults.AlwaysAssigned))
+            Assert.Equal("b", GetSymbolNamesJoined(dataFlowAnalysisResults.Captured))
+            Assert.Equal("b", GetSymbolNamesJoined(dataFlowAnalysisResults.CapturedInside))
+            Assert.Equal("b", GetSymbolNamesJoined(dataFlowAnalysisResults.CapturedOutside))
+            Assert.Equal(Nothing, GetSymbolNamesJoined(dataFlowAnalysisResults.DataFlowsIn))
+            Assert.Equal("b", GetSymbolNamesJoined(dataFlowAnalysisResults.DataFlowsOut))
+            Assert.Equal(Nothing, GetSymbolNamesJoined(dataFlowAnalysisResults.ReadInside))
+            Assert.Equal("Me, a, b", GetSymbolNamesJoined(dataFlowAnalysisResults.ReadOutside))
+            Assert.Equal("b", GetSymbolNamesJoined(dataFlowAnalysisResults.WrittenInside))
+            Assert.Equal("Me, i, a, b", GetSymbolNamesJoined(dataFlowAnalysisResults.WrittenOutside))
         End Sub
 
-        <WorkItem(544298, "DevDiv")>
+        <WorkItem(544298, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/544298")>
         <Fact()>
         Public Sub ObjectInitializers_PassingFieldByRef()
             Dim dataFlowAnalysisResults = CompileAndAnalyzeDataFlow(
@@ -6154,15 +6475,17 @@ End Structure
 </compilation>)
 
             Assert.True(dataFlowAnalysisResults.Succeeded)
-            Assert.Equal(Nothing, GetSymbolNamesSortedAndJoined(dataFlowAnalysisResults.VariablesDeclared))
-            Assert.Equal(Nothing, GetSymbolNamesSortedAndJoined(dataFlowAnalysisResults.AlwaysAssigned))
-            Assert.Equal(Nothing, GetSymbolNamesSortedAndJoined(dataFlowAnalysisResults.Captured))
-            Assert.Equal("b", GetSymbolNamesSortedAndJoined(dataFlowAnalysisResults.DataFlowsIn))
-            Assert.Equal(Nothing, GetSymbolNamesSortedAndJoined(dataFlowAnalysisResults.DataFlowsOut))
-            Assert.Equal("b", GetSymbolNamesSortedAndJoined(dataFlowAnalysisResults.ReadInside))
-            Assert.Equal("Me", GetSymbolNamesSortedAndJoined(dataFlowAnalysisResults.ReadOutside))
-            Assert.Equal("b", GetSymbolNamesSortedAndJoined(dataFlowAnalysisResults.WrittenInside))
-            Assert.Equal("a, b, i, Me", GetSymbolNamesSortedAndJoined(dataFlowAnalysisResults.WrittenOutside))
+            Assert.Equal(Nothing, GetSymbolNamesJoined(dataFlowAnalysisResults.VariablesDeclared))
+            Assert.Equal(Nothing, GetSymbolNamesJoined(dataFlowAnalysisResults.AlwaysAssigned))
+            Assert.Equal(Nothing, GetSymbolNamesJoined(dataFlowAnalysisResults.Captured))
+            Assert.Equal(Nothing, GetSymbolNamesJoined(dataFlowAnalysisResults.CapturedInside))
+            Assert.Equal(Nothing, GetSymbolNamesJoined(dataFlowAnalysisResults.CapturedOutside))
+            Assert.Equal("b", GetSymbolNamesJoined(dataFlowAnalysisResults.DataFlowsIn))
+            Assert.Equal(Nothing, GetSymbolNamesJoined(dataFlowAnalysisResults.DataFlowsOut))
+            Assert.Equal("b", GetSymbolNamesJoined(dataFlowAnalysisResults.ReadInside))
+            Assert.Equal("Me", GetSymbolNamesJoined(dataFlowAnalysisResults.ReadOutside))
+            Assert.Equal("b", GetSymbolNamesJoined(dataFlowAnalysisResults.WrittenInside))
+            Assert.Equal("Me, i, a, b", GetSymbolNamesJoined(dataFlowAnalysisResults.WrittenOutside))
         End Sub
 
         <Fact()>
@@ -6187,15 +6510,17 @@ End Class
     </file>
 </compilation>)
 
-            Assert.Equal(Nothing, GetSymbolNamesSortedAndJoined(dataFlowAnalysisResults.VariablesDeclared))
-            Assert.Equal(Nothing, GetSymbolNamesSortedAndJoined(dataFlowAnalysisResults.AlwaysAssigned))
-            Assert.Equal(Nothing, GetSymbolNamesSortedAndJoined(dataFlowAnalysisResults.Captured))
-            Assert.Equal("x", GetSymbolNamesSortedAndJoined(dataFlowAnalysisResults.DataFlowsIn))
-            Assert.Equal(Nothing, GetSymbolNamesSortedAndJoined(dataFlowAnalysisResults.DataFlowsOut))
-            Assert.Equal("x", GetSymbolNamesSortedAndJoined(dataFlowAnalysisResults.ReadInside))
-            Assert.Equal(Nothing, GetSymbolNamesSortedAndJoined(dataFlowAnalysisResults.ReadOutside))
-            Assert.Equal("x", GetSymbolNamesSortedAndJoined(dataFlowAnalysisResults.WrittenInside))
-            Assert.Equal("x", GetSymbolNamesSortedAndJoined(dataFlowAnalysisResults.WrittenOutside))
+            Assert.Equal(Nothing, GetSymbolNamesJoined(dataFlowAnalysisResults.VariablesDeclared))
+            Assert.Equal(Nothing, GetSymbolNamesJoined(dataFlowAnalysisResults.AlwaysAssigned))
+            Assert.Equal(Nothing, GetSymbolNamesJoined(dataFlowAnalysisResults.Captured))
+            Assert.Equal(Nothing, GetSymbolNamesJoined(dataFlowAnalysisResults.CapturedInside))
+            Assert.Equal(Nothing, GetSymbolNamesJoined(dataFlowAnalysisResults.CapturedOutside))
+            Assert.Equal("x", GetSymbolNamesJoined(dataFlowAnalysisResults.DataFlowsIn))
+            Assert.Equal(Nothing, GetSymbolNamesJoined(dataFlowAnalysisResults.DataFlowsOut))
+            Assert.Equal("x", GetSymbolNamesJoined(dataFlowAnalysisResults.ReadInside))
+            Assert.Equal(Nothing, GetSymbolNamesJoined(dataFlowAnalysisResults.ReadOutside))
+            Assert.Equal("x", GetSymbolNamesJoined(dataFlowAnalysisResults.WrittenInside))
+            Assert.Equal("x", GetSymbolNamesJoined(dataFlowAnalysisResults.WrittenOutside))
         End Sub
 
         <Fact()>
@@ -6222,15 +6547,17 @@ End Class
     </file>
 </compilation>)
 
-            Assert.Null(GetSymbolNamesSortedAndJoined(dataFlowAnalysisResults.VariablesDeclared))
-            Assert.Null(GetSymbolNamesSortedAndJoined(dataFlowAnalysisResults.AlwaysAssigned))
-            Assert.Equal("strlocal", GetSymbolNamesSortedAndJoined(dataFlowAnalysisResults.DataFlowsIn))
-            Assert.Null(GetSymbolNamesSortedAndJoined(dataFlowAnalysisResults.DataFlowsOut))
-            Assert.Equal("strlocal", GetSymbolNamesSortedAndJoined(dataFlowAnalysisResults.ReadInside))
-            Assert.Null(GetSymbolNamesSortedAndJoined(dataFlowAnalysisResults.ReadOutside))
-            Assert.Null(GetSymbolNamesSortedAndJoined(dataFlowAnalysisResults.WrittenInside))
-            Assert.Equal("x", GetSymbolNamesSortedAndJoined(dataFlowAnalysisResults.WrittenOutside))
-            Assert.Null(GetSymbolNamesSortedAndJoined(dataFlowAnalysisResults.Captured))
+            Assert.Null(GetSymbolNamesJoined(dataFlowAnalysisResults.VariablesDeclared))
+            Assert.Null(GetSymbolNamesJoined(dataFlowAnalysisResults.AlwaysAssigned))
+            Assert.Equal("strlocal", GetSymbolNamesJoined(dataFlowAnalysisResults.DataFlowsIn))
+            Assert.Null(GetSymbolNamesJoined(dataFlowAnalysisResults.DataFlowsOut))
+            Assert.Equal("strlocal", GetSymbolNamesJoined(dataFlowAnalysisResults.ReadInside))
+            Assert.Null(GetSymbolNamesJoined(dataFlowAnalysisResults.ReadOutside))
+            Assert.Null(GetSymbolNamesJoined(dataFlowAnalysisResults.WrittenInside))
+            Assert.Equal("x", GetSymbolNamesJoined(dataFlowAnalysisResults.WrittenOutside))
+            Assert.Null(GetSymbolNamesJoined(dataFlowAnalysisResults.Captured))
+            Assert.Null(GetSymbolNamesJoined(dataFlowAnalysisResults.CapturedInside))
+            Assert.Null(GetSymbolNamesJoined(dataFlowAnalysisResults.CapturedOutside))
         End Sub
 
         <Fact()>
@@ -6263,15 +6590,17 @@ End Class
     </file>
 </compilation>)
 
-            Assert.Null(GetSymbolNamesSortedAndJoined(dataFlowAnalysisResults.VariablesDeclared))
-            Assert.Null(GetSymbolNamesSortedAndJoined(dataFlowAnalysisResults.AlwaysAssigned))
-            Assert.Equal("localint", GetSymbolNamesSortedAndJoined(dataFlowAnalysisResults.DataFlowsIn))
-            Assert.Null(GetSymbolNamesSortedAndJoined(dataFlowAnalysisResults.DataFlowsOut))
-            Assert.Equal("localint", GetSymbolNamesSortedAndJoined(dataFlowAnalysisResults.ReadInside))
-            Assert.Equal("x", GetSymbolNamesSortedAndJoined(dataFlowAnalysisResults.ReadOutside))
-            Assert.Null(GetSymbolNamesSortedAndJoined(dataFlowAnalysisResults.WrittenInside))
-            Assert.Equal("localint, x", GetSymbolNamesSortedAndJoined(dataFlowAnalysisResults.WrittenOutside))
-            Assert.Equal("localint", GetSymbolNamesSortedAndJoined(dataFlowAnalysisResults.Captured))
+            Assert.Null(GetSymbolNamesJoined(dataFlowAnalysisResults.VariablesDeclared))
+            Assert.Null(GetSymbolNamesJoined(dataFlowAnalysisResults.AlwaysAssigned))
+            Assert.Equal("localint", GetSymbolNamesJoined(dataFlowAnalysisResults.DataFlowsIn))
+            Assert.Null(GetSymbolNamesJoined(dataFlowAnalysisResults.DataFlowsOut))
+            Assert.Equal("localint", GetSymbolNamesJoined(dataFlowAnalysisResults.ReadInside))
+            Assert.Equal("x", GetSymbolNamesJoined(dataFlowAnalysisResults.ReadOutside))
+            Assert.Null(GetSymbolNamesJoined(dataFlowAnalysisResults.WrittenInside))
+            Assert.Equal("localint, x", GetSymbolNamesJoined(dataFlowAnalysisResults.WrittenOutside))
+            Assert.Equal("localint", GetSymbolNamesJoined(dataFlowAnalysisResults.Captured))
+            Assert.Equal("localint", GetSymbolNamesJoined(dataFlowAnalysisResults.CapturedInside))
+            Assert.Equal(Nothing, GetSymbolNamesJoined(dataFlowAnalysisResults.CapturedOutside))
         End Sub
 
         <Fact()>
@@ -6306,15 +6635,17 @@ End Class
 </compilation>)
 
             Dim dataFlowAnalysisResults = analysisResults.Item2
-            Assert.Equal("x", GetSymbolNamesSortedAndJoined(dataFlowAnalysisResults.VariablesDeclared))
-            Assert.Equal("x", GetSymbolNamesSortedAndJoined(dataFlowAnalysisResults.AlwaysAssigned))
-            Assert.Null(GetSymbolNamesSortedAndJoined(dataFlowAnalysisResults.DataFlowsIn))
-            Assert.Equal("x", GetSymbolNamesSortedAndJoined(dataFlowAnalysisResults.DataFlowsOut))
-            Assert.Equal("localint", GetSymbolNamesSortedAndJoined(dataFlowAnalysisResults.ReadInside))
-            Assert.Equal("x", GetSymbolNamesSortedAndJoined(dataFlowAnalysisResults.ReadOutside))
-            Assert.Equal("localint, x", GetSymbolNamesSortedAndJoined(dataFlowAnalysisResults.WrittenInside))
-            Assert.Null(GetSymbolNamesSortedAndJoined(dataFlowAnalysisResults.WrittenOutside))
-            Assert.Equal("localint", GetSymbolNamesSortedAndJoined(dataFlowAnalysisResults.Captured))
+            Assert.Equal("x", GetSymbolNamesJoined(dataFlowAnalysisResults.VariablesDeclared))
+            Assert.Equal("x", GetSymbolNamesJoined(dataFlowAnalysisResults.AlwaysAssigned))
+            Assert.Null(GetSymbolNamesJoined(dataFlowAnalysisResults.DataFlowsIn))
+            Assert.Equal("x", GetSymbolNamesJoined(dataFlowAnalysisResults.DataFlowsOut))
+            Assert.Equal("localint", GetSymbolNamesJoined(dataFlowAnalysisResults.ReadInside))
+            Assert.Equal("x", GetSymbolNamesJoined(dataFlowAnalysisResults.ReadOutside))
+            Assert.Equal("localint, x", GetSymbolNamesJoined(dataFlowAnalysisResults.WrittenInside))
+            Assert.Null(GetSymbolNamesJoined(dataFlowAnalysisResults.WrittenOutside))
+            Assert.Equal("localint", GetSymbolNamesJoined(dataFlowAnalysisResults.Captured))
+            Assert.Equal("localint", GetSymbolNamesJoined(dataFlowAnalysisResults.CapturedInside))
+            Assert.Equal(Nothing, GetSymbolNamesJoined(dataFlowAnalysisResults.CapturedOutside))
 
             Dim controlFlowAnalysisResults = analysisResults.Item1
             Assert.Equal(0, controlFlowAnalysisResults.EntryPoints.Count)
@@ -6337,21 +6668,21 @@ Imports System.Collections.Generic
 
 Public Class C2
     Public Shared Sub Main()
-        dim foo as string = "Hello World"
-        Dim x as [|New List(Of String) From {foo, "!"}|]
+        dim goo as string = "Hello World"
+        Dim x as [|New List(Of String) From {goo, "!"}|]
     End Sub
 End Class
     </file>
 </compilation>)
 
-            Assert.Null(GetSymbolNamesSortedAndJoined(dataFlowAnalysisResults.VariablesDeclared))
-            Assert.Null(GetSymbolNamesSortedAndJoined(dataFlowAnalysisResults.AlwaysAssigned))
-            Assert.Equal("foo", GetSymbolNamesSortedAndJoined(dataFlowAnalysisResults.DataFlowsIn))
-            Assert.Null(GetSymbolNamesSortedAndJoined(dataFlowAnalysisResults.DataFlowsOut))
-            Assert.Equal("foo", GetSymbolNamesSortedAndJoined(dataFlowAnalysisResults.ReadInside))
-            Assert.Null(GetSymbolNamesSortedAndJoined(dataFlowAnalysisResults.ReadOutside))
-            Assert.Null(GetSymbolNamesSortedAndJoined(dataFlowAnalysisResults.WrittenInside))
-            Assert.Equal("foo, x", GetSymbolNamesSortedAndJoined(dataFlowAnalysisResults.WrittenOutside))
+            Assert.Null(GetSymbolNamesJoined(dataFlowAnalysisResults.VariablesDeclared))
+            Assert.Null(GetSymbolNamesJoined(dataFlowAnalysisResults.AlwaysAssigned))
+            Assert.Equal("goo", GetSymbolNamesJoined(dataFlowAnalysisResults.DataFlowsIn))
+            Assert.Null(GetSymbolNamesJoined(dataFlowAnalysisResults.DataFlowsOut))
+            Assert.Equal("goo", GetSymbolNamesJoined(dataFlowAnalysisResults.ReadInside))
+            Assert.Null(GetSymbolNamesJoined(dataFlowAnalysisResults.ReadOutside))
+            Assert.Null(GetSymbolNamesJoined(dataFlowAnalysisResults.WrittenInside))
+            Assert.Equal("goo, x", GetSymbolNamesJoined(dataFlowAnalysisResults.WrittenOutside))
         End Sub
 
         <Fact()>
@@ -6364,8 +6695,8 @@ Imports System.Collections.Generic
 
 Public Class C2
     Public Shared Sub Main()
-        dim foo as string = "Hello World"
-        Dim x as New List(Of String) From [|{foo, "!"}|]
+        dim goo as string = "Hello World"
+        Dim x as New List(Of String) From [|{goo, "!"}|]
     End Sub
 End Class
     </file>
@@ -6383,8 +6714,8 @@ Imports System.Collections.Generic
 
 Public Class C2
     Public Shared Sub Main()
-        dim foo as string = "Hello World"
-        Dim x as New Dictionary(Of String, Integer) From {[|{foo, 1}|], {"bar", 42}}
+        dim goo as string = "Hello World"
+        Dim x as New Dictionary(Of String, Integer) From {[|{goo, 1}|], {"bar", 42}}
     End Sub
 End Class
     </file>
@@ -6393,7 +6724,7 @@ End Class
             Assert.False(dataFlowAnalysisResults.Succeeded)
         End Sub
 
-        <WorkItem(530032, "DevDiv")>
+        <WorkItem(530032, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/530032")>
         <Fact>
         Public Sub CollectionInitializersNestedInitializer()
             Dim dataFlowAnalysisResults = CompileAndAnalyzeDataFlow(
@@ -6404,22 +6735,22 @@ Imports System.Collections.Generic
 
 Public Class C2
     Public Shared Sub Main(),
-        dim foo as string = "Hello World"
-        Dim x as New Dictionary(Of String(), Integer) From { {[|{foo, "!"}|], 1} }
+        dim goo as string = "Hello World"
+        Dim x as New Dictionary(Of String(), Integer) From { {[|{goo, "!"}|], 1} }
     End Sub
 End Class
     </file>
 </compilation>)
 
             Assert.True(dataFlowAnalysisResults.Succeeded)
-            Assert.Null(GetSymbolNamesSortedAndJoined(dataFlowAnalysisResults.VariablesDeclared))
-            Assert.Null(GetSymbolNamesSortedAndJoined(dataFlowAnalysisResults.AlwaysAssigned))
-            Assert.Equal("foo", GetSymbolNamesSortedAndJoined(dataFlowAnalysisResults.DataFlowsIn))
-            Assert.Null(GetSymbolNamesSortedAndJoined(dataFlowAnalysisResults.DataFlowsOut))
-            Assert.Equal("foo", GetSymbolNamesSortedAndJoined(dataFlowAnalysisResults.ReadInside))
-            Assert.Null(GetSymbolNamesSortedAndJoined(dataFlowAnalysisResults.ReadOutside))
-            Assert.Null(GetSymbolNamesSortedAndJoined(dataFlowAnalysisResults.WrittenInside))
-            Assert.Equal("foo, x", GetSymbolNamesSortedAndJoined(dataFlowAnalysisResults.WrittenOutside))
+            Assert.Null(GetSymbolNamesJoined(dataFlowAnalysisResults.VariablesDeclared))
+            Assert.Null(GetSymbolNamesJoined(dataFlowAnalysisResults.AlwaysAssigned))
+            Assert.Equal("goo", GetSymbolNamesJoined(dataFlowAnalysisResults.DataFlowsIn))
+            Assert.Null(GetSymbolNamesJoined(dataFlowAnalysisResults.DataFlowsOut))
+            Assert.Equal("goo", GetSymbolNamesJoined(dataFlowAnalysisResults.ReadInside))
+            Assert.Null(GetSymbolNamesJoined(dataFlowAnalysisResults.ReadOutside))
+            Assert.Null(GetSymbolNamesJoined(dataFlowAnalysisResults.WrittenInside))
+            Assert.Equal("goo, x", GetSymbolNamesJoined(dataFlowAnalysisResults.WrittenOutside))
         End Sub
 
         <Fact()>
@@ -6432,10 +6763,10 @@ Imports System.Collections.Generic
 
 Public Class C2
     Public Shared Sub Main()
-        Dim foo As String = "Hello World"
+        Dim goo As String = "Hello World"
         Dim x As [|New List(Of Action) From {
             Sub()
-                Console.WriteLine(foo)
+                Console.WriteLine(goo)
             End Sub,
             Sub()
                 Console.WriteLine(x.Item(0))
@@ -6448,15 +6779,17 @@ End Class
 </compilation>)
 
             Assert.True(dataFlowAnalysisResults.Succeeded)
-            Assert.Null(GetSymbolNamesSortedAndJoined(dataFlowAnalysisResults.VariablesDeclared))
-            Assert.Null(GetSymbolNamesSortedAndJoined(dataFlowAnalysisResults.AlwaysAssigned))
-            Assert.Equal("foo, x", GetSymbolNamesSortedAndJoined(dataFlowAnalysisResults.DataFlowsIn))
-            Assert.Null(GetSymbolNamesSortedAndJoined(dataFlowAnalysisResults.DataFlowsOut))
-            Assert.Equal("foo, x", GetSymbolNamesSortedAndJoined(dataFlowAnalysisResults.Captured))
-            Assert.Equal("foo, x", GetSymbolNamesSortedAndJoined(dataFlowAnalysisResults.ReadInside))
-            Assert.Null(GetSymbolNamesSortedAndJoined(dataFlowAnalysisResults.ReadOutside))
-            Assert.Equal("x", GetSymbolNamesSortedAndJoined(dataFlowAnalysisResults.WrittenInside))
-            Assert.Equal("foo, x", GetSymbolNamesSortedAndJoined(dataFlowAnalysisResults.WrittenOutside))
+            Assert.Null(GetSymbolNamesJoined(dataFlowAnalysisResults.VariablesDeclared))
+            Assert.Null(GetSymbolNamesJoined(dataFlowAnalysisResults.AlwaysAssigned))
+            Assert.Equal("goo, x", GetSymbolNamesJoined(dataFlowAnalysisResults.DataFlowsIn))
+            Assert.Null(GetSymbolNamesJoined(dataFlowAnalysisResults.DataFlowsOut))
+            Assert.Equal("goo, x", GetSymbolNamesJoined(dataFlowAnalysisResults.Captured))
+            Assert.Equal("goo, x", GetSymbolNamesJoined(dataFlowAnalysisResults.CapturedInside))
+            Assert.Equal(Nothing, GetSymbolNamesJoined(dataFlowAnalysisResults.CapturedOutside))
+            Assert.Equal("goo, x", GetSymbolNamesJoined(dataFlowAnalysisResults.ReadInside))
+            Assert.Null(GetSymbolNamesJoined(dataFlowAnalysisResults.ReadOutside))
+            Assert.Equal("x", GetSymbolNamesJoined(dataFlowAnalysisResults.WrittenInside))
+            Assert.Equal("goo, x", GetSymbolNamesJoined(dataFlowAnalysisResults.WrittenOutside))
         End Sub
 
         <Fact(), WorkItem(12970, "DevDiv_Projects/Roslyn")>
@@ -6482,7 +6815,7 @@ End Module
 
 #End Region
 
-        <Fact(), WorkItem(544079, "DevDiv")>
+        <Fact(), WorkItem(544079, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/544079")>
         Public Sub UserDefinedOperatorBody()
             Dim analysisResults = CompileAndAnalyzeControlAndDataFlow(
 <compilation>
@@ -6523,15 +6856,19 @@ End Module
             Assert.Empty(dataFlowResults.VariablesDeclared)
             Assert.Empty(dataFlowResults.AlwaysAssigned)
             Assert.Empty(dataFlowResults.Captured)
-            Assert.Equal("x", GetSymbolNamesSortedAndJoined(dataFlowResults.DataFlowsIn))
+            Assert.Empty(dataFlowResults.CapturedInside)
+            Assert.Empty(dataFlowResults.CapturedOutside)
+            Assert.Equal("x", GetSymbolNamesJoined(dataFlowResults.DataFlowsIn))
             Assert.Empty((dataFlowResults.DataFlowsOut))
-            Assert.Equal("x", GetSymbolNamesSortedAndJoined(dataFlowResults.ReadInside))
+            Assert.Equal("x", GetSymbolNamesJoined(dataFlowResults.DefinitelyAssignedOnEntry))
+            Assert.Equal(Nothing, GetSymbolNamesJoined(dataFlowResults.DefinitelyAssignedOnExit))
+            Assert.Equal("x", GetSymbolNamesJoined(dataFlowResults.ReadInside))
             Assert.Empty(dataFlowResults.WrittenInside)
             Assert.Empty(dataFlowResults.ReadOutside)
-            Assert.Equal("x", GetSymbolNamesSortedAndJoined(dataFlowResults.WrittenOutside))
+            Assert.Equal("x", GetSymbolNamesJoined(dataFlowResults.WrittenOutside))
         End Sub
 
-        <Fact(), WorkItem(544079, "DevDiv")>
+        <Fact(), WorkItem(544079, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/544079")>
         Public Sub UserDefinedOperatorBody_1()
             Dim analysisResults = CompileAndAnalyzeControlAndDataFlow(
 <compilation>
@@ -6570,12 +6907,16 @@ End Module
             Assert.Empty(dataFlowResults.VariablesDeclared)
             Assert.Empty(dataFlowResults.AlwaysAssigned)
             Assert.Empty(dataFlowResults.Captured)
-            Assert.Equal("x", GetSymbolNamesSortedAndJoined(dataFlowResults.DataFlowsIn))
+            Assert.Empty(dataFlowResults.CapturedInside)
+            Assert.Empty(dataFlowResults.CapturedOutside)
+            Assert.Equal("x", GetSymbolNamesJoined(dataFlowResults.DataFlowsIn))
             Assert.Empty((dataFlowResults.DataFlowsOut))
-            Assert.Equal("x", GetSymbolNamesSortedAndJoined(dataFlowResults.ReadInside))
+            Assert.Equal("x, y", GetSymbolNamesJoined(dataFlowResults.DefinitelyAssignedOnEntry))
+            Assert.Equal(Nothing, GetSymbolNamesJoined(dataFlowResults.DefinitelyAssignedOnExit))
+            Assert.Equal("x", GetSymbolNamesJoined(dataFlowResults.ReadInside))
             Assert.Empty(dataFlowResults.WrittenInside)
             Assert.Empty(dataFlowResults.ReadOutside)
-            Assert.Equal("x, y", GetSymbolNamesSortedAndJoined(dataFlowResults.WrittenOutside))
+            Assert.Equal("x, y", GetSymbolNamesJoined(dataFlowResults.WrittenOutside))
         End Sub
 
         <Fact()>
@@ -6609,18 +6950,22 @@ End Module
 </compilation>)
 
             Assert.True(dataFlowResults.Succeeded)
-            Assert.Equal("y", GetSymbolNamesSortedAndJoined(dataFlowResults.VariablesDeclared))
+            Assert.Equal("y", GetSymbolNamesJoined(dataFlowResults.VariablesDeclared))
             Assert.Empty(dataFlowResults.AlwaysAssigned)
-            Assert.Equal("args, bb, x", GetSymbolNamesSortedAndJoined(dataFlowResults.Captured))
-            Assert.Equal("args, bb, x", GetSymbolNamesSortedAndJoined(dataFlowResults.DataFlowsIn))
+            Assert.Equal("args, x, bb", GetSymbolNamesJoined(dataFlowResults.Captured))
+            Assert.Equal("args, x, bb", GetSymbolNamesJoined(dataFlowResults.CapturedInside))
+            Assert.Equal(Nothing, GetSymbolNamesJoined(dataFlowResults.CapturedOutside))
+            Assert.Equal("args, x, bb", GetSymbolNamesJoined(dataFlowResults.DataFlowsIn))
             Assert.Empty(dataFlowResults.DataFlowsOut)
-            Assert.Equal("args, bb, x, y", GetSymbolNamesSortedAndJoined(dataFlowResults.ReadInside))
-            Assert.Equal("y", GetSymbolNamesSortedAndJoined(dataFlowResults.WrittenInside))
-            Assert.Equal("x", GetSymbolNamesSortedAndJoined(dataFlowResults.ReadOutside))
-            Assert.Equal("args, bb, ret, x", GetSymbolNamesSortedAndJoined(dataFlowResults.WrittenOutside))
+            Assert.Equal("args, x, bb, ret", GetSymbolNamesJoined(dataFlowResults.DefinitelyAssignedOnEntry))
+            Assert.Equal("args, x, bb, ret", GetSymbolNamesJoined(dataFlowResults.DefinitelyAssignedOnExit))
+            Assert.Equal("args, x, bb, y", GetSymbolNamesJoined(dataFlowResults.ReadInside))
+            Assert.Equal("y", GetSymbolNamesJoined(dataFlowResults.WrittenInside))
+            Assert.Equal("x", GetSymbolNamesJoined(dataFlowResults.ReadOutside))
+            Assert.Equal("args, x, bb, ret", GetSymbolNamesJoined(dataFlowResults.WrittenOutside))
         End Sub
 
-        <Fact(), WorkItem(545047, "DevDiv")>
+        <Fact(), WorkItem(545047, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/545047")>
         Public Sub UserDefinedLiftedOperatorInExpr()
             Dim dataFlowResults = CompileAndAnalyzeDataFlow(
 <compilation>
@@ -6655,18 +7000,22 @@ End Module
 
 
             Assert.True(dataFlowResults.Succeeded)
-            Assert.Equal("x", GetSymbolNamesSortedAndJoined(dataFlowResults.VariablesDeclared))
+            Assert.Equal("x", GetSymbolNamesJoined(dataFlowResults.VariablesDeclared))
             Assert.Empty(dataFlowResults.AlwaysAssigned)
-            Assert.Equal("local, p", GetSymbolNamesSortedAndJoined(dataFlowResults.Captured))
-            Assert.Equal("local, p", GetSymbolNamesSortedAndJoined(dataFlowResults.DataFlowsIn))
+            Assert.Equal("p, local", GetSymbolNamesJoined(dataFlowResults.Captured))
+            Assert.Equal("p, local", GetSymbolNamesJoined(dataFlowResults.CapturedInside))
+            Assert.Equal(Nothing, GetSymbolNamesJoined(dataFlowResults.CapturedOutside))
+            Assert.Equal("p, local", GetSymbolNamesJoined(dataFlowResults.DataFlowsIn))
             Assert.Empty(dataFlowResults.DataFlowsOut)
-            Assert.Equal("local, p, x", GetSymbolNamesSortedAndJoined(dataFlowResults.ReadInside))
-            Assert.Equal("x", GetSymbolNamesSortedAndJoined(dataFlowResults.WrittenInside))
-            Assert.Equal("f, local", GetSymbolNamesSortedAndJoined(dataFlowResults.ReadOutside))
-            Assert.Equal("f, local, p", GetSymbolNamesSortedAndJoined(dataFlowResults.WrittenOutside))
+            Assert.Equal("f", GetSymbolNamesJoined(dataFlowResults.DefinitelyAssignedOnEntry))
+            Assert.Equal("f", GetSymbolNamesJoined(dataFlowResults.DefinitelyAssignedOnExit))
+            Assert.Equal("p, local, x", GetSymbolNamesJoined(dataFlowResults.ReadInside))
+            Assert.Equal("x", GetSymbolNamesJoined(dataFlowResults.WrittenInside))
+            Assert.Equal("local, f", GetSymbolNamesJoined(dataFlowResults.ReadOutside))
+            Assert.Equal("p, local, f", GetSymbolNamesJoined(dataFlowResults.WrittenOutside))
         End Sub
 
-        <Fact(), WorkItem(545047, "DevDiv")>
+        <Fact(), WorkItem(545047, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/545047")>
         Public Sub DataFlowsInAndNullable()
             ' WARNING: if this test is edited, the test with the 
             '          test with the same name in C# must be modified too
@@ -6699,17 +7048,21 @@ End Module
             Assert.Empty(dataFlowResults.VariablesDeclared)
             Assert.Empty(dataFlowResults.AlwaysAssigned)
             Assert.Empty(dataFlowResults.Captured)
-            Assert.Equal("i, s", GetSymbolNamesSortedAndJoined(dataFlowResults.DataFlowsIn))
+            Assert.Empty(dataFlowResults.CapturedInside)
+            Assert.Empty(dataFlowResults.CapturedOutside)
+            Assert.Equal("i, s", GetSymbolNamesJoined(dataFlowResults.DataFlowsIn))
             Assert.Empty(dataFlowResults.DataFlowsOut)
-            Assert.Equal("i, s", GetSymbolNamesSortedAndJoined(dataFlowResults.ReadInside))
+            Assert.Equal("args", GetSymbolNamesJoined(dataFlowResults.DefinitelyAssignedOnEntry))
+            Assert.Equal("args", GetSymbolNamesJoined(dataFlowResults.DefinitelyAssignedOnExit))
+            Assert.Equal("i, s", GetSymbolNamesJoined(dataFlowResults.ReadInside))
             Assert.Empty(dataFlowResults.WrittenInside)
             Assert.Empty(dataFlowResults.ReadOutside)
-            Assert.Equal("args, i, s", GetSymbolNamesSortedAndJoined(dataFlowResults.WrittenOutside))
+            Assert.Equal("args, i, s", GetSymbolNamesJoined(dataFlowResults.WrittenOutside))
         End Sub
 
-        <WorkItem(545249, "DevDiv")>
+        <WorkItem(545249, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/545249")>
         <Fact()>
-        Sub TestWithEventsInitializer()
+        Public Sub TestWithEventsInitializer()
             Dim comp = CompileAndAnalyzeDataFlow(
 <compilation>
     <file name="a.vb">
@@ -6721,9 +7074,9 @@ End Class
             Debug.Assert(comp.Succeeded)
         End Sub
 
-        <WorkItem(545249, "DevDiv")>
+        <WorkItem(545249, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/545249")>
         <Fact()>
-        Sub TestWithEventsInitializer2()
+        Public Sub TestWithEventsInitializer2()
             Dim comp = CompileAndAnalyzeDataFlow(
 <compilation>
     <file name="a.vb">
@@ -6738,7 +7091,7 @@ End Class
         End Sub
 
         <Fact()>
-        Sub TestWithEventsInitializer3()
+        Public Sub TestWithEventsInitializer3()
             Dim comp = CompileAndAnalyzeDataFlow(
 <compilation>
     <file name="a.vb">
@@ -6753,7 +7106,7 @@ End Class
         End Sub
 
         <Fact()>
-        Sub TestWithEventsInitializer4()
+        Public Sub TestWithEventsInitializer4()
             Dim comp = CompileAndAnalyzeDataFlow(
 <compilation>
     <file name="a.vb">
@@ -6767,10 +7120,10 @@ End Class
             Debug.Assert(comp.Succeeded)
         End Sub
 
-        <WorkItem(545480, "DevDiv")>
+        <WorkItem(545480, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/545480")>
         <Fact()>
-        Sub ReturnStatementInElseInsideIncompleteFunction()
-            Dim comp = CompilationUtils.CreateCompilationWithMscorlib(
+        Public Sub ReturnStatementInElseInsideIncompleteFunction()
+            Dim comp = CompilationUtils.CreateCompilationWithMscorlib40(
 <compilation>
     <file name="a.vb">
 Public Class vbPartialCls002
@@ -6789,9 +7142,9 @@ Public Class vbPartialCls002
             Assert.True(controlFlowAnalysis.Succeeded)
         End Sub
 
-        <WorkItem(545900, "DevDiv")>
+        <WorkItem(545900, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/545900")>
         <Fact()>
-        Sub AnonymousObjectCreationExprInsideOptionalParamDecl()
+        Public Sub AnonymousObjectCreationExprInsideOptionalParamDecl()
             Dim comp = CompileAndAnalyzeDataFlow(
 <compilation>
     <file name="a.vb">
@@ -6804,9 +7157,9 @@ End Module
             Assert.False(comp.Succeeded)
         End Sub
 
-        <WorkItem(545900, "DevDiv")>
+        <WorkItem(545900, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/545900")>
         <Fact()>
-        Sub AnonymousObjectCreationExprInsideOptionalParamDecl2()
+        Public Sub AnonymousObjectCreationExprInsideOptionalParamDecl2()
             Dim comp = CompileAndAnalyzeDataFlow(
 <compilation>
     <file name="a.vb">
@@ -6821,9 +7174,9 @@ End Class
             Assert.False(comp.Succeeded)
         End Sub
 
-        <WorkItem(545900, "DevDiv")>
+        <WorkItem(545900, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/545900")>
         <Fact()>
-        Sub LambdaExprInsideOptionalParamDecl2()
+        Public Sub LambdaExprInsideOptionalParamDecl2()
             Dim comp = CompileAndAnalyzeDataFlow(
 <compilation>
     <file name="a.vb">
@@ -6849,7 +7202,7 @@ End Module
 
         <Fact()>
         Public Sub ConstantUnevaluatedReceiver()
-            Dim compilation = CompilationUtils.CreateCompilationWithMscorlib(
+            Dim compilation = CompilationUtils.CreateCompilationWithMscorlib40(
 <compilation>
     <file name="a.vb"><![CDATA[
 Class A
@@ -6868,7 +7221,7 @@ End Class
 
         <Fact()>
         Public Sub CallUnevaluatedReceiver()
-            Dim compilation = CompilationUtils.CreateCompilationWithMscorlib(
+            Dim compilation = CompilationUtils.CreateCompilationWithMscorlib40(
 <compilation>
     <file name="a.vb"><![CDATA[
 Class A
@@ -6887,10 +7240,10 @@ End Class
             model.AnalyzeDataFlow(expr)
         End Sub
 
-        <WorkItem(546639, "DevDiv")>
+        <WorkItem(546639, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/546639")>
         <Fact()>
         Public Sub AddressOfUnevaluatedReceiver()
-            Dim compilation = CompilationUtils.CreateCompilationWithMscorlib(
+            Dim compilation = CompilationUtils.CreateCompilationWithMscorlib40(
 <compilation>
     <file name="a.vb"><![CDATA[
 Class A
@@ -6908,10 +7261,10 @@ End Class
             model.AnalyzeDataFlow(expr)
         End Sub
 
-        <WorkItem(546629, "DevDiv")>
+        <WorkItem(546629, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/546629")>
         <Fact()>
         Public Sub TypeExpressionUnevaluatedReceiver()
-            Dim compilation = CompilationUtils.CreateCompilationWithMscorlib(
+            Dim compilation = CompilationUtils.CreateCompilationWithMscorlib40(
 <compilation>
     <file name="a.vb"><![CDATA[
 Class A
@@ -6930,7 +7283,7 @@ End Class
             model.AnalyzeDataFlow(expr)
         End Sub
 
-        <WorkItem(545266, "DevDiv")>
+        <WorkItem(545266, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/545266")>
         <Fact()>
         Public Sub DataFlowImplicitLoopVariableInBrokenCodeNotInDataFlowsOut()
             Dim dataFlowResults = CompileAndAnalyzeDataFlow(
@@ -6952,15 +7305,19 @@ End Module
             Assert.Empty(dataFlowResults.VariablesDeclared)
             Assert.Empty(dataFlowResults.AlwaysAssigned)
             Assert.Empty(dataFlowResults.Captured)
-            Assert.Equal("i", GetSymbolNamesSortedAndJoined(dataFlowResults.DataFlowsIn))
+            Assert.Empty(dataFlowResults.CapturedInside)
+            Assert.Empty(dataFlowResults.CapturedOutside)
+            Assert.Equal("i", GetSymbolNamesJoined(dataFlowResults.DataFlowsIn))
             Assert.Empty(dataFlowResults.DataFlowsOut)
-            Assert.Equal("i", GetSymbolNamesSortedAndJoined(dataFlowResults.ReadInside))
+            Assert.Equal("args", GetSymbolNamesJoined(dataFlowResults.DefinitelyAssignedOnEntry))
+            Assert.Equal("args", GetSymbolNamesJoined(dataFlowResults.DefinitelyAssignedOnExit))
+            Assert.Equal("i", GetSymbolNamesJoined(dataFlowResults.ReadInside))
             Assert.Empty(dataFlowResults.WrittenInside)
             Assert.Empty(dataFlowResults.ReadOutside)
-            Assert.Equal("args, i, j", GetSymbolNamesSortedAndJoined(dataFlowResults.WrittenOutside))
+            Assert.Equal("args, i, j", GetSymbolNamesJoined(dataFlowResults.WrittenOutside))
         End Sub
 
-        <WorkItem(545266, "DevDiv")>
+        <WorkItem(545266, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/545266")>
         <Fact()>
         Public Sub DataFlowImplicitLoopVariableInBrokenCodeNotInDataFlowsOut_2()
             Dim dataFlowResults = CompileAndAnalyzeDataFlow(
@@ -6984,15 +7341,19 @@ End Module
             Assert.Empty(dataFlowResults.VariablesDeclared)
             Assert.Empty(dataFlowResults.AlwaysAssigned)
             Assert.Empty(dataFlowResults.Captured)
-            Assert.Equal("i", GetSymbolNamesSortedAndJoined(dataFlowResults.DataFlowsIn))
+            Assert.Empty(dataFlowResults.CapturedInside)
+            Assert.Empty(dataFlowResults.CapturedOutside)
+            Assert.Equal("i", GetSymbolNamesJoined(dataFlowResults.DataFlowsIn))
             Assert.Empty(dataFlowResults.DataFlowsOut)
-            Assert.Equal("i", GetSymbolNamesSortedAndJoined(dataFlowResults.ReadInside))
+            Assert.Equal("args", GetSymbolNamesJoined(dataFlowResults.DefinitelyAssignedOnEntry))
+            Assert.Equal("args", GetSymbolNamesJoined(dataFlowResults.DefinitelyAssignedOnExit))
+            Assert.Equal("i", GetSymbolNamesJoined(dataFlowResults.ReadInside))
             Assert.Empty(dataFlowResults.WrittenInside)
             Assert.Empty(dataFlowResults.ReadOutside)
-            Assert.Equal("args, i, j, x", GetSymbolNamesSortedAndJoined(dataFlowResults.WrittenOutside))
+            Assert.Equal("args, x, i, j", GetSymbolNamesJoined(dataFlowResults.WrittenOutside))
         End Sub
 
-        <WorkItem(545266, "DevDiv")>
+        <WorkItem(545266, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/545266")>
         <Fact()>
         Public Sub DataFlowUnassignedVariablesWithoutAssignmentInsideDoNotFlowOut_1()
             Dim dataFlowResults = CompileAndAnalyzeDataFlow(
@@ -7018,15 +7379,19 @@ End Module
             Assert.Empty(dataFlowResults.VariablesDeclared)
             Assert.Empty(dataFlowResults.AlwaysAssigned)
             Assert.Empty(dataFlowResults.Captured)
-            Assert.Equal("i", GetSymbolNamesSortedAndJoined(dataFlowResults.DataFlowsIn))
+            Assert.Empty(dataFlowResults.CapturedInside)
+            Assert.Empty(dataFlowResults.CapturedOutside)
+            Assert.Equal("i", GetSymbolNamesJoined(dataFlowResults.DataFlowsIn))
             Assert.Empty(dataFlowResults.DataFlowsOut)
-            Assert.Equal("i", GetSymbolNamesSortedAndJoined(dataFlowResults.ReadInside))
+            Assert.Equal("args", GetSymbolNamesJoined(dataFlowResults.DefinitelyAssignedOnEntry))
+            Assert.Equal("args", GetSymbolNamesJoined(dataFlowResults.DefinitelyAssignedOnExit))
+            Assert.Equal("i", GetSymbolNamesJoined(dataFlowResults.ReadInside))
             Assert.Empty(dataFlowResults.WrittenInside)
-            Assert.Equal("args", GetSymbolNamesSortedAndJoined(dataFlowResults.ReadOutside))
-            Assert.Equal("args, i, j", GetSymbolNamesSortedAndJoined(dataFlowResults.WrittenOutside))
+            Assert.Equal("args", GetSymbolNamesJoined(dataFlowResults.ReadOutside))
+            Assert.Equal("args, i, j", GetSymbolNamesJoined(dataFlowResults.WrittenOutside))
         End Sub
 
-        <WorkItem(545266, "DevDiv")>
+        <WorkItem(545266, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/545266")>
         <Fact()>
         Public Sub DataFlowUnassignedVariablesWithoutAssignmentInsideDoNotFlowOut_2()
             Dim dataFlowResults = CompileAndAnalyzeDataFlow(
@@ -7052,15 +7417,19 @@ End Module
             Assert.True(dataFlowResults.Succeeded)
             Assert.Empty(dataFlowResults.AlwaysAssigned)
             Assert.Empty(dataFlowResults.Captured)
-            Assert.Equal("i", GetSymbolNamesSortedAndJoined(dataFlowResults.DataFlowsIn))
+            Assert.Empty(dataFlowResults.CapturedInside)
+            Assert.Empty(dataFlowResults.CapturedOutside)
+            Assert.Equal("i", GetSymbolNamesJoined(dataFlowResults.DataFlowsIn))
             Assert.Empty(dataFlowResults.DataFlowsOut)
-            Assert.Equal("i", GetSymbolNamesSortedAndJoined(dataFlowResults.ReadInside))
+            Assert.Equal("args, k", GetSymbolNamesJoined(dataFlowResults.DefinitelyAssignedOnEntry))
+            Assert.Equal("args, k", GetSymbolNamesJoined(dataFlowResults.DefinitelyAssignedOnExit))
+            Assert.Equal("i", GetSymbolNamesJoined(dataFlowResults.ReadInside))
             Assert.Empty(dataFlowResults.WrittenInside)
-            Assert.Equal("args, i", GetSymbolNamesSortedAndJoined(dataFlowResults.ReadOutside))
-            Assert.Equal("args, i, j, k", GetSymbolNamesSortedAndJoined(dataFlowResults.WrittenOutside))
+            Assert.Equal("args, i", GetSymbolNamesJoined(dataFlowResults.ReadOutside))
+            Assert.Equal("args, i, k, j", GetSymbolNamesJoined(dataFlowResults.WrittenOutside))
         End Sub
 
-        <WorkItem(545266, "DevDiv")>
+        <WorkItem(545266, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/545266")>
         <Fact()>
         Public Sub DataFlowImplicitUsingVariableInBrokenCodeNotInDataFlowsOut()
             Dim dataFlowResults = CompileAndAnalyzeDataFlow(
@@ -7082,15 +7451,19 @@ End Module
             Assert.Empty(dataFlowResults.VariablesDeclared)
             Assert.Empty(dataFlowResults.AlwaysAssigned)
             Assert.Empty(dataFlowResults.Captured)
-            Assert.Equal("i", GetSymbolNamesSortedAndJoined(dataFlowResults.DataFlowsIn))
+            Assert.Empty(dataFlowResults.CapturedInside)
+            Assert.Empty(dataFlowResults.CapturedOutside)
+            Assert.Equal("i", GetSymbolNamesJoined(dataFlowResults.DataFlowsIn))
             Assert.Empty(dataFlowResults.DataFlowsOut)
-            Assert.Equal("i", GetSymbolNamesSortedAndJoined(dataFlowResults.ReadInside))
+            Assert.Equal("args", GetSymbolNamesJoined(dataFlowResults.DefinitelyAssignedOnEntry))
+            Assert.Equal("args", GetSymbolNamesJoined(dataFlowResults.DefinitelyAssignedOnExit))
+            Assert.Equal("i", GetSymbolNamesJoined(dataFlowResults.ReadInside))
             Assert.Empty(dataFlowResults.WrittenInside)
-            Assert.Equal("i", GetSymbolNamesSortedAndJoined(dataFlowResults.ReadOutside))
-            Assert.Equal("args, i, j", GetSymbolNamesSortedAndJoined(dataFlowResults.WrittenOutside))
+            Assert.Equal("i", GetSymbolNamesJoined(dataFlowResults.ReadOutside))
+            Assert.Equal("args, i, j", GetSymbolNamesJoined(dataFlowResults.WrittenOutside))
         End Sub
 
-        <WorkItem(546995, "DevDiv")>
+        <WorkItem(546995, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/546995")>
         <Fact()>
         Public Sub DataFlowUnassignedVariablesWithoutAssignmentInsideDoNotFlowOut_3()
             Dim dataFlowResults = CompileAndAnalyzeDataFlow(
@@ -7098,9 +7471,9 @@ End Module
     <file name="a.vb">
 Module Program
     Sub Main(ByVal args As String())
-        [|GoTo Lable1
+        [|GoTo Label1
         For i = 1 To 5
-Lable1:
+Label1:
             Dim q = i
         Next|]
     End Sub
@@ -7109,17 +7482,21 @@ End Module
 </compilation>)
 
             Assert.True(dataFlowResults.Succeeded)
-            Assert.Equal("i, q", GetSymbolNamesSortedAndJoined(dataFlowResults.VariablesDeclared))
+            Assert.Equal("i, q", GetSymbolNamesJoined(dataFlowResults.VariablesDeclared))
             Assert.Empty(dataFlowResults.AlwaysAssigned)
             Assert.Empty(dataFlowResults.Captured)
-            Assert.Equal("i", GetSymbolNamesSortedAndJoined(dataFlowResults.DataFlowsIn))
+            Assert.Empty(dataFlowResults.CapturedInside)
+            Assert.Empty(dataFlowResults.CapturedOutside)
+            Assert.Equal("i", GetSymbolNamesJoined(dataFlowResults.DataFlowsIn))
             Assert.Empty(dataFlowResults.DataFlowsOut)
-            Assert.Equal("i", GetSymbolNamesSortedAndJoined(dataFlowResults.ReadInside))
-            Assert.Equal("i, q", GetSymbolNamesSortedAndJoined(dataFlowResults.WrittenInside))
+            Assert.Equal("args", GetSymbolNamesJoined(dataFlowResults.DefinitelyAssignedOnEntry))
+            Assert.Equal(Nothing, GetSymbolNamesJoined(dataFlowResults.DefinitelyAssignedOnExit))
+            Assert.Equal("i", GetSymbolNamesJoined(dataFlowResults.ReadInside))
+            Assert.Equal("i, q", GetSymbolNamesJoined(dataFlowResults.WrittenInside))
             Assert.Empty(dataFlowResults.ReadOutside)
-            Assert.Equal("args", GetSymbolNamesSortedAndJoined(dataFlowResults.WrittenOutside))
+            Assert.Equal("args", GetSymbolNamesJoined(dataFlowResults.WrittenOutside))
         End Sub
-        <WorkItem(669341, "DevDiv")>
+        <WorkItem(669341, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/669341")>
         <Fact()>
         Public Sub ReceiverRead()
             Dim dataFlowResults = CompileAndAnalyzeDataFlow(
@@ -7148,13 +7525,13 @@ End Module
     </file>
 </compilation>)
 
-            Assert.Equal("X", GetSymbolNamesSortedAndJoined(dataFlowResults.ReadInside))
+            Assert.Equal("X", GetSymbolNamesJoined(dataFlowResults.ReadInside))
             Assert.Empty(dataFlowResults.WrittenInside)
-            Assert.Equal("X", GetSymbolNamesSortedAndJoined(dataFlowResults.ReadOutside))
-            Assert.Equal("Value, X", GetSymbolNamesSortedAndJoined(dataFlowResults.WrittenOutside))
+            Assert.Equal("X", GetSymbolNamesJoined(dataFlowResults.ReadOutside))
+            Assert.Equal("X, Value", GetSymbolNamesJoined(dataFlowResults.WrittenOutside))
         End Sub
 
-        <WorkItem(669341, "DevDiv")>
+        <WorkItem(669341, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/669341")>
         <Fact()>
         Public Sub ReceiverWritten()
             Dim dataFlowResults = CompileAndAnalyzeDataFlow(
@@ -7184,12 +7561,12 @@ End Module
 </compilation>)
 
             Assert.Empty(dataFlowResults.ReadInside)
-            Assert.Equal("X", GetSymbolNamesSortedAndJoined(dataFlowResults.WrittenInside))
+            Assert.Equal("X", GetSymbolNamesJoined(dataFlowResults.WrittenInside))
             Assert.Empty(dataFlowResults.ReadOutside)
-            Assert.Equal("X", GetSymbolNamesSortedAndJoined(dataFlowResults.WrittenOutside))
+            Assert.Equal("X", GetSymbolNamesJoined(dataFlowResults.WrittenOutside))
         End Sub
 
-        <WorkItem(669341, "DevDiv")>
+        <WorkItem(669341, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/669341")>
         <Fact()>
         Public Sub ReceiverReadAndWritten()
             Dim dataFlowResults = CompileAndAnalyzeDataFlow(
@@ -7218,16 +7595,16 @@ End Module
     </file>
 </compilation>)
 
-            Assert.Equal("X", GetSymbolNamesSortedAndJoined(dataFlowResults.ReadInside))
-            Assert.Equal("X", GetSymbolNamesSortedAndJoined(dataFlowResults.WrittenInside))
-            Assert.Equal("X", GetSymbolNamesSortedAndJoined(dataFlowResults.ReadOutside))
-            Assert.Equal("X", GetSymbolNamesSortedAndJoined(dataFlowResults.WrittenOutside))
+            Assert.Equal("X", GetSymbolNamesJoined(dataFlowResults.ReadInside))
+            Assert.Equal("X", GetSymbolNamesJoined(dataFlowResults.WrittenInside))
+            Assert.Equal("X", GetSymbolNamesJoined(dataFlowResults.ReadOutside))
+            Assert.Equal("X", GetSymbolNamesJoined(dataFlowResults.WrittenOutside))
         End Sub
 
 
 #Region "Anonymous Type, Lambda"
 
-        <WorkItem(543464, "DevDiv")>
+        <WorkItem(543464, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/543464")>
         <Fact()>
         Public Sub TestCaptured()
             Dim analysis = CompileAndAnalyzeDataFlow(
@@ -7246,18 +7623,51 @@ class C
 end class</file>
       </compilation>)
 
-            Assert.Equal("l1", GetSymbolNamesSortedAndJoined(analysis.VariablesDeclared))
-            Assert.Equal("l1", GetSymbolNamesSortedAndJoined(analysis.AlwaysAssigned))
-            Assert.Equal("Me, x, y", GetSymbolNamesSortedAndJoined(analysis.Captured))
-            Assert.Equal("Me, x, y", GetSymbolNamesSortedAndJoined(analysis.DataFlowsIn))
-            Assert.Equal(Nothing, GetSymbolNamesSortedAndJoined(analysis.DataFlowsOut))
-            Assert.Equal("Me, x, y", GetSymbolNamesSortedAndJoined(analysis.ReadInside))
-            Assert.Equal("l1", GetSymbolNamesSortedAndJoined(analysis.WrittenInside))
-            Assert.Equal("a, y", GetSymbolNamesSortedAndJoined(analysis.ReadOutside))
-            Assert.Equal("a, c, Me, x, y", GetSymbolNamesSortedAndJoined(analysis.WrittenOutside))
+            Assert.Equal("l1", GetSymbolNamesJoined(analysis.VariablesDeclared))
+            Assert.Equal("l1", GetSymbolNamesJoined(analysis.AlwaysAssigned))
+            Assert.Equal("Me, x, y", GetSymbolNamesJoined(analysis.Captured))
+            Assert.Equal("Me, x, y", GetSymbolNamesJoined(analysis.CapturedInside))
+            Assert.Equal(Nothing, GetSymbolNamesJoined(analysis.CapturedOutside))
+            Assert.Equal("Me, x, y", GetSymbolNamesJoined(analysis.DataFlowsIn))
+            Assert.Equal(Nothing, GetSymbolNamesJoined(analysis.DataFlowsOut))
+            Assert.Equal("Me, x, y", GetSymbolNamesJoined(analysis.ReadInside))
+            Assert.Equal("l1", GetSymbolNamesJoined(analysis.WrittenInside))
+            Assert.Equal("a, y", GetSymbolNamesJoined(analysis.ReadOutside))
+            Assert.Equal("Me, x, a, y, c", GetSymbolNamesJoined(analysis.WrittenOutside))
         End Sub
 
-        <WorkItem(542629, "DevDiv")>
+        <Fact()>
+        Public Sub TestCapturedRegion()
+            Dim analysis = CompileAndAnalyzeDataFlow(
+      <compilation name="TestLifted">
+          <file name="a.b">
+class C
+    Dim field = 123
+    public sub F(x as integer)
+
+        dim a as integer = 1, y as integer = 1
+        dim outside = function() x+field
+[|
+        dim inside = function() y
+|]
+    end sub
+end class</file>
+      </compilation>)
+
+            Assert.Equal("inside", GetSymbolNamesJoined(analysis.VariablesDeclared))
+            Assert.Equal("inside", GetSymbolNamesJoined(analysis.AlwaysAssigned))
+            Assert.Equal("Me, x, y", GetSymbolNamesJoined(analysis.Captured))
+            Assert.Equal("y", GetSymbolNamesJoined(analysis.CapturedInside))
+            Assert.Equal("Me, x", GetSymbolNamesJoined(analysis.CapturedOutside))
+            Assert.Equal("y", GetSymbolNamesJoined(analysis.DataFlowsIn))
+            Assert.Equal(Nothing, GetSymbolNamesJoined(analysis.DataFlowsOut))
+            Assert.Equal("y", GetSymbolNamesJoined(analysis.ReadInside))
+            Assert.Equal("inside", GetSymbolNamesJoined(analysis.WrittenInside))
+            Assert.Equal("Me, x", GetSymbolNamesJoined(analysis.ReadOutside))
+            Assert.Equal("Me, x, a, y, outside", GetSymbolNamesJoined(analysis.WrittenOutside))
+        End Sub
+
+        <WorkItem(542629, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/542629")>
         <Fact()>
         Public Sub TestRegionControlFlowAnalysisInsideLambda()
             Dim controlFlowAnalysis = CompileAndAnalyzeControlFlow(
@@ -7279,7 +7689,7 @@ End Module
             Assert.False(controlFlowAnalysis.EndPointIsReachable)
         End Sub
 
-        <WorkItem(542629, "DevDiv")>
+        <WorkItem(542629, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/542629")>
         <Fact()>
         Public Sub TestRegionControlFlowAnalysisInsideLambda2()
             Dim controlFlowAnalysis = CompileAndAnalyzeControlFlow(
@@ -7301,7 +7711,7 @@ End Module
             Assert.False(controlFlowAnalysis.EndPointIsReachable)
         End Sub
 
-        <WorkItem(542629, "DevDiv")>
+        <WorkItem(542629, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/542629")>
         <Fact()>
         Public Sub TestRegionControlFlowAnalysisInsideLambda3()
             Dim controlFlowAnalysis = CompileAndAnalyzeControlFlow(
@@ -7353,14 +7763,14 @@ End Class
             Assert.Equal(0, controlFlowAnalysisResults.ExitPoints.Count())
             Assert.True(controlFlowAnalysisResults.StartPointIsReachable)
             Assert.True(controlFlowAnalysisResults.EndPointIsReachable)
-            Assert.Equal(Nothing, GetSymbolNamesSortedAndJoined(dataFlowAnalysisResults.VariablesDeclared))
-            Assert.Equal("i", GetSymbolNamesSortedAndJoined(dataFlowAnalysisResults.AlwaysAssigned))
-            Assert.Equal("i", GetSymbolNamesSortedAndJoined(dataFlowAnalysisResults.DataFlowsIn))
-            Assert.Equal(Nothing, GetSymbolNamesSortedAndJoined(dataFlowAnalysisResults.DataFlowsOut))
-            Assert.Equal("i", GetSymbolNamesSortedAndJoined(dataFlowAnalysisResults.ReadInside))
-            Assert.Equal("x", GetSymbolNamesSortedAndJoined(dataFlowAnalysisResults.ReadOutside))
-            Assert.Equal("i", GetSymbolNamesSortedAndJoined(dataFlowAnalysisResults.WrittenInside))
-            Assert.Equal("i, Me, x, x", GetSymbolNamesSortedAndJoined(dataFlowAnalysisResults.WrittenOutside))
+            Assert.Equal(Nothing, GetSymbolNamesJoined(dataFlowAnalysisResults.VariablesDeclared))
+            Assert.Equal("i", GetSymbolNamesJoined(dataFlowAnalysisResults.AlwaysAssigned))
+            Assert.Equal("i", GetSymbolNamesJoined(dataFlowAnalysisResults.DataFlowsIn))
+            Assert.Equal(Nothing, GetSymbolNamesJoined(dataFlowAnalysisResults.DataFlowsOut))
+            Assert.Equal("i", GetSymbolNamesJoined(dataFlowAnalysisResults.ReadInside))
+            Assert.Equal("x", GetSymbolNamesJoined(dataFlowAnalysisResults.ReadOutside))
+            Assert.Equal("i", GetSymbolNamesJoined(dataFlowAnalysisResults.WrittenInside))
+            Assert.Equal("Me, x, x, i", GetSymbolNamesJoined(dataFlowAnalysisResults.WrittenOutside))
         End Sub
 
         <Fact()>
@@ -7403,15 +7813,17 @@ End Class
             Dim dataFlowResults = analysisResults.Item2
             Assert.True(controlFlowResults.Succeeded)
             Assert.True(dataFlowResults.Succeeded)
-            Assert.Equal("lambda", GetSymbolNamesSortedAndJoined(dataFlowResults.AlwaysAssigned))
-            Assert.Equal("local", GetSymbolNamesSortedAndJoined(dataFlowResults.Captured))
-            Assert.Equal("at, lambda, p", GetSymbolNamesSortedAndJoined(dataFlowResults.VariablesDeclared))
-            Assert.Equal("local", GetSymbolNamesSortedAndJoined(dataFlowResults.DataFlowsIn))
-            Assert.Equal("p", GetSymbolNamesSortedAndJoined(dataFlowResults.DataFlowsOut))
-            Assert.Equal("at, local, p", GetSymbolNamesSortedAndJoined(dataFlowResults.ReadInside))
-            Assert.Equal("at, lambda, p", GetSymbolNamesSortedAndJoined(dataFlowResults.WrittenInside))
-            Assert.Equal(Nothing, GetSymbolNamesSortedAndJoined(dataFlowResults.ReadOutside))
-            Assert.Equal("local", GetSymbolNamesSortedAndJoined(dataFlowResults.WrittenOutside))
+            Assert.Equal("lambda", GetSymbolNamesJoined(dataFlowResults.AlwaysAssigned))
+            Assert.Equal("local", GetSymbolNamesJoined(dataFlowResults.Captured))
+            Assert.Equal("local", GetSymbolNamesJoined(dataFlowResults.CapturedInside))
+            Assert.Equal(Nothing, GetSymbolNamesJoined(dataFlowResults.CapturedOutside))
+            Assert.Equal("lambda, p, at", GetSymbolNamesJoined(dataFlowResults.VariablesDeclared))
+            Assert.Equal("local", GetSymbolNamesJoined(dataFlowResults.DataFlowsIn))
+            Assert.Equal("p", GetSymbolNamesJoined(dataFlowResults.DataFlowsOut))
+            Assert.Equal("local, p, at", GetSymbolNamesJoined(dataFlowResults.ReadInside))
+            Assert.Equal("lambda, p, at", GetSymbolNamesJoined(dataFlowResults.WrittenInside))
+            Assert.Equal(Nothing, GetSymbolNamesJoined(dataFlowResults.ReadOutside))
+            Assert.Equal("local", GetSymbolNamesJoined(dataFlowResults.WrittenOutside))
         End Sub
 
         <Fact()>
@@ -7421,24 +7833,24 @@ End Class
        <file name="a.vb">
 Imports System
 
-Interface IFoo
+Interface IGoo
     Delegate Sub DS(ByRef p As Char)
 End Interface
 
-Class CFoo
-    Implements IFoo
+Class CGoo
+    Implements IGoo
 End Class
 
 Friend Module AM
     Sub Main(args As String())
-        Dim ifoo As IFoo = New CFoo()
-        Dim at1 As New With {.if = ifoo}
+        Dim igoo As IGoo = New CGoo()
+        Dim at1 As New With {.if = igoo}
 [|
-        Dim at2 As New With {.if = at1, ifoo,
+        Dim at2 As New With {.if = at1, igoo,
             .friend = New With {Key args, .lambda = DirectCast(Sub(ByRef p As Char)
                                                                    args(0) = p &amp; p
                                                                    p = "Q"c
-                                                               End Sub, IFoo.DS)}}
+                                                               End Sub, IGoo.DS)}}
 |]
      Console.Write(args(0))
     End Sub
@@ -7450,15 +7862,17 @@ End Module
             Dim dataFlowResults = analysisResults.Item2
             Assert.True(controlFlowResults.Succeeded)
             Assert.True(dataFlowResults.Succeeded)
-            Assert.Equal("at2", GetSymbolNamesSortedAndJoined(dataFlowResults.AlwaysAssigned))
-            Assert.Equal("args", GetSymbolNamesSortedAndJoined(dataFlowResults.Captured))
-            Assert.Equal("at2, p", GetSymbolNamesSortedAndJoined(dataFlowResults.VariablesDeclared))
-            Assert.Equal("args, at1, ifoo", GetSymbolNamesSortedAndJoined(dataFlowResults.DataFlowsIn))
-            Assert.Equal("p", GetSymbolNamesSortedAndJoined(dataFlowResults.DataFlowsOut))
-            Assert.Equal("args, at1, ifoo, p", GetSymbolNamesSortedAndJoined(dataFlowResults.ReadInside))
-            Assert.Equal("at2, p", GetSymbolNamesSortedAndJoined(dataFlowResults.WrittenInside))
-            Assert.Equal("args, ifoo", GetSymbolNamesSortedAndJoined(dataFlowResults.ReadOutside))
-            Assert.Equal("args, at1, ifoo", GetSymbolNamesSortedAndJoined(dataFlowResults.WrittenOutside))
+            Assert.Equal("at2", GetSymbolNamesJoined(dataFlowResults.AlwaysAssigned))
+            Assert.Equal("args", GetSymbolNamesJoined(dataFlowResults.Captured))
+            Assert.Equal("args", GetSymbolNamesJoined(dataFlowResults.CapturedInside))
+            Assert.Equal(Nothing, GetSymbolNamesJoined(dataFlowResults.CapturedOutside))
+            Assert.Equal("at2, p", GetSymbolNamesJoined(dataFlowResults.VariablesDeclared))
+            Assert.Equal("args, igoo, at1", GetSymbolNamesJoined(dataFlowResults.DataFlowsIn))
+            Assert.Equal("p", GetSymbolNamesJoined(dataFlowResults.DataFlowsOut))
+            Assert.Equal("args, igoo, at1, p", GetSymbolNamesJoined(dataFlowResults.ReadInside))
+            Assert.Equal("at2, p", GetSymbolNamesJoined(dataFlowResults.WrittenInside))
+            Assert.Equal("args, igoo", GetSymbolNamesJoined(dataFlowResults.ReadOutside))
+            Assert.Equal("args, igoo, at1", GetSymbolNamesJoined(dataFlowResults.WrittenOutside))
         End Sub
 
         <Fact()>
@@ -7468,7 +7882,7 @@ End Module
        <file name="a.vb">
 Imports System
 
-Interface IFoo
+Interface IGoo
     Delegate Sub DS(ByRef p As Char)
 End Interface
 
@@ -7478,7 +7892,7 @@ Friend Module AM
        Dim at1 As New With {.friend = New With {args, Key.lambda = DirectCast(Sub(ByRef p As Char)
                                                                                   args(0) = p &amp; p
                                                                                   p = "Q"c
-                                                                              End Sub, IFoo.DS) }
+                                                                              End Sub, IGoo.DS) }
                           }
        Dim at2 As New With { Key .a= at1, .friend = New With { [| at1 |] }}
        Console.Write(args(0))
@@ -7489,15 +7903,17 @@ End Module
    </compilation>)
 
             Assert.True(dataFlowResults.Succeeded)
-            Assert.Equal(Nothing, GetSymbolNamesSortedAndJoined(dataFlowResults.AlwaysAssigned))
-            Assert.Equal("args", GetSymbolNamesSortedAndJoined(dataFlowResults.Captured))
-            Assert.Equal(Nothing, GetSymbolNamesSortedAndJoined(dataFlowResults.VariablesDeclared))
-            Assert.Equal("at1", GetSymbolNamesSortedAndJoined(dataFlowResults.DataFlowsIn))
-            Assert.Equal(Nothing, GetSymbolNamesSortedAndJoined(dataFlowResults.DataFlowsOut))
-            Assert.Equal("at1", GetSymbolNamesSortedAndJoined(dataFlowResults.ReadInside))
-            Assert.Equal(Nothing, GetSymbolNamesSortedAndJoined(dataFlowResults.WrittenInside))
-            Assert.Equal("args, at1, p", GetSymbolNamesSortedAndJoined(dataFlowResults.ReadOutside))
-            Assert.Equal("args, at1, at2, p", GetSymbolNamesSortedAndJoined(dataFlowResults.WrittenOutside))
+            Assert.Equal(Nothing, GetSymbolNamesJoined(dataFlowResults.AlwaysAssigned))
+            Assert.Equal("args", GetSymbolNamesJoined(dataFlowResults.Captured))
+            Assert.Equal(Nothing, GetSymbolNamesJoined(dataFlowResults.CapturedInside))
+            Assert.Equal("args", GetSymbolNamesJoined(dataFlowResults.CapturedOutside))
+            Assert.Equal(Nothing, GetSymbolNamesJoined(dataFlowResults.VariablesDeclared))
+            Assert.Equal("at1", GetSymbolNamesJoined(dataFlowResults.DataFlowsIn))
+            Assert.Equal(Nothing, GetSymbolNamesJoined(dataFlowResults.DataFlowsOut))
+            Assert.Equal("at1", GetSymbolNamesJoined(dataFlowResults.ReadInside))
+            Assert.Equal(Nothing, GetSymbolNamesJoined(dataFlowResults.WrittenInside))
+            Assert.Equal("args, at1, p", GetSymbolNamesJoined(dataFlowResults.ReadOutside))
+            Assert.Equal("args, at1, p, at2", GetSymbolNamesJoined(dataFlowResults.WrittenOutside))
         End Sub
 
         <Fact()>
@@ -7523,15 +7939,17 @@ End Class
 
             Assert.True(dataFlowResults.Succeeded)
 
-            Assert.Equal(Nothing, GetSymbolNamesSortedAndJoined(dataFlowResults.AlwaysAssigned))
-            Assert.Equal("Me", GetSymbolNamesSortedAndJoined(dataFlowResults.Captured))
-            Assert.Equal("ary", GetSymbolNamesSortedAndJoined(dataFlowResults.VariablesDeclared))
-            Assert.Equal("args, Me", GetSymbolNamesSortedAndJoined(dataFlowResults.DataFlowsIn))
-            Assert.Equal("ary", GetSymbolNamesSortedAndJoined(dataFlowResults.DataFlowsOut))
-            Assert.Equal("args, ary, Me", GetSymbolNamesSortedAndJoined(dataFlowResults.ReadInside))
-            Assert.Equal("ary", GetSymbolNamesSortedAndJoined(dataFlowResults.WrittenInside))
-            Assert.Equal(Nothing, GetSymbolNamesSortedAndJoined(dataFlowResults.ReadOutside))
-            Assert.Equal("args, at1, Me", GetSymbolNamesSortedAndJoined(dataFlowResults.WrittenOutside))
+            Assert.Equal(Nothing, GetSymbolNamesJoined(dataFlowResults.AlwaysAssigned))
+            Assert.Equal("Me", GetSymbolNamesJoined(dataFlowResults.Captured))
+            Assert.Equal("Me", GetSymbolNamesJoined(dataFlowResults.CapturedInside))
+            Assert.Equal(Nothing, GetSymbolNamesJoined(dataFlowResults.CapturedOutside))
+            Assert.Equal("ary", GetSymbolNamesJoined(dataFlowResults.VariablesDeclared))
+            Assert.Equal("Me, args", GetSymbolNamesJoined(dataFlowResults.DataFlowsIn))
+            Assert.Equal("ary", GetSymbolNamesJoined(dataFlowResults.DataFlowsOut))
+            Assert.Equal("Me, args, ary", GetSymbolNamesJoined(dataFlowResults.ReadInside))
+            Assert.Equal("ary", GetSymbolNamesJoined(dataFlowResults.WrittenInside))
+            Assert.Equal(Nothing, GetSymbolNamesJoined(dataFlowResults.ReadOutside))
+            Assert.Equal("Me, args, at1", GetSymbolNamesJoined(dataFlowResults.WrittenOutside))
         End Sub
 
         <Fact()>
@@ -7554,15 +7972,17 @@ End Class
 
             Assert.True(dataFlowResults.Succeeded)
 
-            Assert.Null(GetSymbolNamesSortedAndJoined(dataFlowResults.AlwaysAssigned))
-            Assert.Null(GetSymbolNamesSortedAndJoined(dataFlowResults.Captured))
-            Assert.Null(GetSymbolNamesSortedAndJoined(dataFlowResults.VariablesDeclared))
-            Assert.Null(GetSymbolNamesSortedAndJoined(dataFlowResults.DataFlowsIn))
-            Assert.Null(GetSymbolNamesSortedAndJoined(dataFlowResults.DataFlowsOut))
-            Assert.Null(GetSymbolNamesSortedAndJoined(dataFlowResults.ReadInside))
-            Assert.Null(GetSymbolNamesSortedAndJoined(dataFlowResults.WrittenInside))
-            Assert.Equal("var1", GetSymbolNamesSortedAndJoined(dataFlowResults.ReadOutside))
-            Assert.Equal("args, at1, Me, var1", GetSymbolNamesSortedAndJoined(dataFlowResults.WrittenOutside))
+            Assert.Null(GetSymbolNamesJoined(dataFlowResults.AlwaysAssigned))
+            Assert.Null(GetSymbolNamesJoined(dataFlowResults.Captured))
+            Assert.Null(GetSymbolNamesJoined(dataFlowResults.CapturedInside))
+            Assert.Null(GetSymbolNamesJoined(dataFlowResults.CapturedOutside))
+            Assert.Null(GetSymbolNamesJoined(dataFlowResults.VariablesDeclared))
+            Assert.Null(GetSymbolNamesJoined(dataFlowResults.DataFlowsIn))
+            Assert.Null(GetSymbolNamesJoined(dataFlowResults.DataFlowsOut))
+            Assert.Null(GetSymbolNamesJoined(dataFlowResults.ReadInside))
+            Assert.Null(GetSymbolNamesJoined(dataFlowResults.WrittenInside))
+            Assert.Equal("var1", GetSymbolNamesJoined(dataFlowResults.ReadOutside))
+            Assert.Equal("Me, args, var1, at1", GetSymbolNamesJoined(dataFlowResults.WrittenOutside))
         End Sub
 
         <Fact()>
@@ -7599,15 +8019,17 @@ End Class
 
             Assert.True(dataFlowResults.Succeeded)
 
-            Assert.Equal(Nothing, GetSymbolNamesSortedAndJoined(dataFlowResults.AlwaysAssigned))
-            Assert.Equal("Me", GetSymbolNamesSortedAndJoined(dataFlowResults.Captured))
-            Assert.Equal(Nothing, GetSymbolNamesSortedAndJoined(dataFlowResults.VariablesDeclared))
-            Assert.Equal("Me, x", GetSymbolNamesSortedAndJoined(dataFlowResults.DataFlowsIn))
-            Assert.Equal(Nothing, GetSymbolNamesSortedAndJoined(dataFlowResults.DataFlowsOut))
-            Assert.Equal("Me, x", GetSymbolNamesSortedAndJoined(dataFlowResults.ReadInside))
-            Assert.Equal(Nothing, GetSymbolNamesSortedAndJoined(dataFlowResults.WrittenInside))
-            Assert.Equal("at", GetSymbolNamesSortedAndJoined(dataFlowResults.ReadOutside))
-            Assert.Equal("at, func, Me, x", GetSymbolNamesSortedAndJoined(dataFlowResults.WrittenOutside))
+            Assert.Equal(Nothing, GetSymbolNamesJoined(dataFlowResults.AlwaysAssigned))
+            Assert.Equal("Me", GetSymbolNamesJoined(dataFlowResults.Captured))
+            Assert.Equal("Me", GetSymbolNamesJoined(dataFlowResults.CapturedInside))
+            Assert.Equal(Nothing, GetSymbolNamesJoined(dataFlowResults.CapturedOutside))
+            Assert.Equal(Nothing, GetSymbolNamesJoined(dataFlowResults.VariablesDeclared))
+            Assert.Equal("Me, x", GetSymbolNamesJoined(dataFlowResults.DataFlowsIn))
+            Assert.Equal(Nothing, GetSymbolNamesJoined(dataFlowResults.DataFlowsOut))
+            Assert.Equal("Me, x", GetSymbolNamesJoined(dataFlowResults.ReadInside))
+            Assert.Equal(Nothing, GetSymbolNamesJoined(dataFlowResults.WrittenInside))
+            Assert.Equal("at", GetSymbolNamesJoined(dataFlowResults.ReadOutside))
+            Assert.Equal("Me, func, x, at", GetSymbolNamesJoined(dataFlowResults.WrittenOutside))
         End Sub
 
         <Fact()>
@@ -7642,15 +8064,17 @@ End Class
 
             Assert.True(dataFlowResults.Succeeded)
 
-            Assert.Equal(Nothing, GetSymbolNamesSortedAndJoined(dataFlowResults.AlwaysAssigned))
-            Assert.Equal("Me", GetSymbolNamesSortedAndJoined(dataFlowResults.Captured))
-            Assert.Equal(Nothing, GetSymbolNamesSortedAndJoined(dataFlowResults.VariablesDeclared))
-            Assert.Equal("Me", GetSymbolNamesSortedAndJoined(dataFlowResults.DataFlowsIn))
-            Assert.Equal(Nothing, GetSymbolNamesSortedAndJoined(dataFlowResults.DataFlowsOut))
-            Assert.Equal("Me", GetSymbolNamesSortedAndJoined(dataFlowResults.ReadInside))
-            Assert.Equal(Nothing, GetSymbolNamesSortedAndJoined(dataFlowResults.WrittenInside))
-            Assert.Equal("at", GetSymbolNamesSortedAndJoined(dataFlowResults.ReadOutside))
-            Assert.Equal("at, func, Me, x", GetSymbolNamesSortedAndJoined(dataFlowResults.WrittenOutside))
+            Assert.Equal(Nothing, GetSymbolNamesJoined(dataFlowResults.AlwaysAssigned))
+            Assert.Equal("Me", GetSymbolNamesJoined(dataFlowResults.Captured))
+            Assert.Equal("Me", GetSymbolNamesJoined(dataFlowResults.CapturedInside))
+            Assert.Equal(Nothing, GetSymbolNamesJoined(dataFlowResults.CapturedOutside))
+            Assert.Equal(Nothing, GetSymbolNamesJoined(dataFlowResults.VariablesDeclared))
+            Assert.Equal("Me", GetSymbolNamesJoined(dataFlowResults.DataFlowsIn))
+            Assert.Equal(Nothing, GetSymbolNamesJoined(dataFlowResults.DataFlowsOut))
+            Assert.Equal("Me", GetSymbolNamesJoined(dataFlowResults.ReadInside))
+            Assert.Equal(Nothing, GetSymbolNamesJoined(dataFlowResults.WrittenInside))
+            Assert.Equal("at", GetSymbolNamesJoined(dataFlowResults.ReadOutside))
+            Assert.Equal("Me, func, x, at", GetSymbolNamesJoined(dataFlowResults.WrittenOutside))
         End Sub
 
         <Fact()>
@@ -7703,18 +8127,20 @@ End Module
 
             Assert.True(dataFlowResults.Succeeded)
 
-            Assert.Equal(Nothing, GetSymbolNamesSortedAndJoined(dataFlowResults.AlwaysAssigned))
-            Assert.Equal("Me", GetSymbolNamesSortedAndJoined(dataFlowResults.Captured))
-            Assert.Equal("s", GetSymbolNamesSortedAndJoined(dataFlowResults.VariablesDeclared))
-            Assert.Equal("Me", GetSymbolNamesSortedAndJoined(dataFlowResults.DataFlowsIn))
-            Assert.Equal(Nothing, GetSymbolNamesSortedAndJoined(dataFlowResults.DataFlowsOut))
-            Assert.Equal("Me, s", GetSymbolNamesSortedAndJoined(dataFlowResults.ReadInside))
-            Assert.Equal("s", GetSymbolNamesSortedAndJoined(dataFlowResults.WrittenInside))
-            Assert.Equal("an", GetSymbolNamesSortedAndJoined(dataFlowResults.ReadOutside))
-            Assert.Equal("an, Me", GetSymbolNamesSortedAndJoined(dataFlowResults.WrittenOutside))
+            Assert.Equal(Nothing, GetSymbolNamesJoined(dataFlowResults.AlwaysAssigned))
+            Assert.Equal("Me", GetSymbolNamesJoined(dataFlowResults.Captured))
+            Assert.Equal("Me", GetSymbolNamesJoined(dataFlowResults.CapturedInside))
+            Assert.Equal(Nothing, GetSymbolNamesJoined(dataFlowResults.CapturedOutside))
+            Assert.Equal("s", GetSymbolNamesJoined(dataFlowResults.VariablesDeclared))
+            Assert.Equal("Me", GetSymbolNamesJoined(dataFlowResults.DataFlowsIn))
+            Assert.Equal(Nothing, GetSymbolNamesJoined(dataFlowResults.DataFlowsOut))
+            Assert.Equal("Me, s", GetSymbolNamesJoined(dataFlowResults.ReadInside))
+            Assert.Equal("s", GetSymbolNamesJoined(dataFlowResults.WrittenInside))
+            Assert.Equal("an", GetSymbolNamesJoined(dataFlowResults.ReadOutside))
+            Assert.Equal("Me, an", GetSymbolNamesJoined(dataFlowResults.WrittenOutside))
         End Sub
 
-        <WorkItem(543046, "DevDiv")>
+        <WorkItem(543046, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/543046")>
         <Fact()>
         Public Sub Lambda()
             ' The region is not correct and it is not clear if there is a way to fix the test
@@ -7728,7 +8154,7 @@ Imports System
 Imports System.Runtime.InteropServices
 Public Class S1
     [|Const str As String = "" &lt; MyAttribute(Me.color.blue) &gt;
-    Sub foo()
+    Sub goo()
     End Sub|]
     Shared Sub main()
     End Sub
@@ -7748,7 +8174,7 @@ End Class
                 End Sub)
         End Sub
 
-        <WorkItem(543684, "DevDiv")>
+        <WorkItem(543684, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/543684")>
         <Fact()>
         Public Sub AddressOfExpr()
             Dim dataFlowResults = CompileAndAnalyzeDataFlow(
@@ -7765,7 +8191,7 @@ End Module
             Assert.True(dataFlowResults.Succeeded)
         End Sub
 
-        <WorkItem(543741, "DevDiv")>
+        <WorkItem(543741, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/543741")>
         <Fact()>
         Public Sub AddressOfExpr2()
             Dim dataFlowResults = CompileAndAnalyzeDataFlow(
@@ -7787,7 +8213,7 @@ End Module
 
         <Fact()>
         Public Sub XmlEmbeddedExpression()
-            Dim compilation = CreateCompilationWithMscorlibAndVBRuntimeAndReferences(
+            Dim compilation = CreateCompilationWithMscorlib40AndVBRuntimeAndReferences(
       <compilation>
           <file name="c.vb"><![CDATA[
 Option Strict On
@@ -7804,26 +8230,26 @@ Module M
     End Function
 End Module
     ]]></file>
-      </compilation>, additionalRefs:=XmlReferences)
+      </compilation>, references:=XmlReferences)
             Dim tree = compilation.SyntaxTrees.First()
             Dim model = compilation.GetSemanticModel(tree)
             Dim root = tree.GetCompilationUnitRoot()
-            Dim node = DirectCast(root.FindToken(root.ToFullString().IndexOf("Return")).Parent, StatementSyntax)
+            Dim node = DirectCast(root.FindToken(root.ToFullString().IndexOf("Return", StringComparison.Ordinal)).Parent, StatementSyntax)
             Dim dataFlowAnalysis = model.AnalyzeDataFlow(node, node)
             Assert.True(dataFlowAnalysis.Succeeded)
-            Assert.Equal(Nothing, GetSymbolNamesSortedAndJoined(dataFlowAnalysis.VariablesDeclared))
-            Assert.Equal(Nothing, GetSymbolNamesSortedAndJoined(dataFlowAnalysis.AlwaysAssigned))
-            Assert.Equal("v1, v2, v3, v4, v5", GetSymbolNamesSortedAndJoined(dataFlowAnalysis.DataFlowsIn))
-            Assert.Equal(Nothing, GetSymbolNamesSortedAndJoined(dataFlowAnalysis.DataFlowsOut))
-            Assert.Equal("v1, v2, v3, v4, v5", GetSymbolNamesSortedAndJoined(dataFlowAnalysis.ReadInside))
-            Assert.Equal(Nothing, GetSymbolNamesSortedAndJoined(dataFlowAnalysis.WrittenInside))
-            Assert.Equal(Nothing, GetSymbolNamesSortedAndJoined(dataFlowAnalysis.ReadOutside))
-            Assert.Equal("v0, v1, v2, v3, v4, v5", GetSymbolNamesSortedAndJoined(dataFlowAnalysis.WrittenOutside))
+            Assert.Equal(Nothing, GetSymbolNamesJoined(dataFlowAnalysis.VariablesDeclared))
+            Assert.Equal(Nothing, GetSymbolNamesJoined(dataFlowAnalysis.AlwaysAssigned))
+            Assert.Equal("v1, v2, v3, v4, v5", GetSymbolNamesJoined(dataFlowAnalysis.DataFlowsIn))
+            Assert.Equal(Nothing, GetSymbolNamesJoined(dataFlowAnalysis.DataFlowsOut))
+            Assert.Equal("v1, v2, v3, v4, v5", GetSymbolNamesJoined(dataFlowAnalysis.ReadInside))
+            Assert.Equal(Nothing, GetSymbolNamesJoined(dataFlowAnalysis.WrittenInside))
+            Assert.Equal(Nothing, GetSymbolNamesJoined(dataFlowAnalysis.ReadOutside))
+            Assert.Equal("v0, v1, v2, v3, v4, v5", GetSymbolNamesJoined(dataFlowAnalysis.WrittenOutside))
         End Sub
 
         <Fact()>
         Public Sub XmlMemberAccess()
-            Dim compilation = CreateCompilationWithMscorlibAndVBRuntimeAndReferences(
+            Dim compilation = CreateCompilationWithMscorlib40AndVBRuntimeAndReferences(
       <compilation>
           <file name="c.vb"><![CDATA[
 Option Strict On
@@ -7835,21 +8261,21 @@ Module M
     End Function
 End Module
     ]]></file>
-      </compilation>, additionalRefs:=XmlReferences)
+      </compilation>, references:=XmlReferences)
             Dim tree = compilation.SyntaxTrees.First()
             Dim model = compilation.GetSemanticModel(tree)
             Dim root = tree.GetCompilationUnitRoot()
-            Dim node = DirectCast(root.FindToken(root.ToFullString().IndexOf("Return")).Parent, StatementSyntax)
+            Dim node = DirectCast(root.FindToken(root.ToFullString().IndexOf("Return", StringComparison.Ordinal)).Parent, StatementSyntax)
             Dim dataFlowAnalysis = model.AnalyzeDataFlow(node, node)
             Assert.True(dataFlowAnalysis.Succeeded)
-            Assert.Equal(Nothing, GetSymbolNamesSortedAndJoined(dataFlowAnalysis.VariablesDeclared))
-            Assert.Equal(Nothing, GetSymbolNamesSortedAndJoined(dataFlowAnalysis.AlwaysAssigned))
-            Assert.Equal("x", GetSymbolNamesSortedAndJoined(dataFlowAnalysis.DataFlowsIn))
-            Assert.Equal(Nothing, GetSymbolNamesSortedAndJoined(dataFlowAnalysis.DataFlowsOut))
-            Assert.Equal("x", GetSymbolNamesSortedAndJoined(dataFlowAnalysis.ReadInside))
-            Assert.Equal(Nothing, GetSymbolNamesSortedAndJoined(dataFlowAnalysis.WrittenInside))
-            Assert.Equal(Nothing, GetSymbolNamesSortedAndJoined(dataFlowAnalysis.ReadOutside))
-            Assert.Equal("x", GetSymbolNamesSortedAndJoined(dataFlowAnalysis.WrittenOutside))
+            Assert.Equal(Nothing, GetSymbolNamesJoined(dataFlowAnalysis.VariablesDeclared))
+            Assert.Equal(Nothing, GetSymbolNamesJoined(dataFlowAnalysis.AlwaysAssigned))
+            Assert.Equal("x", GetSymbolNamesJoined(dataFlowAnalysis.DataFlowsIn))
+            Assert.Equal(Nothing, GetSymbolNamesJoined(dataFlowAnalysis.DataFlowsOut))
+            Assert.Equal("x", GetSymbolNamesJoined(dataFlowAnalysis.ReadInside))
+            Assert.Equal(Nothing, GetSymbolNamesJoined(dataFlowAnalysis.WrittenInside))
+            Assert.Equal(Nothing, GetSymbolNamesJoined(dataFlowAnalysis.ReadOutside))
+            Assert.Equal("x", GetSymbolNamesJoined(dataFlowAnalysis.WrittenOutside))
         End Sub
 
         <Fact()>
@@ -7867,57 +8293,21 @@ Module M
 End Module
     ]]></file>
                 </compilation>
-            Dim compilation = CreateCompilationWithMscorlib(source)
+            Dim compilation = CreateCompilationWithMscorlib40(source)
             Dim tree = compilation.SyntaxTrees.First()
             Dim model = compilation.GetSemanticModel(tree)
             Dim root = tree.GetCompilationUnitRoot()
-            Dim node = DirectCast(root.FindToken(root.ToFullString().IndexOf("Dim")).Parent, StatementSyntax)
+            Dim node = DirectCast(root.FindToken(root.ToFullString().IndexOf("Dim", StringComparison.Ordinal)).Parent, StatementSyntax)
             Dim dataFlowAnalysis = model.AnalyzeDataFlow(node, node)
             Assert.True(dataFlowAnalysis.Succeeded)
-            Assert.Equal("o", GetSymbolNamesSortedAndJoined(dataFlowAnalysis.VariablesDeclared))
-            Assert.Equal(Nothing, GetSymbolNamesSortedAndJoined(dataFlowAnalysis.AlwaysAssigned))
-            Assert.Equal(Nothing, GetSymbolNamesSortedAndJoined(dataFlowAnalysis.DataFlowsIn))
-            Assert.Equal(Nothing, GetSymbolNamesSortedAndJoined(dataFlowAnalysis.DataFlowsOut))
-            Assert.Equal(Nothing, GetSymbolNamesSortedAndJoined(dataFlowAnalysis.ReadInside))
-            Assert.Equal(Nothing, GetSymbolNamesSortedAndJoined(dataFlowAnalysis.WrittenInside))
-            Assert.Equal(Nothing, GetSymbolNamesSortedAndJoined(dataFlowAnalysis.ReadOutside))
-            Assert.Equal(Nothing, GetSymbolNamesSortedAndJoined(dataFlowAnalysis.WrittenOutside))
-        End Sub
-
-        <WorkItem(529322, "DevDiv")>
-        <Fact(Skip:="529322")>
-        Public Sub GenericStructureCycleFromMetadata()
-            Dim ilSource = <![CDATA[
-.class public sealed S<T> extends System.ValueType
-{
-  .field public valuetype S<valuetype S<!T>> F
-}
-]]>.Value
-            Dim source =
-                <compilation>
-                    <file name="c.vb"><![CDATA[
-Module M
-    Sub M()
-        Dim o As S(Of Object)
-    End Sub
-End Module
-    ]]></file>
-                </compilation>
-            Dim compilation = CreateCompilationWithCustomILSource(source, ilSource)
-            Dim tree = compilation.SyntaxTrees.First()
-            Dim model = compilation.GetSemanticModel(tree)
-            Dim root = tree.GetCompilationUnitRoot()
-            Dim node = DirectCast(root.FindToken(root.ToFullString().IndexOf("Dim")).Parent, StatementSyntax)
-            Dim dataFlowAnalysis = model.AnalyzeDataFlow(node, node)
-            Assert.True(dataFlowAnalysis.Succeeded)
-            Assert.Equal("o", GetSymbolNamesSortedAndJoined(dataFlowAnalysis.VariablesDeclared))
-            Assert.Equal(Nothing, GetSymbolNamesSortedAndJoined(dataFlowAnalysis.AlwaysAssigned))
-            Assert.Equal(Nothing, GetSymbolNamesSortedAndJoined(dataFlowAnalysis.DataFlowsIn))
-            Assert.Equal(Nothing, GetSymbolNamesSortedAndJoined(dataFlowAnalysis.DataFlowsOut))
-            Assert.Equal(Nothing, GetSymbolNamesSortedAndJoined(dataFlowAnalysis.ReadInside))
-            Assert.Equal(Nothing, GetSymbolNamesSortedAndJoined(dataFlowAnalysis.WrittenInside))
-            Assert.Equal(Nothing, GetSymbolNamesSortedAndJoined(dataFlowAnalysis.ReadOutside))
-            Assert.Equal(Nothing, GetSymbolNamesSortedAndJoined(dataFlowAnalysis.WrittenOutside))
+            Assert.Equal("o", GetSymbolNamesJoined(dataFlowAnalysis.VariablesDeclared))
+            Assert.Equal(Nothing, GetSymbolNamesJoined(dataFlowAnalysis.AlwaysAssigned))
+            Assert.Equal(Nothing, GetSymbolNamesJoined(dataFlowAnalysis.DataFlowsIn))
+            Assert.Equal(Nothing, GetSymbolNamesJoined(dataFlowAnalysis.DataFlowsOut))
+            Assert.Equal(Nothing, GetSymbolNamesJoined(dataFlowAnalysis.ReadInside))
+            Assert.Equal(Nothing, GetSymbolNamesJoined(dataFlowAnalysis.WrittenInside))
+            Assert.Equal(Nothing, GetSymbolNamesJoined(dataFlowAnalysis.ReadOutside))
+            Assert.Equal(Nothing, GetSymbolNamesJoined(dataFlowAnalysis.WrittenOutside))
         End Sub
 
 #End Region
@@ -7947,15 +8337,17 @@ End Class
 </compilation>)
 
             Assert.True(dataFlowResults.Succeeded)
-            Assert.Equal(Nothing, GetSymbolNamesSortedAndJoined(dataFlowResults.VariablesDeclared))
-            Assert.Equal(Nothing, GetSymbolNamesSortedAndJoined(dataFlowResults.AlwaysAssigned))
-            Assert.Equal(Nothing, GetSymbolNamesSortedAndJoined(dataFlowResults.Captured))
-            Assert.Equal("i, Me", GetSymbolNamesSortedAndJoined(dataFlowResults.DataFlowsIn))
-            Assert.Equal(Nothing, GetSymbolNamesSortedAndJoined(dataFlowResults.DataFlowsOut))
-            Assert.Equal("i, Me", GetSymbolNamesSortedAndJoined(dataFlowResults.ReadInside))
-            Assert.Equal(Nothing, GetSymbolNamesSortedAndJoined(dataFlowResults.WrittenInside))
-            Assert.Equal(Nothing, GetSymbolNamesSortedAndJoined(dataFlowResults.ReadOutside))
-            Assert.Equal("i, Me", GetSymbolNamesSortedAndJoined(dataFlowResults.WrittenOutside))
+            Assert.Equal(Nothing, GetSymbolNamesJoined(dataFlowResults.VariablesDeclared))
+            Assert.Equal(Nothing, GetSymbolNamesJoined(dataFlowResults.AlwaysAssigned))
+            Assert.Equal(Nothing, GetSymbolNamesJoined(dataFlowResults.Captured))
+            Assert.Equal(Nothing, GetSymbolNamesJoined(dataFlowResults.CapturedInside))
+            Assert.Equal(Nothing, GetSymbolNamesJoined(dataFlowResults.CapturedOutside))
+            Assert.Equal("Me, i", GetSymbolNamesJoined(dataFlowResults.DataFlowsIn))
+            Assert.Equal(Nothing, GetSymbolNamesJoined(dataFlowResults.DataFlowsOut))
+            Assert.Equal("Me, i", GetSymbolNamesJoined(dataFlowResults.ReadInside))
+            Assert.Equal(Nothing, GetSymbolNamesJoined(dataFlowResults.WrittenInside))
+            Assert.Equal(Nothing, GetSymbolNamesJoined(dataFlowResults.ReadOutside))
+            Assert.Equal("Me, i", GetSymbolNamesJoined(dataFlowResults.WrittenOutside))
         End Sub
 
         <Fact()>
@@ -7982,15 +8374,17 @@ End Class
 </compilation>)
 
             Assert.True(dataFlowResults.Succeeded)
-            Assert.Equal(Nothing, GetSymbolNamesSortedAndJoined(dataFlowResults.VariablesDeclared))
-            Assert.Equal(Nothing, GetSymbolNamesSortedAndJoined(dataFlowResults.AlwaysAssigned))
-            Assert.Equal(Nothing, GetSymbolNamesSortedAndJoined(dataFlowResults.Captured))
-            Assert.Equal("i, Me", GetSymbolNamesSortedAndJoined(dataFlowResults.DataFlowsIn))
-            Assert.Equal(Nothing, GetSymbolNamesSortedAndJoined(dataFlowResults.DataFlowsOut))
-            Assert.Equal("i, Me", GetSymbolNamesSortedAndJoined(dataFlowResults.ReadInside))
-            Assert.Equal(Nothing, GetSymbolNamesSortedAndJoined(dataFlowResults.WrittenInside))
-            Assert.Equal(Nothing, GetSymbolNamesSortedAndJoined(dataFlowResults.ReadOutside))
-            Assert.Equal("i, Me", GetSymbolNamesSortedAndJoined(dataFlowResults.WrittenOutside))
+            Assert.Equal(Nothing, GetSymbolNamesJoined(dataFlowResults.VariablesDeclared))
+            Assert.Equal(Nothing, GetSymbolNamesJoined(dataFlowResults.AlwaysAssigned))
+            Assert.Equal(Nothing, GetSymbolNamesJoined(dataFlowResults.Captured))
+            Assert.Equal(Nothing, GetSymbolNamesJoined(dataFlowResults.CapturedInside))
+            Assert.Equal(Nothing, GetSymbolNamesJoined(dataFlowResults.CapturedOutside))
+            Assert.Equal("Me, i", GetSymbolNamesJoined(dataFlowResults.DataFlowsIn))
+            Assert.Equal(Nothing, GetSymbolNamesJoined(dataFlowResults.DataFlowsOut))
+            Assert.Equal("Me, i", GetSymbolNamesJoined(dataFlowResults.ReadInside))
+            Assert.Equal(Nothing, GetSymbolNamesJoined(dataFlowResults.WrittenInside))
+            Assert.Equal(Nothing, GetSymbolNamesJoined(dataFlowResults.ReadOutside))
+            Assert.Equal("Me, i", GetSymbolNamesJoined(dataFlowResults.WrittenOutside))
         End Sub
 
         <Fact()>
@@ -8021,15 +8415,17 @@ End Class
 </compilation>)
 
             Assert.True(dataFlowResults.Succeeded)
-            Assert.Equal(Nothing, GetSymbolNamesSortedAndJoined(dataFlowResults.VariablesDeclared))
-            Assert.Equal(Nothing, GetSymbolNamesSortedAndJoined(dataFlowResults.AlwaysAssigned))
-            Assert.Equal(Nothing, GetSymbolNamesSortedAndJoined(dataFlowResults.Captured))
-            Assert.Equal("i, Me", GetSymbolNamesSortedAndJoined(dataFlowResults.DataFlowsIn))
-            Assert.Equal(Nothing, GetSymbolNamesSortedAndJoined(dataFlowResults.DataFlowsOut))
-            Assert.Equal("i, Me", GetSymbolNamesSortedAndJoined(dataFlowResults.ReadInside))
-            Assert.Equal(Nothing, GetSymbolNamesSortedAndJoined(dataFlowResults.WrittenInside))
-            Assert.Equal(Nothing, GetSymbolNamesSortedAndJoined(dataFlowResults.ReadOutside))
-            Assert.Equal("i, Me, s", GetSymbolNamesSortedAndJoined(dataFlowResults.WrittenOutside))
+            Assert.Equal(Nothing, GetSymbolNamesJoined(dataFlowResults.VariablesDeclared))
+            Assert.Equal(Nothing, GetSymbolNamesJoined(dataFlowResults.AlwaysAssigned))
+            Assert.Equal(Nothing, GetSymbolNamesJoined(dataFlowResults.Captured))
+            Assert.Equal(Nothing, GetSymbolNamesJoined(dataFlowResults.CapturedInside))
+            Assert.Equal(Nothing, GetSymbolNamesJoined(dataFlowResults.CapturedOutside))
+            Assert.Equal("Me, i", GetSymbolNamesJoined(dataFlowResults.DataFlowsIn))
+            Assert.Equal(Nothing, GetSymbolNamesJoined(dataFlowResults.DataFlowsOut))
+            Assert.Equal("Me, i", GetSymbolNamesJoined(dataFlowResults.ReadInside))
+            Assert.Equal(Nothing, GetSymbolNamesJoined(dataFlowResults.WrittenInside))
+            Assert.Equal(Nothing, GetSymbolNamesJoined(dataFlowResults.ReadOutside))
+            Assert.Equal("Me, i, s", GetSymbolNamesJoined(dataFlowResults.WrittenOutside))
         End Sub
 
         <Fact()>
@@ -8083,15 +8479,17 @@ End Class
 </compilation>)
 
             Assert.True(dataFlowResults.Succeeded)
-            Assert.Equal(Nothing, GetSymbolNamesSortedAndJoined(dataFlowResults.VariablesDeclared))
-            Assert.Equal(Nothing, GetSymbolNamesSortedAndJoined(dataFlowResults.AlwaysAssigned))
-            Assert.Equal(Nothing, GetSymbolNamesSortedAndJoined(dataFlowResults.Captured))
-            Assert.Equal(Nothing, GetSymbolNamesSortedAndJoined(dataFlowResults.DataFlowsIn))
-            Assert.Equal(Nothing, GetSymbolNamesSortedAndJoined(dataFlowResults.DataFlowsOut))
-            Assert.Equal(Nothing, GetSymbolNamesSortedAndJoined(dataFlowResults.ReadInside))
-            Assert.Equal(Nothing, GetSymbolNamesSortedAndJoined(dataFlowResults.WrittenInside))
-            Assert.Equal("i, Me", GetSymbolNamesSortedAndJoined(dataFlowResults.ReadOutside))
-            Assert.Equal("i, Me, x", GetSymbolNamesSortedAndJoined(dataFlowResults.WrittenOutside))
+            Assert.Equal(Nothing, GetSymbolNamesJoined(dataFlowResults.VariablesDeclared))
+            Assert.Equal(Nothing, GetSymbolNamesJoined(dataFlowResults.AlwaysAssigned))
+            Assert.Equal(Nothing, GetSymbolNamesJoined(dataFlowResults.Captured))
+            Assert.Equal(Nothing, GetSymbolNamesJoined(dataFlowResults.CapturedInside))
+            Assert.Equal(Nothing, GetSymbolNamesJoined(dataFlowResults.CapturedOutside))
+            Assert.Equal(Nothing, GetSymbolNamesJoined(dataFlowResults.DataFlowsIn))
+            Assert.Equal(Nothing, GetSymbolNamesJoined(dataFlowResults.DataFlowsOut))
+            Assert.Equal(Nothing, GetSymbolNamesJoined(dataFlowResults.ReadInside))
+            Assert.Equal(Nothing, GetSymbolNamesJoined(dataFlowResults.WrittenInside))
+            Assert.Equal("Me, i", GetSymbolNamesJoined(dataFlowResults.ReadOutside))
+            Assert.Equal("Me, i, x", GetSymbolNamesJoined(dataFlowResults.WrittenOutside))
         End Sub
 
         <Fact()>
@@ -8122,15 +8520,17 @@ End Class
 </compilation>)
 
             Assert.True(dataFlowResults.Succeeded)
-            Assert.Equal(Nothing, GetSymbolNamesSortedAndJoined(dataFlowResults.VariablesDeclared))
-            Assert.Equal(Nothing, GetSymbolNamesSortedAndJoined(dataFlowResults.AlwaysAssigned))
-            Assert.Equal(Nothing, GetSymbolNamesSortedAndJoined(dataFlowResults.Captured))
-            Assert.Equal(Nothing, GetSymbolNamesSortedAndJoined(dataFlowResults.DataFlowsIn))
-            Assert.Equal(Nothing, GetSymbolNamesSortedAndJoined(dataFlowResults.DataFlowsOut))
-            Assert.Equal(Nothing, GetSymbolNamesSortedAndJoined(dataFlowResults.ReadInside))
-            Assert.Equal(Nothing, GetSymbolNamesSortedAndJoined(dataFlowResults.WrittenInside))
-            Assert.Equal("i, Me, x", GetSymbolNamesSortedAndJoined(dataFlowResults.ReadOutside))
-            Assert.Equal("a, b, i, Me, x", GetSymbolNamesSortedAndJoined(dataFlowResults.WrittenOutside))
+            Assert.Equal(Nothing, GetSymbolNamesJoined(dataFlowResults.VariablesDeclared))
+            Assert.Equal(Nothing, GetSymbolNamesJoined(dataFlowResults.AlwaysAssigned))
+            Assert.Equal(Nothing, GetSymbolNamesJoined(dataFlowResults.Captured))
+            Assert.Equal(Nothing, GetSymbolNamesJoined(dataFlowResults.CapturedInside))
+            Assert.Equal(Nothing, GetSymbolNamesJoined(dataFlowResults.CapturedOutside))
+            Assert.Equal(Nothing, GetSymbolNamesJoined(dataFlowResults.DataFlowsIn))
+            Assert.Equal(Nothing, GetSymbolNamesJoined(dataFlowResults.DataFlowsOut))
+            Assert.Equal(Nothing, GetSymbolNamesJoined(dataFlowResults.ReadInside))
+            Assert.Equal(Nothing, GetSymbolNamesJoined(dataFlowResults.WrittenInside))
+            Assert.Equal("Me, i, x", GetSymbolNamesJoined(dataFlowResults.ReadOutside))
+            Assert.Equal("Me, i, x, a, b", GetSymbolNamesJoined(dataFlowResults.WrittenOutside))
         End Sub
 
         <Fact()>
@@ -8158,15 +8558,17 @@ End Class
 </compilation>)
 
             Assert.True(dataFlowResults.Succeeded)
-            Assert.Equal(Nothing, GetSymbolNamesSortedAndJoined(dataFlowResults.VariablesDeclared))
-            Assert.Equal("x", GetSymbolNamesSortedAndJoined(dataFlowResults.AlwaysAssigned))
-            Assert.Equal(Nothing, GetSymbolNamesSortedAndJoined(dataFlowResults.Captured))
-            Assert.Equal(Nothing, GetSymbolNamesSortedAndJoined(dataFlowResults.DataFlowsIn))
-            Assert.Equal(Nothing, GetSymbolNamesSortedAndJoined(dataFlowResults.DataFlowsOut))
-            Assert.Equal(Nothing, GetSymbolNamesSortedAndJoined(dataFlowResults.ReadInside))
-            Assert.Equal("x", GetSymbolNamesSortedAndJoined(dataFlowResults.WrittenInside))
-            Assert.Equal("i, Me", GetSymbolNamesSortedAndJoined(dataFlowResults.ReadOutside))
-            Assert.Equal("i, Me, x", GetSymbolNamesSortedAndJoined(dataFlowResults.WrittenOutside))
+            Assert.Equal(Nothing, GetSymbolNamesJoined(dataFlowResults.VariablesDeclared))
+            Assert.Equal("x", GetSymbolNamesJoined(dataFlowResults.AlwaysAssigned))
+            Assert.Equal(Nothing, GetSymbolNamesJoined(dataFlowResults.Captured))
+            Assert.Equal(Nothing, GetSymbolNamesJoined(dataFlowResults.CapturedInside))
+            Assert.Equal(Nothing, GetSymbolNamesJoined(dataFlowResults.CapturedOutside))
+            Assert.Equal(Nothing, GetSymbolNamesJoined(dataFlowResults.DataFlowsIn))
+            Assert.Equal(Nothing, GetSymbolNamesJoined(dataFlowResults.DataFlowsOut))
+            Assert.Equal(Nothing, GetSymbolNamesJoined(dataFlowResults.ReadInside))
+            Assert.Equal("x", GetSymbolNamesJoined(dataFlowResults.WrittenInside))
+            Assert.Equal("Me, i", GetSymbolNamesJoined(dataFlowResults.ReadOutside))
+            Assert.Equal("Me, i, x", GetSymbolNamesJoined(dataFlowResults.WrittenOutside))
         End Sub
 
         <Fact()>
@@ -8194,15 +8596,17 @@ End Class
 </compilation>)
 
             Assert.True(dataFlowResults.Succeeded)
-            Assert.Equal(Nothing, GetSymbolNamesSortedAndJoined(dataFlowResults.VariablesDeclared))
-            Assert.Equal(Nothing, GetSymbolNamesSortedAndJoined(dataFlowResults.AlwaysAssigned))
-            Assert.Equal(Nothing, GetSymbolNamesSortedAndJoined(dataFlowResults.Captured))
-            Assert.Equal(Nothing, GetSymbolNamesSortedAndJoined(dataFlowResults.DataFlowsIn))
-            Assert.Equal(Nothing, GetSymbolNamesSortedAndJoined(dataFlowResults.DataFlowsOut))
-            Assert.Equal(Nothing, GetSymbolNamesSortedAndJoined(dataFlowResults.ReadInside))
-            Assert.Equal("x", GetSymbolNamesSortedAndJoined(dataFlowResults.WrittenInside))
-            Assert.Equal("i, Me", GetSymbolNamesSortedAndJoined(dataFlowResults.ReadOutside))
-            Assert.Equal("i, Me, x", GetSymbolNamesSortedAndJoined(dataFlowResults.WrittenOutside))
+            Assert.Equal(Nothing, GetSymbolNamesJoined(dataFlowResults.VariablesDeclared))
+            Assert.Equal(Nothing, GetSymbolNamesJoined(dataFlowResults.AlwaysAssigned))
+            Assert.Equal(Nothing, GetSymbolNamesJoined(dataFlowResults.Captured))
+            Assert.Equal(Nothing, GetSymbolNamesJoined(dataFlowResults.CapturedInside))
+            Assert.Equal(Nothing, GetSymbolNamesJoined(dataFlowResults.CapturedOutside))
+            Assert.Equal(Nothing, GetSymbolNamesJoined(dataFlowResults.DataFlowsIn))
+            Assert.Equal(Nothing, GetSymbolNamesJoined(dataFlowResults.DataFlowsOut))
+            Assert.Equal(Nothing, GetSymbolNamesJoined(dataFlowResults.ReadInside))
+            Assert.Equal("x", GetSymbolNamesJoined(dataFlowResults.WrittenInside))
+            Assert.Equal("Me, i", GetSymbolNamesJoined(dataFlowResults.ReadOutside))
+            Assert.Equal("Me, i, x", GetSymbolNamesJoined(dataFlowResults.WrittenOutside))
         End Sub
 
         <Fact()>
@@ -8234,15 +8638,17 @@ End Class
 </compilation>)
 
             Assert.True(dataFlowResults.Succeeded)
-            Assert.Equal(Nothing, GetSymbolNamesSortedAndJoined(dataFlowResults.VariablesDeclared))
-            Assert.Equal(Nothing, GetSymbolNamesSortedAndJoined(dataFlowResults.AlwaysAssigned))
-            Assert.Equal("x", GetSymbolNamesSortedAndJoined(dataFlowResults.Captured))
-            Assert.Equal(Nothing, GetSymbolNamesSortedAndJoined(dataFlowResults.DataFlowsIn))
-            Assert.Equal(Nothing, GetSymbolNamesSortedAndJoined(dataFlowResults.DataFlowsOut))
-            Assert.Equal(Nothing, GetSymbolNamesSortedAndJoined(dataFlowResults.ReadInside))
-            Assert.Equal(Nothing, GetSymbolNamesSortedAndJoined(dataFlowResults.WrittenInside))
-            Assert.Equal("i, Me", GetSymbolNamesSortedAndJoined(dataFlowResults.ReadOutside))
-            Assert.Equal("i, Me, s, x", GetSymbolNamesSortedAndJoined(dataFlowResults.WrittenOutside))
+            Assert.Equal(Nothing, GetSymbolNamesJoined(dataFlowResults.VariablesDeclared))
+            Assert.Equal(Nothing, GetSymbolNamesJoined(dataFlowResults.AlwaysAssigned))
+            Assert.Equal("x", GetSymbolNamesJoined(dataFlowResults.Captured))
+            Assert.Equal(Nothing, GetSymbolNamesJoined(dataFlowResults.CapturedInside))
+            Assert.Equal("x", GetSymbolNamesJoined(dataFlowResults.CapturedOutside))
+            Assert.Equal(Nothing, GetSymbolNamesJoined(dataFlowResults.DataFlowsIn))
+            Assert.Equal(Nothing, GetSymbolNamesJoined(dataFlowResults.DataFlowsOut))
+            Assert.Equal(Nothing, GetSymbolNamesJoined(dataFlowResults.ReadInside))
+            Assert.Equal(Nothing, GetSymbolNamesJoined(dataFlowResults.WrittenInside))
+            Assert.Equal("Me, i", GetSymbolNamesJoined(dataFlowResults.ReadOutside))
+            Assert.Equal("Me, i, x, s", GetSymbolNamesJoined(dataFlowResults.WrittenOutside))
         End Sub
 
         <Fact()>
@@ -8275,15 +8681,17 @@ End Class
 </compilation>)
 
             Assert.True(dataFlowResults.Succeeded)
-            Assert.Equal(Nothing, GetSymbolNamesSortedAndJoined(dataFlowResults.VariablesDeclared))
-            Assert.Equal(Nothing, GetSymbolNamesSortedAndJoined(dataFlowResults.AlwaysAssigned))
-            Assert.Equal("x", GetSymbolNamesSortedAndJoined(dataFlowResults.Captured))
-            Assert.Equal(Nothing, GetSymbolNamesSortedAndJoined(dataFlowResults.DataFlowsIn))
-            Assert.Equal(Nothing, GetSymbolNamesSortedAndJoined(dataFlowResults.DataFlowsOut))
-            Assert.Equal(Nothing, GetSymbolNamesSortedAndJoined(dataFlowResults.ReadInside))
-            Assert.Equal(Nothing, GetSymbolNamesSortedAndJoined(dataFlowResults.WrittenInside))
-            Assert.Equal(Nothing, GetSymbolNamesSortedAndJoined(dataFlowResults.ReadOutside))
-            Assert.Equal("Me, s, x", GetSymbolNamesSortedAndJoined(dataFlowResults.WrittenOutside))
+            Assert.Equal(Nothing, GetSymbolNamesJoined(dataFlowResults.VariablesDeclared))
+            Assert.Equal(Nothing, GetSymbolNamesJoined(dataFlowResults.AlwaysAssigned))
+            Assert.Equal("x", GetSymbolNamesJoined(dataFlowResults.Captured))
+            Assert.Equal(Nothing, GetSymbolNamesJoined(dataFlowResults.CapturedInside))
+            Assert.Equal("x", GetSymbolNamesJoined(dataFlowResults.CapturedOutside))
+            Assert.Equal(Nothing, GetSymbolNamesJoined(dataFlowResults.DataFlowsIn))
+            Assert.Equal(Nothing, GetSymbolNamesJoined(dataFlowResults.DataFlowsOut))
+            Assert.Equal(Nothing, GetSymbolNamesJoined(dataFlowResults.ReadInside))
+            Assert.Equal(Nothing, GetSymbolNamesJoined(dataFlowResults.WrittenInside))
+            Assert.Equal(Nothing, GetSymbolNamesJoined(dataFlowResults.ReadOutside))
+            Assert.Equal("Me, x, s", GetSymbolNamesJoined(dataFlowResults.WrittenOutside))
         End Sub
 
         <Fact()>
@@ -8316,15 +8724,17 @@ End Class
 </compilation>)
 
             Assert.True(dataFlowResults.Succeeded)
-            Assert.Equal(Nothing, GetSymbolNamesSortedAndJoined(dataFlowResults.VariablesDeclared))
-            Assert.Equal(Nothing, GetSymbolNamesSortedAndJoined(dataFlowResults.AlwaysAssigned))
-            Assert.Equal("x", GetSymbolNamesSortedAndJoined(dataFlowResults.Captured))
-            Assert.Equal(Nothing, GetSymbolNamesSortedAndJoined(dataFlowResults.DataFlowsIn))
-            Assert.Equal(Nothing, GetSymbolNamesSortedAndJoined(dataFlowResults.DataFlowsOut))
-            Assert.Equal(Nothing, GetSymbolNamesSortedAndJoined(dataFlowResults.ReadInside))
-            Assert.Equal(Nothing, GetSymbolNamesSortedAndJoined(dataFlowResults.WrittenInside))
-            Assert.Equal(Nothing, GetSymbolNamesSortedAndJoined(dataFlowResults.ReadOutside))
-            Assert.Equal("Me, s, x", GetSymbolNamesSortedAndJoined(dataFlowResults.WrittenOutside))
+            Assert.Equal(Nothing, GetSymbolNamesJoined(dataFlowResults.VariablesDeclared))
+            Assert.Equal(Nothing, GetSymbolNamesJoined(dataFlowResults.AlwaysAssigned))
+            Assert.Equal("x", GetSymbolNamesJoined(dataFlowResults.Captured))
+            Assert.Equal(Nothing, GetSymbolNamesJoined(dataFlowResults.CapturedInside))
+            Assert.Equal("x", GetSymbolNamesJoined(dataFlowResults.CapturedOutside))
+            Assert.Equal(Nothing, GetSymbolNamesJoined(dataFlowResults.DataFlowsIn))
+            Assert.Equal(Nothing, GetSymbolNamesJoined(dataFlowResults.DataFlowsOut))
+            Assert.Equal(Nothing, GetSymbolNamesJoined(dataFlowResults.ReadInside))
+            Assert.Equal(Nothing, GetSymbolNamesJoined(dataFlowResults.WrittenInside))
+            Assert.Equal(Nothing, GetSymbolNamesJoined(dataFlowResults.ReadOutside))
+            Assert.Equal("Me, x, s", GetSymbolNamesJoined(dataFlowResults.WrittenOutside))
         End Sub
 
         <Fact()>
@@ -8358,15 +8768,17 @@ End Class
 </compilation>)
 
             Assert.True(dataFlowResults.Succeeded)
-            Assert.Equal(Nothing, GetSymbolNamesSortedAndJoined(dataFlowResults.VariablesDeclared))
-            Assert.Equal("x", GetSymbolNamesSortedAndJoined(dataFlowResults.AlwaysAssigned))
-            Assert.Equal("x", GetSymbolNamesSortedAndJoined(dataFlowResults.Captured))
-            Assert.Equal(Nothing, GetSymbolNamesSortedAndJoined(dataFlowResults.DataFlowsIn))
-            Assert.Equal("x", GetSymbolNamesSortedAndJoined(dataFlowResults.DataFlowsOut))
-            Assert.Equal(Nothing, GetSymbolNamesSortedAndJoined(dataFlowResults.ReadInside))
-            Assert.Equal("x", GetSymbolNamesSortedAndJoined(dataFlowResults.WrittenInside))
-            Assert.Equal("x", GetSymbolNamesSortedAndJoined(dataFlowResults.ReadOutside))
-            Assert.Equal("Me, s, x", GetSymbolNamesSortedAndJoined(dataFlowResults.WrittenOutside))
+            Assert.Equal(Nothing, GetSymbolNamesJoined(dataFlowResults.VariablesDeclared))
+            Assert.Equal("x", GetSymbolNamesJoined(dataFlowResults.AlwaysAssigned))
+            Assert.Equal("x", GetSymbolNamesJoined(dataFlowResults.Captured))
+            Assert.Equal("x", GetSymbolNamesJoined(dataFlowResults.CapturedInside))
+            Assert.Equal(Nothing, GetSymbolNamesJoined(dataFlowResults.CapturedOutside))
+            Assert.Equal(Nothing, GetSymbolNamesJoined(dataFlowResults.DataFlowsIn))
+            Assert.Equal("x", GetSymbolNamesJoined(dataFlowResults.DataFlowsOut))
+            Assert.Equal(Nothing, GetSymbolNamesJoined(dataFlowResults.ReadInside))
+            Assert.Equal("x", GetSymbolNamesJoined(dataFlowResults.WrittenInside))
+            Assert.Equal("x", GetSymbolNamesJoined(dataFlowResults.ReadOutside))
+            Assert.Equal("Me, x, s", GetSymbolNamesJoined(dataFlowResults.WrittenOutside))
         End Sub
 
         <Fact()>
@@ -8400,18 +8812,21 @@ End Class
 </compilation>)
 
             Assert.True(dataFlowResults.Succeeded)
-            Assert.Equal(Nothing, GetSymbolNamesSortedAndJoined(dataFlowResults.VariablesDeclared))
-            Assert.Equal(Nothing, GetSymbolNamesSortedAndJoined(dataFlowResults.AlwaysAssigned))
-            Assert.Equal("x", GetSymbolNamesSortedAndJoined(dataFlowResults.Captured))
-            Assert.Equal(Nothing, GetSymbolNamesSortedAndJoined(dataFlowResults.DataFlowsIn))
-            Assert.Equal(Nothing, GetSymbolNamesSortedAndJoined(dataFlowResults.DataFlowsOut))
-            Assert.Equal(Nothing, GetSymbolNamesSortedAndJoined(dataFlowResults.ReadInside))
-            Assert.Equal(Nothing, GetSymbolNamesSortedAndJoined(dataFlowResults.WrittenInside))
-            Assert.Equal("x", GetSymbolNamesSortedAndJoined(dataFlowResults.ReadOutside))
-            Assert.Equal("Me, s, x", GetSymbolNamesSortedAndJoined(dataFlowResults.WrittenOutside))
+            Assert.Equal(Nothing, GetSymbolNamesJoined(dataFlowResults.VariablesDeclared))
+            Assert.Equal(Nothing, GetSymbolNamesJoined(dataFlowResults.AlwaysAssigned))
+            Assert.Equal("x", GetSymbolNamesJoined(dataFlowResults.Captured))
+            Assert.Equal(Nothing, GetSymbolNamesJoined(dataFlowResults.CapturedInside))
+            Assert.Equal("x", GetSymbolNamesJoined(dataFlowResults.CapturedOutside))
+            Assert.Equal(Nothing, GetSymbolNamesJoined(dataFlowResults.DataFlowsIn))
+            Assert.Equal(Nothing, GetSymbolNamesJoined(dataFlowResults.DataFlowsOut))
+            Assert.Equal(Nothing, GetSymbolNamesJoined(dataFlowResults.ReadInside))
+            Assert.Equal(Nothing, GetSymbolNamesJoined(dataFlowResults.WrittenInside))
+            Assert.Equal("x", GetSymbolNamesJoined(dataFlowResults.ReadOutside))
+            Assert.Equal("Me, x, s", GetSymbolNamesJoined(dataFlowResults.WrittenOutside))
         End Sub
 
-        <Fact()>
+        <ConditionalFact(GetType(NoUsedAssembliesValidation))> ' https://github.com/dotnet/roslyn/issues/40684: The test hook is blocked by this issue.
+        <WorkItem(40684, "https://github.com/dotnet/roslyn/issues/40684")>
         Public Sub WithStatement_Expression_LValue_4d()
             Dim dataFlowResults = CompileAndAnalyzeDataFlow(
 <compilation>
@@ -8454,18 +8869,21 @@ End Class
 </compilation>)
 
             Assert.True(dataFlowResults.Succeeded)
-            Assert.Equal(Nothing, GetSymbolNamesSortedAndJoined(dataFlowResults.VariablesDeclared))
-            Assert.Equal("x", GetSymbolNamesSortedAndJoined(dataFlowResults.AlwaysAssigned))
-            Assert.Equal("x", GetSymbolNamesSortedAndJoined(dataFlowResults.Captured))
-            Assert.Equal(Nothing, GetSymbolNamesSortedAndJoined(dataFlowResults.DataFlowsIn))
-            Assert.Equal("x", GetSymbolNamesSortedAndJoined(dataFlowResults.DataFlowsOut))
-            Assert.Equal(Nothing, GetSymbolNamesSortedAndJoined(dataFlowResults.ReadInside))
-            Assert.Equal("x", GetSymbolNamesSortedAndJoined(dataFlowResults.WrittenInside))
-            Assert.Equal("x", GetSymbolNamesSortedAndJoined(dataFlowResults.ReadOutside))
-            Assert.Equal("Me, s, x", GetSymbolNamesSortedAndJoined(dataFlowResults.WrittenOutside))
+            Assert.Equal(Nothing, GetSymbolNamesJoined(dataFlowResults.VariablesDeclared))
+            Assert.Equal("x", GetSymbolNamesJoined(dataFlowResults.AlwaysAssigned))
+            Assert.Equal("x", GetSymbolNamesJoined(dataFlowResults.Captured))
+            Assert.Equal("x", GetSymbolNamesJoined(dataFlowResults.CapturedInside))
+            Assert.Equal(Nothing, GetSymbolNamesJoined(dataFlowResults.CapturedOutside))
+            Assert.Equal(Nothing, GetSymbolNamesJoined(dataFlowResults.DataFlowsIn))
+            Assert.Equal("x", GetSymbolNamesJoined(dataFlowResults.DataFlowsOut))
+            Assert.Equal(Nothing, GetSymbolNamesJoined(dataFlowResults.ReadInside))
+            Assert.Equal("x", GetSymbolNamesJoined(dataFlowResults.WrittenInside))
+            Assert.Equal("x", GetSymbolNamesJoined(dataFlowResults.ReadOutside))
+            Assert.Equal("Me, x, s", GetSymbolNamesJoined(dataFlowResults.WrittenOutside))
         End Sub
 
-        <Fact()>
+        <ConditionalFact(GetType(NoUsedAssembliesValidation))> ' https://github.com/dotnet/roslyn/issues/40684: The test hook is blocked by this issue.
+        <WorkItem(40684, "https://github.com/dotnet/roslyn/issues/40684")>
         Public Sub WithStatement_Expression_LValue_4e()
             Dim dataFlowResults = CompileAndAnalyzeDataFlow(
 <compilation>
@@ -8508,15 +8926,17 @@ End Class
 </compilation>)
 
             Assert.True(dataFlowResults.Succeeded)
-            Assert.Equal(Nothing, GetSymbolNamesSortedAndJoined(dataFlowResults.VariablesDeclared))
-            Assert.Equal(Nothing, GetSymbolNamesSortedAndJoined(dataFlowResults.AlwaysAssigned))
-            Assert.Equal("x", GetSymbolNamesSortedAndJoined(dataFlowResults.Captured))
-            Assert.Equal("x", GetSymbolNamesSortedAndJoined(dataFlowResults.DataFlowsIn))
-            Assert.Equal(Nothing, GetSymbolNamesSortedAndJoined(dataFlowResults.DataFlowsOut))
-            Assert.Equal("x", GetSymbolNamesSortedAndJoined(dataFlowResults.ReadInside))
-            Assert.Equal(Nothing, GetSymbolNamesSortedAndJoined(dataFlowResults.WrittenInside))
-            Assert.Equal("x", GetSymbolNamesSortedAndJoined(dataFlowResults.ReadOutside))
-            Assert.Equal("Me, s, x, xyz", GetSymbolNamesSortedAndJoined(dataFlowResults.WrittenOutside))
+            Assert.Equal(Nothing, GetSymbolNamesJoined(dataFlowResults.VariablesDeclared))
+            Assert.Equal(Nothing, GetSymbolNamesJoined(dataFlowResults.AlwaysAssigned))
+            Assert.Equal("x", GetSymbolNamesJoined(dataFlowResults.Captured))
+            Assert.Equal("x", GetSymbolNamesJoined(dataFlowResults.CapturedInside))
+            Assert.Equal(Nothing, GetSymbolNamesJoined(dataFlowResults.CapturedOutside))
+            Assert.Equal("x", GetSymbolNamesJoined(dataFlowResults.DataFlowsIn))
+            Assert.Equal(Nothing, GetSymbolNamesJoined(dataFlowResults.DataFlowsOut))
+            Assert.Equal("x", GetSymbolNamesJoined(dataFlowResults.ReadInside))
+            Assert.Equal(Nothing, GetSymbolNamesJoined(dataFlowResults.WrittenInside))
+            Assert.Equal("x", GetSymbolNamesJoined(dataFlowResults.ReadOutside))
+            Assert.Equal("Me, x, s, xyz", GetSymbolNamesJoined(dataFlowResults.WrittenOutside))
         End Sub
 
         <Fact()>
@@ -8558,15 +8978,17 @@ End Class
 </compilation>)
 
             Assert.True(dataFlowResults.Succeeded)
-            Assert.Equal(Nothing, GetSymbolNamesSortedAndJoined(dataFlowResults.VariablesDeclared))
-            Assert.Equal(Nothing, GetSymbolNamesSortedAndJoined(dataFlowResults.AlwaysAssigned))
-            Assert.Equal("x", GetSymbolNamesSortedAndJoined(dataFlowResults.Captured))
-            Assert.Equal(Nothing, GetSymbolNamesSortedAndJoined(dataFlowResults.DataFlowsIn))
-            Assert.Equal(Nothing, GetSymbolNamesSortedAndJoined(dataFlowResults.DataFlowsOut))
-            Assert.Equal(Nothing, GetSymbolNamesSortedAndJoined(dataFlowResults.ReadInside))
-            Assert.Equal(Nothing, GetSymbolNamesSortedAndJoined(dataFlowResults.WrittenInside))
-            Assert.Equal("x", GetSymbolNamesSortedAndJoined(dataFlowResults.ReadOutside))
-            Assert.Equal("Me, s, x", GetSymbolNamesSortedAndJoined(dataFlowResults.WrittenOutside))
+            Assert.Equal(Nothing, GetSymbolNamesJoined(dataFlowResults.VariablesDeclared))
+            Assert.Equal(Nothing, GetSymbolNamesJoined(dataFlowResults.AlwaysAssigned))
+            Assert.Equal("x", GetSymbolNamesJoined(dataFlowResults.Captured))
+            Assert.Equal(Nothing, GetSymbolNamesJoined(dataFlowResults.CapturedInside))
+            Assert.Equal("x", GetSymbolNamesJoined(dataFlowResults.CapturedOutside))
+            Assert.Equal(Nothing, GetSymbolNamesJoined(dataFlowResults.DataFlowsIn))
+            Assert.Equal(Nothing, GetSymbolNamesJoined(dataFlowResults.DataFlowsOut))
+            Assert.Equal(Nothing, GetSymbolNamesJoined(dataFlowResults.ReadInside))
+            Assert.Equal(Nothing, GetSymbolNamesJoined(dataFlowResults.WrittenInside))
+            Assert.Equal("x", GetSymbolNamesJoined(dataFlowResults.ReadOutside))
+            Assert.Equal("Me, x, s", GetSymbolNamesJoined(dataFlowResults.WrittenOutside))
         End Sub
 
         <Fact()>
@@ -8608,15 +9030,17 @@ End Class
 </compilation>)
 
             Assert.True(dataFlowResults.Succeeded)
-            Assert.Equal(Nothing, GetSymbolNamesSortedAndJoined(dataFlowResults.VariablesDeclared))
-            Assert.Equal(Nothing, GetSymbolNamesSortedAndJoined(dataFlowResults.AlwaysAssigned))
-            Assert.Equal(Nothing, GetSymbolNamesSortedAndJoined(dataFlowResults.Captured))
-            Assert.Equal("x", GetSymbolNamesSortedAndJoined(dataFlowResults.DataFlowsIn))
-            Assert.Equal(Nothing, GetSymbolNamesSortedAndJoined(dataFlowResults.DataFlowsOut))
-            Assert.Equal("x", GetSymbolNamesSortedAndJoined(dataFlowResults.ReadInside))
-            Assert.Equal(Nothing, GetSymbolNamesSortedAndJoined(dataFlowResults.WrittenInside))
-            Assert.Equal("x", GetSymbolNamesSortedAndJoined(dataFlowResults.ReadOutside))
-            Assert.Equal("Me, s, x", GetSymbolNamesSortedAndJoined(dataFlowResults.WrittenOutside))
+            Assert.Equal(Nothing, GetSymbolNamesJoined(dataFlowResults.VariablesDeclared))
+            Assert.Equal(Nothing, GetSymbolNamesJoined(dataFlowResults.AlwaysAssigned))
+            Assert.Equal(Nothing, GetSymbolNamesJoined(dataFlowResults.Captured))
+            Assert.Equal(Nothing, GetSymbolNamesJoined(dataFlowResults.CapturedInside))
+            Assert.Equal(Nothing, GetSymbolNamesJoined(dataFlowResults.CapturedOutside))
+            Assert.Equal("x", GetSymbolNamesJoined(dataFlowResults.DataFlowsIn))
+            Assert.Equal(Nothing, GetSymbolNamesJoined(dataFlowResults.DataFlowsOut))
+            Assert.Equal("x", GetSymbolNamesJoined(dataFlowResults.ReadInside))
+            Assert.Equal(Nothing, GetSymbolNamesJoined(dataFlowResults.WrittenInside))
+            Assert.Equal("x", GetSymbolNamesJoined(dataFlowResults.ReadOutside))
+            Assert.Equal("Me, x, s", GetSymbolNamesJoined(dataFlowResults.WrittenOutside))
         End Sub
 
         <Fact()>
@@ -8658,15 +9082,17 @@ End Class
 </compilation>)
 
             Assert.True(dataFlowResults.Succeeded)
-            Assert.Equal(Nothing, GetSymbolNamesSortedAndJoined(dataFlowResults.VariablesDeclared))
-            Assert.Equal(Nothing, GetSymbolNamesSortedAndJoined(dataFlowResults.AlwaysAssigned))
-            Assert.Equal("Me", GetSymbolNamesSortedAndJoined(dataFlowResults.Captured))
-            Assert.Equal("Me", GetSymbolNamesSortedAndJoined(dataFlowResults.DataFlowsIn))
-            Assert.Equal(Nothing, GetSymbolNamesSortedAndJoined(dataFlowResults.DataFlowsOut))
-            Assert.Equal("Me", GetSymbolNamesSortedAndJoined(dataFlowResults.ReadInside))
-            Assert.Equal(Nothing, GetSymbolNamesSortedAndJoined(dataFlowResults.WrittenInside))
-            Assert.Equal("Me", GetSymbolNamesSortedAndJoined(dataFlowResults.ReadOutside))
-            Assert.Equal("Me, s", GetSymbolNamesSortedAndJoined(dataFlowResults.WrittenOutside))
+            Assert.Equal(Nothing, GetSymbolNamesJoined(dataFlowResults.VariablesDeclared))
+            Assert.Equal(Nothing, GetSymbolNamesJoined(dataFlowResults.AlwaysAssigned))
+            Assert.Equal("Me", GetSymbolNamesJoined(dataFlowResults.Captured))
+            Assert.Equal("Me", GetSymbolNamesJoined(dataFlowResults.CapturedInside))
+            Assert.Equal(Nothing, GetSymbolNamesJoined(dataFlowResults.CapturedOutside))
+            Assert.Equal("Me", GetSymbolNamesJoined(dataFlowResults.DataFlowsIn))
+            Assert.Equal(Nothing, GetSymbolNamesJoined(dataFlowResults.DataFlowsOut))
+            Assert.Equal("Me", GetSymbolNamesJoined(dataFlowResults.ReadInside))
+            Assert.Equal(Nothing, GetSymbolNamesJoined(dataFlowResults.WrittenInside))
+            Assert.Equal("Me", GetSymbolNamesJoined(dataFlowResults.ReadOutside))
+            Assert.Equal("Me, s", GetSymbolNamesJoined(dataFlowResults.WrittenOutside))
         End Sub
 
         <Fact()>
@@ -8708,15 +9134,17 @@ End Class
 </compilation>)
 
             Assert.True(dataFlowResults.Succeeded)
-            Assert.Equal(Nothing, GetSymbolNamesSortedAndJoined(dataFlowResults.VariablesDeclared))
-            Assert.Equal(Nothing, GetSymbolNamesSortedAndJoined(dataFlowResults.AlwaysAssigned))
-            Assert.Equal(Nothing, GetSymbolNamesSortedAndJoined(dataFlowResults.Captured))
-            Assert.Equal(Nothing, GetSymbolNamesSortedAndJoined(dataFlowResults.DataFlowsIn))
-            Assert.Equal(Nothing, GetSymbolNamesSortedAndJoined(dataFlowResults.DataFlowsOut))
-            Assert.Equal(Nothing, GetSymbolNamesSortedAndJoined(dataFlowResults.ReadInside))
-            Assert.Equal(Nothing, GetSymbolNamesSortedAndJoined(dataFlowResults.WrittenInside))
-            Assert.Equal("Me", GetSymbolNamesSortedAndJoined(dataFlowResults.ReadOutside))
-            Assert.Equal("Me", GetSymbolNamesSortedAndJoined(dataFlowResults.WrittenOutside))
+            Assert.Equal(Nothing, GetSymbolNamesJoined(dataFlowResults.VariablesDeclared))
+            Assert.Equal(Nothing, GetSymbolNamesJoined(dataFlowResults.AlwaysAssigned))
+            Assert.Equal(Nothing, GetSymbolNamesJoined(dataFlowResults.Captured))
+            Assert.Equal(Nothing, GetSymbolNamesJoined(dataFlowResults.CapturedInside))
+            Assert.Equal(Nothing, GetSymbolNamesJoined(dataFlowResults.CapturedOutside))
+            Assert.Equal(Nothing, GetSymbolNamesJoined(dataFlowResults.DataFlowsIn))
+            Assert.Equal(Nothing, GetSymbolNamesJoined(dataFlowResults.DataFlowsOut))
+            Assert.Equal(Nothing, GetSymbolNamesJoined(dataFlowResults.ReadInside))
+            Assert.Equal(Nothing, GetSymbolNamesJoined(dataFlowResults.WrittenInside))
+            Assert.Equal("Me", GetSymbolNamesJoined(dataFlowResults.ReadOutside))
+            Assert.Equal("Me", GetSymbolNamesJoined(dataFlowResults.WrittenOutside))
         End Sub
 
         <Fact()>
@@ -8758,15 +9186,17 @@ End Class
 </compilation>)
 
             Assert.True(dataFlowResults.Succeeded)
-            Assert.Equal(Nothing, GetSymbolNamesSortedAndJoined(dataFlowResults.VariablesDeclared))
-            Assert.Equal("Me", GetSymbolNamesSortedAndJoined(dataFlowResults.AlwaysAssigned))
-            Assert.Equal(Nothing, GetSymbolNamesSortedAndJoined(dataFlowResults.Captured))
-            Assert.Equal(Nothing, GetSymbolNamesSortedAndJoined(dataFlowResults.DataFlowsIn))
-            Assert.Equal("Me", GetSymbolNamesSortedAndJoined(dataFlowResults.DataFlowsOut))
-            Assert.Equal(Nothing, GetSymbolNamesSortedAndJoined(dataFlowResults.ReadInside))
-            Assert.Equal("Me", GetSymbolNamesSortedAndJoined(dataFlowResults.WrittenInside))
-            Assert.Equal("Me", GetSymbolNamesSortedAndJoined(dataFlowResults.ReadOutside))
-            Assert.Equal("Me", GetSymbolNamesSortedAndJoined(dataFlowResults.WrittenOutside))
+            Assert.Equal(Nothing, GetSymbolNamesJoined(dataFlowResults.VariablesDeclared))
+            Assert.Equal("Me", GetSymbolNamesJoined(dataFlowResults.AlwaysAssigned))
+            Assert.Equal(Nothing, GetSymbolNamesJoined(dataFlowResults.Captured))
+            Assert.Equal(Nothing, GetSymbolNamesJoined(dataFlowResults.CapturedInside))
+            Assert.Equal(Nothing, GetSymbolNamesJoined(dataFlowResults.CapturedOutside))
+            Assert.Equal(Nothing, GetSymbolNamesJoined(dataFlowResults.DataFlowsIn))
+            Assert.Equal("Me", GetSymbolNamesJoined(dataFlowResults.DataFlowsOut))
+            Assert.Equal(Nothing, GetSymbolNamesJoined(dataFlowResults.ReadInside))
+            Assert.Equal("Me", GetSymbolNamesJoined(dataFlowResults.WrittenInside))
+            Assert.Equal("Me", GetSymbolNamesJoined(dataFlowResults.ReadOutside))
+            Assert.Equal("Me", GetSymbolNamesJoined(dataFlowResults.WrittenOutside))
         End Sub
 
         <Fact()>
@@ -8810,15 +9240,17 @@ End Class
 </compilation>)
 
             Assert.True(dataFlowResults.Succeeded)
-            Assert.Equal(Nothing, GetSymbolNamesSortedAndJoined(dataFlowResults.VariablesDeclared))
-            Assert.Equal(Nothing, GetSymbolNamesSortedAndJoined(dataFlowResults.AlwaysAssigned))
-            Assert.Equal("Me", GetSymbolNamesSortedAndJoined(dataFlowResults.Captured))
-            Assert.Equal("Me", GetSymbolNamesSortedAndJoined(dataFlowResults.DataFlowsIn))
-            Assert.Equal(Nothing, GetSymbolNamesSortedAndJoined(dataFlowResults.DataFlowsOut))
-            Assert.Equal("Me", GetSymbolNamesSortedAndJoined(dataFlowResults.ReadInside))
-            Assert.Equal(Nothing, GetSymbolNamesSortedAndJoined(dataFlowResults.WrittenInside))
-            Assert.Equal("Me", GetSymbolNamesSortedAndJoined(dataFlowResults.ReadOutside))
-            Assert.Equal("a, Me", GetSymbolNamesSortedAndJoined(dataFlowResults.WrittenOutside))
+            Assert.Equal(Nothing, GetSymbolNamesJoined(dataFlowResults.VariablesDeclared))
+            Assert.Equal(Nothing, GetSymbolNamesJoined(dataFlowResults.AlwaysAssigned))
+            Assert.Equal("Me", GetSymbolNamesJoined(dataFlowResults.Captured))
+            Assert.Equal("Me", GetSymbolNamesJoined(dataFlowResults.CapturedInside))
+            Assert.Equal(Nothing, GetSymbolNamesJoined(dataFlowResults.CapturedOutside))
+            Assert.Equal("Me", GetSymbolNamesJoined(dataFlowResults.DataFlowsIn))
+            Assert.Equal(Nothing, GetSymbolNamesJoined(dataFlowResults.DataFlowsOut))
+            Assert.Equal("Me", GetSymbolNamesJoined(dataFlowResults.ReadInside))
+            Assert.Equal(Nothing, GetSymbolNamesJoined(dataFlowResults.WrittenInside))
+            Assert.Equal("Me", GetSymbolNamesJoined(dataFlowResults.ReadOutside))
+            Assert.Equal("Me, a", GetSymbolNamesJoined(dataFlowResults.WrittenOutside))
         End Sub
 
         <Fact()>
@@ -8863,15 +9295,17 @@ End Class
 </compilation>)
 
             Assert.True(dataFlowResults.Succeeded)
-            Assert.Equal(Nothing, GetSymbolNamesSortedAndJoined(dataFlowResults.VariablesDeclared))
-            Assert.Equal(Nothing, GetSymbolNamesSortedAndJoined(dataFlowResults.AlwaysAssigned))
-            Assert.Equal("Me", GetSymbolNamesSortedAndJoined(dataFlowResults.Captured))
-            Assert.Equal("Me", GetSymbolNamesSortedAndJoined(dataFlowResults.DataFlowsIn))
-            Assert.Equal(Nothing, GetSymbolNamesSortedAndJoined(dataFlowResults.DataFlowsOut))
-            Assert.Equal("Me", GetSymbolNamesSortedAndJoined(dataFlowResults.ReadInside))
-            Assert.Equal(Nothing, GetSymbolNamesSortedAndJoined(dataFlowResults.WrittenInside))
-            Assert.Equal("arr, Me", GetSymbolNamesSortedAndJoined(dataFlowResults.ReadOutside))
-            Assert.Equal("a, Me", GetSymbolNamesSortedAndJoined(dataFlowResults.WrittenOutside))
+            Assert.Equal(Nothing, GetSymbolNamesJoined(dataFlowResults.VariablesDeclared))
+            Assert.Equal(Nothing, GetSymbolNamesJoined(dataFlowResults.AlwaysAssigned))
+            Assert.Equal("Me", GetSymbolNamesJoined(dataFlowResults.Captured))
+            Assert.Equal("Me", GetSymbolNamesJoined(dataFlowResults.CapturedInside))
+            Assert.Equal(Nothing, GetSymbolNamesJoined(dataFlowResults.CapturedOutside))
+            Assert.Equal("Me", GetSymbolNamesJoined(dataFlowResults.DataFlowsIn))
+            Assert.Equal(Nothing, GetSymbolNamesJoined(dataFlowResults.DataFlowsOut))
+            Assert.Equal("Me", GetSymbolNamesJoined(dataFlowResults.ReadInside))
+            Assert.Equal(Nothing, GetSymbolNamesJoined(dataFlowResults.WrittenInside))
+            Assert.Equal("Me, arr", GetSymbolNamesJoined(dataFlowResults.ReadOutside))
+            Assert.Equal("Me, a", GetSymbolNamesJoined(dataFlowResults.WrittenOutside))
         End Sub
 
 #End Region
@@ -8903,15 +9337,17 @@ End Module
 
             Dim dataFlowResults = analysis.Item2
             Assert.True(dataFlowResults.Succeeded)
-            Assert.Equal(Nothing, GetSymbolNamesSortedAndJoined(dataFlowResults.AlwaysAssigned))
-            Assert.Equal(Nothing, GetSymbolNamesSortedAndJoined(dataFlowResults.Captured))
-            Assert.Equal(Nothing, GetSymbolNamesSortedAndJoined(dataFlowResults.VariablesDeclared))
-            Assert.Equal("obj", GetSymbolNamesSortedAndJoined(dataFlowResults.DataFlowsIn))
-            Assert.Equal(Nothing, GetSymbolNamesSortedAndJoined(dataFlowResults.DataFlowsOut))
-            Assert.Equal("obj", GetSymbolNamesSortedAndJoined(dataFlowResults.ReadInside))
-            Assert.Equal(Nothing, GetSymbolNamesSortedAndJoined(dataFlowResults.WrittenInside))
-            Assert.Equal(Nothing, GetSymbolNamesSortedAndJoined(dataFlowResults.ReadOutside))
-            Assert.Equal("obj", GetSymbolNamesSortedAndJoined(dataFlowResults.WrittenOutside))
+            Assert.Equal(Nothing, GetSymbolNamesJoined(dataFlowResults.AlwaysAssigned))
+            Assert.Equal(Nothing, GetSymbolNamesJoined(dataFlowResults.Captured))
+            Assert.Equal(Nothing, GetSymbolNamesJoined(dataFlowResults.CapturedInside))
+            Assert.Equal(Nothing, GetSymbolNamesJoined(dataFlowResults.CapturedOutside))
+            Assert.Equal(Nothing, GetSymbolNamesJoined(dataFlowResults.VariablesDeclared))
+            Assert.Equal("obj", GetSymbolNamesJoined(dataFlowResults.DataFlowsIn))
+            Assert.Equal(Nothing, GetSymbolNamesJoined(dataFlowResults.DataFlowsOut))
+            Assert.Equal("obj", GetSymbolNamesJoined(dataFlowResults.ReadInside))
+            Assert.Equal(Nothing, GetSymbolNamesJoined(dataFlowResults.WrittenInside))
+            Assert.Equal(Nothing, GetSymbolNamesJoined(dataFlowResults.ReadOutside))
+            Assert.Equal("obj", GetSymbolNamesJoined(dataFlowResults.WrittenOutside))
         End Sub
 
         <Fact()>
@@ -8944,15 +9380,17 @@ End Module
 
             Dim dataFlowResults = analysis.Item2
             Assert.True(dataFlowResults.Succeeded)
-            Assert.Equal(Nothing, GetSymbolNamesSortedAndJoined(dataFlowResults.AlwaysAssigned))
-            Assert.Equal(Nothing, GetSymbolNamesSortedAndJoined(dataFlowResults.Captured))
-            Assert.Equal("obj4", GetSymbolNamesSortedAndJoined(dataFlowResults.VariablesDeclared))
-            Assert.Equal("obj1, obj2", GetSymbolNamesSortedAndJoined(dataFlowResults.DataFlowsIn))
-            Assert.Equal(Nothing, GetSymbolNamesSortedAndJoined(dataFlowResults.DataFlowsOut))
-            Assert.Equal("obj1, obj2, obj4", GetSymbolNamesSortedAndJoined(dataFlowResults.ReadInside))
-            Assert.Equal("obj3, obj4", GetSymbolNamesSortedAndJoined(dataFlowResults.WrittenInside))
-            Assert.Equal(Nothing, GetSymbolNamesSortedAndJoined(dataFlowResults.ReadOutside))
-            Assert.Equal("obj1, obj2", GetSymbolNamesSortedAndJoined(dataFlowResults.WrittenOutside))
+            Assert.Equal(Nothing, GetSymbolNamesJoined(dataFlowResults.AlwaysAssigned))
+            Assert.Equal(Nothing, GetSymbolNamesJoined(dataFlowResults.Captured))
+            Assert.Equal(Nothing, GetSymbolNamesJoined(dataFlowResults.CapturedInside))
+            Assert.Equal(Nothing, GetSymbolNamesJoined(dataFlowResults.CapturedOutside))
+            Assert.Equal("obj4", GetSymbolNamesJoined(dataFlowResults.VariablesDeclared))
+            Assert.Equal("obj1, obj2", GetSymbolNamesJoined(dataFlowResults.DataFlowsIn))
+            Assert.Equal(Nothing, GetSymbolNamesJoined(dataFlowResults.DataFlowsOut))
+            Assert.Equal("obj1, obj2, obj4", GetSymbolNamesJoined(dataFlowResults.ReadInside))
+            Assert.Equal("obj3, obj4", GetSymbolNamesJoined(dataFlowResults.WrittenInside))
+            Assert.Equal(Nothing, GetSymbolNamesJoined(dataFlowResults.ReadOutside))
+            Assert.Equal("obj1, obj2", GetSymbolNamesJoined(dataFlowResults.WrittenOutside))
         End Sub
 
         <Fact()>
@@ -8985,15 +9423,17 @@ End Module
 
             Dim dataFlowResults = analysis.Item2
             Assert.True(dataFlowResults.Succeeded)
-            Assert.Equal("obj3, obj4", GetSymbolNamesSortedAndJoined(dataFlowResults.AlwaysAssigned))
-            Assert.Equal(Nothing, GetSymbolNamesSortedAndJoined(dataFlowResults.Captured))
-            Assert.Equal("obj4", GetSymbolNamesSortedAndJoined(dataFlowResults.VariablesDeclared))
-            Assert.Equal(Nothing, GetSymbolNamesSortedAndJoined(dataFlowResults.DataFlowsIn))
-            Assert.Equal(Nothing, GetSymbolNamesSortedAndJoined(dataFlowResults.DataFlowsOut))
-            Assert.Equal("obj4", GetSymbolNamesSortedAndJoined(dataFlowResults.ReadInside))
-            Assert.Equal("obj3, obj4", GetSymbolNamesSortedAndJoined(dataFlowResults.WrittenInside))
-            Assert.Equal("obj1, obj2", GetSymbolNamesSortedAndJoined(dataFlowResults.ReadOutside))
-            Assert.Equal("obj1, obj2", GetSymbolNamesSortedAndJoined(dataFlowResults.WrittenOutside))
+            Assert.Equal("obj3, obj4", GetSymbolNamesJoined(dataFlowResults.AlwaysAssigned))
+            Assert.Equal(Nothing, GetSymbolNamesJoined(dataFlowResults.Captured))
+            Assert.Equal(Nothing, GetSymbolNamesJoined(dataFlowResults.CapturedInside))
+            Assert.Equal(Nothing, GetSymbolNamesJoined(dataFlowResults.CapturedOutside))
+            Assert.Equal("obj4", GetSymbolNamesJoined(dataFlowResults.VariablesDeclared))
+            Assert.Equal(Nothing, GetSymbolNamesJoined(dataFlowResults.DataFlowsIn))
+            Assert.Equal(Nothing, GetSymbolNamesJoined(dataFlowResults.DataFlowsOut))
+            Assert.Equal("obj4", GetSymbolNamesJoined(dataFlowResults.ReadInside))
+            Assert.Equal("obj3, obj4", GetSymbolNamesJoined(dataFlowResults.WrittenInside))
+            Assert.Equal("obj1, obj2", GetSymbolNamesJoined(dataFlowResults.ReadOutside))
+            Assert.Equal("obj1, obj2", GetSymbolNamesJoined(dataFlowResults.WrittenOutside))
         End Sub
 
         <Fact()>
@@ -9034,15 +9474,17 @@ End Module
 
             Dim dataFlowResults = analysis.Item2
             Assert.True(dataFlowResults.Succeeded)
-            Assert.Equal("obj4", GetSymbolNamesSortedAndJoined(dataFlowResults.AlwaysAssigned))
-            Assert.Equal(Nothing, GetSymbolNamesSortedAndJoined(dataFlowResults.Captured))
-            Assert.Equal("obj5, obj5", GetSymbolNamesSortedAndJoined(dataFlowResults.VariablesDeclared))
-            Assert.Equal("obj1, obj2", GetSymbolNamesSortedAndJoined(dataFlowResults.DataFlowsIn))
-            Assert.Equal("obj3, obj4", GetSymbolNamesSortedAndJoined(dataFlowResults.DataFlowsOut))
-            Assert.Equal("obj1, obj2, obj5, obj5", GetSymbolNamesSortedAndJoined(dataFlowResults.ReadInside))
-            Assert.Equal("obj2, obj3, obj4, obj5, obj5", GetSymbolNamesSortedAndJoined(dataFlowResults.WrittenInside))
-            Assert.Equal("obj3, obj4", GetSymbolNamesSortedAndJoined(dataFlowResults.ReadOutside))
-            Assert.Equal("obj1, obj2", GetSymbolNamesSortedAndJoined(dataFlowResults.WrittenOutside))
+            Assert.Equal("obj4", GetSymbolNamesJoined(dataFlowResults.AlwaysAssigned))
+            Assert.Equal(Nothing, GetSymbolNamesJoined(dataFlowResults.Captured))
+            Assert.Equal(Nothing, GetSymbolNamesJoined(dataFlowResults.CapturedInside))
+            Assert.Equal(Nothing, GetSymbolNamesJoined(dataFlowResults.CapturedOutside))
+            Assert.Equal("obj5, obj5", GetSymbolNamesJoined(dataFlowResults.VariablesDeclared))
+            Assert.Equal("obj1, obj2", GetSymbolNamesJoined(dataFlowResults.DataFlowsIn))
+            Assert.Equal("obj3, obj4", GetSymbolNamesJoined(dataFlowResults.DataFlowsOut))
+            Assert.Equal("obj1, obj2, obj5, obj5", GetSymbolNamesJoined(dataFlowResults.ReadInside))
+            Assert.Equal("obj2, obj3, obj4, obj5, obj5", GetSymbolNamesJoined(dataFlowResults.WrittenInside))
+            Assert.Equal("obj3, obj4", GetSymbolNamesJoined(dataFlowResults.ReadOutside))
+            Assert.Equal("obj1, obj2", GetSymbolNamesJoined(dataFlowResults.WrittenOutside))
         End Sub
 
         <Fact()>
@@ -9084,15 +9526,17 @@ End Module
 
             Dim dataFlowResults = analysis.Item2
             Assert.True(dataFlowResults.Succeeded)
-            Assert.Equal("obj2, obj4, obj5", GetSymbolNamesSortedAndJoined(dataFlowResults.AlwaysAssigned))
-            Assert.Equal(Nothing, GetSymbolNamesSortedAndJoined(dataFlowResults.Captured))
-            Assert.Equal("obj5", GetSymbolNamesSortedAndJoined(dataFlowResults.VariablesDeclared))
-            Assert.Equal(Nothing, GetSymbolNamesSortedAndJoined(dataFlowResults.DataFlowsIn))
-            Assert.Equal("obj4", GetSymbolNamesSortedAndJoined(dataFlowResults.DataFlowsOut))
-            Assert.Equal("obj5", GetSymbolNamesSortedAndJoined(dataFlowResults.ReadInside))
-            Assert.Equal("obj2, obj4, obj5", GetSymbolNamesSortedAndJoined(dataFlowResults.WrittenInside))
-            Assert.Equal("obj1, obj2, obj3, obj4, obj5", GetSymbolNamesSortedAndJoined(dataFlowResults.ReadOutside))
-            Assert.Equal("obj1, obj2, obj3, obj4, obj5", GetSymbolNamesSortedAndJoined(dataFlowResults.WrittenOutside))
+            Assert.Equal("obj2, obj4, obj5", GetSymbolNamesJoined(dataFlowResults.AlwaysAssigned))
+            Assert.Equal(Nothing, GetSymbolNamesJoined(dataFlowResults.Captured))
+            Assert.Equal(Nothing, GetSymbolNamesJoined(dataFlowResults.CapturedInside))
+            Assert.Equal(Nothing, GetSymbolNamesJoined(dataFlowResults.CapturedOutside))
+            Assert.Equal("obj5", GetSymbolNamesJoined(dataFlowResults.VariablesDeclared))
+            Assert.Equal(Nothing, GetSymbolNamesJoined(dataFlowResults.DataFlowsIn))
+            Assert.Equal("obj4", GetSymbolNamesJoined(dataFlowResults.DataFlowsOut))
+            Assert.Equal("obj5", GetSymbolNamesJoined(dataFlowResults.ReadInside))
+            Assert.Equal("obj2, obj4, obj5", GetSymbolNamesJoined(dataFlowResults.WrittenInside))
+            Assert.Equal("obj1, obj2, obj3, obj4, obj5", GetSymbolNamesJoined(dataFlowResults.ReadOutside))
+            Assert.Equal("obj1, obj2, obj3, obj4, obj5", GetSymbolNamesJoined(dataFlowResults.WrittenOutside))
         End Sub
 
         <Fact()>
@@ -9126,15 +9570,17 @@ End Module
 
             Dim dataFlowResults = analysis.Item2
             Assert.True(dataFlowResults.Succeeded)
-            Assert.Equal(Nothing, GetSymbolNamesSortedAndJoined(dataFlowResults.AlwaysAssigned))
-            Assert.Equal(Nothing, GetSymbolNamesSortedAndJoined(dataFlowResults.Captured))
-            Assert.Equal("obj4", GetSymbolNamesSortedAndJoined(dataFlowResults.VariablesDeclared))
-            Assert.Equal("obj1, obj2", GetSymbolNamesSortedAndJoined(dataFlowResults.DataFlowsIn))
-            Assert.Equal(Nothing, GetSymbolNamesSortedAndJoined(dataFlowResults.DataFlowsOut))
-            Assert.Equal("obj1, obj2, obj4", GetSymbolNamesSortedAndJoined(dataFlowResults.ReadInside))
-            Assert.Equal("obj3, obj4", GetSymbolNamesSortedAndJoined(dataFlowResults.WrittenInside))
-            Assert.Equal(Nothing, GetSymbolNamesSortedAndJoined(dataFlowResults.ReadOutside))
-            Assert.Equal("obj1, obj2", GetSymbolNamesSortedAndJoined(dataFlowResults.WrittenOutside))
+            Assert.Equal(Nothing, GetSymbolNamesJoined(dataFlowResults.AlwaysAssigned))
+            Assert.Equal(Nothing, GetSymbolNamesJoined(dataFlowResults.Captured))
+            Assert.Equal(Nothing, GetSymbolNamesJoined(dataFlowResults.CapturedInside))
+            Assert.Equal(Nothing, GetSymbolNamesJoined(dataFlowResults.CapturedOutside))
+            Assert.Equal("obj4", GetSymbolNamesJoined(dataFlowResults.VariablesDeclared))
+            Assert.Equal("obj1, obj2", GetSymbolNamesJoined(dataFlowResults.DataFlowsIn))
+            Assert.Equal(Nothing, GetSymbolNamesJoined(dataFlowResults.DataFlowsOut))
+            Assert.Equal("obj1, obj2, obj4", GetSymbolNamesJoined(dataFlowResults.ReadInside))
+            Assert.Equal("obj3, obj4", GetSymbolNamesJoined(dataFlowResults.WrittenInside))
+            Assert.Equal(Nothing, GetSymbolNamesJoined(dataFlowResults.ReadOutside))
+            Assert.Equal("obj1, obj2", GetSymbolNamesJoined(dataFlowResults.WrittenOutside))
         End Sub
 
         <Fact()>
@@ -9170,15 +9616,17 @@ End Module
 
             Dim dataFlowResults = analysis.Item2
             Assert.True(dataFlowResults.Succeeded)
-            Assert.Equal("obj3, obj4", GetSymbolNamesSortedAndJoined(dataFlowResults.AlwaysAssigned))
-            Assert.Equal(Nothing, GetSymbolNamesSortedAndJoined(dataFlowResults.Captured))
-            Assert.Equal("obj4", GetSymbolNamesSortedAndJoined(dataFlowResults.VariablesDeclared))
-            Assert.Equal("obj1, obj2", GetSymbolNamesSortedAndJoined(dataFlowResults.DataFlowsIn))
-            Assert.Equal(Nothing, GetSymbolNamesSortedAndJoined(dataFlowResults.DataFlowsOut))
-            Assert.Equal("obj1, obj2, obj4", GetSymbolNamesSortedAndJoined(dataFlowResults.ReadInside))
-            Assert.Equal("obj3, obj4", GetSymbolNamesSortedAndJoined(dataFlowResults.WrittenInside))
-            Assert.Equal(Nothing, GetSymbolNamesSortedAndJoined(dataFlowResults.ReadOutside))
-            Assert.Equal("obj1, obj2", GetSymbolNamesSortedAndJoined(dataFlowResults.WrittenOutside))
+            Assert.Equal("obj3, obj4", GetSymbolNamesJoined(dataFlowResults.AlwaysAssigned))
+            Assert.Equal(Nothing, GetSymbolNamesJoined(dataFlowResults.Captured))
+            Assert.Equal(Nothing, GetSymbolNamesJoined(dataFlowResults.CapturedInside))
+            Assert.Equal(Nothing, GetSymbolNamesJoined(dataFlowResults.CapturedOutside))
+            Assert.Equal("obj4", GetSymbolNamesJoined(dataFlowResults.VariablesDeclared))
+            Assert.Equal("obj1, obj2", GetSymbolNamesJoined(dataFlowResults.DataFlowsIn))
+            Assert.Equal(Nothing, GetSymbolNamesJoined(dataFlowResults.DataFlowsOut))
+            Assert.Equal("obj1, obj2, obj4", GetSymbolNamesJoined(dataFlowResults.ReadInside))
+            Assert.Equal("obj3, obj4", GetSymbolNamesJoined(dataFlowResults.WrittenInside))
+            Assert.Equal(Nothing, GetSymbolNamesJoined(dataFlowResults.ReadOutside))
+            Assert.Equal("obj1, obj2", GetSymbolNamesJoined(dataFlowResults.WrittenOutside))
         End Sub
 
         <Fact()>
@@ -9219,15 +9667,17 @@ End Module
 
             Dim dataFlowResults = analysis.Item2
             Assert.True(dataFlowResults.Succeeded)
-            Assert.Equal(Nothing, GetSymbolNamesSortedAndJoined(dataFlowResults.AlwaysAssigned))
-            Assert.Equal(Nothing, GetSymbolNamesSortedAndJoined(dataFlowResults.Captured))
-            Assert.Equal("obj5, obj5", GetSymbolNamesSortedAndJoined(dataFlowResults.VariablesDeclared))
-            Assert.Equal("obj1, obj2, obj3", GetSymbolNamesSortedAndJoined(dataFlowResults.DataFlowsIn))
-            Assert.Equal("obj3, obj4", GetSymbolNamesSortedAndJoined(dataFlowResults.DataFlowsOut))
-            Assert.Equal("obj1, obj2, obj3, obj5, obj5", GetSymbolNamesSortedAndJoined(dataFlowResults.ReadInside))
-            Assert.Equal("obj2, obj3, obj4, obj5, obj5", GetSymbolNamesSortedAndJoined(dataFlowResults.WrittenInside))
-            Assert.Equal("obj3, obj4", GetSymbolNamesSortedAndJoined(dataFlowResults.ReadOutside))
-            Assert.Equal("obj1, obj2", GetSymbolNamesSortedAndJoined(dataFlowResults.WrittenOutside))
+            Assert.Equal(Nothing, GetSymbolNamesJoined(dataFlowResults.AlwaysAssigned))
+            Assert.Equal(Nothing, GetSymbolNamesJoined(dataFlowResults.Captured))
+            Assert.Equal(Nothing, GetSymbolNamesJoined(dataFlowResults.CapturedInside))
+            Assert.Equal(Nothing, GetSymbolNamesJoined(dataFlowResults.CapturedOutside))
+            Assert.Equal("obj5, obj5", GetSymbolNamesJoined(dataFlowResults.VariablesDeclared))
+            Assert.Equal("obj1, obj2, obj3", GetSymbolNamesJoined(dataFlowResults.DataFlowsIn))
+            Assert.Equal("obj3, obj4", GetSymbolNamesJoined(dataFlowResults.DataFlowsOut))
+            Assert.Equal("obj1, obj2, obj3, obj5, obj5", GetSymbolNamesJoined(dataFlowResults.ReadInside))
+            Assert.Equal("obj2, obj3, obj4, obj5, obj5", GetSymbolNamesJoined(dataFlowResults.WrittenInside))
+            Assert.Equal("obj3, obj4", GetSymbolNamesJoined(dataFlowResults.ReadOutside))
+            Assert.Equal("obj1, obj2", GetSymbolNamesJoined(dataFlowResults.WrittenOutside))
         End Sub
 
         <Fact()>
@@ -9263,15 +9713,17 @@ End Module
 
             Dim dataFlowResults = analysis.Item2
             Assert.True(dataFlowResults.Succeeded)
-            Assert.Equal(Nothing, GetSymbolNamesSortedAndJoined(dataFlowResults.AlwaysAssigned))
-            Assert.Equal(Nothing, GetSymbolNamesSortedAndJoined(dataFlowResults.Captured))
-            Assert.Equal("obj4", GetSymbolNamesSortedAndJoined(dataFlowResults.VariablesDeclared))
-            Assert.Equal("obj1, obj2, obj3", GetSymbolNamesSortedAndJoined(dataFlowResults.DataFlowsIn))
-            Assert.Equal(Nothing, GetSymbolNamesSortedAndJoined(dataFlowResults.DataFlowsOut))
-            Assert.Equal("obj1, obj2, obj3, obj4", GetSymbolNamesSortedAndJoined(dataFlowResults.ReadInside))
-            Assert.Equal("obj3, obj4", GetSymbolNamesSortedAndJoined(dataFlowResults.WrittenInside))
-            Assert.Equal(Nothing, GetSymbolNamesSortedAndJoined(dataFlowResults.ReadOutside))
-            Assert.Equal("obj1, obj2", GetSymbolNamesSortedAndJoined(dataFlowResults.WrittenOutside))
+            Assert.Equal(Nothing, GetSymbolNamesJoined(dataFlowResults.AlwaysAssigned))
+            Assert.Equal(Nothing, GetSymbolNamesJoined(dataFlowResults.Captured))
+            Assert.Equal(Nothing, GetSymbolNamesJoined(dataFlowResults.CapturedInside))
+            Assert.Equal(Nothing, GetSymbolNamesJoined(dataFlowResults.CapturedOutside))
+            Assert.Equal("obj4", GetSymbolNamesJoined(dataFlowResults.VariablesDeclared))
+            Assert.Equal("obj1, obj2, obj3", GetSymbolNamesJoined(dataFlowResults.DataFlowsIn))
+            Assert.Equal(Nothing, GetSymbolNamesJoined(dataFlowResults.DataFlowsOut))
+            Assert.Equal("obj1, obj2, obj3, obj4", GetSymbolNamesJoined(dataFlowResults.ReadInside))
+            Assert.Equal("obj3, obj4", GetSymbolNamesJoined(dataFlowResults.WrittenInside))
+            Assert.Equal(Nothing, GetSymbolNamesJoined(dataFlowResults.ReadOutside))
+            Assert.Equal("obj1, obj2", GetSymbolNamesJoined(dataFlowResults.WrittenOutside))
         End Sub
 
         <Fact()>
@@ -9294,14 +9746,16 @@ End Module
   </file>
       </compilation>)
             Assert.True(dataFlowResults.Succeeded)
-            Assert.Equal(Nothing, GetSymbolNamesSortedAndJoined(dataFlowResults.AlwaysAssigned))
-            Assert.Equal(Nothing, GetSymbolNamesSortedAndJoined(dataFlowResults.Captured))
-            Assert.Equal(Nothing, GetSymbolNamesSortedAndJoined(dataFlowResults.VariablesDeclared))
-            Assert.Equal(Nothing, GetSymbolNamesSortedAndJoined(dataFlowResults.DataFlowsOut))
-            Assert.Equal("obj2", GetSymbolNamesSortedAndJoined(dataFlowResults.ReadInside))
-            Assert.Equal(Nothing, GetSymbolNamesSortedAndJoined(dataFlowResults.WrittenInside))
-            Assert.Equal("obj1", GetSymbolNamesSortedAndJoined(dataFlowResults.ReadOutside))
-            Assert.Equal("obj1, obj2, obj3", GetSymbolNamesSortedAndJoined(dataFlowResults.WrittenOutside))
+            Assert.Equal(Nothing, GetSymbolNamesJoined(dataFlowResults.AlwaysAssigned))
+            Assert.Equal(Nothing, GetSymbolNamesJoined(dataFlowResults.Captured))
+            Assert.Equal(Nothing, GetSymbolNamesJoined(dataFlowResults.CapturedInside))
+            Assert.Equal(Nothing, GetSymbolNamesJoined(dataFlowResults.CapturedOutside))
+            Assert.Equal(Nothing, GetSymbolNamesJoined(dataFlowResults.VariablesDeclared))
+            Assert.Equal(Nothing, GetSymbolNamesJoined(dataFlowResults.DataFlowsOut))
+            Assert.Equal("obj2", GetSymbolNamesJoined(dataFlowResults.ReadInside))
+            Assert.Equal(Nothing, GetSymbolNamesJoined(dataFlowResults.WrittenInside))
+            Assert.Equal("obj1", GetSymbolNamesJoined(dataFlowResults.ReadOutside))
+            Assert.Equal("obj1, obj2, obj3", GetSymbolNamesJoined(dataFlowResults.WrittenOutside))
         End Sub
 
         <Fact()>
@@ -9342,18 +9796,20 @@ End Module
 
             Dim dataFlowResults = analysis.Item2
             Assert.True(dataFlowResults.Succeeded)
-            Assert.Equal("obj2, obj4, obj5", GetSymbolNamesSortedAndJoined(dataFlowResults.AlwaysAssigned))
-            Assert.Equal(Nothing, GetSymbolNamesSortedAndJoined(dataFlowResults.Captured))
-            Assert.Equal("obj5", GetSymbolNamesSortedAndJoined(dataFlowResults.VariablesDeclared))
-            Assert.Equal(Nothing, GetSymbolNamesSortedAndJoined(dataFlowResults.DataFlowsIn))
-            Assert.Equal("obj4", GetSymbolNamesSortedAndJoined(dataFlowResults.DataFlowsOut))
-            Assert.Equal("obj5", GetSymbolNamesSortedAndJoined(dataFlowResults.ReadInside))
-            Assert.Equal("obj2, obj4, obj5", GetSymbolNamesSortedAndJoined(dataFlowResults.WrittenInside))
-            Assert.Equal("obj1, obj2, obj3, obj4, obj5", GetSymbolNamesSortedAndJoined(dataFlowResults.ReadOutside))
-            Assert.Equal("obj1, obj2, obj3, obj4, obj5", GetSymbolNamesSortedAndJoined(dataFlowResults.WrittenOutside))
+            Assert.Equal("obj2, obj4, obj5", GetSymbolNamesJoined(dataFlowResults.AlwaysAssigned))
+            Assert.Equal(Nothing, GetSymbolNamesJoined(dataFlowResults.Captured))
+            Assert.Equal(Nothing, GetSymbolNamesJoined(dataFlowResults.CapturedInside))
+            Assert.Equal(Nothing, GetSymbolNamesJoined(dataFlowResults.CapturedOutside))
+            Assert.Equal("obj5", GetSymbolNamesJoined(dataFlowResults.VariablesDeclared))
+            Assert.Equal(Nothing, GetSymbolNamesJoined(dataFlowResults.DataFlowsIn))
+            Assert.Equal("obj4", GetSymbolNamesJoined(dataFlowResults.DataFlowsOut))
+            Assert.Equal("obj5", GetSymbolNamesJoined(dataFlowResults.ReadInside))
+            Assert.Equal("obj2, obj4, obj5", GetSymbolNamesJoined(dataFlowResults.WrittenInside))
+            Assert.Equal("obj1, obj2, obj3, obj4, obj5", GetSymbolNamesJoined(dataFlowResults.ReadOutside))
+            Assert.Equal("obj1, obj2, obj3, obj4, obj5", GetSymbolNamesJoined(dataFlowResults.WrittenOutside))
         End Sub
 
-        <WorkItem(529089, "DevDiv")>
+        <WorkItem(529089, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/529089")>
         <Fact>
         Public Sub CaseClauseNotReachable()
             Dim analysis = CompileAndAnalyzeControlAndDataFlow(
@@ -9379,21 +9835,23 @@ End Module
 
             Dim dataFlowResults = analysis.Item2
             Assert.True(dataFlowResults.Succeeded)
-            Assert.Equal("x", GetSymbolNamesSortedAndJoined(dataFlowResults.AlwaysAssigned))
-            Assert.Equal(Nothing, GetSymbolNamesSortedAndJoined(dataFlowResults.Captured))
-            Assert.Equal(Nothing, GetSymbolNamesSortedAndJoined(dataFlowResults.VariablesDeclared))
-            Assert.Equal("x", GetSymbolNamesSortedAndJoined(dataFlowResults.DataFlowsIn))
-            Assert.Equal(Nothing, GetSymbolNamesSortedAndJoined(dataFlowResults.DataFlowsOut))
-            Assert.Equal("x", GetSymbolNamesSortedAndJoined(dataFlowResults.ReadInside))
-            Assert.Equal("x", GetSymbolNamesSortedAndJoined(dataFlowResults.WrittenInside))
-            Assert.Equal(Nothing, GetSymbolNamesSortedAndJoined(dataFlowResults.ReadOutside))
-            Assert.Equal("args, x", GetSymbolNamesSortedAndJoined(dataFlowResults.WrittenOutside))
+            Assert.Equal("x", GetSymbolNamesJoined(dataFlowResults.AlwaysAssigned))
+            Assert.Equal(Nothing, GetSymbolNamesJoined(dataFlowResults.Captured))
+            Assert.Equal(Nothing, GetSymbolNamesJoined(dataFlowResults.CapturedInside))
+            Assert.Equal(Nothing, GetSymbolNamesJoined(dataFlowResults.CapturedOutside))
+            Assert.Equal(Nothing, GetSymbolNamesJoined(dataFlowResults.VariablesDeclared))
+            Assert.Equal("x", GetSymbolNamesJoined(dataFlowResults.DataFlowsIn))
+            Assert.Equal(Nothing, GetSymbolNamesJoined(dataFlowResults.DataFlowsOut))
+            Assert.Equal("x", GetSymbolNamesJoined(dataFlowResults.ReadInside))
+            Assert.Equal("x", GetSymbolNamesJoined(dataFlowResults.WrittenInside))
+            Assert.Equal(Nothing, GetSymbolNamesJoined(dataFlowResults.ReadOutside))
+            Assert.Equal("args, x", GetSymbolNamesJoined(dataFlowResults.WrittenOutside))
         End Sub
 
-        <WorkItem(543402, "DevDiv")>
+        <WorkItem(543402, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/543402")>
         <Fact()>
         Public Sub EndSelectStatement()
-            Dim compilation = CreateCompilationWithMscorlibAndVBRuntime(
+            Dim compilation = CreateCompilationWithMscorlib40AndVBRuntime(
    <compilation>
        <file name="a.vb">
 Module Program
@@ -9407,16 +9865,16 @@ End Module
 
             Dim tree = compilation.SyntaxTrees.First()
             Dim model = compilation.GetSemanticModel(tree)
-            Dim stmtNode = DirectCast(tree.GetCompilationUnitRoot().FindToken(tree.GetRoot.ToFullString().IndexOf("End Select")).Parent, StatementSyntax)
+            Dim stmtNode = DirectCast(tree.GetCompilationUnitRoot().FindToken(tree.GetRoot.ToFullString().IndexOf("End Select", StringComparison.Ordinal)).Parent, StatementSyntax)
             Dim analysis = model.AnalyzeControlFlow(stmtNode, stmtNode)
 
             Assert.False(analysis.Succeeded)
         End Sub
 
-        <WorkItem(543434, "DevDiv")>
+        <WorkItem(543434, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/543434")>
         <Fact()>
         Public Sub SelectCaseStatement()
-            Dim compilation = CreateCompilationWithMscorlibAndVBRuntime(
+            Dim compilation = CreateCompilationWithMscorlib40AndVBRuntime(
    <compilation>
        <file name="a.vb">
 Module Program
@@ -9430,13 +9888,13 @@ End Module
 
             Dim tree = compilation.SyntaxTrees.First()
             Dim model = compilation.GetSemanticModel(tree)
-            Dim stmtNode = DirectCast(tree.GetCompilationUnitRoot().FindToken(tree.GetRoot.ToFullString().IndexOf("Select Case")).Parent, StatementSyntax)
+            Dim stmtNode = DirectCast(tree.GetCompilationUnitRoot().FindToken(tree.GetRoot.ToFullString().IndexOf("Select Case", StringComparison.Ordinal)).Parent, StatementSyntax)
             Dim analysis = model.AnalyzeControlFlow(stmtNode, stmtNode)
 
             Assert.False(analysis.Succeeded)
         End Sub
 
-        <Fact, WorkItem(543492, "DevDiv")>
+        <Fact, WorkItem(543492, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/543492")>
         Public Sub MyBaseExpressionSyntax()
             Dim source =
 <compilation>
@@ -9458,27 +9916,31 @@ Public Class MyClass : Inherits BaseClass
 End Class
     </file>
 </compilation>
-            Dim comp = CreateCompilationWithMscorlib(source)
+            Dim comp = CreateCompilationWithMscorlib40(source)
             Dim tree = comp.SyntaxTrees.Single()
             Dim model = comp.GetSemanticModel(tree)
 
             Dim invocation = tree.GetCompilationUnitRoot().DescendantNodes().OfType(Of InvocationExpressionSyntax)().Single()
             Dim flowAnalysis = model.AnalyzeDataFlow(invocation)
             Assert.Empty(flowAnalysis.Captured)
-            Assert.Equal("[Me] As [MyClass]", flowAnalysis.DataFlowsIn.Single().ToTestDisplayString())
+            Assert.Empty(flowAnalysis.CapturedInside)
+            Assert.Empty(flowAnalysis.CapturedOutside)
+            Assert.Equal("Me As [MyClass]", flowAnalysis.DataFlowsIn.Single().ToTestDisplayString())
             Assert.Empty(flowAnalysis.DataFlowsOut)
-            Assert.Equal("[Me] As [MyClass]", flowAnalysis.ReadInside.Single().ToTestDisplayString())
+            Assert.Equal("Me As [MyClass]", flowAnalysis.ReadInside.Single().ToTestDisplayString())
             Assert.Empty(flowAnalysis.WrittenInside)
-            Assert.Equal("[Me] As [MyClass]", flowAnalysis.WrittenOutside.Single().ToTestDisplayString())
+            Assert.Equal("Me As [MyClass]", flowAnalysis.WrittenOutside.Single().ToTestDisplayString())
 
             Dim lambda = tree.GetCompilationUnitRoot().DescendantNodes().OfType(Of LambdaExpressionSyntax)().Single()
             flowAnalysis = model.AnalyzeDataFlow(lambda)
-            Assert.Equal("[Me] As [MyClass]", flowAnalysis.Captured.Single().ToTestDisplayString())
-            Assert.Equal("[Me] As [MyClass]", flowAnalysis.DataFlowsIn.Single().ToTestDisplayString())
+            Assert.Equal("Me As [MyClass]", flowAnalysis.Captured.Single().ToTestDisplayString())
+            Assert.Equal("Me As [MyClass]", flowAnalysis.CapturedInside.Single().ToTestDisplayString())
+            Assert.Empty(flowAnalysis.CapturedOutside)
+            Assert.Equal("Me As [MyClass]", flowAnalysis.DataFlowsIn.Single().ToTestDisplayString())
             Assert.Empty(flowAnalysis.DataFlowsOut)
-            Assert.Equal("[Me] As [MyClass]", flowAnalysis.ReadInside.Single().ToTestDisplayString())
+            Assert.Equal("Me As [MyClass]", flowAnalysis.ReadInside.Single().ToTestDisplayString())
             Assert.Empty(flowAnalysis.WrittenInside)
-            Assert.Equal("f, Me", GetSymbolNamesSortedAndJoined(flowAnalysis.WrittenOutside))
+            Assert.Equal("Me, f", GetSymbolNamesJoined(flowAnalysis.WrittenOutside))
         End Sub
 
 #End Region
@@ -9511,21 +9973,29 @@ End Module
                 Optional captured() As String = Nothing,
                 Optional dataFlowsIn() As String = Nothing,
                 Optional dataFlowsOut() As String = Nothing,
+                Optional definitelyAssignedOnEntry() As String = Nothing,
+                Optional definitelyAssignedOnExit() As String = Nothing,
                 Optional readInside() As String = Nothing,
                 Optional readOutside() As String = Nothing,
                 Optional variablesDeclared() As String = Nothing,
                 Optional writtenInside() As String = Nothing,
-                Optional writtenOutside() As String = Nothing)
+                Optional writtenOutside() As String = Nothing,
+                Optional capturedInside() As String = Nothing,
+                Optional capturedOutside() As String = Nothing)
             VerifyDataFlowAnalysis(GetSourceXElementFromTemplate(code),
                                    alwaysAssigned,
                                    captured,
                                    dataFlowsIn,
                                    dataFlowsOut,
+                                   definitelyAssignedOnEntry,
+                                   definitelyAssignedOnExit,
                                    readInside,
                                    readOutside,
                                    variablesDeclared,
                                    writtenInside,
-                                   writtenOutside)
+                                   writtenOutside,
+                                   capturedInside,
+                                   capturedOutside)
         End Sub
 
 #End Region

@@ -1,18 +1,22 @@
-﻿// Copyright (c) Microsoft.  All Rights Reserved.  Licensed under the Apache License, Version 2.0.  See License.txt in the project root for license information.
+﻿// Licensed to the .NET Foundation under one or more agreements.
+// The .NET Foundation licenses this file to you under the MIT license.
+// See the LICENSE file in the project root for more information.
 
 using System;
 using System.Collections.Immutable;
 using System.Diagnostics;
+using System.IO;
 using System.Linq;
 using System.Reflection.Metadata;
 using Microsoft.CodeAnalysis.CodeGen;
+using Microsoft.CodeAnalysis.PooledObjects;
 
 namespace Microsoft.CodeAnalysis.Emit
 {
     /// <summary>
     /// Debugging information associated with the specified method that is emitted by the compiler to support Edit and Continue.
     /// </summary>
-    public struct EditAndContinueMethodDebugInformation
+    public readonly struct EditAndContinueMethodDebugInformation
     {
         internal readonly int MethodOrdinal;
         internal readonly ImmutableArray<LocalSlotDebugInfo> LocalSlots;
@@ -23,64 +27,51 @@ namespace Microsoft.CodeAnalysis.Emit
         {
             Debug.Assert(methodOrdinal >= -1);
 
-            this.MethodOrdinal = methodOrdinal;
-            this.LocalSlots = localSlots;
-            this.Lambdas = lambdas;
-            this.Closures = closures;
+            MethodOrdinal = methodOrdinal;
+            LocalSlots = localSlots;
+            Lambdas = lambdas;
+            Closures = closures;
         }
 
+        /// <summary>
+        /// Deserializes Edit and Continue method debug information from specified blobs.
+        /// </summary>
+        /// <param name="compressedSlotMap">Local variable slot map.</param>
+        /// <param name="compressedLambdaMap">Lambda and closure map.</param>
+        /// <exception cref="InvalidDataException">Invalid data.</exception>
         public static EditAndContinueMethodDebugInformation Create(ImmutableArray<byte> compressedSlotMap, ImmutableArray<byte> compressedLambdaMap)
         {
-            int methodOrdinal;
-            ImmutableArray<ClosureDebugInfo> closures;
-            ImmutableArray<LambdaDebugInfo> lambdas;
-            UncompressLambdaMap(compressedLambdaMap, out methodOrdinal, out closures, out lambdas);
+            UncompressLambdaMap(compressedLambdaMap, out var methodOrdinal, out var closures, out var lambdas);
             return new EditAndContinueMethodDebugInformation(methodOrdinal, UncompressSlotMap(compressedSlotMap), closures, lambdas);
         }
 
-        internal void SerializeCustomDebugInformation(ArrayBuilder<Cci.MemoryStream> customDebugInfo)
+        private static InvalidDataException CreateInvalidDataException(ImmutableArray<byte> data, int offset)
         {
-            if (!this.LocalSlots.IsDefaultOrEmpty)
-            {
-                customDebugInfo.Add(SerializeRecord(Cci.CustomDebugInfoConstants.CdiKindEditAndContinueLocalSlotMap, SerializeLocalSlots));
-            }
+            const int maxReportedLength = 1024;
 
-            if (!this.Lambdas.IsDefaultOrEmpty)
-            {
-                customDebugInfo.Add(SerializeRecord(Cci.CustomDebugInfoConstants.CdiKindEditAndContinueLambdaMap, SerializeLambdaMap));
-            }
-        }
+            int start = Math.Max(0, offset - maxReportedLength / 2);
+            int end = Math.Min(data.Length, offset + maxReportedLength / 2);
 
-        private Cci.MemoryStream SerializeRecord(byte kind, Action<Cci.BinaryWriter> data)
-        {
-            Cci.MemoryStream customMetadata = new Cci.MemoryStream();
-            Cci.BinaryWriter cmw = new Cci.BinaryWriter(customMetadata);
-            cmw.WriteByte(Cci.CustomDebugInfoConstants.CdiVersion);
-            cmw.WriteByte(kind); 
-            cmw.Align(4);
+            byte[] left = new byte[offset - start];
+            data.CopyTo(start, left, 0, left.Length);
 
-            // length (will be patched)
-            uint lengthPosition = cmw.BaseStream.Position;
-            cmw.WriteUint(0);
+            byte[] right = new byte[end - offset];
+            data.CopyTo(offset, right, 0, right.Length);
 
-            data(cmw);
-
-            uint length = customMetadata.Position;
-            cmw.BaseStream.Position = lengthPosition;
-            cmw.WriteUint(length);
-            cmw.BaseStream.Position = length;
-            return customMetadata;
+            throw new InvalidDataException(string.Format(CodeAnalysisResources.InvalidDataAtOffset,
+                offset, (start != 0) ? "..." : "", BitConverter.ToString(left), BitConverter.ToString(right), (end != data.Length) ? "..." : ""));
         }
 
         #region Local Slots
 
         private const byte SyntaxOffsetBaseline = 0xff;
 
-        private unsafe static ImmutableArray<LocalSlotDebugInfo> UncompressSlotMap(ImmutableArray<byte> compressedSlotMap)
+        /// <exception cref="InvalidDataException">Invalid data.</exception>
+        private static unsafe ImmutableArray<LocalSlotDebugInfo> UncompressSlotMap(ImmutableArray<byte> compressedSlotMap)
         {
             if (compressedSlotMap.IsDefaultOrEmpty)
             {
-                return default(ImmutableArray<LocalSlotDebugInfo>);
+                return default;
             }
 
             var mapBuilder = ArrayBuilder<LocalSlotDebugInfo>.GetInstance();
@@ -91,52 +82,48 @@ namespace Microsoft.CodeAnalysis.Emit
                 var blobReader = new BlobReader(compressedSlotMapPtr, compressedSlotMap.Length);
                 while (blobReader.RemainingBytes > 0)
                 {
-                    byte b = blobReader.ReadByte();
-
-                    if (b == SyntaxOffsetBaseline)
+                    try
                     {
-                        syntaxOffsetBaseline = -blobReader.ReadCompressedInteger();
-                        continue;
-                    }
+                        // Note: integer operations below can't overflow since compressed integers are in range [0, 0x20000000)
 
-                    if (b == 0)
+                        byte b = blobReader.ReadByte();
+
+                        if (b == SyntaxOffsetBaseline)
+                        {
+                            syntaxOffsetBaseline = -blobReader.ReadCompressedInteger();
+                            continue;
+                        }
+
+                        if (b == 0)
+                        {
+                            // short-lived temp, no info
+                            mapBuilder.Add(new LocalSlotDebugInfo(SynthesizedLocalKind.LoweringTemp, default));
+                            continue;
+                        }
+
+                        var kind = (SynthesizedLocalKind)((b & 0x3f) - 1);
+                        bool hasOrdinal = (b & (1 << 7)) != 0;
+
+                        int syntaxOffset = blobReader.ReadCompressedInteger() + syntaxOffsetBaseline;
+
+                        int ordinal = hasOrdinal ? blobReader.ReadCompressedInteger() : 0;
+
+                        mapBuilder.Add(new LocalSlotDebugInfo(kind, new LocalDebugId(syntaxOffset, ordinal)));
+                    }
+                    catch (BadImageFormatException)
                     {
-                        // short-lived temp, no info
-                        mapBuilder.Add(new LocalSlotDebugInfo(SynthesizedLocalKind.LoweringTemp, default(LocalDebugId)));
-                        continue;
+                        throw CreateInvalidDataException(compressedSlotMap, blobReader.Offset);
                     }
-
-                    var kind = (SynthesizedLocalKind)((b & 0x3f) - 1);
-                    bool hasOrdinal = (b & (1 << 7)) != 0;
-
-                    int syntaxOffset;
-                    if (!blobReader.TryReadCompressedInteger(out syntaxOffset))
-                    {
-                        // invalid data
-                        return default(ImmutableArray<LocalSlotDebugInfo>);
-                    }
-
-                    syntaxOffset += syntaxOffsetBaseline;
-
-                    int ordinal = 0;
-                    if (hasOrdinal && !blobReader.TryReadCompressedInteger(out ordinal))
-                    {
-                        // invalid data
-                        return default(ImmutableArray<LocalSlotDebugInfo>);
-                    }
-
-                    mapBuilder.Add(new LocalSlotDebugInfo(kind, new LocalDebugId(syntaxOffset, ordinal)));
                 }
             }
 
             return mapBuilder.ToImmutableAndFree();
         }
 
-        // internal for testing
-        internal void SerializeLocalSlots(Cci.BinaryWriter writer)
+        internal void SerializeLocalSlots(BlobBuilder writer)
         {
             int syntaxOffsetBaseline = -1;
-            foreach (LocalSlotDebugInfo localSlot in this.LocalSlots)
+            foreach (LocalSlotDebugInfo localSlot in LocalSlots)
             {
                 if (localSlot.Id.SyntaxOffset < syntaxOffsetBaseline)
                 {
@@ -147,10 +134,10 @@ namespace Microsoft.CodeAnalysis.Emit
             if (syntaxOffsetBaseline != -1)
             {
                 writer.WriteByte(SyntaxOffsetBaseline);
-                writer.WriteCompressedUInt((uint)(-syntaxOffsetBaseline));
+                writer.WriteCompressedInteger(-syntaxOffsetBaseline);
             }
 
-            foreach (LocalSlotDebugInfo localSlot in this.LocalSlots)
+            foreach (LocalSlotDebugInfo localSlot in LocalSlots)
             {
                 SynthesizedLocalKind kind = localSlot.SynthesizedKind;
                 Debug.Assert(kind <= SynthesizedLocalKind.MaxValidValueForLocalVariableSerializedToDebugInformation);
@@ -172,11 +159,11 @@ namespace Microsoft.CodeAnalysis.Emit
                 }
 
                 writer.WriteByte(b);
-                writer.WriteCompressedUInt((uint)(localSlot.Id.SyntaxOffset - syntaxOffsetBaseline));
+                writer.WriteCompressedInteger(localSlot.Id.SyntaxOffset - syntaxOffsetBaseline);
 
                 if (hasOrdinal)
                 {
-                    writer.WriteCompressedUInt((uint)localSlot.Id.Ordinal);
+                    writer.WriteCompressedInteger(localSlot.Id.Ordinal);
                 }
             }
         }
@@ -185,15 +172,15 @@ namespace Microsoft.CodeAnalysis.Emit
 
         #region Lambdas
 
-        private unsafe static void UncompressLambdaMap(
+        private static unsafe void UncompressLambdaMap(
             ImmutableArray<byte> compressedLambdaMap,
             out int methodOrdinal,
-            out ImmutableArray<ClosureDebugInfo> closures, 
+            out ImmutableArray<ClosureDebugInfo> closures,
             out ImmutableArray<LambdaDebugInfo> lambdas)
         {
-            methodOrdinal = MethodDebugId.UndefinedOrdinal;
-            closures = default(ImmutableArray<ClosureDebugInfo>);
-            lambdas = default(ImmutableArray<LambdaDebugInfo>);
+            methodOrdinal = DebugId.UndefinedOrdinal;
+            closures = default;
+            lambdas = default;
 
             if (compressedLambdaMap.IsDefaultOrEmpty)
             {
@@ -203,72 +190,45 @@ namespace Microsoft.CodeAnalysis.Emit
             var closuresBuilder = ArrayBuilder<ClosureDebugInfo>.GetInstance();
             var lambdasBuilder = ArrayBuilder<LambdaDebugInfo>.GetInstance();
 
-            int syntaxOffsetBaseline = -1;
-            int closureCount;
-
             fixed (byte* blobPtr = &compressedLambdaMap.ToArray()[0])
             {
                 var blobReader = new BlobReader(blobPtr, compressedLambdaMap.Length);
-
-                if (!blobReader.TryReadCompressedInteger(out methodOrdinal))
+                try
                 {
-                    // invalid data
-                    return;
-                }
+                    // Note: integer operations below can't overflow since compressed integers are in range [0, 0x20000000)
 
-                // [-1, inf)
-                methodOrdinal--;
+                    // [-1, inf)
+                    methodOrdinal = blobReader.ReadCompressedInteger() - 1;
 
-                if (!blobReader.TryReadCompressedInteger(out syntaxOffsetBaseline))
-                {
-                    // invalid data
-                    return;
-                }
+                    int syntaxOffsetBaseline = -blobReader.ReadCompressedInteger();
 
-                syntaxOffsetBaseline = -syntaxOffsetBaseline;
+                    int closureCount = blobReader.ReadCompressedInteger();
 
-                if (!blobReader.TryReadCompressedInteger(out closureCount))
-                {
-                    // invalid data
-                    return;
-                }
-
-                for (int i = 0; i < closureCount; i++)
-                {
-                    int syntaxOffset;
-                    if (!blobReader.TryReadCompressedInteger(out syntaxOffset))
+                    for (int i = 0; i < closureCount; i++)
                     {
-                        // invalid data
-                        return;
+                        int syntaxOffset = blobReader.ReadCompressedInteger();
+
+                        var closureId = new DebugId(closuresBuilder.Count, generation: 0);
+                        closuresBuilder.Add(new ClosureDebugInfo(syntaxOffset + syntaxOffsetBaseline, closureId));
                     }
 
-                    closuresBuilder.Add(new ClosureDebugInfo(syntaxOffset + syntaxOffsetBaseline));
+                    while (blobReader.RemainingBytes > 0)
+                    {
+                        int syntaxOffset = blobReader.ReadCompressedInteger();
+                        int closureOrdinal = blobReader.ReadCompressedInteger() + LambdaDebugInfo.MinClosureOrdinal;
+
+                        if (closureOrdinal >= closureCount)
+                        {
+                            throw CreateInvalidDataException(compressedLambdaMap, blobReader.Offset);
+                        }
+
+                        var lambdaId = new DebugId(lambdasBuilder.Count, generation: 0);
+                        lambdasBuilder.Add(new LambdaDebugInfo(syntaxOffset + syntaxOffsetBaseline, lambdaId, closureOrdinal));
+                    }
                 }
-
-                while (blobReader.RemainingBytes > 0)
+                catch (BadImageFormatException)
                 {
-                    int syntaxOffset;
-                    if (!blobReader.TryReadCompressedInteger(out syntaxOffset))
-                    {
-                        // invalid data
-                        return;
-                    }
-
-                    int closureOrdinal;
-                    if (!blobReader.TryReadCompressedInteger(out closureOrdinal))
-                    {
-                        // invalid data
-                        return;
-                    }
-
-                    closureOrdinal--;
-                    if (closureOrdinal < -1 || closureOrdinal >= closureCount)
-                    {
-                        // invalid data
-                        return;
-                    }
-
-                    lambdasBuilder.Add(new LambdaDebugInfo(syntaxOffset + syntaxOffsetBaseline, closureOrdinal));
+                    throw CreateInvalidDataException(compressedLambdaMap, blobReader.Offset);
                 }
             }
 
@@ -276,14 +236,13 @@ namespace Microsoft.CodeAnalysis.Emit
             lambdas = lambdasBuilder.ToImmutableAndFree();
         }
 
-        // internal for testing
-        internal void SerializeLambdaMap(Cci.BinaryWriter writer)
+        internal void SerializeLambdaMap(BlobBuilder writer)
         {
-            Debug.Assert(this.MethodOrdinal >= -1);
-            writer.WriteCompressedUInt((uint)(this.MethodOrdinal + 1));
+            Debug.Assert(MethodOrdinal >= -1);
+            writer.WriteCompressedInteger(MethodOrdinal + 1);
 
             int syntaxOffsetBaseline = -1;
-            foreach (ClosureDebugInfo info in this.Closures)
+            foreach (ClosureDebugInfo info in Closures)
             {
                 if (info.SyntaxOffset < syntaxOffsetBaseline)
                 {
@@ -291,7 +250,7 @@ namespace Microsoft.CodeAnalysis.Emit
                 }
             }
 
-            foreach (LambdaDebugInfo info in this.Lambdas)
+            foreach (LambdaDebugInfo info in Lambdas)
             {
                 if (info.SyntaxOffset < syntaxOffsetBaseline)
                 {
@@ -299,20 +258,21 @@ namespace Microsoft.CodeAnalysis.Emit
                 }
             }
 
-            writer.WriteCompressedUInt((uint)(-syntaxOffsetBaseline));
-            writer.WriteCompressedUInt((uint)this.Closures.Length);
+            writer.WriteCompressedInteger(-syntaxOffsetBaseline);
+            writer.WriteCompressedInteger(Closures.Length);
 
-            foreach (ClosureDebugInfo info in this.Closures)
+            foreach (ClosureDebugInfo info in Closures)
             {
-                writer.WriteCompressedUInt((uint)(info.SyntaxOffset - syntaxOffsetBaseline));
+                writer.WriteCompressedInteger(info.SyntaxOffset - syntaxOffsetBaseline);
             }
 
-            foreach (LambdaDebugInfo info in this.Lambdas)
+            foreach (LambdaDebugInfo info in Lambdas)
             {
-                Debug.Assert(info.ClosureOrdinal >= -1);
+                Debug.Assert(info.ClosureOrdinal >= LambdaDebugInfo.MinClosureOrdinal);
+                Debug.Assert(info.LambdaId.Generation == 0);
 
-                writer.WriteCompressedUInt((uint)(info.SyntaxOffset - syntaxOffsetBaseline));
-                writer.WriteCompressedUInt((uint)(info.ClosureOrdinal + 1));
+                writer.WriteCompressedInteger(info.SyntaxOffset - syntaxOffsetBaseline);
+                writer.WriteCompressedInteger(info.ClosureOrdinal - LambdaDebugInfo.MinClosureOrdinal);
             }
         }
 

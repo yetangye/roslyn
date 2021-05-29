@@ -1,31 +1,69 @@
-﻿// Copyright (c) Microsoft.  All Rights Reserved.  Licensed under the Apache License, Version 2.0.  See License.txt in the project root for license information.
+﻿// Licensed to the .NET Foundation under one or more agreements.
+// The .NET Foundation licenses this file to you under the MIT license.
+// See the LICENSE file in the project root for more information.
+
+#nullable disable
 
 using System;
 using System.Collections.Generic;
+using System.Diagnostics;
 using System.Globalization;
-using System.Linq;
+using System.IO;
 using System.Threading;
 using System.Xml;
 using System.Xml.Linq;
-using Microsoft.CodeAnalysis;
-using Microsoft.CodeAnalysis.Text;
 using Roslyn.Utilities;
 
 namespace Microsoft.CodeAnalysis
 {
-    internal abstract class XmlDocumentationProvider : DocumentationProvider
+    /// <summary>
+    /// A class used to provide XML documentation to the compiler for members from metadata from an XML document source.
+    /// </summary>
+    public abstract class XmlDocumentationProvider : DocumentationProvider
     {
-        private NonReentrantLock _gate = new NonReentrantLock();
+        private readonly NonReentrantLock _gate = new();
         private Dictionary<string, string> _docComments;
 
-        public static XmlDocumentationProvider Create(byte[] xmlDocCommentBytes)
+        /// <summary>
+        /// Gets the source stream for the XML document.
+        /// </summary>
+        /// <param name="cancellationToken">The cancellation token.</param>
+        /// <returns></returns>
+        protected abstract Stream GetSourceStream(CancellationToken cancellationToken);
+
+        /// <summary>
+        /// Creates an <see cref="XmlDocumentationProvider"/> from bytes representing XML documentation data.
+        /// </summary>
+        /// <param name="xmlDocCommentBytes">The XML document bytes.</param>
+        /// <returns>An <see cref="XmlDocumentationProvider"/>.</returns>
+        public static XmlDocumentationProvider CreateFromBytes(byte[] xmlDocCommentBytes)
+            => new ContentBasedXmlDocumentationProvider(xmlDocCommentBytes);
+
+        private static XmlDocumentationProvider DefaultXmlDocumentationProvider { get; } = new NullXmlDocumentationProvider();
+
+        /// <summary>
+        /// Creates an <see cref="XmlDocumentationProvider"/> from an XML documentation file.
+        /// </summary>
+        /// <param name="xmlDocCommentFilePath">The path to the XML file.</param>
+        /// <returns>An <see cref="XmlDocumentationProvider"/>.</returns>
+        public static XmlDocumentationProvider CreateFromFile(string xmlDocCommentFilePath)
         {
-            return new ContentBasedXmlDocumentationProvider(xmlDocCommentBytes);
+            if (!File.Exists(xmlDocCommentFilePath))
+            {
+                return DefaultXmlDocumentationProvider;
+            }
+
+            return new FileBasedXmlDocumentationProvider(xmlDocCommentFilePath);
         }
 
-        protected abstract XDocument GetXDocument();
+        private XDocument GetXDocument(CancellationToken cancellationToken)
+        {
+            using var stream = GetSourceStream(cancellationToken);
+            using var xmlReader = XmlReader.Create(stream, s_xmlSettings);
+            return XDocument.Load(xmlReader);
+        }
 
-        protected override string GetDocumentationForSymbol(string documentationMemberID, CultureInfo preferredCulture, CancellationToken cancellationToken = default(CancellationToken))
+        protected override string GetDocumentationForSymbol(string documentationMemberID, CultureInfo preferredCulture, CancellationToken cancellationToken = default)
         {
             if (_docComments == null)
             {
@@ -33,28 +71,32 @@ namespace Microsoft.CodeAnalysis
                 {
                     try
                     {
-                        _docComments = new Dictionary<string, string>();
+                        var comments = new Dictionary<string, string>();
 
-                        XDocument doc = this.GetXDocument();
+                        var doc = GetXDocument(cancellationToken);
                         foreach (var e in doc.Descendants("member"))
                         {
                             if (e.Attribute("name") != null)
                             {
-                                _docComments[e.Attribute("name").Value] = e.Value;
+                                using var reader = e.CreateReader();
+                                reader.MoveToContent();
+                                comments[e.Attribute("name").Value] = reader.ReadInnerXml();
                             }
                         }
+
+                        _docComments = comments;
                     }
                     catch (Exception)
                     {
+                        _docComments = new Dictionary<string, string>();
                     }
                 }
             }
 
-            string docComment;
-            return _docComments.TryGetValue(documentationMemberID, out docComment) ? docComment : "";
+            return _docComments.TryGetValue(documentationMemberID, out var docComment) ? docComment : "";
         }
 
-        private static readonly XmlReaderSettings s_xmlSettings = new XmlReaderSettings()
+        private static readonly XmlReaderSettings s_xmlSettings = new()
         {
             DtdProcessing = DtdProcessing.Prohibit,
         };
@@ -70,14 +112,8 @@ namespace Microsoft.CodeAnalysis
                 _xmlDocCommentBytes = xmlDocCommentBytes;
             }
 
-            protected override XDocument GetXDocument()
-            {
-                using (var stream = SerializableBytes.CreateReadableStream(_xmlDocCommentBytes, CancellationToken.None))
-                using (var xmlReader = XmlReader.Create(stream, s_xmlSettings))
-                {
-                    return XDocument.Load(xmlReader);
-                }
-            }
+            protected override Stream GetSourceStream(CancellationToken cancellationToken)
+                => SerializableBytes.CreateReadableStream(_xmlDocCommentBytes);
 
             public override bool Equals(object obj)
             {
@@ -99,7 +135,7 @@ namespace Microsoft.CodeAnalysis
                     return false;
                 }
 
-                for (int i = 0; i < _xmlDocCommentBytes.Length; i++)
+                for (var i = 0; i < _xmlDocCommentBytes.Length; i++)
                 {
                     if (_xmlDocCommentBytes[i] != other._xmlDocCommentBytes[i])
                     {
@@ -111,9 +147,53 @@ namespace Microsoft.CodeAnalysis
             }
 
             public override int GetHashCode()
+                => Hash.CombineValues(_xmlDocCommentBytes);
+        }
+
+        private sealed class FileBasedXmlDocumentationProvider : XmlDocumentationProvider
+        {
+            private readonly string _filePath;
+
+            public FileBasedXmlDocumentationProvider(string filePath)
             {
-                return Hash.CombineValues(_xmlDocCommentBytes);
+                Contract.ThrowIfNull(filePath);
+                Debug.Assert(PathUtilities.IsAbsolute(filePath));
+
+                _filePath = filePath;
             }
+
+            protected override Stream GetSourceStream(CancellationToken cancellationToken)
+                => new FileStream(_filePath, FileMode.Open, FileAccess.Read);
+
+            public override bool Equals(object obj)
+            {
+                var other = obj as FileBasedXmlDocumentationProvider;
+                return other != null && _filePath == other._filePath;
+            }
+
+            public override int GetHashCode()
+                => _filePath.GetHashCode();
+        }
+
+        /// <summary>
+        /// A trivial XmlDocumentationProvider which never returns documentation.
+        /// </summary>
+        private sealed class NullXmlDocumentationProvider : XmlDocumentationProvider
+        {
+            protected override string GetDocumentationForSymbol(string documentationMemberID, CultureInfo preferredCulture, CancellationToken cancellationToken = default)
+                => "";
+
+            protected override Stream GetSourceStream(CancellationToken cancellationToken)
+                => new MemoryStream();
+
+            public override bool Equals(object obj)
+            {
+                // Only one instance is expected to exist, so reference equality is fine.
+                return (object)this == obj;
+            }
+
+            public override int GetHashCode()
+                => 0;
         }
     }
 }

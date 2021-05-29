@@ -1,4 +1,6 @@
-﻿' Copyright (c) Microsoft.  All Rights Reserved.  Licensed under the Apache License, Version 2.0.  See License.txt in the project root for license information.
+﻿' Licensed to the .NET Foundation under one or more agreements.
+' The .NET Foundation licenses this file to you under the MIT license.
+' See the LICENSE file in the project root for more information.
 
 Imports System.Collections.Immutable
 Imports System.Globalization
@@ -6,198 +8,232 @@ Imports System.Threading
 Imports System.Reflection
 Imports System.Reflection.Metadata
 Imports Microsoft.Cci
+Imports Microsoft.CodeAnalysis.PooledObjects
 
 Namespace Microsoft.CodeAnalysis.VisualBasic.Symbols.Metadata.PE
 
     ''' <summary>
     ''' The class to represent all properties imported from a PE/module.
     ''' </summary>
-    Friend NotInheritable Class PEPropertySymbol
+    Friend Class PEPropertySymbol
         Inherits PropertySymbol
 
-        Private ReadOnly m_name As String
-        Private ReadOnly m_flags As PropertyAttributes
-        Private ReadOnly m_containingType As PENamedTypeSymbol
-        Private ReadOnly m_signatureHeader As SignatureHeader
-        Private ReadOnly m_parameters As ImmutableArray(Of ParameterSymbol)
-        Private ReadOnly m_propertyType As TypeSymbol
-        Private ReadOnly m_getMethod As PEMethodSymbol
-        Private ReadOnly m_setMethod As PEMethodSymbol
-        Private ReadOnly m_handle As PropertyDefinitionHandle
-        Private ReadOnly m_typeCustomModifiers As ImmutableArray(Of CustomModifier)
-        Private m_lazyCustomAttributes As ImmutableArray(Of VisualBasicAttributeData)
+        Private ReadOnly _name As String
+        Private ReadOnly _flags As PropertyAttributes
+        Private ReadOnly _containingType As PENamedTypeSymbol
+        Private ReadOnly _signatureHeader As SignatureHeader
+        Private ReadOnly _parameters As ImmutableArray(Of ParameterSymbol)
+        Private ReadOnly _returnsByRef As Boolean
+        Private ReadOnly _propertyType As TypeSymbol
+        Private ReadOnly _getMethod As PEMethodSymbol
+        Private ReadOnly _setMethod As PEMethodSymbol
+        Private ReadOnly _handle As PropertyDefinitionHandle
+        Private _lazyCustomAttributes As ImmutableArray(Of VisualBasicAttributeData)
 
-        Private m_lazyDocComment As Tuple(Of CultureInfo, String)
-        Private m_lazyUseSiteErrorInfo As DiagnosticInfo = ErrorFactory.EmptyErrorInfo ' Indicates unknown state. 
+        Private _lazyDocComment As Tuple(Of CultureInfo, String)
+        Private _lazyCachedUseSiteInfo As CachedUseSiteInfo(Of AssemblySymbol) = CachedUseSiteInfo(Of AssemblySymbol).Uninitialized ' Indicates unknown state. 
 
         ' mutable because we only know this part after the property is constructed.
         ' Integer because we want to use CMPXCHG on it
-        Private m_isWithEvents As Integer = ThreeState.Unknown
+        Private _isWithEvents As Integer = ThreeState.Unknown
 
         ' Distinct accessibility value to represent unset.
-        Private Const UnsetAccessibility As Integer = -1
-        Private m_lazyDeclaredAccessibility As Integer = UnsetAccessibility
-        Private m_lazyObsoleteAttributeData As ObsoleteAttributeData = ObsoleteAttributeData.Uninitialized
+        Private Const s_unsetAccessibility As Integer = -1
+        Private _lazyDeclaredAccessibility As Integer = s_unsetAccessibility
+        Private _lazyObsoleteAttributeData As ObsoleteAttributeData = ObsoleteAttributeData.Uninitialized
 
-        Friend Sub New(
-                      moduleSymbol As PEModuleSymbol,
-                      containingType As PENamedTypeSymbol,
-                      handle As PropertyDefinitionHandle,
-                      getMethod As PEMethodSymbol,
-                      setMethod As PEMethodSymbol)
-
+        Friend Shared Function Create(
+            moduleSymbol As PEModuleSymbol,
+            containingType As PENamedTypeSymbol,
+            handle As PropertyDefinitionHandle,
+            getMethod As PEMethodSymbol,
+            setMethod As PEMethodSymbol
+        ) As PEPropertySymbol
             Debug.Assert(moduleSymbol IsNot Nothing)
             Debug.Assert(containingType IsNot Nothing)
             Debug.Assert(Not handle.IsNil)
             Debug.Assert((getMethod IsNot Nothing) OrElse (setMethod IsNot Nothing))
 
-            m_containingType = containingType
-            m_handle = handle
+            Dim metadataDecoder = New MetadataDecoder(moduleSymbol, containingType)
+            Dim signatureHeader As SignatureHeader
+            Dim propEx As BadImageFormatException = Nothing
+            Dim propertyParams = metadataDecoder.GetSignatureForProperty(handle, signatureHeader, propEx)
+            Debug.Assert(propertyParams.Length > 0)
+            Dim returnInfo As ParamInfo(Of TypeSymbol) = propertyParams(0)
+
+            Dim result As PEPropertySymbol
+
+            If returnInfo.CustomModifiers.IsDefaultOrEmpty AndAlso returnInfo.RefCustomModifiers.IsDefaultOrEmpty Then
+                result = New PEPropertySymbol(moduleSymbol, containingType, handle, getMethod, setMethod, metadataDecoder, signatureHeader, propertyParams)
+            Else
+                result = New PEPropertySymbolWithCustomModifiers(moduleSymbol, containingType, handle, getMethod, setMethod, metadataDecoder, signatureHeader, propertyParams)
+            End If
+
+            If propEx IsNot Nothing Then
+                result._lazyCachedUseSiteInfo.Initialize(ErrorFactory.ErrorInfo(ERRID.ERR_UnsupportedProperty1, CustomSymbolDisplayFormatter.QualifiedName(result)))
+            End If
+
+            Return result
+        End Function
+
+        Private Sub New(
+            moduleSymbol As PEModuleSymbol,
+            containingType As PENamedTypeSymbol,
+            handle As PropertyDefinitionHandle,
+            getMethod As PEMethodSymbol,
+            setMethod As PEMethodSymbol,
+            metadataDecoder As MetadataDecoder,
+            signatureHeader As SignatureHeader,
+            propertyParams As ParamInfo(Of TypeSymbol)()
+        )
+            _signatureHeader = signatureHeader
+            _containingType = containingType
+            _handle = handle
             Dim [module] = moduleSymbol.Module
             Dim mrEx As BadImageFormatException = Nothing
 
             Try
-                [module].GetPropertyDefPropsOrThrow(handle, m_name, m_flags)
+                [module].GetPropertyDefPropsOrThrow(handle, _name, _flags)
             Catch mrEx
-                If m_name Is Nothing Then
-                    m_name = String.Empty
+                If _name Is Nothing Then
+                    _name = String.Empty
                 End If
             End Try
 
-            m_getMethod = getMethod
-            m_setMethod = setMethod
-
-            Dim metadataDecoder = New MetadataDecoder(moduleSymbol, containingType)
-            Dim propEx As BadImageFormatException = Nothing
-            Dim propertyParams = MetadataDecoder.GetSignatureForProperty(handle, m_signatureHeader, propEx)
-            Debug.Assert(propertyParams.Length > 0)
+            _getMethod = getMethod
+            _setMethod = setMethod
 
             Dim unusedSignatureHeader As SignatureHeader = Nothing
             Dim getEx As BadImageFormatException = Nothing
-            Dim getParams = If(m_getMethod Is Nothing, Nothing, MetadataDecoder.GetSignatureForMethod(m_getMethod.Handle, unusedSignatureHeader, getEx))
+            Dim getParams = If(_getMethod Is Nothing, Nothing, metadataDecoder.GetSignatureForMethod(_getMethod.Handle, unusedSignatureHeader, getEx))
             Dim setEx As BadImageFormatException = Nothing
-            Dim setParams = If(m_setMethod Is Nothing, Nothing, MetadataDecoder.GetSignatureForMethod(m_setMethod.Handle, unusedSignatureHeader, setEx))
+            Dim setParams = If(_setMethod Is Nothing, Nothing, metadataDecoder.GetSignatureForMethod(_setMethod.Handle, unusedSignatureHeader, setEx))
 
-            Dim signaturesMatch = DoSignaturesMatch(metadataDecoder, propertyParams, m_getMethod, getParams, m_setMethod, setParams)
+            Dim signaturesMatch = DoSignaturesMatch(metadataDecoder, propertyParams, _getMethod, getParams, _setMethod, setParams)
             Dim parametersMatch = True
-            m_parameters = GetParameters(Me, m_getMethod, m_setMethod, propertyParams, parametersMatch)
+            _parameters = GetParameters(Me, _getMethod, _setMethod, propertyParams, parametersMatch)
 
             If Not signaturesMatch OrElse Not parametersMatch OrElse
-               propEx IsNot Nothing OrElse getEx IsNot Nothing OrElse setEx IsNot Nothing OrElse mrEx IsNot Nothing Then
-                m_lazyUseSiteErrorInfo = ErrorFactory.ErrorInfo(ERRID.ERR_UnsupportedProperty1, CustomSymbolDisplayFormatter.QualifiedName(Me))
+               getEx IsNot Nothing OrElse setEx IsNot Nothing OrElse mrEx IsNot Nothing OrElse
+               propertyParams.Any(Function(p) p.RefCustomModifiers.AnyRequired() OrElse p.CustomModifiers.AnyRequired()) Then
+                _lazyCachedUseSiteInfo.Initialize(ErrorFactory.ErrorInfo(ERRID.ERR_UnsupportedProperty1, CustomSymbolDisplayFormatter.QualifiedName(Me)))
             End If
 
-            If m_getMethod IsNot Nothing Then
-                m_getMethod.SetAssociatedProperty(Me, MethodKind.PropertyGet)
+            If _getMethod IsNot Nothing Then
+                _getMethod.SetAssociatedProperty(Me, MethodKind.PropertyGet)
             End If
 
-            If m_setMethod IsNot Nothing Then
-                m_setMethod.SetAssociatedProperty(Me, MethodKind.PropertySet)
+            If _setMethod IsNot Nothing Then
+                _setMethod.SetAssociatedProperty(Me, MethodKind.PropertySet)
             End If
 
-            m_propertyType = propertyParams(0).Type
-            m_typeCustomModifiers = VisualBasicCustomModifier.Convert(propertyParams(0).CustomModifiers)
+            Dim returnInfo As ParamInfo(Of TypeSymbol) = propertyParams(0)
+
+            _returnsByRef = returnInfo.IsByRef
+            _propertyType = returnInfo.Type
+            _propertyType = TupleTypeDecoder.DecodeTupleTypesIfApplicable(_propertyType, handle, moduleSymbol)
         End Sub
 
         Public Overrides ReadOnly Property ContainingSymbol As Symbol
             Get
-                Return m_containingType
+                Return _containingType
             End Get
         End Property
 
         Public Overrides ReadOnly Property ContainingType As NamedTypeSymbol
             Get
-                Return m_containingType
+                Return _containingType
             End Get
         End Property
 
         Public Overrides ReadOnly Property Name As String
             Get
-                Return m_name
+                Return _name
             End Get
         End Property
 
         Friend ReadOnly Property PropertyFlags As PropertyAttributes
             Get
-                Return m_flags
+                Return _flags
             End Get
         End Property
 
         Friend Overrides ReadOnly Property HasSpecialName As Boolean
             Get
-                Return (m_flags And PropertyAttributes.SpecialName) <> 0
+                Return (_flags And PropertyAttributes.SpecialName) <> 0
             End Get
         End Property
 
         Public Overrides ReadOnly Property DeclaredAccessibility As Accessibility
             Get
-                If Me.m_lazyDeclaredAccessibility = UnsetAccessibility Then
-                    Interlocked.CompareExchange(Me.m_lazyDeclaredAccessibility, GetDeclaredAccessibility(Me), UnsetAccessibility)
+                If Me._lazyDeclaredAccessibility = s_unsetAccessibility Then
+                    Interlocked.CompareExchange(Me._lazyDeclaredAccessibility, GetDeclaredAccessibility(Me), s_unsetAccessibility)
                 End If
 
-                Return DirectCast(Me.m_lazyDeclaredAccessibility, Accessibility)
+                Return DirectCast(Me._lazyDeclaredAccessibility, Accessibility)
             End Get
         End Property
 
         Public Overrides ReadOnly Property IsMustOverride As Boolean
             Get
-                Dim method = Me.GetterOrSetter
-                Return If((method IsNot Nothing), method.IsMustOverride, False)
+                Return (Me._getMethod IsNot Nothing AndAlso Me._getMethod.IsMustOverride) OrElse
+                       (Me._setMethod IsNot Nothing AndAlso Me._setMethod.IsMustOverride)
             End Get
         End Property
 
         Public Overrides ReadOnly Property IsNotOverridable As Boolean
             Get
-                Dim method = Me.GetterOrSetter
-                Return If((method IsNot Nothing), method.IsNotOverridable, False)
+                Return (Me._getMethod Is Nothing OrElse Me._getMethod.IsNotOverridable) AndAlso
+                       (Me._setMethod Is Nothing OrElse Me._setMethod.IsNotOverridable)
             End Get
         End Property
 
         Public Overrides ReadOnly Property IsOverridable As Boolean
             Get
-                Dim method = Me.GetterOrSetter
-                Return If((method IsNot Nothing), method.IsOverridable, False)
+                Return Not IsMustOverride AndAlso Not IsOverrides AndAlso
+                       ((Me._getMethod IsNot Nothing AndAlso Me._getMethod.IsOverridable) OrElse
+                        (Me._setMethod IsNot Nothing AndAlso Me._setMethod.IsOverridable))
             End Get
         End Property
 
         Public Overrides ReadOnly Property IsOverrides As Boolean
             Get
-                Dim method = Me.GetterOrSetter
-                Return If((method IsNot Nothing), method.IsOverrides, False)
+                Return (Me._getMethod IsNot Nothing AndAlso Me._getMethod.IsOverrides) OrElse
+                       (Me._setMethod IsNot Nothing AndAlso Me._setMethod.IsOverrides)
             End Get
         End Property
 
         Public Overrides ReadOnly Property IsOverloads As Boolean
             Get
-                Dim method = Me.GetterOrSetter
-                Return If((method IsNot Nothing), method.IsOverloads, False)
+                Return (Me._getMethod IsNot Nothing AndAlso Me._getMethod.IsOverloads) OrElse
+                       (Me._setMethod IsNot Nothing AndAlso Me._setMethod.IsOverloads)
             End Get
         End Property
 
         Public Overrides ReadOnly Property IsShared As Boolean
             Get
-                Dim method = Me.GetterOrSetter
-                Return If((method IsNot Nothing), method.IsShared, True)
+                Return (Me._getMethod Is Nothing OrElse Me._getMethod.IsShared) AndAlso
+                       (Me._setMethod Is Nothing OrElse Me._setMethod.IsShared)
             End Get
         End Property
 
         Public Overrides ReadOnly Property IsDefault As Boolean
             Get
-                Dim defaultPropertyName = m_containingType.DefaultPropertyName
+                Dim defaultPropertyName = _containingType.DefaultPropertyName
                 Return (Not String.IsNullOrEmpty(defaultPropertyName)) AndAlso
-                    IdentifierComparison.Equals(defaultPropertyName, m_name)
+                    IdentifierComparison.Equals(defaultPropertyName, _name)
             End Get
         End Property
 
         Public Overrides ReadOnly Property IsWithEvents As Boolean
             Get
-                'NOTE: If noone set the IsWithEvents, getting the value will permanently set it to Unknown.
-                If Me.m_isWithEvents = ThreeState.Unknown Then
+                'NOTE: If no-one set the IsWithEvents, getting the value will permanently set it to Unknown.
+                If Me._isWithEvents = ThreeState.Unknown Then
                     SetIsWithEvents(MyBase.IsWithEvents)
                 End If
 
-                Debug.Assert(Me.m_isWithEvents = ThreeState.True OrElse Me.m_isWithEvents = ThreeState.False)
-                Return Me.m_isWithEvents = ThreeState.True
+                Debug.Assert(Me._isWithEvents = ThreeState.True OrElse Me._isWithEvents = ThreeState.False)
+                Return Me._isWithEvents = ThreeState.True
             End Get
         End Property
 
@@ -208,37 +244,49 @@ Namespace Microsoft.CodeAnalysis.VisualBasic.Symbols.Metadata.PE
         ''' </summary>
         Friend Sub SetIsWithEvents(value As Boolean)
             Dim newValue = If(value, ThreeState.True, ThreeState.False)
-            Dim origValue = Threading.Interlocked.CompareExchange(Me.m_isWithEvents, newValue, ThreeState.Unknown)
+            Dim origValue = Threading.Interlocked.CompareExchange(Me._isWithEvents, newValue, ThreeState.Unknown)
             Debug.Assert(origValue = ThreeState.Unknown OrElse origValue = newValue, "Tried changing already known IsWithEvent value.")
         End Sub
 
         Public Overrides ReadOnly Property Parameters As ImmutableArray(Of ParameterSymbol)
             Get
-                Return m_parameters
+                Return _parameters
+            End Get
+        End Property
+
+        Public Overrides ReadOnly Property ReturnsByRef As Boolean
+            Get
+                Return _returnsByRef
             End Get
         End Property
 
         Public Overrides ReadOnly Property Type As TypeSymbol
             Get
-                Return m_propertyType
+                Return _propertyType
             End Get
         End Property
 
         Public Overrides ReadOnly Property TypeCustomModifiers As ImmutableArray(Of CustomModifier)
             Get
-                Return m_typeCustomModifiers
+                Return ImmutableArray(Of CustomModifier).Empty
+            End Get
+        End Property
+
+        Public Overrides ReadOnly Property RefCustomModifiers As ImmutableArray(Of CustomModifier)
+            Get
+                Return ImmutableArray(Of CustomModifier).Empty
             End Get
         End Property
 
         Public Overrides ReadOnly Property GetMethod As MethodSymbol
             Get
-                Return m_getMethod
+                Return _getMethod
             End Get
         End Property
 
         Public Overrides ReadOnly Property SetMethod As MethodSymbol
             Get
-                Return m_setMethod
+                Return _setMethod
             End Get
         End Property
 
@@ -250,13 +298,13 @@ Namespace Microsoft.CodeAnalysis.VisualBasic.Symbols.Metadata.PE
 
         Friend Overrides ReadOnly Property CallingConvention As CallingConvention
             Get
-                Return CType(m_signatureHeader.RawValue, CallingConvention)
+                Return CType(_signatureHeader.RawValue, CallingConvention)
             End Get
         End Property
 
         Public Overrides ReadOnly Property Locations As ImmutableArray(Of Location)
             Get
-                Return m_containingType.Locations
+                Return _containingType.Locations
             End Get
         End Property
 
@@ -268,17 +316,17 @@ Namespace Microsoft.CodeAnalysis.VisualBasic.Symbols.Metadata.PE
 
         Friend Overrides ReadOnly Property ObsoleteAttributeData As ObsoleteAttributeData
             Get
-                ObsoleteAttributeHelpers.InitializeObsoleteDataFromMetadata(m_lazyObsoleteAttributeData, m_handle, DirectCast(ContainingModule, PEModuleSymbol))
-                Return m_lazyObsoleteAttributeData
+                ObsoleteAttributeHelpers.InitializeObsoleteDataFromMetadata(_lazyObsoleteAttributeData, _handle, DirectCast(ContainingModule, PEModuleSymbol))
+                Return _lazyObsoleteAttributeData
             End Get
         End Property
 
         Public Overrides Function GetAttributes() As ImmutableArray(Of VisualBasicAttributeData)
-            If m_lazyCustomAttributes.IsDefault Then
+            If _lazyCustomAttributes.IsDefault Then
                 Dim containingPEModuleSymbol = DirectCast(ContainingModule(), PEModuleSymbol)
-                containingPEModuleSymbol.LoadCustomAttributes(m_handle, m_lazyCustomAttributes)
+                containingPEModuleSymbol.LoadCustomAttributes(_handle, _lazyCustomAttributes)
             End If
-            Return m_lazyCustomAttributes
+            Return _lazyCustomAttributes
         End Function
 
         Friend Overrides Function GetCustomAttributesToEmit(compilationState As ModuleCompilationState) As IEnumerable(Of VisualBasicAttributeData)
@@ -287,32 +335,30 @@ Namespace Microsoft.CodeAnalysis.VisualBasic.Symbols.Metadata.PE
 
         Public Overrides ReadOnly Property ExplicitInterfaceImplementations As ImmutableArray(Of PropertySymbol)
             Get
-                If (Me.m_getMethod Is Nothing OrElse Me.m_getMethod.ExplicitInterfaceImplementations.Length = 0) AndAlso (Me.m_setMethod Is Nothing OrElse Me.m_setMethod.ExplicitInterfaceImplementations.Length = 0) Then
+                If (Me._getMethod Is Nothing OrElse Me._getMethod.ExplicitInterfaceImplementations.Length = 0) AndAlso (Me._setMethod Is Nothing OrElse Me._setMethod.ExplicitInterfaceImplementations.Length = 0) Then
                     Return ImmutableArray(Of PropertySymbol).Empty
                 End If
 
-                Dim propertiesWithImplementedGetters = PEPropertyOrEventHelpers.GetPropertiesForExplicitlyImplementedAccessor(Me.m_getMethod)
-                Dim propertiesWithImplementedSetters = PEPropertyOrEventHelpers.GetPropertiesForExplicitlyImplementedAccessor(Me.m_setMethod)
+                Dim propertiesWithImplementedGetters = PEPropertyOrEventHelpers.GetPropertiesForExplicitlyImplementedAccessor(Me._getMethod)
+                Dim propertiesWithImplementedSetters = PEPropertyOrEventHelpers.GetPropertiesForExplicitlyImplementedAccessor(Me._setMethod)
                 Dim builder = ArrayBuilder(Of PropertySymbol).GetInstance()
                 For Each prop In propertiesWithImplementedGetters
-                    If prop.SetMethod Is Nothing OrElse propertiesWithImplementedSetters.Contains(prop) Then
+                    Dim setMethod As MethodSymbol = prop.SetMethod
+
+                    If setMethod Is Nothing OrElse Not setMethod.RequiresImplementation() OrElse propertiesWithImplementedSetters.Contains(prop) Then
                         builder.Add(prop)
                     End If
                 Next
 
                 For Each prop In propertiesWithImplementedSetters
-                    If prop.GetMethod Is Nothing Then
+                    Dim getMethod As MethodSymbol = prop.GetMethod
+
+                    If getMethod Is Nothing OrElse Not getMethod.RequiresImplementation() Then
                         builder.Add(prop)
                     End If
                 Next
 
                 Return builder.ToImmutableAndFree()
-            End Get
-        End Property
-
-        Private ReadOnly Property GetterOrSetter As MethodSymbol
-            Get
-                Return If(Me.m_getMethod, Me.m_setMethod)
             End Get
         End Property
 
@@ -403,7 +449,6 @@ Namespace Microsoft.CodeAnalysis.VisualBasic.Symbols.Metadata.PE
                 ' directly. Instead, use the parameters from the getter or setter.
                 Dim name As String = Nothing
                 Dim isByRef As Boolean = False
-                Dim hasByRefBeforeCustomModifiers As Boolean = False
                 Dim defaultValue As ConstantValue = Nothing
                 Dim flags As ParameterAttributes = 0
                 Dim paramHandle = info.Handle
@@ -413,7 +458,6 @@ Namespace Microsoft.CodeAnalysis.VisualBasic.Symbols.Metadata.PE
                 If accessorParameter IsNot Nothing Then
                     name = accessorParameter.Name
                     isByRef = accessorParameter.IsByRef
-                    hasByRefBeforeCustomModifiers = accessorParameter.HasByRefBeforeCustomModifiers
                     defaultValue = accessorParameter.ExplicitDefaultConstantValue
                     flags = accessorParameter.ParamFlags
                     paramHandle = accessorParameter.Handle
@@ -447,10 +491,6 @@ Namespace Microsoft.CodeAnalysis.VisualBasic.Symbols.Metadata.PE
                         isByRef = True
                     End If
 
-                    If setParameter.HasByRefBeforeCustomModifiers Then
-                        hasByRefBeforeCustomModifiers = True
-                    End If
-
                     ' Do not set IsParamArray unless both accessors use ParamArray.
                     If Not setParameter.IsParamArray Then
                         isParamArray = False
@@ -463,11 +503,11 @@ Namespace Microsoft.CodeAnalysis.VisualBasic.Symbols.Metadata.PE
                     End If
                 End If
 
-                parameters(i) = New PEParameterSymbol(
+                parameters(i) = PEParameterSymbol.Create(
                     [property],
                     name,
                     isByRef:=isByRef,
-                    hasByRefBeforeCustomModifiers:=hasByRefBeforeCustomModifiers,
+                    refCustomModifiers:=VisualBasicCustomModifier.Convert(info.RefCustomModifiers),
                     type:=info.Type,
                     handle:=paramHandle,
                     flags:=flags,
@@ -491,20 +531,22 @@ Namespace Microsoft.CodeAnalysis.VisualBasic.Symbols.Metadata.PE
         End Function
 
         Public Overrides Function GetDocumentationCommentXml(Optional preferredCulture As CultureInfo = Nothing, Optional expandIncludes As Boolean = False, Optional cancellationToken As CancellationToken = Nothing) As String
-            Return PEDocumentationCommentUtils.GetDocumentationComment(Me, m_containingType.ContainingPEModule, preferredCulture, cancellationToken, m_lazyDocComment)
+            Return PEDocumentationCommentUtils.GetDocumentationComment(Me, _containingType.ContainingPEModule, preferredCulture, cancellationToken, _lazyDocComment)
         End Function
 
-        Friend Overrides Function GetUseSiteErrorInfo() As DiagnosticInfo
-            If m_lazyUseSiteErrorInfo Is ErrorFactory.EmptyErrorInfo Then
-                m_lazyUseSiteErrorInfo = CalculateUseSiteErrorInfo()
+        Friend Overrides Function GetUseSiteInfo() As UseSiteInfo(Of AssemblySymbol)
+            Dim primaryDependency As AssemblySymbol = Me.PrimaryDependency
+
+            If Not _lazyCachedUseSiteInfo.IsInitialized Then
+                _lazyCachedUseSiteInfo.Initialize(primaryDependency, CalculateUseSiteInfo())
             End If
 
-            Return m_lazyUseSiteErrorInfo
+            Return _lazyCachedUseSiteInfo.ToUseSiteInfo(primaryDependency)
         End Function
 
         Friend ReadOnly Property Handle As PropertyDefinitionHandle
             Get
-                Return m_handle
+                Return _handle
             End Get
         End Property
 
@@ -516,7 +558,7 @@ Namespace Microsoft.CodeAnalysis.VisualBasic.Symbols.Metadata.PE
 
         Friend Overrides ReadOnly Property HasRuntimeSpecialName As Boolean
             Get
-                Return (m_flags And PropertyAttributes.RTSpecialName) <> 0
+                Return (_flags And PropertyAttributes.RTSpecialName) <> 0
             End Get
         End Property
 
@@ -528,5 +570,42 @@ Namespace Microsoft.CodeAnalysis.VisualBasic.Symbols.Metadata.PE
                 Return Nothing
             End Get
         End Property
+
+        Private NotInheritable Class PEPropertySymbolWithCustomModifiers
+            Inherits PEPropertySymbol
+
+            Private ReadOnly _typeCustomModifiers As ImmutableArray(Of CustomModifier)
+            Private ReadOnly _refCustomModifiers As ImmutableArray(Of CustomModifier)
+
+            Public Sub New(
+                moduleSymbol As PEModuleSymbol,
+                containingType As PENamedTypeSymbol,
+                handle As PropertyDefinitionHandle,
+                getMethod As PEMethodSymbol,
+                setMethod As PEMethodSymbol,
+                metadataDecoder As MetadataDecoder,
+                signatureHeader As SignatureHeader,
+                propertyParams As ParamInfo(Of TypeSymbol)()
+            )
+                MyBase.New(moduleSymbol, containingType, handle, getMethod, setMethod, metadataDecoder, signatureHeader, propertyParams)
+
+                Dim returnInfo As ParamInfo(Of TypeSymbol) = propertyParams(0)
+
+                _typeCustomModifiers = VisualBasicCustomModifier.Convert(returnInfo.CustomModifiers)
+                _refCustomModifiers = VisualBasicCustomModifier.Convert(returnInfo.RefCustomModifiers)
+            End Sub
+
+            Public Overrides ReadOnly Property TypeCustomModifiers As ImmutableArray(Of CustomModifier)
+                Get
+                    Return _typeCustomModifiers
+                End Get
+            End Property
+
+            Public Overrides ReadOnly Property RefCustomModifiers As ImmutableArray(Of CustomModifier)
+                Get
+                    Return _refCustomModifiers
+                End Get
+            End Property
+        End Class
     End Class
 End Namespace

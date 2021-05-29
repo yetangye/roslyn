@@ -1,4 +1,6 @@
-﻿// Copyright (c) Microsoft.  All Rights Reserved.  Licensed under the Apache License, Version 2.0.  See License.txt in the project root for license information.
+﻿// Licensed to the .NET Foundation under one or more agreements.
+// The .NET Foundation licenses this file to you under the MIT license.
+// See the LICENSE file in the project root for more information.
 
 using System;
 using System.Collections.Generic;
@@ -28,42 +30,42 @@ namespace Microsoft.CodeAnalysis
         /// <summary>
         /// Major subsystem version
         /// </summary>
-        public readonly int Major;
+        public int Major { get; }
 
         /// <summary>
         /// Minor subsystem version
         /// </summary>
-        public readonly int Minor;
+        public int Minor { get; }
 
         /// <summary>
         /// Subsystem version not specified
         /// </summary>
-        public static readonly SubsystemVersion None = new SubsystemVersion();
+        public static SubsystemVersion None => new SubsystemVersion();
 
         /// <summary>
         /// Subsystem version: Windows 2000
         /// </summary>
-        public static readonly SubsystemVersion Windows2000 = new SubsystemVersion(5, 0);
+        public static SubsystemVersion Windows2000 => new SubsystemVersion(5, 0);
 
         /// <summary>
         /// Subsystem version: Windows XP 
         /// </summary>
-        public static readonly SubsystemVersion WindowsXP = new SubsystemVersion(5, 1);
+        public static SubsystemVersion WindowsXP => new SubsystemVersion(5, 1);
 
         /// <summary>
         /// Subsystem version: Windows Vista
         /// </summary>
-        public static readonly SubsystemVersion WindowsVista = new SubsystemVersion(6, 0);
+        public static SubsystemVersion WindowsVista => new SubsystemVersion(6, 0);
 
         /// <summary>
         /// Subsystem version: Windows 7
         /// </summary>
-        public static readonly SubsystemVersion Windows7 = new SubsystemVersion(6, 1);
+        public static SubsystemVersion Windows7 => new SubsystemVersion(6, 1);
 
         /// <summary>
         /// Subsystem version: Windows 8
         /// </summary>
-        public static readonly SubsystemVersion Windows8 = new SubsystemVersion(6, 2);
+        public static SubsystemVersion Windows8 => new SubsystemVersion(6, 2);
 
         private SubsystemVersion(int major, int minor)
         {
@@ -83,7 +85,7 @@ namespace Microsoft.CodeAnalysis
             if (!string.IsNullOrWhiteSpace(str))
             {
                 string major;
-                string minor;
+                string? minor;
 
                 int index = str.IndexOf('.');
 
@@ -183,7 +185,7 @@ namespace Microsoft.CodeAnalysis
             }
         }
 
-        public override bool Equals(object obj)
+        public override bool Equals(object? obj)
         {
             return obj is SubsystemVersion && Equals((SubsystemVersion)obj);
         }

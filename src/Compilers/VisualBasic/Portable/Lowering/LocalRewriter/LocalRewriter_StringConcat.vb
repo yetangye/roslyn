@@ -1,8 +1,11 @@
-﻿' Copyright (c) Microsoft.  All Rights Reserved.  Licensed under the Apache License, Version 2.0.  See License.txt in the project root for license information.
+﻿' Licensed to the .NET Foundation under one or more agreements.
+' The .NET Foundation licenses this file to you under the MIT license.
+' See the LICENSE file in the project root for more information.
 
 Imports System.Collections.Immutable
 Imports System.Diagnostics
 Imports System.Runtime.InteropServices
+Imports Microsoft.CodeAnalysis.PooledObjects
 Imports Microsoft.CodeAnalysis.Text
 Imports Microsoft.CodeAnalysis.VisualBasic.Symbols
 Imports Microsoft.CodeAnalysis.VisualBasic.Syntax
@@ -10,10 +13,10 @@ Imports TypeKind = Microsoft.CodeAnalysis.TypeKind
 
 Namespace Microsoft.CodeAnalysis.VisualBasic
 
-    Partial Class LocalRewriter
+    Partial Friend Class LocalRewriter
 
         ' The strategy of this rewrite is to do rewrite "locally".
-        ' We analyze arguments of the concat in a shallow fasion assuming that 
+        ' We analyze arguments of the concat in a shallow fashion assuming that 
         ' lowering and optimizations (including this one) is already done for the arguments.
         ' Based on the arguments we select the most appropriate pattern for the current node.
         ' 
@@ -37,7 +40,7 @@ Namespace Microsoft.CodeAnalysis.VisualBasic
             Dim syntax = node.Syntax
             Dim loweredLeft = node.Left
             Dim loweredRight = node.Right
-            Dim factory = New SyntheticBoundNodeFactory(Me.topMethod, Me.currentMethodOrLambda, syntax, Me.compilationState, Me.diagnostics)
+            Dim factory = New SyntheticBoundNodeFactory(Me._topMethod, Me._currentMethodOrLambda, syntax, Me._compilationState, Me._diagnostics)
 
             ' try fold two args without flattening.
             Dim folded As BoundExpression = TryFoldTwoConcatOperands(factory, loweredLeft, loweredRight)
@@ -108,7 +111,7 @@ Namespace Microsoft.CodeAnalysis.VisualBasic
         ''' otherwise returns the expression as-is
         ''' 
         ''' Generally we only need to recognize same node patterns that we create as a result of concatenation rewrite.
-        ''' We could recognise some other nodes and unwrap to arguments 
+        ''' We could recognize some other nodes and unwrap to arguments 
         ''' </summary>
         Private Sub FlattenConcatArg(lowered As BoundExpression, flattened As ArrayBuilder(Of BoundExpression))
             Select Case lowered.Kind
@@ -169,7 +172,7 @@ Namespace Microsoft.CodeAnalysis.VisualBasic
             If leftConst IsNot Nothing AndAlso rightConst IsNot Nothing Then
                 ' const concat may fail to fold if strings are huge. 
                 ' This would be unusual.
-                Dim concatenated As ConstantValue = Me.TryFoldTwoConcatConsts(leftConst, rightConst)
+                Dim concatenated As ConstantValue = TryFoldTwoConcatConsts(leftConst, rightConst)
                 If concatenated IsNot Nothing Then
                     Return factory.StringLiteral(concatenated)
                 End If
@@ -178,11 +181,11 @@ Namespace Microsoft.CodeAnalysis.VisualBasic
             If IsNullOrEmptyStringConstant(loweredLeft) Then
                 If IsNullOrEmptyStringConstant(loweredRight) Then
                     Return factory.Literal("")
-                ElseIf Not inExpressionLambda Then
-                    Return Me.RewriteStringConcatenationOneExpr(factory, loweredRight)
+                ElseIf Not _inExpressionLambda Then
+                    Return RewriteStringConcatenationOneExpr(factory, loweredRight)
                 End If
-            ElseIf Not inExpressionLambda AndAlso IsNullOrEmptyStringConstant(loweredRight) Then
-                Return Me.RewriteStringConcatenationOneExpr(factory, loweredLeft)
+            ElseIf Not _inExpressionLambda AndAlso IsNullOrEmptyStringConstant(loweredRight) Then
+                Return RewriteStringConcatenationOneExpr(factory, loweredLeft)
             End If
 
             Return Nothing
@@ -199,7 +202,7 @@ Namespace Microsoft.CodeAnalysis.VisualBasic
         ''' otherwise returns null.
         ''' It is generally always possible to concat constants, unless resulting string would be too large.
         ''' </summary>
-        Private Function TryFoldTwoConcatConsts(leftConst As ConstantValue, rightConst As ConstantValue) As ConstantValue
+        Private Shared Function TryFoldTwoConcatConsts(leftConst As ConstantValue, rightConst As ConstantValue) As ConstantValue
             Dim leftVal As String = leftConst.StringValue
             Dim rightVal As String = rightConst.StringValue
 
@@ -220,7 +223,7 @@ Namespace Microsoft.CodeAnalysis.VisualBasic
         ''' <summary>
         ''' Strangely enough there is such a thing as unary concatenation and it must be rewritten.
         ''' </summary>
-        Private Function RewriteStringConcatenationOneExpr(factory As SyntheticBoundNodeFactory,
+        Private Shared Function RewriteStringConcatenationOneExpr(factory As SyntheticBoundNodeFactory,
                                                            loweredOperand As BoundExpression) As BoundExpression
 
             Return factory.BinaryConditional(loweredOperand, factory.Literal(""))

@@ -1,9 +1,12 @@
-﻿// Copyright (c) Microsoft.  All Rights Reserved.  Licensed under the Apache License, Version 2.0.  See License.txt in the project root for license information.
+﻿// Licensed to the .NET Foundation under one or more agreements.
+// The .NET Foundation licenses this file to you under the MIT license.
+// See the LICENSE file in the project root for more information.
+
+#nullable disable
 
 using Microsoft.CodeAnalysis.CSharp.Symbols;
 using Microsoft.CodeAnalysis.CSharp.Test.Utilities;
 using Microsoft.CodeAnalysis.CSharp.UnitTests;
-using ProprietaryTestResources = Microsoft.CodeAnalysis.Test.Resources.Proprietary;
 using Roslyn.Utilities;
 using System;
 using System.Collections.Generic;
@@ -23,14 +26,14 @@ namespace Microsoft.CodeAnalysis.CSharp.UnitTests
             // from it the nodes that describe the method symbols. We then compare the description of
             // the symbols given to the comment that follows the call.
 
-            var mscorlibRef = AssemblyMetadata.CreateFromImage(ProprietaryTestResources.NetFX.v4_0_30316_17626.mscorlib).GetReference(display: "mscorlib");
-            var references = new[] { mscorlibRef }.Concat(additionalRefs ?? SpecializedCollections.EmptyArray<MetadataReference>());
+            var mscorlibRef = AssemblyMetadata.CreateFromImage(TestMetadata.ResourcesNet451.mscorlib).GetReference(display: "mscorlib");
+            var references = new[] { mscorlibRef }.Concat(additionalRefs ?? Array.Empty<MetadataReference>());
 
-            var compilation = CreateCompilation(source, references, TestOptions.ReleaseDll);
+            var compilation = CreateEmptyCompilation(source, references, TestOptions.ReleaseDll);
 
-            var method = (SourceMethodSymbol)compilation.GlobalNamespace.GetTypeMembers("C").Single().GetMembers("M").Single();
+            var method = (SourceMemberMethodSymbol)compilation.GlobalNamespace.GetTypeMembers("C").Single().GetMembers("M").Single();
             var diagnostics = new DiagnosticBag();
-            var block = MethodCompiler.BindMethodBody(method, new TypeCompilationState(method.ContainingType, compilation, null), diagnostics);
+            var block = MethodCompiler.BindMethodBody(method, new TypeCompilationState(method.ContainingType, compilation, null), new BindingDiagnosticBag(diagnostics));
             var tree = BoundTreeDumperNodeProducer.MakeTree(block);
             var results = string.Join("\n", tree.PreorderTraversal().Select(edge => edge.Value)
                 .Where(x => x.Text == "method" && x.Value != null)
@@ -40,12 +43,12 @@ namespace Microsoft.CodeAnalysis.CSharp.UnitTests
             // var r = string.Join("\n", tree.PreorderTraversal().Select(edge => edge.Value).ToArray();
 
             var expected = string.Join("\n", source
-                .Split(new[] { "\r\n" }, System.StringSplitOptions.RemoveEmptyEntries)
+                .Split(new[] { Environment.NewLine }, System.StringSplitOptions.RemoveEmptyEntries)
                 .Where(x => x.Contains("//-"))
-                .Select(x => x.Substring(x.IndexOf("//-") + 3))
+                .Select(x => x.Substring(x.IndexOf("//-", StringComparison.Ordinal) + 3))
                 .ToArray());
 
-            AssertEx.Equal(expected, results);
+            AssertEx.EqualOrDiff(expected, results);
         }
     }
 }

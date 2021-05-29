@@ -1,17 +1,13 @@
-﻿// Copyright (c) Microsoft.  All Rights Reserved.  Licensed under the Apache License, Version 2.0.  See License.txt in the project root for license information.
+﻿// Licensed to the .NET Foundation under one or more agreements.
+// The .NET Foundation licenses this file to you under the MIT license.
+// See the LICENSE file in the project root for more information.
 
-using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Text;
+#nullable disable
+
 using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.CodeAnalysis;
-using Microsoft.CodeAnalysis.LanguageServices;
-using Microsoft.CodeAnalysis.Shared.Extensions;
 using Microsoft.CodeAnalysis.Text;
-using Microsoft.VisualStudio;
-using Microsoft.VisualStudio.Shell.Interop;
 
 namespace Microsoft.VisualStudio.LanguageServices.Implementation.F1Help
 {
@@ -22,7 +18,7 @@ namespace Microsoft.VisualStudio.LanguageServices.Implementation.F1Help
         // C`1.M``2
         // constructors: Parent.Type.#ctor
         protected static readonly SymbolDisplayFormat TypeFormat =
-            new SymbolDisplayFormat(
+            new(
                 globalNamespaceStyle: SymbolDisplayGlobalNamespaceStyle.Omitted,
                 typeQualificationStyle: SymbolDisplayTypeQualificationStyle.NameAndContainingTypesAndNamespaces,
                 propertyStyle: SymbolDisplayPropertyStyle.NameOnly,
@@ -30,7 +26,7 @@ namespace Microsoft.VisualStudio.LanguageServices.Implementation.F1Help
                 miscellaneousOptions: SymbolDisplayMiscellaneousOptions.EscapeKeywordIdentifiers);
 
         protected static readonly SymbolDisplayFormat SpecialTypeFormat =
-            new SymbolDisplayFormat(
+            new(
                 globalNamespaceStyle: SymbolDisplayGlobalNamespaceStyle.Omitted,
                 typeQualificationStyle: SymbolDisplayTypeQualificationStyle.NameOnly,
                 genericsOptions: SymbolDisplayGenericsOptions.None,
@@ -39,7 +35,7 @@ namespace Microsoft.VisualStudio.LanguageServices.Implementation.F1Help
                     SymbolDisplayMiscellaneousOptions.UseSpecialTypes);
 
         protected static readonly SymbolDisplayFormat NameFormat =
-            new SymbolDisplayFormat(
+            new(
                 globalNamespaceStyle: SymbolDisplayGlobalNamespaceStyle.Omitted,
                 typeQualificationStyle: SymbolDisplayTypeQualificationStyle.NameOnly,
                 miscellaneousOptions: SymbolDisplayMiscellaneousOptions.UseSpecialTypes);
@@ -48,5 +44,7 @@ namespace Microsoft.VisualStudio.LanguageServices.Implementation.F1Help
         public abstract string Product { get; }
 
         public abstract Task<string> GetHelpTermAsync(Document document, TextSpan textSpan, CancellationToken cancellationToken);
+
+        public abstract string FormatSymbol(ISymbol symbol);
     }
 }

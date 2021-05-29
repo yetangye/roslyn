@@ -1,4 +1,8 @@
-﻿// Copyright (c) Microsoft.  All Rights Reserved.  Licensed under the Apache License, Version 2.0.  See License.txt in the project root for license information.
+﻿// Licensed to the .NET Foundation under one or more agreements.
+// The .NET Foundation licenses this file to you under the MIT license.
+// See the LICENSE file in the project root for more information.
+
+#nullable disable
 
 using System;
 using System.Collections.Immutable;
@@ -243,13 +247,13 @@ public class Test
         {
             // Same source file
             string testSource = condDefs + s_commonTestSource_ConditionalAttrDefs + s_commonTestSource_ConditionalAttributesApplied;
-            CompileAndVerify(testSource, emitOptions: TestEmitters.CCI, sourceSymbolValidator: CommonSourceValidatorForCondAttrType, symbolValidator: CommonMetadataValidatorForCondAttrType, expectedOutput: "");
+            CompileAndVerify(testSource, sourceSymbolValidator: CommonSourceValidatorForCondAttrType, symbolValidator: CommonMetadataValidatorForCondAttrType, expectedOutput: "");
 
             // Scenario to test Conditional directive stack creation during SyntaxTree.Create, see Devdiv Bug #13846 for details.
             CompilationUnitSyntax root = SyntaxFactory.ParseCompilationUnit(testSource);
             var syntaxTree = SyntaxFactory.SyntaxTree(root);
-            var compilation = CreateCompilationWithMscorlib(syntaxTree, options: TestOptions.ReleaseExe);
-            CompileAndVerify(compilation, emitOptions: TestEmitters.CCI, sourceSymbolValidator: CommonSourceValidatorForCondAttrType, symbolValidator: CommonMetadataValidatorForCondAttrType, expectedOutput: "");
+            var compilation = CreateCompilation(syntaxTree, options: TestOptions.ReleaseExe);
+            CompileAndVerify(compilation, sourceSymbolValidator: CommonSourceValidatorForCondAttrType, symbolValidator: CommonMetadataValidatorForCondAttrType, expectedOutput: "");
         }
 
         private void TestConditionAttributeType_DifferentSource(string condDefsSrcFile1, string condDefsSrcFile2)
@@ -261,11 +265,11 @@ using System;
 
             // Different source files, same compilation
             var testSources = new[] { source1, source2 };
-            CompileAndVerify(testSources, emitOptions: TestEmitters.CCI, sourceSymbolValidator: CommonSourceValidatorForCondAttrType, symbolValidator: CommonMetadataValidatorForCondAttrType, expectedOutput: "");
+            CompileAndVerify(testSources, sourceSymbolValidator: CommonSourceValidatorForCondAttrType, symbolValidator: CommonMetadataValidatorForCondAttrType, expectedOutput: "");
 
             // Different source files, different compilation
-            var comp1 = CreateCompilationWithMscorlib(source1);
-            CompileAndVerify(source2, additionalRefs: new[] { comp1.ToMetadataReference() }, emitOptions: TestEmitters.CCI, sourceSymbolValidator: CommonSourceValidatorForCondAttrType, symbolValidator: CommonMetadataValidatorForCondAttrType, expectedOutput: "");
+            var comp1 = CreateCompilation(source1);
+            CompileAndVerify(source2, references: new[] { comp1.ToMetadataReference() }, sourceSymbolValidator: CommonSourceValidatorForCondAttrType, symbolValidator: CommonMetadataValidatorForCondAttrType, expectedOutput: "");
         }
 
         #endregion
@@ -454,13 +458,13 @@ Z.PreservedCalls_MultipleConditional_Method";
         {
             // Same source file
             string testSource = condDefs + s_commonTestSource_ConditionalMethodDefs + s_commonTestSource_ConditionalMethodCalls;
-            CompileAndVerify(testSource, emitOptions: TestEmitters.CCI, expectedOutput: s_commonExpectedOutput_ConditionalMethodsTest);
+            CompileAndVerify(testSource, expectedOutput: s_commonExpectedOutput_ConditionalMethodsTest);
 
             // Scenario to test Conditional directive stack creation during SyntaxTree.Create, see Devdiv Bug #13846 for details.
             CompilationUnitSyntax root = SyntaxFactory.ParseCompilationUnit(testSource);
             var syntaxTree = SyntaxFactory.SyntaxTree(root);
-            var compilation = CreateCompilationWithMscorlib(syntaxTree, options: TestOptions.ReleaseExe);
-            CompileAndVerify(compilation, emitOptions: TestEmitters.CCI, expectedOutput: s_commonExpectedOutput_ConditionalMethodsTest);
+            var compilation = CreateCompilation(syntaxTree, options: TestOptions.ReleaseExe);
+            CompileAndVerify(compilation, expectedOutput: s_commonExpectedOutput_ConditionalMethodsTest);
         }
 
         private void TestConditionMethods_DifferentSource(string condDefsSrcFile1, string condDefsSrcFile2)
@@ -472,11 +476,11 @@ using System;
 
             // Different source files, same compilation
             var testSources = new[] { source1, source2 };
-            CompileAndVerify(testSources, emitOptions: TestEmitters.CCI, expectedOutput: s_commonExpectedOutput_ConditionalMethodsTest);
+            CompileAndVerify(testSources, expectedOutput: s_commonExpectedOutput_ConditionalMethodsTest);
 
             // Different source files, different compilation
-            var comp1 = CreateCompilationWithMscorlib(source1, assemblyName: Guid.NewGuid().ToString());
-            CompileAndVerify(source2, additionalRefs: new[] { comp1.ToMetadataReference() }, emitOptions: TestEmitters.CCI, expectedOutput: s_commonExpectedOutput_ConditionalMethodsTest);
+            var comp1 = CreateCompilation(source1, assemblyName: Guid.NewGuid().ToString());
+            CompileAndVerify(source2, references: new[] { comp1.ToMetadataReference() }, expectedOutput: s_commonExpectedOutput_ConditionalMethodsTest);
         }
 
         #endregion
@@ -551,10 +555,10 @@ using System;
             TestConditionMethods_DifferentSource(conditionalDefsDummy, conditionalDefs);
         }
 
-        [Fact, WorkItem(529683, "DevDiv")]
+        [Fact, WorkItem(529683, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/529683")]
         public void CondMethodInDelegateCreationExpr()
         {
-            var compilation = CreateCompilationWithMscorlib(@"
+            var compilation = CreateCompilation(@"
 using System.Diagnostics;
 
 class Test
@@ -604,13 +608,13 @@ using System;
 using System.Diagnostics;
 using System.Runtime.InteropServices;
 
-[Conditional(Foo.M)]
+[Conditional(Goo.M)]
 [Conditional(Bar.M)]
-public class Foo: Attribute
+public class Goo: Attribute
 {
     public const string M = Bar.M;
-    public Foo([Optional][Foo]int y) {}
-    public static void Main() { var unused = new Foo(); }
+    public Goo([Optional][Goo]int y) {}
+    public static void Main() { var unused = new Goo(); }
 }
 
 class Bar
@@ -622,13 +626,13 @@ class Bar
             {
                 var globalNamespace = module.GlobalNamespace;
 
-                var classFoo = globalNamespace.GetMember<NamedTypeSymbol>("Foo");
-                Assert.True(classFoo.IsConditional);
+                var classGoo = globalNamespace.GetMember<NamedTypeSymbol>("Goo");
+                Assert.True(classGoo.IsConditional);
 
-                var fooCtor = classFoo.InstanceConstructors.First();
-                Assert.Equal(1, fooCtor.ParameterCount);
+                var gooCtor = classGoo.InstanceConstructors.First();
+                Assert.Equal(1, gooCtor.ParameterCount);
 
-                var paramY = fooCtor.Parameters[0];
+                var paramY = gooCtor.Parameters[0];
                 Assert.True(paramY.IsOptional);
                 var attributes = paramY.GetAttributes();
                 if (isFromSource)
@@ -641,7 +645,7 @@ class Bar
                 }
             };
 
-            CompileAndVerify(source, emitOptions: TestEmitters.CCI, symbolValidator: validator(false), sourceSymbolValidator: validator(true), expectedOutput: "");
+            CompileAndVerify(source, symbolValidator: validator(false), sourceSymbolValidator: validator(true), expectedOutput: "");
         }
 
         [Fact]
@@ -652,15 +656,15 @@ using System;
 using System.Diagnostics;
 using System.Runtime.InteropServices;
 
-[Conditional(Foo.M)]
-[Conditional(Foo.M())]
+[Conditional(Goo.M)]
+[Conditional(Goo.M())]
 [Conditional(Bar.M)]
 [Conditional(Bar.M())]
-public class Foo: Attribute
+public class Goo: Attribute
 {
     public const string M = Bar.M;
-    public Foo([Optional][Foo]int y) {}
-    public static void Main() { var unused = new Foo(); }
+    public Goo([Optional][Goo]int y) {}
+    public static void Main() { var unused = new Goo(); }
 }
 
 class Bar
@@ -668,13 +672,13 @@ class Bar
     public static string M() { return ""str""; }
 }
 ";
-            CreateCompilationWithMscorlib(source).VerifyDiagnostics(
+            CreateCompilation(source).VerifyDiagnostics(
                 // (12,33): error CS0428: Cannot convert method group 'M' to non-delegate type 'string'. Did you intend to invoke the method?
                 //     public const string M = Bar.M;
                 Diagnostic(ErrorCode.ERR_MethGrpToNonDel, "M").WithArguments("M", "string"),
-                // (7,18): error CS1955: Non-invocable member 'Foo.M' cannot be used like a method.
-                // [Conditional(Foo.M())]
-                Diagnostic(ErrorCode.ERR_NonInvocableMemberCalled, "M").WithArguments("Foo.M"),
+                // (7,18): error CS1955: Non-invocable member 'Goo.M' cannot be used like a method.
+                // [Conditional(Goo.M())]
+                Diagnostic(ErrorCode.ERR_NonInvocableMemberCalled, "M").WithArguments("Goo.M"),
                 // (8,14): error CS1503: Argument 1: cannot convert from 'method group' to 'string'
                 // [Conditional(Bar.M)]
                 Diagnostic(ErrorCode.ERR_BadArgType, "Bar.M").WithArguments("1", "method group", "string"),
@@ -682,8 +686,8 @@ class Bar
                 // [Conditional(Bar.M())]
                 Diagnostic(ErrorCode.ERR_BadAttributeArgument, "Bar.M()"),
                 // (6,14): error CS0182: An attribute argument must be a constant expression, typeof expression or array creation expression of an attribute parameter type
-                // [Conditional(Foo.M)]
-                Diagnostic(ErrorCode.ERR_BadAttributeArgument, "Foo.M"));
+                // [Conditional(Goo.M)]
+                Diagnostic(ErrorCode.ERR_BadAttributeArgument, "Goo.M"));
         }
 
         #endregion

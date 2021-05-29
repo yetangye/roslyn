@@ -1,4 +1,8 @@
-﻿// Copyright (c) Microsoft.  All Rights Reserved.  Licensed under the Apache License, Version 2.0.  See License.txt in the project root for license information.
+﻿// Licensed to the .NET Foundation under one or more agreements.
+// The .NET Foundation licenses this file to you under the MIT license.
+// See the LICENSE file in the project root for more information.
+
+#nullable disable
 
 using System;
 using System.Composition;
@@ -12,49 +16,30 @@ namespace Microsoft.VisualStudio.LanguageServices.Implementation.ProjectSystem
     [ExportWorkspaceServiceFactory(typeof(IMetadataService), ServiceLayer.Host), Shared]
     internal sealed class VsMetadataServiceFactory : IWorkspaceServiceFactory
     {
-        public IWorkspaceService CreateService(HostWorkspaceServices workspaceServices)
+        [ImportingConstructor]
+        [Obsolete(MefConstruction.ImportingConstructorMessage, error: true)]
+        public VsMetadataServiceFactory()
         {
-            var manager = workspaceServices.GetService<VisualStudioMetadataReferenceManager>();
-            Debug.Assert(manager != null);
-
-            return new Service(manager);
         }
+
+        public IWorkspaceService CreateService(HostWorkspaceServices workspaceServices)
+            => new Service(workspaceServices);
 
         private sealed class Service : IMetadataService
         {
-            private readonly VisualStudioMetadataReferenceManager _manager;
-            private readonly Provider _provider;
+            private readonly Lazy<VisualStudioMetadataReferenceManager> _manager;
 
-            public Service(VisualStudioMetadataReferenceManager manager)
+            public Service(HostWorkspaceServices workspaceServices)
             {
-                _manager = manager;
-                _provider = new Provider(this);
+                // We will defer creation of this reference manager until we have to to avoid it being constructed too
+                // early and potentially causing deadlocks. We do initialize it on the UI thread in the
+                // VisualStudioWorkspaceImpl.DeferredState constructor to ensure it gets created there.
+                _manager = new Lazy<VisualStudioMetadataReferenceManager>(
+                    () => workspaceServices.GetRequiredService<VisualStudioMetadataReferenceManager>());
             }
 
             public PortableExecutableReference GetReference(string resolvedPath, MetadataReferenceProperties properties)
-            {
-                return _manager.CreateMetadataReferenceSnapshot(resolvedPath, properties);
-            }
-
-            public MetadataFileReferenceProvider GetProvider()
-            {
-                return _provider;
-            }
-        }
-
-        private sealed class Provider : MetadataFileReferenceProvider
-        {
-            private readonly Service _service;
-
-            public Provider(Service service)
-            {
-                _service = service;
-            }
-
-            public override PortableExecutableReference GetReference(string resolvedPath, MetadataReferenceProperties properties)
-            {
-                return _service.GetReference(resolvedPath, properties);
-            }
+                => _manager.Value.CreateMetadataReferenceSnapshot(resolvedPath, properties);
         }
     }
 }

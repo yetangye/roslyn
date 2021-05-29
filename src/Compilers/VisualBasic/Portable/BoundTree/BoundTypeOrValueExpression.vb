@@ -1,4 +1,6 @@
-﻿' Copyright (c) Microsoft.  All Rights Reserved.  Licensed under the Apache License, Version 2.0.  See License.txt in the project root for license information.
+﻿' Licensed to the .NET Foundation under one or more agreements.
+' The .NET Foundation licenses this file to you under the MIT license.
+' See the LICENSE file in the project root for more information.
 
 Imports System
 Imports System.Collections.Immutable
@@ -8,7 +10,7 @@ Imports Microsoft.CodeAnalysis.VisualBasic.Symbols
 Imports Microsoft.CodeAnalysis.VisualBasic.Syntax
 
 Namespace Microsoft.CodeAnalysis.VisualBasic
-    Structure BoundTypeOrValueData
+    Friend Structure BoundTypeOrValueData
         Implements IEquatable(Of BoundTypeOrValueData)
 
         Private ReadOnly _valueExpression As BoundExpression
@@ -18,8 +20,8 @@ Namespace Microsoft.CodeAnalysis.VisualBasic
             End Get
         End Property
 
-        Private ReadOnly _valueDiagnostics As DiagnosticBag
-        Public ReadOnly Property ValueDiagnostics As DiagnosticBag
+        Private ReadOnly _valueDiagnostics As BindingDiagnosticBag
+        Public ReadOnly Property ValueDiagnostics As BindingDiagnosticBag
             Get
                 Return Me._valueDiagnostics
             End Get
@@ -32,19 +34,19 @@ Namespace Microsoft.CodeAnalysis.VisualBasic
             End Get
         End Property
 
-        Private ReadOnly _typeDiagnostics As DiagnosticBag
-        Public ReadOnly Property TypeDiagnostics As DiagnosticBag
+        Private ReadOnly _typeDiagnostics As BindingDiagnosticBag
+        Public ReadOnly Property TypeDiagnostics As BindingDiagnosticBag
             Get
                 Return Me._typeDiagnostics
             End Get
         End Property
 
-        Public Sub New(valueExpression As BoundExpression, valueDiagnostics As DiagnosticBag, typeExpression As BoundExpression, typeDiagnostics As DiagnosticBag)
+        Public Sub New(valueExpression As BoundExpression, valueDiagnostics As BindingDiagnosticBag, typeExpression As BoundExpression, typeDiagnostics As BindingDiagnosticBag)
             Debug.Assert(valueExpression IsNot Nothing, "Field 'valueExpression' cannot be null (use Null=""allow"" in BoundNodes.xml to remove this check)")
             Debug.Assert(valueDiagnostics IsNot Nothing, "Field 'valueDiagnostics' cannot be null (use Null=""allow"" in BoundNodes.xml to remove this check)")
             Debug.Assert(typeExpression IsNot Nothing, "Field 'typeExpression' cannot be null (use Null=""allow"" in BoundNodes.xml to remove this check)")
             Debug.Assert(typeDiagnostics IsNot Nothing, "Field 'typeDiagnostics' cannot be null (use Null=""allow"" in BoundNodes.xml to remove this check)")
-           
+
             Me._valueExpression = valueExpression
             Me._valueDiagnostics = valueDiagnostics
             Me._typeExpression = typeExpression
@@ -74,7 +76,7 @@ Namespace Microsoft.CodeAnalysis.VisualBasic
                 Hash.Combine(TypeExpression.GetHashCode(), TypeDiagnostics.GetHashCode())))
         End Function
 
-        Private Overloads Function Equals(b As BoundTypeOrValueData) As Boolean Implements IEquatable(Of BoundTypeOrValueData).Equals            
+        Private Overloads Function Equals(b As BoundTypeOrValueData) As Boolean Implements IEquatable(Of BoundTypeOrValueData).Equals
             Return b = Me
         End Function
     End Structure

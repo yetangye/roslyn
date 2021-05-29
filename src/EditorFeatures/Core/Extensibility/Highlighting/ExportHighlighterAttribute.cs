@@ -1,4 +1,8 @@
-﻿// Copyright (c) Microsoft.  All Rights Reserved.  Licensed under the Apache License, Version 2.0.  See License.txt in the project root for license information.
+﻿// Licensed to the .NET Foundation under one or more agreements.
+// The .NET Foundation licenses this file to you under the MIT license.
+// See the LICENSE file in the project root for more information.
+
+#nullable disable
 
 using System;
 using System.ComponentModel.Composition;
@@ -11,17 +15,12 @@ namespace Microsoft.CodeAnalysis.Editor
     [ExcludeFromCodeCoverage]
     internal class ExportHighlighterAttribute : ExportAttribute
     {
-        public string Language { get; private set; }
+        public string Language { get; }
 
         public ExportHighlighterAttribute(string language)
             : base(typeof(IHighlighter))
         {
-            if (language == null)
-            {
-                throw new ArgumentNullException("language");
-            }
-
-            this.Language = language;
+            this.Language = language ?? throw new ArgumentNullException(nameof(language));
         }
     }
 }

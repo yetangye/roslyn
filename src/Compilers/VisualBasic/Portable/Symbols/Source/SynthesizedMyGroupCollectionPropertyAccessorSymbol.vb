@@ -1,9 +1,12 @@
-﻿' Copyright (c) Microsoft.  All Rights Reserved.  Licensed under the Apache License, Version 2.0.  See License.txt in the project root for license information.
+﻿' Licensed to the .NET Foundation under one or more agreements.
+' The .NET Foundation licenses this file to you under the MIT license.
+' See the LICENSE file in the project root for more information.
 
 Imports System.Collections.Generic
 Imports System.Collections.Immutable
 Imports System.Diagnostics
 Imports System.Runtime.InteropServices
+Imports Microsoft.CodeAnalysis.PooledObjects
 Imports Microsoft.CodeAnalysis.Text
 Imports Microsoft.CodeAnalysis.VisualBasic.Symbols
 Imports Microsoft.CodeAnalysis.VisualBasic.Syntax
@@ -17,12 +20,12 @@ Namespace Microsoft.CodeAnalysis.VisualBasic.Symbols
     Friend MustInherit Class SynthesizedMyGroupCollectionPropertyAccessorSymbol
         Inherits SynthesizedPropertyAccessorBase(Of SynthesizedMyGroupCollectionPropertySymbol)
 
-        Private ReadOnly m_CreateOrDisposeMethod As String
+        Private ReadOnly _createOrDisposeMethod As String
 
         Public Sub New(container As SourceNamedTypeSymbol, [property] As SynthesizedMyGroupCollectionPropertySymbol, createOrDisposeMethod As String)
             MyBase.New(container, [property])
             Debug.Assert(createOrDisposeMethod IsNot Nothing AndAlso createOrDisposeMethod.Length > 0)
-            m_CreateOrDisposeMethod = createOrDisposeMethod
+            _createOrDisposeMethod = createOrDisposeMethod
         End Sub
 
         Friend Overrides ReadOnly Property BackingFieldSymbol As FieldSymbol
@@ -46,13 +49,13 @@ Namespace Microsoft.CodeAnalysis.VisualBasic.Symbols
             Return name
         End Function
 
-        Friend Overrides Function GetBoundMethodBody(diagnostics As DiagnosticBag, <Out()> Optional ByRef methodBodyBinder As Binder = Nothing) As BoundBlock
+        Friend Overrides Function GetBoundMethodBody(compilationState As TypeCompilationState, diagnostics As BindingDiagnosticBag, <Out()> Optional ByRef methodBodyBinder As Binder = Nothing) As BoundBlock
 
             Dim containingType = DirectCast(Me.ContainingType, SourceNamedTypeSymbol)
             Dim containingTypeName As String = MakeSafeName(containingType.Name)
 
             Dim targetTypeName As String = PropertyOrEvent.Type.ToDisplayString(SymbolDisplayFormat.FullyQualifiedFormat)
-            Debug.Assert(targetTypeName.StartsWith("Global."))
+            Debug.Assert(targetTypeName.StartsWith("Global.", StringComparison.Ordinal))
 
             Dim propertyName As String = MakeSafeName(PropertyOrEvent.Name)
 
@@ -61,7 +64,7 @@ Namespace Microsoft.CodeAnalysis.VisualBasic.Symbols
             Dim codeToParse As String =
                 "Partial Class " & containingTypeName & vbCrLf &
                     "Property " & propertyName & vbCrLf &
-                        GetMethodBlock(fieldName, MakeSafeName(m_CreateOrDisposeMethod), targetTypeName) &
+                        GetMethodBlock(fieldName, MakeSafeName(_createOrDisposeMethod), targetTypeName) &
                     "End Property" & vbCrLf &
                 "End Class" & vbCrLf
 
@@ -96,7 +99,7 @@ Namespace Microsoft.CodeAnalysis.VisualBasic.Symbols
                 Dim typeBinder As Binder = BinderBuilder.CreateBinderForType(containingType.ContainingSourceModule, PropertyOrEvent.AttributeSyntax.SyntaxTree, containingType)
                 methodBodyBinder = BinderBuilder.CreateBinderForMethodBody(Me, accessorBlock, typeBinder)
 
-                Dim bindingDiagnostics = DiagnosticBag.GetInstance()
+                Dim bindingDiagnostics = New BindingDiagnosticBag(DiagnosticBag.GetInstance(), diagnostics.DependenciesBag)
 #If DEBUG Then
                 ' Enable DEBUG check for ordering of simple name binding.
                 methodBodyBinder.EnableSimpleNameBindingOrderChecks(True)
@@ -108,11 +111,11 @@ Namespace Microsoft.CodeAnalysis.VisualBasic.Symbols
                 methodBodyBinder.EnableSimpleNameBindingOrderChecks(False)
 #End If
 
-                For Each diag As VBDiagnostic In bindingDiagnostics.AsEnumerable()
+                For Each diag As VBDiagnostic In bindingDiagnostics.DiagnosticBag.AsEnumerable()
                     diagnostics.Add(diag.WithLocation(diagnosticLocation))
                 Next
 
-                bindingDiagnostics.Free()
+                bindingDiagnostics.DiagnosticBag.Free()
 
                 If boundStatement.Kind = BoundKind.Block Then
                     Return DirectCast(boundStatement, BoundBlock)
@@ -179,13 +182,13 @@ Namespace Microsoft.CodeAnalysis.VisualBasic.Symbols
     Friend Class SynthesizedMyGroupCollectionPropertySetAccessorSymbol
         Inherits SynthesizedMyGroupCollectionPropertyAccessorSymbol
 
-        Private ReadOnly m_Parameters As ImmutableArray(Of ParameterSymbol)
+        Private ReadOnly _parameters As ImmutableArray(Of ParameterSymbol)
 
         Public Sub New(container As SourceNamedTypeSymbol, [property] As SynthesizedMyGroupCollectionPropertySymbol, disposeMethod As String)
             MyBase.New(container, [property], disposeMethod)
 
             Dim params() As ParameterSymbol = {SynthesizedParameterSymbol.CreateSetAccessorValueParameter(Me, [property], StringConstants.ValueParameterName)}
-            m_Parameters = params.AsImmutableOrNull()
+            _parameters = params.AsImmutableOrNull()
         End Sub
 
         Public Overrides ReadOnly Property IsSub As Boolean
@@ -210,7 +213,7 @@ Namespace Microsoft.CodeAnalysis.VisualBasic.Symbols
 
         Public Overrides ReadOnly Property Parameters As ImmutableArray(Of ParameterSymbol)
             Get
-                Return m_Parameters
+                Return _parameters
             End Get
         End Property
 

@@ -1,9 +1,15 @@
-﻿// Copyright (c) Microsoft.  All Rights Reserved.  Licensed under the Apache License, Version 2.0.  See License.txt in the project root for license information.
+﻿// Licensed to the .NET Foundation under one or more agreements.
+// The .NET Foundation licenses this file to you under the MIT license.
+// See the LICENSE file in the project root for more information.
+
+#nullable disable
 
 using System.Collections.Immutable;
 using System.Diagnostics;
 using System.Linq;
 using System.Reflection;
+using System.Reflection.Metadata;
+using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp.Symbols;
 using Roslyn.Utilities;
 
@@ -13,6 +19,11 @@ namespace Microsoft.CodeAnalysis.CSharp
     {
         private const string IL_KEYWORD_MODOPT = "modopt";
         private const string IL_KEYWORD_MODREQ = "modreq";
+
+        private void VisitFieldType(IFieldSymbol symbol)
+        {
+            symbol.Type.Accept(this.NotFirstVisitor);
+        }
 
         public override void VisitField(IFieldSymbol symbol)
         {
@@ -24,7 +35,7 @@ namespace Microsoft.CodeAnalysis.CSharp
                 this.isFirstSymbolVisited &&
                 !IsEnumMember(symbol))
             {
-                symbol.Type.Accept(this.NotFirstVisitor);
+                VisitFieldType(symbol);
                 AddSpace();
 
                 AddCustomModifiersIfRequired(symbol.CustomModifiers);
@@ -37,7 +48,18 @@ namespace Microsoft.CodeAnalysis.CSharp
                 AddPunctuation(SyntaxKind.DotToken);
             }
 
-            builder.Add(CreatePart(SymbolDisplayPartKind.FieldName, symbol, symbol.Name));
+            if (symbol.ContainingType.TypeKind == TypeKind.Enum)
+            {
+                builder.Add(CreatePart(SymbolDisplayPartKind.EnumMemberName, symbol, symbol.Name));
+            }
+            else if (symbol.IsConst)
+            {
+                builder.Add(CreatePart(SymbolDisplayPartKind.ConstantName, symbol, symbol.Name));
+            }
+            else
+            {
+                builder.Add(CreatePart(SymbolDisplayPartKind.FieldName, symbol, symbol.Name));
+            }
 
             if (this.isFirstSymbolVisited &&
                 format.MemberOptions.IncludesOption(SymbolDisplayMemberOptions.IncludeConstantValue) &&
@@ -53,13 +75,74 @@ namespace Microsoft.CodeAnalysis.CSharp
             }
         }
 
+        private static bool ShouldPropertyDisplayReadOnly(IPropertySymbol property)
+        {
+            if (property.ContainingType?.IsReadOnly == true)
+            {
+                return false;
+            }
+
+            // If at least one accessor is present and all present accessors are readonly, the property should be marked readonly.
+
+            var getMethod = property.GetMethod;
+            if (getMethod is object && !ShouldMethodDisplayReadOnly(getMethod, property))
+            {
+                return false;
+            }
+
+            var setMethod = property.SetMethod;
+            if (setMethod is object && !ShouldMethodDisplayReadOnly(setMethod, property))
+            {
+                return false;
+            }
+
+            return getMethod is object || setMethod is object;
+        }
+
+        private static bool ShouldMethodDisplayReadOnly(IMethodSymbol method, IPropertySymbol propertyOpt = null)
+        {
+            if (method.ContainingType?.IsReadOnly == true)
+            {
+                return false;
+            }
+
+            if ((method as Symbols.PublicModel.MethodSymbol)?.UnderlyingMethodSymbol is SourcePropertyAccessorSymbol sourceAccessor &&
+                (propertyOpt as Symbols.PublicModel.PropertySymbol)?.UnderlyingSymbol is SourcePropertySymbolBase sourceProperty)
+            {
+                // only display if the accessor is explicitly readonly
+                return sourceAccessor.LocalDeclaredReadOnly || sourceProperty.HasReadOnlyModifier;
+            }
+            else if (method is Symbols.PublicModel.MethodSymbol m)
+            {
+                return m.UnderlyingMethodSymbol.IsDeclaredReadOnly;
+            }
+
+            return false;
+        }
+
         public override void VisitProperty(IPropertySymbol symbol)
         {
             AddAccessibilityIfRequired(symbol);
             AddMemberModifiersIfRequired(symbol);
 
+            if (ShouldPropertyDisplayReadOnly(symbol))
+            {
+                AddReadOnlyIfRequired();
+            }
+
             if (format.MemberOptions.IncludesOption(SymbolDisplayMemberOptions.IncludeType))
             {
+                if (symbol.ReturnsByRef)
+                {
+                    AddRefIfRequired();
+                }
+                else if (symbol.ReturnsByRefReadonly)
+                {
+                    AddRefReadonlyIfRequired();
+                }
+
+                AddCustomModifiersIfRequired(symbol.RefCustomModifiers);
+
                 symbol.Type.Accept(this.NotFirstVisitor);
                 AddSpace();
 
@@ -81,11 +164,17 @@ namespace Microsoft.CodeAnalysis.CSharp
                 AddPunctuation(SyntaxKind.OpenBraceToken);
 
                 AddAccessor(symbol, symbol.GetMethod, SyntaxKind.GetKeyword);
-                AddAccessor(symbol, symbol.SetMethod, SyntaxKind.SetKeyword);
+                var keywordForSetAccessor = IsInitOnly(symbol.SetMethod) ? SyntaxKind.InitKeyword : SyntaxKind.SetKeyword;
+                AddAccessor(symbol, symbol.SetMethod, keywordForSetAccessor);
 
                 AddSpace();
                 AddPunctuation(SyntaxKind.CloseBraceToken);
             }
+        }
+
+        private static bool IsInitOnly(IMethodSymbol symbol)
+        {
+            return symbol?.IsInitOnly == true;
         }
 
         private void AddPropertyNameAndParameters(IPropertySymbol symbol)
@@ -123,6 +212,12 @@ namespace Microsoft.CodeAnalysis.CSharp
         {
             AddAccessibilityIfRequired(symbol);
             AddMemberModifiersIfRequired(symbol);
+
+            var accessor = symbol.AddMethod ?? symbol.RemoveMethod;
+            if (accessor is object && ShouldMethodDisplayReadOnly(accessor))
+            {
+                AddReadOnlyIfRequired();
+            }
 
             if (format.KindOptions.IncludesOption(SymbolDisplayKindOptions.IncludeMemberKeyword))
             {
@@ -170,13 +265,18 @@ namespace Microsoft.CodeAnalysis.CSharp
                 builder.Add(CreatePart(SymbolDisplayPartKind.NumericLiteral, symbol, "lambda expression"));
                 return;
             }
-            else if (symbol is SynthesizedGlobalMethodSymbol) // It would be nice to handle VB symbols too, but it's not worth the effort.
+            else if ((symbol as Symbols.PublicModel.MethodSymbol)?.UnderlyingMethodSymbol is SynthesizedGlobalMethodSymbol) // It would be nice to handle VB symbols too, but it's not worth the effort.
             {
                 // Represents a compiler generated synthesized method symbol with a null containing
                 // type.
 
                 // TODO(cyrusn); Why is this a literal?
                 builder.Add(CreatePart(SymbolDisplayPartKind.NumericLiteral, symbol, symbol.Name));
+                return;
+            }
+            else if (symbol.MethodKind == MethodKind.FunctionPointerSignature)
+            {
+                visitFunctionPointerSignature(symbol);
                 return;
             }
 
@@ -193,7 +293,7 @@ namespace Microsoft.CodeAnalysis.CSharp
                 }
             }
 
-            // Method members always have a type unless (1) this is a lambda method symbol, which we 
+            // Method members always have a type unless (1) this is a lambda method symbol, which we
             // have dealt with already, or (2) this is an error method symbol. If we have an error method
             // symbol then we do not know its accessibility, modifiers, etc, all of which require knowing
             // the containing type, so we'll skip them.
@@ -202,6 +302,11 @@ namespace Microsoft.CodeAnalysis.CSharp
             {
                 AddAccessibilityIfRequired(symbol);
                 AddMemberModifiersIfRequired(symbol);
+
+                if (ShouldMethodDisplayReadOnly(symbol))
+                {
+                    AddReadOnlyIfRequired();
+                }
 
                 if (format.MemberOptions.IncludesOption(SymbolDisplayMemberOptions.IncludeType))
                 {
@@ -212,8 +317,8 @@ namespace Microsoft.CodeAnalysis.CSharp
                             break;
                         case MethodKind.Destructor:
                         case MethodKind.Conversion:
-                            // If we're using the metadata format, then include the return type.  
-                            // Otherwise we eschew it since it is redundant in an conversion
+                            // If we're using the metadata format, then include the return type.
+                            // Otherwise we eschew it since it is redundant in a conversion
                             // signature.
                             if (format.CompilerInternalOptions.IncludesOption(SymbolDisplayCompilerInternalOptions.UseMetadataMethodNames))
                             {
@@ -223,8 +328,19 @@ namespace Microsoft.CodeAnalysis.CSharp
                             break;
                         default:
                             // The display code is called by the debugger; if a developer is debugging Roslyn and attempts
-                            // to visualize a symbol *during its construction*, the parameters and return type might 
-                            // still be null. 
+                            // to visualize a symbol *during its construction*, the parameters and return type might
+                            // still be null.
+
+                            if (symbol.ReturnsByRef)
+                            {
+                                AddRefIfRequired();
+                            }
+                            else if (symbol.ReturnsByRefReadonly)
+                            {
+                                AddRefReadonlyIfRequired();
+                            }
+
+                            AddCustomModifiersIfRequired(symbol.RefCustomModifiers);
 
                             if (symbol.ReturnsVoid)
                             {
@@ -232,8 +348,9 @@ namespace Microsoft.CodeAnalysis.CSharp
                             }
                             else if (symbol.ReturnType != null)
                             {
-                                symbol.ReturnType.Accept(this.NotFirstVisitor);
+                                AddReturnType(symbol);
                             }
+
                             AddSpace();
                             AddCustomModifiersIfRequired(symbol.ReturnTypeCustomModifiers);
                             break;
@@ -245,7 +362,12 @@ namespace Microsoft.CodeAnalysis.CSharp
                     ITypeSymbol containingType;
                     bool includeType;
 
-                    if (symbol.MethodKind == MethodKind.ReducedExtension)
+                    if (symbol.MethodKind == MethodKind.LocalFunction)
+                    {
+                        includeType = false;
+                        containingType = null;
+                    }
+                    else if (symbol.MethodKind == MethodKind.ReducedExtension)
                     {
                         containingType = symbol.ReceiverType;
                         includeType = true;
@@ -279,128 +401,252 @@ namespace Microsoft.CodeAnalysis.CSharp
             {
                 case MethodKind.Ordinary:
                 case MethodKind.DelegateInvoke:
+                case MethodKind.LocalFunction:
+                    {
+                        //containing type will be the delegate type, name will be Invoke
+                        builder.Add(CreatePart(SymbolDisplayPartKind.MethodName, symbol, symbol.Name));
+                        break;
+                    }
                 case MethodKind.ReducedExtension:
-                    //containing type will be the delegate type, name will be Invoke
-                    builder.Add(CreatePart(SymbolDisplayPartKind.MethodName, symbol, symbol.Name));
-                    break;
+                    {
+                        // Note: Extension methods invoked off of their static class will be tagged as methods.
+                        //       This behavior matches the semantic classification done in NameSyntaxClassifier.
+                        builder.Add(CreatePart(SymbolDisplayPartKind.ExtensionMethodName, symbol, symbol.Name));
+                        break;
+                    }
                 case MethodKind.PropertyGet:
                 case MethodKind.PropertySet:
-                    isAccessor = true;
-                    var associatedProperty = (IPropertySymbol)symbol.AssociatedSymbol;
-                    if (associatedProperty == null)
                     {
-                        goto case MethodKind.Ordinary;
+                        isAccessor = true;
+                        var associatedProperty = (IPropertySymbol)symbol.AssociatedSymbol;
+                        if (associatedProperty == null)
+                        {
+                            goto case MethodKind.Ordinary;
+                        }
+                        AddPropertyNameAndParameters(associatedProperty);
+                        AddPunctuation(SyntaxKind.DotToken);
+                        AddKeyword(symbol.MethodKind == MethodKind.PropertyGet ? SyntaxKind.GetKeyword :
+                            IsInitOnly(symbol) ? SyntaxKind.InitKeyword : SyntaxKind.SetKeyword);
+                        break;
                     }
-                    AddPropertyNameAndParameters(associatedProperty);
-                    AddPunctuation(SyntaxKind.DotToken);
-                    AddKeyword(symbol.MethodKind == MethodKind.PropertyGet ? SyntaxKind.GetKeyword : SyntaxKind.SetKeyword);
-                    break;
                 case MethodKind.EventAdd:
                 case MethodKind.EventRemove:
-                    isAccessor = true;
-                    var associatedEvent = (IEventSymbol)symbol.AssociatedSymbol;
-                    if (associatedEvent == null)
                     {
-                        goto case MethodKind.Ordinary;
+                        isAccessor = true;
+                        var associatedEvent = (IEventSymbol)symbol.AssociatedSymbol;
+                        if (associatedEvent == null)
+                        {
+                            goto case MethodKind.Ordinary;
+                        }
+                        AddEventName(associatedEvent);
+                        AddPunctuation(SyntaxKind.DotToken);
+                        AddKeyword(symbol.MethodKind == MethodKind.EventAdd ? SyntaxKind.AddKeyword : SyntaxKind.RemoveKeyword);
+                        break;
                     }
-                    AddEventName(associatedEvent);
-                    AddPunctuation(SyntaxKind.DotToken);
-                    AddKeyword(symbol.MethodKind == MethodKind.EventAdd ? SyntaxKind.AddKeyword : SyntaxKind.RemoveKeyword);
-                    break;
                 case MethodKind.Constructor:
                 case MethodKind.StaticConstructor:
-                    // Note: we are using the metadata name also in the case that
-                    // symbol.containingType is null (which should never be the case here) or is an
-                    //       anonymous type (which 'does not have a name').
-                    var name = format.CompilerInternalOptions.IncludesOption(SymbolDisplayCompilerInternalOptions.UseMetadataMethodNames) || symbol.ContainingType == null || symbol.ContainingType.IsAnonymousType
-                        ? symbol.Name
-                        : symbol.ContainingType.Name;
-                    builder.Add(CreatePart(SymbolDisplayPartKind.MethodName, symbol, name));
-                    break;
-                case MethodKind.Destructor:
-                    // Note: we are using the metadata name also in the case that symbol.containingType is null, which should never be the case here.
-                    if (format.CompilerInternalOptions.IncludesOption(SymbolDisplayCompilerInternalOptions.UseMetadataMethodNames) || symbol.ContainingType == null)
                     {
-                        builder.Add(CreatePart(SymbolDisplayPartKind.MethodName, symbol, symbol.Name));
-                    }
-                    else
-                    {
-                        AddPunctuation(SyntaxKind.TildeToken);
-                        builder.Add(CreatePart(SymbolDisplayPartKind.MethodName, symbol, symbol.ContainingType.Name));
-                    }
-                    break;
-                case MethodKind.ExplicitInterfaceImplementation:
-                    AddExplicitInterfaceIfRequired(symbol.ExplicitInterfaceImplementations);
-                    builder.Add(CreatePart(SymbolDisplayPartKind.MethodName, symbol,
-                        ExplicitInterfaceHelpers.GetMemberNameWithoutInterfaceName(symbol.Name)));
-                    break;
+                        // Note: we are using the metadata name also in the case that
+                        // symbol.containingType is null (which should never be the case here) or is an
+                        //       anonymous type (which 'does not have a name').
+                        var name = format.CompilerInternalOptions.IncludesOption(SymbolDisplayCompilerInternalOptions.UseMetadataMethodNames) || symbol.ContainingType == null || symbol.ContainingType.IsAnonymousType
+                            ? symbol.Name
+                            : symbol.ContainingType.Name;
 
+                        var partKind = GetPartKindForConstructorOrDestructor(symbol);
+
+                        builder.Add(CreatePart(partKind, symbol, name));
+                        break;
+                    }
+                case MethodKind.Destructor:
+                    {
+                        var partKind = GetPartKindForConstructorOrDestructor(symbol);
+
+                        // Note: we are using the metadata name also in the case that symbol.containingType is null, which should never be the case here.
+                        if (format.CompilerInternalOptions.IncludesOption(SymbolDisplayCompilerInternalOptions.UseMetadataMethodNames) || symbol.ContainingType == null)
+                        {
+                            builder.Add(CreatePart(partKind, symbol, symbol.Name));
+                        }
+                        else
+                        {
+                            AddPunctuation(SyntaxKind.TildeToken);
+                            builder.Add(CreatePart(partKind, symbol, symbol.ContainingType.Name));
+                        }
+                        break;
+                    }
+                case MethodKind.ExplicitInterfaceImplementation:
+                    {
+                        AddExplicitInterfaceIfRequired(symbol.ExplicitInterfaceImplementations);
+                        builder.Add(CreatePart(SymbolDisplayPartKind.MethodName, symbol,
+                            ExplicitInterfaceHelpers.GetMemberNameWithoutInterfaceName(symbol.Name)));
+                        break;
+                    }
                 case MethodKind.UserDefinedOperator:
                 case MethodKind.BuiltinOperator:
-                    if (format.CompilerInternalOptions.IncludesOption(SymbolDisplayCompilerInternalOptions.UseMetadataMethodNames))
                     {
-                        builder.Add(CreatePart(SymbolDisplayPartKind.MethodName, symbol, symbol.MetadataName));
-                    }
-                    else
-                    {
-                        AddKeyword(SyntaxKind.OperatorKeyword);
-                        AddSpace();
-                        if (symbol.MetadataName == WellKnownMemberNames.TrueOperatorName)
+                        if (format.CompilerInternalOptions.IncludesOption(SymbolDisplayCompilerInternalOptions.UseMetadataMethodNames))
                         {
-                            AddKeyword(SyntaxKind.TrueKeyword);
-                        }
-                        else if (symbol.MetadataName == WellKnownMemberNames.FalseOperatorName)
-                        {
-                            AddKeyword(SyntaxKind.FalseKeyword);
+                            builder.Add(CreatePart(SymbolDisplayPartKind.MethodName, symbol, symbol.MetadataName));
                         }
                         else
                         {
-                            builder.Add(CreatePart(SymbolDisplayPartKind.MethodName, symbol,
-                                SyntaxFacts.GetText(SyntaxFacts.GetOperatorKind(symbol.MetadataName))));
+                            AddKeyword(SyntaxKind.OperatorKeyword);
+                            AddSpace();
+                            if (symbol.MetadataName == WellKnownMemberNames.TrueOperatorName)
+                            {
+                                AddKeyword(SyntaxKind.TrueKeyword);
+                            }
+                            else if (symbol.MetadataName == WellKnownMemberNames.FalseOperatorName)
+                            {
+                                AddKeyword(SyntaxKind.FalseKeyword);
+                            }
+                            else
+                            {
+                                builder.Add(CreatePart(SymbolDisplayPartKind.MethodName, symbol,
+                                    SyntaxFacts.GetText(SyntaxFacts.GetOperatorKind(symbol.MetadataName))));
+                            }
                         }
+                        break;
                     }
-                    break;
-
                 case MethodKind.Conversion:
-                    if (format.CompilerInternalOptions.IncludesOption(SymbolDisplayCompilerInternalOptions.UseMetadataMethodNames))
                     {
-                        builder.Add(CreatePart(SymbolDisplayPartKind.MethodName, symbol, symbol.MetadataName));
-                    }
-                    else
-                    {
-                        // "System.IntPtr.explicit operator System.IntPtr(int)"
-
-                        if (symbol.MetadataName == WellKnownMemberNames.ExplicitConversionName)
+                        if (format.CompilerInternalOptions.IncludesOption(SymbolDisplayCompilerInternalOptions.UseMetadataMethodNames))
                         {
-                            AddKeyword(SyntaxKind.ExplicitKeyword);
-                        }
-                        else if (symbol.MetadataName == WellKnownMemberNames.ImplicitConversionName)
-                        {
-                            AddKeyword(SyntaxKind.ImplicitKeyword);
+                            builder.Add(CreatePart(SymbolDisplayPartKind.MethodName, symbol, symbol.MetadataName));
                         }
                         else
                         {
-                            builder.Add(CreatePart(SymbolDisplayPartKind.MethodName, symbol,
-                                SyntaxFacts.GetText(SyntaxFacts.GetOperatorKind(symbol.MetadataName))));
+                            // "System.IntPtr.explicit operator System.IntPtr(int)"
+
+                            if (symbol.MetadataName == WellKnownMemberNames.ExplicitConversionName)
+                            {
+                                AddKeyword(SyntaxKind.ExplicitKeyword);
+                            }
+                            else if (symbol.MetadataName == WellKnownMemberNames.ImplicitConversionName)
+                            {
+                                AddKeyword(SyntaxKind.ImplicitKeyword);
+                            }
+                            else
+                            {
+                                builder.Add(CreatePart(SymbolDisplayPartKind.MethodName, symbol,
+                                    SyntaxFacts.GetText(SyntaxFacts.GetOperatorKind(symbol.MetadataName))));
+                            }
+
+                            AddSpace();
+                            AddKeyword(SyntaxKind.OperatorKeyword);
+                            AddSpace();
+                            AddReturnType(symbol);
                         }
-
-                        AddSpace();
-                        AddKeyword(SyntaxKind.OperatorKeyword);
-                        AddSpace();
-                        symbol.ReturnType.Accept(this.NotFirstVisitor);
+                        break;
                     }
-                    break;
-
                 default:
                     throw ExceptionUtilities.UnexpectedValue(symbol.MethodKind);
             }
 
             if (!isAccessor)
             {
-                AddTypeArguments(symbol.TypeArguments);
+                AddTypeArguments(symbol, default(ImmutableArray<ImmutableArray<CustomModifier>>));
                 AddParameters(symbol);
                 AddTypeParameterConstraints(symbol);
             }
+
+            void visitFunctionPointerSignature(IMethodSymbol symbol)
+            {
+                AddKeyword(SyntaxKind.DelegateKeyword);
+                AddPunctuation(SyntaxKind.AsteriskToken);
+
+                if (symbol.CallingConvention != SignatureCallingConvention.Default)
+                {
+                    AddSpace();
+                    AddKeyword(SyntaxKind.UnmanagedKeyword);
+
+                    var conventionTypes = symbol.UnmanagedCallingConventionTypes;
+
+                    if (symbol.CallingConvention != SignatureCallingConvention.Unmanaged || !conventionTypes.IsEmpty)
+                    {
+                        AddPunctuation(SyntaxKind.OpenBracketToken);
+
+                        switch (symbol.CallingConvention)
+                        {
+                            case SignatureCallingConvention.CDecl:
+                                builder.Add(CreatePart(SymbolDisplayPartKind.ClassName, symbol, "Cdecl"));
+                                break;
+                            case SignatureCallingConvention.StdCall:
+                                builder.Add(CreatePart(SymbolDisplayPartKind.ClassName, symbol, "Stdcall"));
+                                break;
+                            case SignatureCallingConvention.ThisCall:
+                                builder.Add(CreatePart(SymbolDisplayPartKind.ClassName, symbol, "Thiscall"));
+                                break;
+                            case SignatureCallingConvention.FastCall:
+                                builder.Add(CreatePart(SymbolDisplayPartKind.ClassName, symbol, "Fastcall"));
+                                break;
+
+                            case SignatureCallingConvention.Unmanaged:
+                                Debug.Assert(!conventionTypes.IsDefaultOrEmpty);
+                                bool isFirst = true;
+                                foreach (var conventionType in conventionTypes)
+                                {
+                                    if (!isFirst)
+                                    {
+                                        AddPunctuation(SyntaxKind.CommaToken);
+                                        AddSpace();
+                                    }
+
+                                    isFirst = false;
+                                    Debug.Assert(conventionType.Name.StartsWith("CallConv"));
+                                    const int CallConvLength = 8;
+                                    builder.Add(CreatePart(SymbolDisplayPartKind.ClassName, conventionType, conventionType.Name[CallConvLength..]));
+                                }
+
+                                break;
+                        }
+
+                        AddPunctuation(SyntaxKind.CloseBracketToken);
+                    }
+                }
+
+                AddPunctuation(SyntaxKind.LessThanToken);
+
+                foreach (var param in symbol.Parameters)
+                {
+                    param.Accept(this.NotFirstVisitor);
+                    AddPunctuation(SyntaxKind.CommaToken);
+                    AddSpace();
+                }
+
+                if (symbol.ReturnsByRef)
+                {
+                    AddRefIfRequired();
+                }
+                else if (symbol.ReturnsByRefReadonly)
+                {
+                    AddRefReadonlyIfRequired();
+                }
+
+                AddCustomModifiersIfRequired(symbol.RefCustomModifiers);
+
+                symbol.ReturnType.Accept(this.NotFirstVisitor);
+
+                AddCustomModifiersIfRequired(symbol.ReturnTypeCustomModifiers, leadingSpace: true, trailingSpace: false);
+
+                AddPunctuation(SyntaxKind.GreaterThanToken);
+            }
+        }
+
+        private static SymbolDisplayPartKind GetPartKindForConstructorOrDestructor(IMethodSymbol symbol)
+        {
+            // In the case that symbol.containingType is null (which should never be the case here) we will fallback to the MethodName symbol part
+            if (symbol.ContainingType is null)
+            {
+                return SymbolDisplayPartKind.MethodName;
+            }
+
+            return GetPartKind(symbol.ContainingType);
+        }
+
+        private void AddReturnType(IMethodSymbol symbol)
+        {
+            symbol.ReturnType.Accept(this.NotFirstVisitor);
         }
 
         private void AddTypeParameterConstraints(IMethodSymbol symbol)
@@ -433,7 +679,8 @@ namespace Microsoft.CodeAnalysis.CSharp
             // used on their own or in the context of methods.
 
             var includeType = format.ParameterOptions.IncludesOption(SymbolDisplayParameterOptions.IncludeType);
-            var includeName = format.ParameterOptions.IncludesOption(SymbolDisplayParameterOptions.IncludeName);
+            var includeName = format.ParameterOptions.IncludesOption(SymbolDisplayParameterOptions.IncludeName)
+                              && !(symbol.ContainingSymbol is IMethodSymbol { MethodKind: MethodKind.FunctionPointerSignature });
             var includeBrackets = format.ParameterOptions.IncludesOption(SymbolDisplayParameterOptions.IncludeOptionalBrackets);
 
             if (includeBrackets && symbol.IsOptional)
@@ -443,29 +690,16 @@ namespace Microsoft.CodeAnalysis.CSharp
 
             if (includeType)
             {
-                if (format.ParameterOptions.IncludesOption(SymbolDisplayParameterOptions.IncludeParamsRefOut))
-                {
-                    switch (symbol.RefKind)
-                    {
-                        case RefKind.Out:
-                            AddKeyword(SyntaxKind.OutKeyword);
-                            AddSpace();
-                            break;
-                        case RefKind.Ref:
-                            AddKeyword(SyntaxKind.RefKeyword);
-                            AddSpace();
-                            break;
-                    }
+                AddParameterRefKindIfRequired(symbol.RefKind);
+                AddCustomModifiersIfRequired(symbol.RefCustomModifiers, leadingSpace: false, trailingSpace: true);
 
-                    if (symbol.IsParams)
-                    {
-                        AddKeyword(SyntaxKind.ParamsKeyword);
-                        AddSpace();
-                    }
+                if (symbol.IsParams && format.ParameterOptions.IncludesOption(SymbolDisplayParameterOptions.IncludeParamsRefOut))
+                {
+                    AddKeyword(SyntaxKind.ParamsKeyword);
+                    AddSpace();
                 }
 
                 symbol.Type.Accept(this.NotFirstVisitor);
-
                 AddCustomModifiersIfRequired(symbol.CustomModifiers, leadingSpace: true, trailingSpace: false);
             }
 
@@ -476,7 +710,8 @@ namespace Microsoft.CodeAnalysis.CSharp
 
             if (includeName)
             {
-                builder.Add(CreatePart(SymbolDisplayPartKind.ParameterName, symbol, symbol.Name));
+                var kind = symbol.IsThis ? SymbolDisplayPartKind.Keyword : SymbolDisplayPartKind.ParameterName;
+                builder.Add(CreatePart(kind, symbol, symbol.Name));
 
                 if (format.ParameterOptions.IncludesOption(SymbolDisplayParameterOptions.IncludeDefaultValue) &&
                     symbol.HasExplicitDefaultValue &&
@@ -547,7 +782,7 @@ namespace Microsoft.CodeAnalysis.CSharp
 
             if (format.MemberOptions.IncludesOption(SymbolDisplayMemberOptions.IncludeModifiers) &&
                 (containingType == null ||
-                 (containingType.TypeKind != TypeKind.Interface && !IsEnumMember(symbol))))
+                 (containingType.TypeKind != TypeKind.Interface && !IsEnumMember(symbol) && !IsLocalFunction(symbol))))
             {
                 var isConst = symbol is IFieldSymbol && ((IFieldSymbol)symbol).IsConst;
                 if (symbol.IsStatic && !isConst)
@@ -598,8 +833,8 @@ namespace Microsoft.CodeAnalysis.CSharp
             var first = true;
 
             // The display code is called by the debugger; if a developer is debugging Roslyn and attempts
-            // to visualize a symbol *during its construction*, the parameters and return type might 
-            // still be null. 
+            // to visualize a symbol *during its construction*, the parameters and return type might
+            // still be null.
 
             if (!parameters.IsDefault)
             {
@@ -636,14 +871,19 @@ namespace Microsoft.CodeAnalysis.CSharp
             }
         }
 
-        private void AddAccessor(ISymbol property, IMethodSymbol method, SyntaxKind keyword)
+        private void AddAccessor(IPropertySymbol property, IMethodSymbol method, SyntaxKind keyword)
         {
             if (method != null)
             {
                 AddSpace();
                 if (method.DeclaredAccessibility != property.DeclaredAccessibility)
                 {
-                    AddAccessibilityIfRequired(method);
+                    AddAccessibility(method);
+                }
+
+                if (!ShouldPropertyDisplayReadOnly(property) && ShouldMethodDisplayReadOnly(method, property))
+                {
+                    AddReadOnlyIfRequired();
                 }
 
                 AddKeyword(keyword);
@@ -651,14 +891,14 @@ namespace Microsoft.CodeAnalysis.CSharp
             }
         }
 
-        private void AddExplicitInterfaceIfRequired<T>(ImmutableArray<T> implementedMethods) where T : ISymbol
+        private void AddExplicitInterfaceIfRequired<T>(ImmutableArray<T> implementedMembers) where T : ISymbol
         {
-            if (format.MemberOptions.IncludesOption(SymbolDisplayMemberOptions.IncludeExplicitInterface) && !implementedMethods.IsEmpty)
+            if (format.MemberOptions.IncludesOption(SymbolDisplayMemberOptions.IncludeExplicitInterface) && !implementedMembers.IsEmpty)
             {
-                var implementedMethod = implementedMethods[0];
-                Debug.Assert(implementedMethod.ContainingType != null);
+                var implementedMember = implementedMembers[0];
+                Debug.Assert(implementedMember.ContainingType != null);
 
-                INamedTypeSymbol containingType = implementedMethod.ContainingType;
+                INamedTypeSymbol containingType = implementedMember.ContainingType;
                 if (containingType != null)
                 {
                     containingType.Accept(this.NotFirstVisitor);
@@ -688,6 +928,59 @@ namespace Microsoft.CodeAnalysis.CSharp
                 if (trailingSpace)
                 {
                     AddSpace();
+                }
+            }
+        }
+
+        private void AddRefIfRequired()
+        {
+            if (format.MemberOptions.IncludesOption(SymbolDisplayMemberOptions.IncludeRef))
+            {
+                AddKeyword(SyntaxKind.RefKeyword);
+                AddSpace();
+            }
+        }
+
+        private void AddRefReadonlyIfRequired()
+        {
+            if (format.MemberOptions.IncludesOption(SymbolDisplayMemberOptions.IncludeRef))
+            {
+                AddKeyword(SyntaxKind.RefKeyword);
+                AddSpace();
+                AddKeyword(SyntaxKind.ReadOnlyKeyword);
+                AddSpace();
+            }
+        }
+
+        private void AddReadOnlyIfRequired()
+        {
+            // 'readonly' in this context is effectively a 'ref' modifier
+            // because it affects whether the 'this' parameter is 'ref' or 'in'.
+            if (format.MemberOptions.IncludesOption(SymbolDisplayMemberOptions.IncludeRef))
+            {
+                AddKeyword(SyntaxKind.ReadOnlyKeyword);
+                AddSpace();
+            }
+        }
+
+        private void AddParameterRefKindIfRequired(RefKind refKind)
+        {
+            if (format.ParameterOptions.IncludesOption(SymbolDisplayParameterOptions.IncludeParamsRefOut))
+            {
+                switch (refKind)
+                {
+                    case RefKind.Out:
+                        AddKeyword(SyntaxKind.OutKeyword);
+                        AddSpace();
+                        break;
+                    case RefKind.Ref:
+                        AddKeyword(SyntaxKind.RefKeyword);
+                        AddSpace();
+                        break;
+                    case RefKind.In:
+                        AddKeyword(SyntaxKind.InKeyword);
+                        AddSpace();
+                        break;
                 }
             }
         }

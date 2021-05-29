@@ -1,6 +1,11 @@
-﻿// Copyright (c) Microsoft.  All Rights Reserved.  Licensed under the Apache License, Version 2.0.  See License.txt in the project root for license information.
+﻿// Licensed to the .NET Foundation under one or more agreements.
+// The .NET Foundation licenses this file to you under the MIT license.
+// See the LICENSE file in the project root for more information.
 
-using Microsoft.CodeAnalysis.CSharp;
+#nullable disable
+
+using System.Threading.Tasks;
+using Microsoft.CodeAnalysis.Test.Utilities;
 using Microsoft.CodeAnalysis.Text;
 using Roslyn.Test.Utilities;
 using Xunit;
@@ -11,105 +16,105 @@ namespace Microsoft.CodeAnalysis.Editor.CSharp.UnitTests.ExtractMethod
     {
         [Fact]
         [Trait(Traits.Feature, Traits.Features.ExtractMethod)]
-        public void SelectionTest1()
+        public async Task SelectionTest1()
         {
             var code = "{|b:using System;|}";
-            TestSelection(code, expectedFail: true);
+            await TestSelectionAsync(code, expectedFail: true);
         }
 
         [Fact]
         [Trait(Traits.Feature, Traits.Features.ExtractMethod)]
-        public void SelectionTest2()
+        public async Task SelectionTest2()
         {
             var code = @"{|b:namespace A|}
 {
 }";
-            TestSelection(code, expectedFail: true);
+            await TestSelectionAsync(code, expectedFail: true);
         }
 
         [Fact]
         [Trait(Traits.Feature, Traits.Features.ExtractMethod)]
-        public void SelectionTest3()
+        public async Task SelectionTest3()
         {
             var code = @"namespace {|b:A|}
 {
 }";
-            TestSelection(code, expectedFail: true);
+            await TestSelectionAsync(code, expectedFail: true);
         }
 
         [Fact]
         [Trait(Traits.Feature, Traits.Features.ExtractMethod)]
-        public void SelectionTest4()
+        public async Task SelectionTest4()
         {
             var code = @"{|b:class|} A
 {
 }";
-            TestSelection(code, expectedFail: true);
+            await TestSelectionAsync(code, expectedFail: true);
         }
 
         [Fact]
         [Trait(Traits.Feature, Traits.Features.ExtractMethod)]
-        public void SelectionTest5()
+        public async Task SelectionTest5()
         {
             var code = @"class {|b:A|}
 {
 }";
-            TestSelection(code, expectedFail: true);
+            await TestSelectionAsync(code, expectedFail: true);
         }
 
         [Fact]
         [Trait(Traits.Feature, Traits.Features.ExtractMethod)]
-        public void SelectionTest6()
+        public async Task SelectionTest6()
         {
             var code = @"class A : {|b:object|}
 {
 }";
-            TestSelection(code, expectedFail: true);
+            await TestSelectionAsync(code, expectedFail: true);
         }
 
         [Fact]
         [Trait(Traits.Feature, Traits.Features.ExtractMethod)]
-        public void SelectionTest7()
+        public async Task SelectionTest7()
         {
             var code = @"class A : object, {|b:IDisposable|}
 {
 }";
-            TestSelection(code, expectedFail: true);
+            await TestSelectionAsync(code, expectedFail: true);
         }
 
         [Fact]
         [Trait(Traits.Feature, Traits.Features.ExtractMethod)]
-        public void SelectionTest8()
+        public async Task SelectionTest8()
         {
             var code = @"class A<{|b:T|}>
 {
 }";
-            TestSelection(code, expectedFail: true);
+            await TestSelectionAsync(code, expectedFail: true);
         }
 
         [Fact]
         [Trait(Traits.Feature, Traits.Features.ExtractMethod)]
-        public void SelectionTest9()
+        public async Task SelectionTest9()
         {
             var code = @"class A<T> where {|b:T|} : class
 {
 }";
-            TestSelection(code, expectedFail: true);
+            await TestSelectionAsync(code, expectedFail: true);
         }
 
         [Fact]
         [Trait(Traits.Feature, Traits.Features.ExtractMethod)]
-        public void SelectionTest10()
+        public async Task SelectionTest10()
         {
             var code = @"class A<T> where T : {|b:IDisposable|}
 {
 }";
-            TestSelection(code, expectedFail: true);
+            await TestSelectionAsync(code, expectedFail: true);
         }
 
         [Fact]
         [Trait(Traits.Feature, Traits.Features.ExtractMethod)]
-        public void SelectionTest11()
+        public async Task SelectionTest11()
         {
             var code = @"class A
 {
@@ -117,12 +122,12 @@ namespace Microsoft.CodeAnalysis.Editor.CSharp.UnitTests.ExtractMethod
     {
     }
 }";
-            TestSelection(code, expectedFail: true);
+            await TestSelectionAsync(code, expectedFail: true);
         }
 
         [Fact]
         [Trait(Traits.Feature, Traits.Features.ExtractMethod)]
-        public void SelectionTest12()
+        public async Task SelectionTest12()
         {
             var code = @"class A
 {
@@ -130,12 +135,12 @@ namespace Microsoft.CodeAnalysis.Editor.CSharp.UnitTests.ExtractMethod
     {
     }
 }";
-            TestSelection(code, expectedFail: true);
+            await TestSelectionAsync(code, expectedFail: true);
         }
 
         [Fact]
         [Trait(Traits.Feature, Traits.Features.ExtractMethod)]
-        public void SelectionTest13()
+        public async Task SelectionTest13()
         {
             var code = @"class A
 {
@@ -143,109 +148,109 @@ namespace Microsoft.CodeAnalysis.Editor.CSharp.UnitTests.ExtractMethod
     {
     }
 }";
-            TestSelection(code, expectedFail: true);
+            await TestSelectionAsync(code, expectedFail: true);
         }
 
         [Fact]
         [Trait(Traits.Feature, Traits.Features.ExtractMethod)]
-        public void SelectionTest14()
+        public async Task SelectionTest14()
         {
             var code = @"class A
 {
-    [{|b:Foo|}]
+    [{|b:Goo|}]
     A Method(A a)
     {
     }
 }";
-            TestSelection(code, expectedFail: true);
+            await TestSelectionAsync(code, expectedFail: true);
         }
 
         [Fact]
         [Trait(Traits.Feature, Traits.Features.ExtractMethod)]
-        public void SelectionTest15()
+        public async Task SelectionTest15()
         {
             var code = @"class A
 {
-    [Foo({|b:A|}=1)]
+    [Goo({|b:A|}=1)]
     A Method(A a)
     {
     }
 }";
-            TestSelection(code, expectedFail: true);
+            await TestSelectionAsync(code, expectedFail: true);
         }
 
         [Fact]
         [Trait(Traits.Feature, Traits.Features.ExtractMethod)]
-        public void SelectionTest16()
+        public async Task SelectionTest16()
         {
             var code = @"class A
 {
-    [Foo(A={|b:1|})]
+    [Goo(A={|b:1|})]
     A Method(A a)
     {
     }
 }";
-            TestSelection(code, expectedFail: true);
+            await TestSelectionAsync(code, expectedFail: true);
         }
 
         [Fact]
         [Trait(Traits.Feature, Traits.Features.ExtractMethod)]
-        public void SelectionTest17()
+        public async Task SelectionTest17()
         {
             var code = @"class A
 {
     const int {|b:i|} = 1;
 }";
-            TestSelection(code, expectedFail: true);
+            await TestSelectionAsync(code, expectedFail: true);
         }
 
         [Fact]
         [Trait(Traits.Feature, Traits.Features.ExtractMethod)]
-        public void SelectionTest18()
+        public async Task SelectionTest18()
         {
             var code = @"class A
 {
     const {|b:int|} i = 1;
 }";
-            TestSelection(code, expectedFail: true);
+            await TestSelectionAsync(code, expectedFail: true);
         }
 
         [Fact]
         [Trait(Traits.Feature, Traits.Features.ExtractMethod)]
-        public void SelectionTest19()
+        public async Task SelectionTest19()
         {
             var code = @"class A
 {
     const int i = {|b:1|};
 }";
-            TestSelection(code, expectedFail: true);
+            await TestSelectionAsync(code, expectedFail: true);
         }
 
         [Fact]
         [Trait(Traits.Feature, Traits.Features.ExtractMethod)]
-        public void SelectionTest20()
+        public async Task SelectionTest20()
         {
             var code = @"class A
 {
     const int i = {|r:{|b:1 + |}2|};
 }";
-            TestSelection(code, expectedFail: true);
+            await TestSelectionAsync(code, expectedFail: true);
         }
 
         [Fact]
         [Trait(Traits.Feature, Traits.Features.ExtractMethod)]
-        public void SelectionTest21()
+        public async Task SelectionTest21()
         {
             var code = @"class A
 {
     const int {|b:i = 1 + |}2;
 }";
-            TestSelection(code, expectedFail: true);
+            await TestSelectionAsync(code, expectedFail: true);
         }
 
         [Fact]
         [Trait(Traits.Feature, Traits.Features.ExtractMethod)]
-        public void SelectionTest22()
+        public async Task SelectionTest22()
         {
             var code = @"class A
 {
@@ -259,12 +264,12 @@ namespace Microsoft.CodeAnalysis.Editor.CSharp.UnitTests.ExtractMethod
         int b = 2;|}
     }
 }";
-            TestSelection(code, expectedFail: true);
+            await TestSelectionAsync(code, expectedFail: true);
         }
 
         [Fact]
         [Trait(Traits.Feature, Traits.Features.ExtractMethod)]
-        public void SelectionTest23()
+        public async Task SelectionTest23()
         {
             var code = @"class A
 {
@@ -273,12 +278,12 @@ namespace Microsoft.CodeAnalysis.Editor.CSharp.UnitTests.ExtractMethod
         {|b:int i = 1;
     }|}
 }";
-            TestSelection(code, expectedFail: true);
+            await TestSelectionAsync(code, expectedFail: true);
         }
 
         [Fact]
         [Trait(Traits.Feature, Traits.Features.ExtractMethod)]
-        public void SelectionTest24()
+        public async Task SelectionTest24()
         {
             var code = @"class A
 {
@@ -289,12 +294,12 @@ namespace Microsoft.CodeAnalysis.Editor.CSharp.UnitTests.ExtractMethod
 #endRegion
     }
 }";
-            TestSelection(code);
+            await TestSelectionAsync(code);
         }
 
         [Fact]
         [Trait(Traits.Feature, Traits.Features.ExtractMethod)]
-        public void SelectionTest25()
+        public async Task SelectionTest25()
         {
             var code = @"class A
 {
@@ -305,12 +310,12 @@ namespace Microsoft.CodeAnalysis.Editor.CSharp.UnitTests.ExtractMethod
 #endRegion
     }
 }";
-            TestSelection(code, expectedFail: true);
+            await TestSelectionAsync(code, expectedFail: true);
         }
 
         [Fact]
         [Trait(Traits.Feature, Traits.Features.ExtractMethod)]
-        public void SelectionTest26()
+        public async Task SelectionTest26()
         {
             var code = @"class A
 {
@@ -321,12 +326,12 @@ namespace Microsoft.CodeAnalysis.Editor.CSharp.UnitTests.ExtractMethod
 #endregion|}
     }
 }";
-            TestSelection(code, expectedFail: true);
+            await TestSelectionAsync(code, expectedFail: true);
         }
 
         [Fact]
         [Trait(Traits.Feature, Traits.Features.ExtractMethod)]
-        public void SelectionTest27()
+        public async Task SelectionTest27()
         {
             var code = @"class A
 {
@@ -337,12 +342,12 @@ namespace Microsoft.CodeAnalysis.Editor.CSharp.UnitTests.ExtractMethod
         int i = 1;|}
     }
 }";
-            TestSelection(code, expectedFail: true);
+            await TestSelectionAsync(code, expectedFail: true);
         }
 
         [Fact]
         [Trait(Traits.Feature, Traits.Features.ExtractMethod)]
-        public void SelectionTest28()
+        public async Task SelectionTest28()
         {
             var code = @"class A
 {
@@ -353,12 +358,12 @@ namespace Microsoft.CodeAnalysis.Editor.CSharp.UnitTests.ExtractMethod
 #endif|}
     }
 }";
-            TestSelection(code, expectedFail: true);
+            await TestSelectionAsync(code, expectedFail: true);
         }
 
         [Fact]
         [Trait(Traits.Feature, Traits.Features.ExtractMethod)]
-        public void SelectionTest29()
+        public async Task SelectionTest29()
         {
             var code = @"class A
 {
@@ -369,12 +374,12 @@ namespace Microsoft.CodeAnalysis.Editor.CSharp.UnitTests.ExtractMethod
 #endif
     }
 }";
-            TestSelection(code, expectedFail: true);
+            await TestSelectionAsync(code, expectedFail: true);
         }
 
         [Fact]
         [Trait(Traits.Feature, Traits.Features.ExtractMethod)]
-        public void SelectionTest30()
+        public async Task SelectionTest30()
         {
             var code = @"class A
 {
@@ -385,12 +390,12 @@ namespace Microsoft.CodeAnalysis.Editor.CSharp.UnitTests.ExtractMethod
         int i = 1;|}
     }
 }";
-            TestSelection(code, expectedFail: true);
+            await TestSelectionAsync(code, expectedFail: true);
         }
 
         [Fact]
         [Trait(Traits.Feature, Traits.Features.ExtractMethod)]
-        public void SelectionTest31()
+        public async Task SelectionTest31()
         {
             var code = @"class A
 {
@@ -402,12 +407,12 @@ namespace Microsoft.CodeAnalysis.Editor.CSharp.UnitTests.ExtractMethod
 #endif
     }
 }";
-            TestSelection(code, expectedFail: true);
+            await TestSelectionAsync(code, expectedFail: true);
         }
 
         [Fact]
         [Trait(Traits.Feature, Traits.Features.ExtractMethod)]
-        public void SelectionTest32()
+        public async Task SelectionTest32()
         {
             var code = @"class A
 {
@@ -419,12 +424,12 @@ namespace Microsoft.CodeAnalysis.Editor.CSharp.UnitTests.ExtractMethod
 #endif
     }
 }";
-            TestSelection(code, expectedFail: true);
+            await TestSelectionAsync(code, expectedFail: true);
         }
 
         [Fact]
         [Trait(Traits.Feature, Traits.Features.ExtractMethod)]
-        public void SelectionTest33()
+        public async Task SelectionTest33()
         {
             var code = @"class A
 {
@@ -435,12 +440,12 @@ namespace Microsoft.CodeAnalysis.Editor.CSharp.UnitTests.ExtractMethod
 #endif|}
     }
 }";
-            TestSelection(code);
+            await TestSelectionAsync(code);
         }
 
         [Fact]
         [Trait(Traits.Feature, Traits.Features.ExtractMethod)]
-        public void SelectionTest34()
+        public async Task SelectionTest34()
         {
             var code = @"class A
 {
@@ -451,12 +456,12 @@ namespace Microsoft.CodeAnalysis.Editor.CSharp.UnitTests.ExtractMethod
 #endregion|}
     }
 }";
-            TestSelection(code);
+            await TestSelectionAsync(code);
         }
 
         [Fact]
         [Trait(Traits.Feature, Traits.Features.ExtractMethod)]
-        public void SelectionTest35()
+        public async Task SelectionTest35()
         {
             var code = @"class A
 {
@@ -465,12 +470,12 @@ namespace Microsoft.CodeAnalysis.Editor.CSharp.UnitTests.ExtractMethod
         {|b:// test|}
     }
 }";
-            TestSelection(code, expectedFail: true);
+            await TestSelectionAsync(code, expectedFail: true);
         }
 
         [Fact]
         [Trait(Traits.Feature, Traits.Features.ExtractMethod)]
-        public void SelectionTest36()
+        public async Task SelectionTest36()
         {
             var code = @"class A
 {
@@ -479,12 +484,12 @@ namespace Microsoft.CodeAnalysis.Editor.CSharp.UnitTests.ExtractMethod
         {|r:{|b:yield return 1;|}|}
     }
 }";
-            TestSelection(code, expectedFail: true);
+            await TestSelectionAsync(code, expectedFail: true);
         }
 
         [Fact]
         [Trait(Traits.Feature, Traits.Features.ExtractMethod)]
-        public void SelectionTest37()
+        public async Task SelectionTest37()
         {
             var code = @"class A
 {
@@ -499,12 +504,12 @@ namespace Microsoft.CodeAnalysis.Editor.CSharp.UnitTests.ExtractMethod
         }
     }
 }";
-            TestSelection(code, expectedFail: true);
+            await TestSelectionAsync(code, expectedFail: true);
         }
 
         [Fact]
         [Trait(Traits.Feature, Traits.Features.ExtractMethod)]
-        public void SelectionTest38()
+        public async Task SelectionTest38()
         {
             var code = @"class A
 {
@@ -519,13 +524,13 @@ namespace Microsoft.CodeAnalysis.Editor.CSharp.UnitTests.ExtractMethod
         }
     }
 }";
-            TestSelection(code);
+            await TestSelectionAsync(code);
         }
 
-        [WorkItem(540082)]
+        [WorkItem(540082, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/540082")]
         [Fact]
         [Trait(Traits.Feature, Traits.Features.ExtractMethod)]
-        public void SelectionTest39()
+        public async Task SelectionTest39()
         {
             var code = @"class A
 {
@@ -534,13 +539,13 @@ namespace Microsoft.CodeAnalysis.Editor.CSharp.UnitTests.ExtractMethod
         {|r:{|b:System|}.Console.WriteLine(1);|}
     }
 }";
-            TestSelection(code);
+            await TestSelectionAsync(code);
         }
 
-        [WorkItem(540082)]
+        [WorkItem(540082, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/540082")]
         [Fact]
         [Trait(Traits.Feature, Traits.Features.ExtractMethod)]
-        public void SelectionTest40()
+        public async Task SelectionTest40()
         {
             var code = @"class A
 {
@@ -549,13 +554,13 @@ namespace Microsoft.CodeAnalysis.Editor.CSharp.UnitTests.ExtractMethod
         {|r:{|b:System.Console|}.WriteLine(1);|}
     }
 }";
-            TestSelection(code);
+            await TestSelectionAsync(code);
         }
 
-        [WorkItem(540082)]
+        [WorkItem(540082, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/540082")]
         [Fact]
         [Trait(Traits.Feature, Traits.Features.ExtractMethod)]
-        public void SelectionTest41()
+        public async Task SelectionTest41()
         {
             var code = @"class A
 {
@@ -564,13 +569,13 @@ namespace Microsoft.CodeAnalysis.Editor.CSharp.UnitTests.ExtractMethod
         {|r:{|b:System.Console.WriteLine|}(1);|}
     }
 }";
-            TestSelection(code);
+            await TestSelectionAsync(code);
         }
 
-        [WorkItem(540082)]
+        [WorkItem(540082, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/540082")]
         [Fact]
         [Trait(Traits.Feature, Traits.Features.ExtractMethod)]
-        public void SelectionTest42()
+        public async Task SelectionTest42()
         {
             var code = @"class A
 {
@@ -579,13 +584,13 @@ namespace Microsoft.CodeAnalysis.Editor.CSharp.UnitTests.ExtractMethod
 {|r:        System.{|b:Console|}.WriteLine(1);|}
     }
 }";
-            TestSelection(code);
+            await TestSelectionAsync(code);
         }
 
-        [WorkItem(540082)]
+        [WorkItem(540082, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/540082")]
         [Fact]
         [Trait(Traits.Feature, Traits.Features.ExtractMethod)]
-        public void SelectionTest43()
+        public async Task SelectionTest43()
         {
             var code = @"class A
 {
@@ -594,13 +599,13 @@ namespace Microsoft.CodeAnalysis.Editor.CSharp.UnitTests.ExtractMethod
 {|r:        System.{|b:Console.WriteLine|}(1);|}
     }
 }";
-            TestSelection(code);
+            await TestSelectionAsync(code);
         }
 
-        [WorkItem(540082)]
+        [WorkItem(540082, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/540082")]
         [Fact]
         [Trait(Traits.Feature, Traits.Features.ExtractMethod)]
-        public void SelectionTest44()
+        public async Task SelectionTest44()
         {
             var code = @"class A
 {
@@ -609,13 +614,13 @@ namespace Microsoft.CodeAnalysis.Editor.CSharp.UnitTests.ExtractMethod
 {|r:        System.Console.{|b:WriteLine|}(1);|}
     }
 }";
-            TestSelection(code);
+            await TestSelectionAsync(code);
         }
 
-        [WorkItem(539242)]
+        [WorkItem(539242, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/539242")]
         [Fact]
         [Trait(Traits.Feature, Traits.Features.ExtractMethod)]
-        public void SelectionTest45()
+        public async Task SelectionTest45()
         {
             var code = @"class A
 {
@@ -624,13 +629,13 @@ namespace Microsoft.CodeAnalysis.Editor.CSharp.UnitTests.ExtractMethod
         short[,] arr = {|r:new short[,] { {|b:{ 19, 19, 19 }|}, { 19, 19, 19 } }|};
     }
 }";
-            TestSelection(code);
+            await TestSelectionAsync(code);
         }
 
-        [WorkItem(539242)]
+        [WorkItem(539242, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/539242")]
         [Fact]
         [Trait(Traits.Feature, Traits.Features.ExtractMethod)]
-        public void SelectionTest46()
+        public async Task SelectionTest46()
         {
             var code = @"class A
 {
@@ -639,13 +644,13 @@ namespace Microsoft.CodeAnalysis.Editor.CSharp.UnitTests.ExtractMethod
         short[,] arr = {|r:{ {|b:{ 19, 19, 19 }|}, { 19, 19, 19 } }|};
     }
 }";
-            TestSelection(code);
+            await TestSelectionAsync(code);
         }
 
-        [WorkItem(540338)]
+        [WorkItem(540338, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/540338")]
         [Fact]
         [Trait(Traits.Feature, Traits.Features.ExtractMethod)]
-        public void SelectionTest47()
+        public async Task SelectionTest47()
         {
             var code = @"using System;
 class C
@@ -657,11 +662,11 @@ class C
     }
 }
 ";
-            TestSelection(code, expectedFail: true);
+            await TestSelectionAsync(code, expectedFail: true);
         }
 
         [Fact, Trait(Traits.Feature, Traits.Features.ExtractMethod)]
-        public void SelectIfWithReturn()
+        public async Task SelectIfWithReturn()
         {
             var code = @"class A
 {
@@ -673,11 +678,11 @@ class C
         return;
     }
 }";
-            TestSelection(code, expectedFail: true);
+            await TestSelectionAsync(code, expectedFail: true);
         }
 
         [Fact, Trait(Traits.Feature, Traits.Features.ExtractMethod)]
-        public void SelectConstIfWithReturn()
+        public async Task SelectConstIfWithReturn()
         {
             var code = @"class A
 {
@@ -689,11 +694,11 @@ class C
         Console.WriteLine();
     }
 }";
-            TestSelection(code);
+            await TestSelectionAsync(code);
         }
 
         [Fact, Trait(Traits.Feature, Traits.Features.ExtractMethod)]
-        public void SelectReturnButNotAllCodePathsContainAReturn()
+        public async Task SelectReturnButNotAllCodePathsContainAReturn()
         {
             var code = @"class A
 {
@@ -708,11 +713,11 @@ class C
         Console.WriteLine();
     }
 }";
-            TestSelection(code, expectedFail: true);
+            await TestSelectionAsync(code, expectedFail: true);
         }
 
         [Fact, Trait(Traits.Feature, Traits.Features.ExtractMethod)]
-        public void SelectIfBranchWhereNotAllPathsReturn()
+        public async Task SelectIfBranchWhereNotAllPathsReturn()
         {
             var code = @"class A
 {
@@ -733,11 +738,11 @@ class C
         return i;
     }
 }";
-            TestSelection(code, expectedFail: true);
+            await TestSelectionAsync(code, expectedFail: true);
         }
 
         [Fact, Trait(Traits.Feature, Traits.Features.ExtractMethod)]
-        public void SelectCatchFilterClause()
+        public async Task SelectCatchFilterClause()
         {
             var code = @"class A
 {
@@ -747,17 +752,17 @@ class C
         {
             Console.Write(5);
         }
-        catch (Exception ex) if ({|b:ex.Message == ""foo""|})
+        catch (Exception ex) if ({|b:ex.Message == ""goo""|})
         {
             throw;
         }
     }
 }";
-            TestSelection(code);
+            await TestSelectionAsync(code);
         }
 
         [Fact, Trait(Traits.Feature, Traits.Features.ExtractMethod)]
-        public void SelectCatchFilterClause2()
+        public async Task SelectCatchFilterClause2()
         {
             var code = @"class A
 {
@@ -775,11 +780,11 @@ class C
         }
     }
 }";
-            TestSelection(code);
+            await TestSelectionAsync(code);
         }
 
         [Fact, Trait(Traits.Feature, Traits.Features.ExtractMethod)]
-        public void SelectWithinCatchFilterClause()
+        public async Task SelectWithinCatchFilterClause()
         {
             var code = @"class A
 {
@@ -789,17 +794,17 @@ class C
         {
             Console.Write(5);
         }
-        catch (Exception ex) if ({|b:ex.Message|} == ""foo"")
+        catch (Exception ex) if ({|b:ex.Message|} == ""goo"")
         {
             throw;
         }
     }
 }";
-            TestSelection(code);
+            await TestSelectionAsync(code);
         }
 
         [Fact, Trait(Traits.Feature, Traits.Features.ExtractMethod)]
-        public void SelectWithinCatchFilterClause2()
+        public async Task SelectWithinCatchFilterClause2()
         {
             var code = @"class A
 {
@@ -809,17 +814,17 @@ class C
         {
             Console.Write(5);
         }
-        catch (Exception ex) if (ex.Message == {|b:""foo""|})
+        catch (Exception ex) if (ex.Message == {|b:""goo""|})
         {
             throw;
         }
     }
 }";
-            TestSelection(code);
+            await TestSelectionAsync(code);
         }
 
         [Fact, Trait(Traits.Feature, Traits.Features.ExtractMethod)]
-        public void SelectLValueOfPlusEqualsOperator()
+        public async Task SelectLValueOfPlusEqualsOperator()
         {
             var code = @"class A
 {
@@ -830,11 +835,11 @@ class C
         return i;
     }
 }";
-            TestSelection(code);
+            await TestSelectionAsync(code);
         }
 
         [Fact, Trait(Traits.Feature, Traits.Features.ExtractMethod)]
-        public void SelectRValueOfPlusEqualsOperator()
+        public async Task SelectRValueOfPlusEqualsOperator()
         {
             var code = @"class A
 {
@@ -845,11 +850,11 @@ class C
         return i;
     }
 }";
-            TestSelection(code);
+            await TestSelectionAsync(code);
         }
 
         [Fact, Trait(Traits.Feature, Traits.Features.ExtractMethod)]
-        public void SelectRValueOfPredecrementOperator()
+        public async Task SelectRValueOfPredecrementOperator()
         {
             var code = @"class A
 {
@@ -861,11 +866,11 @@ class C
         return myvar[i];
     }
 }";
-            TestSelection(code);
+            await TestSelectionAsync(code);
         }
 
         [Fact, Trait(Traits.Feature, Traits.Features.ExtractMethod)]
-        public void SelectArrayWithDecrementIndex()
+        public async Task SelectArrayWithDecrementIndex()
         {
             var code = @"class A
 {
@@ -877,25 +882,25 @@ class C
         return myvar[i];
     }
 }";
-            TestSelection(code);
+            await TestSelectionAsync(code);
         }
 
         [Fact, Trait(Traits.Feature, Traits.Features.ExtractMethod)]
-        public void SelectCastOperator()
+        public async Task SelectCastOperator()
         {
             var code = @"class A
 {
-    int method(string foo)
+    int method(string goo)
     {
-        String bar = {|b:(String)foo|};
+        String bar = {|b:(String)goo|};
         return bar.Length;
     }
 }";
-            TestSelection(code);
+            await TestSelectionAsync(code);
         }
 
         [Fact, Trait(Traits.Feature, Traits.Features.ExtractMethod)]
-        public void SelectLHSOfPostIncrementOperator()
+        public async Task SelectLHSOfPostIncrementOperator()
         {
             var code = @"class A
 {
@@ -904,11 +909,11 @@ class C
         return {|r:{|b:i|}++|};
     }
 }";
-            TestSelection(code);
+            await TestSelectionAsync(code);
         }
 
         [Fact, Trait(Traits.Feature, Traits.Features.ExtractMethod)]
-        public void SelectPostIncrementOperator()
+        public async Task SelectPostIncrementOperator()
         {
             var code = @"class A
 {
@@ -917,11 +922,11 @@ class C
         return {|r:i{|b:++|}|};
     }
 }";
-            TestSelection(code);
+            await TestSelectionAsync(code);
         }
 
         [Fact, Trait(Traits.Feature, Traits.Features.ExtractMethod)]
-        public void SelectRHSOfPreIncrementOperator()
+        public async Task SelectRHSOfPreIncrementOperator()
         {
             var code = @"class A
 {
@@ -930,11 +935,11 @@ class C
         return {|r:{|b:++|}i|};
     }
 }";
-            TestSelection(code);
+            await TestSelectionAsync(code);
         }
 
         [Fact, Trait(Traits.Feature, Traits.Features.ExtractMethod)]
-        public void SelectPreIncrementOperator()
+        public async Task SelectPreIncrementOperator()
         {
             var code = @"class A
 {
@@ -943,11 +948,11 @@ class C
         return {|r:{|b:++|}i|};
     }
 }";
-            TestSelection(code);
+            await TestSelectionAsync(code);
         }
 
         [Fact, Trait(Traits.Feature, Traits.Features.ExtractMethod)]
-        public void SelectPreDecrementOperator()
+        public async Task SelectPreDecrementOperator()
         {
             var code = @"class A
 {
@@ -956,11 +961,11 @@ class C
         return {|r:{|b:--|}i|};
     }
 }";
-            TestSelection(code);
+            await TestSelectionAsync(code);
         }
 
         [Fact, Trait(Traits.Feature, Traits.Features.ExtractMethod)]
-        public void SelectLHSOfPostDecrementOperator()
+        public async Task SelectLHSOfPostDecrementOperator()
         {
             var code = @"class A
 {
@@ -969,11 +974,11 @@ class C
         return {|r:{|b:i|}--|};
     }
 }";
-            TestSelection(code);
+            await TestSelectionAsync(code);
         }
 
         [Fact, Trait(Traits.Feature, Traits.Features.ExtractMethod)]
-        public void SelectUnaryPlusOperator()
+        public async Task SelectUnaryPlusOperator()
         {
             var code = @"class A
 {
@@ -983,11 +988,11 @@ class C
         return j;
     }
 }";
-            TestSelection(code);
+            await TestSelectionAsync(code);
         }
 
         [Fact, Trait(Traits.Feature, Traits.Features.ExtractMethod)]
-        public void SelectUnaryMinusOperator()
+        public async Task SelectUnaryMinusOperator()
         {
             var code = @"class A
 {
@@ -997,11 +1002,11 @@ class C
         return j;
     }
 }";
-            TestSelection(code);
+            await TestSelectionAsync(code);
         }
 
         [Fact, Trait(Traits.Feature, Traits.Features.ExtractMethod)]
-        public void SelectLogicalNegationOperator()
+        public async Task SelectLogicalNegationOperator()
         {
             var code = @"class A
 {
@@ -1011,11 +1016,11 @@ class C
         return j;
     }
 }";
-            TestSelection(code);
+            await TestSelectionAsync(code);
         }
 
         [Fact, Trait(Traits.Feature, Traits.Features.ExtractMethod)]
-        public void SelectBitwiseNegationOperator()
+        public async Task SelectBitwiseNegationOperator()
         {
             var code = @"class A
 {
@@ -1025,11 +1030,11 @@ class C
         return j;
     }
 }";
-            TestSelection(code);
+            await TestSelectionAsync(code);
         }
 
         [Fact, Trait(Traits.Feature, Traits.Features.ExtractMethod)]
-        public void SelectCastOperator2()
+        public async Task SelectCastOperator2()
         {
             var code = @"class A
 {
@@ -1039,11 +1044,11 @@ class C
         return j;
     }
 }";
-            TestSelection(code);
+            await TestSelectionAsync(code);
         }
 
         [Fact, Trait(Traits.Feature, Traits.Features.ExtractMethod)]
-        public void SelectInvalidSubexpressionToExpand()
+        public async Task SelectInvalidSubexpressionToExpand()
         {
             var code = @"class A
 {
@@ -1052,11 +1057,11 @@ class C
         return {|r:a + {|b:b + c|}|};
     }
 }";
-            TestSelection(code);
+            await TestSelectionAsync(code);
         }
 
         [Fact, Trait(Traits.Feature, Traits.Features.ExtractMethod)]
-        public void SelectValidSubexpressionAndHenceDontExpand()
+        public async Task SelectValidSubexpressionAndHenceDontExpand()
         {
             var code = @"class A
 {
@@ -1065,11 +1070,11 @@ class C
         return {|b:a + b|} + c;
     }
 }";
-            TestSelection(code);
+            await TestSelectionAsync(code);
         }
 
         [Fact, Trait(Traits.Feature, Traits.Features.ExtractMethod)]
-        public void SelectLHSOfMinusEqualsOperator()
+        public async Task SelectLHSOfMinusEqualsOperator()
         {
             var code = @"class A
 {
@@ -1079,11 +1084,11 @@ class C
         return a;
     }
 }";
-            TestSelection(code);
+            await TestSelectionAsync(code);
         }
 
         [Fact, Trait(Traits.Feature, Traits.Features.ExtractMethod)]
-        public void SelectInnerBlockPartially()
+        public async Task SelectInnerBlockPartially()
         {
             var code = @"using System;
 using System.Collections;
@@ -1103,11 +1108,11 @@ class A
         }
     }
 }";
-            TestSelection(code);
+            await TestSelectionAsync(code);
         }
 
         [Fact, Trait(Traits.Feature, Traits.Features.ExtractMethod)]
-        public void SelectInnerBlockWithoutBracesPartially()
+        public async Task SelectInnerBlockWithoutBracesPartially()
         {
             var code = @"using System;
 using System.Collections;
@@ -1125,11 +1130,11 @@ class A
         }
     }
 }";
-            TestSelection(code);
+            await TestSelectionAsync(code);
         }
 
         [Fact, Trait(Traits.Feature, Traits.Features.ExtractMethod)]
-        public void SelectBeginningBrace()
+        public async Task SelectBeginningBrace()
         {
             var code = @"using System;
 using System.Collections;
@@ -1141,11 +1146,11 @@ class A
         if (true) {|r:{|b:{|} }|}
     }
 }";
-            TestSelection(code);
+            await TestSelectionAsync(code);
         }
 
         [Fact, Trait(Traits.Feature, Traits.Features.ExtractMethod)]
-        public void SelectAcrossBlocks1()
+        public async Task SelectAcrossBlocks1()
         {
             var code = @"using System;
 using System.Collections;
@@ -1164,11 +1169,11 @@ class A
         }
     }
 }";
-            TestSelection(code);
+            await TestSelectionAsync(code);
         }
 
         [Fact, Trait(Traits.Feature, Traits.Features.ExtractMethod)]
-        public void SelectMethodParameters()
+        public async Task SelectMethodParameters()
         {
             var code = @"using System;
 using System.Collections;
@@ -1188,11 +1193,11 @@ class A
         return x + y + z;
     }
 }";
-            TestSelection(code);
+            await TestSelectionAsync(code);
         }
 
         [Fact, Trait(Traits.Feature, Traits.Features.ExtractMethod)]
-        public void SelectChainedInvocations1()
+        public async Task SelectChainedInvocations1()
         {
             var code = @"using System;
 using System.Collections;
@@ -1217,11 +1222,11 @@ class Test
         {|b:a.b|}.c();
     }
 }";
-            TestSelection(code);
+            await TestSelectionAsync(code);
         }
 
         [Fact, Trait(Traits.Feature, Traits.Features.ExtractMethod)]
-        public void SelectChainedInvocations2()
+        public async Task SelectChainedInvocations2()
         {
             var code = @"using System;
 using System.Collections;
@@ -1246,12 +1251,12 @@ class Test
 {|r:        a.{|b:b.c()|}|};
     }
 }";
-            TestSelection(code);
+            await TestSelectionAsync(code);
         }
 
-        [WorkItem(540474)]
+        [WorkItem(540474, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/540474")]
         [Fact, Trait(Traits.Feature, Traits.Features.ExtractMethod)]
-        public void GotoStatement()
+        public async Task GotoStatement()
         {
             var code = @"using System;
 using System.Reflection.Emit; 
@@ -1269,12 +1274,12 @@ class Program
         }|};
     }
 }";
-            TestSelection(code);
+            await TestSelectionAsync(code);
         }
 
-        [WorkItem(540481)]
+        [WorkItem(540481, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/540481")]
         [Fact, Trait(Traits.Feature, Traits.Features.ExtractMethod)]
-        public void BugFix6750()
+        public async Task BugFix6750()
         {
             var code = @"using System;
 
@@ -1282,12 +1287,12 @@ class Program
 {
     int[] array = new int[{|b:1|}];
 }";
-            TestSelection(code);
+            await TestSelectionAsync(code);
         }
 
-        [WorkItem(540481)]
+        [WorkItem(540481, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/540481")]
         [Fact, Trait(Traits.Feature, Traits.Features.ExtractMethod)]
-        public void BugFix6750_1()
+        public async Task BugFix6750_1()
         {
             var code = @"using System;
 
@@ -1295,23 +1300,23 @@ class Program
 {
     int[] array = {|r:new int[{|b:1|}] { 1 }|};
 }";
-            TestSelection(code);
+            await TestSelectionAsync(code);
         }
 
-        [WorkItem(542201)]
+        [WorkItem(542201, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/542201")]
         [Fact, Trait(Traits.Feature, Traits.Features.ExtractMethod)]
-        public void MalformedCode_NoOuterType()
+        public async Task MalformedCode_NoOuterType()
         {
             var code = @"x(a){
 {|b:for ();|}
 }
 ";
-            TestSelection(code, expectedFail: true);
+            await TestSelectionAsync(code, expectedFail: true);
         }
 
-        [WorkItem(542210)]
+        [WorkItem(542210, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/542210")]
         [Fact, Trait(Traits.Feature, Traits.Features.ExtractMethod)]
-        public void NoQueryContinuation()
+        public async Task NoQueryContinuation()
         {
             var code = @"using System.Linq;
  
@@ -1325,31 +1330,29 @@ class P
                 {|b:select y|}|};
     }
 }";
-            TestSelection(code);
+            await TestSelectionAsync(code);
         }
 
-        [WorkItem(540787)]
-        [WorkItem(542722)]
+        [WorkItem(540787, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/540787")]
+        [WorkItem(542722, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/542722")]
         [Fact, Trait(Traits.Feature, Traits.Features.ExtractMethod)]
-        public void DontCrash()
-        {
-            IterateAll(TestResource.AllInOneCSharpCode);
-        }
+        public async Task DontCrash()
+            => await IterateAllAsync(TestResource.AllInOneCSharpCode);
 
         [WorkItem(9931, "DevDiv_Projects/Roslyn")]
         [Fact, Trait(Traits.Feature, Traits.Features.ExtractMethod)]
-        public void ExtractMethodIdentifierAtEndOfInteractiveBuffer()
+        public async Task ExtractMethodIdentifierAtEndOfInteractiveBuffer()
         {
             var code = @"using System.Console;
 WriteLine();
 
 {|r:{|b:Diagnostic|}|}";
-            TestSelection(code, expectedFail: true);
+            await TestSelectionAsync(code, expectedFail: true);
         }
 
-        [WorkItem(543020)]
+        [WorkItem(543020, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/543020")]
         [Fact, Trait(Traits.Feature, Traits.Features.ExtractMethod)]
-        public void MemberAccessStructAsExpression()
+        public async Task MemberAccessStructAsExpression()
         {
             var code = @"struct S
 {
@@ -1381,12 +1384,12 @@ WriteLine();
         return new S();
     }
 } ";
-            TestSelection(code);
+            await TestSelectionAsync(code);
         }
 
-        [WorkItem(543140)]
+        [WorkItem(543140, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/543140")]
         [Fact, Trait(Traits.Feature, Traits.Features.ExtractMethod)]
-        public void TypeOfExpression()
+        public async Task TypeOfExpression()
         {
             var code = @"using System;
 using System.Collections.Generic;
@@ -1399,22 +1402,22 @@ class Program
         Console.WriteLine({|r:typeof({|b:Dictionary<,>|})|}.IsGenericTypeDefinition);
     }
 }";
-            TestSelection(code);
+            await TestSelectionAsync(code);
         }
 
-        [WorkItem(543186)]
+        [WorkItem(543186, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/543186")]
         [Fact, Trait(Traits.Feature, Traits.Features.ExtractMethod)]
-        public void AnonymousTypeMember1()
+        public async Task AnonymousTypeMember1()
         {
             var code = @"using System;
 class C { void M() { {|r:var x = new { {|b:String|} = true }; |}} }
 ";
-            TestSelection(code);
+            await TestSelectionAsync(code);
         }
 
-        [WorkItem(543186)]
+        [WorkItem(543186, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/543186")]
         [Fact, Trait(Traits.Feature, Traits.Features.ExtractMethod)]
-        public void AnonymousTypeMember2()
+        public async Task AnonymousTypeMember2()
         {
             var code = @"using System;
 class C { void M() { 
@@ -1422,22 +1425,22 @@ var String = 1;
 {|r:var x = new { {|b:String|} };|}
 } }
 ";
-            TestSelection(code);
+            await TestSelectionAsync(code);
         }
 
-        [WorkItem(543186)]
+        [WorkItem(543186, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/543186")]
         [Fact, Trait(Traits.Feature, Traits.Features.ExtractMethod)]
-        public void AnonymousTypeMember3()
+        public async Task AnonymousTypeMember3()
         {
             var code = @"using System;
 class C { void M() { var x = new { String = {|b:true|} }; } }
 ";
-            TestSelection(code);
+            await TestSelectionAsync(code);
         }
 
-        [WorkItem(543186)]
+        [WorkItem(543186, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/543186")]
         [Fact, Trait(Traits.Feature, Traits.Features.ExtractMethod)]
-        public void AnonymousTypeMember4()
+        public async Task AnonymousTypeMember4()
         {
             var code = @"class Program
 {
@@ -1456,12 +1459,12 @@ class C { void M() { var x = new { String = {|b:true|} }; } }
         }|};
     }
 }";
-            TestSelection(code);
+            await TestSelectionAsync(code);
         }
 
-        [Fact, WorkItem(543984)]
+        [Fact, WorkItem(543984, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/543984")]
         [Trait(Traits.Feature, Traits.Features.ExtractMethod)]
-        public void AddressOfExpr1()
+        public async Task AddressOfExpr1()
         {
             var code = @"
 class C
@@ -1472,12 +1475,12 @@ class C
         int* j = {|r:&{|b:i|}|};
     }
 }";
-            TestSelection(code);
+            await TestSelectionAsync(code);
         }
 
-        [Fact, WorkItem(543984)]
+        [Fact, WorkItem(543984, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/543984")]
         [Trait(Traits.Feature, Traits.Features.ExtractMethod)]
-        public void AddressOfExpr2()
+        public async Task AddressOfExpr2()
         {
             var code = @"
 class C
@@ -1488,33 +1491,33 @@ class C
         int* j = {|b:&i|};
     }
 }";
-            TestSelection(code);
+            await TestSelectionAsync(code);
         }
 
-        [Fact, WorkItem(544627)]
+        [Fact, WorkItem(544627, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/544627")]
         [Trait(Traits.Feature, Traits.Features.ExtractMethod)]
-        public void BaseKeyword()
+        public async Task BaseKeyword()
         {
             var code = @"class C
 {
-    void Foo()
+    void Goo()
     {
         {|r:{|b:base|}.ToString();|}
     }
 }
 ";
-            TestSelection(code);
+            await TestSelectionAsync(code);
         }
 
-        [WorkItem(545057)]
+        [WorkItem(545057, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/545057")]
         [Fact, Trait(Traits.Feature, Traits.Features.ExtractMethod)]
-        public void RefvalueKeyword()
+        public async Task RefvalueKeyword()
         {
             var code = @"using System;
  
 class A
 {
-    static void Foo(__arglist)
+    static void Goo(__arglist)
     {
         var argIterator = new ArgIterator(__arglist);
         var typedReference = argIterator.GetNextArg();
@@ -1522,12 +1525,12 @@ class A
         Console.WriteLine({|r:__refvalue(typedReference, {|b:Int32|})|});
     }
 }";
-            TestSelection(code);
+            await TestSelectionAsync(code);
         }
 
-        [WorkItem(531286)]
+        [WorkItem(531286, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/531286")]
         [Fact, Trait(Traits.Feature, Traits.Features.ExtractMethod)]
-        public void NoCrashOnThrowWithoutCatchClause()
+        public async Task NoCrashOnThrowWithoutCatchClause()
         {
             var code = @"public class Test
 {
@@ -1545,7 +1548,142 @@ class A
         return 1;
     }
 }";
-            TestSelection(code, expectedFail: true);
+            await TestSelectionAsync(code, expectedFail: true);
+        }
+
+        [WorkItem(751, "https://github.com/dotnet/roslyn/issues/751")]
+        [Fact, Trait(Traits.Feature, Traits.Features.ExtractMethod)]
+        public async Task SimpleConditionalAccessExpressionSelectFirstExpression()
+        {
+            var code = @"using System;
+class Program
+{
+    static void Main(string[] args)
+    {
+        A a = new A();
+        var l = {|r:{|b:a|}?.Length |}?? 0;
+    }
+}
+class A
+{
+    public int Length { get; internal set; }
+}";
+            await TestSelectionAsync(code);
+        }
+
+        [WorkItem(751, "https://github.com/dotnet/roslyn/issues/751")]
+        [Fact, Trait(Traits.Feature, Traits.Features.ExtractMethod)]
+        public async Task SimpleConditionalAccessExpressionSelectSecondExpression()
+        {
+            var code = @"using System;
+class Program
+{
+    static void Main(string[] args)
+    {
+        A a = new A();
+        var l = {|r:a?.{|b:Length|}|} ?? 0;
+    }
+}
+class A
+{
+    public int Length { get; internal set; }
+}";
+            await TestSelectionAsync(code);
+        }
+
+        [WorkItem(751, "https://github.com/dotnet/roslyn/issues/751")]
+        [Fact, Trait(Traits.Feature, Traits.Features.ExtractMethod)]
+        public async Task NestedConditionalAccessExpressionWithMemberBindingExpression()
+        {
+            var code = @"using System;
+ 
+class Program
+{
+    static void Main(string[] args)
+    {
+        A a = new A();
+        var l = {|r:a?.{|b:Prop|}?.Length |}?? 0;
+    }
+}
+class A
+{
+    public B Prop { get; set; }
+}
+class B
+{
+    public int Length { get; set; }
+}";
+            await TestSelectionAsync(code);
+        }
+
+        [WorkItem(751, "https://github.com/dotnet/roslyn/issues/751")]
+        [Fact, Trait(Traits.Feature, Traits.Features.ExtractMethod)]
+        public async Task NestedConditionalAccessExpressionWithMemberBindingExpressionSelectSecondExpression()
+        {
+            var code = @"using System;
+ 
+class Program
+{
+    static void Main(string[] args)
+    {
+        A a = new A();
+        var l = {|r:a?.Prop?.{|b:Length|}|} ?? 0;
+    }
+}
+class A
+{
+    public B Prop { get; set; }
+}
+class B
+{
+    public int Length { get; set; }
+}";
+            await TestSelectionAsync(code);
+        }
+
+        [WorkItem(751, "https://github.com/dotnet/roslyn/issues/751")]
+        [Fact, Trait(Traits.Feature, Traits.Features.ExtractMethod)]
+        public async Task NestedConditionalAccessExpressionWithInvocationExpression()
+        {
+            var code = @"using System;
+ 
+class Program
+{
+    static void Main(string[] args)
+    {
+        A a = new A();
+        var l = {|r:a?.{|b:Method()|}?.Length |}?? 0;
+    }
+}
+class A
+{
+    public B Method()
+    {
+        return new B();
+    }
+}
+class B
+{
+    public int Length { get; set; }
+}";
+            await TestSelectionAsync(code);
+        }
+
+        [WorkItem(1228916, "https://devdiv.visualstudio.com/DevDiv/_workitems/edit/1228916")]
+        [Fact, Trait(Traits.Feature, Traits.Features.ExtractMethod)]
+        public async Task DontCrashPastEndOfLine()
+        {
+            //                    11 1
+            //          012345678901 2
+            var code = "class C { }\r\n";
+
+            // Markup parsing doesn't produce the right spans here, so supply one ourselves.
+            // Can be removed when https://github.com/dotnet/roslyn-sdk/issues/637 is fixed
+
+            // This span covers just the "\n"
+            var span = new TextSpan(12, 1);
+
+            await TestSelectionAsync(code, expectedFail: true, textSpanOverride: span);
         }
     }
 }

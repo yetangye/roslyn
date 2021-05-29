@@ -1,7 +1,12 @@
-﻿// Copyright (c) Microsoft.  All Rights Reserved.  Licensed under the Apache License, Version 2.0.  See License.txt in the project root for license information.
+﻿// Licensed to the .NET Foundation under one or more agreements.
+// The .NET Foundation licenses this file to you under the MIT license.
+// See the LICENSE file in the project root for more information.
+
+#nullable disable
 
 using System;
 using System.Collections.Generic;
+using System.Collections.Immutable;
 using System.Diagnostics;
 using Roslyn.Utilities;
 
@@ -11,22 +16,22 @@ namespace Microsoft.CodeAnalysis.FindSymbols
     /// Information about a reference to a symbol.
     /// </summary>
     [DebuggerDisplay("{GetDebuggerDisplay(),nq}")]
-    public struct ReferenceLocation : IComparable<ReferenceLocation>, IEquatable<ReferenceLocation>
+    public readonly struct ReferenceLocation : IComparable<ReferenceLocation>, IEquatable<ReferenceLocation>
     {
         /// <summary>
         /// The document that the reference was found in.
         /// </summary>
-        public Document Document { get; private set; }
+        public Document Document { get; }
 
         /// <summary>
         /// If the symbol was bound through an alias, then this is the alias that was used.
         /// </summary>
-        public IAliasSymbol Alias { get; private set; }
+        public IAliasSymbol Alias { get; }
 
         /// <summary>
         /// The actual source location for a given symbol.
         /// </summary>
-        public Location Location { get; private set; }
+        public Location Location { get; }
 
         /// <summary>
         /// Indicates if this is an implicit reference to the definition.  i.e. the definition wasn't
@@ -34,43 +39,77 @@ namespace Microsoft.CodeAnalysis.FindSymbols
         /// example, this can happen with special methods like GetEnumerator that are used
         /// implicitly by a 'for each' statement.
         /// </summary>
-        public bool IsImplicit { get; private set; }
+        public bool IsImplicit { get; }
 
-        public CandidateReason CandidateReason { get; private set; }
+        /// <summary>
+        /// Indicates if this is a location where the reference is written to.
+        /// </summary>
+        internal bool IsWrittenTo => SymbolUsageInfo.IsWrittenTo();
 
-        internal ReferenceLocation(Document document, IAliasSymbol alias, Location location, bool isImplicit, CandidateReason candidateReason)
+        /// <summary>
+        /// Symbol usage info for this reference.
+        /// </summary>
+        internal SymbolUsageInfo SymbolUsageInfo { get; }
+
+        /// <summary>
+        /// Additional properties for this reference
+        /// </summary>
+        internal ImmutableDictionary<string, string> AdditionalProperties { get; }
+
+        /// <summary>
+        /// If this reference location is within a string literal, then this property
+        /// indicates the location of the containing string literal token.
+        /// Otherwise, <see cref="Location.None"/>.
+        /// </summary>
+        internal Location ContainingStringLocation { get; }
+
+        public CandidateReason CandidateReason { get; }
+
+        private ReferenceLocation(Document document, IAliasSymbol alias, Location location, bool isImplicit, SymbolUsageInfo symbolUsageInfo, ImmutableDictionary<string, string> additionalProperties, CandidateReason candidateReason, Location containingStringLocation)
             : this()
         {
             this.Document = document;
             this.Alias = alias;
             this.Location = location;
             this.IsImplicit = isImplicit;
+            this.SymbolUsageInfo = symbolUsageInfo;
+            this.AdditionalProperties = additionalProperties ?? ImmutableDictionary<string, string>.Empty;
             this.CandidateReason = candidateReason;
+            this.ContainingStringLocation = containingStringLocation;
+        }
+
+        /// <summary>
+        /// Creates a reference location with the given properties.
+        /// </summary>
+        internal ReferenceLocation(Document document, IAliasSymbol alias, Location location, bool isImplicit, SymbolUsageInfo symbolUsageInfo, ImmutableDictionary<string, string> additionalProperties, CandidateReason candidateReason)
+            : this(document, alias, location, isImplicit, symbolUsageInfo, additionalProperties, candidateReason, containingStringLocation: Location.None)
+        {
+        }
+
+        /// <summary>
+        /// Creates a reference location within a string literal.
+        /// For example, location inside the target string of a global SuppressMessageAttribute.
+        /// </summary>
+        internal ReferenceLocation(Document document, Location location, Location containingStringLocation)
+            : this(document, alias: null, location, isImplicit: false,
+                   SymbolUsageInfo.None, additionalProperties: ImmutableDictionary<string, string>.Empty,
+                   CandidateReason.None, containingStringLocation)
+        {
         }
 
         /// <summary>
         /// Indicates if this was not an exact reference to a location, but was instead a possible
         /// location that was found through error tolerance.  For example, a call to a method like
-        /// "Foo()" could show up as an error tolerance location to a method "Foo(int i)" if no
-        /// actual "Foo()" method existed.
+        /// "Goo()" could show up as an error tolerance location to a method "Goo(int i)" if no
+        /// actual "Goo()" method existed.
         /// </summary>
-        public bool IsCandidateLocation
-        {
-            get
-            {
-                return this.CandidateReason != CandidateReason.None;
-            }
-        }
+        public bool IsCandidateLocation => this.CandidateReason != CandidateReason.None;
 
         public static bool operator ==(ReferenceLocation left, ReferenceLocation right)
-        {
-            return left.Equals(right);
-        }
+            => left.Equals(right);
 
         public static bool operator !=(ReferenceLocation left, ReferenceLocation right)
-        {
-            return !(left == right);
-        }
+            => !(left == right);
 
         public override bool Equals(object obj)
         {
@@ -114,8 +153,6 @@ namespace Microsoft.CodeAnalysis.FindSymbols
         }
 
         private string GetDebuggerDisplay()
-        {
-            return string.Format("{0}: {1}", this.Document.Name, this.Location);
-        }
+            => string.Format("{0}: {1}", this.Document.Name, this.Location);
     }
 }

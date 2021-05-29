@@ -1,19 +1,20 @@
-﻿// Copyright (c) Microsoft.  All Rights Reserved.  Licensed under the Apache License, Version 2.0.  See License.txt in the project root for license information.
+﻿// Licensed to the .NET Foundation under one or more agreements.
+// The .NET Foundation licenses this file to you under the MIT license.
+// See the LICENSE file in the project root for more information.
+
+#nullable disable
 
 using System;
 using System.Collections.Immutable;
 using System.Linq;
-using Microsoft.CodeAnalysis.CSharp.Symbols;
-using Microsoft.CodeAnalysis.CSharp.Syntax;
 using Microsoft.CodeAnalysis.CSharp.Test.Utilities;
-using Microsoft.CodeAnalysis.Test.Utilities;
 using Microsoft.CodeAnalysis.Text;
 using Roslyn.Test.Utilities;
 using Xunit;
 
 namespace Microsoft.CodeAnalysis.CSharp.UnitTests
 {
-    public class IncrementalParsingTests
+    public class IncrementalParsingTests : TestBase
     {
         private CSharpParseOptions GetOptions(string[] defines)
         {
@@ -37,9 +38,9 @@ namespace Microsoft.CodeAnalysis.CSharp.UnitTests
         [Fact]
         public void TestChangeClassNameWithNonMatchingMethod()
         {
-            var text = "class foo { void m() { } }";
+            var text = "class goo { void m() { } }";
             var oldTree = this.Parse(text);
-            var newTree = oldTree.WithReplaceFirst("foo", "bar");
+            var newTree = oldTree.WithReplaceFirst("goo", "bar");
             Assert.Equal(0, oldTree.GetCompilationUnitRoot().Errors().Length);
             Assert.Equal(0, newTree.GetCompilationUnitRoot().Errors().Length);
 
@@ -53,11 +54,11 @@ namespace Microsoft.CodeAnalysis.CSharp.UnitTests
         [Fact]
         public void TestChangeClassNameToNotMatchConstructor()
         {
-            var text = "class foo { foo() { } }";
+            var text = "class goo { goo() { } }";
             var oldTree = this.Parse(text);
-            var newTree = oldTree.WithReplaceFirst("foo", "bar");
+            var newTree = oldTree.WithReplaceFirst("goo", "bar");
             Assert.Equal(0, oldTree.GetCompilationUnitRoot().Errors().Length);
-            Assert.NotEqual(0, newTree.GetCompilationUnitRoot().Errors().Length);
+            Assert.Equal(0, newTree.GetCompilationUnitRoot().Errors().Length);
 
             var diffs = SyntaxDifferences.GetRebuiltNodes(oldTree, newTree);
             TestDiffsInOrder(diffs,
@@ -89,10 +90,10 @@ namespace Microsoft.CodeAnalysis.CSharp.UnitTests
         [Fact]
         public void TestChangeClassNameToMatchConstructor()
         {
-            var text = "class foo { bar() { } }";
+            var text = "class goo { bar() { } }";
             var oldTree = this.Parse(text);
-            var newTree = oldTree.WithReplaceFirst("foo", "bar");
-            Assert.NotEqual(0, oldTree.GetCompilationUnitRoot().Errors().Length);
+            var newTree = oldTree.WithReplaceFirst("goo", "bar");
+            Assert.Equal(0, oldTree.GetCompilationUnitRoot().Errors().Length);
             Assert.Equal(0, newTree.GetCompilationUnitRoot().Errors().Length);
 
             var diffs = SyntaxDifferences.GetRebuiltNodes(oldTree, newTree);
@@ -106,39 +107,33 @@ namespace Microsoft.CodeAnalysis.CSharp.UnitTests
         [Fact]
         public void TestChangeClassNameToNotMatchDestructor()
         {
-            var text = "class foo { ~foo() { } }";
+            var text = "class goo { ~goo() { } }";
             var oldTree = this.Parse(text);
-            var newTree = oldTree.WithReplaceFirst("foo", "bar");
+            var newTree = oldTree.WithReplaceFirst("goo", "bar");
             Assert.Equal(0, oldTree.GetCompilationUnitRoot().Errors().Length);
-            Assert.NotEqual(0, newTree.GetCompilationUnitRoot().Errors().Length);
-
-            var diffs = SyntaxDifferences.GetRebuiltNodes(oldTree, newTree);
-            TestDiffsInOrder(diffs,
-                            SyntaxKind.CompilationUnit,
-                            SyntaxKind.ClassDeclaration,
-                            SyntaxKind.IdentifierToken,
-                            SyntaxKind.DestructorDeclaration,
-                            SyntaxKind.IdentifierToken,
-                            SyntaxKind.ParameterList);
-        }
-
-        [Fact]
-        public void TestChangeClassNameToMatchDestructor()
-        {
-            var text = "class foo { ~bar() { } }";
-            var oldTree = this.Parse(text);
-            var newTree = oldTree.WithReplaceFirst("foo", "bar");
-            Assert.NotEqual(0, oldTree.GetCompilationUnitRoot().Errors().Length);
             Assert.Equal(0, newTree.GetCompilationUnitRoot().Errors().Length);
 
             var diffs = SyntaxDifferences.GetRebuiltNodes(oldTree, newTree);
             TestDiffsInOrder(diffs,
                             SyntaxKind.CompilationUnit,
                             SyntaxKind.ClassDeclaration,
-                            SyntaxKind.IdentifierToken,
-                            SyntaxKind.DestructorDeclaration,
-                            SyntaxKind.IdentifierToken,
-                            SyntaxKind.ParameterList);
+                            SyntaxKind.IdentifierToken);
+        }
+
+        [Fact]
+        public void TestChangeClassNameToMatchDestructor()
+        {
+            var text = "class goo { ~bar() { } }";
+            var oldTree = this.Parse(text);
+            var newTree = oldTree.WithReplaceFirst("goo", "bar");
+            Assert.Equal(0, oldTree.GetCompilationUnitRoot().Errors().Length);
+            Assert.Equal(0, newTree.GetCompilationUnitRoot().Errors().Length);
+
+            var diffs = SyntaxDifferences.GetRebuiltNodes(oldTree, newTree);
+            TestDiffsInOrder(diffs,
+                            SyntaxKind.CompilationUnit,
+                            SyntaxKind.ClassDeclaration,
+                            SyntaxKind.IdentifierToken);
         }
 
         [Fact]
@@ -146,7 +141,7 @@ namespace Microsoft.CodeAnalysis.CSharp.UnitTests
         {
             var interfaceKeyword = SyntaxFactory.ParseToken("interface"); // prime the memoizer
 
-            var text = "class foo { public void m() { } }";
+            var text = "class goo { public void m() { } }";
             var oldTree = this.Parse(text);
             var newTree = oldTree.WithReplaceFirst("class", "interface");
             Assert.Equal(0, oldTree.GetCompilationUnitRoot().Errors().Length);
@@ -164,7 +159,7 @@ namespace Microsoft.CodeAnalysis.CSharp.UnitTests
         {
             var interfaceKeyword = SyntaxFactory.ParseToken("struct"); // prime the memoizer
 
-            var text = "class foo { public void m() { } }";
+            var text = "class goo { public void m() { } }";
             var oldTree = this.Parse(text);
             var newTree = oldTree.WithReplaceFirst("class", "struct");
             Assert.Equal(0, oldTree.GetCompilationUnitRoot().Errors().Length);
@@ -180,9 +175,9 @@ namespace Microsoft.CodeAnalysis.CSharp.UnitTests
         [Fact]
         public void TestChangeMethodName()
         {
-            var text = "class c { void foo(a x, b y) { } }";
+            var text = "class c { void goo(a x, b y) { } }";
             var oldTree = this.Parse(text);
-            var newTree = oldTree.WithReplaceFirst("foo", "bar");
+            var newTree = oldTree.WithReplaceFirst("goo", "bar");
             Assert.Equal(0, oldTree.GetCompilationUnitRoot().Errors().Length);
             Assert.Equal(0, newTree.GetCompilationUnitRoot().Errors().Length);
 
@@ -199,12 +194,12 @@ namespace Microsoft.CodeAnalysis.CSharp.UnitTests
         public void TestChangeIfCondition()
         {
             var text = @"
-#if FOO
-class foo { void M() { } }
+#if GOO
+class goo { void M() { } }
 #endif
 ";
-            var oldTree = this.Parse(text, "FOO", "BAR");
-            var newTree = oldTree.WithReplaceFirst("FOO", "BAR");
+            var oldTree = this.Parse(text, "GOO", "BAR");
+            var newTree = oldTree.WithReplaceFirst("GOO", "BAR");
             Assert.Equal(0, oldTree.GetCompilationUnitRoot().Errors().Length);
             Assert.Equal(0, newTree.GetCompilationUnitRoot().Errors().Length);
 
@@ -220,13 +215,13 @@ class foo { void M() { } }
         public void TestChangeDefine()
         {
             var text = @"
-#define FOO
-#if FOO||BAR
-class foo { void M() { } }
+#define GOO
+#if GOO||BAR
+class goo { void M() { } }
 #endif
 ";
             var oldTree = this.Parse(text);
-            var newTree = oldTree.WithReplaceFirst("FOO", "BAR");
+            var newTree = oldTree.WithReplaceFirst("GOO", "BAR");
             Assert.Equal(0, oldTree.GetCompilationUnitRoot().Errors().Length);
             Assert.Equal(0, newTree.GetCompilationUnitRoot().Errors().Length);
 
@@ -242,15 +237,15 @@ class foo { void M() { } }
         public void TestChangeDefineAndIfElse()
         {
             var text = @"
-#define FOO
-#if FOO
+#define GOO
+#if GOO
 class C { void M() { } }
 #else
 class C { void N() { } }
 #endif
 ";
             var oldTree = this.Parse(text);
-            var newTree = oldTree.WithReplaceFirst("FOO", "BAR");
+            var newTree = oldTree.WithReplaceFirst("GOO", "BAR");
             Assert.Equal(0, oldTree.GetCompilationUnitRoot().Errors().Length);
             Assert.Equal(0, newTree.GetCompilationUnitRoot().Errors().Length);
 
@@ -560,7 +555,7 @@ class C { void c() { } }
             Assert.Equal(newText.ToString(), finalText);
         }
 
-        [WorkItem(536457, "DevDiv")]
+        [WorkItem(536457, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/536457")]
         [Fact]
         public void RemovePartialFromClassWithCorrectSpan()
         {
@@ -574,7 +569,7 @@ class C { void c() { } }
             Assert.Equal(newText.ToString(), output);
         }
 
-        [WorkItem(536519, "DevDiv")]
+        [WorkItem(536519, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/536519")]
         [Fact]
         public void AddTopLevelMemberErrorDifference()
         {
@@ -590,7 +585,7 @@ public d");
             CompareIncToFullParseErrors(incrementalTree, parsedTree);
         }
 
-        [WorkItem(536520, "DevDiv")]
+        [WorkItem(536520, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/536520")]
         [Fact]
         public void AddIncompleteStatementErrorDifference()
         {
@@ -606,7 +601,7 @@ public class Test
             CompareIncToFullParseErrors(incrementalTree, parsedTree);
         }
 
-        [WorkItem(536523, "DevDiv")]
+        [WorkItem(536523, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/536523")]
         [Fact]
         public void DifferentNumberOfErrorsForNonCompletedBlock()
         {
@@ -623,7 +618,7 @@ public class Test
             CompareIncToFullParseErrors(incrementalTree, parsedTree);
         }
 
-        [WorkItem(536649, "DevDiv")]
+        [WorkItem(536649, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/536649")]
         [Fact]
         public void AddingCharacterOnErrorWithExtern()
         {
@@ -639,7 +634,7 @@ class C
             CompareIncToFullParseErrors(incrementalTree, parsedTree);
         }
 
-        [WorkItem(536650, "DevDiv")]
+        [WorkItem(536650, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/536650")]
         [Fact]
         public void ErrorWithExtraModifiers()
         {
@@ -652,7 +647,7 @@ class MyClass {
             CompareIncToFullParseErrors(incrementalTree, parsedTree);
         }
 
-        [WorkItem(536651, "DevDiv")]
+        [WorkItem(536651, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/536651")]
         [Fact]
         public void CommentsCauseDifferentErrorStrings()
         {
@@ -668,7 +663,7 @@ class A
             CompareIncToFullParseErrors(incrementalTree, parsedTree);
         }
 
-        [WorkItem(536652, "DevDiv")]
+        [WorkItem(536652, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/536652")]
         [Fact]
         public void ErrorModifierOnClass()
         {
@@ -680,7 +675,7 @@ protected class My");
             CompareIncToFullParseErrors(incrementalTree, parsedTree);
         }
 
-        [WorkItem(536653, "DevDiv")]
+        [WorkItem(536653, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/536653")]
         [Fact]
         public void ErrorPartialClassWithNoBody()
         {
@@ -692,7 +687,7 @@ public partial clas");
             CompareIncToFullParseErrors(incrementalTree, parsedTree);
         }
 
-        [WorkItem(536654, "DevDiv")]
+        [WorkItem(536654, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/536654")]
         [Fact]
         public void ErrorConstKeywordInMethodName()
         {
@@ -708,7 +703,7 @@ public partial clas");
             CompareIncToFullParseErrors(incrementalTree, parsedTree);
         }
 
-        [WorkItem(536655, "DevDiv")]
+        [WorkItem(536655, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/536655")]
         [Fact]
         public void ErrorWithOperatorDeclaration()
         {
@@ -721,7 +716,7 @@ public partial clas");
             CompareIncToFullParseErrors(incrementalTree, parsedTree);
         }
 
-        [WorkItem(536661, "DevDiv")]
+        [WorkItem(536661, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/536661")]
         [Fact]
         public void ErrorWithNestedTypeInNew()
         {
@@ -736,19 +731,19 @@ class Test {
             CompareIncToFullParseErrors(incrementalTree, parsedTree);
         }
 
-        [WorkItem(536662, "DevDiv")]
+        [WorkItem(536662, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/536662")]
         [Fact]
         public void ErrorWithInvalidMethodName()
         {
             SourceText oldText = SourceText.From(@"public class MyClass {	
-	int -foo(");
+	int -goo(");
             char newCharacter = ')';
             SyntaxTree incrementalTree, parsedTree;
             CharByCharIncrementalParse(oldText, newCharacter, out incrementalTree, out parsedTree);
             CompareIncToFullParseErrors(incrementalTree, parsedTree);
         }
 
-        [WorkItem(536524, "DevDiv")]
+        [WorkItem(536524, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/536524")]
         [Fact]
         public void AddingAFieldInIncompleteClass()
         {
@@ -769,7 +764,7 @@ public class Test
             SourceText startingText = SourceText.From(@"
 public class Test
 {
-    void Foo() {} // Point
+    void Goo() {} // Point
 }");
 
             SyntaxTree syntaxTree = SyntaxFactory.ParseSyntaxTree(startingText);
@@ -790,7 +785,7 @@ public class Test
             SourceText startingText = SourceText.From(@"
 public class Test
 {
-    void Foo() {} // Point
+    void Goo() {} // Point
 }");
 
             SyntaxTree syntaxTree = SyntaxFactory.ParseSyntaxTree(startingText);
@@ -809,7 +804,7 @@ public class Test
             SourceText startingText = SourceText.From(@"
 public class Test
 {
-    void Foo() {} // Point
+    void Goo() {} // Point
 }");
 
             SyntaxTree syntaxTree = SyntaxFactory.ParseSyntaxTree(startingText);
@@ -822,7 +817,7 @@ public class Test
             Assert.Equal(0, syntaxTree.GetCompilationUnitRoot().Errors().Length);
         }
 
-        [WorkItem(536563, "DevDiv")]
+        [WorkItem(536563, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/536563")]
         [Fact]
         public void CommentOutClassKeyword()
         {
@@ -842,7 +837,7 @@ public class Test
             CompareIncToFullParseErrors(incrementalTree, parsedTree);
         }
 
-        [WorkItem(536565, "DevDiv")]
+        [WorkItem(536565, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/536565")]
         [Fact]
         public void CommentOutOpeningCurlyOnPrivateDeclaration()
         {
@@ -866,7 +861,7 @@ private class B{ public class MyClass
             CompareIncToFullParseErrors(incrementalTree, parsedTree);
         }
 
-        [WorkItem(536567, "DevDiv")]
+        [WorkItem(536567, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/536567")]
         [Fact]
         public void CommentOutBracesOnMethodDeclaration()
         {
@@ -890,11 +885,11 @@ private class B{ private class MyClass
             CompareIncToFullParseErrors(incrementalTree, parsedTree);
         }
 
-        [WorkItem(536568, "DevDiv")]
+        [WorkItem(536568, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/536568")]
         [Fact]
         public void CommentOutEventKeyword()
         {
-            SourceText oldText = SourceText.From(@"interface IFoo
+            SourceText oldText = SourceText.From(@"interface IGoo
 {
 	event EventHandler E { add { } remove { } }
 }
@@ -914,11 +909,11 @@ class Test
             CompareIncToFullParseErrors(incrementalTree, parsedTree);
         }
 
-        [WorkItem(536571, "DevDiv")]
+        [WorkItem(536571, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/536571")]
         [Fact]
         public void CommentOutEventAccessor()
         {
-            SourceText oldText = SourceText.From(@"interface IFoo
+            SourceText oldText = SourceText.From(@"interface IGoo
 {
 	event EventHandler E { add { } remove { } }
 }
@@ -938,7 +933,7 @@ class Test
             CompareIncToFullParseErrors(incrementalTree, parsedTree);
         }
 
-        [WorkItem(536573, "DevDiv")]
+        [WorkItem(536573, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/536573")]
         [Fact]
         public void CommentOutDotInUsingAlias()
         {
@@ -960,7 +955,7 @@ class A
             CompareIncToFullParseErrors(incrementalTree, parsedTree);
         }
 
-        [WorkItem(536577, "DevDiv")]
+        [WorkItem(536577, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/536577")]
         [Fact]
         public void CommentOutThisInIndexer()
         {
@@ -984,7 +979,7 @@ class A
             CompareIncToFullParseErrors(incrementalTree, parsedTree);
         }
 
-        [WorkItem(536578, "DevDiv")]
+        [WorkItem(536578, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/536578")]
         [Fact]
         public void CommentOutReturnStatementInProperty()
         {
@@ -1011,20 +1006,20 @@ class A
         public void AddSemicolonInForLoop()
         {
             SourceText oldText = SourceText.From(@"public class MyClass {
-    void foo()
+    void goo()
     {
         for (int i = 0
     }
 }
 ");
-            int locationOfInsert = oldText.ToString().IndexOf("0") + 1;
+            int locationOfInsert = oldText.ToString().IndexOf('0') + 1;
             SyntaxTree oldTree = SyntaxFactory.ParseSyntaxTree(oldText);
 
             // The bug was that this would simply assert
             SyntaxTree newTree = oldTree.WithInsertAt(locationOfInsert, ";");
         }
 
-        [WorkItem(536635, "DevDiv")]
+        [WorkItem(536635, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/536635")]
         [Fact]
         public void AddSemicolonAfterStartOfVerbatimString()
         {
@@ -1034,10 +1029,10 @@ string s = @
 }
 ";
             var oldTree = SyntaxFactory.ParseSyntaxTree(oldText);
-            var newTree = oldTree.WithInsertAt(oldText.IndexOf("@"), ";");
+            var newTree = oldTree.WithInsertAt(oldText.IndexOf('@'), ";");
         }
 
-        [WorkItem(536717, "DevDiv")]
+        [WorkItem(536717, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/536717")]
         [Fact]
         public void AddReturnWithTriviaAtStart()
         {
@@ -1060,7 +1055,7 @@ string s = @
             CompareIncToFullParseErrors(incrTree, fullTree);
         }
 
-        [WorkItem(536728, "DevDiv")]
+        [WorkItem(536728, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/536728")]
         [Fact]
         public void CommentClassWithGTandGTEOperator()
         {
@@ -1097,7 +1092,7 @@ string s = @
 #endif
         }
 
-        [WorkItem(536730, "DevDiv")]
+        [WorkItem(536730, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/536730")]
         [Fact]
         public void CodeWithDollarSign()
         {
@@ -1116,12 +1111,12 @@ string s = @
             Assert.Equal(parsedTree.GetCompilationUnitRoot().ToFullString(), incrementalTree.GetCompilationUnitRoot().ToFullString());
         }
 
-        [WorkItem(536731, "DevDiv")]
+        [WorkItem(536731, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/536731")]
         [Fact]
         public void CommentCodeInGOTOStatement()
         {
             SourceText oldText = SourceText.From(@"class CSTR020mod{ public static void CSTR020()  {  ON ERROR GOTO ErrorTrap; } }");
-            int locationOfChange = oldText.ToString().IndexOf("ON"), widthOfChange = 2;
+            int locationOfChange = oldText.ToString().IndexOf("ON", StringComparison.Ordinal), widthOfChange = 2;
             SyntaxTree incrementalTree;
             SyntaxTree parsedTree;
 
@@ -1132,7 +1127,7 @@ string s = @
             CompareIncToFullParseErrors(incrementalTree, parsedTree);
         }
 
-        [WorkItem(536734, "DevDiv")]
+        [WorkItem(536734, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/536734")]
         [Fact]
         public void CommentConstInConstDeclError()
         {
@@ -1141,7 +1136,7 @@ string s = @
     const byte X4var As Byte = 55;
 }
 ");
-            int locationOfChange = oldText.ToString().IndexOf("const"), widthOfChange = 5;
+            int locationOfChange = oldText.ToString().IndexOf("const", StringComparison.Ordinal), widthOfChange = 5;
             SyntaxTree incrementalTree;
             SyntaxTree parsedTree;
 
@@ -1152,7 +1147,7 @@ string s = @
             CompareIncToFullParseErrors(incrementalTree, parsedTree);
         }
 
-        [WorkItem(536738, "DevDiv")]
+        [WorkItem(536738, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/536738")]
         [Fact]
         public void CommentClassWithDelegateDecl()
         {
@@ -1161,7 +1156,7 @@ string s = @
      protected delegate void ProtectedDel(dynamic d);
 }
 ");
-            int locationOfChange = oldText.ToString().IndexOf("class"), widthOfChange = 5;
+            int locationOfChange = oldText.ToString().IndexOf("class", StringComparison.Ordinal), widthOfChange = 5;
             SyntaxTree incrementalTree;
             SyntaxTree parsedTree;
 
@@ -1174,7 +1169,7 @@ string s = @
             CompareIncToFullParseErrors(incrementalTree, parsedTree);
         }
 
-        [WorkItem(536738, "DevDiv")]
+        [WorkItem(536738, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/536738")]
         [Fact]
         public void CommentCloseBraceInPropertyDecl()
         {
@@ -1184,7 +1179,7 @@ string s = @
     public MyEnum[] Property_MyEnumArr { set; private get; }
 }
 ");
-            int locationOfChange = oldText.ToString().IndexOf("}"), widthOfChange = 5;
+            int locationOfChange = oldText.ToString().IndexOf('}'), widthOfChange = 5;
             SyntaxTree incrementalTree;
             SyntaxTree parsedTree;
 
@@ -1195,7 +1190,25 @@ string s = @
             CompareIncToFullParseErrors(incrementalTree, parsedTree);
         }
 
-        [WorkItem(536739, "DevDiv")]
+        [Fact]
+        public void CommentCloseBraceInInitOnlyPropertyDecl()
+        {
+            SourceText oldText = SourceText.From(@"public class MemberClass
+{
+    public MyStruct[] Property_MyStructArr { get; init; }
+    public MyEnum[] Property_MyEnumArr { init; private get; }
+}
+");
+            int locationOfChange = oldText.ToString().IndexOf('}'), widthOfChange = 5;
+
+            // This function will update the first closing brace in property declaration Property_MyStructArr "}" to "/*}*/" in oldText
+            CommentOutText(oldText, locationOfChange, widthOfChange, out SyntaxTree incrementalTree, out SyntaxTree parsedTree);
+
+            // Verify that the errors from the fully parsed tree with the change and the incrementally parsed tree are the same
+            CompareIncToFullParseErrors(incrementalTree, parsedTree);
+        }
+
+        [WorkItem(536739, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/536739")]
         [Fact]
         public void CommentFixedInIllegalArrayDecl()
         {
@@ -1206,7 +1219,7 @@ string s = @
         public fixed byte Array[dy[""Test""]];
     }
 }");
-            int locationOfChange = oldText.ToString().IndexOf("fixed"), widthOfChange = 5;
+            int locationOfChange = oldText.ToString().IndexOf("fixed", StringComparison.Ordinal), widthOfChange = 5;
             SyntaxTree incrementalTree;
             SyntaxTree parsedTree;
 
@@ -1217,7 +1230,7 @@ string s = @
             CompareIncToFullParseErrors(incrementalTree, parsedTree);
         }
 
-        [WorkItem(536788, "DevDiv")]
+        [WorkItem(536788, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/536788")]
         [Fact]
         public void CommentGlobalUsedAsAlias()
         {
@@ -1227,7 +1240,7 @@ class Test
 {
 }
 ");
-            int locationOfChange = oldText.ToString().IndexOf("@global"), widthOfChange = 7;
+            int locationOfChange = oldText.ToString().IndexOf("@global", StringComparison.Ordinal), widthOfChange = 7;
             SyntaxTree incrementalTree;
             SyntaxTree parsedTree;
 
@@ -1244,7 +1257,7 @@ class Test
             }
         }
 
-        [WorkItem(536789, "DevDiv")]
+        [WorkItem(536789, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/536789")]
         [Fact]
         public void CommentUsingStmtGlobalUsedAsAlias()
         {
@@ -1259,7 +1272,7 @@ class Test
 }
 ");
             string txtToCmnt = @"using @global=System.Int32;";
-            int locationOfChange = oldText.ToString().IndexOf(txtToCmnt), widthOfChange = txtToCmnt.Length;
+            int locationOfChange = oldText.ToString().IndexOf(txtToCmnt, StringComparison.Ordinal), widthOfChange = txtToCmnt.Length;
             SyntaxTree incrementalTree;
             SyntaxTree parsedTree;
 
@@ -1270,7 +1283,7 @@ class Test
             CompareIncToFullParseErrors(incrementalTree, parsedTree);
         }
 
-        [WorkItem(536790, "DevDiv")]
+        [WorkItem(536790, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/536790")]
         [Fact]
         public void CmntMainInCodeWithGlobalQualifierInUnsafe()
         {
@@ -1284,7 +1297,7 @@ class Test
 }
 ");
             string txtToCmnt = @"Main";
-            int locationOfChange = oldText.ToString().IndexOf(txtToCmnt), widthOfChange = txtToCmnt.Length;
+            int locationOfChange = oldText.ToString().IndexOf(txtToCmnt, StringComparison.Ordinal), widthOfChange = txtToCmnt.Length;
             SyntaxTree incrementalTree;
             SyntaxTree parsedTree;
 
@@ -1295,7 +1308,7 @@ class Test
             CompareIncToFullParseErrors(incrementalTree, parsedTree);
         }
 
-        [WorkItem(536842, "DevDiv"), WorkItem(543452, "DevDiv")]
+        [WorkItem(536842, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/536842"), WorkItem(543452, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/543452")]
         [Fact]
         public void DelegateDeclInvalidCastException()
         {
@@ -1317,7 +1330,7 @@ class Test
             CompareIncToFullParseErrors(incrementalTree, parsedTree);
         }
 
-        [WorkItem(536843, "DevDiv")]
+        [WorkItem(536843, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/536843")]
         [Fact]
         public void KeyExistsArgumentException()
         {
@@ -1372,7 +1385,7 @@ class Test
             CompareIncToFullParseErrors(incrementalTree, parsedTree);
         }
 
-        [WorkItem(536849, "DevDiv")]
+        [WorkItem(536849, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/536849")]
         [Fact]
         public void QueryExprWithKeywordsAsVariablesAndIncompleteJoin()
         {
@@ -1394,7 +1407,7 @@ class Test
             CompareIncToFullParseErrors(incrementalTree, parsedTree);
         }
 
-        [WorkItem(536865, "DevDiv")]
+        [WorkItem(536865, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/536865")]
         [Fact]
         public void IncompleteGenericTypeParamVarDecl()
         {
@@ -1415,7 +1428,7 @@ class Test
             CompareIncToFullParseErrors(incrementalTree, parsedTree);
         }
 
-        [WorkItem(536866, "DevDiv")]
+        [WorkItem(536866, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/536866")]
         [Fact]
         public void IncompleteArglistMethodInvocation()
         {
@@ -1436,14 +1449,14 @@ class Test
             CompareIncToFullParseErrors(incrementalTree, parsedTree);
         }
 
-        [WorkItem(536867, "DevDiv")]
+        [WorkItem(536867, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/536867")]
         [Fact]
         public void IncompleteErrorExtensionMethodDecl()
         {
             SourceText oldText = SourceText.From(
 @"public static class Extensions
 {
-    public static this Foo(int i, this string str)");
+    public static this Goo(int i, this string str)");
 
             SyntaxTree incrementalTree;
             SyntaxTree parsedTree;
@@ -1459,7 +1472,7 @@ class Test
             CompareIncToFullParseErrors(incrementalTree, parsedTree);
         }
 
-        [WorkItem(536868, "DevDiv")]
+        [WorkItem(536868, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/536868")]
         [Fact]
         public void IncompleteErrorLambdaExpr()
         {
@@ -1480,7 +1493,7 @@ class Test
             CompareIncToFullParseErrors(incrementalTree, parsedTree);
         }
 
-        [WorkItem(536871, "DevDiv")]
+        [WorkItem(536871, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/536871")]
         [Fact]
         public void IncompleteCodeFollowingXmlDocStyleComment()
         {
@@ -1500,7 +1513,7 @@ class Test
             CompareIncToFullParseErrors(incrementalTree, parsedTree);
         }
 
-        [WorkItem(536897, "DevDiv")]
+        [WorkItem(536897, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/536897")]
         [Fact]
         public void IncompleteNamespaceFollowingExternError()
         {
@@ -1518,9 +1531,9 @@ namespace N");
             CompareIncToFullParseErrors(incrementalTree, parsedTree);
         }
 
-        [WorkItem(536898, "DevDiv")]
+        [WorkItem(536898, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/536898")]
         [Fact]
-        public void IncompletConditionWithJaggedArrayAccess()
+        public void IncompleteConditionWithJaggedArrayAccess()
         {
             SourceText oldText = SourceText.From(
 @"class A
@@ -1539,16 +1552,16 @@ namespace N");
             CompareIncToFullParseErrors(incrementalTree, parsedTree);
         }
 
-        [WorkItem(536899, "DevDiv")]
+        [WorkItem(536899, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/536899")]
         [Fact]
         public void TrailingCommentFollowingAttributesInsideMethod()
         {
             SourceText oldText = SourceText.From(
-@"public class foo 
+@"public class goo 
 {
-  public static int Foo
+  public static int Goo
   {
-    [method:A][foo:A]/");
+    [method:A][goo:A]/");
 
             SyntaxTree incrementalTree;
             SyntaxTree parsedTree;
@@ -1562,7 +1575,7 @@ namespace N");
             Assert.Equal(parsedTree.GetCompilationUnitRoot().ChildNodesAndTokens()[0].AsNode().ToFullString(), incrementalTree.GetCompilationUnitRoot().ChildNodesAndTokens()[0].AsNode().ToFullString());
         }
 
-        [WorkItem(536901, "DevDiv")]
+        [WorkItem(536901, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/536901")]
         [Fact]
         public void SpecialAttribNameWithDoubleAtToken()
         {
@@ -1579,12 +1592,12 @@ namespace N");
             CompareIncToFullParseErrors(incrementalTree, parsedTree);
         }
 
-        [WorkItem(536903, "DevDiv")]
+        [WorkItem(536903, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/536903")]
         [Fact]
         public void AssertForAttributeWithGenericType()
         {
             SourceText oldText = SourceText.From(
-@"[Foo<i");
+@"[Goo<i");
 
             SyntaxTree incrementalTree;
             SyntaxTree parsedTree;
@@ -1597,7 +1610,7 @@ namespace N");
             CompareIncToFullParseErrors(incrementalTree, parsedTree);
         }
 
-        [WorkItem(539056, "DevDiv")]
+        [WorkItem(539056, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/539056")]
         [Fact]
         public void AssertOnTypingColonInGenericTypeConstraint()
         {
@@ -1615,7 +1628,7 @@ namespace N");
             CompareIncToFullParseErrors(incrementalTree, parsedTree);
         }
 
-        [WorkItem(536904, "DevDiv")]
+        [WorkItem(536904, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/536904")]
         [Fact]
         public void ArithmeticExprWithLongConstant()
         {
@@ -1636,7 +1649,7 @@ namespace N");
             CompareIncToFullParseErrors(incrementalTree, parsedTree);
         }
 
-        [WorkItem(536913, "DevDiv")]
+        [WorkItem(536913, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/536913")]
         [Fact]
         public void AddClassKeywordWithAnonymousMethodThrowsIndexOutOfRangeException()
         {
@@ -1671,14 +1684,14 @@ namespace N");
             CompareIncToFullParseErrors(incrementalTree, parsedTree);
         }
 
-        [WorkItem(536914, "DevDiv")]
+        [WorkItem(536914, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/536914")]
         [Fact]
         public void AddClassKeywordWithParamsModifierInAnonymousMethod()
         {
             SourceText oldText = SourceText.From(
 @"Test
 {
-    static int Foo()
+    static int Goo()
     {
         Dele f = delegate(params int[] a) { return 1;};
     }
@@ -1695,7 +1708,7 @@ namespace N");
             CompareIncToFullParseErrors(incrementalTree, parsedTree);
         }
 
-        [WorkItem(536916, "DevDiv")]
+        [WorkItem(536916, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/536916")]
         [Fact]
         public void AddEqualTokenBeforeLongConst()
         {
@@ -1713,7 +1726,7 @@ namespace N");
             CompareIncToFullParseErrors(incrementalTree, parsedTree);
         }
 
-        [WorkItem(536917, "DevDiv")]
+        [WorkItem(536917, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/536917")]
         [Fact]
         public void AddEqualTokenBeforeHugeConst()
         {
@@ -1731,7 +1744,7 @@ namespace N");
             CompareIncToFullParseErrors(incrementalTree, parsedTree);
         }
 
-        [WorkItem(536616, "DevDiv")]
+        [WorkItem(536616, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/536616")]
         [Fact]
         public void AddEndTagToXmlDocComment()
         {
@@ -1750,7 +1763,7 @@ namespace N");
             CompareIncToFullParseErrors(incrementalTree, parsedTree);
         }
 
-        [WorkItem(537888, "DevDiv")]
+        [WorkItem(537888, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/537888")]
         [Fact]
         public void AddClassKeywordToCodeWithConstructorAndProperty()
         {
@@ -1781,7 +1794,7 @@ namespace N");
             CompareIncToFullParseErrors(incrementalTree, parsedTree);
         }
 
-        [WorkItem(537890, "DevDiv")]
+        [WorkItem(537890, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/537890")]
         [Fact]
         public void AddCurlyBracesToIncompleteCode()
         {
@@ -1806,7 +1819,7 @@ namespace N");
             CompareIncToFullParseErrors(incrementalTree, parsedTree);
         }
 
-        [WorkItem(537891, "DevDiv")]
+        [WorkItem(537891, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/537891")]
         [Fact]
         public void AddOpenParenToIncompleteMethodDeclBeforeDestructor()
         {
@@ -1825,7 +1838,7 @@ namespace N");
             CompareIncToFullParseErrors(incrementalTree, parsedTree);
         }
 
-        [WorkItem(538977, "DevDiv")]
+        [WorkItem(538977, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/538977")]
         [Fact]
         public void AddTokenToIncompleteQueryExpr()
         {
@@ -1843,7 +1856,7 @@ namespace N");
             CompareIncToFullParseErrors(incrementalTree, parsedTree);
         }
 
-        [WorkItem(536986, "DevDiv")]
+        [WorkItem(536986, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/536986")]
         [Fact]
         public void IncompleteGenericInterfaceImplementation()
         {
@@ -1862,7 +1875,7 @@ namespace N");
             CompareIncToFullParseErrors(incrementalTree, parsedTree);
         }
 
-        [WorkItem(536988, "DevDiv")]
+        [WorkItem(536988, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/536988")]
         [Fact]
         public void IncompleteIndexerDecl()
         {
@@ -1881,7 +1894,7 @@ namespace N");
             CompareIncToFullParseErrors(incrementalTree, parsedTree);
         }
 
-        [WorkItem(536990, "DevDiv")]
+        [WorkItem(536990, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/536990")]
         [Fact]
         public void IncompleteGenericVarDeclWithUnderscore()
         {
@@ -1902,7 +1915,7 @@ namespace N");
             CompareIncToFullParseErrors(incrementalTree, parsedTree);
         }
 
-        [WorkItem(536991, "DevDiv")]
+        [WorkItem(536991, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/536991")]
         [Fact]
         public void IncompleteUnsafeArrayInit()
         {
@@ -1921,14 +1934,14 @@ namespace N");
             CompareIncToFullParseErrors(incrementalTree, parsedTree);
         }
 
-        [WorkItem(537012, "DevDiv")]
+        [WorkItem(537012, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/537012")]
         [Fact]
         public void RemoveClassIdentifierTokenWithDelegDecl()
         {
             SourceText oldText = SourceText.From(
 @"class Test
 {
-    static int Foo()
+    static int Goo()
     {
 
         Dele f = delegate(params int[] a) { return 1;};
@@ -1938,7 +1951,7 @@ namespace N");
             SyntaxTree incrementalTree;
             SyntaxTree parsedTree;
             string textToRemove = "Test";
-            int locationOfChange = oldText.ToString().IndexOf(textToRemove);
+            int locationOfChange = oldText.ToString().IndexOf(textToRemove, StringComparison.Ordinal);
             int widthOfChange = textToRemove.Length;
 
             // This function will remove the "Test" token from oldText
@@ -1948,7 +1961,7 @@ namespace N");
             CompareIncToFullParseErrors(incrementalTree, parsedTree);
         }
 
-        [WorkItem(537889, "DevDiv")]
+        [WorkItem(537889, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/537889")]
         [Fact]
         public void RemoveBracesInExtensionIndexer()
         {
@@ -1966,7 +1979,7 @@ namespace N");
             SyntaxTree incrementalTree;
             SyntaxTree parsedTree;
             string textToRemove = ")[";
-            int locationOfChange = oldText.ToString().IndexOf(textToRemove);
+            int locationOfChange = oldText.ToString().IndexOf(textToRemove, StringComparison.Ordinal);
             int widthOfChange = textToRemove.Length;
 
             // This function will remove the ")[" token from oldText
@@ -1976,7 +1989,7 @@ namespace N");
             CompareIncToFullParseErrors(incrementalTree, parsedTree);
         }
 
-        [WorkItem(537892, "DevDiv")]
+        [WorkItem(537892, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/537892")]
         [Fact]
         public void RemoveParensInMethodDeclContainingPartialKeyword()
         {
@@ -1988,7 +2001,7 @@ namespace N");
             SyntaxTree incrementalTree;
             SyntaxTree parsedTree;
             string textToRemove = "()";
-            int locationOfChange = oldText.ToString().IndexOf(textToRemove);
+            int locationOfChange = oldText.ToString().IndexOf(textToRemove, StringComparison.Ordinal);
             int widthOfChange = textToRemove.Length;
 
             // This function will remove the "()" text from oldText
@@ -1998,7 +2011,7 @@ namespace N");
             CompareIncToFullParseErrors(incrementalTree, parsedTree);
         }
 
-        [WorkItem(537020, "DevDiv")]
+        [WorkItem(537020, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/537020")]
         [Fact]
         public void IncompleteGlobalQualifierExplInterfaceImpl()
         {
@@ -2017,7 +2030,7 @@ namespace N");
             CompareTreeEquivalence(parsedTree.GetCompilationUnitRoot(), incrementalTree.GetCompilationUnitRoot());
         }
 
-        [WorkItem(537033, "DevDiv")]
+        [WorkItem(537033, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/537033")]
         [Fact]
         public void RemoveParensInGetEnumeratorWithPropertyAccess()
         {
@@ -2039,7 +2052,7 @@ namespace N");
             SyntaxTree incrementalTree;
             SyntaxTree parsedTree;
             string textToRemove = "()";
-            int locationOfChange = oldText.ToString().IndexOf(textToRemove);
+            int locationOfChange = oldText.ToString().IndexOf(textToRemove, StringComparison.Ordinal);
             int widthOfChange = textToRemove.Length;
 
             // This function will remove the "()" text from oldText
@@ -2049,7 +2062,7 @@ namespace N");
             CompareTreeEquivalence(parsedTree.GetCompilationUnitRoot(), incrementalTree.GetCompilationUnitRoot());
         }
 
-        [WorkItem(537053, "DevDiv")]
+        [WorkItem(537053, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/537053")]
         [Fact]
         public void RemoveReturnTypeOnProperty()
         {
@@ -2072,7 +2085,7 @@ namespace N");
             SyntaxTree incrementalTree;
             SyntaxTree parsedTree;
             string textToRemove = "int";
-            int locationOfChange = oldText.ToString().IndexOf(textToRemove);
+            int locationOfChange = oldText.ToString().IndexOf(textToRemove, StringComparison.Ordinal);
             int widthOfChange = textToRemove.Length;
 
             // This function will remove the "int" text from oldText
@@ -2082,7 +2095,7 @@ namespace N");
             CompareTreeEquivalence(parsedTree.GetCompilationUnitRoot(), incrementalTree.GetCompilationUnitRoot());
         }
 
-        [WorkItem(538975, "DevDiv")]
+        [WorkItem(538975, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/538975")]
         [Fact]
         public void RemoveTypeOnArrayInParameterWithMethodDeclError()
         {
@@ -2098,7 +2111,7 @@ namespace N");
             SyntaxTree incrementalTree;
             SyntaxTree parsedTree;
             string textToRemove = "string";
-            int locationOfChange = oldText.ToString().IndexOf(textToRemove);
+            int locationOfChange = oldText.ToString().IndexOf(textToRemove, StringComparison.Ordinal);
             int widthOfChange = textToRemove.Length;
 
             // This function will remove the "string" text from oldText
@@ -2108,9 +2121,9 @@ namespace N");
             CompareIncToFullParseErrors(incrementalTree, parsedTree);
         }
 
-        [WorkItem(537054, "DevDiv")]
+        [WorkItem(537054, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/537054")]
         [Fact]
-        public void RemoveReturnTypeOnGenericMethodWithTyeParamConstraint()
+        public void RemoveReturnTypeOnGenericMethodWithTypeParamConstraint()
         {
             SourceText oldText = SourceText.From(
 @"class Test
@@ -2123,7 +2136,7 @@ namespace N");
             SyntaxTree incrementalTree;
             SyntaxTree parsedTree;
             string textToRemove = "int";
-            int locationOfChange = oldText.ToString().IndexOf(textToRemove);
+            int locationOfChange = oldText.ToString().IndexOf(textToRemove, StringComparison.Ordinal);
             int widthOfChange = textToRemove.Length;
 
             // This function will remove the "int" text from oldText
@@ -2133,7 +2146,7 @@ namespace N");
             CompareTreeEquivalence(parsedTree.GetCompilationUnitRoot(), incrementalTree.GetCompilationUnitRoot());
         }
 
-        [WorkItem(537084, "DevDiv")]
+        [WorkItem(537084, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/537084")]
         [Fact]
         public void RemoveNamespaceQualifierFromTypeInIfCondition()
         {
@@ -2152,7 +2165,7 @@ namespace N");
             SyntaxTree incrementalTree;
             SyntaxTree parsedTree;
             string textToRemove = "System";
-            int locationOfChange = oldText.ToString().IndexOf(textToRemove);
+            int locationOfChange = oldText.ToString().IndexOf(textToRemove, StringComparison.Ordinal);
             int widthOfChange = textToRemove.Length;
 
             // This function will remove the "System" text from oldText
@@ -2163,9 +2176,9 @@ namespace N");
             CompareTreeEquivalence(parsedTree.GetCompilationUnitRoot(), incrementalTree.GetCompilationUnitRoot());
         }
 
-        [WorkItem(537092, "DevDiv")]
+        [WorkItem(537092, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/537092")]
         [Fact]
-        public void RemoveMethodnameWithLambdaExprinMethodbody()
+        public void RemoveMethodNameWithLambdaExprInMethodBody()
         {
             SourceText oldText = SourceText.From(
 @"class C
@@ -2179,7 +2192,7 @@ namespace N");
             SyntaxTree incrementalTree;
             SyntaxTree parsedTree;
             string textToRemove = "Main";
-            int locationOfChange = oldText.ToString().IndexOf(textToRemove);
+            int locationOfChange = oldText.ToString().IndexOf(textToRemove, StringComparison.Ordinal);
             int widthOfChange = textToRemove.Length;
 
             // This function will remove the "Main" text from oldText
@@ -2192,7 +2205,7 @@ namespace N");
             CompareTreeEquivalence(parsedTree.GetCompilationUnitRoot(), incrementalTree.GetCompilationUnitRoot());
         }
 
-        [WorkItem(538978, "DevDiv")]
+        [WorkItem(538978, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/538978")]
         [Fact]
         public void RemoveInitializerOnDeclStatementWithErrors()
         {
@@ -2203,7 +2216,7 @@ namespace N");
             SyntaxTree incrementalTree;
             SyntaxTree parsedTree;
             string textToRemove = "null";
-            int locationOfChange = oldText.ToString().IndexOf(textToRemove);
+            int locationOfChange = oldText.ToString().IndexOf(textToRemove, StringComparison.Ordinal);
             int widthOfChange = textToRemove.Length;
 
             // This function will remove the "null" text from oldText
@@ -2213,7 +2226,7 @@ namespace N");
             CompareIncToFullParseErrors(incrementalTree, parsedTree);
         }
 
-        [WorkItem(537116, "DevDiv")]
+        [WorkItem(537116, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/537116")]
         [Fact]
         public void CmntEndIfInMethodDecl()
         {
@@ -2234,7 +2247,7 @@ namespace N");
 #endif
 			static RecordNotFound Method(){}";
 
-            int locationOfChange = oldText.ToString().IndexOf(txtToCmnt), widthOfChange = txtToCmnt.Length;
+            int locationOfChange = oldText.ToString().IndexOf(txtToCmnt, StringComparison.Ordinal), widthOfChange = txtToCmnt.Length;
             SyntaxTree incrementalTree;
             SyntaxTree parsedTree;
 
@@ -2245,7 +2258,7 @@ namespace N");
             CompareIncToFullParseErrors(incrementalTree, parsedTree);
         }
 
-        [WorkItem(537125, "DevDiv")]
+        [WorkItem(537125, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/537125")]
         [Fact]
         public void CmntAnonTypeInQueryExpr()
         {
@@ -2262,7 +2275,7 @@ namespace N");
 
             string txtToCmnt = @"select new { e, delegate }";
 
-            int locationOfChange = oldText.ToString().IndexOf(txtToCmnt), widthOfChange = txtToCmnt.Length;
+            int locationOfChange = oldText.ToString().IndexOf(txtToCmnt, StringComparison.Ordinal), widthOfChange = txtToCmnt.Length;
             SyntaxTree incrementalTree;
             SyntaxTree parsedTree;
 
@@ -2273,19 +2286,19 @@ namespace N");
             CompareIncToFullParseErrors(incrementalTree, parsedTree);
         }
 
-        [WorkItem(537180, "DevDiv")]
+        [WorkItem(537180, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/537180")]
         [Fact]
         public void CmntParamsInExtProperty()
         {
             SourceText oldText = SourceText.From(
 @"public static class Extensions
 {
-    public static int Foo2(this int x ) { set { var1 = value; } }
+    public static int Goo2(this int x ) { set { var1 = value; } }
 }");
 
             string txtToCmnt = @"(this int x )";
 
-            int locationOfChange = oldText.ToString().IndexOf(txtToCmnt), widthOfChange = txtToCmnt.Length;
+            int locationOfChange = oldText.ToString().IndexOf(txtToCmnt, StringComparison.Ordinal), widthOfChange = txtToCmnt.Length;
             SyntaxTree incrementalTree;
             SyntaxTree parsedTree;
 
@@ -2296,7 +2309,7 @@ namespace N");
             CompareTreeEquivalence(parsedTree.GetCompilationUnitRoot(), incrementalTree.GetCompilationUnitRoot());
         }
 
-        [WorkItem(537533, "DevDiv")]
+        [WorkItem(537533, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/537533")]
         [Fact]
         public void MultiCommentInserts()
         {
@@ -2319,11 +2332,9 @@ class Program
             var tree = SyntaxFactory.ParseSyntaxTree(text);
 
             var text2 = text.WithChanges(
-                new TextChange[] {
-                    new TextChange(new TextSpan(str.IndexOf(" abc"), 0), "//"),
-                    new TextChange(new TextSpan(str.IndexOf(" 123"), 0), "//"),
-                    new TextChange(new TextSpan(str.IndexOf(" def"), 0), "//")
-                });
+                new TextChange(new TextSpan(str.IndexOf(" abc", StringComparison.Ordinal), 0), "//"),
+                new TextChange(new TextSpan(str.IndexOf(" 123", StringComparison.Ordinal), 0), "//"),
+                new TextChange(new TextSpan(str.IndexOf(" def", StringComparison.Ordinal), 0), "//"));
 
             var parsedTree = SyntaxFactory.ParseSyntaxTree(text2);
             var reparsedTree = tree.WithChangedText(text2);
@@ -2331,7 +2342,7 @@ class Program
             CompareTreeEquivalence(parsedTree.GetCompilationUnitRoot(), reparsedTree.GetCompilationUnitRoot());
         }
 
-        [WorkItem(542236, "DevDiv")]
+        [WorkItem(542236, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/542236")]
         [Fact]
         public void InsertOpenBraceBeforeCodes()
         {
@@ -2349,7 +2360,94 @@ class Program
             CompareIncToFullParseErrors(reparsedTree, parsedTree);
         }
 
-        [WorkItem(531404, "DevDiv")]
+        [WorkItem(6676, "https://github.com/dotnet/roslyn/issues/6676")]
+        [Fact]
+        public void InsertExpressionStatementWithoutSemicolonBefore()
+        {
+            SourceText oldText = SourceText.From(@"System.Console.WriteLine(true)
+");
+            var startTree = SyntaxFactory.ParseSyntaxTree(oldText, options: TestOptions.Script);
+
+            startTree.GetDiagnostics().Verify();
+
+            var newText = oldText.WithChanges(new TextChange(new TextSpan(0, 0), @"System.Console.WriteLine(false)
+"));
+
+            AssertEx.AreEqual(@"System.Console.WriteLine(false)
+System.Console.WriteLine(true)
+",
+newText.ToString());
+
+            var reparsedTree = startTree.WithChangedText(newText);
+            var parsedTree = SyntaxFactory.ParseSyntaxTree(newText, options: TestOptions.Script);
+
+            parsedTree.GetDiagnostics().Verify(
+                // (1,32): error CS1002: ; expected
+                // System.Console.WriteLine(false)
+                Diagnostic(ErrorCode.ERR_SemicolonExpected, "").WithLocation(1, 32));
+
+            CompareIncToFullParseErrors(reparsedTree, parsedTree);
+        }
+
+        [WorkItem(6676, "https://github.com/dotnet/roslyn/issues/6676")]
+        [Fact]
+        public void InsertExpressionStatementWithoutSemicolonAfter()
+        {
+            SourceText oldText = SourceText.From(@"System.Console.WriteLine(true)
+");
+            var startTree = SyntaxFactory.ParseSyntaxTree(oldText, options: TestOptions.Script);
+
+            startTree.GetDiagnostics().Verify();
+
+            var newText = oldText.WithInsertAt(
+                oldText.Length,
+                @"System.Console.WriteLine(false)
+");
+
+            AssertEx.Equal(@"System.Console.WriteLine(true)
+System.Console.WriteLine(false)
+", newText.ToString());
+
+            var reparsedTree = startTree.WithChangedText(newText);
+
+            var parsedTree = SyntaxFactory.ParseSyntaxTree(newText, options: TestOptions.Script);
+            parsedTree.GetDiagnostics().Verify(
+                // (1,31): error CS1002: ; expected
+                // System.Console.WriteLine(true)
+                Diagnostic(ErrorCode.ERR_SemicolonExpected, "").WithLocation(1, 31));
+
+            CompareIncToFullParseErrors(reparsedTree, parsedTree);
+        }
+
+        [WorkItem(6676, "https://github.com/dotnet/roslyn/issues/6676")]
+        [Fact]
+        public void MakeEmbeddedExpressionStatementWithoutSemicolon()
+        {
+            SourceText oldText = SourceText.From(@"System.Console.WriteLine(true)
+");
+            var startTree = SyntaxFactory.ParseSyntaxTree(oldText, options: TestOptions.Script);
+
+            startTree.GetDiagnostics().Verify();
+
+            var newText = oldText.WithChanges(new TextChange(new TextSpan(0, 0), @"if (false)
+"));
+
+            AssertEx.Equal(@"if (false)
+System.Console.WriteLine(true)
+", newText.ToString());
+
+            var reparsedTree = startTree.WithChangedText(newText);
+            var parsedTree = SyntaxFactory.ParseSyntaxTree(newText, options: TestOptions.Script);
+
+            parsedTree.GetDiagnostics().Verify(
+                // (2,31): error CS1002: ; expected
+                // System.Console.WriteLine(true)
+                Diagnostic(ErrorCode.ERR_SemicolonExpected, "").WithLocation(2, 31));
+
+            CompareIncToFullParseErrors(reparsedTree, parsedTree);
+        }
+
+        [WorkItem(531404, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/531404")]
         [Fact]
         public void AppendDisabledText()
         {
@@ -2369,7 +2467,7 @@ class Program
                 changedTree.GetCompilationUnitRoot().EndOfFileToken.FullSpan);
         }
 
-        [Fact, WorkItem(531614, "DevDiv")]
+        [Fact, WorkItem(531614, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/531614")]
         public void IncrementalParseStopAtEscapeBackSlash()
         {
             var text1 = @"using System;
@@ -2382,7 +2480,7 @@ class Program
 
             var text2 = @"        Console.WriteLine(""\'\0\a\b\";
 
-            var comp = CSharpTestBase.CreateCompilationWithMscorlib(SyntaxFactory.ParseSyntaxTree(String.Empty));
+            var comp = CSharpTestBase.CreateCompilation(SyntaxFactory.ParseSyntaxTree(String.Empty));
 
             var oldTree = comp.SyntaxTrees.First();
             var oldIText = oldTree.GetText();
@@ -2413,7 +2511,7 @@ class Program
             Assert.Equal(fullText, incText);
         }
 
-        [Fact, WorkItem(552741, "DevDiv")]
+        [Fact, WorkItem(552741, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/552741")]
         public void IncrementalParseTopDownCommentOutLines()
         {
             var text = @"// <Title> Query Expression syntax </Title>
@@ -2485,7 +2583,7 @@ public class QueryExpressionTest
             }
         }
 
-        [Fact, WorkItem(552741, "DevDiv")]
+        [Fact, WorkItem(552741, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/552741")]
         public void IncrementalParseStatementAfterQuery()
         {
             var text = @"
@@ -2506,7 +2604,7 @@ class equals
             var currIText = currTree.GetText();
 
             // Insert "// " before the "x" in "select x"; the next statement becomes part of the query.
-            var span = new TextSpan(text.LastIndexOf("x"), 0);
+            var span = new TextSpan(text.LastIndexOf('x'), 0);
             var change = new TextChange(span, "// ");
 
             currIText = currIText.WithChanges(change);
@@ -2517,7 +2615,7 @@ class equals
             WalkTreeAndVerify(currTree.GetCompilationUnitRoot(), fullTree.GetCompilationUnitRoot());
         }
 
-        [Fact, WorkItem(529260, "DevDiv")]
+        [Fact, WorkItem(529260, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/529260")]
         public void DoNotReuseAnnotatedNodes()
         {
             var text = @"
@@ -2576,7 +2674,7 @@ class D { }
         }
 
         [Fact]
-        [WorkItem(658496, "DevDiv")]
+        [WorkItem(658496, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/658496")]
         public void DontReuseLambdaParameterAsMethodParameter()
         {
             var items = new string[]
@@ -2607,13 +2705,420 @@ class D { }
         {
             var interfaceKeyword = SyntaxFactory.ParseToken("interface"); // prime the memoizer
 
-            var text = @"class foo { public void m() { string s = $""{1} world"" ; } }";
+            var text = @"class goo { public void m() { string s = $""{1} world"" ; } }";
             var oldTree = this.Parse6(text);
             var newTree = oldTree.WithReplaceFirst(@"world"" ", @"world""  ");
             Assert.Equal(0, oldTree.GetCompilationUnitRoot().Errors().Length);
             Assert.Equal(0, newTree.GetCompilationUnitRoot().Errors().Length);
         }
 
+        [Fact]
+        public void Goo()
+        {
+            var oldText = SourceText.From(@"
+using System;
+using System.Collections.Generic;
+using System.Linq;
+using System.Threading.Tasks;
+
+class Program
+{
+    static void Main(string[] args)
+    {
+
+    }
+
+    protected abstract int Stuff { get; }
+}
+
+class G: Program
+{
+    protected override int Stuff
+    {
+        get
+        {
+            throw new NotImplementedException();
+        }
+    }
+}");
+            var newText = SourceText.From(@"
+using System;
+using System.Collections.Generic;
+using System.Linq;
+using System.Threading.Tasks;
+
+class Program
+{
+    static void Main(string[] args)
+    {
+
+    }
+
+    protected abstract int Stuff { get; }
+}
+
+class G: Program
+{
+    protected override int Stuff =>
+    {
+        get
+        {
+            throw new NotImplementedException();
+        }
+    }
+}
+");
+            var oldTree = SyntaxFactory.ParseSyntaxTree(oldText);
+            var newTree = oldTree.WithChangedText(newText);
+            WalkTreeAndVerify(newTree.GetCompilationUnitRoot(), SyntaxFactory.ParseSyntaxTree(newText).GetCompilationUnitRoot());
+        }
+
+        [WorkItem(23272, "https://github.com/dotnet/roslyn/issues/23272")]
+        [Fact]
+        public void AddAccessibilityToNullableArray()
+        {
+            var source =
+@"class A { }
+class B
+{
+    A[]? F;
+}";
+            var tree = SyntaxFactory.ParseSyntaxTree(source);
+            var text = tree.GetText();
+            var span = new TextSpan(source.IndexOf(" A[]?"), 0);
+            var change = new TextChange(span, "p");
+            text = text.WithChanges(change);
+            tree = tree.WithChangedText(text);
+            var fullTree = SyntaxFactory.ParseSyntaxTree(text.ToString());
+            WalkTreeAndVerify(tree.GetCompilationUnitRoot(), fullTree.GetCompilationUnitRoot());
+        }
+
+        [Fact]
+        [WorkItem(37663, "https://github.com/dotnet/roslyn/issues/37663")]
+        public void AssemblyAttributeBeforeNamespace()
+        {
+            var src = @"
+using System;
+using System.Linq;
+
+[assembly:]
+namespace N
+{ }";
+            var tree = SyntaxFactory.ParseSyntaxTree(src);
+            var text = tree.GetText();
+            var span = new TextSpan(src.IndexOf(":"), 1);
+            var change = new TextChange(span, "");
+            text = text.WithChanges(change);
+            tree = tree.WithChangedText(text);
+            var fullTree = SyntaxFactory.ParseSyntaxTree(text.ToString());
+            WalkTreeAndVerify(tree.GetCompilationUnitRoot(), fullTree.GetCompilationUnitRoot());
+        }
+
+        [WorkItem(37665, "https://github.com/dotnet/roslyn/issues/37665")]
+        [Fact]
+        public void AddBracketInUsingDirective()
+        {
+            var source =
+@"using System;
+namespace NS
+{
+    class A { }
+}
+";
+            var tree = SyntaxFactory.ParseSyntaxTree(source);
+            var text = tree.GetText();
+            var span = new TextSpan(source.IndexOf(";"), 0);
+            var change = new TextChange(span, "[");
+            text = text.WithChanges(change);
+            tree = tree.WithChangedText(text);
+            var fullTree = SyntaxFactory.ParseSyntaxTree(text.ToString());
+            WalkTreeAndVerify(tree.GetCompilationUnitRoot(), fullTree.GetCompilationUnitRoot());
+        }
+
+        [WorkItem(37665, "https://github.com/dotnet/roslyn/issues/37665")]
+        [Fact]
+        public void AddAttributeAfterUsingDirective()
+        {
+            var source =
+@"using System;
+namespace NS
+{
+    class A { }
+}
+";
+            var tree = SyntaxFactory.ParseSyntaxTree(source);
+            var text = tree.GetText();
+            var span = new TextSpan(source.IndexOf(";") + 1, 0);
+            var change = new TextChange(span, "[Obsolete]");
+            text = text.WithChanges(change);
+            tree = tree.WithChangedText(text);
+            var fullTree = SyntaxFactory.ParseSyntaxTree(text.ToString());
+            WalkTreeAndVerify(tree.GetCompilationUnitRoot(), fullTree.GetCompilationUnitRoot());
+        }
+
+        [WorkItem(37665, "https://github.com/dotnet/roslyn/issues/37665")]
+        [Fact]
+        public void AddTrailingModifierInUsingDirective()
+        {
+            var source =
+@"using System;
+namespace NS
+{
+    class A { }
+}
+";
+            var tree = SyntaxFactory.ParseSyntaxTree(source);
+            var text = tree.GetText();
+            var span = new TextSpan(source.IndexOf(";") + 1, 0);
+            var change = new TextChange(span, "public");
+            text = text.WithChanges(change);
+            tree = tree.WithChangedText(text);
+            var fullTree = SyntaxFactory.ParseSyntaxTree(text.ToString());
+            WalkTreeAndVerify(tree.GetCompilationUnitRoot(), fullTree.GetCompilationUnitRoot());
+        }
+
+        [WorkItem(37665, "https://github.com/dotnet/roslyn/issues/37665")]
+        [Fact]
+        public void AddTrailingModifierInUsingDirective_2()
+        {
+            var source =
+@"using System;publi
+namespace NS
+{
+    class A { }
+}
+";
+            var tree = SyntaxFactory.ParseSyntaxTree(source);
+            var text = tree.GetText();
+            var substring = "publi";
+            var span = new TextSpan(source.IndexOf(substring) + substring.Length, 0);
+            var change = new TextChange(span, "c");
+            text = text.WithChanges(change);
+            tree = tree.WithChangedText(text);
+            var fullTree = SyntaxFactory.ParseSyntaxTree(text.ToString());
+            WalkTreeAndVerify(tree.GetCompilationUnitRoot(), fullTree.GetCompilationUnitRoot());
+        }
+
+        [Fact]
+        public void Statement_EditAttributeList_01()
+        {
+            var source = @"
+class C
+{
+    void M()
+    {
+        [Attr]
+        void local1() { };
+    }
+}
+";
+            var tree = SyntaxFactory.ParseSyntaxTree(source);
+            var text = tree.GetText();
+            var substring = "Attr";
+            var span = new TextSpan(source.IndexOf(substring) + substring.Length, 0);
+            var change = new TextChange(span, "1, Attr2");
+            text = text.WithChanges(change);
+            tree = tree.WithChangedText(text);
+            var fullTree = SyntaxFactory.ParseSyntaxTree(text.ToString());
+            WalkTreeAndVerify(tree.GetCompilationUnitRoot(), fullTree.GetCompilationUnitRoot());
+        }
+
+        [Fact]
+        public void Statement_EditAttributeList_02()
+        {
+            var source = @"
+class C
+{
+    void M()
+    {
+        [Attr1]
+        Method1();
+    }
+}
+";
+            var tree = SyntaxFactory.ParseSyntaxTree(source);
+            var text = tree.GetText();
+            var substring = @"Attr1";
+            var span = new TextSpan(source.IndexOf(substring) + substring.Length, 0);
+            var change = new TextChange(span, ", Attr2");
+            text = text.WithChanges(change);
+            tree = tree.WithChangedText(text);
+            var fullTree = SyntaxFactory.ParseSyntaxTree(text.ToString());
+            WalkTreeAndVerify(tree.GetCompilationUnitRoot(), fullTree.GetCompilationUnitRoot());
+        }
+
+        [Fact]
+        public void Statement_AddAttributeList()
+        {
+            var source = @"
+class C
+{
+    void M()
+    {
+        [Attr1]
+        void local1() { };
+    }
+}
+";
+            var tree = SyntaxFactory.ParseSyntaxTree(source);
+            var text = tree.GetText();
+            var substring = @"[Attr1]";
+            var span = new TextSpan(source.IndexOf(substring) + substring.Length, 0);
+            var change = new TextChange(span, " [Attr2]");
+            text = text.WithChanges(change);
+            tree = tree.WithChangedText(text);
+            var fullTree = SyntaxFactory.ParseSyntaxTree(text.ToString());
+            WalkTreeAndVerify(tree.GetCompilationUnitRoot(), fullTree.GetCompilationUnitRoot());
+        }
+
+        [Fact]
+        public void EditStatementWithAttributes_01()
+        {
+            var source = @"
+class C
+{
+    void M()
+    {
+        [Attr1]
+        void local1() { Method(); };
+    }
+}
+";
+            var tree = SyntaxFactory.ParseSyntaxTree(source);
+            var text = tree.GetText();
+            var substring = @"Method(";
+            var span = new TextSpan(source.IndexOf(substring) + substring.Length, 0);
+            var change = new TextChange(span, "Arg");
+            text = text.WithChanges(change);
+            tree = tree.WithChangedText(text);
+            var fullTree = SyntaxFactory.ParseSyntaxTree(text.ToString());
+            WalkTreeAndVerify(tree.GetCompilationUnitRoot(), fullTree.GetCompilationUnitRoot());
+        }
+
+        [Fact]
+        public void EditStatementWithAttributes_02()
+        {
+            var source = @"
+class C
+{
+    void M()
+    {
+        [Attr1]
+        Method1();
+    }
+}
+";
+            var tree = SyntaxFactory.ParseSyntaxTree(source);
+            var text = tree.GetText();
+            var substring = @"Method";
+            var span = new TextSpan(source.IndexOf(substring) + substring.Length, 1);
+            var change = new TextChange(span, "2");
+            text = text.WithChanges(change);
+            tree = tree.WithChangedText(text);
+            var fullTree = SyntaxFactory.ParseSyntaxTree(text.ToString());
+            WalkTreeAndVerify(tree.GetCompilationUnitRoot(), fullTree.GetCompilationUnitRoot());
+        }
+
+        [Fact]
+        public void EditGlobalStatementWithAttributes_01()
+        {
+            var source = @"
+[Attr]
+x.y();
+";
+            var tree = SyntaxFactory.ParseSyntaxTree(source);
+            var text = tree.GetText();
+            var substring = @"x.y";
+            var span = new TextSpan(source.IndexOf(substring) + substring.Length, 0);
+            var change = new TextChange(span, ".z");
+            text = text.WithChanges(change);
+            tree = tree.WithChangedText(text);
+            var fullTree = SyntaxFactory.ParseSyntaxTree(text.ToString());
+            WalkTreeAndVerify(tree.GetCompilationUnitRoot(), fullTree.GetCompilationUnitRoot());
+        }
+
+        [Fact]
+        public void EditGlobalStatementWithAttributes_02()
+        {
+            var source = @"
+[Attr]
+if (b) { }
+";
+            var tree = SyntaxFactory.ParseSyntaxTree(source);
+            var text = tree.GetText();
+            var substring = @"if (b) { }";
+            var span = new TextSpan(source.IndexOf(substring) + substring.Length, 0);
+            var change = new TextChange(span, " if (c) { }");
+            text = text.WithChanges(change);
+            tree = tree.WithChangedText(text);
+            var fullTree = SyntaxFactory.ParseSyntaxTree(text.ToString());
+            WalkTreeAndVerify(tree.GetCompilationUnitRoot(), fullTree.GetCompilationUnitRoot());
+        }
+
+        [Fact]
+        public void EditGlobalStatementWithAttributes_03()
+        {
+            var source = @"
+[Attr]
+if (b) { }
+";
+            var tree = SyntaxFactory.ParseSyntaxTree(source);
+            var text = tree.GetText();
+            var substring = @"if (b) { }";
+            var span = new TextSpan(source.IndexOf(substring) + substring.Length, 0);
+            var change = new TextChange(span, " else (c) { }");
+            text = text.WithChanges(change);
+            tree = tree.WithChangedText(text);
+            var fullTree = SyntaxFactory.ParseSyntaxTree(text.ToString());
+            WalkTreeAndVerify(tree.GetCompilationUnitRoot(), fullTree.GetCompilationUnitRoot());
+        }
+
+        [Fact]
+        public void EditNestedStatementWithAttributes_01()
+        {
+            var source = "{ [Goo]Goo(); [Goo]Goo(); [Goo]Goo(); }";
+            var tree = SyntaxFactory.ParseSyntaxTree(source);
+            var text = tree.GetText();
+            var span = new TextSpan(start: 0, length: 1); // delete first character
+            var change = new TextChange(span, "");
+            text = text.WithChanges(change);
+            tree = tree.WithChangedText(text);
+            var fullTree = SyntaxFactory.ParseSyntaxTree(text.ToString());
+            WalkTreeAndVerify(tree.GetCompilationUnitRoot(), fullTree.GetCompilationUnitRoot());
+        }
+
+        [Fact]
+        public void EditNestedStatementWithAttributes_02()
+        {
+            var source = "{ [Goo]Goo(); [Goo]Goo(); [Goo]Goo(); }";
+            var tree = SyntaxFactory.ParseSyntaxTree(source);
+            var text = tree.GetText();
+            var span = new TextSpan(start: 0, length: 0);
+            var change = new TextChange(span, "{ ");
+            text = text.WithChanges(change);
+            tree = tree.WithChangedText(text);
+            var fullTree = SyntaxFactory.ParseSyntaxTree(text.ToString());
+            WalkTreeAndVerify(tree.GetCompilationUnitRoot(), fullTree.GetCompilationUnitRoot());
+        }
+
+        [Fact]
+        public void EditNestedStatementWithAttributes_03()
+        {
+            var source = "class C { void M() { Goo[Goo] [Goo]if(Goo) { } } }";
+            var tree = SyntaxFactory.ParseSyntaxTree(source);
+            var text = tree.GetText();
+            var substring = "Goo[Goo]";
+            var span = new TextSpan(start: source.IndexOf(substring), length: 3); // Goo[Goo] -> [Goo]
+            var change = new TextChange(span, "");
+            text = text.WithChanges(change);
+            tree = tree.WithChangedText(text);
+            var fullTree = SyntaxFactory.ParseSyntaxTree(text.ToString());
+            WalkTreeAndVerify(tree.GetCompilationUnitRoot(), fullTree.GetCompilationUnitRoot());
+        }
+
+        #endregion
+
+        #region Helper functions
         private void WalkTreeAndVerify(SyntaxNodeOrToken incNode, SyntaxNodeOrToken fullNode)
         {
             var incChildren = incNode.ChildNodesAndTokens();
@@ -2629,9 +3134,6 @@ class D { }
             }
         }
 
-        #endregion
-
-        #region Helper functions
         private static void CommentOutText(SourceText oldText, int locationOfChange, int widthOfChange, out SyntaxTree incrementalTree, out SyntaxTree parsedTree)
         {
             var newText = oldText.WithChanges(
@@ -2659,7 +3161,7 @@ class D { }
             Assert.Equal(pd.Count(), id.Count());
             for (int i = 0; i < id.Count(); i++)
             {
-                Assert.Equal(pd.ElementAt(i).Stringize(), id.ElementAt(i).Stringize());
+                Assert.Equal(pd.ElementAt(i).Inspect(), id.ElementAt(i).Inspect());
             }
 
             ParentChecker.CheckParents(parsedTree.GetCompilationUnitRoot(), parsedTree);

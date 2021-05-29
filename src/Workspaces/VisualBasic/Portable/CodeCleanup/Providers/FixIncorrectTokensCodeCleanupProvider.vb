@@ -1,10 +1,13 @@
-﻿' Copyright (c) Microsoft.  All Rights Reserved.  Licensed under the Apache License, Version 2.0.  See License.txt in the project root for license information.
+﻿' Licensed to the .NET Foundation under one or more agreements.
+' The .NET Foundation licenses this file to you under the MIT license.
+' See the LICENSE file in the project root for more information.
 
+Imports System.Collections.Immutable
 Imports System.Composition
+Imports System.Diagnostics.CodeAnalysis
 Imports System.Threading
 Imports Microsoft.CodeAnalysis
 Imports Microsoft.CodeAnalysis.Text
-Imports Microsoft.CodeAnalysis.VisualBasic.Symbols
 Imports Microsoft.CodeAnalysis.VisualBasic.Syntax
 
 Namespace Microsoft.CodeAnalysis.CodeCleanup.Providers
@@ -14,12 +17,17 @@ Namespace Microsoft.CodeAnalysis.CodeCleanup.Providers
     Friend Class FixIncorrectTokensCodeCleanupProvider
         Inherits AbstractTokensCodeCleanupProvider
 
-        Private Const ASCII_LSMART_Q As Char = ChrW(&H91S)          '// ASCII left single smart quote
-        Private Const ASCII_RSMART_Q As Char = ChrW(&H92S)          '// ASCII right single smart quote
-        Private Const UNICODE_LSMART_Q As Char = ChrW(&H2018S)      '// UNICODE left single smart quote
-        Private Const UNICODE_RSMART_Q As Char = ChrW(&H2019S)      '// UNICODE right single smart quote
-        Private Const CH_STRGHT_Q As Char = ChrW(&H27S)             '// UNICODE straight quote
-        Private Shared ReadOnly _smartSingleQuotes As Char() = New Char() {ASCII_LSMART_Q, ASCII_RSMART_Q, UNICODE_LSMART_Q, UNICODE_RSMART_Q}
+        Private Const s_ASCII_LSMART_Q As Char = ChrW(&H91S)          '// ASCII left single smart quote
+        Private Const s_ASCII_RSMART_Q As Char = ChrW(&H92S)          '// ASCII right single smart quote
+        Private Const s_UNICODE_LSMART_Q As Char = ChrW(&H2018S)      '// UNICODE left single smart quote
+        Private Const s_UNICODE_RSMART_Q As Char = ChrW(&H2019S)      '// UNICODE right single smart quote
+        Private Const s_CH_STRGHT_Q As Char = ChrW(&H27S)             '// UNICODE straight quote
+        Private Shared ReadOnly s_smartSingleQuotes As Char() = New Char() {s_ASCII_LSMART_Q, s_ASCII_RSMART_Q, s_UNICODE_LSMART_Q, s_UNICODE_RSMART_Q}
+
+        <ImportingConstructor>
+        <SuppressMessage("RoslynDiagnosticsReliability", "RS0033:Importing constructor should be [Obsolete]", Justification:="https://github.com/dotnet/roslyn/issues/42820")>
+        Public Sub New()
+        End Sub
 
         Public Overrides ReadOnly Property Name As String
             Get
@@ -27,41 +35,31 @@ Namespace Microsoft.CodeAnalysis.CodeCleanup.Providers
             End Get
         End Property
 
-        Protected Overrides Function GetRewriter(document As Document, root As SyntaxNode, spans As IEnumerable(Of TextSpan), workspace As Workspace, cancellationToken As CancellationToken) As AbstractTokensCodeCleanupProvider.Rewriter
-            Return New FixIncorrectTokensRewriter(document, spans, cancellationToken)
+        Protected Overrides Function GetRewriterAsync(document As Document, root As SyntaxNode, spans As ImmutableArray(Of TextSpan), workspace As Workspace, cancellationToken As CancellationToken) As Task(Of Rewriter)
+            Return FixIncorrectTokensRewriter.CreateAsync(document, spans, cancellationToken)
         End Function
 
         Private Class FixIncorrectTokensRewriter
             Inherits AbstractTokensCodeCleanupProvider.Rewriter
 
-            Private ReadOnly document As Document
-            Private ReadOnly modifiedSpan As TextSpan
+            Private ReadOnly _semanticModel As SemanticModel
 
-            Private model As SemanticModel = Nothing
-
-            Public Sub New(document As Document, spans As IEnumerable(Of TextSpan), cancellationToken As CancellationToken)
+            Private Sub New(semanticModel As SemanticModel,
+                            spans As ImmutableArray(Of TextSpan),
+                            cancellationToken As CancellationToken)
                 MyBase.New(spans, cancellationToken)
 
-                Me.document = document
-                Me.modifiedSpan = spans.Collapse()
+                _semanticModel = semanticModel
             End Sub
 
-            Private ReadOnly Property SemanticModel As SemanticModel
-                Get
-                    If document Is Nothing Then
-                        Return Nothing
-                    End If
+            Public Shared Async Function CreateAsync(document As Document, spans As ImmutableArray(Of TextSpan), cancellationToken As CancellationToken) As Task(Of Rewriter)
+                Dim modifiedSpan = spans.Collapse()
+                Dim semanticModel = If(document Is Nothing,
+                    Nothing,
+                    Await document.ReuseExistingSpeculativeModelAsync(modifiedSpan, cancellationToken).ConfigureAwait(False))
 
-                    If model Is Nothing Then
-                        ' don't want to create semantic model when it is not needed. so get it synchronously when needed
-                        ' most of cases, this will run on UI thread, so it shouldn't matter
-                        model = document.GetSemanticModelForSpanAsync(modifiedSpan, Me._cancellationToken).WaitAndGetResult(Me._cancellationToken)
-                    End If
-
-                    Contract.Requires(model IsNot Nothing)
-                    Return model
-                End Get
-            End Property
+                Return New FixIncorrectTokensRewriter(semanticModel, spans, cancellationToken)
+            End Function
 
             Public Overrides Function VisitTrivia(trivia As SyntaxTrivia) As SyntaxTrivia
                 Dim newTrivia = MyBase.VisitTrivia(trivia)
@@ -69,8 +67,8 @@ Namespace Microsoft.CodeAnalysis.CodeCleanup.Providers
                 ' convert fullwidth single quotes into halfwidth single quotes.
                 If newTrivia.Kind = SyntaxKind.CommentTrivia Then
                     Dim triviaText = newTrivia.ToString()
-                    If triviaText.Length > 0 AndAlso _smartSingleQuotes.Contains(triviaText(0)) Then
-                        triviaText = CH_STRGHT_Q + triviaText.Substring(1)
+                    If triviaText.Length > 0 AndAlso s_smartSingleQuotes.Contains(triviaText(0)) Then
+                        triviaText = s_CH_STRGHT_Q + triviaText.Substring(1)
                         Return SyntaxFactory.CommentTrivia(triviaText)
                     End If
                 End If
@@ -114,8 +112,8 @@ Namespace Microsoft.CodeAnalysis.CodeCleanup.Providers
 
                 If Not _underStructuredTrivia Then
                     Dim parent = TryCast(node.Parent, QualifiedNameSyntax)
-                    If parent IsNot Nothing AndAlso Me.SemanticModel IsNot Nothing Then
-                        Dim symbol = Me.SemanticModel.GetSymbolInfo(parent.Left, _cancellationToken).Symbol
+                    If parent IsNot Nothing AndAlso _semanticModel IsNot Nothing Then
+                        Dim symbol = _semanticModel.GetSymbolInfo(parent.Left, _cancellationToken).Symbol
                         If symbol IsNot Nothing AndAlso symbol.IsNamespace AndAlso String.Equals(DirectCast(symbol, INamespaceSymbol).MetadataName, "System", StringComparison.Ordinal) Then
                             Dim id = newIdentifierName.Identifier
                             Dim newValueText As String

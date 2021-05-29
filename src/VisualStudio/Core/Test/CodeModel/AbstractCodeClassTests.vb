@@ -1,4 +1,9 @@
-' Copyright (c) Microsoft.  All Rights Reserved.  Licensed under the Apache License, Version 2.0.  See License.txt in the project root for license information.
+﻿' Licensed to the .NET Foundation under one or more agreements.
+' The .NET Foundation licenses this file to you under the MIT license.
+' See the LICENSE file in the project root for more information.
+
+Imports System.Threading.Tasks
+Imports Microsoft.VisualStudio.LanguageServices.Implementation.CodeModel.Interop
 
 Namespace Microsoft.VisualStudio.LanguageServices.UnitTests.CodeModel
     Public MustInherit Class AbstractCodeClassTests
@@ -108,6 +113,10 @@ Namespace Microsoft.VisualStudio.LanguageServices.UnitTests.CodeModel
             Return Sub(name) codeElement.Name = name
         End Function
 
+        Protected Overrides Function GetNamespace(codeElement As EnvDTE80.CodeClass2) As EnvDTE.CodeNamespace
+            Return codeElement.Namespace
+        End Function
+
         Protected Overrides Function GetParent(codeElement As EnvDTE80.CodeClass2) As Object
             Return codeElement.Parent
         End Function
@@ -158,6 +167,20 @@ Namespace Microsoft.VisualStudio.LanguageServices.UnitTests.CodeModel
 
         Protected Overrides Sub RemoveImplementedInterface(codeElement As EnvDTE80.CodeClass2, element As Object)
             codeElement.RemoveInterface(element)
+        End Sub
+
+        Protected Sub TestGetBaseName(code As XElement, expectedBaseName As String)
+            TestElement(code,
+                Sub(codeClass)
+                    Dim codeClassBase = TryCast(codeClass, ICodeClassBase)
+                    Assert.NotNull(codeClassBase)
+
+                    Dim baseName As String = Nothing
+                    Dim hRetVal = codeClassBase.GetBaseName(baseName)
+                    Assert.Equal(VSConstants.S_OK, hRetVal)
+
+                    Assert.Equal(expectedBaseName, baseName)
+                End Sub)
         End Sub
     End Class
 End Namespace

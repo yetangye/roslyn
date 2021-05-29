@@ -1,29 +1,24 @@
-' Copyright (c) Microsoft.  All Rights Reserved.  Licensed under the Apache License, Version 2.0.  See License.txt in the project root for license information.
-
-Imports Microsoft.CodeAnalysis.Text
-Imports Microsoft.CodeAnalysis.VisualBasic
-Imports Microsoft.CodeAnalysis.VisualBasic.Symbols
-Imports Microsoft.CodeAnalysis.VisualBasic.Syntax
-Imports Roslyn.Test.Utilities
-Imports Xunit
+﻿' Licensed to the .NET Foundation under one or more agreements.
+' The .NET Foundation licenses this file to you under the MIT license.
+' See the LICENSE file in the project root for more information.
 
 Namespace Microsoft.CodeAnalysis.Editor.VisualBasic.UnitTests.Recommendations.OnErrorStatements
     Public Class ResumeKeywordRecommenderTests
         <Fact>
         <Trait(Traits.Feature, Traits.Features.KeywordRecommending)>
-        Public Sub ResumeNextAfterOnError()
+        Public Sub ResumeNextAfterOnErrorTest()
             VerifyRecommendationsContain(<MethodBody>On Error |</MethodBody>, "Resume Next")
         End Sub
 
         <Fact>
         <Trait(Traits.Feature, Traits.Features.KeywordRecommending)>
-        Public Sub ResumeInMethodBody()
+        Public Sub ResumeInMethodBodyTest()
             VerifyRecommendationsContain(<MethodBody>|</MethodBody>, "Resume")
         End Sub
 
         <Fact>
         <Trait(Traits.Feature, Traits.Features.KeywordRecommending)>
-        Public Sub ResumeNotInLambda()
+        Public Sub ResumeNotInLambdaTest()
             ' On Error statements are never allowed within lambdas
             VerifyRecommendationsMissing(<MethodBody>
 Dim x = Sub()

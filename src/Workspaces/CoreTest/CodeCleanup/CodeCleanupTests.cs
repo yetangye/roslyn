@@ -1,13 +1,18 @@
-﻿// Copyright (c) Microsoft.  All Rights Reserved.  Licensed under the Apache License, Version 2.0.  See License.txt in the project root for license information.
+﻿// Licensed to the .NET Foundation under one or more agreements.
+// The .NET Foundation licenses this file to you under the MIT license.
+// See the LICENSE file in the project root for more information.
+
+#nullable disable
 
 using System.Collections.Generic;
+using System.Collections.Immutable;
 using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
-using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CodeCleanup;
 using Microsoft.CodeAnalysis.CodeCleanup.Providers;
-using Microsoft.CodeAnalysis.SemanticModelWorkspaceService;
+using Microsoft.CodeAnalysis.Shared.Extensions;
+using Microsoft.CodeAnalysis.Test.Utilities;
 using Microsoft.CodeAnalysis.Text;
 using Roslyn.Test.Utilities;
 using Roslyn.Utilities;
@@ -17,6 +22,7 @@ namespace Microsoft.CodeAnalysis.UnitTests.CodeCleanup
 {
     using CSharp = Microsoft.CodeAnalysis.CSharp;
 
+    [UseExportProvider]
     public class CodeCleanupTests
     {
 #if false
@@ -38,76 +44,70 @@ namespace Microsoft.CodeAnalysis.UnitTests.CodeCleanup
 #endif
 
         [Fact]
-        public void CodeCleaners_NoSpans()
+        public async Task CodeCleaners_NoSpans()
         {
             var document = CreateDocument("class C { }", LanguageNames.CSharp);
-            var cleanDocument = CodeCleaner.CleanupAsync(document, SpecializedCollections.EmptyEnumerable<TextSpan>()).Result;
+            var cleanDocument = await CodeCleaner.CleanupAsync(document, ImmutableArray<TextSpan>.Empty);
 
             Assert.Equal(document, cleanDocument);
         }
 
         [Fact]
-        public void CodeCleaners_Document()
+        public async Task CodeCleaners_Document()
         {
             var document = CreateDocument("class C { }", LanguageNames.CSharp);
-            var cleanDocument = CodeCleaner.CleanupAsync(document).Result;
+            var cleanDocument = await CodeCleaner.CleanupAsync(document);
 
             Assert.Equal(document, cleanDocument);
         }
 
         [Fact]
-        public void CodeCleaners_Span()
+        public async Task CodeCleaners_Span()
         {
             var document = CreateDocument("class C { }", LanguageNames.CSharp);
-            var cleanDocument = CodeCleaner.CleanupAsync(document, document.GetSyntaxRootAsync().Result.FullSpan).Result;
+            var cleanDocument = await CodeCleaner.CleanupAsync(document, (await document.GetSyntaxRootAsync()).FullSpan);
 
             Assert.Equal(document, cleanDocument);
         }
 
         [Fact]
-        public void CodeCleaners_Spans()
+        public async Task CodeCleaners_Spans()
         {
             var document = CreateDocument("class C { }", LanguageNames.CSharp);
-            var cleanDocument = CodeCleaner.CleanupAsync(document, SpecializedCollections.SingletonEnumerable(document.GetSyntaxRootAsync().Result.FullSpan)).Result;
+            var cleanDocument = await CodeCleaner.CleanupAsync(document, ImmutableArray.Create(
+                (await document.GetSyntaxRootAsync()).FullSpan));
 
             Assert.Equal(document, cleanDocument);
         }
 
         [Fact]
-        public void CodeCleaners_Annotation()
+        public async Task CodeCleaners_Annotation()
         {
             var document = CreateDocument("class C { }", LanguageNames.CSharp);
             var annotation = new SyntaxAnnotation();
-            document = document.WithSyntaxRoot(document.GetSyntaxRootAsync().Result.WithAdditionalAnnotations(annotation));
+            document = document.WithSyntaxRoot((await document.GetSyntaxRootAsync()).WithAdditionalAnnotations(annotation));
 
-            var cleanDocument = CodeCleaner.CleanupAsync(document, annotation).Result;
+            var cleanDocument = await CodeCleaner.CleanupAsync(document, annotation);
 
             Assert.Equal(document, cleanDocument);
         }
 
         [Fact]
         public void EntireRange()
-        {
-            VerifyRange("{|b:{|r:class C {}|}|}");
-        }
+            => VerifyRange("{|b:{|r:class C {}|}|}");
 
         [Fact]
         public void EntireRange_Merge()
-        {
-            VerifyRange("{|r:class {|b:C { }|} class {|b: B { } |}|}");
-        }
+            => VerifyRange("{|r:class {|b:C { }|} class {|b: B { } |}|}");
 
         [Fact]
         public void EntireRange_EndOfFile()
-        {
-            VerifyRange("{|r:class {|b:C { }|} class {|b: B { } |} |}");
-        }
+            => VerifyRange("{|r:class {|b:C { }|} class {|b: B { } |} |}");
 
         [Fact]
-        [System.Diagnostics.CodeAnalysis.SuppressMessage("Microsoft.StyleCop.CSharp.SpacingRules", "SA1008:OpeningParenthesisMustBeSpacedCorrectly", Justification = "Working around StyleCop bug 7080")]
         public void EntireRangeWithTransformation_RemoveClass()
         {
-            var expectedResult = default(IEnumerable<TextSpan>);
+            var expectedResult = (IEnumerable<TextSpan>)null;
             var transformer = new SimpleCodeCleanupProvider("TransformerCleanup", async (doc, spans, cancellationToken) =>
             {
                 var root = await doc.GetSyntaxRootAsync().ConfigureAwait(false);
@@ -122,10 +122,9 @@ namespace Microsoft.CodeAnalysis.UnitTests.CodeCleanup
         }
 
         [Fact]
-        [System.Diagnostics.CodeAnalysis.SuppressMessage("Microsoft.StyleCop.CSharp.SpacingRules", "SA1008:OpeningParenthesisMustBeSpacedCorrectly", Justification = "Working around StyleCop bug 7080")]
         public void EntireRangeWithTransformation_AddMember()
         {
-            var expectedResult = default(IEnumerable<TextSpan>);
+            var expectedResult = (IEnumerable<TextSpan>)null;
             var transformer = new SimpleCodeCleanupProvider("TransformerCleanup", async (doc, spans, cancellationToken) =>
             {
                 var root = await doc.GetSyntaxRootAsync().ConfigureAwait(false);
@@ -142,10 +141,9 @@ namespace Microsoft.CodeAnalysis.UnitTests.CodeCleanup
         }
 
         [Fact]
-        [System.Diagnostics.CodeAnalysis.SuppressMessage("Microsoft.StyleCop.CSharp.SpacingRules", "SA1008:OpeningParenthesisMustBeSpacedCorrectly", Justification = "Working around StyleCop bug 7080")]
         public void RangeWithTransformation_AddMember()
         {
-            var expectedResult = default(IEnumerable<TextSpan>);
+            var expectedResult = (IEnumerable<TextSpan>)null;
             var transformer = new SimpleCodeCleanupProvider("TransformerCleanup", async (doc, spans, cancellationToken) =>
             {
                 var root = await doc.GetSyntaxRootAsync().ConfigureAwait(false);
@@ -162,10 +160,9 @@ namespace Microsoft.CodeAnalysis.UnitTests.CodeCleanup
         }
 
         [Fact]
-        [System.Diagnostics.CodeAnalysis.SuppressMessage("Microsoft.StyleCop.CSharp.SpacingRules", "SA1008:OpeningParenthesisMustBeSpacedCorrectly", Justification = "Working around StyleCop bug 7080")]
         public void RangeWithTransformation_RemoveMember()
         {
-            var expectedResult = default(IEnumerable<TextSpan>);
+            var expectedResult = (IEnumerable<TextSpan>)null;
             var transformer = new SimpleCodeCleanupProvider("TransformerCleanup", async (doc, spans, cancellationToken) =>
             {
                 var root = await doc.GetSyntaxRootAsync().ConfigureAwait(false);
@@ -183,21 +180,15 @@ namespace Microsoft.CodeAnalysis.UnitTests.CodeCleanup
 
         [Fact]
         public void MultipleRange_Overlapped()
-        {
-            VerifyRange("namespace N {|r:{ {|b:class C { {|b:void Method() { }|} }|} }|}");
-        }
+            => VerifyRange("namespace N {|r:{ {|b:class C { {|b:void Method() { }|} }|} }|}");
 
         [Fact]
-        public void MultipleRange_Adjuscent()
-        {
-            VerifyRange("namespace N {|r:{ {|b:class C { |}{|b:void Method() { } }|} }|}");
-        }
+        public void MultipleRange_Adjacent()
+            => VerifyRange("namespace N {|r:{ {|b:class C { |}{|b:void Method() { } }|} }|}");
 
         [Fact]
         public void MultipleRanges()
-        {
-            VerifyRange("namespace N { class C {|r:{ {|b:void Method() { }|} }|} class C2 {|r:{ {|b:void Method() { }|} }|} }");
-        }
+            => VerifyRange("namespace N { class C {|r:{ {|b:void Method() { }|} }|} class C2 {|r:{ {|b:void Method() { }|} }|} }");
 
         [Fact]
         [WorkItem(12848, "DevDiv_Projects/Roslyn")]
@@ -221,8 +212,8 @@ Imports System.Diagnostics
         }
 
         [Fact]
-        [WorkItem(774295, "DevDiv")]
-        public void DontCrash_VB_2()
+        [WorkItem(774295, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/774295")]
+        public async Task DontCrash_VB_2()
         {
             var code = @"
 Public Class Class1
@@ -238,27 +229,29 @@ Public Class Class1
 End Class
 ";
             var document = CreateDocument(code, LanguageNames.VisualBasic);
-            var semanticModel = document.GetSemanticModelAsync().Result;
-            var root = document.GetSyntaxRootAsync().Result;
+            var semanticModel = await document.GetSemanticModelAsync();
+            var root = await document.GetSyntaxRootAsync();
             var accessor = root.DescendantNodes().OfType<VisualBasic.Syntax.AccessorBlockSyntax>().Last();
-            var factory = new SemanticModelWorkspaceServiceFactory();
-            var service = (ISemanticModelService)factory.CreateService(document.Project.Solution.Workspace.Services);
-            var newSemanticModel = service.GetSemanticModelForNodeAsync(document, accessor, CancellationToken.None).Result;
+            var newSemanticModel = await document.ReuseExistingSpeculativeModelAsync(accessor.Statements[0], CancellationToken.None);
             Assert.NotNull(newSemanticModel);
+            Assert.False(newSemanticModel.IsSpeculativeSemanticModel);
+
             var newDocument = CreateDocument(code, LanguageNames.VisualBasic);
-            var newRoot = newDocument.GetSyntaxRootAsync().Result;
+            var newRoot = await newDocument.GetSyntaxRootAsync();
             var newAccessor = newRoot.DescendantNodes().OfType<VisualBasic.Syntax.AccessorBlockSyntax>().Last();
             root = root.ReplaceNode(accessor, newAccessor);
             document = document.WithSyntaxRoot(root);
             accessor = root.DescendantNodes().OfType<VisualBasic.Syntax.AccessorBlockSyntax>().Last();
-            newSemanticModel = service.GetSemanticModelForNodeAsync(document, accessor, CancellationToken.None).Result;
+            newSemanticModel = await document.ReuseExistingSpeculativeModelAsync(accessor.Statements[0], CancellationToken.None);
             Assert.NotNull(newSemanticModel);
-            var cleanDocument = CodeCleaner.CleanupAsync(document).Result;
+            Assert.True(newSemanticModel.IsSpeculativeSemanticModel);
+
+            var cleanDocument = await CodeCleaner.CleanupAsync(document);
             Assert.Equal(document, cleanDocument);
         }
 
         [Fact]
-        [WorkItem(547075, "DevDiv")]
+        [WorkItem(547075, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/547075")]
         public void TestCodeCleanupWithinNonStructuredTrivia()
         {
             var code = @"
@@ -279,10 +272,9 @@ End Module";
         }
 
         [Fact]
-        [System.Diagnostics.CodeAnalysis.SuppressMessage("Microsoft.StyleCop.CSharp.SpacingRules", "SA1008:OpeningParenthesisMustBeSpacedCorrectly", Justification = "Working around StyleCop bug 7080")]
         public void RangeWithTransformation_OutsideOfRange()
         {
-            var expectedResult = default(IEnumerable<TextSpan>);
+            var expectedResult = (IEnumerable<TextSpan>)null;
             var transformer = new SimpleCodeCleanupProvider("TransformerCleanup", async (doc, spans, cancellationToken) =>
             {
                 var root = await doc.GetSyntaxRootAsync().ConfigureAwait(false);
@@ -302,35 +294,29 @@ End Module";
         }
 
         public static CSharp.Syntax.MethodDeclarationSyntax CreateCSharpMethod(string returnType = "void", string methodName = "Method")
-        {
-            return CSharp.SyntaxFactory.MethodDeclaration(CSharp.SyntaxFactory.ParseTypeName(returnType), CSharp.SyntaxFactory.Identifier(methodName));
-        }
+            => CSharp.SyntaxFactory.MethodDeclaration(CSharp.SyntaxFactory.ParseTypeName(returnType), CSharp.SyntaxFactory.Identifier(methodName));
 
-        private void VerifyRange(string codeWithMarker, string language = LanguageNames.CSharp)
+        private static void VerifyRange(string codeWithMarker, string language = LanguageNames.CSharp)
         {
-            var codeWithoutMarker = default(string);
-            var namedSpans = (IDictionary<string, IList<TextSpan>>)new Dictionary<string, IList<TextSpan>>();
-
-            MarkupTestFile.GetSpans(codeWithMarker, out codeWithoutMarker, out namedSpans);
+            MarkupTestFile.GetSpans(codeWithMarker,
+                out var codeWithoutMarker, out IDictionary<string, ImmutableArray<TextSpan>> namedSpans);
 
             var expectedResult = namedSpans.ContainsKey("r") ? namedSpans["r"] as IEnumerable<TextSpan> : SpecializedCollections.EmptyEnumerable<TextSpan>();
 
-            VerifyRange(codeWithoutMarker, SpecializedCollections.EmptyEnumerable<ICodeCleanupProvider>(), namedSpans["b"], ref expectedResult, language);
+            VerifyRange(codeWithoutMarker, ImmutableArray<ICodeCleanupProvider>.Empty, namedSpans["b"], ref expectedResult, language);
         }
 
-        private void VerifyRange(string codeWithMarker, ICodeCleanupProvider transformer, ref IEnumerable<TextSpan> expectedResult, string language = LanguageNames.CSharp)
+        private static void VerifyRange(string codeWithMarker, ICodeCleanupProvider transformer, ref IEnumerable<TextSpan> expectedResult, string language = LanguageNames.CSharp)
         {
-            var codeWithoutMarker = default(string);
-            var namedSpans = (IDictionary<string, IList<TextSpan>>)new Dictionary<string, IList<TextSpan>>();
+            MarkupTestFile.GetSpans(codeWithMarker,
+                out var codeWithoutMarker, out IDictionary<string, ImmutableArray<TextSpan>> namedSpans);
 
-            MarkupTestFile.GetSpans(codeWithMarker, out codeWithoutMarker, out namedSpans);
-
-            VerifyRange(codeWithoutMarker, SpecializedCollections.SingletonEnumerable(transformer), namedSpans["b"], ref expectedResult, language);
+            VerifyRange(codeWithoutMarker, ImmutableArray.Create(transformer), namedSpans["b"], ref expectedResult, language);
         }
 
-        private void VerifyRange(string code, IEnumerable<ICodeCleanupProvider> codeCleanups, IEnumerable<TextSpan> spans, ref IEnumerable<TextSpan> expectedResult, string language)
+        private static void VerifyRange(string code, ImmutableArray<ICodeCleanupProvider> codeCleanups, ImmutableArray<TextSpan> spans, ref IEnumerable<TextSpan> expectedResult, string language)
         {
-            var result = default(IEnumerable<TextSpan>);
+            var result = (IEnumerable<TextSpan>)null;
             var spanCodeCleanup = new SimpleCodeCleanupProvider("TestCodeCleanup", (d, s, c) =>
             {
                 result = s;

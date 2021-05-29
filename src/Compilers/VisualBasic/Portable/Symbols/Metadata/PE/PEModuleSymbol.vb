@@ -1,4 +1,6 @@
-﻿' Copyright (c) Microsoft.  All Rights Reserved.  Licensed under the Apache License, Version 2.0.  See License.txt in the project root for license information.
+﻿' Licensed to the .NET Foundation under one or more agreements.
+' The .NET Foundation licenses this file to you under the MIT license.
+' See the LICENSE file in the project root for more information.
 
 Imports System.Collections.Concurrent
 Imports System.Collections.Immutable
@@ -6,6 +8,7 @@ Imports System.Reflection
 Imports System.Reflection.Metadata
 Imports System.Runtime.InteropServices
 Imports System.Threading
+Imports Microsoft.CodeAnalysis.PooledObjects
 Imports Microsoft.CodeAnalysis.VisualBasic.Symbols
 Imports Microsoft.CodeAnalysis.VisualBasic.Symbols.Retargeting
 
@@ -22,31 +25,31 @@ Namespace Microsoft.CodeAnalysis.VisualBasic.Symbols.Metadata.PE
         ''' Owning AssemblySymbol. This can be a PEAssemblySymbol or a SourceAssemblySymbol.
         ''' </summary>
         ''' <remarks></remarks>
-        Private ReadOnly m_AssemblySymbol As AssemblySymbol
-        Private ReadOnly m_Ordinal As Integer
+        Private ReadOnly _assemblySymbol As AssemblySymbol
+        Private ReadOnly _ordinal As Integer
 
         ''' <summary>
         ''' A Module object providing metadata.
         ''' </summary>
         ''' <remarks></remarks>
-        Private ReadOnly m_Module As PEModule
+        Private ReadOnly _module As PEModule
 
         ''' <summary>
         ''' Global namespace. 
         ''' </summary>
         ''' <remarks></remarks>
-        Private ReadOnly m_GlobalNamespace As PENamespaceSymbol
+        Private ReadOnly _globalNamespace As PENamespaceSymbol
 
         ''' <summary>
         ''' Cache the symbol for well-known type System.Type because we use it frequently
         ''' (for attributes).
         ''' </summary>
-        Private m_LazySystemTypeSymbol As NamedTypeSymbol
+        Private _lazySystemTypeSymbol As NamedTypeSymbol
 
         ''' <summary>
         ''' The same value as ConcurrentDictionary.DEFAULT_CAPACITY
         ''' </summary>
-        Private Const DefaultTypeMapCapacity As Integer = 31
+        Private Const s_defaultTypeMapCapacity As Integer = 31
 
         ''' <summary>
         ''' This is a map from TypeDef handle to the target <see cref="TypeSymbol"/>. 
@@ -54,7 +57,7 @@ Namespace Microsoft.CodeAnalysis.VisualBasic.Symbols.Metadata.PE
         ''' for metadata coming from this module. The map is lazily populated
         ''' as we load types from the module.
         ''' </summary>
-        Friend ReadOnly TypeHandleToTypeMap As New ConcurrentDictionary(Of TypeDefinitionHandle, TypeSymbol)(concurrencyLevel:=2, capacity:=DefaultTypeMapCapacity)
+        Friend ReadOnly TypeHandleToTypeMap As New ConcurrentDictionary(Of TypeDefinitionHandle, TypeSymbol)(concurrencyLevel:=2, capacity:=s_defaultTypeMapCapacity)
 
         ''' <summary>
         ''' This is a map from TypeRef row id to the target <see cref="TypeSymbol"/>. 
@@ -62,19 +65,19 @@ Namespace Microsoft.CodeAnalysis.VisualBasic.Symbols.Metadata.PE
         ''' for metadata coming from this module. The map is lazily populated
         ''' by <see cref="MetadataDecoder"/> as we resolve TypeRefs from the module.
         ''' </summary>
-        Friend ReadOnly TypeRefHandleToTypeMap As New ConcurrentDictionary(Of TypeReferenceHandle, TypeSymbol)(concurrencyLevel:=2, capacity:=DefaultTypeMapCapacity)
+        Friend ReadOnly TypeRefHandleToTypeMap As New ConcurrentDictionary(Of TypeReferenceHandle, TypeSymbol)(concurrencyLevel:=2, capacity:=s_defaultTypeMapCapacity)
 
         Friend ReadOnly MetadataLocation As ImmutableArray(Of MetadataLocation) =
                                 ImmutableArray.Create(Of MetadataLocation)(New MetadataLocation(Me))
 
         Friend ReadOnly ImportOptions As MetadataImportOptions
 
-        Private m_lazyCustomAttributes As ImmutableArray(Of VisualBasicAttributeData)
+        Private _lazyCustomAttributes As ImmutableArray(Of VisualBasicAttributeData)
 
-        Private m_lazyAssemblyAttributes As ImmutableArray(Of VisualBasicAttributeData)
+        Private _lazyAssemblyAttributes As ImmutableArray(Of VisualBasicAttributeData)
 
-        Private m_lazyTypeNames As ICollection(Of String)
-        Private m_lazyNamespaceNames As ICollection(Of String)
+        Private _lazyTypeNames As ICollection(Of String)
+        Private _lazyNamespaceNames As ICollection(Of String)
 
         Friend Sub New(assemblySymbol As PEAssemblySymbol, [module] As PEModule, importOptions As MetadataImportOptions, ordinal As Integer)
             Me.New(DirectCast(assemblySymbol, AssemblySymbol), [module], importOptions, ordinal)
@@ -94,61 +97,61 @@ Namespace Microsoft.CodeAnalysis.VisualBasic.Symbols.Metadata.PE
         Private Sub New(assemblySymbol As AssemblySymbol, [module] As PEModule, importOptions As MetadataImportOptions, ordinal As Integer)
             Debug.Assert(assemblySymbol IsNot Nothing)
             Debug.Assert([module] IsNot Nothing)
-            m_AssemblySymbol = assemblySymbol
-            m_Ordinal = ordinal
-            m_Module = [module]
-            m_GlobalNamespace = New PEGlobalNamespaceSymbol(Me)
+            _assemblySymbol = assemblySymbol
+            _ordinal = ordinal
+            _module = [module]
+            _globalNamespace = New PEGlobalNamespaceSymbol(Me)
             Me.ImportOptions = importOptions
         End Sub
 
         Friend Overrides ReadOnly Property Ordinal As Integer
             Get
-                Return m_Ordinal
+                Return _ordinal
             End Get
         End Property
 
         Friend Overrides ReadOnly Property Machine As System.Reflection.PortableExecutable.Machine
             Get
-                Return m_Module.Machine
+                Return _module.Machine
             End Get
         End Property
 
         Friend Overrides ReadOnly Property Bit32Required As Boolean
             Get
-                Return m_Module.Bit32Required
+                Return _module.Bit32Required
             End Get
         End Property
 
         Friend ReadOnly Property [Module] As PEModule
             Get
-                Return m_Module
+                Return _module
             End Get
         End Property
 
         Public Overrides ReadOnly Property ContainingSymbol As Symbol
             Get
-                Return m_AssemblySymbol
+                Return _assemblySymbol
             End Get
         End Property
 
         Public Overloads Overrides Function GetAttributes() As ImmutableArray(Of VisualBasicAttributeData)
-            If m_lazyCustomAttributes.IsDefault Then
+            If _lazyCustomAttributes.IsDefault Then
                 'TODO - Create a Module.Token to return token similar to Assembly.Token
-                Me.LoadCustomAttributes(Handle.ModuleDefinition, m_lazyCustomAttributes)
+                Me.LoadCustomAttributes(EntityHandle.ModuleDefinition, _lazyCustomAttributes)
             End If
-            Return m_lazyCustomAttributes
+            Return _lazyCustomAttributes
         End Function
 
         Friend Function GetAssemblyAttributes() As ImmutableArray(Of VisualBasicAttributeData)
-            If m_lazyAssemblyAttributes.IsDefault Then
+            If _lazyAssemblyAttributes.IsDefault Then
                 Dim moduleAssemblyAttributesBuilder As ArrayBuilder(Of VisualBasicAttributeData) = Nothing
 
                 Dim corlibName As String = ContainingAssembly.CorLibrary.Name
-                Dim assemblyMSCorLib As Handle = [Module].GetAssemblyRef(corlibName)
+                Dim assemblyMSCorLib As EntityHandle = [Module].GetAssemblyRef(corlibName)
 
                 If Not assemblyMSCorLib.IsNil Then
                     For Each qualifier In Cci.MetadataWriter.dummyAssemblyAttributeParentQualifier
-                        Dim typerefAssemblyAttributesGoHere As Handle =
+                        Dim typerefAssemblyAttributesGoHere As EntityHandle =
                             [Module].GetTypeRef(
                                 assemblyMSCorLib,
                                 Cci.MetadataWriter.dummyAssemblyAttributeParentNamespace,
@@ -168,20 +171,20 @@ Namespace Microsoft.CodeAnalysis.VisualBasic.Symbols.Metadata.PE
                 End If
 
                 ImmutableInterlocked.InterlockedCompareExchange(
-                    m_lazyAssemblyAttributes,
+                    _lazyAssemblyAttributes,
                     If((moduleAssemblyAttributesBuilder IsNot Nothing),
                        moduleAssemblyAttributesBuilder.ToImmutableAndFree(),
                        ImmutableArray(Of VisualBasicAttributeData).Empty),
                    Nothing)
             End If
-            Return m_lazyAssemblyAttributes
+            Return _lazyAssemblyAttributes
         End Function
 
-        Friend Function GetCustomAttributesForToken(token As Handle) As ImmutableArray(Of VisualBasicAttributeData)
+        Friend Function GetCustomAttributesForToken(token As EntityHandle) As ImmutableArray(Of VisualBasicAttributeData)
             Return GetCustomAttributesForToken(token, Nothing, filterOut1:=Nothing)
         End Function
 
-        Friend Function GetCustomAttributesForToken(token As Handle,
+        Friend Function GetCustomAttributesForToken(token As EntityHandle,
                                                     <Out()> ByRef filteredOutAttribute1 As CustomAttributeHandle,
                                                     filterOut1 As AttributeDescription,
                                                     <Out()> Optional ByRef filteredOutAttribute2 As CustomAttributeHandle = Nothing,
@@ -229,7 +232,7 @@ Namespace Microsoft.CodeAnalysis.VisualBasic.Symbols.Metadata.PE
             Return ImmutableArray(Of VisualBasicAttributeData).Empty
         End Function
 
-        Friend Sub LoadCustomAttributes(token As Handle, ByRef lazyCustomAttributes As ImmutableArray(Of VisualBasicAttributeData))
+        Friend Sub LoadCustomAttributes(token As EntityHandle, ByRef lazyCustomAttributes As ImmutableArray(Of VisualBasicAttributeData))
             Dim attributes As ImmutableArray(Of VisualBasicAttributeData) = GetCustomAttributesForToken(token)
 
             ImmutableInterlocked.InterlockedCompareExchange(Of VisualBasicAttributeData)(
@@ -240,13 +243,13 @@ Namespace Microsoft.CodeAnalysis.VisualBasic.Symbols.Metadata.PE
 
         Public Overrides ReadOnly Property Name As String
             Get
-                Return m_Module.Name
+                Return _module.Name
             End Get
         End Property
 
         Public Overrides ReadOnly Property GlobalNamespace As NamespaceSymbol
             Get
-                Return m_GlobalNamespace
+                Return _globalNamespace
             End Get
         End Property
 
@@ -258,14 +261,14 @@ Namespace Microsoft.CodeAnalysis.VisualBasic.Symbols.Metadata.PE
 
         Public Overrides ReadOnly Property ContainingAssembly As AssemblySymbol
             Get
-                Return m_AssemblySymbol
+                Return _assemblySymbol
             End Get
         End Property
 
         Friend Sub OnNewTypeDeclarationsLoaded(
             typesDict As Dictionary(Of String, ImmutableArray(Of PENamedTypeSymbol))
         )
-            Dim keepLookingForDeclaredCorTypes As Boolean = (m_Ordinal = 0 AndAlso m_AssemblySymbol.KeepLookingForDeclaredSpecialTypes)
+            Dim keepLookingForDeclaredCorTypes As Boolean = (_ordinal = 0 AndAlso _assemblySymbol.KeepLookingForDeclaredSpecialTypes)
 
             For Each types In typesDict.Values
                 For Each t In types
@@ -275,8 +278,8 @@ Namespace Microsoft.CodeAnalysis.VisualBasic.Symbols.Metadata.PE
 
                     ' Register newly loaded COR types
                     If (keepLookingForDeclaredCorTypes AndAlso t.SpecialType <> SpecialType.None) Then
-                        m_AssemblySymbol.RegisterDeclaredSpecialType(t)
-                        keepLookingForDeclaredCorTypes = m_AssemblySymbol.KeepLookingForDeclaredSpecialTypes
+                        _assemblySymbol.RegisterDeclaredSpecialType(t)
+                        keepLookingForDeclaredCorTypes = _assemblySymbol.KeepLookingForDeclaredSpecialTypes
                     End If
                 Next
             Next
@@ -284,24 +287,24 @@ Namespace Microsoft.CodeAnalysis.VisualBasic.Symbols.Metadata.PE
 
         Friend Overrides ReadOnly Property TypeNames As ICollection(Of String)
             Get
-                If m_lazyTypeNames Is Nothing Then
-                    Interlocked.CompareExchange(m_lazyTypeNames, m_Module.TypeNames.AsCaseInsensitiveCollection(), Nothing)
+                If _lazyTypeNames Is Nothing Then
+                    Interlocked.CompareExchange(_lazyTypeNames, _module.TypeNames.AsCaseInsensitiveCollection(), Nothing)
                 End If
-                Return m_lazyTypeNames
+                Return _lazyTypeNames
             End Get
         End Property
 
         Friend Overrides ReadOnly Property NamespaceNames As ICollection(Of String)
             Get
-                If m_lazyNamespaceNames Is Nothing Then
-                    Interlocked.CompareExchange(m_lazyNamespaceNames, m_Module.NamespaceNames.AsCaseInsensitiveCollection(), Nothing)
+                If _lazyNamespaceNames Is Nothing Then
+                    Interlocked.CompareExchange(_lazyNamespaceNames, _module.NamespaceNames.AsCaseInsensitiveCollection(), Nothing)
                 End If
-                Return m_lazyNamespaceNames
+                Return _lazyNamespaceNames
             End Get
         End Property
 
         Friend Overrides Function GetHash(algorithmId As AssemblyHashAlgorithm) As ImmutableArray(Of Byte)
-            Return m_Module.GetHash(algorithmId)
+            Return _module.GetHash(algorithmId)
         End Function
 
         Friend ReadOnly Property DocumentationProvider As DocumentationProvider
@@ -317,20 +320,20 @@ Namespace Microsoft.CodeAnalysis.VisualBasic.Symbols.Metadata.PE
 
         Friend ReadOnly Property SystemTypeSymbol As NamedTypeSymbol
             Get
-                If m_LazySystemTypeSymbol Is Nothing Then
-                    Interlocked.CompareExchange(m_LazySystemTypeSymbol, GetWellKnownType(WellKnownType.System_Type), Nothing)
-                    Debug.Assert(m_LazySystemTypeSymbol IsNot Nothing)
+                If _lazySystemTypeSymbol Is Nothing Then
+                    Interlocked.CompareExchange(_lazySystemTypeSymbol, GetWellKnownType(WellKnownType.System_Type), Nothing)
+                    Debug.Assert(_lazySystemTypeSymbol IsNot Nothing)
                 End If
 
-                Return m_LazySystemTypeSymbol
+                Return _lazySystemTypeSymbol
             End Get
         End Property
 
         Public Function GetEventRegistrationTokenType() As NamedTypeSymbol
-            Return GetWellKnownType(WellKnownType.System_Runtime_InteropServices_WindowsRuntime_EventRegistrationToken, False)
+            Return GetWellKnownType(WellKnownType.System_Runtime_InteropServices_WindowsRuntime_EventRegistrationToken)
         End Function
 
-        Private Function GetWellKnownType(type As WellKnownType, Optional careAboutAmbiguity As Boolean = True) As NamedTypeSymbol
+        Private Function GetWellKnownType(type As WellKnownType) As NamedTypeSymbol
             Dim emittedName As MetadataTypeName = MetadataTypeName.FromFullName(type.GetMetadataName(), useCLSCompliantNameArityEncoding:=True)
 
             ' First, check this module
@@ -354,10 +357,10 @@ Namespace Microsoft.CodeAnalysis.VisualBasic.Symbols.Metadata.PE
                         ' being returned.  Do we want to differentiate between no result and ambiguous
                         ' results?  There doesn't seem to be an existing error code for "duplicate well-
                         ' known type".
-                        If (careAboutAmbiguity) Then
+                        If referencedAssemblyResult IsNot currResult Then
                             referencedAssemblyResult = Nothing
+                            Exit For
                         End If
-                        Exit For
                     End If
                 End If
             Next
@@ -423,39 +426,63 @@ Namespace Microsoft.CodeAnalysis.VisualBasic.Symbols.Metadata.PE
         End Function
 
         ''' <summary>
-        ''' If this module forwards the given type to another assembly, return that assembly;
-        ''' otherwise, return Nothing.
+        ''' Returns a tuple of the assemblies this module forwards the given type to.
         ''' </summary>
         ''' <param name="fullName">Type to look up.</param>
         ''' <param name="ignoreCase">Pass true to look up fullName case-insensitively.  WARNING: more expensive.</param>
         ''' <param name="matchedName">Returns the actual casing of the matching name.</param>
-        ''' <returns>Assembly symbol or Nothing.</returns>
+        ''' <returns>A tuple of the forwarded to assemblies.</returns>
         ''' <remarks>
-        ''' The returned assembly may also forward the type.
+        ''' The returned assemblies may also forward the type.
         ''' </remarks>
-        Friend Function GetAssemblyForForwardedType(ByRef fullName As MetadataTypeName, ignoreCase As Boolean, <Out> ByRef matchedName As String) As AssemblySymbol
-            Dim assemblyRef As AssemblyReferenceHandle = Me.Module.GetAssemblyForForwardedType(fullName.FullName, ignoreCase, matchedName)
-            Try
-                Return If(assemblyRef.IsNil, Nothing, Me.GetReferencedAssemblySymbols()(Me.Module.GetAssemblyReferenceIndexOrThrow(assemblyRef)))
-            Catch mrEx As BadImageFormatException
-                Return Nothing
-            End Try
+        Friend Function GetAssembliesForForwardedType(ByRef fullName As MetadataTypeName, ignoreCase As Boolean, <Out> ByRef matchedName As String) As (FirstSymbol As AssemblySymbol, SecondSymbol As AssemblySymbol)
+            Dim indices = Me.Module.GetAssemblyRefsForForwardedType(fullName.FullName, ignoreCase, matchedName)
+
+            If indices.FirstIndex < 0 Then
+                Return (Nothing, Nothing)
+            End If
+
+            Dim firstSymbol = GetReferencedAssemblySymbol(indices.FirstIndex)
+
+            If indices.SecondIndex < 0 Then
+                Return (firstSymbol, Nothing)
+            End If
+
+            Dim secondSymbol = GetReferencedAssemblySymbol(indices.SecondIndex)
+            Return (firstSymbol, secondSymbol)
         End Function
 
         Friend Iterator Function GetForwardedTypes() As IEnumerable(Of NamedTypeSymbol)
-            For Each forwareder As KeyValuePair(Of String, AssemblyReferenceHandle) In Me.Module.GetForwardedTypes()
-                Dim assembly As AssemblySymbol
+            For Each forwarder As KeyValuePair(Of String, (FirstIndex As Integer, SecondIndex As Integer)) In Me.Module.GetForwardedTypes()
+                Dim name = MetadataTypeName.FromFullName(forwarder.Key)
 
-                Try
-                    assembly = Me.GetReferencedAssemblySymbols()(Me.Module.GetAssemblyReferenceIndexOrThrow(forwareder.Value))
-                Catch ex As BadImageFormatException
-                    Continue For
-                End Try
+                Debug.Assert(forwarder.Value.FirstIndex >= 0, "First index should never be negative")
+                Dim firstSymbol = GetReferencedAssemblySymbol(forwarder.Value.FirstIndex)
+                Debug.Assert(firstSymbol IsNot Nothing, "Invalid indexes (out of bound) are discarded during reading metadata in PEModule.EnsureForwardTypeToAssemblyMap()")
 
-                Dim name = MetadataTypeName.FromFullName(forwareder.Key)
-                Yield assembly.LookupTopLevelMetadataType(name, digThroughForwardedTypes:=True)
+                If forwarder.Value.SecondIndex >= 0 Then
+                    Dim secondSymbol = GetReferencedAssemblySymbol(forwarder.Value.SecondIndex)
+                    Debug.Assert(secondSymbol IsNot Nothing, "Invalid indexes (out of bound) are discarded during reading metadata in PEModule.EnsureForwardTypeToAssemblyMap()")
+
+                    Yield ContainingAssembly.CreateMultipleForwardingErrorTypeSymbol(name, Me, firstSymbol, secondSymbol)
+                Else
+                    Yield firstSymbol.LookupTopLevelMetadataType(name, digThroughForwardedTypes:=true)
+                End If
             Next
         End Function
 
+        Private Overloads Function GetReferencedAssemblySymbol(assemblyRef As AssemblyReferenceHandle) As AssemblySymbol
+            Dim referencedAssemblyIndex As Integer
+            Try
+                referencedAssemblyIndex = Me.Module.GetAssemblyReferenceIndexOrThrow(assemblyRef)
+            Catch ex As BadImageFormatException
+                Return Nothing
+            End Try
+            Return GetReferencedAssemblySymbol(referencedAssemblyIndex)
+        End Function
+
+        Public Overrides Function GetMetadata() As ModuleMetadata
+            Return _module.GetNonDisposableMetadata()
+        End Function
     End Class
 End Namespace

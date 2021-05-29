@@ -1,4 +1,6 @@
-﻿' Copyright (c) Microsoft.  All Rights Reserved.  Licensed under the Apache License, Version 2.0.  See License.txt in the project root for license information.
+﻿' Licensed to the .NET Foundation under one or more agreements.
+' The .NET Foundation licenses this file to you under the MIT license.
+' See the LICENSE file in the project root for more information.
 
 Imports System.Collections.Immutable
 Imports System.Reflection
@@ -11,14 +13,14 @@ Namespace Microsoft.CodeAnalysis.VisualBasic.Emit
         Implements Cci.IModuleReference
         Implements Cci.IFileReference
 
-        Private ReadOnly m_ModuleBeingBuilt As PEModuleBuilder
-        Private ReadOnly m_UnderlyingModule As ModuleSymbol
+        Private ReadOnly _moduleBeingBuilt As PEModuleBuilder
+        Private ReadOnly _underlyingModule As ModuleSymbol
 
         Friend Sub New(moduleBeingBuilt As PEModuleBuilder, underlyingModule As ModuleSymbol)
             Debug.Assert(moduleBeingBuilt IsNot Nothing)
             Debug.Assert(underlyingModule IsNot Nothing)
-            Me.m_ModuleBeingBuilt = moduleBeingBuilt
-            Me.m_UnderlyingModule = underlyingModule
+            Me._moduleBeingBuilt = moduleBeingBuilt
+            Me._underlyingModule = underlyingModule
         End Sub
 
         Private Sub IReferenceDispatch(visitor As Cci.MetadataVisitor) Implements Cci.IReference.Dispatch
@@ -27,7 +29,7 @@ Namespace Microsoft.CodeAnalysis.VisualBasic.Emit
 
         Private ReadOnly Property INamedEntityName As String Implements Cci.INamedEntity.Name
             Get
-                Return m_UnderlyingModule.Name
+                Return _underlyingModule.Name
             End Get
         End Property
 
@@ -39,25 +41,25 @@ Namespace Microsoft.CodeAnalysis.VisualBasic.Emit
 
         Private ReadOnly Property IFileReferenceFileName As String Implements Cci.IFileReference.FileName
             Get
-                Return m_UnderlyingModule.Name
+                Return _underlyingModule.Name
             End Get
         End Property
 
         Private Function IFileReferenceGetHashValue(algorithmId As AssemblyHashAlgorithm) As ImmutableArray(Of Byte) Implements Cci.IFileReference.GetHashValue
-            Return m_UnderlyingModule.GetHash(algorithmId)
+            Return _underlyingModule.GetHash(algorithmId)
         End Function
 
         Private Function IModuleReferenceGetContainingAssembly(context As EmitContext) As Cci.IAssemblyReference Implements Cci.IModuleReference.GetContainingAssembly
-            If m_ModuleBeingBuilt.OutputKind.IsNetModule() AndAlso
-                m_ModuleBeingBuilt.SourceModule.ContainingAssembly Is m_UnderlyingModule.ContainingAssembly Then
+            If _moduleBeingBuilt.OutputKind.IsNetModule() AndAlso
+                _moduleBeingBuilt.SourceModule.ContainingAssembly Is _underlyingModule.ContainingAssembly Then
                 Return Nothing
             End If
 
-            Return m_ModuleBeingBuilt.Translate(m_UnderlyingModule.ContainingAssembly, context.Diagnostics)
+            Return _moduleBeingBuilt.Translate(_underlyingModule.ContainingAssembly, context.Diagnostics)
         End Function
 
         Public Overrides Function ToString() As String
-            Return m_UnderlyingModule.ToString()
+            Return _underlyingModule.ToString()
         End Function
 
         Private Function IReferenceAttributes(context As EmitContext) As IEnumerable(Of Cci.ICustomAttribute) Implements Cci.IReference.GetAttributes
@@ -65,6 +67,10 @@ Namespace Microsoft.CodeAnalysis.VisualBasic.Emit
         End Function
 
         Private Function IReferenceAsDefinition(context As EmitContext) As Cci.IDefinition Implements Cci.IReference.AsDefinition
+            Return Nothing
+        End Function
+
+        Private Function IReferenceGetInternalSymbol() As CodeAnalysis.Symbols.ISymbolInternal Implements Cci.IReference.GetInternalSymbol
             Return Nothing
         End Function
     End Class

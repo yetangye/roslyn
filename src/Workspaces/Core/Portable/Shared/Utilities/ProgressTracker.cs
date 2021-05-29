@@ -1,46 +1,46 @@
-﻿// Copyright (c) Microsoft.  All Rights Reserved.  Licensed under the Apache License, Version 2.0.  See License.txt in the project root for license information.
+﻿// Licensed to the .NET Foundation under one or more agreements.
+// The .NET Foundation licenses this file to you under the MIT license.
+// See the LICENSE file in the project root for more information.
+
+#nullable disable
 
 using System;
 using System.Threading;
-using Microsoft.CodeAnalysis.Text;
 
 namespace Microsoft.CodeAnalysis.Shared.Utilities
 {
     /// <summary>
     /// Utility class that can be used to track the progress of an operation in a threadsafe manner.
     /// </summary>
-    internal class ProgressTracker
+    internal class ProgressTracker : IProgressTracker
     {
-        private int _completedItems = 0;
-        private int _totalItems = 0;
+        private string _description;
+        private int _completedItems;
+        private int _totalItems;
 
-        private readonly Action<int, int> _updateActionOpt;
+        private readonly Action<string, int, int> _updateActionOpt;
 
         public ProgressTracker()
             : this(null)
         {
         }
 
-        public ProgressTracker(Action<int, int> updateActionOpt)
-        {
-            _updateActionOpt = updateActionOpt;
-        }
+        public ProgressTracker(Action<string, int, int> updateActionOpt)
+            => _updateActionOpt = updateActionOpt;
 
-        public int CompletedItems
+        public string Description
         {
-            get
+            get => _description;
+            set
             {
-                return _completedItems;
+                _description = value;
+                Update();
             }
         }
 
-        public int TotalItems
-        {
-            get
-            {
-                return _totalItems;
-            }
-        }
+        public int CompletedItems => _completedItems;
+
+        public int TotalItems => _totalItems;
 
         public void AddItems(int count)
         {
@@ -54,12 +54,15 @@ namespace Microsoft.CodeAnalysis.Shared.Utilities
             Update();
         }
 
-        private void Update()
+        public void Clear()
         {
-            if (_updateActionOpt != null)
-            {
-                _updateActionOpt(_completedItems, _totalItems);
-            }
+            _totalItems = 0;
+            _completedItems = 0;
+            _description = null;
+            Update();
         }
+
+        private void Update()
+            => _updateActionOpt?.Invoke(_description, _completedItems, _totalItems);
     }
 }

@@ -1,12 +1,16 @@
-' Copyright (c) Microsoft.  All Rights Reserved.  Licensed under the Apache License, Version 2.0.  See License.txt in the project root for license information.
+﻿' Licensed to the .NET Foundation under one or more agreements.
+' The .NET Foundation licenses this file to you under the MIT license.
+' See the LICENSE file in the project root for more information.
+
+Imports System.Threading.Tasks
 
 Namespace Microsoft.CodeAnalysis.Editor.UnitTests.Simplification
     Public Class ModuleNameSimplifierTest
         Inherits AbstractSimplificationTests
 
-        <WorkItem(624131)>
+        <WorkItem(624131, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/624131")>
         <Fact(), Trait(Traits.Feature, Traits.Features.Simplification)>
-        Public Sub SimplifyModuleNameInNewStatement()
+        Public Async Function TestSimplifyModuleNameInNewStatement() As Task
             Dim input =
         <Workspace>
             <Project Language="Visual Basic" CommonReferences="true">
@@ -43,11 +47,11 @@ Module Program
 End Module
             </text>
 
-            Test(input, expected)
-        End Sub
+            Await TestAsync(input, expected)
+        End Function
 
         <Fact, Trait(Traits.Feature, Traits.Features.Simplification)>
-        Public Sub SimplifyModuleNameInNestedNamespaces()
+        Public Async Function TestSimplifyModuleNameInNestedNamespaces() As Task
             Dim input =
         <Workspace>
             <Project Language="Visual Basic" CommonReferences="true">
@@ -56,21 +60,21 @@ Namespace N
     Namespace M
         Module K
             Class C
-                Shared Sub Foo()
+                Shared Sub Goo()
                 End Sub
             End Class
         End Module
         Namespace L
             Module K
                 Class C
-                    Shared Sub Foo()
+                    Shared Sub Goo()
 
                     End Sub
                 End Class
             End Module
             Class C
-                Shared Sub Foo()
-                    {|SimplifyExtension:N.M.K.C.Foo|}()
+                Shared Sub Goo()
+                    {|SimplifyExtension:N.M.K.C.Goo|}()
                 End Sub
             End Class
         End Namespace
@@ -86,21 +90,21 @@ Namespace N
     Namespace M
         Module K
             Class C
-                Shared Sub Foo()
+                Shared Sub Goo()
                 End Sub
             End Class
         End Module
         Namespace L
             Module K
                 Class C
-                    Shared Sub Foo()
+                    Shared Sub Goo()
 
                     End Sub
                 End Class
             End Module
             Class C
-                Shared Sub Foo()
-                    M.C.Foo()
+                Shared Sub Goo()
+                    M.C.Goo()
                 End Sub
             End Class
         End Namespace
@@ -108,11 +112,11 @@ Namespace N
 End Namespace
             </text>
 
-            Test(input, expected)
-        End Sub
+            Await TestAsync(input, expected)
+        End Function
 
         <Fact, Trait(Traits.Feature, Traits.Features.Simplification)>
-        Public Sub SimplifyModuleNameInDelegateConstruct()
+        Public Async Function TestSimplifyModuleNameInDelegateConstruct() As Task
             Dim input =
         <Workspace>
             <Project Language="Visual Basic" CommonReferences="true">
@@ -121,16 +125,16 @@ Imports System
 Namespace N
     Module M
         Class C
-            Shared Sub Foo()
+            Shared Sub Goo()
 
-            End Sub
+            End Function
         End Class
     End Module
 End Namespace
 Module Program
     Delegate Sub myDel()
     Sub Main(args As String())
-        Dim m As myDel = AddressOf {|SimplifyExtension:N.M.C.Foo|}
+        Dim m As myDel = AddressOf {|SimplifyExtension:N.M.C.Goo|}
     End Sub
 End Module
                 </Document>
@@ -143,26 +147,26 @@ Imports System
 Namespace N
     Module M
         Class C
-            Shared Sub Foo()
+            Shared Sub Goo()
 
-            End Sub
+            End Function
         End Class
     End Module
 End Namespace
 Module Program
     Delegate Sub myDel()
     Sub Main(args As String())
-        Dim m As myDel = AddressOf N.C.Foo
+        Dim m As myDel = AddressOf N.C.Goo
     End Sub
 End Module
             </text>
 
-            Test(input, expected)
-        End Sub
+            Await TestAsync(input, expected)
+        End Function
 
-        <WorkItem(608198)>
+        <WorkItem(608198, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/608198")>
         <Fact, Trait(Traits.Feature, Traits.Features.Simplification)>
-        Public Sub DontSimplifyModuleNameInFieldInitializerAndConflictOfModuleNameAndField()
+        Public Async Function TestDontSimplifyModuleNameInFieldInitializerAndConflictOfModuleNameAndField() As Task
             Dim input =
         <Workspace>
             <Project Language="Visual Basic" CommonReferences="true">
@@ -181,12 +185,12 @@ Module X
 End Module
             </text>
 
-            Test(input, expected)
-        End Sub
+            Await TestAsync(input, expected)
+        End Function
 
-        <WorkItem(608198)>
+        <WorkItem(608198, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/608198")>
         <Fact, Trait(Traits.Feature, Traits.Features.Simplification)>
-        Public Sub DontSimplifyModuleNameInFieldInitializerAndConflictOfModuleNameAndField_2()
+        Public Async Function TestDontSimplifyModuleNameInFieldInitializerAndConflictOfModuleNameAndField_2() As Task
             Dim input =
         <Workspace>
             <Project Language="Visual Basic" CommonReferences="true">
@@ -205,8 +209,8 @@ Module X
 End Module
             </text>
 
-            Test(input, expected)
-        End Sub
+            Await TestAsync(input, expected)
+        End Function
 
     End Class
 End Namespace

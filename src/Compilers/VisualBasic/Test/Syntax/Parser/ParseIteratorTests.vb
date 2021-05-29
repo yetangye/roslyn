@@ -1,4 +1,6 @@
-﻿' Copyright (c) Microsoft.  All Rights Reserved.  Licensed under the Apache License, Version 2.0.  See License.txt in the project root for license information.
+﻿' Licensed to the .NET Foundation under one or more agreements.
+' The .NET Foundation licenses this file to you under the MIT license.
+' See the LICENSE file in the project root for more information.
 
 Imports Microsoft.CodeAnalysis.Test.Utilities
 Imports Microsoft.CodeAnalysis.VisualBasic
@@ -78,7 +80,7 @@ End Class]]>)
     End Sub
 
     <Fact>
-    Sub ParseYieldStatements()
+    Public Sub ParseYieldStatements()
         Dim tree = VisualBasicSyntaxTree.ParseText(<![CDATA[
 Module Program
 
@@ -224,7 +226,7 @@ End Module]]>.Value)
         Assert.Equal(1, yieldStatements.Count)
 
     End Sub
-    
+
     <Fact>
     Public Sub ParseIteratorLambdas()
         Dim tree = ParseAndVerify(<![CDATA[
@@ -369,9 +371,7 @@ End Class]]>.Value)
     <Fact>
     Public Sub ParseYieldInScriptingAndInteractive()
 
-        For Each mode In {SourceCodeKind.Script, SourceCodeKind.Interactive}
-
-            Dim tree = VisualBasicSyntaxTree.ParseText(<![CDATA[
+        Dim source = "
 Yield T                                     ' No
 Yield (T)                                   ' No
 Yield T + Yield (T)                         ' No, No
@@ -402,18 +402,17 @@ Iterator Function F()
     Yield T + Yield (T)                     ' Yes, No
     Dim i = Yield T + Yield (T)             ' No, No
     Return Yield T                          ' No
-End Function]]>.Value,
-                options:=VisualBasicParseOptions.Default.WithKind(mode))
+End Function"
 
-            Dim yieldStatements = tree.GetRoot().DescendantNodes.OfType(Of YieldStatementSyntax).ToArray()
+        Dim tree = VisualBasicSyntaxTree.ParseText(source, options:=TestOptions.Script)
 
-            Assert.Equal(6, yieldStatements.Count)
+        Dim yieldStatements = tree.GetRoot().DescendantNodes.OfType(Of YieldStatementSyntax).ToArray()
 
-            For Each yieldStatement In yieldStatements
-                Assert.True(IsInIteratorMethod(yieldStatement))
-            Next
+        Assert.Equal(6, yieldStatements.Count)
+
+        For Each yieldStatement In yieldStatements
+            Assert.True(IsInIteratorMethod(yieldStatement))
         Next
-
     End Sub
 
     Private Shared Function IsIteratorMethod(methodSyntax As MethodBlockBaseSyntax) As Boolean

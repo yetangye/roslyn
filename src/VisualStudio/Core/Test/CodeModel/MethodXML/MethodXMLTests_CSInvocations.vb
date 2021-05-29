@@ -1,12 +1,15 @@
-' Copyright (c) Microsoft.  All Rights Reserved.  Licensed under the Apache License, Version 2.0.  See License.txt in the project root for license information.
+﻿' Licensed to the .NET Foundation under one or more agreements.
+' The .NET Foundation licenses this file to you under the MIT license.
+' See the LICENSE file in the project root for more information.
 
+Imports Microsoft.CodeAnalysis.Test.Utilities
 Imports Roslyn.Test.Utilities
 
 Namespace Microsoft.VisualStudio.LanguageServices.UnitTests.CodeModel.MethodXML
     Partial Public Class MethodXMLTests
 
-        <ConditionalFact(GetType(x86)), Trait(Traits.Feature, Traits.Features.CodeModelMethodXml)>
-        Public Sub CSInvocations_InvocationWithThis()
+        <WpfFact, Trait(Traits.Feature, Traits.Features.CodeModelMethodXml)>
+        Public Sub TestCSInvocations_InvocationWithThis()
             Dim definition =
     <Workspace>
         <Project Language="C#" CommonReferences="true">
@@ -15,10 +18,10 @@ public class C
 {
     $$void M()
     {
-        this.Foo();
+        this.Goo();
     }
 
-    void Foo()
+    void Goo()
     {
     }
 }
@@ -36,7 +39,7 @@ public class C
                         <Expression>
                             <ThisReference/>
                         </Expression>
-                        <Name>Foo</Name>
+                        <Name>Goo</Name>
                     </NameRef>
                 </Expression>
             </MethodCall>
@@ -47,8 +50,8 @@ public class C
             Test(definition, expected)
         End Sub
 
-        <ConditionalFact(GetType(x86)), Trait(Traits.Feature, Traits.Features.CodeModelMethodXml)>
-        Public Sub CSInvocations_InvocationWithThisAndArgs()
+        <WpfFact, Trait(Traits.Feature, Traits.Features.CodeModelMethodXml)>
+        Public Sub TestCSInvocations_InvocationWithThisAndArgs()
             Dim definition =
     <Workspace>
         <Project Language="C#" CommonReferences="true">
@@ -57,10 +60,10 @@ public class C
 {
     $$void M()
     {
-        this.Foo(1, 2);
+        this.Goo(1, 2);
     }
 
-    void Foo(int arg1, int arg2)
+    void Goo(int arg1, int arg2)
     {
     }
 }
@@ -78,7 +81,7 @@ public class C
                         <Expression>
                             <ThisReference/>
                         </Expression>
-                        <Name>Foo</Name>
+                        <Name>Goo</Name>
                     </NameRef>
                 </Expression>
                 <Argument>
@@ -103,8 +106,8 @@ public class C
             Test(definition, expected)
         End Sub
 
-        <ConditionalFact(GetType(x86)), Trait(Traits.Feature, Traits.Features.CodeModelMethodXml)>
-        Public Sub CSInvocations_InvocationWithoutThis()
+        <WpfFact, Trait(Traits.Feature, Traits.Features.CodeModelMethodXml)>
+        Public Sub TestCSInvocations_InvocationWithoutThis()
             Dim definition =
     <Workspace>
         <Project Language="C#" CommonReferences="true">
@@ -113,10 +116,10 @@ public class C
 {
     $$void M()
     {
-        Foo();
+        Goo();
     }
 
-    void Foo()
+    void Goo()
     {
     }
 }
@@ -134,7 +137,7 @@ public class C
                         <Expression>
                             <ThisReference/>
                         </Expression>
-                        <Name>Foo</Name>
+                        <Name>Goo</Name>
                     </NameRef>
                 </Expression>
             </MethodCall>
@@ -145,8 +148,8 @@ public class C
             Test(definition, expected)
         End Sub
 
-        <ConditionalFact(GetType(x86)), Trait(Traits.Feature, Traits.Features.CodeModelMethodXml)>
-        Public Sub CSInvocations_WithArrayInitializer()
+        <WpfFact, Trait(Traits.Feature, Traits.Features.CodeModelMethodXml)>
+        Public Sub TestCSInvocations_WithArrayInitializer()
             Dim definition =
     <Workspace>
         <Project Language="C#" CommonReferences="true">
@@ -155,7 +158,7 @@ public class C
 {
     $$void M()
     {
-        this.list.AddRange(new object[] { "foo", "bar", "baz" });
+        this.list.AddRange(new object[] { "goo", "bar", "baz" });
     }
 
     System.Collections.ArrayList list;
@@ -200,7 +203,7 @@ public class C
                                     <Array>
                                         <Expression>
                                             <Literal>
-                                                <String>foo</String>
+                                                <String>goo</String>
                                             </Literal>
                                         </Expression>
                                         <Expression>
@@ -227,8 +230,8 @@ public class C
             Test(definition, expected)
         End Sub
 
-        <ConditionalFact(GetType(x86)), Trait(Traits.Feature, Traits.Features.CodeModelMethodXml)>
-        Public Sub CSInvocations_CastOfParenthesizedExpression()
+        <WpfFact, Trait(Traits.Feature, Traits.Features.CodeModelMethodXml)>
+        Public Sub TestCSInvocations_CastOfParenthesizedExpression()
             Dim definition =
 <Workspace>
     <Project Language="C#" CommonReferences="true">
@@ -255,9 +258,14 @@ public class C
                 <Type>System.String</Type>
                 <Argument>
                     <Expression>
-                        <Literal>
-                            <Char>.</Char>
-                        </Literal>
+                        <Cast>
+                            <Type>System.Char</Type>
+                            <Expression>
+                                <Literal>
+                                    <Number type="System.UInt16">46</Number>
+                                </Literal>
+                            </Expression>
+                        </Cast>
                     </Expression>
                 </Argument>
                 <Argument>

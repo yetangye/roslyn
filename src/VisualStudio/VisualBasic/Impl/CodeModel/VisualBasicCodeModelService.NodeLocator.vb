@@ -1,8 +1,11 @@
-' Copyright (c) Microsoft.  All Rights Reserved.  Licensed under the Apache License, Version 2.0.  See License.txt in the project root for license information.
+﻿' Licensed to the .NET Foundation under one or more agreements.
+' The .NET Foundation licenses this file to you under the MIT license.
+' See the LICENSE file in the project root for more information.
 
 Imports Microsoft.CodeAnalysis
 Imports Microsoft.CodeAnalysis.Editor.Shared.Utilities
 Imports Microsoft.CodeAnalysis.Editor.VisualBasic.Utilities
+Imports Microsoft.CodeAnalysis.Options
 Imports Microsoft.CodeAnalysis.Text
 Imports Microsoft.CodeAnalysis.VisualBasic
 Imports Microsoft.CodeAnalysis.VisualBasic.Extensions
@@ -13,15 +16,17 @@ Namespace Microsoft.VisualStudio.LanguageServices.VisualBasic.CodeModel
     Partial Friend Class VisualBasicCodeModelService
 
         Protected Overrides Function CreateNodeLocator() As AbstractNodeLocator
-            Return New NodeLocator(Me)
+            Return New NodeLocator()
         End Function
 
         Private Class NodeLocator
             Inherits AbstractNodeLocator
 
-            Public Sub New(codeModelService As VisualBasicCodeModelService)
-                MyBase.New(codeModelService)
-            End Sub
+            Protected Overrides ReadOnly Property LanguageName As String
+                Get
+                    Return LanguageNames.VisualBasic
+                End Get
+            End Property
 
             Protected Overrides ReadOnly Property DefaultPart As EnvDTE.vsCMPart
                 Get
@@ -29,22 +34,22 @@ Namespace Microsoft.VisualStudio.LanguageServices.VisualBasic.CodeModel
                 End Get
             End Property
 
-            Protected Overrides Function GetStartPoint(text As SourceText, node As SyntaxNode, part As EnvDTE.vsCMPart) As VirtualTreePoint?
+            Protected Overrides Function GetStartPoint(text As SourceText, options As OptionSet, node As SyntaxNode, part As EnvDTE.vsCMPart) As VirtualTreePoint?
                 Select Case node.Kind
                     Case SyntaxKind.ClassBlock,
                          SyntaxKind.InterfaceBlock,
                          SyntaxKind.ModuleBlock,
                          SyntaxKind.StructureBlock
-                        Return GetTypeBlockStartPoint(text, DirectCast(node, TypeBlockSyntax), part)
+                        Return GetTypeBlockStartPoint(text, options, DirectCast(node, TypeBlockSyntax), part)
                     Case SyntaxKind.EnumBlock
-                        Return GetEnumBlockStartPoint(text, DirectCast(node, EnumBlockSyntax), part)
+                        Return GetEnumBlockStartPoint(text, options, DirectCast(node, EnumBlockSyntax), part)
                     Case SyntaxKind.ClassStatement,
                          SyntaxKind.InterfaceStatement,
                          SyntaxKind.ModuleStatement,
                          SyntaxKind.StructureStatement
-                        Return GetTypeBlockStartPoint(text, DirectCast(node.Parent, TypeBlockSyntax), part)
+                        Return GetTypeBlockStartPoint(text, options, DirectCast(node.Parent, TypeBlockSyntax), part)
                     Case SyntaxKind.EnumStatement
-                        Return GetEnumBlockStartPoint(text, DirectCast(node.Parent, EnumBlockSyntax), part)
+                        Return GetEnumBlockStartPoint(text, options, DirectCast(node.Parent, EnumBlockSyntax), part)
                     Case SyntaxKind.ConstructorBlock,
                          SyntaxKind.FunctionBlock,
                          SyntaxKind.OperatorBlock,
@@ -54,7 +59,7 @@ Namespace Microsoft.VisualStudio.LanguageServices.VisualBasic.CodeModel
                          SyntaxKind.AddHandlerAccessorBlock,
                          SyntaxKind.RemoveHandlerAccessorBlock,
                          SyntaxKind.RaiseEventAccessorBlock
-                        Return GetMethodBlockStartPoint(text, DirectCast(node, MethodBlockBaseSyntax), part)
+                        Return GetMethodBlockStartPoint(text, options, DirectCast(node, MethodBlockBaseSyntax), part)
                     Case SyntaxKind.SubNewStatement,
                          SyntaxKind.OperatorStatement,
                          SyntaxKind.GetAccessorStatement,
@@ -62,22 +67,25 @@ Namespace Microsoft.VisualStudio.LanguageServices.VisualBasic.CodeModel
                          SyntaxKind.AddHandlerStatement,
                          SyntaxKind.RemoveHandlerStatement,
                          SyntaxKind.RaiseEventStatement
-                        Return GetMethodBlockStartPoint(text, DirectCast(node.Parent, MethodBlockBaseSyntax), part)
+                        Return GetMethodBlockStartPoint(text, options, DirectCast(node.Parent, MethodBlockBaseSyntax), part)
                     Case SyntaxKind.FunctionStatement,
                          SyntaxKind.SubStatement
                         If TypeOf node.Parent Is MethodBlockBaseSyntax Then
-                            Return GetMethodBlockStartPoint(text, DirectCast(node.Parent, MethodBlockBaseSyntax), part)
+                            Return GetMethodBlockStartPoint(text, options, DirectCast(node.Parent, MethodBlockBaseSyntax), part)
                         Else
                             Return GetMethodStatementStartPoint(text, DirectCast(node, MethodStatementSyntax), part)
                         End If
 
+                    Case SyntaxKind.DeclareFunctionStatement,
+                         SyntaxKind.DeclareSubStatement
+                        Return GetDeclareStatementStartPoint(text, DirectCast(node, DeclareStatementSyntax), part)
                     Case SyntaxKind.PropertyBlock
                         Return GetPropertyBlockStartPoint(text, DirectCast(node, PropertyBlockSyntax), part)
                     Case SyntaxKind.PropertyStatement
                         Return GetPropertyStatementStartPoint(text, DirectCast(node, PropertyStatementSyntax), part)
 
                     Case SyntaxKind.EventBlock
-                        Return GetEventBlockStartPoint(text, DirectCast(node, EventBlockSyntax), part)
+                        Return GetEventBlockStartPoint(text, options, DirectCast(node, EventBlockSyntax), part)
                     Case SyntaxKind.EventStatement
                         Return GetEventStatementStartPoint(text, DirectCast(node, EventStatementSyntax), part)
 
@@ -86,9 +94,9 @@ Namespace Microsoft.VisualStudio.LanguageServices.VisualBasic.CodeModel
                         Return GetDelegateStatementStartPoint(text, DirectCast(node, DelegateStatementSyntax), part)
 
                     Case SyntaxKind.NamespaceBlock
-                        Return GetNamespaceBlockStartPoint(text, DirectCast(node, NamespaceBlockSyntax), part)
+                        Return GetNamespaceBlockStartPoint(text, options, DirectCast(node, NamespaceBlockSyntax), part)
                     Case SyntaxKind.NamespaceStatement
-                        Return GetNamespaceBlockStartPoint(text, DirectCast(node.Parent, NamespaceBlockSyntax), part)
+                        Return GetNamespaceBlockStartPoint(text, options, DirectCast(node.Parent, NamespaceBlockSyntax), part)
                     Case SyntaxKind.ModifiedIdentifier
                         Return GetVariableStartPoint(text, DirectCast(node, ModifiedIdentifierSyntax), part)
                     Case SyntaxKind.EnumMemberDeclaration
@@ -116,7 +124,7 @@ Namespace Microsoft.VisualStudio.LanguageServices.VisualBasic.CodeModel
                 End Select
             End Function
 
-            Protected Overrides Function GetEndPoint(text As SourceText, node As SyntaxNode, part As EnvDTE.vsCMPart) As VirtualTreePoint?
+            Protected Overrides Function GetEndPoint(text As SourceText, options As OptionSet, node As SyntaxNode, part As EnvDTE.vsCMPart) As VirtualTreePoint?
                 Select Case node.Kind
                     Case SyntaxKind.ClassBlock,
                          SyntaxKind.InterfaceBlock,
@@ -158,6 +166,9 @@ Namespace Microsoft.VisualStudio.LanguageServices.VisualBasic.CodeModel
                             Return GetMethodStatementEndPoint(text, DirectCast(node, MethodStatementSyntax), part)
                         End If
 
+                    Case SyntaxKind.DeclareFunctionStatement,
+                         SyntaxKind.DeclareSubStatement
+                        Return GetDeclareStatementEndPoint(text, DirectCast(node, DeclareStatementSyntax), part)
                     Case SyntaxKind.PropertyBlock
                         Return GetPropertyBlockEndPoint(text, DirectCast(node, PropertyBlockSyntax), part)
                     Case SyntaxKind.PropertyStatement
@@ -285,7 +296,7 @@ Namespace Microsoft.VisualStudio.LanguageServices.VisualBasic.CodeModel
                 End If
             End Function
 
-            Private Function GetTypeBlockStartPoint(text As SourceText, typeBlock As TypeBlockSyntax, part As EnvDTE.vsCMPart) As VirtualTreePoint?
+            Private Function GetTypeBlockStartPoint(text As SourceText, options As OptionSet, typeBlock As TypeBlockSyntax, part As EnvDTE.vsCMPart) As VirtualTreePoint?
                 Dim startPosition As Integer
 
                 Select Case part
@@ -330,12 +341,12 @@ Namespace Microsoft.VisualStudio.LanguageServices.VisualBasic.CodeModel
                         If nextStatementLine IsNot Nothing AndAlso nextStatementLine.Value.LineNumber = statementLine.LineNumber Then
                             startPosition = statement.Span.End
                         Else
-                            ' Otherwise, use the beginninng of the next line.
+                            ' Otherwise, use the beginning of the next line.
                             startPosition = text.Lines(statementLine.LineNumber + 1).Start
                         End If
 
                         If part = EnvDTE.vsCMPart.vsCMPartNavigate Then
-                            Return NavigationPointHelpers.GetNavigationPoint(text, GetTabSize(text), typeBlock.BlockStatement, typeBlock.EndBlockStatement, statementLine.LineNumber + 1)
+                            Return NavigationPointHelpers.GetNavigationPoint(text, GetTabSize(options), typeBlock.BlockStatement, statementLine.LineNumber + 1)
                         End If
 
                     Case Else
@@ -371,7 +382,7 @@ Namespace Microsoft.VisualStudio.LanguageServices.VisualBasic.CodeModel
                 Return New VirtualTreePoint(typeBlock.SyntaxTree, text, startPosition)
             End Function
 
-            Private Function GetEnumBlockStartPoint(text As SourceText, enumBlock As EnumBlockSyntax, part As EnvDTE.vsCMPart) As VirtualTreePoint?
+            Private Function GetEnumBlockStartPoint(text As SourceText, options As OptionSet, enumBlock As EnumBlockSyntax, part As EnvDTE.vsCMPart) As VirtualTreePoint?
                 Dim startPosition As Integer
 
                 Select Case part
@@ -401,12 +412,12 @@ Namespace Microsoft.VisualStudio.LanguageServices.VisualBasic.CodeModel
                         If nextStatementLine IsNot Nothing AndAlso nextStatementLine.Value.LineNumber = statementLine.LineNumber Then
                             startPosition = statement.Span.End
                         Else
-                            ' Otherwise, use the beginninng of the next line.
+                            ' Otherwise, use the beginning of the next line.
                             startPosition = text.Lines(statementLine.LineNumber + 1).Start
                         End If
 
                         If part = EnvDTE.vsCMPart.vsCMPartNavigate Then
-                            Return NavigationPointHelpers.GetNavigationPoint(text, GetTabSize(text), enumBlock.EnumStatement, enumBlock.EndEnumStatement, statementLine.LineNumber + 1)
+                            Return NavigationPointHelpers.GetNavigationPoint(text, GetTabSize(options), enumBlock.EnumStatement, statementLine.LineNumber + 1)
                         End If
 
                     Case Else
@@ -442,7 +453,7 @@ Namespace Microsoft.VisualStudio.LanguageServices.VisualBasic.CodeModel
                 Return New VirtualTreePoint(enumBlock.SyntaxTree, text, startPosition)
             End Function
 
-            Private Function GetMethodBlockStartPoint(text As SourceText, methodBlock As MethodBlockBaseSyntax, part As EnvDTE.vsCMPart) As VirtualTreePoint?
+            Private Function GetMethodBlockStartPoint(text As SourceText, options As OptionSet, methodBlock As MethodBlockBaseSyntax, part As EnvDTE.vsCMPart) As VirtualTreePoint?
                 Dim startPosition As Integer
 
                 Select Case part
@@ -455,6 +466,25 @@ Namespace Microsoft.VisualStudio.LanguageServices.VisualBasic.CodeModel
                                 startPosition = DirectCast(methodBlock.BlockStatement, MethodStatementSyntax).Identifier.SpanStart
                             Case SyntaxKind.OperatorStatement
                                 startPosition = DirectCast(methodBlock.BlockStatement, OperatorStatementSyntax).OperatorToken.SpanStart
+                            Case SyntaxKind.GetAccessorStatement,
+                                 SyntaxKind.SetAccessorStatement
+                                ' For properties accessors, use the name of property block
+                                Dim propertyBlock = methodBlock.FirstAncestorOrSelf(Of PropertyBlockSyntax)()
+                                If propertyBlock Is Nothing Then
+                                    Throw Exceptions.ThrowEFail()
+                                End If
+
+                                Return GetPropertyBlockStartPoint(text, propertyBlock, part)
+                            Case SyntaxKind.AddHandlerAccessorStatement,
+                                 SyntaxKind.RemoveHandlerAccessorStatement,
+                                 SyntaxKind.RaiseEventAccessorStatement
+                                ' For event accessors, use the name of event block
+                                Dim eventBlock = methodBlock.FirstAncestorOrSelf(Of EventBlockSyntax)()
+                                If eventBlock Is Nothing Then
+                                    Throw Exceptions.ThrowEFail()
+                                End If
+
+                                Return GetEventBlockStartPoint(text, options, eventBlock, part)
                             Case Else
                                 Throw Exceptions.ThrowEFail()
                         End Select
@@ -468,7 +498,7 @@ Namespace Microsoft.VisualStudio.LanguageServices.VisualBasic.CodeModel
                          EnvDTE.vsCMPart.vsCMPartWhole
                         startPosition = NavigationPointHelpers.GetHeaderStartPosition(methodBlock)
                     Case EnvDTE.vsCMPart.vsCMPartNavigate
-                        Return NavigationPointHelpers.GetNavigationPoint(text, GetTabSize(text), methodBlock)
+                        Return NavigationPointHelpers.GetNavigationPoint(text, GetTabSize(options), methodBlock)
                     Case EnvDTE.vsCMPart.vsCMPartBody,
                          EnvDTE.vsCMPart.vsCMPartBodyWithDelimiter
 
@@ -480,6 +510,71 @@ Namespace Microsoft.VisualStudio.LanguageServices.VisualBasic.CodeModel
                 End Select
 
                 Return New VirtualTreePoint(methodBlock.SyntaxTree, text, startPosition)
+            End Function
+
+            Private Function GetDeclareStatementStartPoint(text As SourceText, declareStatement As DeclareStatementSyntax, part As EnvDTE.vsCMPart) As VirtualTreePoint?
+                Dim startPosition As Integer
+
+                Select Case part
+                    Case EnvDTE.vsCMPart.vsCMPartName
+                        startPosition = declareStatement.Identifier.SpanStart
+
+                    Case EnvDTE.vsCMPart.vsCMPartAttributes,
+                         EnvDTE.vsCMPart.vsCMPartAttributesWithDelimiter
+
+                        Return GetAttributesStartPoint(text, declareStatement.AttributeLists, part)
+
+                    Case EnvDTE.vsCMPart.vsCMPartHeader,
+                         EnvDTE.vsCMPart.vsCMPartWhole,
+                         EnvDTE.vsCMPart.vsCMPartNavigate,
+                         EnvDTE.vsCMPart.vsCMPartBody,
+                         EnvDTE.vsCMPart.vsCMPartBodyWithDelimiter
+
+                        If declareStatement.AttributeLists.Count > 0 Then
+                            startPosition = declareStatement.AttributeLists.Last().GetLastToken().GetNextToken().SpanStart
+                        Else
+                            startPosition = declareStatement.SpanStart
+                        End If
+
+                    Case EnvDTE.vsCMPart.vsCMPartHeaderWithAttributes,
+                         EnvDTE.vsCMPart.vsCMPartWholeWithAttributes
+
+                        startPosition = declareStatement.SpanStart
+
+                    Case Else
+                        Throw Exceptions.ThrowEFail()
+                End Select
+
+                Return New VirtualTreePoint(declareStatement.SyntaxTree, text, startPosition)
+            End Function
+
+            Private Function GetDeclareStatementEndPoint(text As SourceText, declareStatement As DeclareStatementSyntax, part As EnvDTE.vsCMPart) As VirtualTreePoint?
+                Dim endPosition As Integer
+
+                Select Case part
+                    Case EnvDTE.vsCMPart.vsCMPartName
+                        endPosition = declareStatement.Identifier.Span.End
+
+                    Case EnvDTE.vsCMPart.vsCMPartAttributes,
+                         EnvDTE.vsCMPart.vsCMPartAttributesWithDelimiter
+
+                        Return GetAttributesEndPoint(text, declareStatement.AttributeLists, part)
+
+                    Case EnvDTE.vsCMPart.vsCMPartHeaderWithAttributes,
+                         EnvDTE.vsCMPart.vsCMPartWholeWithAttributes,
+                         EnvDTE.vsCMPart.vsCMPartHeader,
+                         EnvDTE.vsCMPart.vsCMPartWhole,
+                         EnvDTE.vsCMPart.vsCMPartNavigate,
+                         EnvDTE.vsCMPart.vsCMPartBody,
+                         EnvDTE.vsCMPart.vsCMPartBodyWithDelimiter
+
+                        endPosition = declareStatement.Span.End
+
+                    Case Else
+                        Throw Exceptions.ThrowEFail()
+                End Select
+
+                Return New VirtualTreePoint(declareStatement.SyntaxTree, text, endPosition)
             End Function
 
             Private Function GetMethodStatementStartPoint(text As SourceText, methodStatement As MethodStatementSyntax, part As EnvDTE.vsCMPart) As VirtualTreePoint?
@@ -531,6 +626,25 @@ Namespace Microsoft.VisualStudio.LanguageServices.VisualBasic.CodeModel
                                 startPosition = DirectCast(methodBlock.BlockStatement, MethodStatementSyntax).Identifier.Span.End
                             Case SyntaxKind.OperatorStatement
                                 startPosition = DirectCast(methodBlock.BlockStatement, OperatorStatementSyntax).OperatorToken.Span.End
+                            Case SyntaxKind.GetAccessorStatement,
+                                 SyntaxKind.SetAccessorStatement
+                                ' For properties accessors, use the name of property block
+                                Dim propertyBlock = methodBlock.FirstAncestorOrSelf(Of PropertyBlockSyntax)()
+                                If propertyBlock Is Nothing Then
+                                    Throw Exceptions.ThrowEFail()
+                                End If
+
+                                Return GetPropertyBlockEndPoint(text, propertyBlock, part)
+                            Case SyntaxKind.AddHandlerAccessorStatement,
+                                 SyntaxKind.RemoveHandlerAccessorStatement,
+                                 SyntaxKind.RaiseEventAccessorStatement
+                                ' For event accessors, use the name of event block
+                                Dim eventBlock = methodBlock.FirstAncestorOrSelf(Of EventBlockSyntax)()
+                                If eventBlock Is Nothing Then
+                                    Throw Exceptions.ThrowEFail()
+                                End If
+
+                                Return GetEventBlockEndPoint(text, eventBlock, part)
                             Case Else
                                 Throw Exceptions.ThrowEFail()
                         End Select
@@ -667,7 +781,7 @@ Namespace Microsoft.VisualStudio.LanguageServices.VisualBasic.CodeModel
                 Return New VirtualTreePoint(propertyStatement.SyntaxTree, text, startPosition)
             End Function
 
-            Private Function GetEventBlockStartPoint(text As SourceText, eventBlock As EventBlockSyntax, part As EnvDTE.vsCMPart) As VirtualTreePoint?
+            Private Function GetEventBlockStartPoint(text As SourceText, options As OptionSet, eventBlock As EventBlockSyntax, part As EnvDTE.vsCMPart) As VirtualTreePoint?
                 Dim startPosition As Integer
 
                 Select Case part
@@ -692,7 +806,7 @@ Namespace Microsoft.VisualStudio.LanguageServices.VisualBasic.CodeModel
 
                     Case EnvDTE.vsCMPart.vsCMPartNavigate
 
-                        Return NavigationPointHelpers.GetNavigationPoint(text, GetTabSize(text), eventBlock)
+                        Return NavigationPointHelpers.GetNavigationPoint(text, GetTabSize(options), eventBlock)
 
                     Case EnvDTE.vsCMPart.vsCMPartBody,
                          EnvDTE.vsCMPart.vsCMPartBodyWithDelimiter
@@ -861,10 +975,10 @@ Namespace Microsoft.VisualStudio.LanguageServices.VisualBasic.CodeModel
 
                 Return statement _
                     .GetTrailingTrivia() _
-                    .FirstOrNullable(Function(t) t.Kind = SyntaxKind.ColonTrivia)
+                    .FirstOrNull(Function(t) t.Kind = SyntaxKind.ColonTrivia)
             End Function
 
-            Private Function GetNamespaceBlockStartPoint(text As SourceText, namespaceBlock As NamespaceBlockSyntax, part As EnvDTE.vsCMPart) As VirtualTreePoint?
+            Private Function GetNamespaceBlockStartPoint(text As SourceText, options As OptionSet, namespaceBlock As NamespaceBlockSyntax, part As EnvDTE.vsCMPart) As VirtualTreePoint?
                 Dim startPosition As Integer
 
                 Select Case part
@@ -893,7 +1007,7 @@ Namespace Microsoft.VisualStudio.LanguageServices.VisualBasic.CodeModel
                             lineNumber = text.Lines.IndexOf(colonTrivia.Value.SpanStart)
                         End If
 
-                        Return NavigationPointHelpers.GetNavigationPoint(text, GetTabSize(text), namespaceBlock.NamespaceStatement, namespaceBlock.EndNamespaceStatement, lineNumber)
+                        Return NavigationPointHelpers.GetNavigationPoint(text, GetTabSize(options), namespaceBlock.NamespaceStatement, lineNumber)
 
                     Case EnvDTE.vsCMPart.vsCMPartBody,
                          EnvDTE.vsCMPart.vsCMPartBodyWithDelimiter

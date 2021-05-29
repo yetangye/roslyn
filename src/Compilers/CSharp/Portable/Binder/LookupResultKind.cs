@@ -1,9 +1,14 @@
-﻿// Copyright (c) Microsoft.  All Rights Reserved.  Licensed under the Apache License, Version 2.0.  See License.txt in the project root for license information.
+﻿// Licensed to the .NET Foundation under one or more agreements.
+// The .NET Foundation licenses this file to you under the MIT license.
+// See the LICENSE file in the project root for more information.
+
+#nullable disable
 
 using System.Diagnostics;
 using Microsoft.CodeAnalysis.CSharp.Symbols;
 using Microsoft.CodeAnalysis.CSharp.Syntax;
 using Microsoft.CodeAnalysis.Text;
+using Roslyn.Utilities;
 
 namespace Microsoft.CodeAnalysis.CSharp
 {
@@ -21,7 +26,7 @@ namespace Microsoft.CodeAnalysis.CSharp
     /// detected at lookup time (e.g., NotAVariable), so only occur in bound nodes.
     /// </summary>
     /// <remarks>
-    /// This enumeration is parallel to and almost the same as as the CandidateReason enumeration.
+    /// This enumeration is parallel to and almost the same as the CandidateReason enumeration.
     /// Changes to one should usually result in changes to the other.
     /// 
     /// There are two enumerations because:
@@ -40,7 +45,7 @@ namespace Microsoft.CodeAnalysis.CSharp
         WrongArity,
         NotCreatable,      // E.g., new of an interface or static class
         Inaccessible,
-        NotReferencable,   // E.g., get_Foo binding to an accessor.
+        NotReferencable,   // E.g., get_Goo binding to an accessor.
         NotAValue,
         NotAVariable,      // used for several slightly different places, e.g. LHS of =, out/ref parameters, etc.
         NotInvocable,
@@ -51,7 +56,7 @@ namespace Microsoft.CodeAnalysis.CSharp
         // Note: within LookupResult, LookupResultKind.Ambiguous is currently not used (in C#). Instead
         // ambiguous results are determined later by examining multiple viable results to determine if
         // they are ambiguous or overloaded. Thus, LookupResultKind.Ambiguous does not occur in a LookupResult,
-        // but can occur withing a BoundBadExpression.
+        // but can occur within a BoundBadExpression.
         Ambiguous,
 
         // Indicates a set of symbols, and they are totally fine.
@@ -90,8 +95,7 @@ namespace Microsoft.CodeAnalysis.CSharp
                     return CandidateReason.None;
 
                 default:
-                    Debug.Assert(false, "Unknown or unexpected LookupResultKind.");
-                    return CandidateReason.NotReferencable;  // most generic one.
+                    throw ExceptionUtilities.UnexpectedValue(resultKind);
             }
         }
 

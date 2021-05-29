@@ -1,4 +1,6 @@
-﻿' Copyright (c) Microsoft.  All Rights Reserved.  Licensed under the Apache License, Version 2.0.  See License.txt in the project root for license information.
+﻿' Licensed to the .NET Foundation under one or more agreements.
+' The .NET Foundation licenses this file to you under the MIT license.
+' See the LICENSE file in the project root for more information.
 
 Imports System.Collections.Immutable
 Imports System.Globalization
@@ -100,7 +102,7 @@ Namespace Microsoft.CodeAnalysis.VisualBasic.UnitTests
         Private Sub CheckDeclaringSyntax(Of TNode As VisualBasicSyntaxNode)(comp As VisualBasicCompilation, tree As SyntaxTree, name As String, kind As SymbolKind)
             Dim model = comp.GetSemanticModel(tree)
             Dim code As String = tree.GetText().ToString()
-            Dim position As Integer = code.IndexOf(name)
+            Dim position As Integer = code.IndexOf(name, StringComparison.Ordinal)
             Dim token = tree.GetCompilationUnitRoot().FindToken(position)
             Dim node = token.Parent.FirstAncestorOrSelf(Of TNode)()
             Dim sym As Symbol = model.GetDeclaredSymbolFromSyntaxNode(node)
@@ -114,7 +116,7 @@ Namespace Microsoft.CodeAnalysis.VisualBasic.UnitTests
         Private Sub CheckDeclaringSyntaxIsNoDeclaration(Of TNode As VisualBasicSyntaxNode)(comp As VisualBasicCompilation, tree As SyntaxTree, name As String)
             Dim model = comp.GetSemanticModel(tree)
             Dim code As String = tree.GetText().ToString()
-            Dim position As Integer = code.IndexOf(name)
+            Dim position As Integer = code.IndexOf(name, StringComparison.Ordinal)
             Dim token = tree.GetCompilationUnitRoot().FindToken(position)
             Dim node = token.Parent.FirstAncestorOrSelf(Of TNode)()
             Dim sym As Symbol = model.GetDeclaredSymbolFromSyntaxNode(node)
@@ -125,7 +127,7 @@ Namespace Microsoft.CodeAnalysis.VisualBasic.UnitTests
         Private Sub CheckLambdaDeclaringSyntax(Of TNode As ExpressionSyntax)(comp As VisualBasicCompilation, tree As SyntaxTree, textToSearchFor As String)
             Dim model = comp.GetSemanticModel(tree)
             Dim code As String = tree.GetText().ToString()
-            Dim position As Integer = code.IndexOf(textToSearchFor)
+            Dim position As Integer = code.IndexOf(textToSearchFor, StringComparison.Ordinal)
             Dim node = tree.GetCompilationUnitRoot().FindToken(position).Parent.FirstAncestorOrSelf(Of TNode)()
             Dim sym As MethodSymbol = TryCast(model.GetSymbolInfo(node).Symbol, MethodSymbol)
             Assert.NotNull(sym)
@@ -140,7 +142,7 @@ Namespace Microsoft.CodeAnalysis.VisualBasic.UnitTests
 
         <Fact>
         Public Sub SourceNamedTypeDeclaringSyntax()
-            Dim comp = CompilationUtils.CreateCompilationWithMscorlib(
+            Dim comp = CompilationUtils.CreateCompilationWithMscorlib40(
     <compilation name="SourceNamedTypeDeclaringSyntax">
         <file name="a.vb">
 Namespace N1
@@ -188,7 +190,7 @@ End Namespace
 
         <Fact>
         Public Sub NonSourceTypeDeclaringSyntax()
-            Dim comp = CompilationUtils.CreateCompilationWithMscorlib(
+            Dim comp = CompilationUtils.CreateCompilationWithMscorlib40(
     <compilation name="NonSourceTypeDeclaringSyntax">
         <file name="a.vb">
 Namespace N1
@@ -214,7 +216,7 @@ End Namespace    </file>
 
         <Fact>
         Public Sub AnonTypeDeclaringSyntax()
-            Dim comp = CompilationUtils.CreateCompilationWithMscorlib(
+            Dim comp = CompilationUtils.CreateCompilationWithMscorlib40(
     <compilation name="AnonTypeDeclaringSyntax">
         <file name="a.vb">
 Public Class C1
@@ -229,7 +231,7 @@ End Class
             Dim text = tree.GetText().ToString()
             Dim model = comp.GetSemanticModel(tree)
             Dim globalNS = comp.GlobalNamespace
-            Dim posA1 As Integer = text.IndexOf("a1")
+            Dim posA1 As Integer = text.IndexOf("a1", StringComparison.Ordinal)
             Dim declaratorA1 = tree.GetCompilationUnitRoot().FindToken(posA1).Parent.FirstAncestorOrSelf(Of VariableDeclaratorSyntax)()
             Dim localA1 = DirectCast(model.GetDeclaredSymbol(declaratorA1.Names(0)), LocalSymbol)
             Dim localA1Type = localA1.Type
@@ -249,7 +251,7 @@ End Class
         <WorkItem(15925, "DevDiv_Projects/Roslyn")>
         <Fact()>
         Public Sub AnonTypeDeclaringSyntaxStaticLocal()
-            Dim comp = CompilationUtils.CreateCompilationWithMscorlib(
+            Dim comp = CompilationUtils.CreateCompilationWithMscorlib40(
     <compilation name="AnonTypeDeclaringSyntax">
         <file name="a.vb">
 Public Class C1
@@ -264,7 +266,7 @@ End Class
             Dim text = tree.GetText().ToString()
             Dim model = comp.GetSemanticModel(tree)
             Dim globalNS = comp.GlobalNamespace
-            Dim posA1 As Integer = text.IndexOf("a1")
+            Dim posA1 As Integer = text.IndexOf("a1", StringComparison.Ordinal)
             Dim declaratorA1 = tree.GetCompilationUnitRoot().FindToken(posA1).Parent.FirstAncestorOrSelf(Of VariableDeclaratorSyntax)()
             Dim localA1 = DirectCast(model.GetDeclaredSymbol(declaratorA1.Names(0)), LocalSymbol)
             Dim localA1Type = localA1.Type
@@ -291,7 +293,7 @@ End Class
         Public Sub AnonTypeDeclaringSyntaxStaticLocalWithDimKeyword()
             'This should be fixed when multiple modifiers issues is resolved so that this should work in the same
             'way as static and not normal local declarations as at present.
-            Dim comp = CompilationUtils.CreateCompilationWithMscorlib(
+            Dim comp = CompilationUtils.CreateCompilationWithMscorlib40(
     <compilation name="AnonTypeDeclaringSyntax">
         <file name="a.vb">
 Public Class C1
@@ -306,7 +308,7 @@ End Class
             Dim text = tree.GetText().ToString()
             Dim model = comp.GetSemanticModel(tree)
             Dim globalNS = comp.GlobalNamespace
-            Dim posA1 As Integer = text.IndexOf("a1")
+            Dim posA1 As Integer = text.IndexOf("a1", StringComparison.Ordinal)
             Dim declaratorA1 = tree.GetCompilationUnitRoot().FindToken(posA1).Parent.FirstAncestorOrSelf(Of VariableDeclaratorSyntax)()
             Dim localA1 = DirectCast(model.GetDeclaredSymbol(declaratorA1.Names(0)), LocalSymbol)
             Dim localA1Type = localA1.Type
@@ -314,7 +316,7 @@ End Class
 
             Dim declaringNodes As ImmutableArray(Of SyntaxReference) = localA1Type.DeclaringSyntaxReferences
 
-            'Object Not Anonymous Type - when multipel modifier issues is resolved
+            'Object Not Anonymous Type - when multiple modifier issues is resolved
             Assert.False(localA1Type.IsAnonymousType)
             CheckDeclaringSyntaxNodesWithoutGetDeclaredSymbol(comp, localA1Type, 0, SyntaxKind.AnonymousObjectCreationExpression)
 
@@ -332,7 +334,7 @@ End Class
 
         <Fact>
         Public Sub NamespaceDeclaringSyntax()
-            Dim comp = CompilationUtils.CreateCompilationWithMscorlib(
+            Dim comp = CompilationUtils.CreateCompilationWithMscorlib40(
     <compilation name="NamespaceDeclaringSyntax">
         <file name="a.vb">
 Namespace N1
@@ -366,7 +368,7 @@ End Namespace     </file>
 
         <Fact>
         Public Sub NamespaceDeclaringSyntax2()
-            Dim comp = CompilationUtils.CreateCompilationWithMscorlib(
+            Dim comp = CompilationUtils.CreateCompilationWithMscorlib40(
     <compilation name="NamespaceDeclaringSyntax">
         <file name="a.vb">
 Namespace N2
@@ -377,7 +379,7 @@ End Namespace
 Namespace Global.N4
 End Namespace
 </file>
-    </compilation>, New VisualBasicCompilationOptions(OutputKind.DynamicallyLinkedLibrary).WithRootNamespace("N1"))
+    </compilation>, options:=New VisualBasicCompilationOptions(OutputKind.DynamicallyLinkedLibrary).WithRootNamespace("N1"))
 
             Dim tree = comp.SyntaxTrees(0)
             Dim globalNS = comp.GlobalNamespace
@@ -395,7 +397,7 @@ End Namespace
 
         <Fact>
         Public Sub TypeParameterDeclaringSyntax()
-            Dim comp = CompilationUtils.CreateCompilationWithMscorlib(
+            Dim comp = CompilationUtils.CreateCompilationWithMscorlib40(
     <compilation name="TypeParameterDeclaringSyntax">
         <file name="a.vb">
 Imports System
@@ -411,7 +413,7 @@ Namespace N1
 
         Class C3(Of W)
             Public f2 As IEnumerable(Of U)
-            Public f3 As Foo(Of Bar)
+            Public f3 As Goo(Of Bar)
         End Class
     End Class
 
@@ -450,7 +452,7 @@ End Namespace
 
         <Fact>
         Public Sub MemberDeclaringSyntax()
-            Dim comp = CompilationUtils.CreateCompilationWithMscorlib(
+            Dim comp = CompilationUtils.CreateCompilationWithMscorlib40(
     <compilation name="SourceNamedTypeDeclaringSyntax">
         <file name="a.vb">
 Namespace N1
@@ -553,7 +555,7 @@ End Namespace
 
                 If TypeOf memb Is NamedTypeSymbol Then
                     Dim nt As NamedTypeSymbol = DirectCast(memb, NamedTypeSymbol)
-                    If nt.TypeKind = TypeKind.Delegate AndAlso nt.Name.EndsWith("EventHandler") Then
+                    If nt.TypeKind = TypeKind.Delegate AndAlso nt.Name.EndsWith("EventHandler", StringComparison.Ordinal) Then
                         expectedDeclaringNodes = 0
                     End If
                 End If
@@ -589,7 +591,7 @@ End Namespace
 
                 If TypeOf memb Is NamedTypeSymbol Then
                     Dim nt As NamedTypeSymbol = DirectCast(memb, NamedTypeSymbol)
-                    If nt.TypeKind = TypeKind.Delegate AndAlso nt.Name.EndsWith("EventHandler") Then
+                    If nt.TypeKind = TypeKind.Delegate AndAlso nt.Name.EndsWith("EventHandler", StringComparison.Ordinal) Then
                         expectedDeclaringNodes = 0
                     End If
                 End If
@@ -606,7 +608,7 @@ End Namespace
 
         <Fact>
         Public Sub LocalDeclaringSyntax()
-            Dim comp = CompilationUtils.CreateCompilationWithMscorlib(
+            Dim comp = CompilationUtils.CreateCompilationWithMscorlib40(
     <compilation name="LocalDeclaringSyntax">
         <file name="a.vb">
 Imports System
@@ -618,7 +620,7 @@ Class C1
         Dim loc3 = 5
         Const loc4 = 6
         Const loc5 As Integer = 7
-        Using loc6 As IDisposable = foo()
+        Using loc6 As IDisposable = goo()
         End Using
         For loc7 as Integer = 1 To 10
         Next
@@ -629,7 +631,7 @@ Class C1
         For Each loc10 in {5, 6, 6}
         Next
     End Sub
-    Function foo() As IDisposable
+    Function goo() As IDisposable
     End Function
 End Class
     </file>
@@ -650,7 +652,7 @@ End Class
 
         <Fact>
         Public Sub LabelDeclaringSyntax()
-            Dim comp = CompilationUtils.CreateCompilationWithMscorlib(
+            Dim comp = CompilationUtils.CreateCompilationWithMscorlib40(
     <compilation name="LabelDeclaringSyntax">
         <file name="a.vb">
 Imports System
@@ -675,12 +677,12 @@ End Class
 
         <Fact>
         Public Sub AliasDeclaringSyntax()
-            Dim comp = CompilationUtils.CreateCompilationWithMscorlib(
+            Dim comp = CompilationUtils.CreateCompilationWithMscorlib40(
     <compilation name="AliasDeclaringSyntax">
         <file name="a.vb">
 Imports System
 Imports System.Collections.Generic
-Imports ConsoleAlias = System.Console, FooAlias = System
+Imports ConsoleAlias = System.Console, GooAlias = System
 Imports ListOfIntAlias = System.Collections.Generic.List(Of Integer)
 
 Namespace N1
@@ -691,13 +693,13 @@ End Namespace
 
             Dim tree = comp.SyntaxTrees(0)
             CheckDeclaringSyntax(Of SimpleImportsClauseSyntax)(comp, tree, "ConsoleAlias", SymbolKind.Alias)
-            CheckDeclaringSyntax(Of SimpleImportsClauseSyntax)(comp, tree, "FooAlias", SymbolKind.Alias)
+            CheckDeclaringSyntax(Of SimpleImportsClauseSyntax)(comp, tree, "GooAlias", SymbolKind.Alias)
             CheckDeclaringSyntax(Of SimpleImportsClauseSyntax)(comp, tree, "ListOfIntAlias", SymbolKind.Alias)
         End Sub
 
         <Fact>
         Public Sub RangeVariableDeclaringSyntax()
-            Dim comp = CompilationUtils.CreateCompilationWithMscorlib(
+            Dim comp = CompilationUtils.CreateCompilationWithMscorlib40(
     <compilation name="RangeVariableDeclaringSyntax">
         <file name="a.vb">
 Imports System
@@ -729,7 +731,7 @@ End Class
 
         <Fact>
         Public Sub LambdaDeclaringSyntax()
-            Dim comp = CompilationUtils.CreateCompilationWithMscorlib(
+            Dim comp = CompilationUtils.CreateCompilationWithMscorlib40(
     <compilation name="RangeVariableDeclaringSyntax">
         <file name="a.vb">
 Imports System

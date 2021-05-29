@@ -1,13 +1,17 @@
-﻿// Copyright (c) Microsoft.  All Rights Reserved.  Licensed under the Apache License, Version 2.0.  See License.txt in the project root for license information.
+﻿// Licensed to the .NET Foundation under one or more agreements.
+// The .NET Foundation licenses this file to you under the MIT license.
+// See the LICENSE file in the project root for more information.
+
+#nullable disable
 
 namespace Microsoft.CodeAnalysis.Editor
 {
     internal class NavigationBarSelectedTypeAndMember
     {
-        public NavigationBarItem TypeItem { get; private set; }
-        public bool ShowTypeItemGrayed { get; private set; }
-        public NavigationBarItem MemberItem { get; private set; }
-        public bool ShowMemberItemGrayed { get; private set; }
+        public NavigationBarItem TypeItem { get; }
+        public bool ShowTypeItemGrayed { get; }
+        public NavigationBarItem MemberItem { get; }
+        public bool ShowMemberItemGrayed { get; }
 
         public NavigationBarSelectedTypeAndMember(NavigationBarItem typeItem, NavigationBarItem memberItem)
         {

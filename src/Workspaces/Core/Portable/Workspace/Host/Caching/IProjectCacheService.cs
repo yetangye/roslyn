@@ -1,4 +1,9 @@
-﻿using System;
+﻿// Licensed to the .NET Foundation under one or more agreements.
+// The .NET Foundation licenses this file to you under the MIT license.
+// See the LICENSE file in the project root for more information.
+
+using System;
+using System.Diagnostics.CodeAnalysis;
 
 namespace Microsoft.CodeAnalysis.Host
 {
@@ -23,7 +28,7 @@ namespace Microsoft.CodeAnalysis.Host
     {
         /// <summary>
         /// If caching is enabled for <see cref="ProjectId"/> key, the instance is added to 
-        /// a condtional weak table.  
+        /// a conditional weak table.  
         /// 
         /// It will not be collected until either caching is disabled for the project
         /// or the owner object is collected.
@@ -32,13 +37,15 @@ namespace Microsoft.CodeAnalysis.Host
         /// cache.
         /// </summary>
         /// <returns>The instance passed in is always returned</returns>
-        T CacheObjectIfCachingEnabledForKey<T>(ProjectId key, object owner, T instance) where T : class;
+        [return: NotNullIfNotNull("instance")]
+        T? CacheObjectIfCachingEnabledForKey<T>(ProjectId key, object owner, T? instance) where T : class;
 
         /// <summary>
         /// If caching is enabled for <see cref="ProjectId"/> key, <see cref="ICachedObjectOwner.CachedObject"/>
         /// will be set to instance.
         /// </summary>
         /// <returns>The instance passed in is always returned</returns>
-        T CacheObjectIfCachingEnabledForKey<T>(ProjectId key, ICachedObjectOwner owner, T instance) where T : class;
+        [return: NotNullIfNotNull("instance")]
+        T? CacheObjectIfCachingEnabledForKey<T>(ProjectId key, ICachedObjectOwner owner, T? instance) where T : class;
     }
 }

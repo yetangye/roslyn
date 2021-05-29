@@ -1,4 +1,8 @@
-﻿// Copyright (c) Microsoft.  All Rights Reserved.  Licensed under the Apache License, Version 2.0.  See License.txt in the project root for license information.
+﻿// Licensed to the .NET Foundation under one or more agreements.
+// The .NET Foundation licenses this file to you under the MIT license.
+// See the LICENSE file in the project root for more information.
+
+#nullable disable
 
 using System.Collections.Generic;
 using Microsoft.CodeAnalysis.Text;
@@ -35,39 +39,18 @@ namespace Microsoft.CodeAnalysis.CodeGen
             _typeName = typeName;
         }
 
-        public string TypeName
-        {
-            get { return _typeName; }
-        }
+        public string TypeName => _typeName;
 
-        public int TypeId
-        {
-            get { return _typeId; }
-        }
+        public int TypeId => _typeId;
 
-        public string Name
-        {
-            get { return _name; }
-        }
+        public string Name => _name;
 
-        public int Id
-        {
-            get { return _id; }
-        }
+        public int Id => _id;
 
-        public DWORD LanguageId
-        {
-            get { return _languageId; }
-        }
+        public DWORD LanguageId => _languageId;
 
-        public DWORD CodePage
-        {
-            get { return _codePage; }
-        }
+        public DWORD CodePage => _codePage;
 
-        public IEnumerable<byte> Data
-        {
-            get { return _data; }
-        }
+        public IEnumerable<byte> Data => _data;
     }
 }

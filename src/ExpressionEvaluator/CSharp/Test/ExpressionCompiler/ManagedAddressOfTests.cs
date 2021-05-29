@@ -1,13 +1,17 @@
-// Copyright (c) Microsoft.  All Rights Reserved.  Licensed under the Apache License, Version 2.0.  See License.txt in the project root for license information.
+﻿// Licensed to the .NET Foundation under one or more agreements.
+// The .NET Foundation licenses this file to you under the MIT license.
+// See the LICENSE file in the project root for more information.
+
+#nullable disable
 
 using Microsoft.CodeAnalysis.CodeGen;
 using Microsoft.CodeAnalysis.CSharp.Symbols;
 using Microsoft.CodeAnalysis.CSharp.Test.Utilities;
-using Microsoft.CodeAnalysis.ExpressionEvaluator;
-using Microsoft.CodeAnalysis.Test.Utilities;
+using Microsoft.CodeAnalysis.ExpressionEvaluator.UnitTests;
+using Roslyn.Test.Utilities;
 using Xunit;
 
-namespace Microsoft.CodeAnalysis.CSharp.UnitTests
+namespace Microsoft.CodeAnalysis.CSharp.ExpressionEvaluator.UnitTests
 {
     public class ManagedAddressOfTests : ExpressionCompilerTestBase
     {
@@ -21,19 +25,18 @@ namespace Microsoft.CodeAnalysis.CSharp.UnitTests
     {
     }
 }";
-            var comp = CreateCompilationWithMscorlib(source, options: TestOptions.DebugDll);
-            var runtime = CreateRuntimeInstance(comp);
-            var context = CreateMethodContext(
-                runtime,
-                methodName: "C.M");
-            var testData = new CompilationTestData();
-            string error;
-            context.CompileExpression("&s", out error, testData);
-            Assert.Null(error);
+            var comp = CreateCompilation(source, options: TestOptions.DebugDll);
+            WithRuntimeInstance(comp, runtime =>
+            {
+                var context = CreateMethodContext(runtime, "C.M");
+                var testData = new CompilationTestData();
+                string error;
+                context.CompileExpression("&s", out error, testData);
+                Assert.Null(error);
 
-            var methodData = testData.GetMethodData("<>x.<>m0");
-            AssertIsIntPtrPointer(methodData.Method.ReturnType);
-            methodData.VerifyIL(@"
+                var methodData = testData.GetMethodData("<>x.<>m0");
+                AssertIsIntPtrPointer(((MethodSymbol)methodData.Method).ReturnType);
+                methodData.VerifyIL(@"
 {
   // Code size        4 (0x4)
   .maxstack  1
@@ -42,6 +45,7 @@ namespace Microsoft.CodeAnalysis.CSharp.UnitTests
   IL_0003:  ret
 }
 ");
+            });
         }
 
         [Fact]
@@ -55,19 +59,18 @@ namespace Microsoft.CodeAnalysis.CSharp.UnitTests
         string s = ""hello"";
     }
 }";
-            var comp = CreateCompilationWithMscorlib(source, options: TestOptions.DebugDll);
-            var runtime = CreateRuntimeInstance(comp);
-            var context = CreateMethodContext(
-                runtime,
-                methodName: "C.M");
-            var testData = new CompilationTestData();
-            string error;
-            context.CompileExpression("&s", out error, testData);
-            Assert.Null(error);
+            var comp = CreateCompilation(source, options: TestOptions.DebugDll);
+            WithRuntimeInstance(comp, runtime =>
+            {
+                var context = CreateMethodContext(runtime, "C.M");
+                var testData = new CompilationTestData();
+                string error;
+                context.CompileExpression("&s", out error, testData);
+                Assert.Null(error);
 
-            var methodData = testData.GetMethodData("<>x.<>m0");
-            AssertIsIntPtrPointer(methodData.Method.ReturnType);
-            methodData.VerifyIL(@"
+                var methodData = testData.GetMethodData("<>x.<>m0");
+                AssertIsIntPtrPointer(((MethodSymbol)methodData.Method).ReturnType);
+                methodData.VerifyIL(@"
 {
   // Code size        4 (0x4)
   .maxstack  1
@@ -77,6 +80,7 @@ namespace Microsoft.CodeAnalysis.CSharp.UnitTests
   IL_0003:  ret
 }
 ");
+            });
         }
 
         [Fact]
@@ -91,19 +95,18 @@ namespace Microsoft.CodeAnalysis.CSharp.UnitTests
     {
     }
 }";
-            var comp = CreateCompilationWithMscorlib(source, options: TestOptions.DebugDll);
-            var runtime = CreateRuntimeInstance(comp);
-            var context = CreateMethodContext(
-                runtime,
-                methodName: "C.M");
-            var testData = new CompilationTestData();
-            string error;
-            context.CompileExpression("&s", out error, testData);
-            Assert.Null(error);
+            var comp = CreateCompilation(source, options: TestOptions.DebugDll);
+            WithRuntimeInstance(comp, runtime =>
+            {
+                var context = CreateMethodContext(runtime, "C.M");
+                var testData = new CompilationTestData();
+                string error;
+                context.CompileExpression("&s", out error, testData);
+                Assert.Null(error);
 
-            var methodData = testData.GetMethodData("<>x.<>m0");
-            AssertIsIntPtrPointer(methodData.Method.ReturnType);
-            methodData.VerifyIL(@"
+                var methodData = testData.GetMethodData("<>x.<>m0");
+                AssertIsIntPtrPointer(((MethodSymbol)methodData.Method).ReturnType);
+                methodData.VerifyIL(@"
 {
   // Code size        8 (0x8)
   .maxstack  1
@@ -113,6 +116,7 @@ namespace Microsoft.CodeAnalysis.CSharp.UnitTests
   IL_0007:  ret
 }
 ");
+            });
         }
 
         /// <remarks>
@@ -141,37 +145,31 @@ enum E
 {
     A
 }
-
-struct Generic<T>
-{
-}
 ";
-            var comp = CreateCompilationWithMscorlib(source, options: TestOptions.DebugDll);
-            var runtime = CreateRuntimeInstance(comp);
-            var context = CreateMethodContext(
-                runtime,
-                methodName: "C.M");
-
-
-            var types = new[]
+            var comp = CreateCompilation(source, options: TestOptions.DebugDll);
+            WithRuntimeInstance(comp, runtime =>
             {
-                "C", // class
-                "D", // delegate
-                "I", // interface
-                "T", // type parameter
-                "int[]",
-                "Generic<int>",
-                "dynamic",
-            };
+                var context = CreateMethodContext(runtime, "C.M");
 
-            foreach (var type in types)
-            {
-                string error;
-                CompilationTestData testData = new CompilationTestData();
-                context.CompileExpression(string.Format("sizeof({0})", type), out error, testData);
-                // CONSIDER: change error code to make text less confusing?
-                Assert.Equal(string.Format("error CS0208: Cannot take the address of, get the size of, or declare a pointer to a managed type ('{0}')", type), error);
-            }
+                var types = new[]
+                {
+                    "C", // class
+                    "D", // delegate
+                    "I", // interface
+                    "T", // type parameter
+                    "int[]",
+                    "dynamic",
+                };
+
+                foreach (var type in types)
+                {
+                    string error;
+                    CompilationTestData testData = new CompilationTestData();
+                    context.CompileExpression(string.Format("sizeof({0})", type), out error, testData);
+                    // CONSIDER: change error code to make text less confusing?
+                    Assert.Equal(string.Format("error CS0208: Cannot take the address of, get the size of, or declare a pointer to a managed type ('{0}')", type), error);
+                }
+            });
         }
 
         [Fact]
@@ -185,16 +183,16 @@ struct Generic<T>
         System.Action a;
     }
 }";
-            var comp = CreateCompilationWithMscorlib(source, options: TestOptions.DebugDll);
-            var runtime = CreateRuntimeInstance(comp);
-            var context = CreateMethodContext(
-                runtime,
-                methodName: "C.M");
-            var testData = new CompilationTestData();
-            string error;
-            context.CompileAssignment("a", "() => { var s = stackalloc string[1]; }", out error, testData);
-            // CONSIDER: change error code to make text less confusing?
-            Assert.Equal("error CS0208: Cannot take the address of, get the size of, or declare a pointer to a managed type ('string')", error);
+            var comp = CreateCompilation(source, options: TestOptions.DebugDll);
+            WithRuntimeInstance(comp, runtime =>
+            {
+                var context = CreateMethodContext(runtime, "C.M");
+                var testData = new CompilationTestData();
+                string error;
+                context.CompileAssignment("a", "() => { var s = stackalloc string[1]; }", out error, testData);
+                // CONSIDER: change error code to make text less confusing?
+                Assert.Equal("error CS0208: Cannot take the address of, get the size of, or declare a pointer to a managed type ('string')", error);
+            });
         }
 
         [Fact]
@@ -207,16 +205,16 @@ struct Generic<T>
     {
     }
 }";
-            var comp = CreateCompilationWithMscorlib(source, options: TestOptions.DebugDll);
-            var runtime = CreateRuntimeInstance(comp);
-            var context = CreateMethodContext(
-                runtime,
-                methodName: "C.M");
-            var testData = new CompilationTestData();
-            string error;
-            context.CompileExpression("(string*)null", out error, testData);
-            // CONSIDER: change error code to make text less confusing?
-            Assert.Equal("error CS0208: Cannot take the address of, get the size of, or declare a pointer to a managed type ('string')", error);
+            var comp = CreateCompilation(source, options: TestOptions.DebugDll);
+            WithRuntimeInstance(comp, runtime =>
+            {
+                var context = CreateMethodContext(runtime, "C.M");
+                var testData = new CompilationTestData();
+                string error;
+                context.CompileExpression("(string*)null", out error, testData);
+                // CONSIDER: change error code to make text less confusing?
+                Assert.Equal("error CS0208: Cannot take the address of, get the size of, or declare a pointer to a managed type ('string')", error);
+            });
         }
 
         /// <remarks>
@@ -233,19 +231,19 @@ struct Generic<T>
         System.Action a;
     }
 }";
-            var comp = CreateCompilationWithMscorlib(source, options: TestOptions.DebugDll);
-            var runtime = CreateRuntimeInstance(comp);
-            var context = CreateMethodContext(
-                runtime,
-                methodName: "C.M");
-            var testData = new CompilationTestData();
-            string error;
-            context.CompileAssignment("a", "() => { fixed (void* p = args) { } }", out error, testData);
-            // CONSIDER: change error code to make text less confusing?
-            Assert.Equal("error CS0208: Cannot take the address of, get the size of, or declare a pointer to a managed type ('string')", error);
+            var comp = CreateCompilation(source, options: TestOptions.DebugDll);
+            WithRuntimeInstance(comp, runtime =>
+            {
+                var context = CreateMethodContext(runtime, "C.M");
+                var testData = new CompilationTestData();
+                string error;
+                context.CompileAssignment("a", "() => { fixed (void* p = args) { } }", out error, testData);
+                // CONSIDER: change error code to make text less confusing?
+                Assert.Equal("error CS0208: Cannot take the address of, get the size of, or declare a pointer to a managed type ('string')", error);
+            });
         }
 
-        private static void AssertIsIntPtrPointer(ITypeSymbol returnType)
+        private static void AssertIsIntPtrPointer(TypeSymbol returnType)
         {
             Assert.Equal(TypeKind.Pointer, returnType.TypeKind);
             Assert.Equal(SpecialType.System_IntPtr, ((PointerTypeSymbol)returnType).PointedAtType.SpecialType);

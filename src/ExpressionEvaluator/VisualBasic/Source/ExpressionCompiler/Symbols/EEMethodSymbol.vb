@@ -1,13 +1,22 @@
-﻿Imports System.Collections.Immutable
+﻿' Licensed to the .NET Foundation under one or more agreements.
+' The .NET Foundation licenses this file to you under the MIT license.
+' See the LICENSE file in the project root for more information.
+
+Imports System.Collections.Immutable
 Imports System.Reflection
 Imports System.Runtime.InteropServices
 Imports Microsoft.CodeAnalysis.Collections
+Imports Microsoft.CodeAnalysis.ExpressionEvaluator
+Imports Microsoft.CodeAnalysis.PooledObjects
 Imports Microsoft.CodeAnalysis.VisualBasic.Symbols
 Imports Roslyn.Utilities
 
 Namespace Microsoft.CodeAnalysis.VisualBasic.ExpressionEvaluator
 
-    Friend Delegate Function GenerateMethodBody(method As EEMethodSymbol, diagnostics As DiagnosticBag) As BoundStatement
+    Friend Delegate Function GenerateMethodBody(
+        method As EEMethodSymbol,
+        diagnostics As DiagnosticBag,
+        <Out> ByRef properties As ResultProperties) As BoundStatement
 
     Friend NotInheritable Class EEMethodSymbol
         Inherits MethodSymbol
@@ -35,6 +44,7 @@ Namespace Microsoft.CodeAnalysis.VisualBasic.ExpressionEvaluator
         Private ReadOnly _generateMethodBody As GenerateMethodBody
 
         Private _lazyReturnType As TypeSymbol
+        Private _lazyResultProperties As ResultProperties
 
         ' NOTE: This is only used for asserts, so it could be conditional on DEBUG.
         Private ReadOnly _allTypeParameters As ImmutableArray(Of TypeParameterSymbol)
@@ -52,7 +62,7 @@ Namespace Microsoft.CodeAnalysis.VisualBasic.ExpressionEvaluator
             generateMethodBody As GenerateMethodBody)
 
             Debug.Assert(sourceMethod.IsDefinition)
-            Debug.Assert(sourceMethod.ContainingSymbol = container.SubstitutedSourceType.OriginalDefinition)
+            Debug.Assert(TypeSymbol.Equals(sourceMethod.ContainingType, container.SubstitutedSourceType.OriginalDefinition, TypeCompareKind.ConsiderEverything))
             Debug.Assert(sourceLocals.All(Function(l) l.ContainingSymbol = sourceMethod))
 
             _compilation = compilation
@@ -93,14 +103,14 @@ Namespace Microsoft.CodeAnalysis.VisualBasic.ExpressionEvaluator
             Dim parameterBuilder = ArrayBuilder(Of ParameterSymbol).GetInstance()
 
             Dim substitutedSourceMeParameter = Me.SubstitutedSourceMethod.MeParameter
-            Dim subsitutedSourceHasMeParameter = substitutedSourceMeParameter IsNot Nothing
-            If subsitutedSourceHasMeParameter Then
+            Dim substitutedSourceHasMeParameter = substitutedSourceMeParameter IsNot Nothing
+            If substitutedSourceHasMeParameter Then
                 _meParameter = MakeParameterSymbol(0, GeneratedNames.MakeStateMachineCapturedMeName(), substitutedSourceMeParameter) ' NOTE: Name doesn't actually matter.
-                Debug.Assert(_meParameter.Type = Me.SubstitutedSourceMethod.ContainingType)
+                Debug.Assert(TypeSymbol.Equals(_meParameter.Type, Me.SubstitutedSourceMethod.ContainingType, TypeCompareKind.ConsiderEverything))
                 parameterBuilder.Add(_meParameter)
             End If
 
-            Dim ordinalOffset = If(subsitutedSourceHasMeParameter, 1, 0)
+            Dim ordinalOffset = If(substitutedSourceHasMeParameter, 1, 0)
             For Each substitutedSourceParameter In Me.SubstitutedSourceMethod.Parameters
                 Dim ordinal = substitutedSourceParameter.Ordinal + ordinalOffset
                 Debug.Assert(ordinal = parameterBuilder.Count)
@@ -130,33 +140,49 @@ Namespace Microsoft.CodeAnalysis.VisualBasic.ExpressionEvaluator
             Me.LocalsForBinding = localsBuilder.ToImmutableAndFree()
 
             ' Create a map from variable name to display class field.
-            Dim displayClassVariables = PooledDictionary(Of String, DisplayClassVariable).GetInstance()
-            For Each pair In sourceDisplayClassVariables
-                Dim variable = pair.Value
-                Dim displayClassInstanceFromLocal = TryCast(variable.DisplayClassInstance, DisplayClassInstanceFromLocal)
-                Dim displayClassInstance = If(displayClassInstanceFromLocal Is Nothing,
-                    DirectCast(New DisplayClassInstanceFromMe(Me.Parameters(0)), DisplayClassInstance),
-                    New DisplayClassInstanceFromLocal(DirectCast(localsMap(displayClassInstanceFromLocal.Local), EELocalSymbol)))
-                variable = variable.SubstituteFields(displayClassInstance, Me.TypeMap)
-                displayClassVariables.Add(pair.Key, variable)
-            Next
-
-            _displayClassVariables = displayClassVariables.ToImmutableDictionary()
-            displayClassVariables.Free()
+            _displayClassVariables = SubstituteDisplayClassVariables(sourceDisplayClassVariables, localsMap, Me, Me.TypeMap)
             localsMap.Free()
 
             _generateMethodBody = generateMethodBody
         End Sub
 
+        Private Shared Function SubstituteDisplayClassVariables(
+            oldDisplayClassVariables As ImmutableDictionary(Of String, DisplayClassVariable),
+            localsMap As Dictionary(Of LocalSymbol, LocalSymbol),
+            otherMethod As MethodSymbol,
+            typeMap As TypeSubstitution) As ImmutableDictionary(Of String, DisplayClassVariable)
+
+            ' Create a map from variable name to display class field.
+            Dim newDisplayClassVariables = PooledDictionary(Of String, DisplayClassVariable).GetInstance()
+            For Each pair In oldDisplayClassVariables
+                Dim variable = pair.Value
+                Dim oldDisplayClassInstance = variable.DisplayClassInstance
+
+                ' Note: we don't call ToOtherMethod in the local case because doing so would produce
+                ' a new LocalSymbol that would not be ReferenceEquals to the one in this.LocalsForBinding.
+                Dim oldDisplayClassInstanceFromLocal = TryCast(oldDisplayClassInstance, DisplayClassInstanceFromLocal)
+                Dim newDisplayClassInstance = If(oldDisplayClassInstanceFromLocal Is Nothing,
+                    oldDisplayClassInstance.ToOtherMethod(otherMethod, typeMap),
+                    New DisplayClassInstanceFromLocal(DirectCast(localsMap(oldDisplayClassInstanceFromLocal.Local), EELocalSymbol)))
+
+                variable = variable.SubstituteFields(newDisplayClassInstance, typeMap)
+                newDisplayClassVariables.Add(pair.Key, variable)
+            Next
+
+            Dim result = newDisplayClassVariables.ToImmutableDictionary()
+            newDisplayClassVariables.Free()
+            Return result
+        End Function
+
         Private Function MakeParameterSymbol(ordinal As Integer, name As String, sourceParameter As ParameterSymbol) As ParameterSymbol
-            Return New SynthesizedParameterSymbolWithCustomModifiers(
+            Return SynthesizedParameterSymbol.Create(
                 Me,
                 sourceParameter.Type,
                 ordinal,
                 sourceParameter.IsByRef,
                 name,
                 sourceParameter.CustomModifiers,
-                sourceParameter.HasByRefBeforeCustomModifiers)
+                sourceParameter.RefCustomModifiers)
         End Function
 
         Public Overrides ReadOnly Property MethodKind As MethodKind
@@ -226,6 +252,12 @@ Namespace Microsoft.CodeAnalysis.VisualBasic.ExpressionEvaluator
             End Get
         End Property
 
+        Public Overrides ReadOnly Property ReturnsByRef As Boolean
+            Get
+                Return False
+            End Get
+        End Property
+
         Public Overrides ReadOnly Property IsSub As Boolean
             Get
                 Return ReturnType.SpecialType = SpecialType.System_Void
@@ -272,6 +304,12 @@ Namespace Microsoft.CodeAnalysis.VisualBasic.ExpressionEvaluator
         End Property
 
         Public Overrides ReadOnly Property ReturnTypeCustomModifiers As ImmutableArray(Of CustomModifier)
+            Get
+                Return ImmutableArray(Of CustomModifier).Empty
+            End Get
+        End Property
+
+        Public Overrides ReadOnly Property RefCustomModifiers As ImmutableArray(Of CustomModifier)
             Get
                 Return ImmutableArray(Of CustomModifier).Empty
             End Get
@@ -373,6 +411,12 @@ Namespace Microsoft.CodeAnalysis.VisualBasic.ExpressionEvaluator
             End Get
         End Property
 
+        Public Overrides ReadOnly Property IsInitOnly As Boolean
+            Get
+                Return False
+            End Get
+        End Property
+
         Public Overrides ReadOnly Property IsOverloads As Boolean
             Get
                 Return False
@@ -391,22 +435,30 @@ Namespace Microsoft.CodeAnalysis.VisualBasic.ExpressionEvaluator
             End Get
         End Property
 
-        Friend Overrides ReadOnly Property Syntax As VisualBasicSyntaxNode
+        Friend Overrides ReadOnly Property Syntax As SyntaxNode
             Get
                 Return Nothing
             End Get
         End Property
 
-#Disable Warning RS0010
+        Friend ReadOnly Property ResultProperties As ResultProperties
+            Get
+                Return _lazyResultProperties
+            End Get
+        End Property
+
+#Disable Warning CA1200 ' Avoid using cref tags with a prefix
         ''' <remarks>
         ''' The corresponding C# method, 
         ''' <see cref="M:Microsoft.CodeAnalysis.CSharp.ExpressionEvaluator.EEMethodSymbol.GenerateMethodBody(Microsoft.CodeAnalysis.CSharp.TypeCompilationState,Microsoft.CodeAnalysis.DiagnosticBag)"/>, 
         ''' invokes the <see cref="LocalRewriter"/> and the <see cref="LambdaRewriter"/> explicitly.
         ''' In VB, the caller (of this method) does that.
         ''' </remarks>
-#Enable Warning RS0010
-        Friend Overrides Function GetBoundMethodBody(diagnostics As DiagnosticBag, <Out> ByRef Optional methodBodyBinder As Binder = Nothing) As BoundBlock
-            Dim body = _generateMethodBody(Me, diagnostics)
+#Enable Warning CA1200 ' Avoid using cref tags with a prefix
+        Friend Overrides Function GetBoundMethodBody(compilationState As TypeCompilationState, diagnostics As BindingDiagnosticBag, <Out> ByRef Optional methodBodyBinder As Binder = Nothing) As BoundBlock
+            Debug.Assert(diagnostics.DiagnosticBag IsNot Nothing)
+
+            Dim body = _generateMethodBody(Me, diagnostics.DiagnosticBag, _lazyResultProperties)
             Debug.Assert(body IsNot Nothing)
 
             _lazyReturnType = CalculateReturnType(body)
@@ -414,7 +466,7 @@ Namespace Microsoft.CodeAnalysis.VisualBasic.ExpressionEvaluator
             ' Can't do this until the return type has been computed.
             TypeParameterChecker.Check(Me, _allTypeParameters)
 
-            Dim syntax As VisualBasicSyntaxNode = body.Syntax
+            Dim syntax As SyntaxNode = body.Syntax
             Dim statementsBuilder = ArrayBuilder(Of BoundStatement).GetInstance()
             statementsBuilder.Add(body)
             ' Insert an implicit return statement if necessary.
@@ -430,7 +482,7 @@ Namespace Microsoft.CodeAnalysis.VisualBasic.ExpressionEvaluator
                 originalLocalsSet.Add(local)
             Next
             For Each local In Me.Locals
-                If Not originalLocalsSet.Contains(local) Then
+                If originalLocalsSet.Add(local) Then
                     originalLocalsBuilder.Add(local)
                 End If
             Next
@@ -442,14 +494,14 @@ Namespace Microsoft.CodeAnalysis.VisualBasic.ExpressionEvaluator
                 Return newBody
             End If
 
-            DiagnosticsPass.IssueDiagnostics(newBody, diagnostics, Me)
+            DiagnosticsPass.IssueDiagnostics(newBody, diagnostics.DiagnosticBag, Me)
             If diagnostics.HasAnyErrors() Then
                 Return newBody
             End If
 
             ' Check for use-site errors (e.g. missing types in the signature).
-            Dim useSiteInfo As DiagnosticInfo = Me.CalculateUseSiteErrorInfo()
-            If useSiteInfo IsNot Nothing Then
+            Dim useSiteInfo As UseSiteInfo(Of AssemblySymbol) = Me.CalculateUseSiteInfo()
+            If useSiteInfo.DiagnosticInfo IsNot Nothing Then
                 diagnostics.Add(useSiteInfo, _locations(0))
                 Return newBody
             End If
@@ -459,84 +511,86 @@ Namespace Microsoft.CodeAnalysis.VisualBasic.ExpressionEvaluator
             ' NOTE: In C#, EE rewriting happens AFTER local rewriting.  However, that order would be difficult
             ' to accommodate in VB, so we reverse it.
 
-            ' Rewrite local declaration statement.
-            newBody = LocalDeclarationRewriter.Rewrite(_compilation, _container, newBody)
+            Try
+                ' Rewrite local declaration statement.
+                newBody = LocalDeclarationRewriter.Rewrite(_compilation, _container, newBody)
 
-            ' Rewrite pseudo-variable references to helper method calls.
-            newBody = DirectCast(PlaceholderLocalRewriter.Rewrite(_compilation, _container, newBody), BoundBlock)
+                ' Rewrite pseudo-variable references to helper method calls.
+                newBody = DirectCast(PlaceholderLocalRewriter.Rewrite(_compilation, _container, newBody, diagnostics.DiagnosticBag), BoundBlock)
+                If diagnostics.HasAnyErrors() Then
+                    Return newBody
+                End If
 
-            ' Create a map from original local to target local.
-            Dim localMap = PooledDictionary(Of LocalSymbol, LocalSymbol).GetInstance()
-            Dim targetLocals = newBody.Locals
-            Debug.Assert(originalLocals.Length = targetLocals.Length)
-            For i = 0 To originalLocals.Length - 1
-                Dim originalLocal = originalLocals(i)
-                Dim targetLocal = targetLocals(i)
-                Debug.Assert(TypeOf originalLocal IsNot EELocalSymbol OrElse
+                ' Create a map from original local to target local.
+                Dim localMap = PooledDictionary(Of LocalSymbol, LocalSymbol).GetInstance()
+                Dim targetLocals = newBody.Locals
+                Debug.Assert(originalLocals.Length = targetLocals.Length)
+                For i = 0 To originalLocals.Length - 1
+                    Dim originalLocal = originalLocals(i)
+                    Dim targetLocal = targetLocals(i)
+                    Debug.Assert(TypeOf originalLocal IsNot EELocalSymbol OrElse
                         DirectCast(originalLocal, EELocalSymbol).Ordinal = DirectCast(targetLocal, EELocalSymbol).Ordinal)
-                localMap.Add(originalLocal, targetLocal)
-            Next
+                    localMap.Add(originalLocal, targetLocal)
+                Next
 
-            ' Variables may have been captured by lambdas in the original method
-            ' or in the expression, and we need to preserve the existing values of
-            ' those variables in the expression. This requires rewriting the variables
-            ' in the expression based on the closure classes from both the original
-            ' method and the expression, and generating a preamble that copies
-            ' values into the expression closure classes.
-            '
-            ' Consider the original method:
-            ' Shared Sub M()
-            '     Dim x, y, z as Integer
-            '     ...
-            '     F(Function() x + y)
-            ' End Sub
-            ' and the expression in the EE: "F(Function() x + z)".
-            '
-            ' The expression is first rewritten using the closure class and local <1>
-            ' from the original method: F(Function() <1>.x + z)
-            ' Then lambda rewriting introduces a new closure class that includes
-            ' the locals <1> and z, and a corresponding local <2>: F(Function() <2>.<1>.x + <2>.z)
-            ' And a preamble is added to initialize the fields of <2>:
-            '     <2> = New <>c__DisplayClass0()
-            '     <2>.<1> = <1>
-            '     <2>.z = z
+                ' Variables may have been captured by lambdas in the original method
+                ' or in the expression, and we need to preserve the existing values of
+                ' those variables in the expression. This requires rewriting the variables
+                ' in the expression based on the closure classes from both the original
+                ' method and the expression, and generating a preamble that copies
+                ' values into the expression closure classes.
+                '
+                ' Consider the original method:
+                ' Shared Sub M()
+                '     Dim x, y, z as Integer
+                '     ...
+                '     F(Function() x + y)
+                ' End Sub
+                ' and the expression in the EE: "F(Function() x + z)".
+                '
+                ' The expression is first rewritten using the closure class and local <1>
+                ' from the original method: F(Function() <1>.x + z)
+                ' Then lambda rewriting introduces a new closure class that includes
+                ' the locals <1> and z, and a corresponding local <2>: F(Function() <2>.<1>.x + <2>.z)
+                ' And a preamble is added to initialize the fields of <2>:
+                '     <2> = New <>c__DisplayClass0()
+                '     <2>.<1> = <1>
+                '     <2>.z = z
+                '
+                ' Note: The above behavior is actually implemented in the LambdaRewriter and
+                '       is triggered by overriding PreserveOriginalLocals to return "True".
 
-            ' Create a map from variable name to display class field.
-            Dim displayClassVariables = PooledDictionary(Of String, DisplayClassVariable).GetInstance()
-            For Each pair In _displayClassVariables
-                Dim variable = pair.Value
-                Dim displayClassInstanceFromLocal = TryCast(variable.DisplayClassInstance, DisplayClassInstanceFromLocal)
-                Dim displayClassInstance = If(displayClassInstanceFromLocal Is Nothing,
-                        DirectCast(New DisplayClassInstanceFromMe(Me.Parameters(0)), DisplayClassInstance),
-                        New DisplayClassInstanceFromLocal(DirectCast(localMap(displayClassInstanceFromLocal.Local), EELocalSymbol)))
-                variable = New DisplayClassVariable(variable.Name, variable.Kind, displayClassInstance, variable.DisplayClassFields)
-                displayClassVariables.Add(pair.Key, variable)
-            Next
+                ' Create a map from variable name to display class field.
+                Dim displayClassVariables = SubstituteDisplayClassVariables(_displayClassVariables, localMap, Me, Me.TypeMap)
 
-            ' Rewrite references to "Me" to refer to this method's "Me" parameter.
-            ' Rewrite variables within body to reference existing display classes.
-            newBody = DirectCast(CapturedVariableRewriter.Rewrite(
+                ' Rewrite references to "Me" to refer to this method's "Me" parameter.
+                ' Rewrite variables within body to reference existing display classes.
+                newBody = DirectCast(CapturedVariableRewriter.Rewrite(
                     If(Me.SubstitutedSourceMethod.IsShared, Nothing, Me.Parameters(0)),
-                    displayClassVariables.ToImmutableDictionary(),
+                    displayClassVariables,
                     newBody,
-                    diagnostics), BoundBlock)
-            displayClassVariables.Free()
+                    diagnostics.DiagnosticBag), BoundBlock)
 
-            If diagnostics.HasAnyErrors() Then
-                Return newBody
-            End If
+                If diagnostics.HasAnyErrors() Then
+                    Return newBody
+                End If
 
-            ' Insert locals from the original method, followed by any new locals.
-            Dim localBuilder = ArrayBuilder(Of LocalSymbol).GetInstance()
-            For Each originalLocal In Me.Locals
-                Dim targetLocal = localMap(originalLocal)
-                Debug.Assert(TypeOf targetLocal IsNot EELocalSymbol OrElse DirectCast(targetLocal, EELocalSymbol).Ordinal = localBuilder.Count)
-                localBuilder.Add(targetLocal)
-            Next
+                ' Insert locals from the original method, followed by any new locals.
+                Dim localBuilder = ArrayBuilder(Of LocalSymbol).GetInstance()
+                For Each originalLocal In Me.Locals
+                    Dim targetLocal = localMap(originalLocal)
+                    Debug.Assert(TypeOf targetLocal IsNot EELocalSymbol OrElse DirectCast(targetLocal, EELocalSymbol).Ordinal = localBuilder.Count)
+                    localBuilder.Add(targetLocal)
+                Next
 
-            localMap.Free()
-            newBody = newBody.Update(newBody.StatementListSyntax, localBuilder.ToImmutableAndFree(), newBody.Statements)
-            TypeParameterChecker.Check(newBody, _allTypeParameters)
+                localMap.Free()
+                newBody = newBody.Update(newBody.StatementListSyntax, localBuilder.ToImmutableAndFree(), newBody.Statements)
+                TypeParameterChecker.Check(newBody, _allTypeParameters)
+
+            Catch ex As BoundTreeVisitor.CancelledByStackGuardException
+                ex.AddAnError(diagnostics)
+            End Try
+
             Return newBody
         End Function
 
@@ -552,8 +606,25 @@ Namespace Microsoft.CodeAnalysis.VisualBasic.ExpressionEvaluator
             End Select
         End Function
 
+        Friend Overrides Sub AddSynthesizedReturnTypeAttributes(ByRef attributes As ArrayBuilder(Of SynthesizedAttributeData))
+            MyBase.AddSynthesizedReturnTypeAttributes(attributes)
+
+            Dim returnType = Me.ReturnType
+            If returnType.ContainsTupleNames() AndAlso DeclaringCompilation.HasTupleNamesAttributes() Then
+                AddSynthesizedAttribute(attributes, DeclaringCompilation.SynthesizeTupleNamesAttribute(returnType))
+            End If
+        End Sub
+
         Friend Overrides Function CalculateLocalSyntaxOffset(localPosition As Integer, localTree As SyntaxTree) As Integer
-            Throw ExceptionUtilities.Unreachable
+            Return localPosition
         End Function
+
+        Friend Overrides ReadOnly Property PreserveOriginalLocals As Boolean
+            Get
+                Return True
+            End Get
+        End Property
+
     End Class
+
 End Namespace

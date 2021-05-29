@@ -1,380 +1,435 @@
-' Copyright (c) Microsoft.  All Rights Reserved.  Licensed under the Apache License, Version 2.0.  See License.txt in the project root for license information.
+﻿' Licensed to the .NET Foundation under one or more agreements.
+' The .NET Foundation licenses this file to you under the MIT license.
+' See the LICENSE file in the project root for more information.
 
 Imports Microsoft.CodeAnalysis.Editor.UnitTests.SignatureHelp
-Imports Microsoft.CodeAnalysis.Editor.VisualBasic.SignatureHelp
-Imports Microsoft.VisualStudio.Composition
+Imports Microsoft.CodeAnalysis.VisualBasic.SignatureHelp
 
 Namespace Microsoft.CodeAnalysis.Editor.VisualBasic.UnitTests.SignatureHelp
     Public Class InvocationExpressionSignatureHelpProviderTests
         Inherits AbstractVisualBasicSignatureHelpProviderTests
 
-        Friend Overrides Function CreateSignatureHelpProvider() As ISignatureHelpProvider
-            Return New InvocationExpressionSignatureHelpProvider()
+        Friend Overrides Function GetSignatureHelpProviderType() As Type
+            Return GetType(InvocationExpressionSignatureHelpProvider)
         End Function
 
 #Region "Regular tests"
 
         <Fact, Trait(Traits.Feature, Traits.Features.SignatureHelp)>
-        Public Sub TestInvocationWithoutParameters()
+        Public Async Function TestInvocationWithoutParameters() As Task
             Dim markup = <a><![CDATA[
 Class C
-    Sub Foo()
-        [|Foo($$|])
+    Sub Goo()
+        [|Goo($$|])
     End Sub
 End Class
 ]]></a>.Value
 
             Dim expectedOrderedItems = New List(Of SignatureHelpTestItem)()
-            expectedOrderedItems.Add(New SignatureHelpTestItem("C.Foo()", String.Empty, Nothing, currentParameterIndex:=0))
+            expectedOrderedItems.Add(New SignatureHelpTestItem("C.Goo()", String.Empty, Nothing, currentParameterIndex:=0))
 
-            Test(markup, expectedOrderedItems)
-        End Sub
+            Await TestAsync(markup, expectedOrderedItems)
+        End Function
 
-        <WorkItem(958593)>
+        <Fact, Trait(Traits.Feature, Traits.Features.Completion)>
+        <WorkItem(25830, "https://github.com/dotnet/roslyn/issues/25830")>
+        Public Async Function PickCorrectOverload_PickString() As Task
+
+            Dim markup = <Text><![CDATA[
+Public Class C
+    Sub M()
+        [|M(i:="Hello"$$|])
+    End Sub
+
+    Public Sub M(i As String)
+    End Sub
+    Public Sub M(i As Integer)
+    End Sub
+    Public Sub M(filtered As Byte)
+    End Sub
+End Class
+]]></Text>.Value
+
+            Dim expectedOrderedItems = {
+                New SignatureHelpTestItem("C.M(i As Integer)", String.Empty, Nothing, currentParameterIndex:=0),
+                New SignatureHelpTestItem("C.M(i As String)", String.Empty, Nothing, currentParameterIndex:=0, isSelected:=True)
+            }
+
+            Await TestAsync(markup, expectedOrderedItems)
+        End Function
+
+        <Fact, Trait(Traits.Feature, Traits.Features.Completion)>
+        <WorkItem(25830, "https://github.com/dotnet/roslyn/issues/25830")>
+        Public Async Function PickCorrectOverload_PickInteger() As Task
+
+            Dim markup = <Text><![CDATA[
+Public Class C
+    Sub M()
+        [|M(i:=1$$|])
+    End Sub
+
+    Public Sub M(i As String)
+    End Sub
+    Public Sub M(i As Integer)
+    End Sub
+    Public Sub M(filtered As Byte)
+    End Sub
+End Class
+]]></Text>.Value
+
+            Dim expectedOrderedItems = {
+                New SignatureHelpTestItem("C.M(i As Integer)", String.Empty, Nothing, currentParameterIndex:=0, isSelected:=True),
+                New SignatureHelpTestItem("C.M(i As String)", String.Empty, Nothing, currentParameterIndex:=0)
+            }
+
+            Await TestAsync(markup, expectedOrderedItems)
+        End Function
+
+        <WorkItem(958593, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/958593")>
         <Fact, Trait(Traits.Feature, Traits.Features.SignatureHelp)>
-        Public Sub TestInvocationInsideStringLiteral()
+        Public Async Function TestInvocationInsideStringLiteral() As Task
             Dim markup = <a><![CDATA[
 Class C
-    Sub Foo()
-        [|Foo("$$"|])
+    Sub Goo()
+        [|Goo("$$"|])
     End Sub
 End Class
 ]]></a>.Value
 
             Dim expectedOrderedItems = New List(Of SignatureHelpTestItem)()
-            expectedOrderedItems.Add(New SignatureHelpTestItem("C.Foo()", currentParameterIndex:=0))
+            expectedOrderedItems.Add(New SignatureHelpTestItem("C.Goo()", currentParameterIndex:=0))
 
-            Test(markup, expectedOrderedItems)
-        End Sub
+            Await TestAsync(markup, expectedOrderedItems)
+        End Function
 
         <Fact, Trait(Traits.Feature, Traits.Features.SignatureHelp)>
-        Public Sub TestInvocationWithoutParametersMethodXmlComments()
+        Public Async Function TestInvocationWithoutParametersMethodXmlComments() As Task
             Dim markup = <a><![CDATA[
 Class C
     ''' <summary>
-    ''' Summary for Foo
+    ''' Summary for Goo
     ''' </summary>
-    Sub Foo()
-        [|Foo($$|])
+    Sub Goo()
+        [|Goo($$|])
     End Sub
 End Class
 ]]></a>.Value
 
             Dim expectedOrderedItems = New List(Of SignatureHelpTestItem)()
-            expectedOrderedItems.Add(New SignatureHelpTestItem("C.Foo()", "Summary for Foo", Nothing, currentParameterIndex:=0))
+            expectedOrderedItems.Add(New SignatureHelpTestItem("C.Goo()", "Summary for Goo", Nothing, currentParameterIndex:=0))
 
-            Test(markup, expectedOrderedItems)
-        End Sub
+            Await TestAsync(markup, expectedOrderedItems)
+        End Function
 
         <Fact, Trait(Traits.Feature, Traits.Features.SignatureHelp)>
-        Public Sub TestInvocationWithParametersOn1()
+        Public Async Function TestInvocationWithParametersOn1() As Task
             Dim markup = <a><![CDATA[
 Class C
-    Sub Foo(a As Integer, b As Integer)
-        [|Foo($$a, b|])
+    Sub Goo(a As Integer, b As Integer)
+        [|Goo($$a, b|])
     End Sub
 End Class
 ]]></a>.Value
 
             Dim expectedOrderedItems = New List(Of SignatureHelpTestItem)()
-            expectedOrderedItems.Add(New SignatureHelpTestItem("C.Foo(a As Integer, b As Integer)", String.Empty, String.Empty, currentParameterIndex:=0))
+            expectedOrderedItems.Add(New SignatureHelpTestItem("C.Goo(a As Integer, b As Integer)", String.Empty, String.Empty, currentParameterIndex:=0))
 
-            Test(markup, expectedOrderedItems)
-        End Sub
+            Await TestAsync(markup, expectedOrderedItems)
+        End Function
 
         <Fact, Trait(Traits.Feature, Traits.Features.SignatureHelp)>
-        Public Sub TestInvocationWithParametersXmlCommentsOn1()
+        Public Async Function TestInvocationWithParametersXmlCommentsOn1() As Task
             Dim markup = <a><![CDATA[
 Class C
     ''' <summary>
-    ''' Summary for Foo
+    ''' Summary for Goo
     ''' </summary>
     ''' <param name="a">Param a</param>
     ''' <param name="b">Param b</param>
-    Sub Foo(a As Integer, b As Integer)
-        [|Foo($$a, b|])
+    Sub Goo(a As Integer, b As Integer)
+        [|Goo($$a, b|])
     End Sub
 End Class
 ]]></a>.Value
 
             Dim expectedOrderedItems = New List(Of SignatureHelpTestItem)()
-            expectedOrderedItems.Add(New SignatureHelpTestItem("C.Foo(a As Integer, b As Integer)", "Summary for Foo", "Param a", currentParameterIndex:=0))
+            expectedOrderedItems.Add(New SignatureHelpTestItem("C.Goo(a As Integer, b As Integer)", "Summary for Goo", "Param a", currentParameterIndex:=0))
 
-            Test(markup, expectedOrderedItems)
-        End Sub
+            Await TestAsync(markup, expectedOrderedItems)
+        End Function
 
         <Fact, Trait(Traits.Feature, Traits.Features.SignatureHelp)>
-        Public Sub TestInvocationWithParametersOn2()
+        Public Async Function TestInvocationWithParametersOn2() As Task
             Dim markup = <a><![CDATA[
 Class C
-    Sub Foo(a As Integer, b As Integer)
-        [|Foo(a, $$b|])
+    Sub Goo(a As Integer, b As Integer)
+        [|Goo(a, $$b|])
     End Sub
 End Class
 ]]></a>.Value
 
             Dim expectedOrderedItems = New List(Of SignatureHelpTestItem)()
-            expectedOrderedItems.Add(New SignatureHelpTestItem("C.Foo(a As Integer, b As Integer)", String.Empty, String.Empty, currentParameterIndex:=1))
+            expectedOrderedItems.Add(New SignatureHelpTestItem("C.Goo(a As Integer, b As Integer)", String.Empty, String.Empty, currentParameterIndex:=1))
 
-            Test(markup, expectedOrderedItems)
-        End Sub
+            Await TestAsync(markup, expectedOrderedItems)
+        End Function
 
         <Fact, Trait(Traits.Feature, Traits.Features.SignatureHelp)>
-        Public Sub TestInvocationWithParametersXmlCommentsOn2()
+        Public Async Function TestInvocationWithParametersXmlCommentsOn2() As Task
             Dim markup = <a><![CDATA[
 Class C
     ''' <summary>
-    ''' Summary for Foo
+    ''' Summary for Goo
     ''' </summary>
     ''' <param name="a">Param a</param>
     ''' <param name="b">Param b</param>
-    Sub Foo(a As Integer, b As Integer)
-        [|Foo(a, $$b|])
+    Sub Goo(a As Integer, b As Integer)
+        [|Goo(a, $$b|])
     End Sub
 End Class
 ]]></a>.Value
 
             Dim expectedOrderedItems = New List(Of SignatureHelpTestItem)()
-            expectedOrderedItems.Add(New SignatureHelpTestItem("C.Foo(a As Integer, b As Integer)", "Summary for Foo", "Param b", currentParameterIndex:=1))
+            expectedOrderedItems.Add(New SignatureHelpTestItem("C.Goo(a As Integer, b As Integer)", "Summary for Goo", "Param b", currentParameterIndex:=1))
 
-            Test(markup, expectedOrderedItems)
-        End Sub
+            Await TestAsync(markup, expectedOrderedItems)
+        End Function
 
         <Fact, Trait(Traits.Feature, Traits.Features.SignatureHelp)>
-        Public Sub TestInvocationWithoutClosingParen()
+        Public Async Function TestInvocationWithoutClosingParen() As Task
             Dim markup = <a><![CDATA[
 Class C
-    Sub Foo()
-        [|Foo($$
+    Sub Goo()
+        [|Goo($$
     |]End Sub
 End Class
 ]]></a>.Value
 
             Dim expectedOrderedItems = New List(Of SignatureHelpTestItem)()
-            expectedOrderedItems.Add(New SignatureHelpTestItem("C.Foo()", String.Empty, Nothing, currentParameterIndex:=0))
+            expectedOrderedItems.Add(New SignatureHelpTestItem("C.Goo()", String.Empty, Nothing, currentParameterIndex:=0))
 
-            Test(markup, expectedOrderedItems)
-        End Sub
+            Await TestAsync(markup, expectedOrderedItems)
+        End Function
 
         <Fact, Trait(Traits.Feature, Traits.Features.SignatureHelp)>
-        Public Sub TestInvocationWithoutClosingParenWithParametersOn1()
+        Public Async Function TestInvocationWithoutClosingParenWithParametersOn1() As Task
             Dim markup = <a><![CDATA[
 Class C
-    Sub Foo(a As Integer, b As Integer)
-        [|Foo($$a, b
+    Sub Goo(a As Integer, b As Integer)
+        [|Goo($$a, b
     |]End Sub
 End Class
 ]]></a>.Value
 
             Dim expectedOrderedItems = New List(Of SignatureHelpTestItem)()
-            expectedOrderedItems.Add(New SignatureHelpTestItem("C.Foo(a As Integer, b As Integer)", String.Empty, String.Empty, currentParameterIndex:=0))
+            expectedOrderedItems.Add(New SignatureHelpTestItem("C.Goo(a As Integer, b As Integer)", String.Empty, String.Empty, currentParameterIndex:=0))
 
-            Test(markup, expectedOrderedItems)
-        End Sub
+            Await TestAsync(markup, expectedOrderedItems)
+        End Function
 
         <Fact, Trait(Traits.Feature, Traits.Features.SignatureHelp)>
-        Public Sub TestInvocationWithoutClosingParenWithParametersOn2()
+        Public Async Function TestInvocationWithoutClosingParenWithParametersOn2() As Task
             Dim markup = <a><![CDATA[
 Class C
-    Sub Foo(a As Integer, b As Integer)
-        [|Foo(a, $$b
+    Sub Goo(a As Integer, b As Integer)
+        [|Goo(a, $$b
     |]End Sub
 End Class
 ]]></a>.Value
 
             Dim expectedOrderedItems = New List(Of SignatureHelpTestItem)()
-            expectedOrderedItems.Add(New SignatureHelpTestItem("C.Foo(a As Integer, b As Integer)", String.Empty, String.Empty, currentParameterIndex:=1))
+            expectedOrderedItems.Add(New SignatureHelpTestItem("C.Goo(a As Integer, b As Integer)", String.Empty, String.Empty, currentParameterIndex:=1))
 
-            Test(markup, expectedOrderedItems)
-        End Sub
+            Await TestAsync(markup, expectedOrderedItems)
+        End Function
 
-        <WorkItem(968188)>
+        <WorkItem(968188, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/968188")>
         <Fact, Trait(Traits.Feature, Traits.Features.SignatureHelp)>
-        Public Sub TestInvocationOnBaseExpression_ProtectedAccessibility()
+        Public Async Function TestInvocationOnBaseExpression_ProtectedAccessibility() As Task
             Dim markup = <a><![CDATA[
 Imports System
 Public Class Base
-    Protected Overridable Sub Foo(x As Integer)
+    Protected Overridable Sub Goo(x As Integer)
     End Sub
 End Class
 
 Public Class Derived
     Inherits Base
     Private Sub Test()
-        [|MyBase.Foo($$
+        [|MyBase.Goo($$
     |]End Sub
 
-    Protected Overrides Sub Foo(x As Integer)
+    Protected Overrides Sub Goo(x As Integer)
     End Sub
 End Class
 ]]></a>.Value
 
             Dim expectedOrderedItems = New List(Of SignatureHelpTestItem)()
-            expectedOrderedItems.Add(New SignatureHelpTestItem("Base.Foo(x As Integer)", String.Empty, String.Empty, currentParameterIndex:=0))
+            expectedOrderedItems.Add(New SignatureHelpTestItem("Base.Goo(x As Integer)", String.Empty, String.Empty, currentParameterIndex:=0))
 
-            Test(markup, expectedOrderedItems)
-        End Sub
+            Await TestAsync(markup, expectedOrderedItems)
+        End Function
 
-        <WorkItem(968188)>
+        <WorkItem(968188, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/968188")>
         <Fact, Trait(Traits.Feature, Traits.Features.SignatureHelp)>
-        Public Sub TestInvocationOnBaseExpression_AbstractBase()
+        Public Async Function TestInvocationOnBaseExpression_AbstractBase() As Task
             Dim markup = <a><![CDATA[
 Imports System
 Public MustInherit Class Base
-    Protected MustOverride Sub Foo(x As Integer)
+    Protected MustOverride Sub Goo(x As Integer)
     End Sub
 End Class
 
 Public Class Derived
     Inherits Base
     Private Sub Test()
-        [|MyBase.Foo($$
+        [|MyBase.Goo($$
     |]End Sub
 
-    Protected Overrides Sub Foo(x As Integer)
+    Protected Overrides Sub Goo(x As Integer)
     End Sub
 End Class
 ]]></a>.Value
 
             Dim expectedOrderedItems = New List(Of SignatureHelpTestItem)()
-            expectedOrderedItems.Add(New SignatureHelpTestItem("Base.Foo(x As Integer)", String.Empty, String.Empty, currentParameterIndex:=0))
+            expectedOrderedItems.Add(New SignatureHelpTestItem("Base.Goo(x As Integer)", String.Empty, String.Empty, currentParameterIndex:=0))
 
-            Test(markup, expectedOrderedItems)
-        End Sub
+            Await TestAsync(markup, expectedOrderedItems)
+        End Function
 
-        <WorkItem(968188)>
+        <WorkItem(968188, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/968188")>
         <Fact, Trait(Traits.Feature, Traits.Features.SignatureHelp)>
-        Public Sub TestInvocationOnThisExpression_ProtectedAccessibility()
+        Public Async Function TestInvocationOnThisExpression_ProtectedAccessibility() As Task
             Dim markup = <a><![CDATA[
 Imports System
 Public Class Base
-    Protected Overridable Sub Foo(x As Integer)
+    Protected Overridable Sub Goo(x As Integer)
     End Sub
 End Class
 
 Public Class Derived
     Inherits Base
     Private Sub Test()
-        [|Me.Foo($$
+        [|Me.Goo($$
     |]End Sub
 End Class
 ]]></a>.Value
 
             Dim expectedOrderedItems = New List(Of SignatureHelpTestItem)()
-            expectedOrderedItems.Add(New SignatureHelpTestItem("Base.Foo(x As Integer)", String.Empty, String.Empty, currentParameterIndex:=0))
+            expectedOrderedItems.Add(New SignatureHelpTestItem("Base.Goo(x As Integer)", String.Empty, String.Empty, currentParameterIndex:=0))
 
-            Test(markup, expectedOrderedItems)
-        End Sub
+            Await TestAsync(markup, expectedOrderedItems)
+        End Function
 
-        <WorkItem(968188)>
+        <WorkItem(968188, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/968188")>
         <Fact, Trait(Traits.Feature, Traits.Features.SignatureHelp)>
-        Public Sub TestInvocationOnThisExpression_ProtectedAccessibility_Overridden()
+        Public Async Function TestInvocationOnThisExpression_ProtectedAccessibility_Overridden() As Task
             Dim markup = <a><![CDATA[
 Imports System
 Public Class Base
-    Protected Overridable Sub Foo(x As Integer)
+    Protected Overridable Sub Goo(x As Integer)
     End Sub
 End Class
 
 Public Class Derived
     Inherits Base
     Private Sub Test()
-        [|Me.Foo($$
+        [|Me.Goo($$
     |]End Sub
-    Protected Overrides Sub Foo(x As Integer)
+    Protected Overrides Sub Goo(x As Integer)
     End Sub
 End Class
 ]]></a>.Value
 
             Dim expectedOrderedItems = New List(Of SignatureHelpTestItem)()
-            expectedOrderedItems.Add(New SignatureHelpTestItem("Derived.Foo(x As Integer)", String.Empty, String.Empty, currentParameterIndex:=0))
+            expectedOrderedItems.Add(New SignatureHelpTestItem("Derived.Goo(x As Integer)", String.Empty, String.Empty, currentParameterIndex:=0))
 
-            Test(markup, expectedOrderedItems)
-        End Sub
+            Await TestAsync(markup, expectedOrderedItems)
+        End Function
 
-        <WorkItem(968188)>
+        <WorkItem(968188, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/968188")>
         <Fact, Trait(Traits.Feature, Traits.Features.SignatureHelp)>
-        Public Sub TestInvocationOnThisExpression_ProtectedAccessibility_AbstractBase()
+        Public Async Function TestInvocationOnThisExpression_ProtectedAccessibility_AbstractBase() As Task
             Dim markup = <a><![CDATA[
 Imports System
 Public MustInherit Class Base
-    Protected MustOverride Sub Foo(x As Integer)
+    Protected MustOverride Sub Goo(x As Integer)
     End Sub
 End Class
 
 Public Class Derived
     Inherits Base
     Private Sub Test()
-        [|Me.Foo($$
+        [|Me.Goo($$
     |]End Sub
 End Class
 ]]></a>.Value
 
             Dim expectedOrderedItems = New List(Of SignatureHelpTestItem)()
-            expectedOrderedItems.Add(New SignatureHelpTestItem("Base.Foo(x As Integer)", String.Empty, String.Empty, currentParameterIndex:=0))
+            expectedOrderedItems.Add(New SignatureHelpTestItem("Base.Goo(x As Integer)", String.Empty, String.Empty, currentParameterIndex:=0))
 
-            Test(markup, expectedOrderedItems)
-        End Sub
+            Await TestAsync(markup, expectedOrderedItems)
+        End Function
 
-        <WorkItem(968188)>
+        <WorkItem(968188, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/968188")>
         <Fact, Trait(Traits.Feature, Traits.Features.SignatureHelp)>
-        Public Sub TestInvocationOnThisExpression_ProtectedAccessibility_AbstractBase_Overridden()
+        Public Async Function TestInvocationOnThisExpression_ProtectedAccessibility_AbstractBase_Overridden() As Task
             Dim markup = <a><![CDATA[
 Imports System
 Public MustInherit Class Base
-    Protected MustOverride Sub Foo(x As Integer)
+    Protected MustOverride Sub Goo(x As Integer)
     End Sub
 End Class
 
 Public Class Derived
     Inherits Base
     Private Sub Test()
-        [|Me.Foo($$
+        [|Me.Goo($$
     |]End Sub
-    Protected Overrides Sub Foo(x As Integer)
+    Protected Overrides Sub Goo(x As Integer)
     End Sub
 End Class
 ]]></a>.Value
 
             Dim expectedOrderedItems = New List(Of SignatureHelpTestItem)()
-            expectedOrderedItems.Add(New SignatureHelpTestItem("Derived.Foo(x As Integer)", String.Empty, String.Empty, currentParameterIndex:=0))
+            expectedOrderedItems.Add(New SignatureHelpTestItem("Derived.Goo(x As Integer)", String.Empty, String.Empty, currentParameterIndex:=0))
 
-            Test(markup, expectedOrderedItems)
-        End Sub
+            Await TestAsync(markup, expectedOrderedItems)
+        End Function
 
-        <WorkItem(968188)>
+        <WorkItem(968188, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/968188")>
         <Fact, Trait(Traits.Feature, Traits.Features.SignatureHelp)>
-        Public Sub TestInvocationOnBaseExpression_ProtectedFriendAccessibility()
+        Public Async Function TestInvocationOnBaseExpression_ProtectedFriendAccessibility() As Task
             Dim markup = <a><![CDATA[
 Imports System
 Public Class Base
-    Protected Friend Sub Foo(x As Integer)
+    Protected Friend Sub Goo(x As Integer)
     End Sub
 End Class
 
 Public Class Derived
     Inherits Base
     Private Sub Test()
-        [|MyBase.Foo($$
+        [|MyBase.Goo($$
     |]End Sub
-    Protected Overrides Sub Foo(x As Integer)
+    Protected Overrides Sub Goo(x As Integer)
     End Sub
 End Class
 ]]></a>.Value
 
             Dim expectedOrderedItems = New List(Of SignatureHelpTestItem)()
-            expectedOrderedItems.Add(New SignatureHelpTestItem("Base.Foo(x As Integer)", String.Empty, String.Empty, currentParameterIndex:=0))
+            expectedOrderedItems.Add(New SignatureHelpTestItem("Base.Goo(x As Integer)", String.Empty, String.Empty, currentParameterIndex:=0))
 
-            Test(markup, expectedOrderedItems)
-        End Sub
+            Await TestAsync(markup, expectedOrderedItems)
+        End Function
 
-        <WorkItem(968188)>
+        <WorkItem(968188, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/968188")>
         <Fact, Trait(Traits.Feature, Traits.Features.SignatureHelp)>
-        Public Sub TestInvocationOnBaseMember_ProtectedAccessibility_ThroughType()
+        Public Async Function TestInvocationOnBaseMember_ProtectedAccessibility_ThroughType() As Task
             Dim markup = <a><![CDATA[
 Imports System
 Public Class Base
-    Protected Sub Foo(x As Integer)
+    Protected Sub Goo(x As Integer)
     End Sub
 End Class
 
@@ -382,23 +437,23 @@ Public Class Derived
     Inherits Base
     Private Sub Test()
         Dim x as New Base()
-        [|x.Foo($$
+        [|x.Goo($$
     |]End Sub
-    Protected Overrides Sub Foo(x As Integer)
+    Protected Overrides Sub Goo(x As Integer)
     End Sub
 End Class
 ]]></a>.Value
 
-            Test(markup, Nothing)
-        End Sub
+            Await TestAsync(markup, Nothing)
+        End Function
 
-        <WorkItem(968188)>
+        <WorkItem(968188, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/968188")>
         <Fact, Trait(Traits.Feature, Traits.Features.SignatureHelp)>
-        Public Sub TestInvocationOnBaseExpression_PrivateAccessibility()
+        Public Async Function TestInvocationOnBaseExpression_PrivateAccessibility() As Task
             Dim markup = <a><![CDATA[
 Imports System
 Public Class Base
-    Private Sub Foo(x As Integer)
+    Private Sub Goo(x As Integer)
     End Sub
 End Class
 
@@ -406,19 +461,19 @@ Public Class Derived
     Inherits Base
     Private Sub Test()
         Dim x as New Base()
-        [|x.Foo($$
+        [|x.Goo($$
     |]End Sub
-    Protected Overrides Sub Foo(x As Integer)
+    Protected Overrides Sub Goo(x As Integer)
     End Sub
 End Class
 ]]></a>.Value
 
-            Test(markup, Nothing)
-        End Sub
+            Await TestAsync(markup, Nothing)
+        End Function
 
-        <WorkItem(968188)>
+        <WorkItem(968188, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/968188")>
         <Fact, Trait(Traits.Feature, Traits.Features.SignatureHelp)>
-        Public Sub TestInvocationOnBaseExpression_Constructor()
+        Public Async Function TestInvocationOnBaseExpression_Constructor() As Task
             Dim markup = <a><![CDATA[
 Imports System
 Public MustInherit Class Base
@@ -436,12 +491,12 @@ End Class
             Dim expectedOrderedItems = New List(Of SignatureHelpTestItem)()
             expectedOrderedItems.Add(New SignatureHelpTestItem("Base.New(x As Integer)", String.Empty, String.Empty, currentParameterIndex:=0))
 
-            Test(markup, expectedOrderedItems)
-        End Sub
+            Await TestAsync(markup, expectedOrderedItems)
+        End Function
 
-        <WorkItem(968188), WorkItem(544989)>
+        <WorkItem(968188, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/968188"), WorkItem(544989, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/544989")>
         <Fact, Trait(Traits.Feature, Traits.Features.SignatureHelp)>
-        Public Sub TestInvocationOnBaseExpression_Finalizer()
+        Public Async Function TestInvocationOnBaseExpression_Finalizer() As Task
             Dim markup = <a><![CDATA[
 Class C
     Protected Overrides Sub Finalize()
@@ -452,16 +507,16 @@ End Class]]></a>.Value
             Dim expectedOrderedItems = New List(Of SignatureHelpTestItem)()
             expectedOrderedItems.Add(New SignatureHelpTestItem("Object.Finalize()"))
 
-            Test(markup, expectedOrderedItems)
-        End Sub
+            Await TestAsync(markup, expectedOrderedItems)
+        End Function
 
         <Fact, Trait(Traits.Feature, Traits.Features.SignatureHelp)>
-        Public Sub TestInvocationOnSubLambda()
+        Public Async Function TestInvocationOnSubLambda() As Task
             Dim markup = <a><![CDATA[
 Imports System
 
 Class C
-    Sub Foo(a As Integer, b As Integer)
+    Sub Goo(a As Integer, b As Integer)
         Dim bar As Action(Of Integer) = Sub(i) Console.WriteLine(i)
         [|bar($$
     |]End Sub
@@ -471,16 +526,16 @@ End Class
             Dim expectedOrderedItems = New List(Of SignatureHelpTestItem)()
             expectedOrderedItems.Add(New SignatureHelpTestItem("Action(Of Integer)(obj As Integer)", String.Empty, String.Empty, currentParameterIndex:=0))
 
-            Test(markup, expectedOrderedItems)
-        End Sub
+            Await TestAsync(markup, expectedOrderedItems)
+        End Function
 
         <Fact, Trait(Traits.Feature, Traits.Features.SignatureHelp)>
-        Public Sub TestInvocationOnFunctionLambda()
+        Public Async Function TestInvocationOnFunctionLambda() As Task
             Dim markup = <a><![CDATA[
 Imports System
 
 Class C
-    Sub Foo(a As Integer, b As Integer)
+    Sub Goo(a As Integer, b As Integer)
         Dim bar As Func(Of Integer, String) = Function(i) i.ToString()
         [|bar($$
     |]End Sub
@@ -490,14 +545,14 @@ End Class
             Dim expectedOrderedItems = New List(Of SignatureHelpTestItem)()
             expectedOrderedItems.Add(New SignatureHelpTestItem("Func(Of Integer, String)(arg As Integer) As String", String.Empty, String.Empty, currentParameterIndex:=0))
 
-            Test(markup, expectedOrderedItems)
-        End Sub
+            Await TestAsync(markup, expectedOrderedItems)
+        End Function
 
         <Fact, Trait(Traits.Feature, Traits.Features.SignatureHelp)>
-        Public Sub TestInvocationOnLambdaInsideAnonType()
+        Public Async Function TestInvocationOnLambdaInsideAnonType() As Task
             Dim markup = <a><![CDATA[
 Class C
-    Sub Foo()
+    Sub Goo()
         Dim lambda = Function() 0
         Dim bar = New With {.Value = [|lambda($$}
     |]End Sub
@@ -507,17 +562,17 @@ End Class
             Dim expectedOrderedItems = New List(Of SignatureHelpTestItem)()
             expectedOrderedItems.Add(New SignatureHelpTestItem("Invoke() As Integer", String.Empty, Nothing, currentParameterIndex:=0))
 
-            Test(markup, expectedOrderedItems)
-        End Sub
+            Await TestAsync(markup, expectedOrderedItems)
+        End Function
 
         <Fact, Trait(Traits.Feature, Traits.Features.SignatureHelp)>
-        Public Sub TestInvocationOnMemberAccessExpression()
+        Public Async Function TestInvocationOnMemberAccessExpression() As Task
             Dim markup = <a><![CDATA[
 Class C
     Shared Sub Bar(a As Integer)
     End Sub
 
-    Sub Foo()
+    Sub Goo()
         [|C.Bar($$
     |]End Sub
 End Class
@@ -526,11 +581,11 @@ End Class
             Dim expectedOrderedItems = New List(Of SignatureHelpTestItem)()
             expectedOrderedItems.Add(New SignatureHelpTestItem("C.Bar(a As Integer)", String.Empty, String.Empty, currentParameterIndex:=0))
 
-            Test(markup, expectedOrderedItems)
-        End Sub
+            Await TestAsync(markup, expectedOrderedItems)
+        End Function
 
         <Fact, Trait(Traits.Feature, Traits.Features.SignatureHelp)>
-        Public Sub TestExtensionMethod1()
+        Public Async Function TestExtensionMethod1() As Task
             Dim markup = <a><![CDATA[
 Imports System.Runtime.CompilerServices
 
@@ -551,35 +606,35 @@ End Module
 ]]></a>.Value
 
             Dim expectedOrderedItems = New List(Of SignatureHelpTestItem)()
-            expectedOrderedItems.Add(New SignatureHelpTestItem("<Extension> MyExtension.ExtensionMethod(x As Integer) As Integer", String.Empty, String.Empty, currentParameterIndex:=0))
+            expectedOrderedItems.Add(New SignatureHelpTestItem($"<{VBFeaturesResources.Extension}> MyExtension.ExtensionMethod(x As Integer) As Integer", String.Empty, String.Empty, currentParameterIndex:=0))
 
-            Test(markup, expectedOrderedItems)
-        End Sub
+            Await TestAsync(markup, expectedOrderedItems)
+        End Function
 
         <Fact, Trait(Traits.Feature, Traits.Features.SignatureHelp)>
-        Public Sub TestProperty()
+        Public Async Function TestProperty() As Task
             Dim markup = <a><![CDATA[
 Class C
-    Property foo As Integer
+    Property goo As Integer
 
     Sub bar()
-        [|foo($$
+        [|goo($$
     |]End Sub
 End Class]]></a>.Value
 
             Dim expectedOrderedItems = New List(Of SignatureHelpTestItem)()
-            expectedOrderedItems.Add(New SignatureHelpTestItem("C.foo() As Integer", String.Empty, Nothing, currentParameterIndex:=0))
+            expectedOrderedItems.Add(New SignatureHelpTestItem("C.goo() As Integer", String.Empty, Nothing, currentParameterIndex:=0))
 
-            Test(markup, expectedOrderedItems)
-        End Sub
+            Await TestAsync(markup, expectedOrderedItems)
+        End Function
 
-        <WorkItem(544068)>
+        <WorkItem(544068, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/544068")>
         <Fact, Trait(Traits.Feature, Traits.Features.SignatureHelp)>
-        Public Sub TestExtension()
+        Public Async Function TestExtension() As Task
             Dim markup = <a><![CDATA[
 Imports System.Runtime.CompilerServices
  
-Public Class Foo
+Public Class Goo
     Sub bar()
         Me.ExtensionMethod($$
     End Sub
@@ -587,7 +642,7 @@ End Class
  
 Module SomeModule
     <Extension()>
-    Public Sub ExtensionMethod(ByRef f As Foo)
+    Public Sub ExtensionMethod(ByRef f As Goo)
  
     End Sub
 End Module
@@ -595,14 +650,14 @@ End Module
 ]]></a>.Value
 
             Dim expectedOrderedItems = New List(Of SignatureHelpTestItem)() From {
-                New SignatureHelpTestItem("<Extension> SomeModule.ExtensionMethod()", String.Empty, Nothing, currentParameterIndex:=0)
+                New SignatureHelpTestItem($"<{VBFeaturesResources.Extension}> SomeModule.ExtensionMethod()", String.Empty, Nothing, currentParameterIndex:=0)
             }
 
-            Test(markup, expectedOrderedItems)
-        End Sub
+            Await TestAsync(markup, expectedOrderedItems)
+        End Function
 
         <Fact, Trait(Traits.Feature, Traits.Features.SignatureHelp)>
-        Public Sub TestInvocationOnAnonymousType()
+        Public Async Function TestInvocationOnAnonymousType() As Task
             Dim markup = <a><![CDATA[
 Imports System.Collections.Generic
 
@@ -612,33 +667,33 @@ Module Program
         M(x).Add($$
     End Sub
 
-    Function M(Of T)(foo As T) As List(Of T)
+    Function M(Of T)(goo As T) As List(Of T)
     End Function
 End Module]]></a>.Value
 
             Dim expectedOrderedItems = New List(Of SignatureHelpTestItem)()
             expectedOrderedItems.Add(New SignatureHelpTestItem(
-<d>List(Of 'a).Add(item As 'a)
+$"List(Of 'a).Add(item As 'a)
 
-Anonymous Types:
-    'a is New With { .A As Integer, .B As Integer }</d>.Value.Replace(vbLf, vbCrLf),
+{FeaturesResources.Anonymous_Types_colon}
+    'a {FeaturesResources.is_} New With {{ .A As Integer, .B As Integer }}",
                                      String.Empty,
                                      String.Empty,
                                      currentParameterIndex:=0,
-                                     description:=<d>
+                                     description:=$"
 
-Anonymous Types:
-    'a is New With { .A As Integer, .B As Integer }</d>.Value.Replace(vbLf, vbCrLf)))
+{FeaturesResources.Anonymous_Types_colon}
+    'a {FeaturesResources.is_} New With {{ .A As Integer, .B As Integer }}"))
 
-            Test(markup, expectedOrderedItems)
-        End Sub
+            Await TestAsync(markup, expectedOrderedItems)
+        End Function
 
-        <WorkItem(545118)>
+        <WorkItem(545118, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/545118")>
         <Fact, Trait(Traits.Feature, Traits.Features.SignatureHelp)>
-        Public Sub TestStatic1()
+        Public Async Function TestStatic1() As Task
             Dim markup = <a><![CDATA[
 Class C
-    Shared Sub Foo()
+    Shared Sub Goo()
         Bar($$
     End Sub
 
@@ -656,15 +711,15 @@ End Class
                 New SignatureHelpTestItem("C.Bar()", currentParameterIndex:=0)
             }
 
-            Test(markup, expectedOrderedItems)
-        End Sub
+            Await TestAsync(markup, expectedOrderedItems)
+        End Function
 
-        <WorkItem(545118)>
+        <WorkItem(545118, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/545118")>
         <Fact, Trait(Traits.Feature, Traits.Features.SignatureHelp)>
-        Public Sub TestStatic2()
+        Public Async Function TestStatic2() As Task
             Dim markup = <a><![CDATA[
 Class C
-    Sub Foo()
+    Sub Goo()
         Bar($$
     End Sub
 
@@ -683,12 +738,12 @@ End Class
                 New SignatureHelpTestItem("C.Bar(i As Integer)", currentParameterIndex:=0)
             }
 
-            Test(markup, expectedOrderedItems)
-        End Sub
+            Await TestAsync(markup, expectedOrderedItems)
+        End Function
 
-        <WorkItem(539111)>
+        <WorkItem(539111, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/539111")>
         <Fact, Trait(Traits.Feature, Traits.Features.SignatureHelp)>
-        Public Sub TestFilteringInOverloadedGenericMethods()
+        Public Async Function TestFilteringInOverloadedGenericMethods() As Task
             Dim markup = <a><![CDATA[
 Class C
     Sub M()
@@ -726,11 +781,11 @@ End Class
                                           parameterDocumentation:="Param 2 of type T2",
                                           currentParameterIndex:=1))
 
-            Test(markup, expectedOrderedItems)
-        End Sub
+            Await TestAsync(markup, expectedOrderedItems)
+        End Function
 
         <Fact, Trait(Traits.Feature, Traits.Features.SignatureHelp)>
-        Public Sub AwaitableItem()
+        Public Async Function TestAwaitableItem() As Task
             Dim markup = <a><![CDATA[
 Imports System.Threading.Tasks
 
@@ -738,23 +793,21 @@ Class C
     ''' &lt;summary&gt;
     ''' Doc Comment!
     ''' &lt;/summary&gt;
-    Async Function Foo() As Task
-        Me.Foo($$
+    Async Function Goo() As Task
+        Me.Goo($$
     End Function
 End Class
 ]]></a>.Value
 
-            Dim documentation = StringFromLines("", "Usage:", "  Await Foo()")
-
             Dim expectedOrderedItems = New List(Of SignatureHelpTestItem)() From {
-                New SignatureHelpTestItem("C.Foo() As Task", currentParameterIndex:=0, methodDocumentation:=documentation)
+                New SignatureHelpTestItem("C.Goo() As Task", currentParameterIndex:=0, methodDocumentation:=String.Empty)
             }
 
-            TestSignatureHelpWithMscorlib45(markup, expectedOrderedItems, LanguageNames.VisualBasic)
-        End Sub
+            Await TestSignatureHelpWithMscorlib45Async(markup, expectedOrderedItems, LanguageNames.VisualBasic)
+        End Function
 
         <Fact, Trait(Traits.Feature, Traits.Features.SignatureHelp)>
-        Public Sub AwaitableItem2()
+        Public Async Function TestAwaitableItem2() As Task
             Dim markup = <a><![CDATA[
 Imports System.Threading.Tasks
 
@@ -762,32 +815,30 @@ Class C
     ''' &lt;summary&gt;
     ''' Doc Comment!
     ''' &lt;/summary&gt;
-    Async Function Foo() As Task(Of Integer)
-        Me.Foo($$
+    Async Function Goo() As Task(Of Integer)
+        Me.Goo($$
     End Function
 End Class
 ]]></a>.Value
 
-            Dim documentation = StringFromLines("", "Usage:", "  Dim r as Integer = Await Foo()")
-
             Dim expectedOrderedItems = New List(Of SignatureHelpTestItem)() From {
-                New SignatureHelpTestItem("C.Foo() As Task(Of Integer)", currentParameterIndex:=0, methodDocumentation:=documentation)
+                New SignatureHelpTestItem("C.Goo() As Task(Of Integer)", currentParameterIndex:=0, methodDocumentation:=String.Empty)
             }
 
-            TestSignatureHelpWithMscorlib45(markup, expectedOrderedItems, LanguageNames.VisualBasic)
-        End Sub
+            Await TestSignatureHelpWithMscorlib45Async(markup, expectedOrderedItems, LanguageNames.VisualBasic)
+        End Function
 
 #End Region
 
 #Region "Default Properties"
 
         <Fact, Trait(Traits.Feature, Traits.Features.SignatureHelp)>
-        Public Sub TestDefaultProperty()
+        Public Async Function TestDefaultProperty() As Task
             Dim markup = <a><![CDATA[
 Class C
     Default Public Property item(index As Integer) As String
         Get
-            Return "foo"
+            Return "goo"
         End Get
         Set(ByVal value As String)
 
@@ -796,7 +847,7 @@ Class C
 End Class
 
 Class D
-    Sub Foo
+    Sub Goo
         Dim obj As New C
         [|obj($$
     |]End Sub
@@ -806,88 +857,88 @@ End Class
             Dim expectedOrderedItems = New List(Of SignatureHelpTestItem)()
             expectedOrderedItems.Add(New SignatureHelpTestItem("C(index As Integer) As String", String.Empty, String.Empty, currentParameterIndex:=0))
 
-            Test(markup, expectedOrderedItems)
-        End Sub
+            Await TestAsync(markup, expectedOrderedItems)
+        End Function
 
 #End Region
 
 #Region "Current Parameter Name"
 
         <Fact, Trait(Traits.Feature, Traits.Features.SignatureHelp)>
-        Public Sub TestCurrentParameterName()
+        Public Async Function TestCurrentParameterName() As Task
 
             Dim markup = <a><![CDATA[
 Class C
-    Sub Foo(someParameter As Integer, something As Boolean)
-        Foo(something:=false, someParameter:=$$)
+    Sub Goo(someParameter As Integer, something As Boolean)
+        Goo(something:=false, someParameter:=$$)
     End Sub
 End Class
 ]]></a>.Value
 
-            VerifyCurrentParameterName(markup, "someParameter")
-        End Sub
+            Await VerifyCurrentParameterNameAsync(markup, "someParameter")
+        End Function
 
 #End Region
 
 #Region "Trigger tests"
 
         <Fact, Trait(Traits.Feature, Traits.Features.SignatureHelp)>
-        Public Sub TestInvocationOnTriggerParens()
+        Public Async Function TestInvocationOnTriggerParens() As Task
 
             Dim markup = <a><![CDATA[
 Class C
-    Sub Foo()
-        [|Foo($$
+    Sub Goo()
+        [|Goo($$
     |]End Sub
 End Class
 ]]></a>.Value
 
             Dim expectedOrderedItems = New List(Of SignatureHelpTestItem)()
-            expectedOrderedItems.Add(New SignatureHelpTestItem("C.Foo()", String.Empty, Nothing, currentParameterIndex:=0))
+            expectedOrderedItems.Add(New SignatureHelpTestItem("C.Goo()", String.Empty, Nothing, currentParameterIndex:=0))
 
-            Test(markup, expectedOrderedItems, usePreviousCharAsTrigger:=True)
-        End Sub
+            Await TestAsync(markup, expectedOrderedItems, usePreviousCharAsTrigger:=True)
+        End Function
 
         <Fact, Trait(Traits.Feature, Traits.Features.SignatureHelp)>
-        Public Sub TestInvocationOnTriggerComma()
+        Public Async Function TestInvocationOnTriggerComma() As Task
 
             Dim markup = <a><![CDATA[
 Class C
-    Sub Foo(a As Integer, b As Integer)
-        [|Foo(a,$$
+    Sub Goo(a As Integer, b As Integer)
+        [|Goo(a,$$
     |]End Sub
 End Class
 ]]></a>.Value
 
             Dim expectedOrderedItems = New List(Of SignatureHelpTestItem)()
-            expectedOrderedItems.Add(New SignatureHelpTestItem("C.Foo(a As Integer, b As Integer)", String.Empty, String.Empty, currentParameterIndex:=1))
+            expectedOrderedItems.Add(New SignatureHelpTestItem("C.Goo(a As Integer, b As Integer)", String.Empty, String.Empty, currentParameterIndex:=1))
 
-            Test(markup, expectedOrderedItems, usePreviousCharAsTrigger:=True)
-        End Sub
+            Await TestAsync(markup, expectedOrderedItems, usePreviousCharAsTrigger:=True)
+        End Function
 
         <Fact, Trait(Traits.Feature, Traits.Features.SignatureHelp)>
-        Public Sub TestNoInvocationOnSpace()
+        Public Async Function TestNoInvocationOnSpace() As Task
 
             Dim markup = <a><![CDATA[
 Class C
-    Sub Foo(a As Integer, b As Integer)
-        [|Foo(a, $$|]
+    Sub Goo(a As Integer, b As Integer)
+        [|Goo(a, $$|]
     End Sub
 End Class
 ]]></a>.Value
 
             Dim expectedOrderedItems = New List(Of SignatureHelpTestItem)()
 
-            Test(markup, expectedOrderedItems, usePreviousCharAsTrigger:=True)
-        End Sub
+            Await TestAsync(markup, expectedOrderedItems, usePreviousCharAsTrigger:=True)
+        End Function
 
         <Fact, Trait(Traits.Feature, Traits.Features.SignatureHelp)>
-        Public Sub ConditionalIndexing()
+        Public Async Function TestConditionalIndexing() As Task
             Dim markup = <a><![CDATA[
 Class C
     Dim x as String = Nothing
 
-    Sub Foo()
+    Sub Goo()
         x?($$)
     End Sub
 End Class
@@ -895,16 +946,16 @@ End Class
 
             Dim expected = New SignatureHelpTestItem("String(index As Integer) As Char", currentParameterIndex:=0)
 
-            Test(markup, {expected}, experimental:=True)
-        End Sub
+            Await TestAsync(markup, {expected}, experimental:=True)
+        End Function
 
         <Fact, Trait(Traits.Feature, Traits.Features.SignatureHelp)>
-        Public Sub ConditionalMethodCall()
+        Public Async Function TestConditionalMethodCall() As Task
             Dim markup = <a><![CDATA[
 Class C
     Dim x as String = Nothing
 
-    Sub Foo()
+    Sub Goo()
         x?.ToString($$)
     End Sub
 End Class
@@ -913,15 +964,15 @@ End Class
             Dim expected = {New SignatureHelpTestItem("String.ToString() As String", currentParameterIndex:=0),
                             New SignatureHelpTestItem("String.ToString(provider As System.IFormatProvider) As String", currentParameterIndex:=0)}
 
-            Test(markup, expected, experimental:=True)
-        End Sub
+            Await TestAsync(markup, expected, experimental:=True)
+        End Function
 
         <Fact, Trait(Traits.Feature, Traits.Features.SignatureHelp)>
-        Public Sub ConditionalDelegateInvocation()
+        Public Async Function TestConditionalDelegateInvocation() As Task
             Dim markup = <a><![CDATA[
 Imports System
 Class C
-    Sub Foo()
+    Sub Goo()
         Dim x As Func(Of Integer, Integer)
         x?($$
     End Sub
@@ -930,8 +981,73 @@ End Class
 
             Dim expected = {New SignatureHelpTestItem("Func(Of Integer, Integer)(arg As Integer) As Integer", currentParameterIndex:=0)}
 
-            Test(markup, expected, experimental:=True)
-        End Sub
+            Await TestAsync(markup, expected, experimental:=True)
+        End Function
+
+        <Fact, Trait(Traits.Feature, Traits.Features.SignatureHelp)>
+        Public Async Function TestNonIdentifierConditionalIndexer() As Task
+            Dim expected = {New SignatureHelpTestItem("String(index As Integer) As Char")}
+
+            ' inline with a string literal
+            Await TestAsync("
+Class C
+    Sub M()
+        Dim c = """"?($$
+    End Sub
+End Class
+", expected)
+
+            ' parenthesized expression
+            Await TestAsync("
+Class C
+    Sub M()
+        Dim c = ("""")?($$
+    End Sub
+End Class
+", expected)
+
+            ' new object expression
+            Await TestAsync("
+Class C
+    Sub M()
+        Dim c = (New System.String("" ""c, 1))?($$
+    End Sub
+End Class
+", expected)
+
+            ' more complicated parenthesized expression
+            Await TestAsync("
+Class C
+    Sub M()
+        Dim c = (CType(Nothing, System.Collections.Generic.List(Of Integer)))?($$
+    End Sub
+End Class
+", {New SignatureHelpTestItem("System.Collections.Generic.List(Of Integer)(index As Integer) As Integer")})
+        End Function
+
+        <Fact, Trait(Traits.Feature, Traits.Features.SignatureHelp)>
+        Public Async Function TestTriggerCharacterInComment01() As Task
+            Dim markup = "
+Class C
+    Sub M(p As String)
+        M(',$$
+    End Sub
+End Class
+"
+            Await TestAsync(markup, Enumerable.Empty(Of SignatureHelpTestItem)(), usePreviousCharAsTrigger:=True)
+        End Function
+
+        <Fact, Trait(Traits.Feature, Traits.Features.SignatureHelp)>
+        Public Async Function TestTriggerCharacterInString01() As Task
+            Dim markup = "
+Class C
+    Sub M(p As String)
+        M("",$$""
+    End Sub
+End Class
+"
+            Await TestAsync(markup, Enumerable.Empty(Of SignatureHelpTestItem)(), usePreviousCharAsTrigger:=True)
+        End Function
 
         <Fact, Trait(Traits.Feature, Traits.Features.SignatureHelp)>
         Public Sub TestTriggerCharacters()
@@ -947,48 +1063,48 @@ End Class
 
         <WorkItem(7336, "DevDiv_Projects/Roslyn")>
         <Fact, Trait(Traits.Feature, Traits.Features.Completion)>
-        Public Sub EditorBrowsable_Method_BrowsableStateAlways()
+        Public Async Function TestEditorBrowsable_Method_BrowsableStateAlways() As Task
 
             Dim markup = <Text><![CDATA[
 Class Program
     Sub M()
-        Foo.Bar($$
+        Goo.Bar($$
     End Sub
 End Class
 ]]></Text>.Value
 
             Dim referencedCode = <Text><![CDATA[
-Public Class Foo
+Public Class Goo
     <System.ComponentModel.EditorBrowsableAttribute(System.ComponentModel.EditorBrowsableState.Always)>
     Public Shared Sub Bar() 
     End Sub
 End Class
 ]]></Text>.Value
             Dim expectedOrderedItems = New List(Of SignatureHelpTestItem)()
-            expectedOrderedItems.Add(New SignatureHelpTestItem("Foo.Bar()", String.Empty, Nothing, currentParameterIndex:=0))
+            expectedOrderedItems.Add(New SignatureHelpTestItem("Goo.Bar()", String.Empty, Nothing, currentParameterIndex:=0))
 
-            TestSignatureHelpInEditorBrowsableContexts(markup:=markup,
+            Await TestSignatureHelpInEditorBrowsableContextsAsync(markup:=markup,
                                                 referencedCode:=referencedCode,
                                                 expectedOrderedItemsMetadataReference:=expectedOrderedItems,
                                                 expectedOrderedItemsSameSolution:=expectedOrderedItems,
                                                 sourceLanguage:=LanguageNames.VisualBasic,
                                                 referencedLanguage:=LanguageNames.VisualBasic)
-        End Sub
+        End Function
 
         <WorkItem(7336, "DevDiv_Projects/Roslyn")>
         <Fact, Trait(Traits.Feature, Traits.Features.Completion)>
-        Public Sub EditorBrowsable_Method_BrowsableStateNever()
+        Public Async Function TestEditorBrowsable_Method_BrowsableStateNever() As Task
 
             Dim markup = <Text><![CDATA[
 Class Program
     Sub M()
-        Foo.Bar($$
+        Goo.Bar($$
     End Sub
 End Class
 ]]></Text>.Value
 
             Dim referencedCode = <Text><![CDATA[
-Public Class Foo
+Public Class Goo
     <System.ComponentModel.EditorBrowsableAttribute(System.ComponentModel.EditorBrowsableState.Never)>
     Public Shared Sub Bar() 
     End Sub
@@ -996,40 +1112,40 @@ End Class
 ]]></Text>.Value
 
             Dim expectedOrderedItems = New List(Of SignatureHelpTestItem)()
-            expectedOrderedItems.Add(New SignatureHelpTestItem("Foo.Bar()", String.Empty, Nothing, currentParameterIndex:=0))
+            expectedOrderedItems.Add(New SignatureHelpTestItem("Goo.Bar()", String.Empty, Nothing, currentParameterIndex:=0))
 
-            TestSignatureHelpInEditorBrowsableContexts(markup:=markup,
+            Await TestSignatureHelpInEditorBrowsableContextsAsync(markup:=markup,
                                                 referencedCode:=referencedCode,
                                                 expectedOrderedItemsMetadataReference:=New List(Of SignatureHelpTestItem),
                                                 expectedOrderedItemsSameSolution:=expectedOrderedItems,
                                                 sourceLanguage:=LanguageNames.VisualBasic,
                                                 referencedLanguage:=LanguageNames.VisualBasic)
-        End Sub
+        End Function
 
         <WorkItem(7336, "DevDiv_Projects/Roslyn")>
         <Fact, Trait(Traits.Feature, Traits.Features.Completion)>
-        Public Sub EditorBrowsable_Method_BrowsableStateAdvanced()
+        Public Async Function TestEditorBrowsable_Method_BrowsableStateAdvanced() As Task
 
             Dim markup = <Text><![CDATA[
 Class Program
     Sub M()
-        Dim f As Foo
+        Dim f As Goo
         f.Bar($$
     End Sub
 End Class
 ]]></Text>.Value
 
             Dim referencedCode = <Text><![CDATA[
-Public Class Foo
+Public Class Goo
     <System.ComponentModel.EditorBrowsableAttribute(System.ComponentModel.EditorBrowsableState.Advanced)>
     Public Sub Bar() 
     End Sub
 End Class
 ]]></Text>.Value
             Dim expectedOrderedItems = New List(Of SignatureHelpTestItem)()
-            expectedOrderedItems.Add(New SignatureHelpTestItem("Foo.Bar()", String.Empty, Nothing, currentParameterIndex:=0))
+            expectedOrderedItems.Add(New SignatureHelpTestItem("Goo.Bar()", String.Empty, Nothing, currentParameterIndex:=0))
 
-            TestSignatureHelpInEditorBrowsableContexts(markup:=markup,
+            Await TestSignatureHelpInEditorBrowsableContextsAsync(markup:=markup,
                                                 referencedCode:=referencedCode,
                                                 expectedOrderedItemsMetadataReference:=New List(Of SignatureHelpTestItem),
                                                 expectedOrderedItemsSameSolution:=expectedOrderedItems,
@@ -1037,30 +1153,30 @@ End Class
                                                 referencedLanguage:=LanguageNames.VisualBasic,
                                                 hideAdvancedMembers:=True)
 
-            TestSignatureHelpInEditorBrowsableContexts(markup:=markup,
+            Await TestSignatureHelpInEditorBrowsableContextsAsync(markup:=markup,
                                                 referencedCode:=referencedCode,
                                                 expectedOrderedItemsMetadataReference:=expectedOrderedItems,
                                                 expectedOrderedItemsSameSolution:=expectedOrderedItems,
                                                 sourceLanguage:=LanguageNames.VisualBasic,
                                                 referencedLanguage:=LanguageNames.VisualBasic,
                                                 hideAdvancedMembers:=False)
-        End Sub
+        End Function
 
         <WorkItem(7336, "DevDiv_Projects/Roslyn")>
         <Fact, Trait(Traits.Feature, Traits.Features.Completion)>
-        Public Sub EditorBrowsable_Method_Overloads_OneBrowsableAlways_OneBrowsableNever()
+        Public Async Function TestEditorBrowsable_Method_Overloads_OneBrowsableAlways_OneBrowsableNever() As Task
 
             Dim markup = <Text><![CDATA[
 Class Program
     Sub M()
-        Dim f As Foo
+        Dim f As Goo
         f.Bar($$
     End Sub
 End Class
 ]]></Text>.Value
 
             Dim referencedCode = <Text><![CDATA[
-Public Class Foo
+Public Class Goo
     <System.ComponentModel.EditorBrowsableAttribute(System.ComponentModel.EditorBrowsableState.Always)>
     Public Sub Bar() 
     End Sub
@@ -1072,34 +1188,34 @@ End Class
 ]]></Text>.Value
 
             Dim expectedOrderedItemsMetadataReference = New List(Of SignatureHelpTestItem)()
-            expectedOrderedItemsMetadataReference.Add(New SignatureHelpTestItem("Foo.Bar()", String.Empty, Nothing, currentParameterIndex:=0))
+            expectedOrderedItemsMetadataReference.Add(New SignatureHelpTestItem("Goo.Bar()", String.Empty, Nothing, currentParameterIndex:=0))
 
             Dim expectedOrderedItemsSameSolution = New List(Of SignatureHelpTestItem)()
-            expectedOrderedItemsSameSolution.Add(New SignatureHelpTestItem("Foo.Bar()", String.Empty, Nothing, currentParameterIndex:=0))
-            expectedOrderedItemsSameSolution.Add(New SignatureHelpTestItem("Foo.Bar(x As Integer)", String.Empty, String.Empty, currentParameterIndex:=0))
+            expectedOrderedItemsSameSolution.Add(New SignatureHelpTestItem("Goo.Bar()", String.Empty, Nothing, currentParameterIndex:=0))
+            expectedOrderedItemsSameSolution.Add(New SignatureHelpTestItem("Goo.Bar(x As Integer)", String.Empty, String.Empty, currentParameterIndex:=0))
 
-            TestSignatureHelpInEditorBrowsableContexts(markup:=markup,
+            Await TestSignatureHelpInEditorBrowsableContextsAsync(markup:=markup,
                                                 referencedCode:=referencedCode,
                                                 expectedOrderedItemsMetadataReference:=expectedOrderedItemsMetadataReference,
                                                 expectedOrderedItemsSameSolution:=expectedOrderedItemsSameSolution,
                                                 sourceLanguage:=LanguageNames.VisualBasic,
                                                 referencedLanguage:=LanguageNames.VisualBasic)
-        End Sub
+        End Function
 
         <WorkItem(7336, "DevDiv_Projects/Roslyn")>
         <Fact, Trait(Traits.Feature, Traits.Features.Completion)>
-        Public Sub EditorBrowsable_Method_Overloads_BothBrowsableNever()
+        Public Async Function TestEditorBrowsable_Method_Overloads_BothBrowsableNever() As Task
 
             Dim markup = <Text><![CDATA[
 Class Program
     Sub M()
-        New Foo().Bar($$
+        New Goo().Bar($$
     End Sub
 End Class
 ]]></Text>.Value
 
             Dim referencedCode = <Text><![CDATA[
-Public Class Foo
+Public Class Goo
     <System.ComponentModel.EditorBrowsableAttribute(System.ComponentModel.EditorBrowsableState.Never)>
     Public Sub Bar() 
     End Sub
@@ -1110,60 +1226,60 @@ Public Class Foo
 End Class
 ]]></Text>.Value
 
-            TestSignatureHelpInEditorBrowsableContexts(markup:=markup,
+            Await TestSignatureHelpInEditorBrowsableContextsAsync(markup:=markup,
                                                 referencedCode:=referencedCode,
                                                 expectedOrderedItemsMetadataReference:=New List(Of SignatureHelpTestItem),
                                                 expectedOrderedItemsSameSolution:=New List(Of SignatureHelpTestItem),
                                                 sourceLanguage:=LanguageNames.VisualBasic,
                                                 referencedLanguage:=LanguageNames.VisualBasic)
-        End Sub
+        End Function
 
         <WorkItem(7336, "DevDiv_Projects/Roslyn")>
         <Fact, Trait(Traits.Feature, Traits.Features.Completion)>
-        Public Sub OverriddenSymbolsFilteredFromSigHelp()
+        Public Async Function TestOverriddenSymbolsFilteredFromSigHelp() As Task
 
             Dim markup = <Text><![CDATA[
 Class Program
     Sub M()
         Dim dd as D
-        dd.Foo($$
+        dd.Goo($$
     End Sub   
 End Class
 ]]></Text>.Value
 
             Dim referencedCode = <Text><![CDATA[
 Public Class B
-    Public Overridable Sub Foo(original As Integer) 
+    Public Overridable Sub Goo(original As Integer) 
     End Sub
 End Class
 
 Public Class D 
     Inherits B
-    Public Overrides Sub Foo(derived As Integer) 
+    Public Overrides Sub Goo(derived As Integer) 
     End Sub
 End Class
 ]]></Text>.Value
 
             Dim expectedOrderedItems = New List(Of SignatureHelpTestItem)()
-            expectedOrderedItems.Add(New SignatureHelpTestItem("D.Foo(derived As Integer)", String.Empty, String.Empty, currentParameterIndex:=0))
+            expectedOrderedItems.Add(New SignatureHelpTestItem("D.Goo(derived As Integer)", String.Empty, String.Empty, currentParameterIndex:=0))
 
-            TestSignatureHelpInEditorBrowsableContexts(markup:=markup,
+            Await TestSignatureHelpInEditorBrowsableContextsAsync(markup:=markup,
                                                 referencedCode:=referencedCode,
                                                 expectedOrderedItemsMetadataReference:=expectedOrderedItems,
                                                 expectedOrderedItemsSameSolution:=expectedOrderedItems,
                                                 sourceLanguage:=LanguageNames.VisualBasic,
                                                 referencedLanguage:=LanguageNames.VisualBasic)
-        End Sub
+        End Function
 
         <WorkItem(7336, "DevDiv_Projects/Roslyn")>
         <Fact, Trait(Traits.Feature, Traits.Features.Completion)>
-        Public Sub EditorBrowsable_BrowsableStateAlwaysMethodInBrowsableStateNeverClass()
+        Public Async Function TestEditorBrowsable_BrowsableStateAlwaysMethodInBrowsableStateNeverClass() As Task
 
             Dim markup = <Text><![CDATA[
 Class Program
     Sub M()
         Dim x As C
-        x.Foo($$
+        x.Goo($$
     End Sub
 End Class
 ]]></Text>.Value
@@ -1171,30 +1287,30 @@ End Class
             Dim referencedCode = <Text><![CDATA[
 <System.ComponentModel.EditorBrowsableAttribute(System.ComponentModel.EditorBrowsableState.Never)>
 Public Class C
-    Public Sub Foo() 
+    Public Sub Goo() 
     End Sub
 End Class
 ]]></Text>.Value
             Dim expectedOrderedItems = New List(Of SignatureHelpTestItem)()
-            expectedOrderedItems.Add(New SignatureHelpTestItem("C.Foo()", String.Empty, Nothing, currentParameterIndex:=0))
+            expectedOrderedItems.Add(New SignatureHelpTestItem("C.Goo()", String.Empty, Nothing, currentParameterIndex:=0))
 
-            TestSignatureHelpInEditorBrowsableContexts(markup:=markup,
+            Await TestSignatureHelpInEditorBrowsableContextsAsync(markup:=markup,
                                                 referencedCode:=referencedCode,
                                                 expectedOrderedItemsMetadataReference:=expectedOrderedItems,
                                                 expectedOrderedItemsSameSolution:=expectedOrderedItems,
                                                 sourceLanguage:=LanguageNames.VisualBasic,
                                                 referencedLanguage:=LanguageNames.VisualBasic)
-        End Sub
+        End Function
 
         <WorkItem(7336, "DevDiv_Projects/Roslyn")>
         <Fact, Trait(Traits.Feature, Traits.Features.Completion)>
-        Public Sub EditorBrowsable_BrowsableStateAlwaysMethodInBrowsableStateNeverBaseClass()
+        Public Async Function TestEditorBrowsable_BrowsableStateAlwaysMethodInBrowsableStateNeverBaseClass() As Task
 
             Dim markup = <Text><![CDATA[
 Class Program
     Sub M()
         Dim x As D
-        x.Foo($$
+        x.Goo($$
     End Sub
 End Class
 ]]></Text>.Value
@@ -1202,74 +1318,74 @@ End Class
             Dim referencedCode = <Text><![CDATA[
 <System.ComponentModel.EditorBrowsableAttribute(System.ComponentModel.EditorBrowsableState.Never)>
 Public Class B
-    Public Sub Foo() 
+    Public Sub Goo() 
     End Sub
 End Class
 
 Public Class D 
     Inherits B
-    Public Overloads Sub Foo(x As Integer)
+    Public Overloads Sub Goo(x As Integer)
     End Sub
 End Class
 ]]></Text>.Value
             Dim expectedOrderedItems = New List(Of SignatureHelpTestItem) From {
-                New SignatureHelpTestItem("B.Foo()", String.Empty, Nothing, currentParameterIndex:=0),
-                New SignatureHelpTestItem("D.Foo(x As Integer)", String.Empty, String.Empty, currentParameterIndex:=0)
+                New SignatureHelpTestItem("B.Goo()", String.Empty, Nothing, currentParameterIndex:=0),
+                New SignatureHelpTestItem("D.Goo(x As Integer)", String.Empty, String.Empty, currentParameterIndex:=0)
             }
 
-            TestSignatureHelpInEditorBrowsableContexts(markup:=markup,
+            Await TestSignatureHelpInEditorBrowsableContextsAsync(markup:=markup,
                                                 referencedCode:=referencedCode,
                                                 expectedOrderedItemsMetadataReference:=expectedOrderedItems,
                                                 expectedOrderedItemsSameSolution:=expectedOrderedItems,
                                                 sourceLanguage:=LanguageNames.VisualBasic,
                                                 referencedLanguage:=LanguageNames.VisualBasic)
-        End Sub
+        End Function
 
         <WorkItem(7336, "DevDiv_Projects/Roslyn")>
         <Fact, Trait(Traits.Feature, Traits.Features.Completion)>
-        Public Sub EditorBrowsable_HidingWithDifferentParameterList()
+        Public Async Function TestEditorBrowsable_HidingWithDifferentParameterList() As Task
 
             Dim markup = <Text><![CDATA[
 Class Program
     Sub M()
         Dim x As D
-        x.Foo($$
+        x.Goo($$
     End Sub
 End Class
 ]]></Text>.Value
 
             Dim referencedCode = <Text><![CDATA[
 Public Class B
-    Public Sub Foo() 
+    Public Sub Goo() 
     End Sub
 End Class
 
 Public Class D 
     Inherits B
-    Public Sub Foo(x As Integer)
+    Public Sub Goo(x As Integer)
     End Sub
 End Class
 ]]></Text>.Value
             Dim expectedOrderedItems = New List(Of SignatureHelpTestItem)()
-            expectedOrderedItems.Add(New SignatureHelpTestItem("D.Foo(x As Integer)", String.Empty, String.Empty, currentParameterIndex:=0))
+            expectedOrderedItems.Add(New SignatureHelpTestItem("D.Goo(x As Integer)", String.Empty, String.Empty, currentParameterIndex:=0))
 
-            TestSignatureHelpInEditorBrowsableContexts(markup:=markup,
+            Await TestSignatureHelpInEditorBrowsableContextsAsync(markup:=markup,
                                                 referencedCode:=referencedCode,
                                                 expectedOrderedItemsMetadataReference:=expectedOrderedItems,
                                                 expectedOrderedItemsSameSolution:=expectedOrderedItems,
                                                 sourceLanguage:=LanguageNames.VisualBasic,
                                                 referencedLanguage:=LanguageNames.VisualBasic)
-        End Sub
+        End Function
 
         <WorkItem(7336, "DevDiv_Projects/Roslyn")>
         <Fact, Trait(Traits.Feature, Traits.Features.Completion)>
-        Public Sub EditorBrowsable_BrowsableStateNeverMethodsInBaseClass()
+        Public Async Function TestEditorBrowsable_BrowsableStateNeverMethodsInBaseClass() As Task
 
             Dim markup = <Text><![CDATA[
 Class Program 
     Inherits B
     Sub M()
-        Foo($$
+        Goo($$
     End Sub
 End Class
 ]]></Text>.Value
@@ -1277,63 +1393,63 @@ End Class
             Dim referencedCode = <Text><![CDATA[
 Public Class B
     <System.ComponentModel.EditorBrowsableAttribute(System.ComponentModel.EditorBrowsableState.Never)>
-    Public Sub Foo() 
+    Public Sub Goo() 
     End Sub
 End Class
 ]]></Text>.Value
             Dim expectedOrderedItems = New List(Of SignatureHelpTestItem)()
-            expectedOrderedItems.Add(New SignatureHelpTestItem("B.Foo()", String.Empty, Nothing, currentParameterIndex:=0))
+            expectedOrderedItems.Add(New SignatureHelpTestItem("B.Goo()", String.Empty, Nothing, currentParameterIndex:=0))
 
-            TestSignatureHelpInEditorBrowsableContexts(markup:=markup,
+            Await TestSignatureHelpInEditorBrowsableContextsAsync(markup:=markup,
                                                 referencedCode:=referencedCode,
                                                 expectedOrderedItemsMetadataReference:=New List(Of SignatureHelpTestItem),
                                                 expectedOrderedItemsSameSolution:=expectedOrderedItems,
                                                 sourceLanguage:=LanguageNames.VisualBasic,
                                                 referencedLanguage:=LanguageNames.VisualBasic)
-        End Sub
+        End Function
 
         <WorkItem(7336, "DevDiv_Projects/Roslyn")>
         <Fact, Trait(Traits.Feature, Traits.Features.Completion)>
-        Public Sub EditorBrowsable_GenericTypeCausingMethodSignatureEquality_BothBrowsableAlways()
+        Public Async Function TestEditorBrowsable_GenericTypeCausingMethodSignatureEquality_BothBrowsableAlways() As Task
 
             Dim markup = <Text><![CDATA[
 Class Program
     Sub M()
         Dim ci = New C(Of Integer)()
-        ci.Foo($$
+        ci.Goo($$
     End Sub
 End Class
 ]]></Text>.Value
 
             Dim referencedCode = <Text><![CDATA[
 Public Class C(Of T)
-    Public Sub Foo(t As T)
+    Public Sub Goo(t As T)
     End Sub
-    Public Sub Foo(i As Integer)  
+    Public Sub Goo(i As Integer)  
     End Sub
 End Class
 ]]></Text>.Value
             Dim expectedOrderedItems = New List(Of SignatureHelpTestItem)()
-            expectedOrderedItems.Add(New SignatureHelpTestItem("C(Of Integer).Foo(t As Integer)", String.Empty, String.Empty, currentParameterIndex:=0))
-            expectedOrderedItems.Add(New SignatureHelpTestItem("C(Of Integer).Foo(i As Integer)", String.Empty, String.Empty, currentParameterIndex:=0))
+            expectedOrderedItems.Add(New SignatureHelpTestItem("C(Of Integer).Goo(t As Integer)", String.Empty, String.Empty, currentParameterIndex:=0))
+            expectedOrderedItems.Add(New SignatureHelpTestItem("C(Of Integer).Goo(i As Integer)", String.Empty, String.Empty, currentParameterIndex:=0))
 
-            TestSignatureHelpInEditorBrowsableContexts(markup:=markup,
+            Await TestSignatureHelpInEditorBrowsableContextsAsync(markup:=markup,
                                                 referencedCode:=referencedCode,
                                                 expectedOrderedItemsMetadataReference:=expectedOrderedItems,
                                                 expectedOrderedItemsSameSolution:=expectedOrderedItems,
                                                 sourceLanguage:=LanguageNames.VisualBasic,
                                                 referencedLanguage:=LanguageNames.VisualBasic)
-        End Sub
+        End Function
 
         <WorkItem(7336, "DevDiv_Projects/Roslyn")>
         <Fact, Trait(Traits.Feature, Traits.Features.Completion)>
-        Public Sub EditorBrowsable_GenericTypeCausingMethodSignatureEquality_BrowsableMixed1()
+        Public Async Function TestEditorBrowsable_GenericTypeCausingMethodSignatureEquality_BrowsableMixed1() As Task
 
             Dim markup = <Text><![CDATA[
 Class Program
     Sub M()
         Dim ci = New C(Of Integer)()
-        ci.Foo($$
+        ci.Goo($$
     End Sub
 End Class
 ]]></Text>.Value
@@ -1341,74 +1457,74 @@ End Class
             Dim referencedCode = <Text><![CDATA[
 Public Class C(Of T)
     <System.ComponentModel.EditorBrowsableAttribute(System.ComponentModel.EditorBrowsableState.Never)>
-    Public Sub Foo(t As T)  
+    Public Sub Goo(t As T)  
     End Sub
-    Public Sub Foo(i As Integer)  
+    Public Sub Goo(i As Integer)  
     End Sub
 End Class
 ]]></Text>.Value
 
             Dim expectedOrderedItemsMetadataReference = New List(Of SignatureHelpTestItem)()
-            expectedOrderedItemsMetadataReference.Add(New SignatureHelpTestItem("C(Of Integer).Foo(i As Integer)", String.Empty, String.Empty, currentParameterIndex:=0))
+            expectedOrderedItemsMetadataReference.Add(New SignatureHelpTestItem("C(Of Integer).Goo(i As Integer)", String.Empty, String.Empty, currentParameterIndex:=0))
 
             Dim expectedOrderedItemsSameSolution = New List(Of SignatureHelpTestItem)()
-            expectedOrderedItemsSameSolution.Add(New SignatureHelpTestItem("C(Of Integer).Foo(t As Integer)", String.Empty, String.Empty, currentParameterIndex:=0))
-            expectedOrderedItemsSameSolution.Add(New SignatureHelpTestItem("C(Of Integer).Foo(i As Integer)", String.Empty, String.Empty, currentParameterIndex:=0))
+            expectedOrderedItemsSameSolution.Add(New SignatureHelpTestItem("C(Of Integer).Goo(t As Integer)", String.Empty, String.Empty, currentParameterIndex:=0))
+            expectedOrderedItemsSameSolution.Add(New SignatureHelpTestItem("C(Of Integer).Goo(i As Integer)", String.Empty, String.Empty, currentParameterIndex:=0))
 
-            TestSignatureHelpInEditorBrowsableContexts(markup:=markup,
+            Await TestSignatureHelpInEditorBrowsableContextsAsync(markup:=markup,
                                                 referencedCode:=referencedCode,
                                                 expectedOrderedItemsMetadataReference:=expectedOrderedItemsMetadataReference,
                                                 expectedOrderedItemsSameSolution:=expectedOrderedItemsSameSolution,
                                                 sourceLanguage:=LanguageNames.VisualBasic,
                                                 referencedLanguage:=LanguageNames.VisualBasic)
-        End Sub
+        End Function
 
         <WorkItem(7336, "DevDiv_Projects/Roslyn")>
         <Fact, Trait(Traits.Feature, Traits.Features.Completion)>
-        Public Sub EditorBrowsable_GenericTypeCausingMethodSignatureEquality_BrowsableMixed2()
+        Public Async Function TestEditorBrowsable_GenericTypeCausingMethodSignatureEquality_BrowsableMixed2() As Task
 
             Dim markup = <Text><![CDATA[
 Class Program
     Sub M()
         Dim ci = New C(Of Integer)()
-        ci.Foo($$
+        ci.Goo($$
     End Sub
 End Class
 ]]></Text>.Value
 
             Dim referencedCode = <Text><![CDATA[
 Public Class C(Of T)
-    Public Sub Foo(t As T)
+    Public Sub Goo(t As T)
     End Sub
     <System.ComponentModel.EditorBrowsableAttribute(System.ComponentModel.EditorBrowsableState.Never)>
-    Public Sub Foo(i As Integer)  
+    Public Sub Goo(i As Integer)  
     End Sub
 End Class
 ]]></Text>.Value
             Dim expectedOrderedItemsMetadataReference = New List(Of SignatureHelpTestItem)()
-            expectedOrderedItemsMetadataReference.Add(New SignatureHelpTestItem("C(Of Integer).Foo(t As Integer)", String.Empty, String.Empty, currentParameterIndex:=0))
+            expectedOrderedItemsMetadataReference.Add(New SignatureHelpTestItem("C(Of Integer).Goo(t As Integer)", String.Empty, String.Empty, currentParameterIndex:=0))
 
             Dim expectedOrderedItemsSameSolution = New List(Of SignatureHelpTestItem)()
-            expectedOrderedItemsSameSolution.Add(New SignatureHelpTestItem("C(Of Integer).Foo(t As Integer)", String.Empty, String.Empty, currentParameterIndex:=0))
-            expectedOrderedItemsSameSolution.Add(New SignatureHelpTestItem("C(Of Integer).Foo(i As Integer)", String.Empty, String.Empty, currentParameterIndex:=0))
+            expectedOrderedItemsSameSolution.Add(New SignatureHelpTestItem("C(Of Integer).Goo(t As Integer)", String.Empty, String.Empty, currentParameterIndex:=0))
+            expectedOrderedItemsSameSolution.Add(New SignatureHelpTestItem("C(Of Integer).Goo(i As Integer)", String.Empty, String.Empty, currentParameterIndex:=0))
 
-            TestSignatureHelpInEditorBrowsableContexts(markup:=markup,
+            Await TestSignatureHelpInEditorBrowsableContextsAsync(markup:=markup,
                                                 referencedCode:=referencedCode,
                                                 expectedOrderedItemsMetadataReference:=expectedOrderedItemsMetadataReference,
                                                 expectedOrderedItemsSameSolution:=expectedOrderedItemsSameSolution,
                                                 sourceLanguage:=LanguageNames.VisualBasic,
                                                 referencedLanguage:=LanguageNames.VisualBasic)
-        End Sub
+        End Function
 
         <WorkItem(7336, "DevDiv_Projects/Roslyn")>
         <Fact, Trait(Traits.Feature, Traits.Features.Completion)>
-        Public Sub EditorBrowsable_GenericTypeCausingMethodSignatureEquality_BothBrowsableNever()
+        Public Async Function TestEditorBrowsable_GenericTypeCausingMethodSignatureEquality_BothBrowsableNever() As Task
 
             Dim markup = <Text><![CDATA[
 Class Program
     Sub M()
         Dim ci = New C(Of Integer)()
-        ci.Foo($$
+        ci.Goo($$
     End Sub
 End Class
 ]]></Text>.Value
@@ -1416,69 +1532,69 @@ End Class
             Dim referencedCode = <Text><![CDATA[
 Public Class C(Of T)
     <System.ComponentModel.EditorBrowsableAttribute(System.ComponentModel.EditorBrowsableState.Never)>
-    Public Sub Foo(t As T)  
+    Public Sub Goo(t As T)  
     End Sub
     <System.ComponentModel.EditorBrowsableAttribute(System.ComponentModel.EditorBrowsableState.Never)>
-    Public Sub Foo(i As Integer)  
+    Public Sub Goo(i As Integer)  
     End Sub
 End Class
 ]]></Text>.Value
 
             Dim expectedOrderedItems = New List(Of SignatureHelpTestItem)()
-            expectedOrderedItems.Add(New SignatureHelpTestItem("C(Of Integer).Foo(t As Integer)", String.Empty, String.Empty, currentParameterIndex:=0))
-            expectedOrderedItems.Add(New SignatureHelpTestItem("C(Of Integer).Foo(i As Integer)", String.Empty, String.Empty, currentParameterIndex:=0))
+            expectedOrderedItems.Add(New SignatureHelpTestItem("C(Of Integer).Goo(t As Integer)", String.Empty, String.Empty, currentParameterIndex:=0))
+            expectedOrderedItems.Add(New SignatureHelpTestItem("C(Of Integer).Goo(i As Integer)", String.Empty, String.Empty, currentParameterIndex:=0))
 
-            TestSignatureHelpInEditorBrowsableContexts(markup:=markup,
+            Await TestSignatureHelpInEditorBrowsableContextsAsync(markup:=markup,
                                                 referencedCode:=referencedCode,
                                                 expectedOrderedItemsMetadataReference:=New List(Of SignatureHelpTestItem),
                                                 expectedOrderedItemsSameSolution:=expectedOrderedItems,
                                                 sourceLanguage:=LanguageNames.VisualBasic,
                                                 referencedLanguage:=LanguageNames.VisualBasic)
-        End Sub
+        End Function
 
         <WorkItem(7336, "DevDiv_Projects/Roslyn")>
         <Fact, Trait(Traits.Feature, Traits.Features.Completion)>
-        Public Sub EditorBrowsable_GenericType2CausingMethodSignatureEquality_BothBrowsableAlways()
+        Public Async Function TestEditorBrowsable_GenericType2CausingMethodSignatureEquality_BothBrowsableAlways() As Task
 
             Dim markup = <Text><![CDATA[
 Class Program
     Sub M()
         Dim cii As C(Of Integer, Integer)
-        cii.Foo($$
+        cii.Goo($$
     End Sub
 End Class
 ]]></Text>.Value
 
             Dim referencedCode = <Text><![CDATA[
 Public Class C(Of T, U)
-    Public Sub Foo(t As T)
+    Public Sub Goo(t As T)
     End Sub  
-    Public Sub Foo(u As U)  
+    Public Sub Goo(u As U)  
     End Sub
 End Class
 ]]></Text>.Value
 
             Dim expectedOrderedItems = New List(Of SignatureHelpTestItem)()
-            expectedOrderedItems.Add(New SignatureHelpTestItem("C(Of Integer, Integer).Foo(t As Integer)", String.Empty, String.Empty, currentParameterIndex:=0))
-            expectedOrderedItems.Add(New SignatureHelpTestItem("C(Of Integer, Integer).Foo(u As Integer)", String.Empty, String.Empty, currentParameterIndex:=0))
+            expectedOrderedItems.Add(New SignatureHelpTestItem("C(Of Integer, Integer).Goo(t As Integer)", String.Empty, String.Empty, currentParameterIndex:=0))
+            expectedOrderedItems.Add(New SignatureHelpTestItem("C(Of Integer, Integer).Goo(u As Integer)", String.Empty, String.Empty, currentParameterIndex:=0))
 
-            TestSignatureHelpInEditorBrowsableContexts(markup:=markup,
+            Await TestSignatureHelpInEditorBrowsableContextsAsync(markup:=markup,
                                                 referencedCode:=referencedCode,
                                                 expectedOrderedItemsMetadataReference:=expectedOrderedItems,
                                                 expectedOrderedItemsSameSolution:=expectedOrderedItems,
                                                 sourceLanguage:=LanguageNames.VisualBasic,
                                                 referencedLanguage:=LanguageNames.VisualBasic)
-        End Sub
+        End Function
 
         <WorkItem(7336, "DevDiv_Projects/Roslyn")>
         <Fact, Trait(Traits.Feature, Traits.Features.Completion)>
-        Public Sub EditorBrowsable_GenericType2CausingMethodSignatureEquality_BrowsableMixed()
+        Public Async Function TestEditorBrowsable_GenericType2CausingMethodSignatureEquality_BrowsableMixed() As Task
 
             Dim markup = <Text><![CDATA[
 Class Program
     Sub M()
         Dim cii As C(Of Integer, Integer)
-        cii.Foo($$
+        cii.Goo($$
     End Sub
 End Class
 ]]></Text>.Value
@@ -1486,36 +1602,36 @@ End Class
             Dim referencedCode = <Text><![CDATA[
 Public Class C(Of T, U)
     <System.ComponentModel.EditorBrowsableAttribute(System.ComponentModel.EditorBrowsableState.Never)>
-    Public Sub Foo(t As T)
+    Public Sub Goo(t As T)
     End Sub
-    Public Sub Foo(u As U)
+    Public Sub Goo(u As U)
     End Sub
 End Class
 ]]></Text>.Value
             Dim expectedOrderedItemsMetadataReference = New List(Of SignatureHelpTestItem)()
-            expectedOrderedItemsMetadataReference.Add(New SignatureHelpTestItem("C(Of Integer, Integer).Foo(u As Integer)", String.Empty, String.Empty, currentParameterIndex:=0))
+            expectedOrderedItemsMetadataReference.Add(New SignatureHelpTestItem("C(Of Integer, Integer).Goo(u As Integer)", String.Empty, String.Empty, currentParameterIndex:=0))
 
             Dim expectedOrderedItemsSameSolution = New List(Of SignatureHelpTestItem)()
-            expectedOrderedItemsSameSolution.Add(New SignatureHelpTestItem("C(Of Integer, Integer).Foo(t As Integer)", String.Empty, String.Empty, currentParameterIndex:=0))
-            expectedOrderedItemsSameSolution.Add(New SignatureHelpTestItem("C(Of Integer, Integer).Foo(u As Integer)", String.Empty, String.Empty, currentParameterIndex:=0))
+            expectedOrderedItemsSameSolution.Add(New SignatureHelpTestItem("C(Of Integer, Integer).Goo(t As Integer)", String.Empty, String.Empty, currentParameterIndex:=0))
+            expectedOrderedItemsSameSolution.Add(New SignatureHelpTestItem("C(Of Integer, Integer).Goo(u As Integer)", String.Empty, String.Empty, currentParameterIndex:=0))
 
-            TestSignatureHelpInEditorBrowsableContexts(markup:=markup,
+            Await TestSignatureHelpInEditorBrowsableContextsAsync(markup:=markup,
                                                 referencedCode:=referencedCode,
                                                 expectedOrderedItemsMetadataReference:=expectedOrderedItemsMetadataReference,
                                                 expectedOrderedItemsSameSolution:=expectedOrderedItemsSameSolution,
                                                 sourceLanguage:=LanguageNames.VisualBasic,
                                                 referencedLanguage:=LanguageNames.VisualBasic)
-        End Sub
+        End Function
 
         <WorkItem(7336, "DevDiv_Projects/Roslyn")>
         <Fact, Trait(Traits.Feature, Traits.Features.Completion)>
-        Public Sub EditorBrowsable_GenericType2CausingMethodSignatureEquality_BothBrowsableNever()
+        Public Async Function TestEditorBrowsable_GenericType2CausingMethodSignatureEquality_BothBrowsableNever() As Task
 
             Dim markup = <Text><![CDATA[
 Class Program
     Sub M()
         Dim cii as C(Of Integer, Integer)
-        cii.Foo($$
+        cii.Goo($$
     End Sub
 End Class
 ]]></Text>.Value
@@ -1523,29 +1639,29 @@ End Class
             Dim referencedCode = <Text><![CDATA[
 Public Class C(Of T, U)
     <System.ComponentModel.EditorBrowsableAttribute(System.ComponentModel.EditorBrowsableState.Never)>
-    Public Sub Foo(t As T)
+    Public Sub Goo(t As T)
     End Sub
     <System.ComponentModel.EditorBrowsableAttribute(System.ComponentModel.EditorBrowsableState.Never)>
-    Public Sub Foo(u As U)  
+    Public Sub Goo(u As U)  
     End Sub
 End Class
 ]]></Text>.Value
 
             Dim expectedOrderedItems = New List(Of SignatureHelpTestItem)()
-            expectedOrderedItems.Add(New SignatureHelpTestItem("C(Of Integer, Integer).Foo(t As Integer)", String.Empty, String.Empty, currentParameterIndex:=0))
-            expectedOrderedItems.Add(New SignatureHelpTestItem("C(Of Integer, Integer).Foo(u As Integer)", String.Empty, String.Empty, currentParameterIndex:=0))
+            expectedOrderedItems.Add(New SignatureHelpTestItem("C(Of Integer, Integer).Goo(t As Integer)", String.Empty, String.Empty, currentParameterIndex:=0))
+            expectedOrderedItems.Add(New SignatureHelpTestItem("C(Of Integer, Integer).Goo(u As Integer)", String.Empty, String.Empty, currentParameterIndex:=0))
 
-            TestSignatureHelpInEditorBrowsableContexts(markup:=markup,
+            Await TestSignatureHelpInEditorBrowsableContextsAsync(markup:=markup,
                                                 referencedCode:=referencedCode,
                                                 expectedOrderedItemsMetadataReference:=New List(Of SignatureHelpTestItem),
                                                 expectedOrderedItemsSameSolution:=expectedOrderedItems,
                                                 sourceLanguage:=LanguageNames.VisualBasic,
                                                 referencedLanguage:=LanguageNames.VisualBasic)
-        End Sub
+        End Function
 
         <WorkItem(7336, "DevDiv_Projects/Roslyn")>
         <Fact, Trait(Traits.Feature, Traits.Features.Completion)>
-        Public Sub EditorBrowsable_DefaultProperty_BrowsableStateAlways()
+        Public Async Function TestEditorBrowsable_DefaultProperty_BrowsableStateAlways() As Task
 
             Dim markup = <Text><![CDATA[
 Class Program
@@ -1572,17 +1688,17 @@ End Class
             Dim expectedOrderedItems = New List(Of SignatureHelpTestItem)()
             expectedOrderedItems.Add(New SignatureHelpTestItem("C(x As Integer) As String", String.Empty, String.Empty, currentParameterIndex:=0))
 
-            TestSignatureHelpInEditorBrowsableContexts(markup:=markup,
+            Await TestSignatureHelpInEditorBrowsableContextsAsync(markup:=markup,
                                                 referencedCode:=referencedCode,
                                                 expectedOrderedItemsMetadataReference:=expectedOrderedItems,
                                                 expectedOrderedItemsSameSolution:=expectedOrderedItems,
                                                 sourceLanguage:=LanguageNames.VisualBasic,
                                                 referencedLanguage:=LanguageNames.VisualBasic)
-        End Sub
+        End Function
 
         <WorkItem(7336, "DevDiv_Projects/Roslyn")>
         <Fact, Trait(Traits.Feature, Traits.Features.Completion)>
-        Public Sub EditorBrowsable_DefaultProperty_BrowsableStateNever()
+        Public Async Function TestEditorBrowsable_DefaultProperty_BrowsableStateNever() As Task
 
             Dim markup = <Text><![CDATA[
 Class Program
@@ -1609,17 +1725,17 @@ End Class
             Dim expectedOrderedItems = New List(Of SignatureHelpTestItem)()
             expectedOrderedItems.Add(New SignatureHelpTestItem("C(x As Integer) As String", String.Empty, String.Empty, currentParameterIndex:=0))
 
-            TestSignatureHelpInEditorBrowsableContexts(markup:=markup,
+            Await TestSignatureHelpInEditorBrowsableContextsAsync(markup:=markup,
                                                 referencedCode:=referencedCode,
                                                 expectedOrderedItemsMetadataReference:=New List(Of SignatureHelpTestItem)(),
                                                 expectedOrderedItemsSameSolution:=expectedOrderedItems,
                                                 sourceLanguage:=LanguageNames.VisualBasic,
                                                 referencedLanguage:=LanguageNames.VisualBasic)
-        End Sub
+        End Function
 
         <WorkItem(7336, "DevDiv_Projects/Roslyn")>
         <Fact, Trait(Traits.Feature, Traits.Features.Completion)>
-        Public Sub EditorBrowsable_DefaultProperty_BrowsableStateAdvanced()
+        Public Async Function TestEditorBrowsable_DefaultProperty_BrowsableStateAdvanced() As Task
 
             Dim markup = <Text><![CDATA[
 Class Program
@@ -1646,7 +1762,7 @@ End Class
             Dim expectedOrderedItems = New List(Of SignatureHelpTestItem)()
             expectedOrderedItems.Add(New SignatureHelpTestItem("C(x As Integer) As String", String.Empty, String.Empty, currentParameterIndex:=0))
 
-            TestSignatureHelpInEditorBrowsableContexts(markup:=markup,
+            Await TestSignatureHelpInEditorBrowsableContextsAsync(markup:=markup,
                                                 referencedCode:=referencedCode,
                                                 expectedOrderedItemsMetadataReference:=New List(Of SignatureHelpTestItem)(),
                                                 expectedOrderedItemsSameSolution:=expectedOrderedItems,
@@ -1654,21 +1770,20 @@ End Class
                                                 referencedLanguage:=LanguageNames.VisualBasic,
                                                 hideAdvancedMembers:=True)
 
-            TestSignatureHelpInEditorBrowsableContexts(markup:=markup,
+            Await TestSignatureHelpInEditorBrowsableContextsAsync(markup:=markup,
                                                 referencedCode:=referencedCode,
                                                 expectedOrderedItemsMetadataReference:=expectedOrderedItems,
                                                 expectedOrderedItemsSameSolution:=expectedOrderedItems,
                                                 sourceLanguage:=LanguageNames.VisualBasic,
                                                 referencedLanguage:=LanguageNames.VisualBasic,
                                                 hideAdvancedMembers:=False)
-        End Sub
-
+        End Function
 
 #End Region
 
-        <WorkItem(543038)>
+        <WorkItem(543038, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/543038")>
         <Fact, Trait(Traits.Feature, Traits.Features.SignatureHelp)>
-        Public Sub SignatureHelpWhenALambdaExpressionDeclaredAndInvokedAtTheSameTime()
+        Public Async Function TestSignatureHelpWhenALambdaExpressionDeclaredAndInvokedAtTheSameTime() As Task
             Dim markup = <text>
 Class C
     Private ReadOnly field As Integer
@@ -1683,20 +1798,20 @@ End Class
             Dim expectedOrderedItems = New List(Of SignatureHelpTestItem)()
             expectedOrderedItems.Add(New SignatureHelpTestItem("Invoke(arg As Integer) As Integer", currentParameterIndex:=0))
 
-            Test(markup, expectedOrderedItems)
-        End Sub
+            Await TestAsync(markup, expectedOrderedItems)
+        End Function
 
         <Fact, Trait(Traits.Feature, Traits.Features.SignatureHelp)>
-        Public Sub MethodUnavailableInOneLinkedFile()
+        Public Async Function TestMethodUnavailableInOneLinkedFile() As Task
             Dim markup = <text><![CDATA[<Workspace>
-                             <Project Language="Visual Basic" CommonReferences="true" AssemblyName="Proj1" PreprocessorSymbols="FOO=true">
+                             <Project Language="Visual Basic" CommonReferences="true" AssemblyName="Proj1" PreprocessorSymbols="GOO=true">
                                  <Document FilePath="SourceDocument">
 class C
-#if FOO
+#if GOO
     sub bar()
     end sub
 #endif
-    sub foo()
+    sub goo()
         bar($$
     end sub
 end class
@@ -1707,23 +1822,23 @@ end class
                                  <Document IsLinkFile="true" LinkAssemblyName="Proj1" LinkFilePath="SourceDocument"/>
                              </Project>
                          </Workspace>]]></text>.Value.NormalizeLineEndings()
-            Dim expectedDescription = New SignatureHelpTestItem("C.bar()" + vbCrLf + vbCrLf + "    Proj1 - Available" + vbCrLf + "    Proj2 - Not Available" + vbCrLf + vbCrLf + "You can use the navigation bar to switch context.", currentParameterIndex:=0)
-            VerifyItemWithReferenceWorker(markup, {expectedDescription}, False)
-        End Sub
+            Dim expectedDescription = New SignatureHelpTestItem("C.bar()" + vbCrLf + vbCrLf + String.Format(FeaturesResources._0_1, "Proj1", FeaturesResources.Available) + vbCrLf + String.Format(FeaturesResources._0_1, "Proj2", FeaturesResources.Not_Available) + vbCrLf + vbCrLf + FeaturesResources.You_can_use_the_navigation_bar_to_switch_contexts, currentParameterIndex:=0)
+            Await VerifyItemWithReferenceWorkerAsync(markup, {expectedDescription}, False)
+        End Function
 
         <Fact, Trait(Traits.Feature, Traits.Features.SignatureHelp)>
-        Public Sub ExcludeLinkedFilesWithInactiveRegions()
+        Public Async Function TestExcludeLinkedFilesWithInactiveRegions() As Task
             Dim markup = <text><![CDATA[<Workspace>
-                             <Project Language="Visual Basic" CommonReferences="true" AssemblyName="Proj1" PreprocessorSymbols="FOO=true,BAR=true">
+                             <Project Language="Visual Basic" CommonReferences="true" AssemblyName="Proj1" PreprocessorSymbols="GOO=true,BAR=true">
                                  <Document FilePath="SourceDocument">
 class C
-#if FOO
+#if GOO
     sub bar()
     end sub
 #endif
 
 #if BAR
-    sub foo()
+    sub goo()
         bar($$
     end sub
 #endif
@@ -1737,8 +1852,138 @@ class C
                              </Project>
                          </Workspace>]]></text>.Value.NormalizeLineEndings()
 
-            Dim expectedDescription = New SignatureHelpTestItem("C.bar()" + "\r\n\r\n    Proj1 - Available\r\n    Proj3 - Not Available\r\n\r\nYou can use the navigation bar to switch context.".Replace("\r\n", vbCrLf), currentParameterIndex:=0)
-            VerifyItemWithReferenceWorker(markup, {expectedDescription}, False)
-        End Sub
+            Dim expectedDescription = New SignatureHelpTestItem("C.bar()" + $"\r\n\r\n{String.Format(FeaturesResources._0_1, "Proj1", FeaturesResources.Available)}\r\n{String.Format(FeaturesResources._0_1, "Proj3", FeaturesResources.Not_Available)}\r\n\r\n{FeaturesResources.You_can_use_the_navigation_bar_to_switch_contexts}".Replace("\r\n", vbCrLf), currentParameterIndex:=0)
+            Await VerifyItemWithReferenceWorkerAsync(markup, {expectedDescription}, False)
+        End Function
+
+        <WorkItem(699, "https://github.com/dotnet/roslyn/issues/699")>
+        <WorkItem(1068424, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/1068424")>
+        <Fact, Trait(Traits.Feature, Traits.Features.SignatureHelp)>
+        Public Async Function TestGenericParameters1() As Task
+            Dim markup = <a><![CDATA[
+Class C
+    Sub M()
+        Goo(""$$)
+    End Sub
+
+    Sub Goo(Of T)(a As T)
+    End Sub
+
+    Sub Goo(Of T, U)(a As T, b As U)
+    End Sub
+End Class
+]]></a>.Value
+
+            Dim expectedOrderedItems = New List(Of SignatureHelpTestItem) From
+            {
+                New SignatureHelpTestItem("C.Goo(Of String)(a As String)", String.Empty, String.Empty, currentParameterIndex:=0),
+                New SignatureHelpTestItem("C.Goo(Of T, U)(a As T, b As U)", String.Empty)
+            }
+
+            Await TestAsync(markup, expectedOrderedItems)
+        End Function
+
+        <WorkItem(699, "https://github.com/dotnet/roslyn/issues/699")>
+        <WorkItem(1068424, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/1068424")>
+        <Fact, Trait(Traits.Feature, Traits.Features.SignatureHelp)>
+        Public Async Function TestGenericParameters2() As Task
+            Dim markup = <a><![CDATA[
+Class C
+    Sub M()
+        Goo("", $$)
+    End Sub
+
+    Sub Goo(Of T)(a As T)
+    End Sub
+
+    Sub Goo(Of T, U)(a As T, b As U)
+    End Sub
+End Class
+]]></a>.Value
+
+            Dim expectedOrderedItems = New List(Of SignatureHelpTestItem) From
+            {
+                New SignatureHelpTestItem("C.Goo(Of T)(a As T)", String.Empty),
+                New SignatureHelpTestItem("C.Goo(Of T, U)(a As T, b As U)", String.Empty, String.Empty, currentParameterIndex:=1)
+            }
+
+            Await TestAsync(markup, expectedOrderedItems)
+        End Function
+
+        <WorkItem(3537, "https://github.com/dotnet/roslyn/issues/3537")>
+        <Fact, Trait(Traits.Feature, Traits.Features.SignatureHelp)>
+        Public Async Function TestEscapedIdentifiers() As Task
+            Dim markup = "
+Class C
+    Sub [Next]()
+        Dim x As New C
+        x.Next($$)
+    End Sub
+End Class
+"
+            Await TestAsync(markup, SpecializedCollections.SingletonEnumerable(New SignatureHelpTestItem("C.Next()", String.Empty)))
+        End Function
+
+        <WorkItem(4144, "https://github.com/dotnet/roslyn/issues/4144")>
+        <Fact, Trait(Traits.Feature, Traits.Features.SignatureHelp)>
+        Public Async Function TestSigHelpIsVisibleOnInaccessibleItem() As Task
+            Dim markup = "
+Imports System.Collections.Generic
+
+Class A
+    Dim args As List(Of Integer)
+End Class
+
+Class B
+    Inherits A
+
+    Sub M()
+        args.Add($$
+    End Sub
+End Class
+"
+
+            Await TestAsync(markup, {New SignatureHelpTestItem("List(Of Integer).Add(item As Integer)")})
+        End Function
+
+        <WorkItem(2579, "https://github.com/dotnet/roslyn/issues/2579")>
+        <Fact, Trait(Traits.Feature, Traits.Features.SignatureHelp)>
+        Public Async Function TestInvocationOnMeExpression_Constructor() As Task
+            Dim markup = <a><![CDATA[
+Imports System
+Public Class A
+    Public Sub New()
+        [|Me.New($$
+    |]End Sub
+    Public Sub New(x As Integer)
+    End Sub
+End Class
+]]></a>.Value
+
+            Dim expectedOrderedItems = New List(Of SignatureHelpTestItem)()
+            expectedOrderedItems.Add(New SignatureHelpTestItem("A.New(x As Integer)", String.Empty, String.Empty, currentParameterIndex:=0))
+
+            Await TestAsync(markup, expectedOrderedItems)
+        End Function
+
+        <WorkItem(40451, "https://github.com/dotnet/roslyn/issues/40451")>
+        <Fact, Trait(Traits.Feature, Traits.Features.SignatureHelp)>
+        Public Async Function TestSigHelpIsVisibleWithDuplicateMethodNames() As Task
+            Dim markup = "
+Class C
+    Shared Sub Test()
+        M(1, 2$$)
+    End Sub
+
+    Sub M(y As Integer)
+    End Sub
+
+    Shared Sub M(x As Integer, y As Integer)
+    End Sub
+End Class
+"
+
+            Await TestAsync(markup, {New SignatureHelpTestItem("C.M(x As Integer, y As Integer)")})
+        End Function
     End Class
 End Namespace

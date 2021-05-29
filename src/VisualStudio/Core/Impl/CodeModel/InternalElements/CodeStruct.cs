@@ -1,4 +1,8 @@
-// Copyright (c) Microsoft.  All Rights Reserved.  Licensed under the Apache License, Version 2.0.  See License.txt in the project root for license information.
+﻿// Licensed to the .NET Foundation under one or more agreements.
+// The .NET Foundation licenses this file to you under the MIT license.
+// See the LICENSE file in the project root for more information.
+
+#nullable disable
 
 using System;
 using System.Runtime.InteropServices;
@@ -8,7 +12,7 @@ using Microsoft.VisualStudio.LanguageServices.Implementation.Interop;
 namespace Microsoft.VisualStudio.LanguageServices.Implementation.CodeModel.InternalElements
 {
     [ComVisible(true)]
-    [ComDefaultInterface(typeof(EnvDTE.CodeStruct))]
+    [ComDefaultInterface(typeof(EnvDTE80.CodeStruct2))]
     public sealed class CodeStruct : AbstractCodeType, EnvDTE.CodeStruct, EnvDTE80.CodeStruct2
     {
         internal static EnvDTE.CodeStruct Create(
@@ -20,7 +24,7 @@ namespace Microsoft.VisualStudio.LanguageServices.Implementation.CodeModel.Inter
             var element = new CodeStruct(state, fileCodeModel, nodeKey, nodeKind);
             var result = (EnvDTE.CodeStruct)ComAggregate.CreateAggregatedObject(element);
 
-            fileCodeModel.OnElementCreated(nodeKey, (EnvDTE.CodeElement)result);
+            fileCodeModel.OnCodeElementCreated(nodeKey, (EnvDTE.CodeElement)result);
 
             return result;
         }
@@ -76,7 +80,7 @@ namespace Microsoft.VisualStudio.LanguageServices.Implementation.CodeModel.Inter
 
         public EnvDTE.CodeElements Parts
         {
-            get { return PartialTypeCollection.Create(State, FileCodeModel, this); }
+            get { return PartialTypeCollection.Create(State, this); }
         }
 
         public EnvDTE.CodeClass AddClass(string name, object position, object bases, object implementedInterfaces, EnvDTE.vsCMAccess access)

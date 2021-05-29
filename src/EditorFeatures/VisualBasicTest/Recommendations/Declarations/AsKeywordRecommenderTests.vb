@@ -1,281 +1,277 @@
-' Copyright (c) Microsoft.  All Rights Reserved.  Licensed under the Apache License, Version 2.0.  See License.txt in the project root for license information.
-
-Imports Microsoft.CodeAnalysis.Text
-Imports Microsoft.CodeAnalysis.VisualBasic
-Imports Microsoft.CodeAnalysis.VisualBasic.Symbols
-Imports Microsoft.CodeAnalysis.VisualBasic.Syntax
-Imports Roslyn.Test.Utilities
-Imports Xunit
+﻿' Licensed to the .NET Foundation under one or more agreements.
+' The .NET Foundation licenses this file to you under the MIT license.
+' See the LICENSE file in the project root for more information.
 
 Namespace Microsoft.CodeAnalysis.Editor.VisualBasic.UnitTests.Recommendations.Declarations
+    <[UseExportProvider]>
     Public Class AsKeywordRecommenderTests
 
         <Fact, Trait(Traits.Feature, Traits.Features.KeywordRecommending)>
-        Public Sub AsInAggregateClause1()
+        Public Sub AsInAggregateClause1Test()
             VerifyRecommendationsContain(<MethodBody>Dim x = From x In {1, 2, 3} Aggregate x |</MethodBody>, "As")
         End Sub
 
         <Fact, Trait(Traits.Feature, Traits.Features.KeywordRecommending)>
-        Public Sub AsInAggregateClause2()
+        Public Sub AsInAggregateClause2Test()
             VerifyRecommendationsContain(<MethodBody>Dim x = From x In {1, 2, 3} Aggregate x | As Type1 In collection, element2 |</MethodBody>, "As")
         End Sub
 
         <Fact, Trait(Traits.Feature, Traits.Features.KeywordRecommending)>
-        Public Sub AsInConst1()
-            VerifyRecommendationsContain(<ClassDeclaration>Const foo |</ClassDeclaration>, "As")
+        Public Sub AsInConst1Test()
+            VerifyRecommendationsContain(<ClassDeclaration>Const goo |</ClassDeclaration>, "As")
         End Sub
 
         <Fact, Trait(Traits.Feature, Traits.Features.KeywordRecommending)>
-        Public Sub AsInConst2()
-            VerifyRecommendationsContain(<ClassDeclaration>Const foo As Integer = 42, bar |</ClassDeclaration>, "As")
+        Public Sub AsInConst2Test()
+            VerifyRecommendationsContain(<ClassDeclaration>Const goo As Integer = 42, bar |</ClassDeclaration>, "As")
         End Sub
 
         <Fact, Trait(Traits.Feature, Traits.Features.KeywordRecommending)>
-        Public Sub AsInExternalMethodSub1()
-            VerifyRecommendationsContain(<ClassDeclaration>Declare Sub foo Lib "foo.dll" (x |</ClassDeclaration>, "As")
+        Public Sub AsInExternalMethodSub1Test()
+            VerifyRecommendationsContain(<ClassDeclaration>Declare Sub goo Lib "goo.dll" (x |</ClassDeclaration>, "As")
         End Sub
 
         <Fact, Trait(Traits.Feature, Traits.Features.KeywordRecommending)>
-        Public Sub AsInExternalMethodSub2()
-            VerifyRecommendationsContain(<ClassDeclaration>Declare Sub foo Lib "foo.dll" (x As Integer, y |</ClassDeclaration>, "As")
+        Public Sub AsInExternalMethodSub2Test()
+            VerifyRecommendationsContain(<ClassDeclaration>Declare Sub goo Lib "goo.dll" (x As Integer, y |</ClassDeclaration>, "As")
         End Sub
 
         <Fact, Trait(Traits.Feature, Traits.Features.KeywordRecommending)>
-        Public Sub AsNotInExternalMethodSubReturnType()
-            VerifyRecommendationsMissing(<ClassDeclaration>Declare Sub foo Lib "foo.dll" (x As Integer) |</ClassDeclaration>, "As")
+        Public Sub AsNotInExternalMethodSubReturnTypeTest()
+            VerifyRecommendationsMissing(<ClassDeclaration>Declare Sub goo Lib "goo.dll" (x As Integer) |</ClassDeclaration>, "As")
         End Sub
 
         <Fact, Trait(Traits.Feature, Traits.Features.KeywordRecommending)>
-        Public Sub AsInExternalMethodFunction1()
-            VerifyRecommendationsContain(<ClassDeclaration>Declare Function foo Lib "foo.dll" (x |</ClassDeclaration>, "As")
+        Public Sub AsInExternalMethodFunction1Test()
+            VerifyRecommendationsContain(<ClassDeclaration>Declare Function goo Lib "goo.dll" (x |</ClassDeclaration>, "As")
         End Sub
 
         <Fact, Trait(Traits.Feature, Traits.Features.KeywordRecommending)>
-        Public Sub AsInExternalMethodFunction2()
-            VerifyRecommendationsContain(<ClassDeclaration>Declare Function foo Lib "foo.dll" (x As Integer, y |</ClassDeclaration>, "As")
+        Public Sub AsInExternalMethodFunction2Test()
+            VerifyRecommendationsContain(<ClassDeclaration>Declare Function goo Lib "goo.dll" (x As Integer, y |</ClassDeclaration>, "As")
         End Sub
 
         <Fact, Trait(Traits.Feature, Traits.Features.KeywordRecommending)>
-        Public Sub AsInExternalMethodFunctionReturnType()
-            VerifyRecommendationsContain(<ClassDeclaration>Declare Function foo Lib "foo.dll" (x As Integer) |</ClassDeclaration>, "As")
+        Public Sub AsInExternalMethodFunctionReturnTypeTest()
+            VerifyRecommendationsContain(<ClassDeclaration>Declare Function goo Lib "goo.dll" (x As Integer) |</ClassDeclaration>, "As")
         End Sub
 
         <Fact, Trait(Traits.Feature, Traits.Features.KeywordRecommending)>
-        Public Sub AsInDelegateSub1()
-            VerifyRecommendationsContain(<ClassDeclaration>Delegate Sub foo (x |</ClassDeclaration>, "As")
+        Public Sub AsInDelegateSub1Test()
+            VerifyRecommendationsContain(<ClassDeclaration>Delegate Sub goo (x |</ClassDeclaration>, "As")
         End Sub
 
         <Fact, Trait(Traits.Feature, Traits.Features.KeywordRecommending)>
-        Public Sub AsInDelegateSub2()
-            VerifyRecommendationsContain(<ClassDeclaration>Delegate Sub foo (x As Integer, y |</ClassDeclaration>, "As")
+        Public Sub AsInDelegateSub2Test()
+            VerifyRecommendationsContain(<ClassDeclaration>Delegate Sub goo (x As Integer, y |</ClassDeclaration>, "As")
         End Sub
 
         <Fact, Trait(Traits.Feature, Traits.Features.KeywordRecommending)>
-        Public Sub AsNotInDelegateSubReturnType()
-            VerifyRecommendationsMissing(<ClassDeclaration>Delegate Sub foo (x As Integer) |</ClassDeclaration>, "As")
+        Public Sub AsNotInDelegateSubReturnTypeTest()
+            VerifyRecommendationsMissing(<ClassDeclaration>Delegate Sub goo (x As Integer) |</ClassDeclaration>, "As")
         End Sub
 
         <Fact, Trait(Traits.Feature, Traits.Features.KeywordRecommending)>
-        Public Sub AsInDelegateFunction1()
-            VerifyRecommendationsContain(<ClassDeclaration>Delegate Function foo (x |</ClassDeclaration>, "As")
+        Public Sub AsInDelegateFunction1Test()
+            VerifyRecommendationsContain(<ClassDeclaration>Delegate Function goo (x |</ClassDeclaration>, "As")
         End Sub
 
         <Fact, Trait(Traits.Feature, Traits.Features.KeywordRecommending)>
-        Public Sub AsInDelegateFunction2()
-            VerifyRecommendationsContain(<ClassDeclaration>Delegate Function foo (x As Integer, y |</ClassDeclaration>, "As")
+        Public Sub AsInDelegateFunction2Test()
+            VerifyRecommendationsContain(<ClassDeclaration>Delegate Function goo (x As Integer, y |</ClassDeclaration>, "As")
         End Sub
 
         <Fact, Trait(Traits.Feature, Traits.Features.KeywordRecommending)>
-        Public Sub AsInDelegateFunctionReturnType()
-            VerifyRecommendationsContain(<ClassDeclaration>Delegate Function foo (x As Integer) |</ClassDeclaration>, "As")
+        Public Sub AsInDelegateFunctionReturnTypeTest()
+            VerifyRecommendationsContain(<ClassDeclaration>Delegate Function goo (x As Integer) |</ClassDeclaration>, "As")
         End Sub
 
         <Fact, Trait(Traits.Feature, Traits.Features.KeywordRecommending)>
-        Public Sub AsInDim1()
+        Public Sub AsInDim1Test()
             VerifyRecommendationsContain(<ClassDeclaration>Dim x |</ClassDeclaration>, "As")
         End Sub
 
         <Fact, Trait(Traits.Feature, Traits.Features.KeywordRecommending)>
-        Public Sub AsInDim2()
+        Public Sub AsInDim2Test()
             VerifyRecommendationsContain(<ClassDeclaration>Dim x As Integer, y |</ClassDeclaration>, "As")
         End Sub
 
         <Fact, Trait(Traits.Feature, Traits.Features.KeywordRecommending)>
-        Public Sub AsInEnum()
-            VerifyRecommendationsContain(<ClassDeclaration>Enum Foo |</ClassDeclaration>, "As")
+        Public Sub AsInEnumTest()
+            VerifyRecommendationsContain(<ClassDeclaration>Enum Goo |</ClassDeclaration>, "As")
         End Sub
 
         <Fact, Trait(Traits.Feature, Traits.Features.KeywordRecommending)>
-        Public Sub AsInAddHandler()
+        Public Sub AsInAddHandlerTest()
             VerifyRecommendationsContain(<ClassDeclaration>
-Custom Event Foo As Action
+Custom Event Goo As Action
 AddHandler(value |</ClassDeclaration>, "As")
         End Sub
 
         <Fact, Trait(Traits.Feature, Traits.Features.KeywordRecommending)>
-        Public Sub AsInRemoveHandler()
+        Public Sub AsInRemoveHandlerTest()
             VerifyRecommendationsContain(<ClassDeclaration>
-Custom Event Foo As Action
+Custom Event Goo As Action
 RemoveHandler(value |</ClassDeclaration>, "As")
         End Sub
 
         <Fact, Trait(Traits.Feature, Traits.Features.KeywordRecommending)>
-        Public Sub AsInForLoop()
+        Public Sub AsInForLoopTest()
             VerifyRecommendationsContain(<MethodBody>For x |</MethodBody>, "As")
         End Sub
 
         <Fact, Trait(Traits.Feature, Traits.Features.KeywordRecommending)>
-        Public Sub AsInForLoopWithTypeCharacter()
+        Public Sub AsInForLoopWithTypeCharacterTest()
             VerifyRecommendationsMissing(<MethodBody>For x% |</MethodBody>, "As")
         End Sub
 
         <Fact, Trait(Traits.Feature, Traits.Features.KeywordRecommending)>
-        Public Sub AsInForEachLoop()
+        Public Sub AsInForEachLoopTest()
             VerifyRecommendationsContain(<MethodBody>For Each x |</MethodBody>, "As")
         End Sub
 
         <Fact, Trait(Traits.Feature, Traits.Features.KeywordRecommending)>
-        Public Sub AsInFromClause1()
+        Public Sub AsInFromClause1Test()
             VerifyRecommendationsContain(<MethodBody>Dim x = From x |</MethodBody>, "As")
         End Sub
 
         <Fact, Trait(Traits.Feature, Traits.Features.KeywordRecommending)>
-        Public Sub AsInFromClause2()
+        Public Sub AsInFromClause2Test()
             VerifyRecommendationsContain(<MethodBody>Dim x = From x As Integer in collection1, y |</MethodBody>, "As")
         End Sub
 
         <Fact, Trait(Traits.Feature, Traits.Features.KeywordRecommending)>
-        Public Sub AsInFunctionArguments1()
-            VerifyRecommendationsContain(<ClassDeclaration>Function Foo(x |</ClassDeclaration>, "As")
+        Public Sub AsInFunctionArguments1Test()
+            VerifyRecommendationsContain(<ClassDeclaration>Function Goo(x |</ClassDeclaration>, "As")
         End Sub
 
         <Fact, Trait(Traits.Feature, Traits.Features.KeywordRecommending)>
-        Public Sub AsInFunctionArguments2()
-            VerifyRecommendationsContain(<ClassDeclaration>Function Foo(x As Integer, y |</ClassDeclaration>, "As")
+        Public Sub AsInFunctionArguments2Test()
+            VerifyRecommendationsContain(<ClassDeclaration>Function Goo(x As Integer, y |</ClassDeclaration>, "As")
         End Sub
 
         <Fact, Trait(Traits.Feature, Traits.Features.KeywordRecommending)>
-        Public Sub AsNotInFunctionArgumentsWithTypeCharacter()
-            VerifyRecommendationsMissing(<ClassDeclaration>Function Foo(x% |</ClassDeclaration>, "As")
+        Public Sub AsNotInFunctionArgumentsWithTypeCharacterTest()
+            VerifyRecommendationsMissing(<ClassDeclaration>Function Goo(x% |</ClassDeclaration>, "As")
         End Sub
 
         <Fact, Trait(Traits.Feature, Traits.Features.KeywordRecommending)>
-        Public Sub AsInFunctionReturnValue()
-            VerifyRecommendationsContain(<ClassDeclaration>Function Foo(x As Integer) |</ClassDeclaration>, "As")
+        Public Sub AsInFunctionReturnValueTest()
+            VerifyRecommendationsContain(<ClassDeclaration>Function Goo(x As Integer) |</ClassDeclaration>, "As")
         End Sub
 
         <Fact, Trait(Traits.Feature, Traits.Features.KeywordRecommending)>
-        Public Sub AsInFunctionLambdaArguments1()
+        Public Sub AsInFunctionLambdaArguments1Test()
             VerifyRecommendationsContain(<ClassDeclaration>Dim x = Function(x |</ClassDeclaration>, "As")
         End Sub
 
         <Fact, Trait(Traits.Feature, Traits.Features.KeywordRecommending)>
-        Public Sub AsInFunctionLambdaArguments2()
+        Public Sub AsInFunctionLambdaArguments2Test()
             VerifyRecommendationsContain(<ClassDeclaration>Dim x = Function(x As Integer, y |</ClassDeclaration>, "As")
         End Sub
 
         <Fact, Trait(Traits.Feature, Traits.Features.KeywordRecommending)>
-        Public Sub AsInFunctionLambdaReturnValue()
+        Public Sub AsInFunctionLambdaReturnValueTest()
             VerifyRecommendationsContain(<ClassDeclaration>Dim x = Function(x As Integer) |</ClassDeclaration>, "As")
         End Sub
 
         <Fact, Trait(Traits.Feature, Traits.Features.KeywordRecommending)>
-        Public Sub AsInGroupJoin()
+        Public Sub AsInGroupJoinTest()
             VerifyRecommendationsContain(<ClassDeclaration>Dim x = From i In {1, 2, 3} Group Join x |</ClassDeclaration>, "As")
         End Sub
 
         <Fact, Trait(Traits.Feature, Traits.Features.KeywordRecommending)>
-        Public Sub AsInOperatorArguments1()
+        Public Sub AsInOperatorArguments1Test()
             VerifyRecommendationsContain(<ClassDeclaration>Public Shared Operator +(x |</ClassDeclaration>, "As")
         End Sub
 
         <Fact, Trait(Traits.Feature, Traits.Features.KeywordRecommending)>
-        Public Sub AsInOperatorArguments2()
+        Public Sub AsInOperatorArguments2Test()
             VerifyRecommendationsContain(<ClassDeclaration>Public Shared Operator +(x As Integer, y |</ClassDeclaration>, "As")
         End Sub
 
         <Fact, Trait(Traits.Feature, Traits.Features.KeywordRecommending)>
-        Public Sub AsInOperatorReturnValue()
+        Public Sub AsInOperatorReturnValueTest()
             VerifyRecommendationsContain(<ClassDeclaration>Public Shared Operator +(x As Integer, y As Integer) |</ClassDeclaration>, "As")
         End Sub
 
         <Fact, Trait(Traits.Feature, Traits.Features.KeywordRecommending)>
-        Public Sub AsInPropertyArguments1()
-            VerifyRecommendationsContain(<ClassDeclaration>Public Property Foo(x |</ClassDeclaration>, "As")
+        Public Sub AsInPropertyArguments1Test()
+            VerifyRecommendationsContain(<ClassDeclaration>Public Property Goo(x |</ClassDeclaration>, "As")
         End Sub
 
         <Fact, Trait(Traits.Feature, Traits.Features.KeywordRecommending)>
-        Public Sub AsInPropertyArguments2()
-            VerifyRecommendationsContain(<ClassDeclaration>Public Property Foo(x As Integer, y |</ClassDeclaration>, "As")
+        Public Sub AsInPropertyArguments2Test()
+            VerifyRecommendationsContain(<ClassDeclaration>Public Property Goo(x As Integer, y |</ClassDeclaration>, "As")
         End Sub
 
         <Fact, Trait(Traits.Feature, Traits.Features.KeywordRecommending)>
-        Public Sub AsInPropertyType()
-            VerifyRecommendationsContain(<ClassDeclaration>Public Property Foo(x As Integer, y As Integer) |</ClassDeclaration>, "As")
+        Public Sub AsInPropertyTypeTest()
+            VerifyRecommendationsContain(<ClassDeclaration>Public Property Goo(x As Integer, y As Integer) |</ClassDeclaration>, "As")
         End Sub
 
         <Fact, Trait(Traits.Feature, Traits.Features.KeywordRecommending)>
-        Public Sub AsInPropertySetArgument()
+        Public Sub AsInPropertySetArgumentTest()
             VerifyRecommendationsContain(<ClassDeclaration>
-Public Property Foo(x As Integer, y As Integer) 
+Public Property Goo(x As Integer, y As Integer) 
     Set(value |</ClassDeclaration>, "As")
         End Sub
 
         <Fact, Trait(Traits.Feature, Traits.Features.KeywordRecommending)>
-        Public Sub AsInSubArguments1()
-            VerifyRecommendationsContain(<ClassDeclaration>Sub Foo(x |</ClassDeclaration>, "As")
+        Public Sub AsInSubArguments1Test()
+            VerifyRecommendationsContain(<ClassDeclaration>Sub Goo(x |</ClassDeclaration>, "As")
         End Sub
 
         <Fact, Trait(Traits.Feature, Traits.Features.KeywordRecommending)>
-        Public Sub AsInSubArguments2()
-            VerifyRecommendationsContain(<ClassDeclaration>Sub Foo(x As Integer, y |</ClassDeclaration>, "As")
+        Public Sub AsInSubArguments2Test()
+            VerifyRecommendationsContain(<ClassDeclaration>Sub Goo(x As Integer, y |</ClassDeclaration>, "As")
         End Sub
 
         <Fact, Trait(Traits.Feature, Traits.Features.KeywordRecommending)>
-        Public Sub AsNotInSubReturnValue()
-            VerifyRecommendationsMissing(<ClassDeclaration>Sub Foo(x As Integer) |</ClassDeclaration>, "As")
+        Public Sub AsNotInSubReturnValueTest()
+            VerifyRecommendationsMissing(<ClassDeclaration>Sub Goo(x As Integer) |</ClassDeclaration>, "As")
         End Sub
 
         <Fact, Trait(Traits.Feature, Traits.Features.KeywordRecommending)>
-        Public Sub AsInSubLambdaArguments1()
+        Public Sub AsInSubLambdaArguments1Test()
             VerifyRecommendationsContain(<ClassDeclaration>Dim x = Sub(x |</ClassDeclaration>, "As")
         End Sub
 
         <Fact, Trait(Traits.Feature, Traits.Features.KeywordRecommending)>
-        Public Sub AsInSubLambdaArguments2()
+        Public Sub AsInSubLambdaArguments2Test()
             VerifyRecommendationsContain(<ClassDeclaration>Dim x = Sub(x As Integer, y |</ClassDeclaration>, "As")
         End Sub
 
         <Fact, Trait(Traits.Feature, Traits.Features.KeywordRecommending)>
-        Public Sub AsNotInSubLambdaReturnValue()
+        Public Sub AsNotInSubLambdaReturnValueTest()
             VerifyRecommendationsMissing(<ClassDeclaration>Dim x = Sub(x As Integer) |</ClassDeclaration>, "As")
         End Sub
 
         <Fact, Trait(Traits.Feature, Traits.Features.KeywordRecommending)>
-        Public Sub AsInCatchBlock()
+        Public Sub AsInCatchBlockTest()
             VerifyRecommendationsContain(<MethodBody>
 Try
-Catch foo |</MethodBody>, "As")
+Catch goo |</MethodBody>, "As")
         End Sub
 
         <Fact, Trait(Traits.Feature, Traits.Features.KeywordRecommending)>
-        Public Sub AsInEventDeclaration()
-            VerifyRecommendationsContain(<ClassDeclaration>Event Foo |</ClassDeclaration>, "As")
+        Public Sub AsInEventDeclarationTest()
+            VerifyRecommendationsContain(<ClassDeclaration>Event Goo |</ClassDeclaration>, "As")
         End Sub
 
-        <WorkItem(543118)>
+        <WorkItem(543118, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/543118")>
         <Fact, Trait(Traits.Feature, Traits.Features.KeywordRecommending)>
-        Public Sub AsAfterLetIdentifier()
+        Public Sub AsAfterLetIdentifierTest()
             VerifyRecommendationsContain(<MethodBody>From i1 In New Integer() {4, 5} Let i2  |</MethodBody>, "As")
         End Sub
 
-        <WorkItem(543637)>
+        <WorkItem(543637, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/543637")>
         <Fact, Trait(Traits.Feature, Traits.Features.KeywordRecommending)>
-        Public Sub AsInGenericTypeParameterList()
+        Public Sub AsInGenericTypeParameterListTest()
             Dim code =
 <File>
 Module Module1
-    Sub Foo(Of T |
+    Sub Goo(Of T |
     End Sub
 End Module
 </File>
@@ -283,14 +279,14 @@ End Module
             VerifyRecommendationsContain(code, "As")
         End Sub
 
-        <WorkItem(543637)>
+        <WorkItem(543637, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/543637")>
         <Fact, Trait(Traits.Feature, Traits.Features.KeywordRecommending)>
-        Public Sub NoAsInGenericTypeArgumentList()
+        Public Sub NoAsInGenericTypeArgumentListTest()
             Dim code =
 <File>
 Module Module1
-    Sub Foo(Of T)
-        Foo(Of T |
+    Sub Goo(Of T)
+        Goo(Of T |
     End Sub
 End Module
 </File>
@@ -298,9 +294,9 @@ End Module
             VerifyRecommendationsMissing(code, "As")
         End Sub
 
-        <WorkItem(544192)>
+        <WorkItem(544192, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/544192")>
         <Fact, Trait(Traits.Feature, Traits.Features.KeywordRecommending)>
-        Public Sub AsAfterPropertyName()
+        Public Sub AsAfterPropertyNameTest()
             Dim code =
 <File>
 Class C
@@ -311,9 +307,9 @@ End Class
             VerifyRecommendationsContain(code, "As")
         End Sub
 
-        <WorkItem(544192)>
+        <WorkItem(544192, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/544192")>
         <Fact, Trait(Traits.Feature, Traits.Features.KeywordRecommending)>
-        Public Sub NoAsAfterPropertyOpenParen()
+        Public Sub NoAsAfterPropertyOpenParenTest()
             Dim code =
 <File>
 Class C
@@ -324,9 +320,9 @@ End Class
             VerifyRecommendationsMissing(code, "As")
         End Sub
 
-        <WorkItem(544192)>
+        <WorkItem(544192, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/544192")>
         <Fact, Trait(Traits.Feature, Traits.Features.KeywordRecommending)>
-        Public Sub AsAfterPropertyCloseParen()
+        Public Sub AsAfterPropertyCloseParenTest()
             Dim code =
 <File>
 Class C
@@ -338,87 +334,96 @@ End Class
         End Sub
 
         <Fact, Trait(Traits.Feature, Traits.Features.KeywordRecommending)>
-        Public Sub AsAfterFunctionName()
-            VerifyRecommendationsContain(<ClassDeclaration>Function Foo |</ClassDeclaration>, "As")
+        Public Sub AsAfterFunctionNameTest()
+            VerifyRecommendationsContain(<ClassDeclaration>Function Goo |</ClassDeclaration>, "As")
         End Sub
 
-        <WorkItem(530387)>
+        <WorkItem(530387, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/530387")>
         <Fact, Trait(Traits.Feature, Traits.Features.KeywordRecommending)>
-        Public Sub NoAsAfterSubName()
-            VerifyRecommendationsMissing(<ClassDeclaration>Sub Foo |</ClassDeclaration>, "As")
+        Public Sub NoAsAfterSubNameTest()
+            VerifyRecommendationsMissing(<ClassDeclaration>Sub Goo |</ClassDeclaration>, "As")
         End Sub
 
-        <WorkItem(530387)>
+        <WorkItem(530387, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/530387")>
         <Fact, Trait(Traits.Feature, Traits.Features.KeywordRecommending)>
-        Public Sub NoAsAfterSubNameWithParens()
-            VerifyRecommendationsMissing(<ClassDeclaration>Sub Foo() |</ClassDeclaration>, "As")
+        Public Sub NoAsAfterSubNameWithParensTest()
+            VerifyRecommendationsMissing(<ClassDeclaration>Sub Goo() |</ClassDeclaration>, "As")
         End Sub
 
-        <WorkItem(530387)>
+        <WorkItem(530387, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/530387")>
         <Fact, Trait(Traits.Feature, Traits.Features.KeywordRecommending)>
-        Public Sub NoAsAfterSubNameWithBody()
+        Public Sub NoAsAfterSubNameWithBodyTest()
             Dim code =
 <File>
 Class C
-    Sub Foo |
+    Sub Goo |
     End Sub
 End Class
 </File>
             VerifyRecommendationsMissing(code, "As")
         End Sub
 
-        <WorkItem(530387)>
+        <WorkItem(530387, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/530387")>
         <Fact, Trait(Traits.Feature, Traits.Features.KeywordRecommending)>
-        Public Sub NoAsAfterSubNameWithBodyAndParameters()
+        Public Sub NoAsAfterSubNameWithBodyAndParametersTest()
             Dim code =
 <File>
 Class C
-    Sub Foo(x As String) |
+    Sub Goo(x As String) |
     End Sub
 End Class
 </File>
             VerifyRecommendationsMissing(code, "As")
         End Sub
 
-        <WorkItem(546659)>
+        <WorkItem(546659, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/546659")>
         <Fact, Trait(Traits.Feature, Traits.Features.KeywordRecommending)>
-        Public Sub AsInUsingBlock()
-            VerifyRecommendationsContain(<MethodBody>Using Foo |</MethodBody>, "As")
+        Public Sub AsInUsingBlockTest()
+            VerifyRecommendationsContain(<MethodBody>Using Goo |</MethodBody>, "As")
         End Sub
 
-        <WorkItem(530953)>
+        <WorkItem(530953, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/530953")>
         <Fact, Trait(Traits.Feature, Traits.Features.KeywordRecommending)>
-        Public Sub NoAsAfterEol()
+        Public Sub NoAsAfterEolTest()
             VerifyRecommendationsMissing(
 <MethodBody>
-Dim Foo 
+Dim Goo 
 | </MethodBody>,
                 "As")
         End Sub
 
-        <WorkItem(530953)>
+        <WorkItem(530953, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/530953")>
         <Fact, Trait(Traits.Feature, Traits.Features.KeywordRecommending)>
-        Public Sub NoAsAfterColon()
+        Public Sub NoAsAfterColonTest()
             VerifyRecommendationsMissing(
 <MethodBody>
-Dim Foo : | 
+Dim Goo : | 
 </MethodBody>,
                 "As")
         End Sub
 
-        <WorkItem(530953)>
+        <WorkItem(530953, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/530953")>
         <Fact, Trait(Traits.Feature, Traits.Features.KeywordRecommending)>
-        Public Sub AsAfterExplicitLineContinuation()
+        Public Sub AsAfterExplicitLineContinuationTest()
             VerifyRecommendationsContain(
 <MethodBody>
-Dim Foo _
+Dim Goo _
 | </MethodBody>,
                 "As")
         End Sub
 
-        <WorkItem(547254)>
         <Fact, Trait(Traits.Feature, Traits.Features.KeywordRecommending)>
-        Public Sub AfterPublicAsync()
+        Public Sub AsAfterExplicitLineContinuationTestCommentsAfterLineContinuation()
+            VerifyRecommendationsContain(
+<MethodBody>
+Dim Goo _ ' Test
+| </MethodBody>,
+                "As")
+        End Sub
+
+        <WorkItem(547254, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/547254")>
+        <Fact, Trait(Traits.Feature, Traits.Features.KeywordRecommending)>
+        Public Sub AfterPublicAsyncTest()
             VerifyRecommendationsContain(<ClassDeclaration>Public Async |</ClassDeclaration>, "As")
         End Sub
     End Class

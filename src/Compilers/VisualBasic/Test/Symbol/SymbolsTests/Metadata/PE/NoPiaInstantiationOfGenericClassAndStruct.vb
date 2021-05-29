@@ -1,4 +1,6 @@
-﻿' Copyright (c) Microsoft.  All Rights Reserved.  Licensed under the Apache License, Version 2.0.  See License.txt in the project root for license information.
+﻿' Licensed to the .NET Foundation under one or more agreements.
+' The .NET Foundation licenses this file to you under the MIT license.
+' See the LICENSE file in the project root for more information.
 
 Imports System
 Imports System.[Text]
@@ -19,7 +21,7 @@ Namespace Microsoft.CodeAnalysis.VisualBasic.UnitTests.Symbols.Metadata.PE
         Inherits BasicTestBase
 
         <Fact>
-        Public Sub NoPiaIllegalGenericInstantiationSymboleForClassThatInheritsGeneric()
+        Public Sub NoPiaIllegalGenericInstantiationSymbolForClassThatInheritsGeneric()
             'Test class that inherits Generic<NoPIAType>
             Dim localTypeSource = <text>
 public class NoPIAGenerics 
@@ -34,7 +36,7 @@ end class
         End Sub
 
         <Fact>
-        Public Sub NoPiaIllegalGenericInstantiationSymboleForGenericType()
+        Public Sub NoPiaIllegalGenericInstantiationSymbolForGenericType()
             'Test field with Generic(Of NoPIAType())
             Dim localTypeSource = <text>
 public class NoPIAGenerics 
@@ -50,7 +52,7 @@ end class
         End Sub
 
         <Fact>
-        Public Sub NoPiaIllegalGenericInstantiationSymboleForFieldWithNestedGenericType()
+        Public Sub NoPiaIllegalGenericInstantiationSymbolForFieldWithNestedGenericType()
             'Test field with Generic(Of IGeneric(Of NoPIAType))
             Dim localTypeSource = <text>
 public class NoPIAGenerics 
@@ -66,7 +68,7 @@ End class
         End Sub
 
         <Fact>
-        Public Sub NoPiaIllegalGenericInstantiationSymboleForFieldWithTwoNestedGenericType()
+        Public Sub NoPiaIllegalGenericInstantiationSymbolForFieldWithTwoNestedGenericType()
             'Test field with IGeneric(Of IGeneric(Of Generic(Of NoPIAType)))
             Dim localTypeSource = <text>
 public class NoPIAGenerics 
@@ -107,12 +109,12 @@ end class
             'Test class that inherits Generic(Of NoPIAType) used as method return or arguments
             Dim localTypeSource1 = <text>
 public class NoPIAGenerics 
-     Dim inhertsMethods As InheritsMethods = Nothing
+     Dim inheritsMethods As InheritsMethods = Nothing
 end class
 </text>.Value
             Dim localConsumer = CreateCompilation(localTypeSource1)
             Dim classLocalType As NamedTypeSymbol = localConsumer.GlobalNamespace.GetTypeMembers("NoPIAGenerics").[Single]()
-            Dim localField = classLocalType.GetMembers("inhertsMethods").OfType(Of FieldSymbol)().[Single]()
+            Dim localField = classLocalType.GetMembers("inheritsMethods").OfType(Of FieldSymbol)().[Single]()
             For Each m In localField.[Type].GetMembers("Method1").OfType(Of MethodSymbol)()
                 If m.Parameters.Length > 0 Then
                     Assert.Equal(SymbolKind.ErrorType, m.Parameters.[Where](Function(arg) arg.Name = "c1").[Select](Function(arg) arg).[Single]().[Type].BaseType.Kind)
@@ -395,7 +397,7 @@ End Structure
         Public Sub NoPiaIllegalGenericInstantiationSymbolForAssemblyRefsWithClassThatInheritsGenericOfNoPiaType()
             'Test class that inherits Generic(Of NoPIAType)
             Dim sources = <compilation name="Dummy"></compilation>
-            Dim localConsumer = CreateCompilationWithMscorlibAndReferences(
+            Dim localConsumer = CreateCompilationWithMscorlib40AndReferences(
                 sources,
                 references:=New List(Of MetadataReference)() From {TestReferences.SymbolsTests.NoPia.NoPIAGenericsAsm1})
             Dim localConsumerRefsAsm = localConsumer.Assembly.GetNoPiaResolutionAssemblies()
@@ -415,7 +417,7 @@ End Structure
             Dim nestedType = localConsumerRefsAsm(1).GlobalNamespace.GetTypeMembers("NestedConstructs").[Single]()
             Dim localField = nestedType.GetMembers("field1").OfType(Of FieldSymbol)().[Single]()
             Assert.Equal(SymbolKind.ArrayType, localField.[Type].Kind)
-            Assert.IsType(Of ArrayTypeSymbol)(localField.[Type])
+            Assert.True(TypeOf localField.[Type] Is ArrayTypeSymbol)
         End Sub
 
         <Fact>
@@ -461,7 +463,7 @@ End class
     </file>
 </compilation>
 
-            Dim localType = CompilationUtils.CreateCompilationWithMscorlib(localTypeCompilationDef)
+            Dim localType = CompilationUtils.CreateCompilationWithMscorlib40(localTypeCompilationDef)
 
             localType = localType.AddReferences(TestReferences.SymbolsTests.NoPia.GeneralPia.WithEmbedInteropTypes(True))
 
@@ -471,7 +473,7 @@ End class
     </file>
 </compilation>
 
-            Dim localConsumer = CompilationUtils.CreateCompilationWithMscorlib(localConsumerCompilationDef)
+            Dim localConsumer = CompilationUtils.CreateCompilationWithMscorlib40(localConsumerCompilationDef)
             localConsumer = localConsumer.AddReferences(TestReferences.SymbolsTests.NoPia.GeneralPiaCopy, New VisualBasicCompilationReference(localType))
 
             Dim localConsumerRefsAsm = localConsumer.[Assembly].GetNoPiaResolutionAssemblies()
@@ -492,7 +494,7 @@ End class
     </file>
 </compilation>
 
-            Dim c1 = CompilationUtils.CreateCompilationWithMscorlib(compilationDef)
+            Dim c1 = CompilationUtils.CreateCompilationWithMscorlib40(compilationDef)
             Dim c2 = c1.AddReferences(TestReferences.SymbolsTests.NoPia.NoPIAGenericsAsm1,
                                   TestReferences.SymbolsTests.NoPia.GeneralPiaCopy)
 

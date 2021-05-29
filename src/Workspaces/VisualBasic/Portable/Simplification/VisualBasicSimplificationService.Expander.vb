@@ -1,12 +1,13 @@
-﻿' Copyright (c) Microsoft.  All Rights Reserved.  Licensed under the Apache License, Version 2.0.  See License.txt in the project root for license information.
+﻿' Licensed to the .NET Foundation under one or more agreements.
+' The .NET Foundation licenses this file to you under the MIT license.
+' See the LICENSE file in the project root for more information.
 
 Imports System.Threading
 Imports Microsoft.CodeAnalysis
 Imports Microsoft.CodeAnalysis.Simplification
-Imports Microsoft.CodeAnalysis.VisualBasic.Symbols
 Imports Microsoft.CodeAnalysis.VisualBasic.Syntax
-Imports Microsoft.CodeAnalysis.VisualBasic.Rename
 Imports Microsoft.CodeAnalysis.VisualBasic.Utilities
+Imports Microsoft.CodeAnalysis.VisualBasic.Extensions.ContextQuery
 
 Namespace Microsoft.CodeAnalysis.VisualBasic.Simplification
     Partial Friend Class VisualBasicSimplificationService
@@ -59,9 +60,9 @@ Namespace Microsoft.CodeAnalysis.VisualBasic.Simplification
                 Return AddCast(expression, targetType, semanticModel)
             End Function
 
-            Private Shared Function AddCast(expression As ExpressionSyntax, targetType As ITypeSymbol, semanticModel As SemanticModel) As ExpressionSyntax
+            Private Function AddCast(expression As ExpressionSyntax, targetType As ITypeSymbol, semanticModel As SemanticModel) As ExpressionSyntax
                 Dim wasCastAdded As Boolean = False
-                Dim result = expression.CastIfPossible(targetType, expression.SpanStart, semanticModel, wasCastAdded)
+                Dim result = expression.CastIfPossible(targetType, expression.SpanStart, semanticModel, wasCastAdded, _cancellationToken)
 
                 If wasCastAdded Then
                     result = result.Parenthesize()
@@ -203,12 +204,12 @@ Namespace Microsoft.CodeAnalysis.VisualBasic.Simplification
                         .WithAdditionalAnnotations(Simplifier.Annotation)
                 End If
 
-                If (node.Expression.Kind = SyntaxKind.SimpleMemberAccessExpression) Then
+                If node.Expression.IsKind(SyntaxKind.SimpleMemberAccessExpression) Then
                     Dim memberAccess = DirectCast(node.Expression, MemberAccessExpressionSyntax)
                     Dim targetSymbol = SimplificationHelpers.GetOriginalSymbolInfo(_semanticModel, memberAccess.Name)
 
-                    If (Not targetSymbol Is Nothing And targetSymbol.IsReducedExtension()) Then
-                        newInvocationExpression = RewriteExtensionMethodInvocation(node, newInvocationExpression, DirectCast(node.Expression, MemberAccessExpressionSyntax).Expression, DirectCast(newInvocationExpression.Expression, MemberAccessExpressionSyntax).Expression, DirectCast(targetSymbol, IMethodSymbol))
+                    If Not targetSymbol Is Nothing And targetSymbol.IsReducedExtension() AndAlso memberAccess.Expression IsNot Nothing Then
+                        newInvocationExpression = RewriteExtensionMethodInvocation(node, newInvocationExpression, memberAccess.Expression, DirectCast(newInvocationExpression.Expression, MemberAccessExpressionSyntax).Expression, DirectCast(targetSymbol, IMethodSymbol))
                     End If
                 End If
 
@@ -216,11 +217,20 @@ Namespace Microsoft.CodeAnalysis.VisualBasic.Simplification
             End Function
 
             Private Function RewriteExtensionMethodInvocation(
-            originalNode As InvocationExpressionSyntax,
-            rewrittenNode As InvocationExpressionSyntax,
-            oldThisExpression As ExpressionSyntax,
-            thisExpression As ExpressionSyntax,
-            reducedExtensionMethod As IMethodSymbol) As InvocationExpressionSyntax
+                originalNode As InvocationExpressionSyntax,
+                rewrittenNode As InvocationExpressionSyntax,
+                oldThisExpression As ExpressionSyntax,
+                thisExpression As ExpressionSyntax,
+                reducedExtensionMethod As IMethodSymbol) As InvocationExpressionSyntax
+
+                Dim originalMemberAccess = DirectCast(originalNode.Expression, MemberAccessExpressionSyntax)
+                If originalMemberAccess.GetRootConditionalAccessExpression() IsNot Nothing Then
+                    ' Bail out on extension method invocations in conditional access expression.
+                    ' Note that this is a temporary workaround for https://github.com/dotnet/roslyn/issues/2593.
+                    ' Issue https//github.com/dotnet/roslyn/issues/3260 tracks fixing this workaround.
+                    Return rewrittenNode
+                End If
+
                 Dim expression = RewriteExtensionMethodInvocation(rewrittenNode, oldThisExpression, thisExpression, reducedExtensionMethod, typeNameFormatWithoutGenerics)
 
                 Dim binding = _semanticModel.GetSpeculativeSymbolInfo(originalNode.SpanStart, expression, SpeculativeBindingOption.BindAsExpression)
@@ -287,6 +297,23 @@ Namespace Microsoft.CodeAnalysis.VisualBasic.Simplification
 
                 Dim newSimpleArgument = DirectCast(MyBase.VisitSimpleArgument(node), SimpleArgumentSyntax)
 
+                If node.NameColonEquals Is Nothing Then
+                    Dim tuple = TryCast(node.Parent, TupleExpressionSyntax)
+                    If tuple IsNot Nothing Then
+                        Dim inferredName = node.Expression.TryGetInferredMemberName()
+                        If CanMakeNameExplicitInTuple(tuple, inferredName) Then
+                            Dim identifier = SyntaxFactory.Identifier(inferredName)
+                            identifier = TryEscapeIdentifierToken(identifier)
+
+                            newSimpleArgument = newSimpleArgument.
+                                WithLeadingTrivia().
+                                WithNameColonEquals(SyntaxFactory.NameColonEquals(SyntaxFactory.IdentifierName(identifier))).
+                                WithAdditionalAnnotations(Simplifier.Annotation).
+                                WithLeadingTrivia(node.GetLeadingTrivia())
+                        End If
+                    End If
+                End If
+
                 ' We need to be careful here. if this is a local, field or property passed to a ByRef argument, we shouldn't
                 ' parenthesize to avoid breaking copy-back semantics.
                 Dim symbol = _semanticModel.GetSymbolInfo(node.Expression, _cancellationToken).Symbol
@@ -316,6 +343,50 @@ Namespace Microsoft.CodeAnalysis.VisualBasic.Simplification
                     .WithAdditionalAnnotations(Simplifier.Annotation)
 
                 Return newSimpleArgument
+            End Function
+
+            Private Shared Function CanMakeNameExplicitInTuple(tuple As TupleExpressionSyntax, name As String) As Boolean
+                If name Is Nothing OrElse SyntaxFacts.IsReservedTupleElementName(name) Then
+                    Return False
+                End If
+
+                Dim found = False
+
+                For Each argument In tuple.Arguments
+                    Dim elementName As Object
+                    If argument.NameColonEquals IsNot Nothing Then
+                        elementName = argument.NameColonEquals.Name.Identifier.ValueText
+                    Else
+                        elementName = argument.Expression?.TryGetInferredMemberName()
+                    End If
+
+                    If CaseInsensitiveComparison.Equals(elementName, name) Then
+                        If found Then
+                            ' No duplicate names allowed
+                            Return False
+                        End If
+                        found = True
+                    End If
+                Next
+
+                Return True
+            End Function
+
+            Public Overrides Function VisitInferredFieldInitializer(node As InferredFieldInitializerSyntax) As SyntaxNode
+                Dim newInitializer = TryCast(MyBase.VisitInferredFieldInitializer(node), InferredFieldInitializerSyntax)
+                If newInitializer IsNot Nothing Then
+                    Dim inferredName = node.Expression.TryGetInferredMemberName()
+                    If inferredName IsNot Nothing Then
+                        Dim identifier = SyntaxFactory.Identifier(inferredName)
+                        identifier = TryEscapeIdentifierToken(identifier)
+
+                        Return SyntaxFactory.NamedFieldInitializer(SyntaxFactory.IdentifierName(identifier), newInitializer.Expression.WithoutLeadingTrivia()).
+                            WithLeadingTrivia(node.GetLeadingTrivia()).
+                            WithAdditionalAnnotations(Simplifier.Annotation)
+                    End If
+                End If
+
+                Return newInitializer
             End Function
 
             Public Overrides Function VisitGenericName(node As GenericNameSyntax) As SyntaxNode
@@ -354,7 +425,7 @@ Namespace Microsoft.CodeAnalysis.VisualBasic.Simplification
 
                         ' <rewritten_left>.<module_name>.<rewritten_right>
                         Dim moduleIdentifierToken = SyntaxFactory.Identifier(symbolForQualifiedName.ContainingType.Name)
-                        moduleIdentifierToken = TryEscapeIdentifierToken(moduleIdentifierToken, _semanticModel)
+                        moduleIdentifierToken = TryEscapeIdentifierToken(moduleIdentifierToken)
 
                         Dim qualifiedNameWithModuleName = rewrittenQualifiedName.CopyAnnotationsTo(SyntaxFactory.QualifiedName(
                             SyntaxFactory.QualifiedName(DirectCast(rewrittenQualifiedName, QualifiedNameSyntax).Left, SyntaxFactory.IdentifierName(moduleIdentifierToken)) _
@@ -377,14 +448,14 @@ Namespace Microsoft.CodeAnalysis.VisualBasic.Simplification
 
                 Dim symbolForMemberAccess = _semanticModel.GetSymbolInfo(node).Symbol
 
-                If symbolForMemberAccess.IsModuleMember Then
+                If node.Expression IsNot Nothing AndAlso symbolForMemberAccess.IsModuleMember Then
                     Dim symbolForLeftPart = _semanticModel.GetSymbolInfo(node.Expression).Symbol
 
                     If Not symbolForMemberAccess.ContainingType.Equals(symbolForLeftPart) Then
 
                         ' <rewritten_left>.<module_name>.<rewritten_right>
                         Dim moduleIdentifierToken = SyntaxFactory.Identifier(symbolForMemberAccess.ContainingType.Name)
-                        moduleIdentifierToken = TryEscapeIdentifierToken(moduleIdentifierToken, _semanticModel)
+                        moduleIdentifierToken = TryEscapeIdentifierToken(moduleIdentifierToken)
 
                         Dim memberAccessWithModuleName = rewrittenMemberAccess.CopyAnnotationsTo(
                             SyntaxFactory.SimpleMemberAccessExpression(
@@ -467,6 +538,25 @@ Namespace Microsoft.CodeAnalysis.VisualBasic.Simplification
                             Return replacement
                         End If
 
+                        If replacement.IsKind(SyntaxKind.IdentifierName) Then
+                            Dim identifierReplacement = DirectCast(replacement, IdentifierNameSyntax)
+
+                            Dim newIdentifier = identifier.CopyAnnotationsTo(identifierReplacement.Identifier)
+
+                            If Me._annotationForReplacedAliasIdentifier IsNot Nothing Then
+                                newIdentifier = newIdentifier.WithAdditionalAnnotations(Me._annotationForReplacedAliasIdentifier)
+                            End If
+
+                            Dim aliasAnnotationInfo = AliasAnnotation.Create(aliasInfo.Name)
+                            newIdentifier = newIdentifier.WithAdditionalAnnotations(aliasAnnotationInfo)
+
+                            replacement = replacement.ReplaceToken(identifier, newIdentifier)
+
+                            replacement = newNode.CopyAnnotationsTo(replacement)
+
+                            Return replacement
+                        End If
+
                         Throw New NotImplementedException()
                     End If
                 End If
@@ -480,10 +570,10 @@ Namespace Microsoft.CodeAnalysis.VisualBasic.Simplification
                 ' 2. If it's an attribute, make sure the identifier matches the attribute's class name without the attribute suffix.
                 '
                 If originalSimpleName.GetAncestor(Of AttributeSyntax)() IsNot Nothing Then
-                    If symbol.IsConstructor() AndAlso symbol.ContainingType.IsAttribute() Then
+                    If symbol.IsConstructor() AndAlso symbol.ContainingType?.IsAttribute() Then
                         symbol = symbol.ContainingType
                         Dim name = symbol.Name
-                        Debug.Assert(name.StartsWith(originalSimpleName.Identifier.ValueText))
+                        Debug.Assert(name.StartsWith(originalSimpleName.Identifier.ValueText, StringComparison.Ordinal))
 
                         ' Note, VB can't escape attribute names like C#, so we actually need to expand to the symbol name
                         ' without a suffix, see http://msdn.microsoft.com/en-us/library/aa711866(v=vs.71).aspx
@@ -506,7 +596,7 @@ Namespace Microsoft.CodeAnalysis.VisualBasic.Simplification
                 '
                 ' 3. Always try to escape keyword identifiers
                 '
-                identifier = TryEscapeIdentifierToken(identifier, Me._semanticModel)
+                identifier = TryEscapeIdentifierToken(identifier)
                 If identifier <> rewrittenSimpleName.Identifier Then
                     Select Case newNode.Kind
                         Case SyntaxKind.IdentifierName,
@@ -554,7 +644,10 @@ Namespace Microsoft.CodeAnalysis.VisualBasic.Simplification
                    symbol.Kind = SymbolKind.Field OrElse
                    symbol.Kind = SymbolKind.Property Then
 
-                    If symbol.IsStatic OrElse (TypeOf (parent) Is CrefReferenceSyntax) Then
+                    If symbol.IsStatic OrElse
+                       (TypeOf (parent) Is CrefReferenceSyntax) OrElse
+                       _semanticModel.SyntaxTree.IsNameOfContext(originalSimpleName.SpanStart, _cancellationToken) Then
+
                         newNode = FullyQualifyIdentifierName(
                             symbol,
                             newNode,
@@ -562,7 +655,7 @@ Namespace Microsoft.CodeAnalysis.VisualBasic.Simplification
                             replaceNode:=False)
                     Else
                         Dim left As ExpressionSyntax
-                        If _semanticModel.GetEnclosingNamedType(originalSimpleName.SpanStart, _cancellationToken) IsNot symbol.ContainingType Then
+                        If Not Equals(_semanticModel.GetEnclosingNamedType(originalSimpleName.SpanStart, _cancellationToken), symbol.ContainingType) Then
                             left = SyntaxFactory.MyBaseExpression()
                         Else
                             left = SyntaxFactory.MeExpression()
@@ -585,21 +678,22 @@ Namespace Microsoft.CodeAnalysis.VisualBasic.Simplification
                 Return newNode
             End Function
 
-            Private Function TryAddTypeArgumentToIdentifierName(
+            Private Shared Function TryAddTypeArgumentToIdentifierName(
                 newNode As ExpressionSyntax,
                 symbol As ISymbol) As ExpressionSyntax
                 If newNode.Kind = SyntaxKind.IdentifierName AndAlso symbol.Kind = SymbolKind.Method Then
                     If DirectCast(symbol, IMethodSymbol).TypeArguments.Length <> 0 Then
                         Dim typeArguments = DirectCast(symbol, IMethodSymbol).TypeArguments
 
-                        newNode = SyntaxFactory.GenericName(
+                        Dim genericName = SyntaxFactory.GenericName(
                                         DirectCast(newNode, IdentifierNameSyntax).Identifier,
                                         SyntaxFactory.TypeArgumentList(
                                             SyntaxFactory.SeparatedList(typeArguments.Select(Function(p) SyntaxFactory.ParseTypeName(p.ToDisplayParts(typeNameFormatWithGenerics).ToDisplayString()))))) _
                             .WithLeadingTrivia(newNode.GetLeadingTrivia()) _
                             .WithTrailingTrivia(newNode.GetTrailingTrivia()) _
                             .WithAdditionalAnnotations(Simplifier.Annotation)
-
+                        genericName = newNode.CopyAnnotationsTo(genericName)
+                        Return genericName
                     End If
                 End If
 
@@ -658,8 +752,6 @@ Namespace Microsoft.CodeAnalysis.VisualBasic.Simplification
 
                     Select Case parent.Kind
                         Case SyntaxKind.QualifiedName
-                            Dim qualifiedParent = DirectCast(parent, QualifiedNameSyntax)
-
                             result = rewrittenNode.CopyAnnotationsTo(
                                 SyntaxFactory.QualifiedName(
                                     DirectCast(left, NameSyntax),
@@ -720,7 +812,7 @@ Namespace Microsoft.CodeAnalysis.VisualBasic.Simplification
 
                 Dim newLabelStatement = DirectCast(MyBase.VisitLabelStatement(node), LabelStatementSyntax)
 
-                Dim escapedLabelToken = TryEscapeIdentifierToken(newLabelStatement.LabelToken, Me._semanticModel)
+                Dim escapedLabelToken = TryEscapeIdentifierToken(newLabelStatement.LabelToken)
                 If newLabelStatement.LabelToken <> escapedLabelToken Then
                     newLabelStatement = newLabelStatement.WithLabelToken(escapedLabelToken)
                 End If

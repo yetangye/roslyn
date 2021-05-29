@@ -1,4 +1,6 @@
-' Copyright (c) Microsoft.  All Rights Reserved.  Licensed under the Apache License, Version 2.0.  See License.txt in the project root for license information.
+﻿' Licensed to the .NET Foundation under one or more agreements.
+' The .NET Foundation licenses this file to you under the MIT license.
+' See the LICENSE file in the project root for more information.
 
 Imports Microsoft.CodeAnalysis.Simplification
 Imports Microsoft.CodeAnalysis.Text
@@ -8,27 +10,27 @@ Namespace Microsoft.CodeAnalysis.Editor.UnitTests.Simplification
         Inherits AbstractSimplificationTests
 
 #Region "CSharp tests"
-        Private Sub TestDocumentSimplification(input As String, expected As String)
+        Private Shared Async Function TestDocumentSimplificationAsync(input As String, expected As String) As System.Threading.Tasks.Task
             Using workspace = New AdhocWorkspace()
                 Dim solution = workspace.CurrentSolution
                 Dim projId = ProjectId.CreateNewId()
                 Dim project = solution.AddProject(projId, "Project", "Project.dll", LanguageNames.CSharp) _
                     .GetProject(projId)
 
-                Dim document = project.AddMetadataReference(TestReferences.NetFx.v4_0_30319.mscorlib) _
+                Dim document = project.AddMetadataReference(TestMetadata.Net451.mscorlib) _
                     .AddDocument("Document", SourceText.From(input))
 
                 Dim annotatedDocument = document.WithSyntaxRoot(
-                    document.GetSyntaxRootAsync().Result.WithAdditionalAnnotations(Simplifier.Annotation))
+                    (Await document.GetSyntaxRootAsync()).WithAdditionalAnnotations(Simplifier.Annotation))
 
-                Dim simplifiedDocument = Simplifier.ReduceAsync(annotatedDocument).Result
+                Dim simplifiedDocument = Await Simplifier.ReduceAsync(annotatedDocument)
 
-                Assert.Equal(expected, simplifiedDocument.GetTextAsync().Result.ToString())
+                Assert.Equal(expected, (Await simplifiedDocument.GetTextAsync()).ToString())
             End Using
-        End Sub
+        End Function
 
         <Fact, Trait(Traits.Feature, Traits.Features.Simplification)>
-        Public Sub CSharp_ParameterCanBeSimplified()
+        Public Async Function CSharp_ParameterCanBeSimplified() As System.Threading.Tasks.Task
             Dim code = <![CDATA[
 using System;
 
@@ -50,11 +52,11 @@ class C
         Action<int> a = (j) => { };
     }
 }]]>
-            TestDocumentSimplification(code.Value, expected.Value)
-        End Sub
+            Await TestDocumentSimplificationAsync(code.Value, expected.Value)
+        End Function
 
         <Fact, Trait(Traits.Feature, Traits.Features.Simplification)>
-        Public Sub CSharp_ParameterCannotBeSimplified()
+        Public Async Function CSharp_ParameterCannotBeSimplified() As System.Threading.Tasks.Task
             Dim code = <![CDATA[
 using System;
 
@@ -65,8 +67,8 @@ class C
         Action<int> a = j => { };
     }
 }]]>
-            TestDocumentSimplification(code.Value, code.Value)
-        End Sub
+            Await TestDocumentSimplificationAsync(code.Value, code.Value)
+        End Function
 #End Region
     End Class
 End Namespace

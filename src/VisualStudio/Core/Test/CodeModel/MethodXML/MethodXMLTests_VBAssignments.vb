@@ -1,14 +1,17 @@
-' Copyright (c) Microsoft.  All Rights Reserved.  Licensed under the Apache License, Version 2.0.  See License.txt in the project root for license information.
+﻿' Licensed to the .NET Foundation under one or more agreements.
+' The .NET Foundation licenses this file to you under the MIT license.
+' See the LICENSE file in the project root for more information.
 
 Imports System.Globalization
 Imports System.Threading
+Imports Microsoft.CodeAnalysis.Test.Utilities
 Imports Roslyn.Test.Utilities
 
 Namespace Microsoft.VisualStudio.LanguageServices.UnitTests.CodeModel.MethodXML
     Partial Public Class MethodXMLTests
 
-        <ConditionalFact(GetType(x86)), Trait(Traits.Feature, Traits.Features.CodeModelMethodXml)>
-        Public Sub VBAssignments_FieldWithoutMe()
+        <WpfFact, Trait(Traits.Feature, Traits.Features.CodeModelMethodXml)>
+        Public Sub TestVBAssignments_FieldWithoutMe()
             Dim definition =
 <Workspace>
     <Project Language="Visual Basic" CommonReferences="true">
@@ -51,8 +54,8 @@ End Class
             Test(definition, expected)
         End Sub
 
-        <ConditionalFact(GetType(x86)), Trait(Traits.Feature, Traits.Features.CodeModelMethodXml)>
-        Public Sub VBAssignments_WithEventsFieldWithoutMe()
+        <WpfFact, Trait(Traits.Feature, Traits.Features.CodeModelMethodXml)>
+        Public Sub TestVBAssignments_WithEventsFieldWithoutMe()
             Dim definition =
 <Workspace>
     <Project Language="Visual Basic" CommonReferences="true">
@@ -95,8 +98,8 @@ End Class
             Test(definition, expected)
         End Sub
 
-        <ConditionalFact(GetType(x86)), Trait(Traits.Feature, Traits.Features.CodeModelMethodXml)>
-        Public Sub VBAssignments_FieldWithMe()
+        <WpfFact, Trait(Traits.Feature, Traits.Features.CodeModelMethodXml)>
+        Public Sub TestVBAssignments_FieldWithMe()
             Dim definition =
 <Workspace>
     <Project Language="Visual Basic" CommonReferences="true">
@@ -139,8 +142,8 @@ End Class
             Test(definition, expected)
         End Sub
 
-        <ConditionalFact(GetType(x86)), Trait(Traits.Feature, Traits.Features.CodeModelMethodXml)>
-        Public Sub VBAssignments_PropertyThroughFieldWithoutMe()
+        <WpfFact, Trait(Traits.Feature, Traits.Features.CodeModelMethodXml)>
+        Public Sub TestVBAssignments_PropertyThroughFieldWithoutMe()
             Dim definition =
 <Workspace>
     <Project Language="Visual Basic" CommonReferences="true">
@@ -190,8 +193,8 @@ End Class
             Test(definition, expected)
         End Sub
 
-        <ConditionalFact(GetType(x86)), Trait(Traits.Feature, Traits.Features.CodeModelMethodXml)>
-        Public Sub VBAssignments_PropertyThroughFieldWithMe()
+        <WpfFact, Trait(Traits.Feature, Traits.Features.CodeModelMethodXml)>
+        Public Sub TestVBAssignments_PropertyThroughFieldWithMe()
             Dim definition =
 <Workspace>
     <Project Language="Visual Basic" CommonReferences="true">
@@ -241,8 +244,8 @@ End Class
             Test(definition, expected)
         End Sub
 
-        <ConditionalFact(GetType(x86)), Trait(Traits.Feature, Traits.Features.CodeModelMethodXml)>
-        Public Sub VBAssignments_InferredWithBinaryPlusOperation()
+        <WpfFact, Trait(Traits.Feature, Traits.Features.CodeModelMethodXml)>
+        Public Sub TestVBAssignments_InferredWithBinaryPlusOperation()
             Dim definition =
 <Workspace>
     <Project Language="Visual Basic" CommonReferences="true">
@@ -282,8 +285,8 @@ End Class
             Test(definition, expected)
         End Sub
 
-        <ConditionalFact(GetType(x86)), Trait(Traits.Feature, Traits.Features.CodeModelMethodXml)>
-        Public Sub VBAssignments_WithBinaryPlusOperation()
+        <WpfFact, Trait(Traits.Feature, Traits.Features.CodeModelMethodXml)>
+        Public Sub TestVBAssignments_WithBinaryPlusOperation()
             Dim definition =
 <Workspace>
     <Project Language="Visual Basic" CommonReferences="true">
@@ -323,8 +326,8 @@ End Class
             Test(definition, expected)
         End Sub
 
-        <ConditionalFact(GetType(x86)), Trait(Traits.Feature, Traits.Features.CodeModelMethodXml)>
-        Public Sub VBAssignments_HexNumber()
+        <WpfFact, Trait(Traits.Feature, Traits.Features.CodeModelMethodXml)>
+        Public Sub TestVBAssignments_HexNumber()
             Dim definition =
 <Workspace>
     <Project Language="Visual Basic" CommonReferences="true">
@@ -355,9 +358,9 @@ End Class
             Test(definition, expected)
         End Sub
 
-        <WorkItem(462922)>
-        <ConditionalFact(GetType(x86)), Trait(Traits.Feature, Traits.Features.CodeModelMethodXml)>
-        Public Sub VBAssignments_Bug462922()
+        <WorkItem(462922, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/462922")>
+        <WpfFact, Trait(Traits.Feature, Traits.Features.CodeModelMethodXml)>
+        Public Sub TestVBAssignments_Bug462922()
             Dim definition =
 <Workspace>
     <Project Language="Visual Basic" CommonReferences="true">
@@ -417,8 +420,8 @@ End Class
             Test(definition, expected)
         End Sub
 
-        <ConditionalFact(GetType(x86)), Trait(Traits.Feature, Traits.Features.CodeModelMethodXml)>
-        Public Sub VBAssignments_EnumsAndCasts()
+        <WpfFact, Trait(Traits.Feature, Traits.Features.CodeModelMethodXml)>
+        Public Sub TestVBAssignments_EnumsAndCasts()
             Dim definition =
 <Workspace>
     <Project Language="Visual Basic" CommonReferences="true">
@@ -426,10 +429,10 @@ End Class
         <Document>
 Public Class C
     $$Sub M()
-        Me.Foo = (CType(((AnchorStyles.Top Or AnchorStyles.Left) Or AnchorStyles.Right), AnchorStyles))
+        Me.Goo = (CType(((AnchorStyles.Top Or AnchorStyles.Left) Or AnchorStyles.Right), AnchorStyles))
     End Sub
 
-    Public Property Foo As AnchorStyles
+    Public Property Goo As AnchorStyles
 End Class
 
 Enum AnchorStyles
@@ -452,7 +455,7 @@ End Enum
                         <Expression>
                             <ThisReference/>
                         </Expression>
-                        <Name>Foo</Name>
+                        <Name>Goo</Name>
                     </NameRef>
                 </Expression>
                 <Expression>
@@ -518,9 +521,9 @@ End Enum
             Test(definition, expected)
         End Sub
 
-        <WorkItem(743120)>
-        <ConditionalFact(GetType(x86)), Trait(Traits.Feature, Traits.Features.CodeModelMethodXml)>
-        Public Sub VBAssignments_PropertyOffParameter()
+        <WorkItem(743120, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/743120")>
+        <WpfFact, Trait(Traits.Feature, Traits.Features.CodeModelMethodXml)>
+        Public Sub TestVBAssignments_PropertyOffParameter()
             Dim definition =
     <Workspace>
         <Project Language="Visual Basic" CommonReferences="true">
@@ -562,9 +565,9 @@ End Class
             Test(definition, expected)
         End Sub
 
-        <WorkItem(831374)>
-        <ConditionalFact(GetType(x86)), Trait(Traits.Feature, Traits.Features.CodeModelMethodXml)>
-        Public Sub VBAssignments_NullableValue()
+        <WorkItem(831374, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/831374")>
+        <WpfFact, Trait(Traits.Feature, Traits.Features.CodeModelMethodXml)>
+        Public Sub TestVBAssignments_NullableValue()
             Dim definition =
     <Workspace>
         <Project Language="Visual Basic" CommonReferences="true">
@@ -604,9 +607,9 @@ End Class
             Test(definition, expected)
         End Sub
 
-        <WorkItem(831374)>
-        <ConditionalFact(GetType(x86)), Trait(Traits.Feature, Traits.Features.CodeModelMethodXml)>
-        Public Sub VBAssignments_ClosedGeneric1()
+        <WorkItem(831374, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/831374")>
+        <WpfFact, Trait(Traits.Feature, Traits.Features.CodeModelMethodXml)>
+        Public Sub TestVBAssignments_ClosedGeneric1()
             Dim definition =
     <Workspace>
         <Project Language="Visual Basic" CommonReferences="true">
@@ -637,9 +640,9 @@ End Class
             Test(definition, expected)
         End Sub
 
-        <WorkItem(831374)>
-        <ConditionalFact(GetType(x86)), Trait(Traits.Feature, Traits.Features.CodeModelMethodXml)>
-        Public Sub VBAssignments_ClosedGeneric2()
+        <WorkItem(831374, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/831374")>
+        <WpfFact, Trait(Traits.Feature, Traits.Features.CodeModelMethodXml)>
+        Public Sub TestVBAssignments_ClosedGeneric2()
             Dim definition =
     <Workspace>
         <Project Language="Visual Basic" CommonReferences="true">
@@ -670,9 +673,9 @@ End Class
             Test(definition, expected)
         End Sub
 
-        <WorkItem(831374)>
-        <ConditionalFact(GetType(x86)), Trait(Traits.Feature, Traits.Features.CodeModelMethodXml)>
-        Public Sub VBAssignments_ClosedGeneric3()
+        <WorkItem(831374, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/831374")>
+        <WpfFact, Trait(Traits.Feature, Traits.Features.CodeModelMethodXml)>
+        Public Sub TestVBAssignments_ClosedGeneric3()
             Dim definition =
     <Workspace>
         <Project Language="Visual Basic" CommonReferences="true">
@@ -703,9 +706,9 @@ End Class
             Test(definition, expected)
         End Sub
 
-        <WorkItem(831374)>
-        <ConditionalFact(GetType(x86)), Trait(Traits.Feature, Traits.Features.CodeModelMethodXml)>
-        Public Sub VBAssignments_ClosedGeneric4()
+        <WorkItem(831374, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/831374")>
+        <WpfFact, Trait(Traits.Feature, Traits.Features.CodeModelMethodXml)>
+        Public Sub TestVBAssignments_ClosedGeneric4()
             Dim definition =
     <Workspace>
         <Project Language="Visual Basic" CommonReferences="true">
@@ -736,9 +739,9 @@ End Class
             Test(definition, expected)
         End Sub
 
-        <WorkItem(831374)>
-        <ConditionalFact(GetType(x86)), Trait(Traits.Feature, Traits.Features.CodeModelMethodXml)>
-        Public Sub VBAssignments_TypeConfluence()
+        <WorkItem(831374, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/831374")>
+        <WpfFact, Trait(Traits.Feature, Traits.Features.CodeModelMethodXml)>
+        Public Sub TestVBAssignments_TypeConfluence()
             Dim definition =
     <Workspace>
         <Project Language="Visual Basic" CommonReferences="true">
@@ -769,9 +772,9 @@ End Class
             Test(definition, expected)
         End Sub
 
-        <WorkItem(887584)>
-        <ConditionalFact(GetType(x86)), Trait(Traits.Feature, Traits.Features.CodeModelMethodXml)>
-        Public Sub VBAssignments_EscapedNames()
+        <WorkItem(887584, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/887584")>
+        <WpfFact, Trait(Traits.Feature, Traits.Features.CodeModelMethodXml)>
+        Public Sub TestVBAssignments_EscapedNames()
             Dim definition =
     <Workspace>
         <Project Language="Visual Basic" CommonReferences="true">
@@ -822,8 +825,8 @@ End Class
             Test(definition, expected)
         End Sub
 
-        <ConditionalFact(GetType(x86)), Trait(Traits.Feature, Traits.Features.CodeModelMethodXml)>
-        Public Sub VBAssignments_FloatingPointLiteralInGermanUICulture()
+        <WpfFact, Trait(Traits.Feature, Traits.Features.CodeModelMethodXml)>
+        Public Sub TestVBAssignments_FloatingPointLiteralInGermanUICulture()
             Dim definition =
 <Workspace>
     <Project Language="Visual Basic" CommonReferences="true">
@@ -871,6 +874,187 @@ End Class
             Finally
                 currentThread.CurrentCulture = oldCulture
             End Try
+        End Sub
+
+        <WpfFact, Trait(Traits.Feature, Traits.Features.CodeModelMethodXml)>
+        Public Sub TestVBAssignments_DontThrowWhenLeftHandSideDoesntBind()
+            Dim definition =
+<Workspace>
+    <Project Language="Visual Basic" CommonReferences="true">
+        <CompilationOptions RootNamespace="ClassLibrary1"/>
+        <Document>
+Public Class A
+    Public Property Prop As B
+End Class
+
+Public Class C
+    Dim x As New A
+
+    $$Sub M()
+        x.Prop.NestedProp = "Text"
+    End Sub
+End Class
+        </Document>
+    </Project>
+</Workspace>
+
+            Dim expected =
+<Block>
+    <ExpressionStatement line="9">
+        <Expression>
+            <Assignment>
+                <Expression>
+                    <NameRef variablekind="unknown">
+                        <Expression>
+                            <NameRef variablekind="property">
+                                <Expression>
+                                    <NameRef variablekind="field">
+                                        <Expression>
+                                            <ThisReference/>
+                                        </Expression>
+                                        <Name>x</Name>
+                                    </NameRef>
+                                </Expression>
+                                <Name>Prop</Name>
+                            </NameRef>
+                        </Expression>
+                        <Name>NestedProp</Name>
+                    </NameRef>
+                </Expression>
+                <Expression>
+                    <Literal>
+                        <String>Text</String>
+                    </Literal>
+                </Expression>
+            </Assignment>
+        </Expression>
+    </ExpressionStatement>
+</Block>
+
+            Dim currentThread = Thread.CurrentThread
+            Dim oldCulture = currentThread.CurrentCulture
+            Try
+                currentThread.CurrentCulture = CultureInfo.GetCultureInfo("de-DE")
+                Test(definition, expected)
+            Finally
+                currentThread.CurrentCulture = oldCulture
+            End Try
+        End Sub
+
+        <WorkItem(4312, "https://github.com/dotnet/roslyn/issues/4312")>
+        <WpfFact, Trait(Traits.Feature, Traits.Features.CodeModelMethodXml)>
+        Public Sub TestVBAssignments_PropertyAssignedWithEmptyArray()
+            Dim definition =
+    <Workspace>
+        <Project Language="Visual Basic" CommonReferences="true">
+            <Document>
+Class C
+    Private Property Series As Object()
+
+    $$Sub M()
+        Me.Series = New Object(-1) {}
+    End Sub
+End Class
+            </Document>
+        </Project>
+    </Workspace>
+
+            Dim expected =
+<Block>
+    <ExpressionStatement line="5"><Expression>
+        <Assignment>
+            <Expression>
+                <NameRef variablekind="property">
+                    <Expression>
+                        <ThisReference/>
+                    </Expression>
+                    <Name>Series</Name>
+                </NameRef>
+            </Expression>
+            <Expression>
+                <NewArray>
+                    <ArrayType rank="1">
+                        <Type>System.Object</Type>
+                    </ArrayType>
+                    <Bound>
+                        <Expression>
+                            <Literal>
+                                <Number type="System.Int32">0</Number>
+                            </Literal>
+                        </Expression>
+                    </Bound>
+                </NewArray>
+            </Expression>
+        </Assignment>
+        </Expression>
+    </ExpressionStatement>
+</Block>
+
+            Test(definition, expected)
+        End Sub
+
+        <WorkItem(4149, "https://github.com/dotnet/roslyn/issues/4149")>
+        <WpfFact, Trait(Traits.Feature, Traits.Features.CodeModelMethodXml)>
+        Public Sub TestVBAssignments_RoundTrippedDoubles()
+            Dim definition =
+    <Workspace>
+        <Project Language="Visual Basic" CommonReferences="true">
+            <Document>
+Class C
+    Sub $$M()
+        Dim d As Double = 9.2233720368547758E+18R
+    End Sub
+End Class
+            </Document>
+        </Project>
+    </Workspace>
+
+            Dim expected =
+<Block>
+    <Local line="3">
+        <Type>System.Double</Type>
+        <Name>d</Name>
+        <Expression>
+            <Literal>
+                <Number type="System.Double">9.2233720368547758E+18</Number>
+            </Literal>
+        </Expression>
+    </Local>
+</Block>
+
+            Test(definition, expected)
+        End Sub
+
+        <WorkItem(4149, "https://github.com/dotnet/roslyn/issues/4149")>
+        <WpfFact, Trait(Traits.Feature, Traits.Features.CodeModelMethodXml)>
+        Public Sub TestVBAssignments_RoundTrippedSingles()
+            Dim definition =
+    <Workspace>
+        <Project Language="Visual Basic" CommonReferences="true">
+            <Document>
+Class C
+    Sub $$M()
+        Dim s As Single = 0.333333343F
+    End Sub
+End Class
+            </Document>
+        </Project>
+    </Workspace>
+
+            Dim expected =
+<Block>
+    <Local line="3">
+        <Type>System.Single</Type>
+        <Name>s</Name>
+        <Expression>
+            <Literal>
+                <Number type="System.Single">0.333333343</Number>
+            </Literal>
+        </Expression>
+    </Local>
+</Block>
+
+            Test(definition, expected)
         End Sub
 
     End Class

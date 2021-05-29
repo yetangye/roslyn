@@ -1,16 +1,17 @@
-' Copyright (c) Microsoft.  All Rights Reserved.  Licensed under the Apache License, Version 2.0.  See License.txt in the project root for license information.
+﻿' Licensed to the .NET Foundation under one or more agreements.
+' The .NET Foundation licenses this file to you under the MIT license.
+' See the LICENSE file in the project root for more information.
 
-Imports Microsoft.CodeAnalysis.Text
 Namespace Microsoft.CodeAnalysis.Editor.VisualBasic.UnitTests.Recommendations.Statements
     Public Class GoToKeywordRecommenderTests
 
         <Fact, Trait(Traits.Feature, Traits.Features.KeywordRecommending)>
-        Public Sub GoToInMethodBody()
+        Public Sub GoToInMethodBodyTest()
             VerifyRecommendationsContain(<MethodBody>|</MethodBody>, "GoTo")
         End Sub
 
         <Fact, Trait(Traits.Feature, Traits.Features.KeywordRecommending)>
-        Public Sub GoToInMultiLineLambda()
+        Public Sub GoToInMultiLineLambdaTest()
             VerifyRecommendationsContain(<MethodBody>
 Dim x = Sub()
 |
@@ -18,13 +19,13 @@ Dim x = Sub()
         End Sub
 
         <Fact, Trait(Traits.Feature, Traits.Features.KeywordRecommending)>
-        Public Sub GoToNotInSingleLineLambda()
+        Public Sub GoToNotInSingleLineLambdaTest()
             VerifyRecommendationsMissing(<MethodBody>
 Dim x = Sub() |</MethodBody>, "GoTo")
         End Sub
 
         <Fact, Trait(Traits.Feature, Traits.Features.KeywordRecommending)>
-        Public Sub GoToNotInFinallyBlock()
+        Public Sub GoToNotInFinallyBlockTest()
             Dim code =
 <MethodBody>
 Try
@@ -34,6 +35,5 @@ Finally
 
             VerifyRecommendationsMissing(code, "GoTo")
         End Sub
-
     End Class
 End Namespace

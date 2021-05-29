@@ -1,4 +1,6 @@
-' Copyright (c) Microsoft.  All Rights Reserved.  Licensed under the Apache License, Version 2.0.  See License.txt in the project root for license information.
+﻿' Licensed to the .NET Foundation under one or more agreements.
+' The .NET Foundation licenses this file to you under the MIT license.
+' See the LICENSE file in the project root for more information.
 
 Imports Microsoft.CodeAnalysis.VisualBasic.Syntax
 
@@ -41,12 +43,12 @@ Namespace Microsoft.CodeAnalysis.Editor.VisualBasic.LineCommit
             End Function
 
             Public Overrides Function VisitForBlock(node As ForBlockSyntax) As IList(Of StatementSyntax)
-                ' TODO: evilness around ending multiple stateents at once with a single "next"
+                ' TODO: evilness around ending multiple statements at once with a single "next"
                 Return New StatementSyntax() {node.ForStatement, node.NextStatement}
             End Function
 
             Public Overrides Function VisitForEachBlock(node As ForEachBlockSyntax) As IList(Of StatementSyntax)
-                ' TODO: evilness around ending multiple stateents at once with a single "next"
+                ' TODO: evilness around ending multiple statements at once with a single "next"
                 Return New StatementSyntax() {node.ForEachStatement, node.NextStatement}
             End Function
 

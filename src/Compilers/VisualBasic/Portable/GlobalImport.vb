@@ -1,15 +1,12 @@
-﻿' Copyright (c) Microsoft.  All Rights Reserved.  Licensed under the Apache License, Version 2.0.  See License.txt in the project root for license information.
+﻿' Licensed to the .NET Foundation under one or more agreements.
+' The .NET Foundation licenses this file to you under the MIT license.
+' See the LICENSE file in the project root for more information.
 
-Imports System.Collections.Generic
 Imports System.Collections.Immutable
 Imports System.Globalization
 Imports System.Runtime.InteropServices
-Imports System.Threading
 Imports Microsoft.CodeAnalysis
-Imports Microsoft.CodeAnalysis.Text
-Imports Microsoft.CodeAnalysis.VisualBasic.Symbols
 Imports Microsoft.CodeAnalysis.VisualBasic.Syntax
-Imports TypeKind = Microsoft.CodeAnalysis.TypeKind
 
 Namespace Microsoft.CodeAnalysis.VisualBasic
     ''' <summary>
@@ -35,6 +32,12 @@ Namespace Microsoft.CodeAnalysis.VisualBasic
         Public ReadOnly Property Clause As ImportsClauseSyntax
             Get
                 Return CType(_clause.GetSyntax(), ImportsClauseSyntax)
+            End Get
+        End Property
+
+        Friend ReadOnly Property IsXmlClause As Boolean
+            Get
+                Return Clause.IsKind(SyntaxKind.XmlNamespaceImportsClause)
             End Get
         End Property
 
@@ -92,7 +95,7 @@ Namespace Microsoft.CodeAnalysis.VisualBasic
         End Function
 
         ''' <summary>
-        ''' Parses a collection of strings representing imports to create a collecion of GlobalImport instance and diagnostics
+        ''' Parses a collection of strings representing imports to create a collection of GlobalImport instance and diagnostics
         ''' </summary>
         ''' <param name="importedNames">A collection of strings to be parsed.</param>
         ''' <param name="diagnostics">A ImmutableArray of diagnostics.</param>
@@ -107,7 +110,7 @@ Namespace Microsoft.CodeAnalysis.VisualBasic
         ' Map a diagnostic to the diagnostic we want to give.
         Friend Function MapDiagnostic(unmappedDiag As Diagnostic) As Diagnostic
             If unmappedDiag.Code = ERRID.WRN_UndefinedOrEmptyNamespaceOrClass1 Then
-                Return New VBDiagnostic(ErrorFactory.ErrorInfo(ERRID.WRN_UndefinedOrEmpyProjectNamespaceOrClass1, _importedName), NoLocation.Singleton)
+                Return New VBDiagnostic(ErrorFactory.ErrorInfo(ERRID.WRN_UndefinedOrEmptyProjectNamespaceOrClass1, _importedName), NoLocation.Singleton)
             Else
                 ' Determine the text of the import, plus the startIndex/length within that text
                 ' that the error is.

@@ -1,4 +1,6 @@
-﻿' Copyright (c) Microsoft.  All Rights Reserved.  Licensed under the Apache License, Version 2.0.  See License.txt in the project root for license information.
+﻿' Licensed to the .NET Foundation under one or more agreements.
+' The .NET Foundation licenses this file to you under the MIT license.
+' See the LICENSE file in the project root for more information.
 
 Imports System.Collections.Immutable
 Imports System.Globalization
@@ -24,7 +26,7 @@ Namespace Microsoft.CodeAnalysis.VisualBasic.Symbols
     ''' Given a type A(Of IComparable).B(Of ), alpha-renamed type parameter T will have type constraint IComparable.
     ''' The rest will be exactly as for the original type parameter T. In fact, OriginalDefinition will return symbol for T.
     ''' </summary>
-    Friend Class SubstitutedTypeParameterSymbol
+    Friend NotInheritable Class SubstitutedTypeParameterSymbol
         Inherits TypeParameterSymbol
 
         ''' <summary>
@@ -32,140 +34,149 @@ Namespace Microsoft.CodeAnalysis.VisualBasic.Symbols
         ''' The field is not read-only because it is initialized after construction through
         ''' SetContainingSymbol() method.
         ''' </summary>
-        Private m_ContainingSymbol As Symbol
-        Private ReadOnly m_OriginalDefinition As TypeParameterSymbol
+        Private _containingSymbol As Symbol
+        Private ReadOnly _originalDefinition As TypeParameterSymbol
 
         Public Sub New(originalDefinition As TypeParameterSymbol)
             Debug.Assert(originalDefinition.IsDefinition)
-            m_OriginalDefinition = originalDefinition
+            Debug.Assert(TypeOf originalDefinition Is SubstitutableTypeParameterSymbol) ' Required to ensure symmetrical equality
+            _originalDefinition = originalDefinition
         End Sub
 
         Public Overrides ReadOnly Property TypeParameterKind As TypeParameterKind
             Get
-                Return m_OriginalDefinition.TypeParameterKind
+                Return _originalDefinition.TypeParameterKind
             End Get
         End Property
 
         Public Overrides ReadOnly Property Name As String
             Get
-                Return m_OriginalDefinition.Name
+                Return _originalDefinition.Name
             End Get
         End Property
 
         Public Overrides ReadOnly Property MetadataName As String
             Get
-                Return m_OriginalDefinition.MetadataName
+                Return _originalDefinition.MetadataName
             End Get
         End Property
 
         Public Sub SetContainingSymbol(container As Symbol)
-            Debug.Assert(m_ContainingSymbol Is Nothing AndAlso container IsNot Nothing)
+            Debug.Assert(_containingSymbol Is Nothing AndAlso container IsNot Nothing)
 
             Debug.Assert(TypeOf container Is SubstitutedNamedType.SpecializedGenericType OrElse
                          TypeOf container Is SubstitutedMethodSymbol.SpecializedGenericMethod OrElse
                          (TypeOf container Is UnboundGenericType AndAlso DirectCast(container, UnboundGenericType).Arity > 0 AndAlso
                           DirectCast(container, UnboundGenericType).ConstructedFrom Is container))
 
-            m_ContainingSymbol = container
+            _containingSymbol = container
         End Sub
 
         Public Overrides ReadOnly Property OriginalDefinition As TypeParameterSymbol
             Get
-                Return m_OriginalDefinition
+                Return _originalDefinition
             End Get
         End Property
 
         Public Overrides ReadOnly Property ReducedFrom As TypeParameterSymbol
             Get
-                Return m_OriginalDefinition.ReducedFrom
+                Return _originalDefinition.ReducedFrom
             End Get
         End Property
 
         Private ReadOnly Property TypeSubstitution As TypeSubstitution
             Get
-                Return If(m_ContainingSymbol.Kind = SymbolKind.Method,
-                          DirectCast(m_ContainingSymbol, SubstitutedMethodSymbol).TypeSubstitution,
-                          DirectCast(m_ContainingSymbol, NamedTypeSymbol).TypeSubstitution)
+                Return If(_containingSymbol.Kind = SymbolKind.Method,
+                          DirectCast(_containingSymbol, SubstitutedMethodSymbol).TypeSubstitution,
+                          DirectCast(_containingSymbol, NamedTypeSymbol).TypeSubstitution)
             End Get
         End Property
 
         Friend Overrides ReadOnly Property ConstraintTypesNoUseSiteDiagnostics As ImmutableArray(Of TypeSymbol)
             Get
-                Return InternalSubstituteTypeParametersDistinct(TypeSubstitution, m_OriginalDefinition.ConstraintTypesNoUseSiteDiagnostics)
+                Return InternalSubstituteTypeParametersDistinct(TypeSubstitution, _originalDefinition.ConstraintTypesNoUseSiteDiagnostics)
             End Get
         End Property
 
         Public Overrides ReadOnly Property ContainingSymbol As Symbol
             Get
-                Return m_ContainingSymbol
+                Return _containingSymbol
             End Get
         End Property
 
         Public Overloads Overrides Function GetAttributes() As ImmutableArray(Of VisualBasicAttributeData)
-            Return m_OriginalDefinition.GetAttributes()
+            Return _originalDefinition.GetAttributes()
         End Function
 
         Public Overrides ReadOnly Property HasConstructorConstraint As Boolean
             Get
-                Return m_OriginalDefinition.HasConstructorConstraint
+                Return _originalDefinition.HasConstructorConstraint
             End Get
         End Property
 
         Public Overrides ReadOnly Property HasReferenceTypeConstraint As Boolean
             Get
-                Return m_OriginalDefinition.HasReferenceTypeConstraint
+                Return _originalDefinition.HasReferenceTypeConstraint
             End Get
         End Property
 
         Public Overrides ReadOnly Property HasValueTypeConstraint As Boolean
             Get
-                Return m_OriginalDefinition.HasValueTypeConstraint
+                Return _originalDefinition.HasValueTypeConstraint
             End Get
         End Property
 
         Public Overrides ReadOnly Property IsImplicitlyDeclared As Boolean
             Get
-                Return m_OriginalDefinition.IsImplicitlyDeclared
+                Return _originalDefinition.IsImplicitlyDeclared
             End Get
         End Property
 
         Public Overrides ReadOnly Property Locations As ImmutableArray(Of Location)
             Get
-                Return m_OriginalDefinition.Locations
+                Return _originalDefinition.Locations
             End Get
         End Property
 
         Public Overrides ReadOnly Property DeclaringSyntaxReferences As ImmutableArray(Of SyntaxReference)
             Get
-                Return m_OriginalDefinition.DeclaringSyntaxReferences
+                Return _originalDefinition.DeclaringSyntaxReferences
             End Get
         End Property
 
         Public Overrides ReadOnly Property Ordinal As Integer
             Get
-                Return m_OriginalDefinition.Ordinal
+                Return _originalDefinition.Ordinal
             End Get
         End Property
 
         Public Overrides ReadOnly Property Variance As VarianceKind
             Get
-                Return m_OriginalDefinition.Variance
+                Return _originalDefinition.Variance
             End Get
         End Property
 
         Public Overrides Function GetHashCode() As Integer
-            Return Hash.Combine(Me.Ordinal.GetHashCode(), m_ContainingSymbol.GetHashCode())
+            Dim containingType = TryCast(_containingSymbol, SubstitutedNamedType)
+
+            If containingType IsNot Nothing AndAlso containingType.TypeSubstitution.WasConstructedForModifiers() Then
+                Return _originalDefinition.GetHashCode()
+            End If
+
+            Return Hash.Combine(Me.Ordinal.GetHashCode(), _containingSymbol.GetHashCode())
         End Function
 
-        Public Overrides Function Equals(obj As Object) As Boolean
+        Public Overrides Function Equals(other As TypeSymbol, comparison As TypeCompareKind) As Boolean
+            Return Equals(TryCast(other, TypeParameterSymbol), comparison)
+        End Function
 
-            If Me Is obj Then
+        Private Overloads Function Equals(other As TypeParameterSymbol, comparison As TypeCompareKind) As Boolean
+
+            If Me Is other Then
                 Return True
             End If
 
-            Dim other = TryCast(obj, SubstitutedTypeParameterSymbol)
-
-            Return other IsNot Nothing AndAlso Me.Ordinal = other.Ordinal AndAlso Me.ContainingSymbol.Equals(other.ContainingSymbol)
+            Return other IsNot Nothing AndAlso Me.OriginalDefinition.Equals(other.OriginalDefinition) AndAlso Me.ContainingSymbol.Equals(other.ContainingSymbol, comparison)
         End Function
 
         ''' <summary>
@@ -174,24 +185,24 @@ Namespace Microsoft.CodeAnalysis.VisualBasic.Symbols
         ''' !!! Only code implementing construction of generic types is allowed to call this method !!!
         ''' !!! All other code should use Construct methods.                                        !!! 
         ''' </summary>
-        Friend Overrides Function InternalSubstituteTypeParameters(substitution As TypeSubstitution) As TypeSymbol
+        Friend Overrides Function InternalSubstituteTypeParameters(substitution As TypeSubstitution) As TypeWithModifiers
             If substitution IsNot Nothing Then
-                If substitution.TargetGenericDefinition Is m_ContainingSymbol Then
+                If substitution.TargetGenericDefinition Is _containingSymbol Then
                     Return substitution.GetSubstitutionFor(Me)
                 End If
 
                 Throw ExceptionUtilities.Unreachable
             End If
 
-            Return Me
+            Return New TypeWithModifiers(Me)
         End Function
 
         Friend Overrides Sub EnsureAllConstraintsAreResolved()
-            m_OriginalDefinition.EnsureAllConstraintsAreResolved()
+            _originalDefinition.EnsureAllConstraintsAreResolved()
         End Sub
 
         Public Overrides Function GetDocumentationCommentXml(Optional preferredCulture As CultureInfo = Nothing, Optional expandIncludes As Boolean = False, Optional cancellationToken As CancellationToken = Nothing) As String
-            Return m_OriginalDefinition.GetDocumentationCommentXml(preferredCulture, expandIncludes, cancellationToken)
+            Return _originalDefinition.GetDocumentationCommentXml(preferredCulture, expandIncludes, cancellationToken)
         End Function
     End Class
 

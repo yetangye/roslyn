@@ -1,6 +1,15 @@
-﻿// Copyright (c) Microsoft.  All Rights Reserved.  Licensed under the Apache License, Version 2.0.  See License.txt in the project root for license information.
+﻿// Licensed to the .NET Foundation under one or more agreements.
+// The .NET Foundation licenses this file to you under the MIT license.
+// See the LICENSE file in the project root for more information.
 
-using Microsoft.CodeAnalysis.CSharp.CodeRefactorings.IntroduceVariable;
+#nullable disable
+
+using System.Collections.Immutable;
+using System.Threading.Tasks;
+using Microsoft.CodeAnalysis.CodeActions;
+using Microsoft.CodeAnalysis.CodeRefactorings;
+using Microsoft.CodeAnalysis.IntroduceVariable;
+using Microsoft.CodeAnalysis.Test.Utilities;
 using Roslyn.Test.Utilities;
 using Xunit;
 
@@ -8,36 +17,53 @@ namespace Microsoft.CodeAnalysis.Editor.CSharp.UnitTests.CodeRefactorings.Introd
 {
     public class InteractiveIntroduceVariableTests : AbstractCSharpCodeActionTest
     {
-        protected override object CreateCodeRefactoringProvider(Workspace workspace)
-        {
-            return new IntroduceVariableCodeRefactoringProvider();
-        }
+        protected override CodeRefactoringProvider CreateCodeRefactoringProvider(Workspace workspace, TestParameters parameters)
+            => new IntroduceVariableCodeRefactoringProvider();
 
-        protected void Test(string initial, string expected, int index = 0, bool compareTokens = true)
-        {
-            Test(initial, expected, Options.Script, index, compareTokens);
-        }
+        protected override ImmutableArray<CodeAction> MassageActions(ImmutableArray<CodeAction> actions)
+            => GetNestedActions(actions);
+
+        protected Task TestAsync(string initial, string expected, int index = 0)
+            => TestAsync(initial, expected, Options.Script, null, index);
 
         [Fact, Trait(Traits.Feature, Traits.Features.CodeActionsIntroduceVariable)]
-        public void TestMethodFix1()
+        public async Task TestMethodFix1()
         {
-            Test(
-                @"void Foo() { Bar([|1 + 1|]); Bar(1 + 1); }",
-                @"void Foo() { const int {|Rename:V|} = 1 + 1; Bar(V); Bar(1 + 1); }",
+            await TestAsync(
+@"void Goo()
+{
+    Bar([|1 + 1|]);
+    Bar(1 + 1);
+}",
+@"void Goo()
+{
+    const int {|Rename:V|} = 1 + 1;
+    Bar(V);
+    Bar(1 + 1);
+}",
                 index: 2);
         }
 
         [Fact, Trait(Traits.Feature, Traits.Features.CodeActionsIntroduceVariable)]
-        public void TestMethodFix2()
+        public async Task TestMethodFix2()
         {
-            Test(
-                @"void Foo() { Bar([|1 + 1|]); Bar(1 + 1); }",
-                @"void Foo() { const int {|Rename:V|} = 1 + 1; Bar(V); Bar(V); }",
+            await TestAsync(
+@"void Goo()
+{
+    Bar([|1 + 1|]);
+    Bar(1 + 1);
+}",
+@"void Goo()
+{
+    const int {|Rename:V|} = 1 + 1;
+    Bar(V);
+    Bar(V);
+}",
                 index: 3);
         }
 
         [Fact, Trait(Traits.Feature, Traits.Features.CodeActionsIntroduceVariable)]
-        public void TestFieldFix1()
+        public async Task TestFieldFix1()
         {
             var code =
 @"int i = ([|1 + 1|]) + (1 + 1);";
@@ -46,11 +72,11 @@ namespace Microsoft.CodeAnalysis.Editor.CSharp.UnitTests.CodeRefactorings.Introd
 @"private const int {|Rename:V|} = 1 + 1;
 int i = V + (1 + 1);";
 
-            Test(code, expected, index: 0, compareTokens: false);
+            await TestAsync(code, expected, index: 0);
         }
 
         [Fact, Trait(Traits.Feature, Traits.Features.CodeActionsIntroduceVariable)]
-        public void TestFieldFix2()
+        public async Task TestFieldFix2()
         {
             var code =
 @"int i = ([|1 + 1|]) + (1 + 1);";
@@ -59,50 +85,78 @@ int i = V + (1 + 1);";
 @"private const int {|Rename:V|} = 1 + 1;
 int i = V + V;";
 
-            Test(code, expected, index: 1, compareTokens: false);
+            await TestAsync(code, expected, index: 1);
         }
 
         [Fact, Trait(Traits.Feature, Traits.Features.CodeActionsIntroduceVariable)]
-        public void TestParameterFix1()
+        public async Task TestParameterFix1()
         {
-            Test(
-                @"void Bar(int i = [|1 + 1|], int j = 1 + 1) { }",
-                @"private const int {|Rename:V|} = 1 + 1; void Bar(int i = V, int j = 1 + 1) { }",
+            await TestAsync(
+@"void Bar(int i = [|1 + 1|], int j = 1 + 1)
+{
+}",
+@"private const int {|Rename:V|} = 1 + 1;
+
+void Bar(int i = V, int j = 1 + 1)
+{
+}",
                 index: 0);
         }
 
         [Fact, Trait(Traits.Feature, Traits.Features.CodeActionsIntroduceVariable)]
-        public void TestParameterFix2()
+        public async Task TestParameterFix2()
         {
-            Test(
-                @"void Bar(int i = [|1 + 1|], int j = 1 + 1) { }",
-                @"private const int {|Rename:V|} = 1 + 1; void Bar(int i = V, int j = V) { }",
+            await TestAsync(
+@"void Bar(int i = [|1 + 1|], int j = 1 + 1)
+{
+}",
+@"private const int {|Rename:V|} = 1 + 1;
+
+void Bar(int i = V, int j = V)
+{
+}",
                 index: 1);
         }
 
         [Fact]
-        public void TestAttributeFix1()
+        public async Task TestAttributeFix1()
         {
-            Test(
-                @"[Foo([|1 + 1|], 1 + 1)]void Bar() { }",
-                @"private const int {|Rename:V|} = 1 + 1; [Foo(V, 1 + 1)]void Bar() { }",
+            await TestAsync(
+@"[Goo([|1 + 1|], 1 + 1)]
+void Bar()
+{
+}",
+@"private const int {|Rename:V|} = 1 + 1;
+
+[Goo(V, 1 + 1)]
+void Bar()
+{
+}",
                 index: 0);
         }
 
         [Fact, Trait(Traits.Feature, Traits.Features.CodeActionsIntroduceVariable)]
-        public void TestAttributeFix2()
+        public async Task TestAttributeFix2()
         {
-            Test(
-                @"[Foo([|1 + 1|], 1 + 1)]void Bar() { }",
-                @"private const int {|Rename:V|} = 1 + 1; [Foo(V, V)]void Bar() { }",
+            await TestAsync(
+@"[Goo([|1 + 1|], 1 + 1)]
+void Bar()
+{
+}",
+@"private const int {|Rename:V|} = 1 + 1;
+
+[Goo(V, V)]
+void Bar()
+{
+}",
                 index: 1);
         }
 
-        [WorkItem(541287)]
+        [WorkItem(541287, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/541287")]
         [Fact, Trait(Traits.Feature, Traits.Features.CodeActionsIntroduceVariable)]
-        public void TestBlockFormatting()
+        public async Task TestBlockFormatting()
         {
-            Test(
+            await TestAsync(
 @"using System;
  
 class C
@@ -122,21 +176,20 @@ class C
     {
         for (int i = 0; i < 10; i++)
         {
-            var {|Rename:v|} = i + 1;
-            Console.WriteLine(v);
+            int {|Rename:value|} = i + 1;
+            Console.WriteLine(value);
         }
     }
 }
 ",
-index: 1,
-compareTokens: false);
+index: 1);
         }
 
-        [WorkItem(546465)]
+        [WorkItem(546465, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/546465")]
         [Fact, Trait(Traits.Feature, Traits.Features.CodeActionsIntroduceVariable)]
-        public void TestPreserveTrivia()
+        public async Task TestPreserveTrivia()
         {
-            Test(
+            await TestAsync(
 @"class C
 {
     void M(params string[] args)
@@ -160,8 +213,7 @@ compareTokens: false);
             ""c"");
     }
 }
-",
-compareTokens: false);
+");
         }
     }
 }

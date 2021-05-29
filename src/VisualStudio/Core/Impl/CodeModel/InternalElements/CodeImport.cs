@@ -1,4 +1,8 @@
-// Copyright (c) Microsoft.  All Rights Reserved.  Licensed under the Apache License, Version 2.0.  See License.txt in the project root for license information.
+﻿// Licensed to the .NET Foundation under one or more agreements.
+// The .NET Foundation licenses this file to you under the MIT license.
+// See the LICENSE file in the project root for more information.
+
+#nullable disable
 
 using System;
 using System.Diagnostics;
@@ -60,24 +64,26 @@ namespace Microsoft.VisualStudio.LanguageServices.Implementation.CodeModel.Inter
             _dottedName = dottedName;
         }
 
-        internal override SyntaxNode LookupNode()
+        internal override bool TryLookupNode(out SyntaxNode node)
         {
+            node = null;
+
             var parentNode = _parentHandle.Value != null
                 ? _parentHandle.Value.LookupNode()
                 : FileCodeModel.GetSyntaxRoot();
 
             if (parentNode == null)
             {
-                throw Exceptions.ThrowEFail();
+                return false;
             }
 
-            SyntaxNode importNode;
-            if (!CodeModelService.TryGetImportNode(parentNode, _dottedName, out importNode))
+            if (!CodeModelService.TryGetImportNode(parentNode, _dottedName, out var importNode))
             {
-                throw Exceptions.ThrowEFail();
+                return false;
             }
 
-            return importNode;
+            node = importNode;
+            return node != null;
         }
 
         internal override ISymbol LookupSymbol()
@@ -140,18 +146,12 @@ namespace Microsoft.VisualStudio.LanguageServices.Implementation.CodeModel.Inter
         }
 
         protected override string GetName()
-        {
-            return CodeModelService.GetName(LookupNode());
-        }
+            => CodeModelService.GetName(LookupNode());
 
         protected override void SetName(string value)
-        {
-            throw Exceptions.ThrowEFail();
-        }
+            => throw Exceptions.ThrowEFail();
 
         protected override string GetFullName()
-        {
-            return CodeModelService.GetFullName(LookupNode(), semanticModel: null);
-        }
+            => CodeModelService.GetFullName(LookupNode(), semanticModel: null);
     }
 }

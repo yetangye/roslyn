@@ -1,20 +1,33 @@
-' Copyright (c) Microsoft.  All Rights Reserved.  Licensed under the Apache License, Version 2.0.  See License.txt in the project root for license information.
+﻿' Licensed to the .NET Foundation under one or more agreements.
+' The .NET Foundation licenses this file to you under the MIT license.
+' See the LICENSE file in the project root for more information.
+
+Imports System.Threading.Tasks
 
 Namespace Microsoft.VisualStudio.LanguageServices.UnitTests.CodeModel
     Public MustInherit Class AbstractRootCodeModelTests
-        Inherits AbstractCodeModelObjectTests(Of EnvDTE.CodeModel)
+        Inherits AbstractCodeModelObjectTests(Of EnvDTE80.CodeModel2)
 
-        Protected Sub TestRootCodeModel(code As XElement, action As Action(Of EnvDTE.CodeModel))
-            Using state = CreateCodeModelTestState(GetWorkspaceDefinition(code))
-                Dim rootCodeModel = state.RootCodeModel
+        Protected Sub TestRootCodeModel(workspaceDefinition As XElement, action As Action(Of EnvDTE80.CodeModel2))
+            Using state = CreateCodeModelTestState(workspaceDefinition)
+                Dim rootCodeModel = TryCast(state.RootCodeModel, EnvDTE80.CodeModel2)
                 Assert.NotNull(rootCodeModel)
 
                 action(rootCodeModel)
             End Using
         End Sub
 
-        Protected Sub TestCodeElements(code As XElement, ParamArray expectedChildren() As Action(Of Object))
-            TestRootCodeModel(code,
+        Protected Sub TestRootCodeModelWithCodeFile(code As XElement, action As Action(Of EnvDTE80.CodeModel2))
+            Using state = CreateCodeModelTestState(GetWorkspaceDefinition(code))
+                Dim rootCodeModel = TryCast(state.RootCodeModel, EnvDTE80.CodeModel2)
+                Assert.NotNull(rootCodeModel)
+
+                action(rootCodeModel)
+            End Using
+        End Sub
+
+        Protected Overrides Sub TestChildren(code As XElement, ParamArray expectedChildren() As Action(Of Object))
+            TestRootCodeModelWithCodeFile(code,
                 Sub(rootCodeModel)
                     Dim codeElements = rootCodeModel.CodeElements
                     Assert.Equal(expectedChildren.Length, rootCodeModel.CodeElements.Count)
@@ -25,12 +38,11 @@ Namespace Microsoft.VisualStudio.LanguageServices.UnitTests.CodeModel
                 End Sub)
         End Sub
 
-        Protected Sub TestCodeElements(code As XElement, ParamArray names() As String)
-            TestRootCodeModel(code,
+        Protected Overloads Sub TestChildren(code As XElement, ParamArray names() As String)
+            TestRootCodeModelWithCodeFile(code,
                 Sub(rootCodeModel)
-                    Assert.Equal(names.Length, rootCodeModel.CodeElements.Count)
-
                     Dim actualNames = rootCodeModel.CodeElements.OfType(Of EnvDTE.CodeElement).Select(Function(e) e.Name).ToArray()
+                    Assert.Equal(names.Length, rootCodeModel.CodeElements.Count)
 
                     For i = 0 To names.Length - 1
                         Assert.Contains(names(i), actualNames)
@@ -43,7 +55,7 @@ Namespace Microsoft.VisualStudio.LanguageServices.UnitTests.CodeModel
         End Sub
 
         Protected Sub TestCreateCodeTypeRef(code As XElement, type As Object, data As CodeTypeRefData)
-            TestRootCodeModel(code,
+            TestRootCodeModelWithCodeFile(code,
                 Sub(rootCodeModel)
                     Dim codeTypeRef = rootCodeModel.CreateCodeTypeRef(type)
 
@@ -56,12 +68,19 @@ Namespace Microsoft.VisualStudio.LanguageServices.UnitTests.CodeModel
         End Sub
 
         Protected Sub TestCreateCodeTypeRef(Of TException As Exception)(code As XElement, type As Object)
-            TestRootCodeModel(code,
+            TestRootCodeModelWithCodeFile(code,
                 Sub(rootCodeModel)
                     Assert.Throws(Of TException)(
                         Sub()
                             rootCodeModel.CreateCodeTypeRef(type)
                         End Sub)
+                End Sub)
+        End Sub
+
+        Protected Sub TestCodeTypeFromFullName(workspaceDefinition As XElement, fullName As String, action As Action(Of EnvDTE.CodeType))
+            TestRootCodeModel(workspaceDefinition,
+                Sub(rootCodeModel)
+                    action(rootCodeModel.CodeTypeFromFullName(fullName))
                 End Sub)
         End Sub
 

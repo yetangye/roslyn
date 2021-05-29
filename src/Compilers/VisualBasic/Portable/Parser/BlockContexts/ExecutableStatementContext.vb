@@ -1,4 +1,6 @@
-﻿' Copyright (c) Microsoft.  All Rights Reserved.  Licensed under the Apache License, Version 2.0.  See License.txt in the project root for license information.
+﻿' Licensed to the .NET Foundation under one or more agreements.
+' The .NET Foundation licenses this file to you under the MIT license.
+' See the LICENSE file in the project root for more information.
 
 Imports Microsoft.CodeAnalysis.Text
 Imports Microsoft.CodeAnalysis.VisualBasic.Syntax
@@ -103,7 +105,7 @@ Namespace Microsoft.CodeAnalysis.VisualBasic.Syntax.InternalSyntax
                     SyntaxKind.InterfaceStatement
                     ' Reuse as long as the statement does not have modifiers.
                     ' These statements parse differently when they appear at the top level and when they appear within a method body.
-                    ' Within a method body, if the statement begins with a modifier then then statement is parsed as a variable declaration (with an error).
+                    ' Within a method body, if the statement begins with a modifier then the statement is parsed as a variable declaration (with an error).
                     If Not DirectCast(node, TypeStatementSyntax).Modifiers.Any() Then
                         Return UseSyntax(node, newContext)
                     Else
@@ -114,7 +116,7 @@ Namespace Microsoft.CodeAnalysis.VisualBasic.Syntax.InternalSyntax
                 Case SyntaxKind.EnumStatement
                     ' Reuse as long as the statement does not have modifiers
                     ' These statements parse differently when they appear at the top level and when they appear within a method body.
-                    ' Within a method body, if the statement begins with a modifier then then statement is parsed as a variable declaration (with an error).
+                    ' Within a method body, if the statement begins with a modifier then the statement is parsed as a variable declaration (with an error).
                     If Not DirectCast(node, EnumStatementSyntax).Modifiers.Any() Then
                         Return UseSyntax(node, newContext)
                     Else
@@ -130,7 +132,7 @@ Namespace Microsoft.CodeAnalysis.VisualBasic.Syntax.InternalSyntax
                     SyntaxKind.DelegateSubStatement
                     ' Reuse as long as the statement does not have modifiers
                     ' These statements parse differently when they appear at the top level and when they appear within a method body.
-                    ' Within a method body, if the statement begins with a dim/const then then statement is parsed as a variable declaration (with an error).
+                    ' Within a method body, if the statement begins with a dim/const then the statement is parsed as a variable declaration (with an error).
                     If Not DirectCast(node, MethodBaseSyntax).Modifiers.Any() Then
                         Return UseSyntax(node, newContext)
                     Else
@@ -152,8 +154,8 @@ Namespace Microsoft.CodeAnalysis.VisualBasic.Syntax.InternalSyntax
                         Return LinkResult.NotUsed
                     End If
 
-                    ' these blocks cannot happen in current context so we should crumble them
-                    ' on next pass we will give error on the first statement
+                ' these blocks cannot happen in current context so we should crumble them
+                ' on next pass we will give error on the first statement
                 Case _
                     SyntaxKind.SubBlock,
                     SyntaxKind.ConstructorBlock,

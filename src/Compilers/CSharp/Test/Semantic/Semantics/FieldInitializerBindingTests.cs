@@ -1,4 +1,8 @@
-﻿// Copyright (c) Microsoft.  All Rights Reserved.  Licensed under the Apache License, Version 2.0.  See License.txt in the project root for license information.
+﻿// Licensed to the .NET Foundation under one or more agreements.
+// The .NET Foundation licenses this file to you under the MIT license.
+// See the LICENSE file in the project root for more information.
+
+#nullable disable
 
 using System;
 using System.Collections.Generic;
@@ -6,6 +10,7 @@ using System.Collections.Immutable;
 using System.Linq;
 using Microsoft.CodeAnalysis.CSharp.Symbols;
 using Microsoft.CodeAnalysis.CSharp.Syntax;
+using Microsoft.CodeAnalysis.PooledObjects;
 using Microsoft.CodeAnalysis.Text;
 using Roslyn.Utilities;
 using Xunit;
@@ -77,16 +82,16 @@ class C
 class C
 {
     static int s1;
-    int i1 = 1 + Foo();
+    int i1 = 1 + Goo();
 
-    static int Foo() { return 1; }
+    static int Goo() { return 1; }
 }";
 
             IEnumerable<ExpectedInitializer> expectedStaticInitializers = null;
 
             IEnumerable<ExpectedInitializer> expectedInstanceInitializers = new ExpectedInitializer[]
             {
-                new ExpectedInitializer("i1", "1 + Foo()", lineNumber: 4),
+                new ExpectedInitializer("i1", "1 + Goo()", lineNumber: 4),
             };
 
             CompileAndCheckInitializers(source, expectedInstanceInitializers, expectedStaticInitializers);
@@ -98,15 +103,15 @@ class C
             var source = @"
 class C
 {
-    static int s1 = 1 + Foo();
+    static int s1 = 1 + Goo();
     int i1;
 
-    static int Foo() { return 1; }
+    static int Goo() { return 1; }
 }";
 
             IEnumerable<ExpectedInitializer> expectedStaticInitializers = new ExpectedInitializer[]
             {
-                new ExpectedInitializer("s1", "1 + Foo()", lineNumber: 3),
+                new ExpectedInitializer("s1", "1 + Goo()", lineNumber: 3),
             };
 
             IEnumerable<ExpectedInitializer> expectedInstanceInitializers = null;
@@ -237,7 +242,7 @@ class C
 
         private static void CompileAndCheckInitializers(string source, IEnumerable<ExpectedInitializer> expectedInstanceInitializers, IEnumerable<ExpectedInitializer> expectedStaticInitializers)
         {
-            var compilation = CreateCompilationWithMscorlib(source);
+            var compilation = CreateCompilation(source);
             var syntaxTree = compilation.SyntaxTrees.First();
             var typeSymbol = (SourceNamedTypeSymbol)compilation.GlobalNamespace.GetMembers("C").Single();
 
@@ -266,12 +271,12 @@ class C
                 foreach (var expectedInitializer in expectedInitializers)
                 {
                     var boundInit = boundInitializers[i++];
-                    Assert.Equal(BoundKind.FieldInitializer, boundInit.Kind);
+                    Assert.Equal(BoundKind.FieldEqualsValue, boundInit.Kind);
 
-                    var boundFieldInit = (BoundFieldInitializer)boundInit;
+                    var boundFieldInit = (BoundFieldEqualsValue)boundInit;
 
-                    var initValueSyntax = boundFieldInit.InitialValue.Syntax;
-                    Assert.Same(initValueSyntax, boundInit.Syntax);
+                    var initValueSyntax = boundFieldInit.Value.Syntax;
+                    Assert.Same(initValueSyntax.Parent, boundInit.Syntax);
                     Assert.Equal(expectedInitializer.InitialValue, initValueSyntax.ToFullString());
 
                     var initValueLineNumber = syntaxTree.GetLineSpan(initValueSyntax.Span).StartLinePosition.Line;
@@ -285,38 +290,24 @@ class C
         private static ImmutableArray<BoundInitializer> BindInitializersWithoutDiagnostics(SourceNamedTypeSymbol typeSymbol, ImmutableArray<ImmutableArray<FieldOrPropertyInitializer>> initializers)
         {
             DiagnosticBag diagnostics = DiagnosticBag.GetInstance();
-            try
-            {
-                ImportChain unused;
-                var boundInitializers = Binder.BindFieldInitializers(
-                    containingType: typeSymbol,
-                    scriptCtor: null,
-                    initializers: initializers,
-                    diagnostics: diagnostics,
-                    generateDebugInfo: false,
-                    firstImportChain: out unused);
-
-                var filteredDiag = diagnostics.AsEnumerable();
-                foreach (var diagnostic in filteredDiag)
-                {
-                    Console.WriteLine(diagnostic);
-                }
-
-                Assert.True(filteredDiag.IsEmpty());
-
-                return boundInitializers;
-            }
-            finally
-            {
-                diagnostics.Free();
-            }
+            ImportChain unused;
+            var boundInitializers = ArrayBuilder<BoundInitializer>.GetInstance();
+            Binder.BindRegularCSharpFieldInitializers(
+                typeSymbol.DeclaringCompilation,
+                initializers,
+                boundInitializers,
+                new BindingDiagnosticBag(diagnostics),
+                firstDebugImports: out unused);
+            diagnostics.Verify();
+            diagnostics.Free();
+            return boundInitializers.ToImmutableAndFree();
         }
 
         private class ExpectedInitializer
         {
-            public string FieldName { get; set; }
-            public string InitialValue { get; set; }
-            public int LineNumber { get; set; } //0-indexed
+            public string FieldName { get; }
+            public string InitialValue { get; }
+            public int LineNumber { get; } //0-indexed
 
             public ExpectedInitializer(string fieldName, string initialValue, int lineNumber)
             {

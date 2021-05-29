@@ -1,9 +1,14 @@
-// Copyright (c) Microsoft.  All Rights Reserved.  Licensed under the Apache License, Version 2.0.  See License.txt in the project root for license information.
+﻿// Licensed to the .NET Foundation under one or more agreements.
+// The .NET Foundation licenses this file to you under the MIT license.
+// See the LICENSE file in the project root for more information.
+
+#nullable disable
 
 using System.Threading;
+using System.Threading.Tasks;
 using Microsoft.CodeAnalysis.LanguageServices;
 using Microsoft.CodeAnalysis.Shared.Extensions;
-using Microsoft.CodeAnalysis.Text;
+using Microsoft.CodeAnalysis.Test.Utilities;
 using Roslyn.Test.Utilities;
 using Xunit;
 
@@ -11,25 +16,26 @@ namespace Microsoft.CodeAnalysis.Editor.CSharp.UnitTests.TypeInferrer
 {
     public partial class TypeInferrerTests
     {
-        private void TestDelegate(string text, string expectedType)
+        private async Task TestDelegateAsync(string text, string expectedType)
         {
-            TextSpan textSpan;
-            MarkupTestFile.GetSpan(text, out text, out textSpan);
+            using var workspaceFixture = GetOrCreateWorkspaceFixture();
 
-            Document document = fixture.UpdateDocument(text, SourceCodeKind.Regular);
+            MarkupTestFile.GetSpan(text, out text, out var textSpan);
 
-            var root = document.GetSyntaxTreeAsync().Result.GetRoot();
+            var document = workspaceFixture.Target.UpdateDocument(text, SourceCodeKind.Regular);
+
+            var root = await document.GetSyntaxRootAsync();
             var node = FindExpressionSyntaxFromSpan(root, textSpan);
 
             var typeInference = document.GetLanguageService<ITypeInferenceService>();
-            var delegateType = typeInference.InferDelegateType(document.GetSemanticModelAsync().Result, node, CancellationToken.None);
+            var delegateType = typeInference.InferDelegateType(await document.GetSemanticModelAsync(), node, CancellationToken.None);
 
             Assert.NotNull(delegateType);
             Assert.Equal(expectedType, delegateType.ToNameDisplayString());
         }
 
         [Fact, Trait(Traits.Feature, Traits.Features.TypeInferenceService)]
-        public void TestDeclaration1()
+        public async Task TestDeclaration1()
         {
             var text =
 @"using System;
@@ -41,11 +47,11 @@ class C
   }
 }";
 
-            TestDelegate(text, "System.Func<int>");
+            await TestDelegateAsync(text, "System.Func<int>");
         }
 
         [Fact, Trait(Traits.Feature, Traits.Features.TypeInferenceService)]
-        public void TestAssignment1()
+        public async Task TestAssignment1()
         {
             var text =
 @"using System;
@@ -58,11 +64,11 @@ class C
   }
 }";
 
-            TestDelegate(text, "System.Func<int>");
+            await TestDelegateAsync(text, "System.Func<int>");
         }
 
         [Fact, Trait(Traits.Feature, Traits.Features.TypeInferenceService)]
-        public void TestArgument1()
+        public async Task TestArgument1()
         {
             var text =
 @"using System;
@@ -76,11 +82,11 @@ class C
   void Bar(Func<int> f);
 }";
 
-            TestDelegate(text, "System.Func<int>");
+            await TestDelegateAsync(text, "System.Func<int>");
         }
 
         [Fact, Trait(Traits.Feature, Traits.Features.TypeInferenceService)]
-        public void TestConstructor1()
+        public async Task TestConstructor1()
         {
             var text =
 @"using System;
@@ -94,11 +100,11 @@ class C
   public C(Func<int> f);
 }";
 
-            TestDelegate(text, "System.Func<int>");
+            await TestDelegateAsync(text, "System.Func<int>");
         }
 
         [Fact, Trait(Traits.Feature, Traits.Features.TypeInferenceService)]
-        public void TestDelegateConstructor1()
+        public async Task TestDelegateConstructor1()
         {
             var text =
 @"using System;
@@ -110,11 +116,11 @@ class C
   }
 }";
 
-            TestDelegate(text, "System.Func<int>");
+            await TestDelegateAsync(text, "System.Func<int>");
         }
 
         [Fact, Trait(Traits.Feature, Traits.Features.TypeInferenceService)]
-        public void TestCastExpression1()
+        public async Task TestCastExpression1()
         {
             var text =
 @"using System;
@@ -126,11 +132,11 @@ class C
   }
 }";
 
-            TestDelegate(text, "System.Func<int>");
+            await TestDelegateAsync(text, "System.Func<int>");
         }
 
         [Fact, Trait(Traits.Feature, Traits.Features.TypeInferenceService)]
-        public void TestCastExpression2()
+        public async Task TestCastExpression2()
         {
             var text =
 @"using System;
@@ -142,11 +148,11 @@ class C
   }
 }";
 
-            TestDelegate(text, "System.Func<int>");
+            await TestDelegateAsync(text, "System.Func<int>");
         }
 
         [Fact, Trait(Traits.Feature, Traits.Features.TypeInferenceService)]
-        public void TestReturnFromMethod()
+        public async Task TestReturnFromMethod()
         {
             var text =
 @"using System;
@@ -158,11 +164,11 @@ class C
   }
 }";
 
-            TestDelegate(text, "System.Func<int>");
+            await TestDelegateAsync(text, "System.Func<int>");
         }
 
         [Fact, Trait(Traits.Feature, Traits.Features.TypeInferenceService)]
-        public void TestInsideLambda1()
+        public async Task TestInsideLambda1()
         {
             var text =
 @"using System;
@@ -174,7 +180,7 @@ class C
   }
 }";
 
-            TestDelegate(text, "System.Func<string, bool>");
+            await TestDelegateAsync(text, "System.Func<string, bool>");
         }
     }
 }

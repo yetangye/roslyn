@@ -1,4 +1,8 @@
-﻿Imports System.Collections.Immutable
+﻿' Licensed to the .NET Foundation under one or more agreements.
+' The .NET Foundation licenses this file to you under the MIT license.
+' See the LICENSE file in the project root for more information.
+
+Imports System.Collections.Immutable
 Imports System.Runtime.InteropServices
 Imports Microsoft.CodeAnalysis.ExpressionEvaluator
 Imports Microsoft.CodeAnalysis.Test.Utilities
@@ -7,7 +11,7 @@ Imports Microsoft.VisualStudio.Debugger.Evaluation
 Imports Roslyn.Test.Utilities
 Imports Xunit
 
-Namespace Microsoft.CodeAnalysis.VisualBasic.ExpressionEvaluator
+Namespace Microsoft.CodeAnalysis.VisualBasic.ExpressionEvaluator.UnitTests
 
     Public Class ExpansionTests : Inherits VisualBasicResultProviderTestBase
 
@@ -41,10 +45,10 @@ End Class"
                 EvalResult(rootExpr, "{C}", "C", rootExpr, DkmEvaluationResultFlags.Expandable))
             Dim children = GetChildren(result)
             Verify(children,
-                EvalResult("e", "B {1}", "E", "(New C()).e", editableValue:="E.B"),
-                EvalResult("f", "0", "F", "(New C()).f", editableValue:="0"),
-                EvalResult("g", "else Or fi {3}", "if", "(New C()).g", editableValue:="[if].else Or [if].fi"),
-                EvalResult("h", "5", "if", "(New C()).h", editableValue:="5"))
+                EvalResult("e", "B {1}", "E", "(New C()).e", DkmEvaluationResultFlags.CanFavorite, editableValue:="E.B"),
+                EvalResult("f", "0", "F", "(New C()).f", DkmEvaluationResultFlags.CanFavorite, editableValue:="0"),
+                EvalResult("g", "else Or fi {3}", "if", "(New C()).g", DkmEvaluationResultFlags.CanFavorite, editableValue:="[if].else Or [if].fi"),
+                EvalResult("h", "5", "if", "(New C()).h", DkmEvaluationResultFlags.CanFavorite, editableValue:="5"))
         End Sub
 
         <Fact>
@@ -76,21 +80,21 @@ End Class"
                 EvalResult(rootExpr, "{C}", "C", rootExpr, DkmEvaluationResultFlags.Expandable))
             Dim children = GetChildren(result)
             Verify(children,
-                EvalResult("e1", "A {0}", "E?", "(New C()).e1", editableValue:="E.A"),
-                EvalResult("e2", "Nothing", "E?", "(New C()).e2"),
-                EvalResult("o1", "{S}", "Object {S}", "(New C()).o1", DkmEvaluationResultFlags.Expandable),
-                EvalResult("o2", "Nothing", "Object", "(New C()).o2"),
-                EvalResult("s1", "{S}", "S?", "(New C()).s1", DkmEvaluationResultFlags.Expandable),
-                EvalResult("s2", "Nothing", "S?", "(New C()).s2"))
+                EvalResult("e1", "A {0}", "E?", "(New C()).e1", DkmEvaluationResultFlags.CanFavorite, editableValue:="E.A"),
+                EvalResult("e2", "Nothing", "E?", "(New C()).e2", DkmEvaluationResultFlags.CanFavorite),
+                EvalResult("o1", "{S}", "Object {S}", "(New C()).o1", DkmEvaluationResultFlags.Expandable Or DkmEvaluationResultFlags.CanFavorite),
+                EvalResult("o2", "Nothing", "Object", "(New C()).o2", DkmEvaluationResultFlags.CanFavorite),
+                EvalResult("s1", "{S}", "S?", "(New C()).s1", DkmEvaluationResultFlags.Expandable Or DkmEvaluationResultFlags.CanFavorite),
+                EvalResult("s2", "Nothing", "S?", "(New C()).s2", DkmEvaluationResultFlags.CanFavorite))
             ' Dim o1 As Object = New System.Nullable(Of S)(Nothing)
             Verify(GetChildren(children(2)),
-                EvalResult("F", "Nothing", "Object", "DirectCast((New C()).o1, S).F"))
+                EvalResult("F", "Nothing", "Object", "DirectCast((New C()).o1, S).F", DkmEvaluationResultFlags.CanFavorite))
             ' Dim s1 As S? = New S(1)
             Verify(GetChildren(children(4)),
-                EvalResult("F", "1", "Object {Integer}", "(New C()).s1.F"))
+                EvalResult("F", "1", "Object {Integer}", "(New C()).s1.F", DkmEvaluationResultFlags.CanFavorite))
         End Sub
 
-        <Fact(Skip := "Issue #321")>
+        <Fact>
         Public Sub Pointers()
             Dim source =
 ".class private auto ansi beforefieldinit C
@@ -128,7 +132,7 @@ End Class"
                     EvalResult("q", PointerToString(IntPtr.Zero), "Integer*", String.Format("({0}).q", rootExpr)))
             Dim fullName = String.Format("*({0}).p", rootExpr)
             Verify(GetChildren(children(0)),
-                    EvalResult(fullName, "4", "Integer", fullName))
+                    EvalResult(fullName, "4", "Integer", fullName, DkmEvaluationResultFlags.None))
         End Sub
 
         <Fact>
@@ -168,11 +172,11 @@ End Class"
                 EvalResult(rootExpr, "{C}", "C", rootExpr, DkmEvaluationResultFlags.Expandable))
             Dim children = GetChildren(result)
             Verify(children,
-                EvalResult("a", "Nothing", "A", "(New C()).a", DkmEvaluationResultFlags.Expandable),
-                EvalResult("b", "Nothing", "B", "(New C()).b", DkmEvaluationResultFlags.Expandable),
-                EvalResult("e", "B {1}", "E", "(New C()).e", editableValue:="E.B"),
-                EvalResult("s", "{S}", "S", "(New C()).s", DkmEvaluationResultFlags.Expandable),
-                EvalResult("sn", "Nothing", "S?", "(New C()).sn"))
+                EvalResult("a", "Nothing", "A", "(New C()).a", DkmEvaluationResultFlags.Expandable Or DkmEvaluationResultFlags.CanFavorite),
+                EvalResult("b", "Nothing", "B", "(New C()).b", DkmEvaluationResultFlags.Expandable Or DkmEvaluationResultFlags.CanFavorite),
+                EvalResult("e", "B {1}", "E", "(New C()).e", DkmEvaluationResultFlags.CanFavorite, editableValue:="E.B"),
+                EvalResult("s", "{S}", "S", "(New C()).s", DkmEvaluationResultFlags.Expandable Or DkmEvaluationResultFlags.CanFavorite),
+                EvalResult("sn", "Nothing", "S?", "(New C()).sn", DkmEvaluationResultFlags.CanFavorite))
 
             ' Dim a As A = Nothing
             Dim more = GetChildren(children(0))
@@ -230,30 +234,30 @@ End Class
 
             Dim children = GetChildren(FormatResult("c", CreateDkmClrValue(Activator.CreateInstance(typeC))))
             Verify(children,
-                EvalResult("a", "{Length=1}", "A()", "c.a", DkmEvaluationResultFlags.Expandable),
-                EvalResult("b", "{Length=1}", "B()", "c.b", DkmEvaluationResultFlags.Expandable),
-                EvalResult("i", "{Length=1}", "I()", "c.i", DkmEvaluationResultFlags.Expandable),
-                EvalResult("o", "{Length=1}", "Object()", "c.o", DkmEvaluationResultFlags.Expandable))
+                EvalResult("a", "{Length=1}", "A()", "c.a", DkmEvaluationResultFlags.Expandable Or DkmEvaluationResultFlags.CanFavorite),
+                EvalResult("b", "{Length=1}", "B()", "c.b", DkmEvaluationResultFlags.Expandable Or DkmEvaluationResultFlags.CanFavorite),
+                EvalResult("i", "{Length=1}", "I()", "c.i", DkmEvaluationResultFlags.Expandable Or DkmEvaluationResultFlags.CanFavorite),
+                EvalResult("o", "{Length=1}", "Object()", "c.o", DkmEvaluationResultFlags.Expandable Or DkmEvaluationResultFlags.CanFavorite))
 
             Verify(GetChildren(GetChildren(children(0)).Single()), ' as A()
-                EvalResult("F", "1", "Object {Integer}", "c.a(0).F"),
-                EvalResult("P", "1", "Object {Integer}", "DirectCast(c.a(0), B).P", DkmEvaluationResultFlags.ReadOnly),
-                EvalResult("Q", "0", "Integer", "DirectCast(c.a(0), B).Q"))
+                EvalResult("F", "1", "Object {Integer}", "c.a(0).F", DkmEvaluationResultFlags.CanFavorite),
+                EvalResult("P", "1", "Object {Integer}", "DirectCast(c.a(0), B).P", DkmEvaluationResultFlags.ReadOnly Or DkmEvaluationResultFlags.CanFavorite),
+                EvalResult("Q", "0", "Integer", "DirectCast(c.a(0), B).Q", DkmEvaluationResultFlags.CanFavorite))
 
             Verify(GetChildren(GetChildren(children(1)).Single()), ' as B()
-                EvalResult("F", "2", "Object {Integer}", "c.b(0).F"),
-                EvalResult("P", "2", "Object {Integer}", "c.b(0).P", DkmEvaluationResultFlags.ReadOnly),
-                EvalResult("Q", "0", "Integer", "c.b(0).Q"))
+                EvalResult("F", "2", "Object {Integer}", "c.b(0).F", DkmEvaluationResultFlags.CanFavorite),
+                EvalResult("P", "2", "Object {Integer}", "c.b(0).P", DkmEvaluationResultFlags.ReadOnly Or DkmEvaluationResultFlags.CanFavorite),
+                EvalResult("Q", "0", "Integer", "c.b(0).Q", DkmEvaluationResultFlags.CanFavorite))
 
             Verify(GetChildren(GetChildren(children(2)).Single()), ' as I()
-                EvalResult("F", "3", "Object {Integer}", "DirectCast(c.i(0), A).F"),
-                EvalResult("P", "3", "Object {Integer}", "DirectCast(c.i(0), B).P", DkmEvaluationResultFlags.ReadOnly),
-                EvalResult("Q", "0", "Integer", "DirectCast(c.i(0), B).Q"))
+                EvalResult("F", "3", "Object {Integer}", "DirectCast(c.i(0), A).F", DkmEvaluationResultFlags.CanFavorite),
+                EvalResult("P", "3", "Object {Integer}", "DirectCast(c.i(0), B).P", DkmEvaluationResultFlags.ReadOnly Or DkmEvaluationResultFlags.CanFavorite),
+                EvalResult("Q", "0", "Integer", "DirectCast(c.i(0), B).Q", DkmEvaluationResultFlags.CanFavorite))
 
             Verify(GetChildren(GetChildren(children(3)).Single()), ' as Object()
-                EvalResult("F", "4", "Object {Integer}", "DirectCast(c.o(0), A).F"),
-                EvalResult("P", "4", "Object {Integer}", "DirectCast(c.o(0), B).P", DkmEvaluationResultFlags.ReadOnly),
-                EvalResult("Q", "0", "Integer", "DirectCast(c.o(0), B).Q"))
+                EvalResult("F", "4", "Object {Integer}", "DirectCast(c.o(0), A).F", DkmEvaluationResultFlags.CanFavorite),
+                EvalResult("P", "4", "Object {Integer}", "DirectCast(c.o(0), B).P", DkmEvaluationResultFlags.ReadOnly Or DkmEvaluationResultFlags.CanFavorite),
+                EvalResult("Q", "0", "Integer", "DirectCast(c.o(0), B).Q", DkmEvaluationResultFlags.CanFavorite))
         End Sub
 
         <Fact>
@@ -278,13 +282,22 @@ End Class
 
             ' This Char is not printable, so we expect the EditableValue to be the "ChrW" representation.
             quotedChar = "ChrW(&H7)"
-            value = CreateDkmClrValue(ChrW(&H0007), GetType(Char), inspectionContext:=CreateDkmInspectionContext(radix:=16))
-            result = FormatResult("c", value)
+            value = CreateDkmClrValue(ChrW(&H0007))
+            result = FormatResult("c", value, inspectionContext:=CreateDkmInspectionContext(radix:=16))
             Verify(result,
                 EvalResult("c", quotedChar, "Char", "c", editableValue:=quotedChar))
         End Sub
 
-        <Fact, WorkItem(1002381)>
+        <Fact>
+        Public Sub UnicodeString()
+            Const quotedString = """" & ChrW(&H1234) & """ & ChrW(7)"
+            Dim value = CreateDkmClrValue(New String({ChrW(&H1234), ChrW(&H0007)}))
+            Dim result = FormatResult("s", value)
+            Verify(result,
+                EvalResult("s", quotedString, "String", "s", editableValue:=quotedString, flags:=DkmEvaluationResultFlags.RawString))
+        End Sub
+
+        <Fact, WorkItem(1002381, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/1002381")>
         Public Sub BaseTypeEditableValue()
             Dim source = "
 Imports System
@@ -306,9 +319,9 @@ End Class"
                 EvalResult("o", "{C}", "C", "o", DkmEvaluationResultFlags.Expandable))
             Dim children = GetChildren(result)
             Verify(children,
-                EvalResult("d1", "1", "Object {Decimal}", "o.d1", editableValue:="1D"),
-                EvalResult("e1", "A Or B {3}", "System.ValueType {E}", "o.e1", DkmEvaluationResultFlags.None, editableValue:="E.A Or E.B"),
-                EvalResult("s1", """""", "System.Collections.Generic.IEnumerable(Of Char) {String}", "o.s1", DkmEvaluationResultFlags.RawString, editableValue:=""""""))
+                EvalResult("d1", "1", "Object {Decimal}", "o.d1", DkmEvaluationResultFlags.CanFavorite, editableValue:="1D"),
+                EvalResult("e1", "A Or B {3}", "System.ValueType {E}", "o.e1", DkmEvaluationResultFlags.CanFavorite, editableValue:="E.A Or E.B"),
+                EvalResult("s1", """""", "System.Collections.Generic.IEnumerable(Of Char) {String}", "o.s1", DkmEvaluationResultFlags.RawString Or DkmEvaluationResultFlags.CanFavorite, editableValue:=""""""))
         End Sub
 
         ''' <summary>
@@ -317,7 +330,7 @@ End Class"
         ''' <remarks>
         ''' As in dev11, the FullName expressions don't parse.
         ''' </remarks> 
-        <Fact, WorkItem(1010498)>
+        <Fact, WorkItem(1010498, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/1010498")>
         Public Sub HiddenMembers()
             Dim source =
 ".class public A
@@ -385,14 +398,14 @@ End Class"
                 EvalResult(rootExpr, "{A}", "A", rootExpr, DkmEvaluationResultFlags.Expandable))
             Dim children = GetChildren(result)
             Verify(children,
-                EvalResult("1<>", "Nothing", "Object", "(New A()).1<>"),
-                EvalResult("@", "Nothing", "Object", "(New A()).@"),
-                EvalResult("CS<>7__8", "Nothing", "Object", "(New A()).CS<>7__8"),
+                EvalResult("1<>", "Nothing", "Object", fullName:=Nothing, DkmEvaluationResultFlags.CanFavorite),
+                EvalResult("@", "Nothing", "Object", fullName:=Nothing, DkmEvaluationResultFlags.CanFavorite),
+                EvalResult("CS<>7__8", "Nothing", "Object", fullName:=Nothing, DkmEvaluationResultFlags.CanFavorite),
                 EvalResult("Shared members", Nothing, "", "A", DkmEvaluationResultFlags.Expandable Or DkmEvaluationResultFlags.ReadOnly, DkmEvaluationResultCategory.Class))
             children = GetChildren(children(children.Length - 1))
             Verify(children,
-                EvalResult("[>]", "Nothing", "Object", "A.[>]"),
-                EvalResult("><", "Nothing", "Object", "A.><"))
+                EvalResult(">", "Nothing", "Object", fullName:=Nothing),
+                EvalResult("><", "Nothing", "Object", fullName:=Nothing))
 
             type = assembly.GetType("B")
             rootExpr = "New B()"
@@ -402,17 +415,17 @@ End Class"
                 EvalResult(rootExpr, "{B}", "B", rootExpr, DkmEvaluationResultFlags.Expandable))
             children = GetChildren(result)
             Verify(children,
-                EvalResult("1<>", "Nothing", "Object", "(New B()).1<>", DkmEvaluationResultFlags.ReadOnly),
-                EvalResult("@", "Nothing", "Object", "(New B()).@", DkmEvaluationResultFlags.ReadOnly),
-                EvalResult("VB<>7__8", "Nothing", "Object", "(New B()).VB<>7__8", DkmEvaluationResultFlags.ReadOnly),
+                EvalResult("1<>", "Nothing", "Object", fullName:=Nothing, flags:=DkmEvaluationResultFlags.ReadOnly Or DkmEvaluationResultFlags.CanFavorite),
+                EvalResult("@", "Nothing", "Object", fullName:=Nothing, flags:=DkmEvaluationResultFlags.ReadOnly Or DkmEvaluationResultFlags.CanFavorite),
+                EvalResult("VB<>7__8", "Nothing", "Object", fullName:=Nothing, flags:=DkmEvaluationResultFlags.ReadOnly Or DkmEvaluationResultFlags.CanFavorite),
                 EvalResult("Shared members", Nothing, "", "B", DkmEvaluationResultFlags.Expandable Or DkmEvaluationResultFlags.ReadOnly, DkmEvaluationResultCategory.Class))
             children = GetChildren(children(children.Length - 1))
             Verify(children,
-                EvalResult("[>]", "Nothing", "Object", "B.[>]", DkmEvaluationResultFlags.ReadOnly),
-                EvalResult("><", "Nothing", "Object", "B.><", DkmEvaluationResultFlags.ReadOnly))
+                EvalResult(">", "Nothing", "Object", fullName:=Nothing, flags:=DkmEvaluationResultFlags.ReadOnly),
+                EvalResult("><", "Nothing", "Object", fullName:=Nothing, flags:=DkmEvaluationResultFlags.ReadOnly))
         End Sub
 
-        <Fact, WorkItem(965892)>
+        <Fact, WorkItem(965892, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/965892")>
         Public Sub DeclaredTypeAndRuntimeTypeDifferent()
             Dim source = "
 Class A
@@ -446,14 +459,14 @@ End Class"
             Dim result = FormatResult("b", value)
             Verify(GetChildren(result),
                 EvalResult("f (A)", "0", "Integer", "DirectCast(b, A).f"),
-                EvalResult("f", "0", "Double", "b.f"))
+                EvalResult("f", "0", "Double", "b.f", DkmEvaluationResultFlags.CanFavorite))
 
             Dim typeA = assembly.GetType("A")
             value = CreateDkmClrValue(instanceB, typeB)
             result = FormatResult("a", value, New DkmClrType(CType(typeA, TypeImpl)))
             Verify(GetChildren(result),
                 EvalResult("f (A)", "0", "Integer", "a.f"),
-                EvalResult("f", "0", "Double", "DirectCast(a, B).f"))
+                EvalResult("f", "0", "Double", "DirectCast(a, B).f", DkmEvaluationResultFlags.CanFavorite))
         End Sub
 
         <Fact>
@@ -474,14 +487,14 @@ End Class"
             Dim result = FormatResult("c", value)
             Verify(GetChildren(result),
                 EvalResult("f (A)", "0", "Integer", "DirectCast(c, A).f"),
-                EvalResult("f", "0", "Double", "c.f"))
+                EvalResult("f", "0", "Double", "c.f", DkmEvaluationResultFlags.CanFavorite))
 
             Dim typeB = assembly.GetType("B")
             value = CreateDkmClrValue(instanceC, typeC)
             result = FormatResult("b", value, New DkmClrType(CType(typeB, TypeImpl)))
             Verify(GetChildren(result),
                 EvalResult("f (A)", "0", "Integer", "DirectCast(b, A).f"),
-                EvalResult("f", "0", "Double", "b.f"))
+                EvalResult("f", "0", "Double", "b.f", DkmEvaluationResultFlags.CanFavorite))
         End Sub
 
         <Fact>
@@ -504,9 +517,9 @@ End Class
             Dim result = FormatResult("c", value)
             Verify(GetChildren(result),
                 EvalResult("P (A)", "0", "Integer", "DirectCast(c, A).P"),
-                EvalResult("P", "0", "Double", "c.P"),
+                EvalResult("P", "0", "Double", "c.P", DkmEvaluationResultFlags.CanFavorite),
                 EvalResult("_P (A)", "0", "Integer", "DirectCast(c, A)._P"),
-                EvalResult("_P", "0", "Double", "c._P"))
+                EvalResult("_P", "0", "Double", "c._P", DkmEvaluationResultFlags.CanFavorite))
         End Sub
 
         <Fact>
@@ -528,9 +541,9 @@ End Class
             Dim result = FormatResult("c", value)
             Verify(GetChildren(result),
                 EvalResult("P (A(Of Integer))", "0", "Integer", "DirectCast(c, A(Of Integer)).P"),
-                EvalResult("P", "0", "Double", "c.P"),
+                EvalResult("P", "0", "Double", "c.P", DkmEvaluationResultFlags.CanFavorite),
                 EvalResult("_P (A(Of Integer))", "0", "Integer", "DirectCast(c, A(Of Integer))._P"),
-                EvalResult("_P", "0", "Double", "c._P"))
+                EvalResult("_P", "0", "Double", "c._P", DkmEvaluationResultFlags.CanFavorite))
         End Sub
 
         <Fact>
@@ -552,8 +565,8 @@ End Class
             Dim result = FormatResult("c", value)
             Verify(GetChildren(result),
                 EvalResult("F (A)", "Nothing", "String", "DirectCast(c, A).F"),
-                EvalResult("F", "0", "Double", "c.F"),
-                EvalResult("_F", "0", "Double", "c._F"))
+                EvalResult("F", "0", "Double", "c.F", DkmEvaluationResultFlags.CanFavorite),
+                EvalResult("_F", "0", "Double", "c._F", DkmEvaluationResultFlags.CanFavorite))
         End Sub
 
         <Fact>
@@ -576,8 +589,8 @@ End Class
             Dim value = CreateDkmClrValue(instanceB, type)
             Dim result = FormatResult("b", value)
             Verify(GetChildren(result),
-                EvalResult("P", """Derived""", "String", "b.P", DkmEvaluationResultFlags.RawString, editableValue:="""Derived"""),
-                EvalResult("_P", """Derived""", "String", "b._P", DkmEvaluationResultFlags.RawString, editableValue:="""Derived"""))
+                EvalResult("P", """Derived""", "String", "b.P", DkmEvaluationResultFlags.RawString Or DkmEvaluationResultFlags.CanFavorite, editableValue:="""Derived"""),
+                EvalResult("_P", """Derived""", "String", "b._P", DkmEvaluationResultFlags.RawString Or DkmEvaluationResultFlags.CanFavorite, editableValue:="""Derived"""))
         End Sub
 
         <Fact>
@@ -606,17 +619,17 @@ End Class
             ' support multiple members on the same type that differ only by case
             ' (properties in C# that have the same name as their backing field, etc).
             Verify(children,
-                EvalResult("P", "4.4", "Double", "c.P"),
+                EvalResult("P", "4.4", "Double", "c.P", DkmEvaluationResultFlags.CanFavorite),
                 EvalResult("_P (B)", "45", "Integer", "DirectCast(c, B)._P"),
-                EvalResult("_P", "4.4", "Double", "c._P"),
-                EvalResult("_p", "0", "Integer", "c._p"),
-                EvalResult("p", "45", "Integer", "c.p"),
+                EvalResult("_P", "4.4", "Double", "c._P", DkmEvaluationResultFlags.CanFavorite),
+                EvalResult("_p", "0", "Integer", "c._p", DkmEvaluationResultFlags.CanFavorite),
+                EvalResult("p", "45", "Integer", "c.p", DkmEvaluationResultFlags.CanFavorite),
                 EvalResult("Shared members", Nothing, "", "C", DkmEvaluationResultFlags.Expandable Or DkmEvaluationResultFlags.ReadOnly, DkmEvaluationResultCategory.Class))
             Verify(GetChildren(children(5)),
                 EvalResult("S", "42", "Integer", "A.S"))
         End Sub
 
-        <Fact(Skip:="1074435"), WorkItem(1074435)>
+        <Fact, WorkItem(1074435, "DevDiv")>
         Public Sub NameConflictsWithInterfaceReimplementation()
             Dim source = "
 Interface I
@@ -657,11 +670,11 @@ End Class
             Verify(children,
                 EvalResult("P (A)", "1", "Integer", "DirectCast(b, A).P", DkmEvaluationResultFlags.ReadOnly),
                 EvalResult("P (B)", "2", "Integer", "b.P", DkmEvaluationResultFlags.ReadOnly),
-                EvalResult("P", "3", "Integer", "DirectCast(b, C).P", DkmEvaluationResultFlags.ReadOnly))
+                EvalResult("P", "3", "Integer", "DirectCast(b, C).P", DkmEvaluationResultFlags.ReadOnly Or DkmEvaluationResultFlags.CanFavorite))
         End Sub
 
         <Fact>
-        Public Sub NameConflictsWithVirualPropertiesAcrossDeclaredType()
+        Public Sub NameConflictsWithVirtualPropertiesAcrossDeclaredType()
             Dim source = "
 Class A 
     Public Overridable Property P As Integer = 1
@@ -685,13 +698,13 @@ End Class"
             ' the added complexity of figuring that out (instead always just calling
             ' most derived) doesn't seem worth it.
             Verify(children,
-                EvalResult("P", "3", "Integer", "DirectCast(c, D).P"),
+                EvalResult("P", "3", "Integer", "DirectCast(c, D).P", DkmEvaluationResultFlags.CanFavorite),
                 EvalResult("_P (A)", "0", "Integer", "DirectCast(c, A)._P"),
-                EvalResult("_P", "0", "Integer", "c._P"),
-                EvalResult("_p", "3", "Integer", "DirectCast(c, D)._p"))
+                EvalResult("_P", "0", "Integer", "c._P", DkmEvaluationResultFlags.CanFavorite),
+                EvalResult("_p", "3", "Integer", "DirectCast(c, D)._p", DkmEvaluationResultFlags.CanFavorite))
         End Sub
 
-        <WorkItem(1016895)>
+        <WorkItem(1016895, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/1016895")>
         <Fact>
         Public Sub RootVersusInternal()
             Const source = "

@@ -1,4 +1,8 @@
-﻿// Copyright (c) Microsoft.  All Rights Reserved.  Licensed under the Apache License, Version 2.0.  See License.txt in the project root for license information.
+﻿// Licensed to the .NET Foundation under one or more agreements.
+// The .NET Foundation licenses this file to you under the MIT license.
+// See the LICENSE file in the project root for more information.
+
+#nullable disable
 
 using System;
 using System.Linq;
@@ -32,7 +36,7 @@ class C
         [Fact]
         public void SetGetOnlyAutoPropInConstructor()
         {
-            CreateExperimentalCompilationWithMscorlib45(@"
+            CreateCompilationWithMscorlib45(@"
 class C
 {
     public int P { get; }
@@ -47,7 +51,7 @@ class C
         [Fact]
         public void GetOnlyAutoPropBadOverride()
         {
-            CreateExperimentalCompilationWithMscorlib45(@"
+            CreateCompilationWithMscorlib45(@"
 
 class Base
 {
@@ -68,10 +72,10 @@ class C : Base
     }
 
 }").VerifyDiagnostics(
-    // (12,25): error CS8080: “Auto-implemented properties must override all accessors of the overridden property.”
+    // (12,25): error CS8080: "Auto-implemented properties must override all accessors of the overridden property."
     //     public override int P { get; }
     Diagnostic(ErrorCode.ERR_AutoPropertyMustOverrideSet, "P").WithArguments("C.P").WithLocation(12, 25),
-    // (13,25): error CS8080: “Auto-implemented properties must override all accessors of the overridden property.”
+    // (13,25): error CS8080: "Auto-implemented properties must override all accessors of the overridden property."
     //     public override int P1 { get; }
     Diagnostic(ErrorCode.ERR_AutoPropertyMustOverrideSet, "P1").WithArguments("C.P1").WithLocation(13, 25)
 
@@ -81,7 +85,7 @@ class C : Base
         [Fact]
         public void SetGetOnlyAutoPropOutOfConstructor()
         {
-            CreateExperimentalCompilationWithMscorlib45(@"
+            CreateCompilationWithMscorlib45(@"
 class C
 {
     public int P { get; }
@@ -118,12 +122,15 @@ struct S
 }
 
 ").VerifyDiagnostics(
-    // (27,9): error CS0200: Property or indexer 'S.Ps' cannot be assigned to -- it is read only
-    //         Ps = 5;
-    Diagnostic(ErrorCode.ERR_AssgReadonlyProp, "Ps").WithArguments("S.Ps").WithLocation(27, 9),
+    // (24,12): error CS0568: Structs cannot contain explicit parameterless constructors
+    //     public S()
+    Diagnostic(ErrorCode.ERR_StructsCantContainDefaultConstructor, "S").WithLocation(24, 12),
     // (9,9): error CS0200: Property or indexer 'C.Ps' cannot be assigned to -- it is read only
     //         Ps = 3;
     Diagnostic(ErrorCode.ERR_AssgReadonlyProp, "Ps").WithArguments("C.Ps").WithLocation(9, 9),
+    // (27,9): error CS0200: Property or indexer 'S.Ps' cannot be assigned to -- it is read only
+    //         Ps = 5;
+    Diagnostic(ErrorCode.ERR_AssgReadonlyProp, "Ps").WithArguments("S.Ps").WithLocation(27, 9),
     // (14,9): error CS0200: Property or indexer 'C.P' cannot be assigned to -- it is read only
     //         P = 10;
     Diagnostic(ErrorCode.ERR_AssgReadonlyProp, "P").WithArguments("C.P").WithLocation(14, 9),
@@ -136,6 +143,7 @@ struct S
     // (33,9): error CS0200: Property or indexer 'S.Ps' cannot be assigned to -- it is read only
     //         S.Ps = 1;
     Diagnostic(ErrorCode.ERR_AssgReadonlyProp, "S.Ps").WithArguments("S.Ps").WithLocation(33, 9)
+
     );
         }
 
@@ -148,16 +156,16 @@ struct S
     int a = 2;
     int a { get { return 1; } set {} }
 }";
-            CreateCompilationWithMscorlib(text).VerifyDiagnostics(
+            CreateCompilation(text).VerifyDiagnostics(
     // (4,9): error CS0573: 'S': cannot have instance property or field initializers in structs
     //     int a = 2;
     Diagnostic(ErrorCode.ERR_FieldInitializerInStruct, "a").WithArguments("S").WithLocation(4, 9),
     // (5,9): error CS0102: The type 'S' already contains a definition for 'a'
     //     int a { get { return 1; } set {} }
     Diagnostic(ErrorCode.ERR_DuplicateNameInClass, "a").WithArguments("S", "a").WithLocation(5, 9),
-    // (4,9): warning CS0414: The field 'S.a' is assigned but its value is never used
+    // (4,9): warning CS0169: The field 'S.a' is never used
     //     int a = 2;
-    Diagnostic(ErrorCode.WRN_UnreferencedFieldAssg, "a").WithArguments("S.a").WithLocation(4, 9)
+    Diagnostic(ErrorCode.WRN_UnreferencedField, "a").WithArguments("S.a").WithLocation(4, 9)
     );
         }
 
@@ -171,7 +179,7 @@ struct S
     public decimal R { get; } = 300;
 }";
 
-            var comp = CreateCompilationWithMscorlib(text);
+            var comp = CreateCompilation(text);
             var global = comp.GlobalNamespace;
             var c = global.GetTypeMember("C");
 
@@ -199,7 +207,7 @@ struct S
     public decimal R { get; } = 300;
 }";
 
-            var comp = CreateCompilationWithMscorlib(text, parseOptions: TestOptions.ExperimentalParseOptions);
+            var comp = CreateCompilation(text, parseOptions: TestOptions.Regular);
             comp.VerifyDiagnostics(
     // (4,16): error CS0573: 'S': cannot have instance property or field initializers in structs
     //     public int P { get; set; } = 1;
@@ -222,7 +230,7 @@ struct S
     public S(int i) : this() {}
 }";
 
-            var comp = CreateCompilationWithMscorlib(text, parseOptions: TestOptions.ExperimentalParseOptions);
+            var comp = CreateCompilation(text, parseOptions: TestOptions.Regular);
             comp.VerifyDiagnostics(
     // (3,16): error CS0573: 'S': cannot have instance property or field initializers in structs
     //     public int P { get; set; } = 1;
@@ -255,12 +263,12 @@ struct S
 {
     int P { get; } = 0;
 }";
-            var comp = CreateCompilationWithMscorlib(text, parseOptions: TestOptions.ExperimentalParseOptions);
+            var comp = CreateCompilation(text, parseOptions: TestOptions.Regular);
 
             comp.VerifyDiagnostics(
-                // (3,9): error CS8035: Auto-implemented properties inside interfaces cannot have initializers.
+                // (3,9): error CS8053: Instance properties in interfaces cannot have initializers.
                 //     int P { get; } = 0;
-                Diagnostic(ErrorCode.ERR_AutoPropertyInitializerInInterface, "P").WithArguments("I.P").WithLocation(3, 9));
+                Diagnostic(ErrorCode.ERR_InstancePropertyInitializerInInterface, "P").WithArguments("I.P").WithLocation(3, 9));
         }
 
         [Fact]
@@ -270,7 +278,7 @@ struct S
 {
     public int P { get; }
 }";
-            var comp = CreateCompilationWithMscorlib(text, parseOptions: TestOptions.ExperimentalParseOptions);
+            var comp = CreateCompilation(text, parseOptions: TestOptions.Regular);
 
             comp.VerifyDiagnostics();
         }
@@ -284,18 +292,51 @@ struct S
     public int Q { set; } = 0;
     public int R { set; }
 }";
-            var comp = CreateCompilationWithMscorlib(text, parseOptions: TestOptions.ExperimentalParseOptions);
+            var comp = CreateCompilation(text, parseOptions: TestOptions.Regular);
 
             comp.VerifyDiagnostics(
-// (4,20): error CS8034: Auto-implemented properties must have get accessors.
+// (4,20): error CS8051: Auto-implemented properties must have get accessors.
 //     public int Q { set; } = 0;
 Diagnostic(ErrorCode.ERR_AutoPropertyMustHaveGetAccessor, "set").WithArguments("C.Q.set").WithLocation(4, 20),
-// (5,20): error CS8034: Auto-implemented properties must have get accessors.
+// (5,20): error CS8051: Auto-implemented properties must have get accessors.
 //     public int R { set; }
 Diagnostic(ErrorCode.ERR_AutoPropertyMustHaveGetAccessor, "set").WithArguments("C.R.set").WithLocation(5, 20));
         }
 
+        [Fact]
+        public void AutoRefReturn()
+        {
+            var text = @"class C
+{
+    public ref int P { get; }
+}";
+            var comp = CreateCompilation(text, parseOptions: TestOptions.Regular);
+
+            comp.VerifyDiagnostics(
+// (3,20): error CS8080: Auto-implemented properties cannot return by reference
+//     public ref int P { get; }
+Diagnostic(ErrorCode.ERR_AutoPropertyCannotBeRefReturning, "P").WithArguments("C.P").WithLocation(3, 20));
+        }
+
+        [Fact]
+        public void AutoRefReadOnlyReturn()
+        {
+            var text = @"
+class C
+{
+    public ref readonly int P1 { get; set; }
+}";
+            var comp = CreateCompilation(text).VerifyDiagnostics(
+                // (4,29): error CS8145: Auto-implemented properties cannot return by reference
+                //     public ref readonly int P1 { get; set; }
+                Diagnostic(ErrorCode.ERR_AutoPropertyCannotBeRefReturning, "P1").WithArguments("C.P1").WithLocation(4, 29),
+                // (4,39): error CS8147: Properties which return by reference cannot have set accessors
+                //     public ref readonly int P1 { get; set; }
+                Diagnostic(ErrorCode.ERR_RefPropertyCannotHaveSetAccessor, "set").WithArguments("C.P1.set").WithLocation(4, 39));
+        }
+
         [WorkItem(542745, "DevDiv")]
+        [WorkItem(542745, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/542745")]
         [Fact()]
         public void AutoImplementedAccessorNotImplicitlyDeclared()
         {
@@ -314,7 +355,7 @@ interface I
             // Per design meeting (see bug 11253), in C#, if there's a "get" or "set" written,
             // then IsImplicitDeclared should be false.
 
-            var comp = CreateCompilationWithMscorlib(text);
+            var comp = CreateCompilation(text);
             var global = comp.GlobalNamespace;
             var a = global.GetTypeMembers("A", 0).Single();
             var i = global.GetTypeMembers("I", 0).Single();
@@ -332,7 +373,7 @@ interface I
             Assert.False(q.SetMethod.IsImplicitlyDeclared);
         }
 
-        [WorkItem(542746, "DevDiv")]
+        [WorkItem(542746, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/542746")]
         [Fact]
         public void AutoImplementedBackingFieldLocation()
         {
@@ -347,7 +388,7 @@ class C
     }
 }
 ";
-            var comp = CreateCompilationWithMscorlib(text);
+            var comp = CreateCompilation(text);
             var global = comp.GlobalNamespace;
             var type01 = global.GetTypeMembers("C").Single();
             var type02 = type01.GetTypeMembers("S").Single();
@@ -391,7 +432,7 @@ class C
             Assert.Equal(prop.Locations[0].ToString(), backField.Locations[0].ToString());
         }
 
-        [WorkItem(537401, "DevDiv")]
+        [WorkItem(537401, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/537401")]
         [Fact]
         public void EventEscapedIdentifier()
         {
@@ -405,7 +446,7 @@ class C1
     };
 }
 ";
-            var comp = CreateCompilationWithMscorlib(Parse(text));
+            var comp = CreateCompilation(Parse(text));
             NamedTypeSymbol c1 = (NamedTypeSymbol)comp.SourceModule.GlobalNamespace.GetMembers("C1").Single();
             PropertySymbol ein = (PropertySymbol)c1.GetMembers("in").Single();
             Assert.Equal("in", ein.Name);
@@ -415,7 +456,7 @@ class C1
             Assert.Equal("@out", dout.ToString());
         }
 
-        [Fact]
+        [ClrOnlyFact]
         public void PropertyNonDefaultAccessorNames()
         {
             var source = @"
@@ -450,7 +491,7 @@ class Program
 ");
         }
 
-        [WorkItem(528633, "DevDiv")]
+        [WorkItem(528633, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/528633")]
         [Fact]
         public void MismatchedAccessorTypes()
         {
@@ -501,7 +542,7 @@ class Program
         /// Properties should refer to methods
         /// in the type members collection.
         /// </summary>
-        [Fact]
+        [ClrOnlyFact]
         public void MethodsAndAccessorsSame()
         {
             var source =
@@ -523,21 +564,21 @@ class C : B<string>
             {
                 // Non-generic type.
                 var type = module.GlobalNamespace.GetMember<NamedTypeSymbol>("A");
-                Assert.Equal(type.TypeParameters.Length, 0);
+                Assert.Equal(0, type.TypeParameters.Length);
                 Assert.Same(type, type.ConstructedFrom);
                 VerifyMethodsAndAccessorsSame(type, type.GetMember<PropertySymbol>("P"));
                 VerifyMethodsAndAccessorsSame(type, type.GetMember<PropertySymbol>("Q"));
 
                 // Generic type.
                 type = module.GlobalNamespace.GetMember<NamedTypeSymbol>("B");
-                Assert.Equal(type.TypeParameters.Length, 1);
+                Assert.Equal(1, type.TypeParameters.Length);
                 Assert.Same(type, type.ConstructedFrom);
                 VerifyMethodsAndAccessorsSame(type, type.GetMember<PropertySymbol>("P"));
                 VerifyMethodsAndAccessorsSame(type, type.GetMember<PropertySymbol>("Q"));
 
                 // Generic type with parameter substitution.
-                type = module.GlobalNamespace.GetMember<NamedTypeSymbol>("C").BaseType;
-                Assert.Equal(type.TypeParameters.Length, 1);
+                type = module.GlobalNamespace.GetMember<NamedTypeSymbol>("C").BaseType();
+                Assert.Equal(1, type.TypeParameters.Length);
                 Assert.NotSame(type, type.ConstructedFrom);
                 VerifyMethodsAndAccessorsSame(type, type.GetMember<PropertySymbol>("P"));
                 VerifyMethodsAndAccessorsSame(type, type.GetMember<PropertySymbol>("Q"));
@@ -566,7 +607,7 @@ class C : B<string>
             Assert.Equal(accessor.AssociatedSymbol, property);
         }
 
-        [WorkItem(538789, "DevDiv")]
+        [WorkItem(538789, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/538789")]
         [Fact]
         public void NoAccessors()
         {
@@ -601,7 +642,7 @@ class Program
         /// <summary>
         /// Calling bogus methods directly should be allowed.
         /// </summary>
-        [Fact]
+        [ClrOnlyFact]
         public void CallMethodsDirectly()
         {
             var source = @"
@@ -636,7 +677,7 @@ class Program
 ");
         }
 
-        [Fact]
+        [ClrOnlyFact]
         public void MethodsReferencedInMultipleProperties()
         {
             var source = @"
@@ -669,7 +710,7 @@ class Program
   IL_001a:  ret       
 }
 ");
-            var type = (PENamedTypeSymbol)verifier.Compilation.GlobalNamespace.GetMembers("Signatures").Single();
+            var type = (PENamedTypeSymbol)verifier.Compilation.GlobalNamespace.GetMembers("Signatures").Single().GetSymbol();
 
             // Valid static property, property with signature that does not match accessors,
             // and property with accessors that do not match each other.
@@ -832,7 +873,7 @@ class C
     {
     }
 }";
-            CreateCompilationWithCustomILSource(cSharpSource, ilSource).VerifyDiagnostics(
+            CreateCompilationWithILAndMscorlib40(cSharpSource, ilSource).VerifyDiagnostics(
                 Diagnostic(ErrorCode.ERR_BadArgType, "A.P").WithArguments("1", "void", "object"),
                 Diagnostic(ErrorCode.ERR_BadArgType, "x.Q").WithArguments("1", "void", "object"));
         }
@@ -841,7 +882,7 @@ class C
         /// Properties where the property and accessor signatures differ by
         /// modopt only should be supported (as in the native compiler).
         /// </summary>
-        [Fact]
+        [ClrOnlyFact]
         public void SignaturesDifferByModOptsOnly()
         {
             const string ilSource =
@@ -924,40 +965,40 @@ class C
             CompileWithCustomILSource(cSharpSource, ilSource);
         }
 
-        [WorkItem(538956, "DevDiv")]
-        [Fact]
+        [WorkItem(538956, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/538956")]
+        [ClrOnlyFact]
         public void PropertyAccessorDoesNotHideMethod()
         {
             const string cSharpSource = @"
 interface IA {
-    string get_Foo();
+    string get_Goo();
 }
 
 interface IB : IA {
-    int Foo { get; }
+    int Goo { get; }
 }
 
 class Program {
     static void Main() {
         IB x = null;
-        string s = x.get_Foo().ToLower();
+        string s = x.get_Goo().ToLower();
     }
 }
 ";
             CompileWithCustomILSource(cSharpSource, null);
         }
 
-        [WorkItem(538956, "DevDiv")]
-        [Fact]
+        [WorkItem(538956, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/538956")]
+        [ClrOnlyFact]
         public void PropertyAccessorDoesNotConflictWithMethod()
         {
             const string cSharpSource = @"
 interface IA {
-    string get_Foo();
+    string get_Goo();
 }
 
 interface IB {
-    int Foo { get; }
+    int Goo { get; }
 }
 
 interface IC : IA, IB { }
@@ -965,36 +1006,36 @@ interface IC : IA, IB { }
 class Program {
     static void Main() {
         IC x = null;
-        string s = x.get_Foo().ToLower();
+        string s = x.get_Goo().ToLower();
     }
 }
 ";
             CompileWithCustomILSource(cSharpSource, null);
         }
 
-        [WorkItem(538956, "DevDiv")]
+        [WorkItem(538956, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/538956")]
         [Fact]
         public void PropertyAccessorCannotBeCalledAsMethod()
         {
             const string cSharpSource = @"
 interface I {
-    int Foo { get; }
+    int Goo { get; }
 }
 
 class Program {
     static void Main() {
         I x = null;
-        string s = x.get_Foo();
+        string s = x.get_Goo();
     }
 }
 ";
-            CreateCompilationWithMscorlib(cSharpSource).VerifyDiagnostics(
-                // (9,22): error CS0571: 'I.Foo.get': cannot explicitly call operator or accessor
-                //         string s = x.get_Foo();
-                Diagnostic(ErrorCode.ERR_CantCallSpecialMethod, "get_Foo").WithArguments("I.Foo.get"));
+            CreateCompilation(cSharpSource).VerifyDiagnostics(
+                // (9,22): error CS0571: 'I.Goo.get': cannot explicitly call operator or accessor
+                //         string s = x.get_Goo();
+                Diagnostic(ErrorCode.ERR_CantCallSpecialMethod, "get_Goo").WithArguments("I.Goo.get"));
         }
 
-        [WorkItem(538992, "DevDiv")]
+        [WorkItem(538992, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/538992")]
         [Fact]
         public void CanNotAccessPropertyThroughParenthesizedType()
         {
@@ -1009,25 +1050,25 @@ class Program
     static int X { get; set; }
 }
 ";
-            CreateCompilationWithMscorlib(cSharpSource).VerifyDiagnostics(
+            CreateCompilation(cSharpSource).VerifyDiagnostics(
                 // (6,10): error CS0119: 'Program' is a type, which is not valid in the given context
                 //         (Program).X = 1;
                 Diagnostic(ErrorCode.ERR_BadSKunknown, "Program").WithArguments("Program", "type"));
         }
 
-        [Fact]
+        [ClrOnlyFact]
         public void CanReadInstancePropertyWithStaticGetterAsStatic()
         {
             const string ilSource = @"
 .class public A {
-  .method public static int32 get_Foo() { ldnull throw }
-  .property instance int32 Foo() { .get int32 A::get_Foo() }
+  .method public static int32 get_Goo() { ldnull throw }
+  .property instance int32 Goo() { .get int32 A::get_Goo() }
 }
 ";
             const string cSharpSource = @"
 class B {
   static void Main() {
-    int x = A.Foo;
+    int x = A.Goo;
   }
 }
 ";
@@ -1039,104 +1080,104 @@ class B {
         {
             const string ilSource = @"
 .class public A {
-  .method public static int32 get_Foo() { ldnull throw }
-  .property instance int32 Foo() { .get int32 A::get_Foo() }
+  .method public static int32 get_Goo() { ldnull throw }
+  .property instance int32 Goo() { .get int32 A::get_Goo() }
 }
 ";
             const string cSharpSource = @"
 class B {
   static void Main() {
     A a = null;
-    int x = a.Foo;
+    int x = a.Goo;
   }
 }
 ";
-            CreateCompilationWithCustomILSource(cSharpSource, ilSource).VerifyDiagnostics(
-                // (5,13): error CS0176: Member 'A.Foo' cannot be accessed with an instance reference; qualify it with a type name instead
-                //     int x = a.Foo;
-                Diagnostic(ErrorCode.ERR_ObjectProhibited, "a.Foo").WithArguments("A.Foo"));
+            CreateCompilationWithILAndMscorlib40(cSharpSource, ilSource).VerifyDiagnostics(
+                // (5,13): error CS0176: Member 'A.Goo' cannot be accessed with an instance reference; qualify it with a type name instead
+                //     int x = a.Goo;
+                Diagnostic(ErrorCode.ERR_ObjectProhibited, "a.Goo").WithArguments("A.Goo"));
         }
 
-        [WorkItem(527658, "DevDiv")]
-        [Fact]
+        [WorkItem(527658, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/527658")]
+        [ClrOnlyFact(ClrOnlyReason.Unknown)]
         public void CS1546ERR_BindToBogusProp1_PropertyWithPinnedModifierIsBogus()
         {
             const string ilSource = @"
 .class public A {
-  .method public static int32 get_Foo() { ldnull throw }
-  .property instance int32 pinned Foo() { .get int32 A::get_Foo() }
+  .method public static int32 get_Goo() { ldnull throw }
+  .property instance int32 pinned Goo() { .get int32 A::get_Goo() }
 }
 ";
             const string cSharpSource = @"
 class B {
   static void Main() {
-    object x = A.Foo;
+    object x = A.Goo;
   }
 }
 ";
-            CreateCompilationWithCustomILSource(cSharpSource, ilSource).VerifyDiagnostics(
-                // (4,18): error CS1546: Property, indexer, or event 'A.Foo' is not supported by the language; try directly calling accessor method 'A.get_Foo()'
-                //     object x = A.Foo;
-                Diagnostic(ErrorCode.ERR_BindToBogusProp1, "Foo").WithArguments("A.Foo", "A.get_Foo()"));
+            CreateCompilationWithILAndMscorlib40(cSharpSource, ilSource).VerifyDiagnostics(
+                // (4,18): error CS1546: Property, indexer, or event 'A.Goo' is not supported by the language; try directly calling accessor method 'A.get_Goo()'
+                //     object x = A.Goo;
+                Diagnostic(ErrorCode.ERR_BindToBogusProp1, "Goo").WithArguments("A.Goo", "A.get_Goo()"));
         }
 
-        [WorkItem(538850, "DevDiv")]
+        [WorkItem(538850, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/538850")]
         [Fact]
         public void PropertyWithMismatchedReturnTypeOfGetterIsBogus()
         {
             const string ilSource = @"
 .class public A {
-  .method public static int32 get_Foo() { ldnull throw }
-  .property string Foo() { .get int32 A::get_Foo() }
+  .method public static int32 get_Goo() { ldnull throw }
+  .property string Goo() { .get int32 A::get_Goo() }
 }
 ";
             const string cSharpSource = @"
 class B {
   static void Main() {
-    object x = A.Foo;
+    object x = A.Goo;
   }
 }
 ";
-            CreateCompilationWithCustomILSource(cSharpSource, ilSource).VerifyDiagnostics(
-                // (4,18): error CS1546: Property, indexer, or event 'A.Foo' is not supported by the language; try directly calling accessor method 'A.get_Foo()'
-                //     object x = A.Foo;
-                Diagnostic(ErrorCode.ERR_BindToBogusProp1, "Foo").WithArguments("A.Foo", "A.get_Foo()"));
+            CreateCompilationWithILAndMscorlib40(cSharpSource, ilSource).VerifyDiagnostics(
+                // (4,18): error CS1546: Property, indexer, or event 'A.Goo' is not supported by the language; try directly calling accessor method 'A.get_Goo()'
+                //     object x = A.Goo;
+                Diagnostic(ErrorCode.ERR_BindToBogusProp1, "Goo").WithArguments("A.Goo", "A.get_Goo()"));
         }
 
-        [WorkItem(527659, "DevDiv")]
-        [Fact]
+        [WorkItem(527659, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/527659")]
+        [ClrOnlyFact(ClrOnlyReason.Ilasm)]
         public void PropertyWithCircularReturnTypeIsNotSupported()
         {
             const string ilSource = @"
 .class public E extends E { }
 
 .class public A {
-  .method public static class E get_Foo() { ldnull throw }
-  .property class E Foo() { .get class E A::get_Foo() }
+  .method public static class E get_Goo() { ldnull throw }
+  .property class E Goo() { .get class E A::get_Goo() }
 }
 ";
             const string cSharpSource = @"
 class B {
   static void Main() {
-    object x = A.Foo;
-    B y = A.Foo; 
+    object x = A.Goo;
+    B y = A.Goo; 
   }
 }
 ";
-            CreateCompilationWithCustomILSource(cSharpSource, ilSource).VerifyDiagnostics(
-    // (5,11): error CS0268: Imported type 'E' is invalid. It contains a circular base class dependency.
-    //     B y = A.Foo; 
-    Diagnostic(ErrorCode.ERR_ImportedCircularBase, "A.Foo").WithArguments("E", "E"),
+            CreateCompilationWithILAndMscorlib40(cSharpSource, ilSource).VerifyDiagnostics(
+    // (5,11): error CS0268: Imported type 'E' is invalid. It contains a circular base type dependency.
+    //     B y = A.Goo; 
+    Diagnostic(ErrorCode.ERR_ImportedCircularBase, "A.Goo").WithArguments("E", "E"),
     // (5,11): error CS0029: Cannot implicitly convert type 'E' to 'B'
-    //     B y = A.Foo; 
-    Diagnostic(ErrorCode.ERR_NoImplicitConv, "A.Foo").WithArguments("E", "B")
+    //     B y = A.Goo; 
+    Diagnostic(ErrorCode.ERR_NoImplicitConv, "A.Goo").WithArguments("E", "B")
                 );
             // Dev10 errors:
-            // error CS0268: Imported type 'E' is invalid. It contains a circular base class dependency.
-            // error CS0570: 'A.Foo' is not supported by the language
+            // error CS0268: Imported type 'E' is invalid. It contains a circular base type dependency.
+            // error CS0570: 'A.Goo' is not supported by the language
         }
 
-        [WorkItem(527664, "DevDiv")]
+        [WorkItem(527664, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/527664")]
         [Fact(Skip = "527664")]
         public void PropertyWithOpenGenericTypeAsTypeArgumentOfReturnTypeIsNotSupported()
         {
@@ -1144,14 +1185,14 @@ class B {
 .class public E<T> { }
 
 .class public A {
-  .method public static class E<class E> get_Foo() { ldnull throw }
-  .property class E<class E> Foo() { .get class E<class E> A::get_Foo() }
+  .method public static class E<class E> get_Goo() { ldnull throw }
+  .property class E<class E> Goo() { .get class E<class E> A::get_Goo() }
 }
 ";
             const string cSharpSource = @"
 class B {
   static void Main() {
-    object x = A.Foo;
+    object x = A.Goo;
   }
 }
 ";
@@ -1159,46 +1200,46 @@ class B {
             // TODO: check diagnostics when it is implemented
         }
 
-        [WorkItem(527657, "DevDiv")]
+        [WorkItem(527657, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/527657")]
         [Fact(Skip = "527657")]
         public void Dev10IgnoresSentinelInPropertySignature()
         {
             const string ilSource = @"
 .class public A {
-  .method public static int32 get_Foo() { ldnull throw }
-  .property int32 Foo(...) { .get int32 A::get_Foo() }
+  .method public static int32 get_Goo() { ldnull throw }
+  .property int32 Goo(...) { .get int32 A::get_Goo() }
 }
 ";
             const string cSharpSource = @"
 class B {
   static void Main() {
-    int x = A.Foo;
+    int x = A.Goo;
   }
 }
 ";
             CompileWithCustomILSource(cSharpSource, ilSource);
         }
 
-        [Fact]
+        [ClrOnlyFact(ClrOnlyReason.Ilasm)]
         public void CanReadModOptProperty()
         {
             const string ilSource = @"
 .class public A {
-  .method public static int32 modopt(int32) get_Foo() { ldnull throw }
-  .property int32 modopt(int32) Foo() { .get int32 modopt(int32) A::get_Foo() }
+  .method public static int32 modopt(int32) get_Goo() { ldnull throw }
+  .property int32 modopt(int32) Goo() { .get int32 modopt(int32) A::get_Goo() }
 }
 ";
             const string cSharpSource = @"
 class B {
   static void Main() {
-    int x = A.Foo;
+    int x = A.Goo;
   }
 }
 ";
             CompileWithCustomILSource(cSharpSource, ilSource);
         }
 
-        [WorkItem(527660, "DevDiv")]
+        [WorkItem(527660, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/527660")]
         [Fact(Skip = "527660")]
         public void CanReadPropertyWithModOptInBaseClassOfReturnType()
         {
@@ -1206,245 +1247,252 @@ class B {
 .class public E extends class [mscorlib]System.Collections.Generic.List`1<int32> modopt(int8) { }
 
 .class public A  {
-  .method public static class E get_Foo() { ldnull throw }
-  .property class E Foo() { .get class E A::get_Foo() }
+  .method public static class E get_Goo() { ldnull throw }
+  .property class E Goo() { .get class E A::get_Goo() }
 }
 
 ";
             const string cSharpSource = @"
 class B {
   static void Main() {
-    object x = A.Foo;
+    object x = A.Goo;
   }
 }
 ";
             CompileWithCustomILSource(cSharpSource, ilSource);
         }
 
-        [Fact]
+        [ClrOnlyFact(ClrOnlyReason.Ilasm)]
         public void CanReadPropertyOfArrayTypeWithModOptElement()
         {
             const string ilSource = @"
 .class public A {
-  .method public static int32 modopt(int32)[] get_Foo() { ldnull throw }
-  .property int32 modopt(int32)[] Foo() { .get int32 modopt(int32)[] A::get_Foo() }
+  .method public static int32 modopt(int32)[] get_Goo() { ldnull throw }
+  .property int32 modopt(int32)[] Goo() { .get int32 modopt(int32)[] A::get_Goo() }
 }
 ";
             const string cSharpSource = @"
 class B {
   static void Main() {
-    int[] x = A.Foo;
-  }
-}
-";
-            CompileWithCustomILSource(cSharpSource, ilSource, emitOptions: TestEmitters.RefEmitUnsupported);
-        }
-
-        [Fact]
-        public void CanReadModOptPropertyWithNonModOptGetter()
-        {
-            const string ilSource = @"
-.class public A {
-  .method public static int32 get_Foo() { ldnull throw }
-  .property int32 modopt(int32) Foo() { .get int32 A::get_Foo() }
-}
-";
-            const string cSharpSource = @"
-class B {
-  static void Main() {
-    int x = A.Foo;
+    int[] x = A.Goo;
   }
 }
 ";
             CompileWithCustomILSource(cSharpSource, ilSource);
         }
 
-        [WorkItem(527656, "DevDiv")]
+        [ClrOnlyFact(ClrOnlyReason.Ilasm)]
+        public void CanReadModOptPropertyWithNonModOptGetter()
+        {
+            const string ilSource = @"
+.class public A {
+  .method public static int32 get_Goo() { ldnull throw }
+  .property int32 modopt(int32) Goo() { .get int32 A::get_Goo() }
+}
+";
+            const string cSharpSource = @"
+class B {
+  static void Main() {
+    int x = A.Goo;
+  }
+}
+";
+            CompileWithCustomILSource(cSharpSource, ilSource);
+        }
+
+        [WorkItem(527656, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/527656")]
         [Fact(Skip = "527656")]
         public void CanReadNonModOptPropertyWithOpenGenericModOptGetter()
         {
             const string ilSource = @"
 .class public A {
-  .method public static int32 modopt(class [mscorlib]System.IComparable`1) get_Foo() { ldnull throw }
-  .property int32 Foo() { .get int32 modopt(class [mscorlib]System.IComparable`1) A::get_Foo() }
+  .method public static int32 modopt(class [mscorlib]System.IComparable`1) get_Goo() { ldnull throw }
+  .property int32 Goo() { .get int32 modopt(class [mscorlib]System.IComparable`1) A::get_Goo() }
 }
 ";
             const string cSharpSource = @"
 class B {
   static void Main() {
-    int x = A.Foo;
+    int x = A.Goo;
   }
 }
 ";
             CompileWithCustomILSource(cSharpSource, ilSource);
         }
 
-        [Fact]
+        [ClrOnlyFact(ClrOnlyReason.Ilasm)]
         public void CanReadNonModOptPropertyWithModOptGetter()
         {
             const string ilSource = @"
 .class public A {
-  .method public static int32 modopt(int32) get_Foo() { ldnull throw }
-  .property int32 Foo() { .get int32 modopt(int32) A::get_Foo() }
+  .method public static int32 modopt(int32) get_Goo() { ldnull throw }
+  .property int32 Goo() { .get int32 modopt(int32) A::get_Goo() }
 }
 ";
             const string cSharpSource = @"
 class B {
   static void Main() {
-    int x = A.Foo;
+    int x = A.Goo;
   }
 }
 ";
             CompileWithCustomILSource(cSharpSource, ilSource);
         }
 
-        [Fact]
+        [ClrOnlyFact(ClrOnlyReason.Ilasm)]
         public void CanReadModOptPropertyWithDifferentModOptGetter()
         {
             const string ilSource = @"
 .class public A {
-  .method public static int32 modopt(int32) get_Foo() { ldnull throw }
-  .property int32 modopt(string) Foo() { .get int32 modopt(int32) A::get_Foo() }
+  .method public static int32 modopt(int32) get_Goo() { ldnull throw }
+  .property int32 modopt(string) Goo() { .get int32 modopt(int32) A::get_Goo() }
 }
 ";
             const string cSharpSource = @"
 class B {
   static void Main() {
-    int x = A.Foo;
+    int x = A.Goo;
   }
 }
 ";
-            CreateCompilationWithCustomILSource(cSharpSource, ilSource).VerifyDiagnostics();
+            CreateCompilationWithILAndMscorlib40(cSharpSource, ilSource).VerifyDiagnostics();
         }
 
-        [WorkItem(538845, "DevDiv")]
-        [Fact]
+        [WorkItem(538845, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/538845")]
+        [ClrOnlyFact(ClrOnlyReason.Ilasm)]
         public void CanReadPropertyWithMultipleAndNestedModOpts()
         {
             const string ilSource = @"
 .class public A {
-  .method public static int32 modopt(int32) get_Foo() { ldnull throw }
-  .property int32 modopt(int8) modopt(native int modopt(uint8)*[] modopt(void)) Foo() { .get int32 modopt(int32) A::get_Foo() }
+  .method public static int32 modopt(int32) get_Goo() { ldnull throw }
+  .property int32 modopt(int8) modopt(native int modopt(uint8)*[] modopt(void)) Goo() { .get int32 modopt(int32) A::get_Goo() }
 }
 ";
             const string cSharpSource = @"
 class B {
   static void Main() {
-    int x = A.Foo;
+    int x = A.Goo;
   }
 }
 ";
-            CreateCompilationWithCustomILSource(cSharpSource, ilSource).VerifyDiagnostics(
-                // (4,15): error CS1546: Property, indexer, or event 'A.Foo' is not supported by the language; try directly calling accessor method 'A.get_Foo()'
-                //     int x = A.Foo;
-                Diagnostic(ErrorCode.ERR_BindToBogusProp1, "Foo").WithArguments("A.Foo", "A.get_Foo()"));
+            CreateCompilationWithILAndMscorlib40(cSharpSource, ilSource).VerifyDiagnostics(
+                // (4,15): error CS1546: Property, indexer, or event 'A.Goo' is not supported by the language; try directly calling accessor method 'A.get_Goo()'
+                //     int x = A.Goo;
+                Diagnostic(ErrorCode.ERR_BindToBogusProp1, "Goo").WithArguments("A.Goo", "A.get_Goo()"));
         }
 
-        [Fact]
+        [ClrOnlyFact(ClrOnlyReason.Ilasm)]
         public void CanReadPropertyWithModReqsNestedWithinModOpts()
         {
             const string ilSource = @"
 .class public A {
-  .method public static int32 modopt(int32) get_Foo() { ldnull throw }
-  .property int32 modopt(class [mscorlib]System.IComparable`1<method void*()[]> modreq(bool)) Foo() { .get int32 modopt(int32) A::get_Foo() }
+  .method public static int32 modopt(int32) get_Goo() { ldnull throw }
+  .property int32 modopt(class [mscorlib]System.IComparable`1<method void*()[]> modreq(bool)) Goo() { .get int32 modopt(int32) A::get_Goo() }
 }
 ";
             const string cSharpSource = @"
 class B {
   static void Main() {
-    int x = A.Foo;
+    int x = A.Goo;
   }
 }
 ";
-            CreateCompilationWithCustomILSource(cSharpSource, ilSource).VerifyDiagnostics(
-                // (4,15): error CS1546: Property, indexer, or event 'A.Foo' is not supported by the language; try directly calling accessor method 'A.get_Foo()'
-                //     int x = A.Foo;
-                Diagnostic(ErrorCode.ERR_BindToBogusProp1, "Foo").WithArguments("A.Foo", "A.get_Foo()"));
+            CreateCompilationWithILAndMscorlib40(cSharpSource, ilSource).VerifyDiagnostics(
+                // (4,15): error CS1546: Property, indexer, or event 'A.Goo' is not supported by the language; try directly calling accessor method 'A.get_Goo()'
+                //     int x = A.Goo;
+                Diagnostic(ErrorCode.ERR_BindToBogusProp1, "Goo").WithArguments("A.Goo", "A.get_Goo()"));
         }
 
-        [WorkItem(538846, "DevDiv")]
-        [Fact]
+        [WorkItem(538846, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/538846")]
+        [ClrOnlyFact(ClrOnlyReason.Ilasm)]
         public void CanNotReadPropertyWithModReq()
         {
             const string ilSource = @"
 .class public A {
-  .method public static int32 get_Foo() { ldnull throw }
-  .property int32 modreq(int8) Foo() { .get int32 A::get_Foo() }
+  .method public static int32 get_Goo() { ldnull throw }
+  .property int32 modreq(int8) Goo() { .get int32 A::get_Goo() }
 }
 ";
             const string cSharpSource = @"
 class B {
   static void Main() {
-    object x = A.Foo;
+    object x = A.Goo;
   }
 }
 ";
-            CreateCompilationWithCustomILSource(cSharpSource, ilSource).VerifyDiagnostics(
-                // (4,18): error CS1546: Property, indexer, or event 'A.Foo' is not supported by the language; try directly calling accessor method 'A.get_Foo()'
-                //     object x = A.Foo;
-                Diagnostic(ErrorCode.ERR_BindToBogusProp1, "Foo").WithArguments("A.Foo", "A.get_Foo()"));
+            CreateCompilationWithILAndMscorlib40(cSharpSource, ilSource).VerifyDiagnostics(
+                // (4,18): error CS1546: Property, indexer, or event 'A.Goo' is not supported by the language; try directly calling accessor method 'A.get_Goo()'
+                //     object x = A.Goo;
+                Diagnostic(ErrorCode.ERR_BindToBogusProp1, "Goo").WithArguments("A.Goo", "A.get_Goo()"));
         }
 
-        [WorkItem(527662, "DevDiv")]
-        [Fact]
+        [WorkItem(527662, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/527662")]
+        [ClrOnlyFact(ClrOnlyReason.Ilasm)]
         public void CanReadPropertyWithModReqInBaseClassOfReturnType()
         {
             const string ilSource = @"
 .class public E extends class [mscorlib]System.Collections.Generic.List`1<int32 modreq(int8)[]> { }
 
 .class public A {
-  .method public static class E get_Foo() { ldnull throw }
-  .property class E Foo() { .get class E A::get_Foo() }
+  .method public static class E get_Goo() { ldnull throw }
+  .property class E Goo() { .get class E A::get_Goo() }
 }
 ";
             const string cSharpSource = @"
 class B {
   static void Main() {
-    object x = A.Foo;
+    object x = A.Goo;
   }
 }
 ";
-            CreateCompilationWithCustomILSource(cSharpSource, ilSource).VerifyDiagnostics();
+            CreateCompilationWithILAndMscorlib40(cSharpSource, ilSource).VerifyDiagnostics();
         }
 
-        [WorkItem(538787, "DevDiv")]
+        [WorkItem(538787, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/538787")]
         [Fact]
         public void CanNotReadPropertyOfUnsupportedType()
         {
             const string ilSource = @"
-.class public B
+.class public auto ansi beforefieldinit Indexers
+       extends [mscorlib]System.Object
 {
-  .method public instance void .ctor()
+  .custom instance void [mscorlib]System.Reflection.DefaultMemberAttribute::.ctor(string)
+           = {string('Item')}
+  .method public hidebysig specialname instance int32 
+          get_Item(string modreq(int16) x) cil managed
+  {
+    ldc.i4.0
+    ret
+  }
+
+  .method public hidebysig specialname rtspecialname 
+          instance void  .ctor() cil managed
   {
     ldarg.0
-    call instance void class System.Object::.ctor()
+    call       instance void [mscorlib]System.Object::.ctor()
     ret
   }
-  .method public static method void*()[] get_Foo()
+
+  .property instance int32 Item(string modreq(int16))
   {
-    ldnull
-    ret
+    .get instance int32 Indexers::get_Item(string modreq(int16))
   }
-  .property method void*()[] Foo()
-  {
-    .get method void*()[] B::get_Foo()
-  }
-}
+} // end of class Indexers
 ";
             const string cSharpSource = @"
 class C {
     static void Main() {
-        object foo = B.Foo;
+        object goo = new Indexers()[null];
     }
 }
 ";
-            CreateCompilationWithCustomILSource(cSharpSource, ilSource).VerifyDiagnostics(
-                // (4,24): error CS1546: Property, indexer, or event 'B.Foo' is not supported by the language; try directly calling accessor method 'B.get_Foo()'
-                //         object foo = B.Foo;
-                Diagnostic(ErrorCode.ERR_BindToBogusProp1, "Foo").WithArguments("B.Foo", "B.get_Foo()"));
+            CreateCompilationWithILAndMscorlib40(cSharpSource, ilSource).VerifyDiagnostics(
+                // (4,22): error CS1546: Property, indexer, or event 'Indexers.this[string]' is not supported by the language; try directly calling accessor method 'Indexers.get_Item(string)'
+                //         object goo = new Indexers()[null];
+                Diagnostic(ErrorCode.ERR_BindToBogusProp1, "new Indexers()[null]").WithArguments("Indexers.this[string]", "Indexers.get_Item(string)").WithLocation(4, 22));
         }
 
-        [WorkItem(538791, "DevDiv")]
+        [WorkItem(538791, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/538791")]
         [Fact]
         public void CanNotReadAmbiguousProperty()
         {
@@ -1457,37 +1505,37 @@ class C {
     call instance void class System.Object::.ctor()
     ret
   }
-  .method public static int32 get_Foo()
+  .method public static int32 get_Goo()
   {
     ldnull
     throw
   }
-  .method public static int32[] get_Foo()
+  .method public static int32[] get_Goo()
   {
     ldnull
     throw
   }
-  .property int32 Foo()
+  .property int32 Goo()
   {
-    .get int32 B::get_Foo()
+    .get int32 B::get_Goo()
   }
-  .property int32[] Foo()
+  .property int32[] Goo()
   {
-    .get int32[] B::get_Foo()
+    .get int32[] B::get_Goo()
   }
 }
 ";
             const string cSharpSource = @"
 class C {
     static void Main() {
-        object foo = B.Foo;
+        object goo = B.Goo;
     }
 }
 ";
-            CreateCompilationWithCustomILSource(cSharpSource, ilSource).VerifyDiagnostics(
-                // (4,24): error CS0229: Ambiguity between 'B.Foo' and 'B.Foo'
-                //         object foo = B.Foo;
-                Diagnostic(ErrorCode.ERR_AmbigMember, "Foo").WithArguments("B.Foo", "B.Foo"));
+            CreateCompilationWithILAndMscorlib40(cSharpSource, ilSource).VerifyDiagnostics(
+                // (4,24): error CS0229: Ambiguity between 'B.Goo' and 'B.Goo'
+                //         object goo = B.Goo;
+                Diagnostic(ErrorCode.ERR_AmbigMember, "Goo").WithArguments("B.Goo", "B.Goo"));
         }
 
         [Fact]
@@ -1495,59 +1543,64 @@ class C {
         {
             const string ilSource = @"
 .class public B {
-  .method public static int32 get_Foo() { ldnull throw }
-  .property int32 Foo() { .get int32 B::get_Foo() }
+  .method public static int32 get_Goo() { ldnull throw }
+  .property int32 Goo() { .get int32 B::get_Goo() }
 }
 
 .class public A extends B {
-  .method public static void get_Foo() { ldnull throw }
-  .property void Foo() { .get void A::get_Foo() }
+  .method public static void get_Goo() { ldnull throw }
+  .property void Goo() { .get void A::get_Goo() }
 }
 ";
             const string cSharpSource = @"
 class B {
   static void Main() {
-    object x = A.Foo;
+    object x = A.Goo;
   }
 }
 ";
-            CreateCompilationWithCustomILSource(cSharpSource, ilSource).VerifyDiagnostics(
+            CreateCompilationWithILAndMscorlib40(cSharpSource, ilSource).VerifyDiagnostics(
                 // (4,16): error CS0029: Cannot implicitly convert type 'void' to 'object'
-                //     object x = A.Foo;
-                Diagnostic(ErrorCode.ERR_NoImplicitConv, "A.Foo").WithArguments("void", "object"));
+                //     object x = A.Goo;
+                Diagnostic(ErrorCode.ERR_NoImplicitConv, "A.Goo").WithArguments("void", "object"));
         }
 
-        [WorkItem(527663, "DevDiv")]
+        [WorkItem(527663, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/527663")]
         [Fact]
         public void CanNotReadPropertyFromAmbiguousGenericClass()
         {
             const string ilSource = @"
+.assembly extern mscorlib { .ver 4:0:0:0 .publickeytoken = (B7 7A 5C 56 19 34 E0 89) }
+.assembly '09f9df97-a228-4ca4-9b71-151909f205e6'
+{
+}
+
 .class public A`1<T> {
-  .method public static int32 get_Foo() { ldnull throw }
-  .property int32 Foo() { .get int32 A`1::get_Foo() }
+  .method public static int32 get_Goo() { ldnull throw }
+  .property int32 Goo() { .get int32 A`1::get_Goo() }
 }
 
 .class public A<T> {
-  .method public static int32 get_Foo() { ldnull throw }
-  .property int32 Foo() { .get int32 A::get_Foo() }
+  .method public static int32 get_Goo() { ldnull throw }
+  .property int32 Goo() { .get int32 A::get_Goo() }
 }
 ";
+            var ref0 = CompileIL(ilSource, prependDefaultHeader: false);
+
             const string cSharpSource = @"
 class B {
   static void Main() {
-    object x = A<int>.Foo;
+    object x = A<int>.Goo;
   }
 }
 ";
-            CreateCompilationWithCustomILSource(cSharpSource, ilSource).VerifyDiagnostics(
-                // (4,16): error CS0104: 'A<int>' is an ambiguous reference between 'A<T>' and 'A<T>'
-                //     object x = A<int>.Foo;
-                Diagnostic(ErrorCode.ERR_AmbigContext, "A<int>").WithArguments("A<int>", "A<T>", "A<T>"));
-            // Dev10 error:
-            // error CS0433: The type 'A<T>' exists in both 'X.dll' and 'X.dll'
+            CreateCompilation(cSharpSource, references: new[] { ref0 }).VerifyDiagnostics(
+                // (4,16): error CS0433: The type 'A<T>' exists in both '09f9df97-a228-4ca4-9b71-151909f205e6, Version=0.0.0.0, Culture=neutral, PublicKeyToken=null' and '09f9df97-a228-4ca4-9b71-151909f205e6, Version=0.0.0.0, Culture=neutral, PublicKeyToken=null'
+                //     object x = A<int>.Goo;
+                Diagnostic(ErrorCode.ERR_SameFullNameAggAgg, "A<int>").WithArguments("09f9df97-a228-4ca4-9b71-151909f205e6, Version=0.0.0.0, Culture=neutral, PublicKeyToken=null", "A<T>", "09f9df97-a228-4ca4-9b71-151909f205e6, Version=0.0.0.0, Culture=neutral, PublicKeyToken=null").WithLocation(4, 16));
         }
 
-        [WorkItem(538789, "DevDiv")]
+        [WorkItem(538789, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/538789")]
         [Fact]
         public void PropertyWithoutAccessorsIsBogus()
         {
@@ -1559,30 +1612,30 @@ class B {
     ret
   }
 
-  .property int32 Foo() { }
+  .property int32 Goo() { }
 }
 ";
             const string cSharpSource = @"
 class C {
     static void Main() {
-        object foo = B.Foo;
+        object goo = B.Goo;
     }
 }
 ";
-            CreateCompilationWithCustomILSource(cSharpSource, ilSource).VerifyDiagnostics(
-                // (4,24): error CS0117: 'B' does not contain a definition for 'Foo'
-                //         object foo = B.Foo;
-                Diagnostic(ErrorCode.ERR_NoSuchMember, "Foo").WithArguments("B", "Foo"));
+            CreateCompilationWithILAndMscorlib40(cSharpSource, ilSource).VerifyDiagnostics(
+                // (4,24): error CS0117: 'B' does not contain a definition for 'Goo'
+                //         object goo = B.Goo;
+                Diagnostic(ErrorCode.ERR_NoSuchMember, "Goo").WithArguments("B", "Goo"));
         }
 
-        [WorkItem(538946, "DevDiv")]
+        [WorkItem(538946, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/538946")]
         [Fact]
         public void FalseAmbiguity()
         {
             const string text = @"
 interface IA
 {
-    int Foo { get; }
+    int Goo { get; }
 }
  
 interface IB<T> : IA { }
@@ -1594,16 +1647,16 @@ class C
     static void Main()
     {
         IC x = null;
-        int y = x.Foo;
+        int y = x.Goo;
     }
 }
 ";
-            var comp = CreateCompilationWithMscorlib(Parse(text));
+            var comp = CreateCompilation(Parse(text));
             var diagnostics = comp.GetDiagnostics();
             Assert.Empty(diagnostics);
         }
 
-        [WorkItem(539320, "DevDiv")]
+        [WorkItem(539320, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/539320")]
         [Fact]
         public void FalseWarningCS0109ForNewModifier()
         {
@@ -1635,12 +1688,12 @@ class MyClass : MyBase
     }
 }
 ";
-            var comp = CreateCompilationWithMscorlib(Parse(text));
+            var comp = CreateCompilation(Parse(text));
             var diagnostics = comp.GetDiagnostics();
             Assert.Empty(diagnostics);
         }
 
-        [WorkItem(539319, "DevDiv")]
+        [WorkItem(539319, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/539319")]
         [Fact]
         public void FalseErrorCS0103ForValueKeywordInExpImpl()
         {
@@ -1670,7 +1723,7 @@ class MyClass : MyInter
     }
 }
 ";
-            var comp = CreateCompilationWithMscorlib(Parse(text));
+            var comp = CreateCompilation(Parse(text));
             var diagnostics = comp.GetDiagnostics();
             Assert.Empty(diagnostics);
         }
@@ -1690,7 +1743,7 @@ class C : I
 }
 ";
 
-            var comp = CreateCompilationWithMscorlib(Parse(text));
+            var comp = CreateCompilation(Parse(text));
 
             var globalNamespace = comp.GlobalNamespace;
 
@@ -1701,11 +1754,46 @@ class C : I
 
             var @class = (NamedTypeSymbol)globalNamespace.GetTypeMembers("C").Single();
             Assert.Equal(TypeKind.Class, @class.TypeKind);
-            Assert.True(@class.Interfaces.Contains(@interface));
+            Assert.True(@class.Interfaces().Contains(@interface));
 
             var classProperty = (PropertySymbol)@class.GetMembers("I.P").Single();
 
             CheckPropertyExplicitImplementation(@class, classProperty, interfaceProperty);
+        }
+
+        [Fact]
+        public void ExplicitInterfaceImplementationRefReturn()
+        {
+            string text = @"
+interface I
+{
+    ref int P { get; }
+}
+
+class C : I
+{
+    int field;
+    ref int I.P { get { return ref field; } }
+}
+";
+
+            var comp = CreateCompilationWithMscorlib45(text);
+
+            var globalNamespace = comp.GlobalNamespace;
+
+            var @interface = (NamedTypeSymbol)globalNamespace.GetTypeMembers("I").Single();
+            Assert.Equal(TypeKind.Interface, @interface.TypeKind);
+
+            var interfaceProperty = (PropertySymbol)@interface.GetMembers("P").Single();
+
+            var @class = (NamedTypeSymbol)globalNamespace.GetTypeMembers("C").Single();
+            Assert.Equal(TypeKind.Class, @class.TypeKind);
+            Assert.True(@class.Interfaces().Contains(@interface));
+
+            var classProperty = (PropertySymbol)@class.GetMembers("I.P").Single();
+            Assert.Equal(RefKind.Ref, classProperty.RefKind);
+
+            CheckRefPropertyExplicitImplementation(@class, classProperty, interfaceProperty);
         }
 
         [Fact]
@@ -1726,7 +1814,7 @@ class C : N.I<int>
 }
 ";
 
-            var comp = CreateCompilationWithMscorlib(Parse(text));
+            var comp = CreateCompilation(Parse(text));
 
             var globalNamespace = comp.GlobalNamespace;
             var @namespace = (NamespaceSymbol)globalNamespace.GetMembers("N").Single();
@@ -1741,7 +1829,7 @@ class C : N.I<int>
 
             var classProperty = (PropertySymbol)@class.GetMembers("N.I<System.Int32>.P").Single();
 
-            var substitutedInterface = @class.Interfaces.Single();
+            var substitutedInterface = @class.Interfaces().Single();
             Assert.Equal(@interface, substitutedInterface.ConstructedFrom);
 
             var substitutedInterfaceProperty = (PropertySymbol)substitutedInterface.GetMembers("P").Single();
@@ -1755,8 +1843,8 @@ class C : N.I<int>
             //TODO: To be implemented once indexer properties implemented
         }
 
-        [WorkItem(539998, "DevDiv")]
-        [Fact]
+        [WorkItem(539998, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/539998")]
+        [ClrOnlyFact]
         public void ImportDefaultPropertiesWithParameters()
         {
             var source = @"
@@ -1777,7 +1865,7 @@ class Program
     }
 }
 ";
-            var compilation = CreateCompilationWithMscorlib(
+            var compilation = CreateCompilation(
                 source,
                 new[] { TestReferences.SymbolsTests.Properties },
                 TestOptions.ReleaseExe);
@@ -1806,8 +1894,8 @@ class Program
             CompileAndVerify(compilation, sourceSymbolValidator: validator, /*symbolValidator: validator,*/ expectedOutput: "1221");
         }
 
-        [WorkItem(540342, "DevDiv")]
-        [Fact]
+        [WorkItem(540342, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/540342")]
+        [ClrOnlyFact]
         public void NoSequencePointsForAutoPropertyAccessors()
         {
             var text = @"
@@ -1818,7 +1906,7 @@ class C
             CompileAndVerify(text).VerifyDiagnostics();
         }
 
-        [WorkItem(541688, "DevDiv")]
+        [WorkItem(541688, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/541688")]
         [Fact]
         public void Simple2()
         {
@@ -1832,7 +1920,7 @@ public class A : Attribute
     public A X { get; set; }
 }
 ";
-            var comp = CreateCompilationWithMscorlib(text);
+            var comp = CreateCompilation(text);
             var global = comp.GlobalNamespace;
             var a = global.GetTypeMembers("A", 0).Single();
             var xs = a.GetMembers("X");
@@ -1847,7 +1935,7 @@ public class A : Attribute
             Assert.Equal(ErrorCode.ERR_DuplicateNameInClass, (ErrorCode)one.Code);
         }
 
-        [WorkItem(528769, "DevDiv")]
+        [WorkItem(528769, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/528769")]
         [Fact]
         public void IndexerGetSetParameterLocation()
         {
@@ -1862,7 +1950,7 @@ class Test
 }
 ";
 
-            var comp = CreateCompilationWithMscorlib(text);
+            var comp = CreateCompilation(text);
 
             var globalNamespace = comp.SourceModule.GlobalNamespace;
 
@@ -1884,8 +1972,8 @@ class Test
             Assert.True(locs[0].IsInSource, "InSource");
         }
 
-        [WorkItem(545682, "DevDiv")]
-        [Fact]
+        [WorkItem(545682, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/545682")]
+        [ClrOnlyFact]
         public void PropertyWithParametersHidingMethod01()
         {
             var source1 =
@@ -1958,7 +2046,7 @@ End Class";
         o = b.Q();
     }
 }";
-            var compilation3 = CreateCompilationWithMscorlib(source3, new[] { reference1 });
+            var compilation3 = CreateCompilation(source3, new[] { reference1 });
             compilation3.VerifyDiagnostics(
                 // (6,16): error CS0428: Cannot convert method group 'P' to non-delegate type 'object'. Did you intend to invoke the method?
                 Diagnostic(ErrorCode.ERR_MethGrpToNonDel, "P").WithArguments("P", "object").WithLocation(6, 16),
@@ -1966,7 +2054,7 @@ End Class";
                 Diagnostic(ErrorCode.ERR_MethGrpToNonDel, "Q").WithArguments("Q", "object").WithLocation(8, 15));
         }
 
-        [Fact]
+        [ClrOnlyFact]
         public void PropertyWithParametersHidingMethod02()
         {
             var source1 =
@@ -1996,7 +2084,7 @@ End Class";
         o = b.P;
     }
 }";
-            var compilation2 = CreateCompilationWithMscorlib(source2, new[] { reference1 });
+            var compilation2 = CreateCompilation(source2, new[] { reference1 });
             compilation2.VerifyDiagnostics(
                 // (6,15): error CS1546: Property, indexer, or event 'B.P[object]' is not supported by the language; try directly calling accessor method 'B.get_P(object)'
                 Diagnostic(ErrorCode.ERR_BindToBogusProp1, "P").WithArguments("B.P[object]", "B.get_P(object)").WithLocation(6, 15));
@@ -2014,13 +2102,13 @@ static class E
 {
     internal static object P(this object o) { return null; }
 }";
-            var compilation3 = CreateCompilationWithMscorlibAndSystemCore(source3, new[] { reference1 });
+            var compilation3 = CreateCompilationWithMscorlib40AndSystemCore(source3, new[] { reference1 });
             compilation3.VerifyDiagnostics(
                 // (6,15): error CS0428: Cannot convert method group 'P' to non-delegate type 'object'. Did you intend to invoke the method?
                 Diagnostic(ErrorCode.ERR_MethGrpToNonDel, "P").WithArguments("P", "object").WithLocation(6, 15));
         }
 
-        [Fact]
+        [ClrOnlyFact]
         public void PropertyWithParametersHidingMethod03()
         {
             var source1 =
@@ -2135,7 +2223,7 @@ class D
         o = b.P9();
     }
 }";
-            var compilation2 = CreateCompilationWithMscorlib(source2, new[] { reference1 });
+            var compilation2 = CreateCompilation(source2, new[] { reference1 });
             compilation2.VerifyDiagnostics(
                 // (9,18): error CS1955: Non-invocable member 'B.P4[object]' cannot be used like a method.
                 Diagnostic(ErrorCode.ERR_NonInvocableMemberCalled, "P4").WithArguments("B.P4[object]").WithLocation(9, 18),
@@ -2157,7 +2245,7 @@ class D
                 Diagnostic(ErrorCode.ERR_NonInvocableMemberCalled, "P9").WithArguments("B.P9[object]").WithLocation(30, 15));
         }
 
-        [Fact]
+        [ClrOnlyFact]
         public void PropertyWithParametersAndOtherErrors()
         {
             var source1 =
@@ -2190,7 +2278,7 @@ End Class";
         o = a.P3;
     }
 }";
-            var compilation2 = CreateCompilationWithMscorlib(source2, new[] { reference1 });
+            var compilation2 = CreateCompilation(source2, new[] { reference1 });
             compilation2.VerifyDiagnostics(
                 // (6,15): error CS1546: Property, indexer, or event 'A.P1[object]' is not supported by the language; try directly calling accessor method 'A.get_P1(object)'
                 Diagnostic(ErrorCode.ERR_BindToBogusProp1, "P1").WithArguments("A.P1[object]", "A.get_P1(object)").WithLocation(6, 15),
@@ -2200,7 +2288,7 @@ End Class";
                 Diagnostic(ErrorCode.ERR_BadAccess, "P3").WithArguments("A.P3[object]").WithLocation(8, 15));
         }
 
-        [Fact]
+        [ClrOnlyFact]
         public void SubstitutedPropertyWithParameters()
         {
             var source1 =
@@ -2226,7 +2314,7 @@ End Class";
         a.set_P(null, o);
     }
 }";
-            var compilation2 = CreateCompilationWithMscorlib(source2, new[] { reference1 });
+            var compilation2 = CreateCompilation(source2, new[] { reference1 });
             compilation2.VerifyDiagnostics(
                 // (6,15): error CS1545: Property, indexer, or event 'A<object>.P[object]' is not supported by the language; try directly calling accessor methods 'A<object>.get_P(object)' or 'A<object>.set_P(object, object)'
                 Diagnostic(ErrorCode.ERR_BindToBogusProp2, "P").WithArguments("A<object>.P[object]", "A<object>.get_P(object)", "A<object>.set_P(object, object)").WithLocation(6, 15),
@@ -2234,7 +2322,7 @@ End Class";
                 Diagnostic(ErrorCode.ERR_BindToBogusProp2, "P").WithArguments("A<object>.P[object]", "A<object>.get_P(object)", "A<object>.set_P(object, object)").WithLocation(7, 11));
         }
 
-        [Fact]
+        [ClrOnlyFact(ClrOnlyReason.Ilasm)]
         public void DifferentAccessorSignatures_ByRef()
         {
             var source1 =
@@ -2356,7 +2444,7 @@ End Class";
         _9[ref y] = _9[ref x];
     }
 }";
-            var compilation2 = CreateCompilationWithMscorlib(source2, new[] { reference1 });
+            var compilation2 = CreateCompilation(source2, new[] { reference1 });
             compilation2.VerifyDiagnostics(
                 // (8,9): error CS1545: Property, indexer, or event 'A2.this[object]' is not supported by the language; try directly calling accessor methods 'A2.get_P(object)' or 'A2.set_P(ref object, object)'
                 Diagnostic(ErrorCode.ERR_BindToBogusProp2, "_2[y]").WithArguments("A2.this[object]", "A2.get_P(object)", "A2.set_P(ref object, object)").WithLocation(8, 9),
@@ -2384,7 +2472,7 @@ End Class";
                 Diagnostic(ErrorCode.ERR_BindToBogusProp2, "_7[ref x]").WithArguments("A7.this[ref object]", "A7.get_P(ref object)", "A7.set_P(object, object)").WithLocation(13, 21),
                 // (14,9): error CS1545: Property, indexer, or event 'A8.this[ref object]' is not supported by the language; try directly calling accessor methods 'A8.get_P(ref object)' or 'A8.set_P(ref object, object)'
                 Diagnostic(ErrorCode.ERR_BindToBogusProp2, "_8[ref y]").WithArguments("A8.this[ref object]", "A8.get_P(ref object)", "A8.set_P(ref object, object)").WithLocation(14, 9),
-                /// (14,21): error CS1545: Property, indexer, or event 'A8.this[ref object]' is not supported by the language; try directly calling accessor methods 'A8.get_P(ref object)' or 'A8.set_P(ref object, object)'
+                // (14,21): error CS1545: Property, indexer, or event 'A8.this[ref object]' is not supported by the language; try directly calling accessor methods 'A8.get_P(ref object)' or 'A8.set_P(ref object, object)'
                 Diagnostic(ErrorCode.ERR_BindToBogusProp2, "_8[ref x]").WithArguments("A8.this[ref object]", "A8.get_P(ref object)", "A8.set_P(ref object, object)").WithLocation(14, 21),
                 // (15,9): error CS1545: Property, indexer, or event 'A9.this[ref object]' is not supported by the language; try directly calling accessor methods 'A9.get_P(ref object)' or 'A9.set_P(object, ref object)'
                 Diagnostic(ErrorCode.ERR_BindToBogusProp2, "_9[ref y]").WithArguments("A9.this[ref object]", "A9.get_P(ref object)", "A9.set_P(object, ref object)").WithLocation(15, 9),
@@ -2411,26 +2499,58 @@ End Class";
             Assert.Equal(interfacePropertyGetter, classPropertyGetter.ExplicitInterfaceImplementations.Single());
             Assert.Equal(interfacePropertySetter, classPropertySetter.ExplicitInterfaceImplementations.Single());
 
-            var typeDef = (Microsoft.Cci.ITypeDefinition)@class;
+            var typeDef = (Microsoft.Cci.ITypeDefinition)@class.GetCciAdapter();
             var module = new PEAssemblyBuilder((SourceAssemblySymbol)@class.ContainingAssembly, EmitOptions.Default, OutputKind.DynamicallyLinkedLibrary,
                 GetDefaultModulePropertiesForSerialization(), SpecializedCollections.EmptyEnumerable<ResourceDescription>());
 
-            var context = new EmitContext(module, null, new DiagnosticBag());
+            var context = new EmitContext(module, null, new DiagnosticBag(), metadataOnly: false, includePrivateMembers: true);
             var explicitOverrides = typeDef.GetExplicitImplementationOverrides(context);
             Assert.Equal(2, explicitOverrides.Count());
-            Assert.True(explicitOverrides.All(@override => ReferenceEquals(@class, @override.ContainingType)));
+            Assert.True(explicitOverrides.All(@override => ReferenceEquals(@class, @override.ContainingType.GetInternalSymbol())));
 
             // We're not actually asserting that the overrides are in this order - set comparison just seems like overkill for two elements
             var getterOverride = explicitOverrides.First();
-            Assert.Equal(classPropertyGetter, getterOverride.ImplementingMethod);
-            Assert.Equal(interfacePropertyGetter.ContainingType, getterOverride.ImplementedMethod.GetContainingType(context));
+            Assert.Equal(classPropertyGetter, getterOverride.ImplementingMethod.GetInternalSymbol());
+            Assert.Equal(interfacePropertyGetter.ContainingType, getterOverride.ImplementedMethod.GetContainingType(context).GetInternalSymbol());
             Assert.Equal(interfacePropertyGetter.Name, getterOverride.ImplementedMethod.Name);
 
             var setterOverride = explicitOverrides.Last();
-            Assert.Equal(classPropertySetter, setterOverride.ImplementingMethod);
-            Assert.Equal(interfacePropertySetter.ContainingType, setterOverride.ImplementedMethod.GetContainingType(context));
+            Assert.Equal(classPropertySetter, setterOverride.ImplementingMethod.GetInternalSymbol());
+            Assert.Equal(interfacePropertySetter.ContainingType, setterOverride.ImplementedMethod.GetContainingType(context).GetInternalSymbol());
             Assert.Equal(interfacePropertySetter.Name, setterOverride.ImplementedMethod.Name);
             context.Diagnostics.Verify();
+        }
+
+        private static void CheckRefPropertyExplicitImplementation(NamedTypeSymbol @class, PropertySymbol classProperty, PropertySymbol interfaceProperty)
+        {
+            var interfacePropertyGetter = interfaceProperty.GetMethod;
+            Assert.NotNull(interfacePropertyGetter);
+            var interfacePropertySetter = interfaceProperty.SetMethod;
+            Assert.Null(interfacePropertySetter);
+
+            Assert.Equal(interfaceProperty, classProperty.ExplicitInterfaceImplementations.Single());
+
+            var classPropertyGetter = classProperty.GetMethod;
+            Assert.NotNull(classPropertyGetter);
+            var classPropertySetter = classProperty.SetMethod;
+            Assert.Null(classPropertySetter);
+
+            Assert.Equal(interfacePropertyGetter, classPropertyGetter.ExplicitInterfaceImplementations.Single());
+
+            var typeDef = (Microsoft.Cci.ITypeDefinition)@class.GetCciAdapter();
+            var module = new PEAssemblyBuilder((SourceAssemblySymbol)@class.ContainingAssembly, EmitOptions.Default, OutputKind.DynamicallyLinkedLibrary,
+                GetDefaultModulePropertiesForSerialization(), SpecializedCollections.EmptyEnumerable<ResourceDescription>());
+
+            var context = new EmitContext(module, null, new DiagnosticBag(), metadataOnly: false, includePrivateMembers: true);
+            var explicitOverrides = typeDef.GetExplicitImplementationOverrides(context);
+            Assert.Equal(1, explicitOverrides.Count());
+            Assert.True(explicitOverrides.All(@override => ReferenceEquals(@class, @override.ContainingType.GetInternalSymbol())));
+
+            // We're not actually asserting that the overrides are in this order - set comparison just seems like overkill for two elements
+            var getterOverride = explicitOverrides.Single();
+            Assert.Equal(classPropertyGetter, getterOverride.ImplementingMethod.GetInternalSymbol());
+            Assert.Equal(interfacePropertyGetter.ContainingType, getterOverride.ImplementedMethod.GetContainingType(context).GetInternalSymbol());
+            Assert.Equal(interfacePropertyGetter.Name, getterOverride.ImplementedMethod.Name);
         }
 
         private static void VerifyAccessibility(PEPropertySymbol property, Accessibility propertyAccessibility, Accessibility getAccessibility, Accessibility setAccessibility)
@@ -2456,14 +2576,14 @@ End Class";
 
         private CSharpCompilation CompileWithCustomPropertiesAssembly(string source, CSharpCompilationOptions options = null)
         {
-            return CreateCompilationWithMscorlib(source, new[] { s_propertiesDll }, options ?? TestOptions.ReleaseDll);
+            return CreateCompilation(source, new[] { s_propertiesDll }, options ?? TestOptions.ReleaseDll);
         }
 
-        private static MetadataReference s_propertiesDll = TestReferences.SymbolsTests.Properties;
+        private static readonly MetadataReference s_propertiesDll = TestReferences.SymbolsTests.Properties;
 
         #endregion
 
-        [Fact]
+        [ConditionalFact(typeof(DesktopOnly))]
         public void InteropDynamification()
         {
             var refSrc = @"
@@ -2480,13 +2600,13 @@ public interface IA
     string M2();
 }";
             var refComp = CSharpCompilation.Create("DLL",
-                options: new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary),
+                options: TestOptions.DebugDll,
                 syntaxTrees: new[] { SyntaxFactory.ParseSyntaxTree(refSrc) },
                 references: new MetadataReference[] { MscorlibRef });
 
             var refData = AssemblyMetadata.CreateFromImage(refComp.EmitToArray());
             var mdRef = refData.GetReference(embedInteropTypes: false);
-            var comp = CreateCompilationWithMscorlib("", new[] { mdRef });
+            var comp = CreateCompilationWithMscorlib46("", new[] { mdRef });
 
             Assert.Equal(2, comp.ExternalReferences.Length);
             Assert.False(comp.ExternalReferences[1].Properties.EmbedInteropTypes);
@@ -2504,7 +2624,7 @@ public interface IA
             Assert.Equal(SpecialType.System_String, iam2.ReturnType.SpecialType);
 
             var compRef = refComp.ToMetadataReference(embedInteropTypes: false);
-            comp = CreateCompilationWithMscorlib("", new[] { compRef });
+            comp = CreateCompilationWithMscorlib46("", new[] { compRef });
 
             Assert.Equal(2, comp.ExternalReferences.Length);
             Assert.False(comp.ExternalReferences[1].Properties.EmbedInteropTypes);
@@ -2522,7 +2642,7 @@ public interface IA
             Assert.Equal(SpecialType.System_String, iam2.ReturnType.SpecialType);
 
             mdRef = refData.GetReference(embedInteropTypes: true);
-            comp = CreateCompilationWithMscorlib("", new[] { mdRef });
+            comp = CreateCompilationWithMscorlib46("", new[] { mdRef });
 
             Assert.Equal(2, comp.ExternalReferences.Length);
             Assert.True(comp.ExternalReferences[1].Properties.EmbedInteropTypes);
@@ -2540,7 +2660,7 @@ public interface IA
             Assert.Equal(SpecialType.System_String, iam2.ReturnType.SpecialType);
 
             compRef = refComp.ToMetadataReference(embedInteropTypes: true);
-            comp = CreateCompilationWithMscorlib("", new[] { compRef });
+            comp = CreateCompilationWithMscorlib46("", new[] { compRef });
 
             Assert.Equal(2, comp.ExternalReferences.Length);
             Assert.True(comp.ExternalReferences[1].Properties.EmbedInteropTypes);
@@ -2572,14 +2692,14 @@ public interface IA
 }";
 
             refComp = CSharpCompilation.Create("DLL",
-                options: new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary),
+                options: TestOptions.DebugDll,
                 syntaxTrees: new[] { SyntaxFactory.ParseSyntaxTree(refSrc) },
                 references: new[] { MscorlibRef });
 
             refData = AssemblyMetadata.CreateFromImage(refComp.EmitToArray());
             mdRef = refData.GetReference(embedInteropTypes: true);
 
-            comp = CreateCompilationWithMscorlib("", new[] { mdRef });
+            comp = CreateCompilationWithMscorlib46("", new[] { mdRef });
 
             Assert.Equal(2, comp.ExternalReferences.Length);
             Assert.True(comp.ExternalReferences[1].Properties.EmbedInteropTypes);
@@ -2597,7 +2717,7 @@ public interface IA
             Assert.Equal(SpecialType.System_String, iam2.ReturnType.SpecialType);
 
             compRef = refComp.ToMetadataReference(embedInteropTypes: true);
-            comp = CreateCompilationWithMscorlib("", new[] { compRef });
+            comp = CreateCompilationWithMscorlib46("", new[] { compRef });
 
             Assert.Equal(2, comp.ExternalReferences.Length);
             Assert.True(comp.ExternalReferences[1].Properties.EmbedInteropTypes);
@@ -2621,7 +2741,7 @@ public interface IA
         /// When the output type is .winmdobj properties should emit put_Property methods instead
         /// of set_Property methods.
         /// </summary>
-        [Fact]
+        [ClrOnlyFact]
         public void WinRtPropertySet()
         {
             const string libSrc =
@@ -2650,13 +2770,12 @@ public interface IA
              {
                  var validator = getValidator(expected);
 
-                // We should see the same members from both source and metadata
-                var verifier = CompileAndVerify(
-                     libSrc,
-                     emitOptions: TestEmitters.RefEmitBug,
-                     sourceSymbolValidator: validator,
-                     symbolValidator: validator,
-                     options: winmd ? TestOptions.ReleaseWinMD : TestOptions.ReleaseDll);
+                 // We should see the same members from both source and metadata
+                 var verifier = CompileAndVerify(
+                      libSrc,
+                      sourceSymbolValidator: validator,
+                      symbolValidator: validator,
+                      options: winmd ? TestOptions.ReleaseWinMD : TestOptions.ReleaseDll);
                  verifier.VerifyDiagnostics();
              };
 
@@ -2682,7 +2801,7 @@ public interface IA
         /// (i.e., set_ for dll, put_ for winmdobj)
         /// </summary>
         [Fact]
-        public void WinRtPropertyAccesorNameConflict()
+        public void WinRtPropertyAccessorNameConflict()
         {
             const string libSrc =
 @"namespace Test
@@ -2698,13 +2817,13 @@ public interface IA
         public void set_A(int value) {}
     }
 }";
-            var comp = CreateCompilationWithMscorlib(libSrc, options: TestOptions.ReleaseDll);
+            var comp = CreateCompilation(libSrc, options: TestOptions.ReleaseDll);
             comp.VerifyDiagnostics(
     // (7,18): error CS0082: Type 'Test.C' already reserves a member called 'set_A' with the same parameter types
     //             get; set;
     Diagnostic(ErrorCode.ERR_MemberReserved, "set").WithArguments("set_A", "Test.C"));
 
-            comp = CreateCompilationWithMscorlib(libSrc, options: TestOptions.ReleaseWinMD);
+            comp = CreateCompilation(libSrc, options: TestOptions.ReleaseWinMD);
             comp.VerifyDiagnostics(
     // (7,18): error CS0082: Type 'Test.C' already reserves a member called 'put_A' with the same parameter types
     //             get; set;
@@ -2730,15 +2849,15 @@ class C
     public int P { get; set; } // Error
 }
 ";
-            CreateCompilationWithMscorlib(source, parseOptions: TestOptions.Regular.WithLanguageVersion(LanguageVersion.CSharp3)).VerifyDiagnostics();
-            CreateCompilationWithMscorlib(source, parseOptions: TestOptions.Regular.WithLanguageVersion(LanguageVersion.CSharp2)).VerifyDiagnostics(
-                // (14,16): error CS8023: Feature 'automatically implemented properties' is not available in C# 2.  Please use language version 3 or greater.
+            CreateCompilation(source, parseOptions: TestOptions.Regular.WithLanguageVersion(LanguageVersion.CSharp3)).VerifyDiagnostics();
+            CreateCompilation(source, parseOptions: TestOptions.Regular.WithLanguageVersion(LanguageVersion.CSharp2)).VerifyDiagnostics(
+                // (14,16): error CS8023: Feature 'automatically implemented properties' is not available in C# 2. Please use language version 3 or greater.
                 //     public int P { get; set; } // Error
                 Diagnostic(ErrorCode.ERR_FeatureNotAvailableInVersion2, "P").WithArguments("automatically implemented properties", "3"));
         }
 
-        [WorkItem(1073332, "DevDiv")]
-        [Fact]
+        [WorkItem(1073332, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/1073332")]
+        [ClrOnlyFact]
         public void Bug1073332_01()
         {
             var text = @"
@@ -2758,28 +2877,116 @@ class Test
             CompileAndVerify(text, expectedOutput: "123").VerifyDiagnostics();
         }
 
-        [WorkItem(1073332, "DevDiv")]
+        [WorkItem(1073332, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/1073332")]
         [Fact]
         public void Bug1073332_02()
         {
             var text = @"
 unsafe class Test
 {
-    int[] property { get; } = stackalloc int[256];
+    int* property { get; } = stackalloc int[256];
 
     static void Main(string[] args)
     {
     }
 }
 ";
-            CreateCompilationWithMscorlib(text).VerifyDiagnostics(
-    // (4,31): error CS1525: Invalid expression term 'stackalloc'
-    //     int[] property { get; } = stackalloc int[256];
-    Diagnostic(ErrorCode.ERR_InvalidExprTerm, "stackalloc").WithArguments("stackalloc").WithLocation(4, 31),
-    // (2,14): error CS0227: Unsafe code may only appear if compiling with /unsafe
-    // unsafe class Test
-    Diagnostic(ErrorCode.ERR_IllegalUnsafe, "Test").WithLocation(2, 14)
+            CreateCompilationWithMscorlibAndSpan(text, options: TestOptions.UnsafeDebugDll).VerifyDiagnostics(
+                // (4,30): error CS8346: Conversion of a stackalloc expression of type 'int' to type 'int*' is not possible.
+                //     int* property { get; } = stackalloc int[256];
+                Diagnostic(ErrorCode.ERR_StackAllocConversionNotPossible, "stackalloc int[256]").WithArguments("int", "int*").WithLocation(4, 30)
                 );
+        }
+        [Fact]
+        public void RefPropertyWithoutGetter()
+        {
+            var source = @"
+    class C
+    {
+        ref int P { set { } }
+    }
+    ";
+
+            CreateCompilationWithMscorlib45(source).VerifyDiagnostics(
+                // (4,17): error CS8080: Properties with by-reference returns must have a get accessor.
+                //         ref int P { set { } }
+                Diagnostic(ErrorCode.ERR_RefPropertyMustHaveGetAccessor, "P").WithArguments("C.P").WithLocation(4, 17));
+        }
+
+        [Fact]
+        public void RefPropertyWithGetterAndSetter()
+        {
+            var source = @"
+    class C
+    {
+        int field = 0;
+        ref int P { get { return ref field; } set { } } 
+    }
+    ";
+
+            CreateCompilationWithMscorlib45(source).VerifyDiagnostics(
+                // (5,47): error CS8081: Properties with by-reference returns cannot have set accessors.
+                //         ref int P { get { return ref field; } set { } } 
+                Diagnostic(ErrorCode.ERR_RefPropertyCannotHaveSetAccessor, "set").WithArguments("C.P.set").WithLocation(5, 47));
+        }
+
+        [Fact, WorkItem(4696, "https://github.com/dotnet/roslyn/issues/4696")]
+        public void LangVersionAndReadonlyAutoProperty()
+        {
+            var source = @"
+public class Class1
+{
+    public Class1()
+    {
+        Prop1 = ""Test"";
+    }
+
+    public string Prop1 { get; }
+}
+
+abstract class Class2
+{
+    public abstract string Prop2 { get; }
+}
+
+interface I1
+{
+    string Prop3 { get; }
+}
+";
+
+            var comp = CreateCompilation(source, parseOptions: CSharpParseOptions.Default.WithLanguageVersion(LanguageVersion.CSharp5));
+            comp.GetDeclarationDiagnostics().Verify(
+    // (9,19): error CS8026: Feature 'readonly automatically implemented properties' is not available in C# 5. Please use language version 6 or greater.
+    //     public string Prop1 { get; }
+    Diagnostic(ErrorCode.ERR_FeatureNotAvailableInVersion5, "Prop1").WithArguments("readonly automatically implemented properties", "6").WithLocation(9, 19)
+                );
+        }
+
+        [Fact]
+        public void StaticPropertyDoesNotRequireInstanceReceiver()
+        {
+            var source = @"
+class C
+{
+    public static int P { get; }
+}";
+            var compilation = CreateCompilation(source).VerifyDiagnostics();
+            var property = compilation.GetMember<PropertySymbol>("C.P");
+            Assert.False(property.RequiresInstanceReceiver);
+        }
+
+        [Fact]
+        public void InstancePropertyRequiresInstanceReceiver()
+        {
+            var source = @"
+class C
+{
+    public int P { get; }
+}";
+            var compilation = CreateCompilation(source).VerifyDiagnostics();
+            var property = compilation.GetMember<PropertySymbol>("C.P");
+            Assert.True(property.RequiresInstanceReceiver);
         }
     }
 }

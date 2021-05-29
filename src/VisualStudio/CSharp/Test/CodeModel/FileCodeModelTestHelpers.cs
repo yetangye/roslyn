@@ -1,19 +1,20 @@
-// Copyright (c) Microsoft.  All Rights Reserved.  Licensed under the Apache License, Version 2.0.  See License.txt in the project root for license information.
+﻿// Licensed to the .NET Foundation under one or more agreements.
+// The .NET Foundation licenses this file to you under the MIT license.
+// See the LICENSE file in the project root for more information.
 
-using System;
-using System.Collections.Generic;
+#nullable disable
+
 using System.Linq;
 using System.Runtime.ExceptionServices;
-using System.Threading;
-using Microsoft.CodeAnalysis;
+using Microsoft.CodeAnalysis.Editor;
+using Microsoft.CodeAnalysis.Editor.Shared.Utilities;
 using Microsoft.CodeAnalysis.Editor.UnitTests.Workspaces;
-using Microsoft.CodeAnalysis.FindSymbols;
-using Microsoft.VisualStudio.ComponentModelHost;
-using Microsoft.VisualStudio.LanguageServices;
+using Microsoft.CodeAnalysis.Shared.TestHooks;
 using Microsoft.VisualStudio.LanguageServices.Implementation.CodeModel;
-using Microsoft.VisualStudio.LanguageServices.Implementation.Library.ObjectBrowser.Lists;
-using Microsoft.VisualStudio.LanguageServices.Implementation.ProjectSystem;
+using Microsoft.VisualStudio.LanguageServices.Implementation.Interop;
 using Microsoft.VisualStudio.LanguageServices.UnitTests;
+using Microsoft.VisualStudio.LanguageServices.UnitTests.CodeModel.Mocks;
+using static Microsoft.VisualStudio.LanguageServices.UnitTests.CodeModel.CodeModelTestHelpers;
 
 namespace Microsoft.VisualStudio.LanguageServices.CSharp.UnitTests.CodeModel
 {
@@ -25,9 +26,9 @@ namespace Microsoft.VisualStudio.LanguageServices.CSharp.UnitTests.CodeModel
         // finalizer complaining we didn't clean it up. Catching AVs is of course not safe, but this is balancing
         // "probably not crash" as an improvement over "will crash when the finalizer throws."
         [HandleProcessCorruptedStateExceptions]
-        public static Tuple<TestWorkspace, EnvDTE.FileCodeModel> CreateWorkspaceAndFileCodeModel(string file)
+        public static (TestWorkspace workspace, VisualStudioWorkspace extraWorkspaceToDisposeButNotUse, EnvDTE.FileCodeModel fileCodeModel) CreateWorkspaceAndFileCodeModel(string file)
         {
-            var workspace = CSharpWorkspaceFactory.CreateWorkspaceFromFile(file, exportProvider: VisualStudioTestExportProvider.ExportProvider);
+            var workspace = TestWorkspace.CreateCSharp(file, composition: VisualStudioTestCompositions.LanguageServices);
 
             try
             {
@@ -36,40 +37,34 @@ namespace Microsoft.VisualStudio.LanguageServices.CSharp.UnitTests.CodeModel
 
                 var componentModel = new MockComponentModel(workspace.ExportProvider);
                 var serviceProvider = new MockServiceProvider(componentModel);
+                WrapperPolicy.s_ComWrapperFactory = MockComWrapperFactory.Instance;
 
                 var visualStudioWorkspaceMock = new MockVisualStudioWorkspace(workspace);
+                var threadingContext = workspace.ExportProvider.GetExportedValue<IThreadingContext>();
+                var notificationService = workspace.ExportProvider.GetExportedValue<IForegroundNotificationService>();
+                var listenerProvider = workspace.ExportProvider.GetExportedValue<AsynchronousOperationListenerProvider>();
 
-                var state = new CodeModelState(serviceProvider, project.LanguageServices, visualStudioWorkspaceMock);
+                var state = new CodeModelState(
+                    threadingContext,
+                    serviceProvider,
+                    project.LanguageServices,
+                    visualStudioWorkspaceMock,
+                    new ProjectCodeModelFactory(
+                        visualStudioWorkspaceMock,
+                        serviceProvider,
+                        threadingContext,
+                        notificationService,
+                        listenerProvider));
 
                 var codeModel = FileCodeModel.Create(state, null, document, new MockTextManagerAdapter()).Handle;
 
-                return Tuple.Create(workspace, (EnvDTE.FileCodeModel)codeModel);
+                return (workspace, visualStudioWorkspaceMock, codeModel);
             }
             catch
             {
                 // We threw during creation of the FileCodeModel. Make sure we clean up our workspace or else we leak it
                 workspace.Dispose();
                 throw;
-            }
-        }
-
-        public class MockServiceProvider : IServiceProvider
-        {
-            private readonly MockComponentModel _componentModel;
-
-            public MockServiceProvider(MockComponentModel componentModel)
-            {
-                _componentModel = componentModel;
-            }
-
-            public object GetService(Type serviceType)
-            {
-                if (serviceType == typeof(SComponentModel))
-                {
-                    return _componentModel;
-                }
-
-                throw new NotImplementedException();
             }
         }
     }

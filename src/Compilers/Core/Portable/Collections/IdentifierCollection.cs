@@ -1,4 +1,6 @@
-﻿// Copyright (c) Microsoft.  All Rights Reserved.  Licensed under the Apache License, Version 2.0.  See License.txt in the project root for license information.
+﻿// Licensed to the .NET Foundation under one or more agreements.
+// The .NET Foundation licenses this file to you under the MIT license.
+// See the LICENSE file in the project root for more information.
 
 using System;
 using System.Collections.Generic;
@@ -11,7 +13,7 @@ namespace Microsoft.CodeAnalysis
     /// <summary>
     /// A dictionary that maps strings to all known spellings of that string. Can be used to
     /// efficiently store the set of known type names for a module for both VB and C# while also
-    /// answering questions like "do you have a type called Foo" in either a case sensitive or
+    /// answering questions like "do you have a type called Goo" in either a case sensitive or
     /// insensitive manner.
     /// </summary>
     internal partial class IdentifierCollection
@@ -44,9 +46,9 @@ namespace Microsoft.CodeAnalysis
 
         public void AddIdentifier(string identifier)
         {
-            Debug.Assert(identifier != null);
+            RoslynDebug.Assert(identifier != null);
 
-            object value;
+            object? value;
             if (!_map.TryGetValue(identifier, out value))
             {
                 AddInitialSpelling(identifier);
@@ -61,22 +63,20 @@ namespace Microsoft.CodeAnalysis
         {
             // Had a mapping for it.  It will either map to a single 
             // spelling, or to a set of spellings.
-            if (value is string)
+            var strValue = value as string;
+            if (strValue != null)
             {
-                if (!string.Equals(identifier, value as string, StringComparison.Ordinal))
+                if (!string.Equals(identifier, strValue, StringComparison.Ordinal))
                 {
                     // We now have two spellings.  Create a collection for
                     // that and map the name to it.
-                    var set = new HashSet<string>();
-                    set.Add(identifier);
-                    set.Add((string)value);
-                    _map[identifier] = set;
+                    _map[identifier] = new HashSet<string> { identifier, strValue };
                 }
             }
             else
             {
                 // We have multiple spellings already.
-                var spellings = value as HashSet<string>;
+                var spellings = (HashSet<string>)value;
 
                 // Note: the set will prevent duplicates.
                 spellings.Add(identifier);
@@ -92,7 +92,7 @@ namespace Microsoft.CodeAnalysis
 
         public bool ContainsIdentifier(string identifier, bool caseSensitive)
         {
-            Debug.Assert(identifier != null);
+            RoslynDebug.Assert(identifier != null);
 
             if (caseSensitive)
             {
@@ -114,18 +114,17 @@ namespace Microsoft.CodeAnalysis
 
         private bool CaseSensitiveContains(string identifier)
         {
-            object spellings;
+            object? spellings;
             if (_map.TryGetValue(identifier, out spellings))
             {
-                if (spellings is string)
+                var spelling = spellings as string;
+                if (spelling != null)
                 {
-                    return string.Equals(identifier, spellings as string, StringComparison.Ordinal);
+                    return string.Equals(identifier, spelling, StringComparison.Ordinal);
                 }
-                else
-                {
-                    var set = spellings as HashSet<string>;
-                    return set.Contains(identifier);
-                }
+
+                var set = (HashSet<string>)spellings;
+                return set.Contains(identifier);
             }
 
             return false;

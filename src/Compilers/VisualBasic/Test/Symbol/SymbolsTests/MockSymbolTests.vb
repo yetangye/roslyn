@@ -1,14 +1,10 @@
-﻿' Copyright (c) Microsoft.  All Rights Reserved.  Licensed under the Apache License, Version 2.0.  See License.txt in the project root for license information.
+﻿' Licensed to the .NET Foundation under one or more agreements.
+' The .NET Foundation licenses this file to you under the MIT license.
+' See the LICENSE file in the project root for more information.
 
-Imports System.Runtime.InteropServices
 Imports System.Text
-Imports System.Threading
-Imports System.Xml.Linq
-Imports Microsoft.CodeAnalysis.Text
-Imports Microsoft.CodeAnalysis.VisualBasic
+Imports Microsoft.CodeAnalysis.Test.Utilities
 Imports Microsoft.CodeAnalysis.VisualBasic.Symbols
-Imports Microsoft.CodeAnalysis.VisualBasic.Syntax
-Imports TypeKind = Microsoft.CodeAnalysis.TypeKind
 
 Namespace Microsoft.CodeAnalysis.VisualBasic.UnitTests
 
@@ -23,7 +19,7 @@ Namespace Microsoft.CodeAnalysis.VisualBasic.UnitTests
             Dim compilation As VisualBasicCompilation = TrivialCompilation()
             Dim elementType As NamedTypeSymbol = New MockNamedTypeSymbol("TestClass", Enumerable.Empty(Of Symbol))   ' this can be any type.
 
-            Dim ats1 As ArrayTypeSymbol = New ArrayTypeSymbol(elementType, Nothing, 1, compilation)
+            Dim ats1 As ArrayTypeSymbol = ArrayTypeSymbol.CreateVBArray(elementType, Nothing, 1, compilation)
             Assert.Equal(1, ats1.Rank)
             Assert.Same(elementType, ats1.ElementType)
             Assert.Equal(SymbolKind.ArrayType, ats1.Kind)
@@ -31,7 +27,7 @@ Namespace Microsoft.CodeAnalysis.VisualBasic.UnitTests
             Assert.False(ats1.IsValueType)
             Assert.Equal("TestClass()", ats1.ToString())
 
-            Dim ats2 As ArrayTypeSymbol = New ArrayTypeSymbol(elementType, Nothing, 2, compilation)
+            Dim ats2 As ArrayTypeSymbol = ArrayTypeSymbol.CreateVBArray(elementType, Nothing, 2, compilation)
             Assert.Equal(2, ats2.Rank)
             Assert.Same(elementType, ats2.ElementType)
             Assert.Equal(SymbolKind.ArrayType, ats2.Kind)
@@ -39,14 +35,14 @@ Namespace Microsoft.CodeAnalysis.VisualBasic.UnitTests
             Assert.False(ats2.IsValueType)
             Assert.Equal("TestClass(*,*)", ats2.ToString())
 
-            Dim ats3 As ArrayTypeSymbol = New ArrayTypeSymbol(elementType, Nothing, 3, compilation)
+            Dim ats3 As ArrayTypeSymbol = ArrayTypeSymbol.CreateVBArray(elementType, Nothing, 3, compilation)
             Assert.Equal(3, ats3.Rank)
             Assert.Equal("TestClass(*,*,*)", ats3.ToString())
         End Sub
 
         <Fact>
         Public Sub TestMissingMetadataSymbol()
-            Dim missingAssemblyName = New AssemblyIdentity("foo")
+            Dim missingAssemblyName = New AssemblyIdentity("goo")
             Dim assem As AssemblySymbol = New MockAssemblySymbol("banana")
             Dim [module] = New MissingModuleSymbol(assem, -1)
             Dim container As NamedTypeSymbol = New MockNamedTypeSymbol("TestClass", Enumerable.Empty(Of Symbol), TypeKind.Class)
@@ -56,7 +52,7 @@ Namespace Microsoft.CodeAnalysis.VisualBasic.UnitTests
             Assert.Equal("Elvis", mms1.NamespaceName)
             Assert.Equal("Lives", mms1.Name)
             Assert.Equal("Elvis.Lives(Of ,)[missing]", mms1.ToTestDisplayString())
-            Assert.Equal("foo", mms1.ContainingAssembly.Identity.Name)
+            Assert.Equal("goo", mms1.ContainingAssembly.Identity.Name)
 
             Dim mms2 = New MissingMetadataTypeSymbol.TopLevel([module], "Elvis.Is", "Cool", 0, True)
             Assert.Equal(0, mms2.Arity)
@@ -70,7 +66,7 @@ Namespace Microsoft.CodeAnalysis.VisualBasic.UnitTests
 
         <Fact>
         Public Sub TestNamespaceExtent()
-            Dim assem1 As AssemblySymbol = New MockAssemblySymbol("foo")
+            Dim assem1 As AssemblySymbol = New MockAssemblySymbol("goo")
 
             Dim ne1 As NamespaceExtent = New NamespaceExtent(assem1)
             Assert.Equal(ne1.Kind, NamespaceKind.Assembly)
@@ -87,7 +83,7 @@ Namespace Microsoft.CodeAnalysis.VisualBasic.UnitTests
         Private Function CreateMockSymbol(extent As NamespaceExtent, xel As XElement) As Symbol
             Dim result As Symbol
             Dim childSymbols = From childElement In xel.Elements()
-                                  Select CreateMockSymbol(extent, childElement)
+                               Select CreateMockSymbol(extent, childElement)
 
             Dim name As String = xel.Attribute("name").Value
             Select Case xel.Name.LocalName
@@ -208,7 +204,7 @@ Namespace Microsoft.CodeAnalysis.VisualBasic.UnitTests
     Class X
     Class Y
     Class Z
-}</expected>.Value.Replace(vbLf, vbCrLf).
+}</expected>.Value.Replace(vbLf, Environment.NewLine).
                    Replace("Assembly: Merged", "Assembly: Merged, Version=0.0.0.0, Culture=neutral, PublicKeyToken=null").
                    Replace("Assembly: Assem1", "Assembly: Assem1, Version=0.0.0.0, Culture=neutral, PublicKeyToken=null").
                    Replace("Assembly: Assem3", "Assembly: Assem3, Version=0.0.0.0, Culture=neutral, PublicKeyToken=null")

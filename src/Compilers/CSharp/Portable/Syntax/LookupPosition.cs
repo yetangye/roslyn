@@ -1,4 +1,6 @@
-﻿// Copyright (c) Microsoft.  All Rights Reserved.  Licensed under the Apache License, Version 2.0.  See License.txt in the project root for license information.
+﻿// Licensed to the .NET Foundation under one or more agreements.
+// The .NET Foundation licenses this file to you under the MIT license.
+// See the LICENSE file in the project root for more information.
 
 using System.Diagnostics;
 using Roslyn.Utilities;
@@ -18,18 +20,24 @@ namespace Microsoft.CodeAnalysis.CSharp.Syntax
         /// A position is considered to be inside a block if it is on or after
         /// the open brace and strictly before the close brace.
         /// </summary>
-        internal static bool IsInBlock(int position, BlockSyntax blockOpt)
+        internal static bool IsInBlock(int position, BlockSyntax? blockOpt)
         {
             return blockOpt != null && IsBeforeToken(position, blockOpt, blockOpt.CloseBraceToken);
         }
 
         internal static bool IsInExpressionBody(
             int position,
-            ArrowExpressionClauseSyntax expressionBodyOpt,
+            ArrowExpressionClauseSyntax? expressionBodyOpt,
             SyntaxToken semicolonToken)
         {
             return expressionBodyOpt != null
                 && IsBeforeToken(position, expressionBodyOpt, semicolonToken);
+        }
+
+        private static bool IsInBody(int position, BlockSyntax? blockOpt, ArrowExpressionClauseSyntax? exprOpt, SyntaxToken semiOpt)
+        {
+            return IsInExpressionBody(position, exprOpt, semiOpt)
+                || IsInBlock(position, blockOpt);
         }
 
         /// <summary>
@@ -39,10 +47,7 @@ namespace Microsoft.CodeAnalysis.CSharp.Syntax
         /// </summary>
         internal static bool IsInBody(int position,
             PropertyDeclarationSyntax property)
-        {
-            var exprOpt = property.GetExpressionBodySyntax();
-            return IsInExpressionBody(position, exprOpt, property.Semicolon);
-        }
+            => IsInBody(position, blockOpt: null, property.GetExpressionBodySyntax(), property.SemicolonToken);
 
         /// <summary>
         /// A position is inside a property body only if it is inside an expression body.
@@ -51,10 +56,14 @@ namespace Microsoft.CodeAnalysis.CSharp.Syntax
         /// </summary>
         internal static bool IsInBody(int position,
             IndexerDeclarationSyntax indexer)
-        {
-            var exprOpt = indexer.GetExpressionBodySyntax();
-            return IsInExpressionBody(position, exprOpt, indexer.Semicolon);
-        }
+            => IsInBody(position, blockOpt: null, indexer.GetExpressionBodySyntax(), indexer.SemicolonToken);
+
+        /// <summary>
+        /// A position is inside an accessor body if it is inside the block or expression
+        /// body. 
+        /// </summary>
+        internal static bool IsInBody(int position, AccessorDeclarationSyntax method)
+            => IsInBody(position, method.Body, method.GetExpressionBodySyntax(), method.SemicolonToken);
 
         /// <summary>
         /// A position is inside a body if it is inside the block or expression
@@ -66,12 +75,7 @@ namespace Microsoft.CodeAnalysis.CSharp.Syntax
         /// the '=>' and strictly before the semicolon.
         /// </summary>
         internal static bool IsInBody(int position, BaseMethodDeclarationSyntax method)
-        {
-            var exprOpt = method.GetExpressionBodySyntax();
-
-            return IsInExpressionBody(position, exprOpt, method.SemicolonToken)
-                || IsInBlock(position, method.Body);
-        }
+            => IsInBody(position, method.Body, method.GetExpressionBodySyntax(), method.SemicolonToken);
 
         internal static bool IsBetweenTokens(int position, SyntaxToken firstIncluded, SyntaxToken firstExcluded)
         {
@@ -116,13 +120,21 @@ namespace Microsoft.CodeAnalysis.CSharp.Syntax
             return IsBeforeToken(position, parameterList, parameterList.CloseParenToken);
         }
 
+        internal static bool IsInParameterList(int position, ParameterListSyntax parameterList)
+            => parameterList != null && IsBeforeToken(position, parameterList, parameterList.CloseParenToken);
+
         internal static bool IsInMethodDeclaration(int position, BaseMethodDeclarationSyntax methodDecl)
         {
             Debug.Assert(methodDecl != null);
 
             var body = methodDecl.Body;
-            SyntaxToken lastToken = body == null ? methodDecl.SemicolonToken : body.CloseBraceToken;
-            return IsBeforeToken(position, methodDecl, lastToken);
+            if (body == null)
+            {
+                return IsBeforeToken(position, methodDecl, methodDecl.SemicolonToken);
+            }
+
+            return IsBeforeToken(position, methodDecl, body.CloseBraceToken) ||
+                   IsInExpressionBody(position, methodDecl.GetExpressionBodySyntax(), methodDecl.SemicolonToken);
         }
 
         internal static bool IsInMethodDeclaration(int position, AccessorDeclarationSyntax accessorDecl)
@@ -160,9 +172,9 @@ namespace Microsoft.CodeAnalysis.CSharp.Syntax
             Debug.Assert(constructorDecl != null);
 
             var initializerOpt = constructorDecl.Initializer;
-            var blockOpt = constructorDecl.Body;
+            var hasBody = constructorDecl.Body != null || constructorDecl.ExpressionBody != null;
 
-            if (blockOpt == null)
+            if (!hasBody)
             {
                 var nextToken = (SyntaxToken)SyntaxNavigator.Instance.GetNextToken(constructorDecl, predicate: null, stepInto: null);
                 return initializerOpt == null ?
@@ -171,8 +183,9 @@ namespace Microsoft.CodeAnalysis.CSharp.Syntax
             }
 
             return initializerOpt == null ?
-                IsInBlock(position, blockOpt) :
-                IsBetweenTokens(position, initializerOpt.ColonToken, blockOpt.CloseBraceToken);
+                IsInBody(position, constructorDecl) :
+                IsBetweenTokens(position, initializerOpt.ColonToken,
+                                constructorDecl.SemicolonToken.Kind() == SyntaxKind.None ? constructorDecl.Body!.CloseBraceToken : constructorDecl.SemicolonToken);
         }
 
         internal static bool IsInMethodTypeParameterScope(int position, MethodDeclarationSyntax methodDecl)
@@ -229,6 +242,16 @@ namespace Microsoft.CodeAnalysis.CSharp.Syntax
         }
 
         /// <remarks>
+        /// Used to determine whether it would be appropriate to use the binder for the switch section (if any).
+        /// Not used to determine whether the position is syntactically within the statement.
+        /// </remarks>
+        internal static bool IsInSwitchSectionScope(int position, SwitchSectionSyntax section)
+        {
+            Debug.Assert(section != null);
+            return section.Span.Contains(position);
+        }
+
+        /// <remarks>
         /// Used to determine whether it would be appropriate to use the binder for the statement (if any).
         /// Not used to determine whether the position is syntactically within the statement.
         /// </remarks>
@@ -250,7 +273,7 @@ namespace Microsoft.CodeAnalysis.CSharp.Syntax
             return IsBetweenTokens(position, filterClause.OpenParenToken, filterClause.CloseParenToken);
         }
 
-        private static SyntaxToken GetFirstIncludedToken(StatementSyntax statement, bool inRecursiveCall = false)
+        private static SyntaxToken GetFirstIncludedToken(StatementSyntax statement)
         {
             Debug.Assert(statement != null);
             switch (statement.Kind())
@@ -274,24 +297,10 @@ namespace Microsoft.CodeAnalysis.CSharp.Syntax
                 case SyntaxKind.FixedStatement:
                     return ((FixedStatementSyntax)statement).FixedKeyword;
                 case SyntaxKind.ForEachStatement:
-                    // NB: iteration variable is only in scope in body.
-                    ForEachStatementSyntax forEachSyntax = (ForEachStatementSyntax)statement;
-                    if (inRecursiveCall)
-                    {
-                        return forEachSyntax.ForEachKeyword;
-                    }
-                    return GetFirstIncludedToken(forEachSyntax.Statement, inRecursiveCall: true);
+                case SyntaxKind.ForEachVariableStatement:
+                    return ((CommonForEachStatementSyntax)statement).OpenParenToken.GetNextToken();
                 case SyntaxKind.ForStatement:
-                    // Section 8.8.3 of the spec says that the scope of the loop variable starts at 
-                    // its declaration.  If it's not there, then the scope we are interested in is
-                    // the loop body.
-                    ForStatementSyntax forSyntax = (ForStatementSyntax)statement;
-                    if (inRecursiveCall)
-                    {
-                        return forSyntax.ForKeyword;
-                    }
-                    VariableDeclarationSyntax declOpt = forSyntax.Declaration;
-                    return declOpt == null ? GetFirstIncludedToken(forSyntax.Statement, inRecursiveCall: true) : declOpt.GetFirstToken();
+                    return ((ForStatementSyntax)statement).OpenParenToken.GetNextToken();
                 case SyntaxKind.GotoDefaultStatement:
                 case SyntaxKind.GotoCaseStatement:
                 case SyntaxKind.GotoStatement:
@@ -305,7 +314,7 @@ namespace Microsoft.CodeAnalysis.CSharp.Syntax
                 case SyntaxKind.ReturnStatement:
                     return ((ReturnStatementSyntax)statement).ReturnKeyword;
                 case SyntaxKind.SwitchStatement:
-                    return ((SwitchStatementSyntax)statement).OpenBraceToken;
+                    return ((SwitchStatementSyntax)statement).Expression.GetFirstToken();
                 case SyntaxKind.ThrowStatement:
                     return ((ThrowStatementSyntax)statement).ThrowKeyword;
                 case SyntaxKind.TryStatement:
@@ -319,12 +328,14 @@ namespace Microsoft.CodeAnalysis.CSharp.Syntax
                 case SyntaxKind.YieldReturnStatement:
                 case SyntaxKind.YieldBreakStatement:
                     return ((YieldStatementSyntax)statement).YieldKeyword;
+                case SyntaxKind.LocalFunctionStatement:
+                    return statement.GetFirstToken();
                 default:
                     throw ExceptionUtilities.UnexpectedValue(statement.Kind());
             }
         }
 
-        private static SyntaxToken GetFirstExcludedToken(StatementSyntax statement)
+        internal static SyntaxToken GetFirstExcludedToken(StatementSyntax statement)
         {
             Debug.Assert(statement != null);
             switch (statement.Kind())
@@ -349,7 +360,8 @@ namespace Microsoft.CodeAnalysis.CSharp.Syntax
                 case SyntaxKind.FixedStatement:
                     return GetFirstExcludedToken(((FixedStatementSyntax)statement).Statement);
                 case SyntaxKind.ForEachStatement:
-                    return GetFirstExcludedToken(((ForEachStatementSyntax)statement).Statement);
+                case SyntaxKind.ForEachVariableStatement:
+                    return GetFirstExcludedToken(((CommonForEachStatementSyntax)statement).Statement);
                 case SyntaxKind.ForStatement:
                     return GetFirstExcludedToken(((ForStatementSyntax)statement).Statement);
                 case SyntaxKind.GotoDefaultStatement:
@@ -358,7 +370,7 @@ namespace Microsoft.CodeAnalysis.CSharp.Syntax
                     return ((GotoStatementSyntax)statement).SemicolonToken;
                 case SyntaxKind.IfStatement:
                     IfStatementSyntax ifStmt = (IfStatementSyntax)statement;
-                    ElseClauseSyntax elseOpt = ifStmt.Else;
+                    ElseClauseSyntax? elseOpt = ifStmt.Else;
                     return GetFirstExcludedToken(elseOpt == null ? ifStmt.Statement : elseOpt.Statement);
                 case SyntaxKind.LabeledStatement:
                     return GetFirstExcludedToken(((LabeledStatementSyntax)statement).Statement);
@@ -373,13 +385,13 @@ namespace Microsoft.CodeAnalysis.CSharp.Syntax
                 case SyntaxKind.TryStatement:
                     TryStatementSyntax tryStmt = (TryStatementSyntax)statement;
 
-                    FinallyClauseSyntax finallyClause = tryStmt.Finally;
+                    FinallyClauseSyntax? finallyClause = tryStmt.Finally;
                     if (finallyClause != null)
                     {
                         return finallyClause.Block.CloseBraceToken;
                     }
 
-                    CatchClauseSyntax lastCatch = tryStmt.Catches.LastOrDefault();
+                    CatchClauseSyntax? lastCatch = tryStmt.Catches.LastOrDefault();
                     if (lastCatch != null)
                     {
                         return lastCatch.Block.CloseBraceToken;
@@ -394,12 +406,19 @@ namespace Microsoft.CodeAnalysis.CSharp.Syntax
                 case SyntaxKind.YieldReturnStatement:
                 case SyntaxKind.YieldBreakStatement:
                     return ((YieldStatementSyntax)statement).SemicolonToken;
+                case SyntaxKind.LocalFunctionStatement:
+                    LocalFunctionStatementSyntax localFunctionStmt = (LocalFunctionStatementSyntax)statement;
+                    if (localFunctionStmt.Body != null)
+                        return GetFirstExcludedToken(localFunctionStmt.Body);
+                    if (localFunctionStmt.SemicolonToken != default(SyntaxToken))
+                        return localFunctionStmt.SemicolonToken;
+                    return localFunctionStmt.ParameterList.GetLastToken();
                 default:
                     throw ExceptionUtilities.UnexpectedValue(statement.Kind());
             }
         }
 
-        internal static bool IsInAnonymousFunctionOrQuery(int position, CSharpSyntaxNode lambdaExpressionOrQueryNode)
+        internal static bool IsInAnonymousFunctionOrQuery(int position, SyntaxNode lambdaExpressionOrQueryNode)
         {
             Debug.Assert(lambdaExpressionOrQueryNode.IsAnonymousFunction() || lambdaExpressionOrQueryNode.IsQuery());
 
@@ -410,20 +429,20 @@ namespace Microsoft.CodeAnalysis.CSharp.Syntax
             {
                 case SyntaxKind.SimpleLambdaExpression:
                     SimpleLambdaExpressionSyntax simple = (SimpleLambdaExpressionSyntax)lambdaExpressionOrQueryNode;
-                    firstIncluded = simple.Parameter.Identifier;
+                    firstIncluded = simple.ArrowToken;
                     body = simple.Body;
                     break;
 
                 case SyntaxKind.ParenthesizedLambdaExpression:
                     ParenthesizedLambdaExpressionSyntax parenthesized = (ParenthesizedLambdaExpressionSyntax)lambdaExpressionOrQueryNode;
-                    firstIncluded = parenthesized.ParameterList.OpenParenToken;
+                    firstIncluded = parenthesized.ArrowToken;
                     body = parenthesized.Body;
                     break;
 
                 case SyntaxKind.AnonymousMethodExpression:
                     AnonymousMethodExpressionSyntax anon = (AnonymousMethodExpressionSyntax)lambdaExpressionOrQueryNode;
-                    firstIncluded = anon.DelegateKeyword;
                     body = anon.Block;
+                    firstIncluded = body.GetFirstToken(includeZeroWidth: true);
                     break;
 
                 default:

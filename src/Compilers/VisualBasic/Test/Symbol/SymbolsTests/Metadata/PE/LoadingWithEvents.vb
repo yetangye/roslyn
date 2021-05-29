@@ -1,4 +1,6 @@
-﻿' Copyright (c) Microsoft.  All Rights Reserved.  Licensed under the Apache License, Version 2.0.  See License.txt in the project root for license information.
+﻿' Licensed to the .NET Foundation under one or more agreements.
+' The .NET Foundation licenses this file to you under the MIT license.
+' See the LICENSE file in the project root for more information.
 
 Imports System.Runtime.CompilerServices
 Imports CompilationCreationTestHelpers
@@ -22,8 +24,8 @@ Namespace Microsoft.CodeAnalysis.VisualBasic.UnitTests.Symbols.Metadata.PE
 
     </file>
 </compilation>
-            Dim simpleWithEvents = MetadataReference.CreateFromImage(TestResources.SymbolsTests._WithEvents.SimpleWithEvents.AsImmutableOrNull())
-            Dim c1 = CompilationUtils.CreateCompilationWithMscorlibAndVBRuntime(source, {simpleWithEvents}, TestOptions.ReleaseExe)
+            Dim simpleWithEvents = MetadataReference.CreateFromImage(TestResources.SymbolsTests.WithEvents.SimpleWithEvents.AsImmutableOrNull())
+            Dim c1 = CompilationUtils.CreateCompilationWithMscorlib40AndVBRuntime(source, {simpleWithEvents}, TestOptions.ReleaseExe)
 
             Dim ns = DirectCast(c1.GlobalNamespace.GetMembers("SimpleWithEvents").Single, NamespaceSymbol)
 
@@ -46,8 +48,8 @@ Namespace Microsoft.CodeAnalysis.VisualBasic.UnitTests.Symbols.Metadata.PE
 
     </file>
 </compilation>
-            Dim ref = MetadataReference.CreateFromImage(TestResources.SymbolsTests._WithEvents.SimpleWithEvents.AsImmutableOrNull())
-            Dim c1 = CompilationUtils.CreateCompilationWithMscorlibAndVBRuntime(source, {ref}, TestOptions.ReleaseExe)
+            Dim ref = MetadataReference.CreateFromImage(TestResources.SymbolsTests.WithEvents.SimpleWithEvents.AsImmutableOrNull())
+            Dim c1 = CompilationUtils.CreateCompilationWithMscorlib40AndVBRuntime(source, {ref}, TestOptions.ReleaseExe)
 
             Dim ns = DirectCast(c1.GlobalNamespace.GetMembers("SimpleWithEvents").Single, NamespaceSymbol)
 

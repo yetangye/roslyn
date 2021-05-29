@@ -1,16 +1,17 @@
-' Copyright (c) Microsoft.  All Rights Reserved.  Licensed under the Apache License, Version 2.0.  See License.txt in the project root for license information.
+﻿' Licensed to the .NET Foundation under one or more agreements.
+' The .NET Foundation licenses this file to you under the MIT license.
+' See the LICENSE file in the project root for more information.
 
-Imports Microsoft.CodeAnalysis.Text
 Namespace Microsoft.CodeAnalysis.Editor.VisualBasic.UnitTests.Recommendations.Statements
     Public Class SelectKeywordRecommenderTests
 
         <Fact, Trait(Traits.Feature, Traits.Features.KeywordRecommending)>
-        Public Sub SelectInMethodBody()
+        Public Sub SelectInMethodBodyTest()
             VerifyRecommendationsContain(<MethodBody>|</MethodBody>, "Select")
         End Sub
 
         <Fact, Trait(Traits.Feature, Traits.Features.KeywordRecommending)>
-        Public Sub SelectInMultiLineLambda()
+        Public Sub SelectInMultiLineLambdaTest()
             VerifyRecommendationsContain(<ClassDeclaration>
 Private _member = Sub()
 |
@@ -20,20 +21,20 @@ End Sub
         End Sub
 
         <Fact, Trait(Traits.Feature, Traits.Features.KeywordRecommending)>
-        Public Sub SelectNotInSingleLineLambda()
+        Public Sub SelectNotInSingleLineLambdaTest()
             VerifyRecommendationsMissing(<ClassDeclaration>
 Private _member = Sub() |
                                          </ClassDeclaration>, "Select")
         End Sub
 
-        <WorkItem(543396)>
+        <WorkItem(543396, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/543396")>
         <Fact, Trait(Traits.Feature, Traits.Features.KeywordRecommending)>
-        Public Sub SelectInSingleLineIf()
+        Public Sub SelectInSingleLineIfTest()
             VerifyRecommendationsContain(<MethodBody>If True Then S|</MethodBody>, "Select")
         End Sub
 
         <Fact, Trait(Traits.Feature, Traits.Features.KeywordRecommending)>
-        Public Sub SelectAfterExitInsideCase()
+        Public Sub SelectAfterExitInsideCaseTest()
             Dim code =
 <MethodBody>
 Dim i As Integer = 1
@@ -46,7 +47,7 @@ Select Case i
         End Sub
 
         <Fact, Trait(Traits.Feature, Traits.Features.KeywordRecommending)>
-        Public Sub SelectNotAfterExitInsideCaseInsideFinallyBlock()
+        Public Sub SelectNotAfterExitInsideCaseInsideFinallyBlockTest()
             Dim code =
 <MethodBody>
 Try
@@ -61,7 +62,7 @@ Finally
         End Sub
 
         <Fact, Trait(Traits.Feature, Traits.Features.KeywordRecommending)>
-        Public Sub SelectNotAfterExitInsideFinallyBlockInsideCase()
+        Public Sub SelectNotAfterExitInsideFinallyBlockInsideCaseTest()
             Dim code =
 <MethodBody>
 Select Case i
@@ -74,6 +75,5 @@ Select Case i
 
             VerifyRecommendationsMissing(code, "Select")
         End Sub
-
     End Class
 End Namespace

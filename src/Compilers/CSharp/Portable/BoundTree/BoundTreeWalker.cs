@@ -1,9 +1,9 @@
-﻿// Copyright (c) Microsoft.  All Rights Reserved.  Licensed under the Apache License, Version 2.0.  See License.txt in the project root for license information.
+﻿// Licensed to the .NET Foundation under one or more agreements.
+// The .NET Foundation licenses this file to you under the MIT license.
+// See the LICENSE file in the project root for more information.
 
 using System.Collections.Immutable;
-using Microsoft.CodeAnalysis.CSharp.Symbols;
-using Microsoft.CodeAnalysis.CSharp.Syntax;
-using Microsoft.CodeAnalysis.Text;
+using Microsoft.CodeAnalysis.PooledObjects;
 
 namespace Microsoft.CodeAnalysis.CSharp
 {
@@ -26,7 +26,7 @@ namespace Microsoft.CodeAnalysis.CSharp
 
         protected void VisitUnoptimizedForm(BoundQueryClause queryClause)
         {
-            BoundExpression unoptimizedForm = queryClause.UnoptimizedForm;
+            BoundExpression? unoptimizedForm = queryClause.UnoptimizedForm;
 
             // The unoptimized form of a query has an additional argument in the call,
             // which is typically the "trivial" expression x where x is the query
@@ -47,6 +47,93 @@ namespace Microsoft.CodeAnalysis.CSharp
                     this.Visit(arguments[arguments.Length - 2]);
                 }
             }
+        }
+    }
+
+    /// <summary>
+    /// Note: do not use a static/singleton instance of this type, as it holds state.
+    /// </summary>
+    internal abstract class BoundTreeWalkerWithStackGuard : BoundTreeWalker
+    {
+        private int _recursionDepth;
+
+        protected BoundTreeWalkerWithStackGuard()
+        { }
+
+        protected BoundTreeWalkerWithStackGuard(int recursionDepth)
+        {
+            _recursionDepth = recursionDepth;
+        }
+
+        protected int RecursionDepth => _recursionDepth;
+
+        public override BoundNode? Visit(BoundNode? node)
+        {
+            var expression = node as BoundExpression;
+            if (expression != null)
+            {
+                return VisitExpressionWithStackGuard(ref _recursionDepth, expression);
+            }
+
+            return base.Visit(node);
+        }
+
+        protected BoundExpression VisitExpressionWithStackGuard(BoundExpression node)
+        {
+            return VisitExpressionWithStackGuard(ref _recursionDepth, node);
+        }
+
+        protected sealed override BoundExpression VisitExpressionWithoutStackGuard(BoundExpression node)
+        {
+            return (BoundExpression)base.Visit(node);
+        }
+    }
+
+    /// <summary>
+    /// Note: do not use a static/singleton instance of this type, as it holds state.
+    /// </summary>
+    internal abstract class BoundTreeWalkerWithStackGuardWithoutRecursionOnTheLeftOfBinaryOperator : BoundTreeWalkerWithStackGuard
+    {
+        protected BoundTreeWalkerWithStackGuardWithoutRecursionOnTheLeftOfBinaryOperator()
+        { }
+
+        protected BoundTreeWalkerWithStackGuardWithoutRecursionOnTheLeftOfBinaryOperator(int recursionDepth)
+            : base(recursionDepth)
+        { }
+
+        public sealed override BoundNode? VisitBinaryOperator(BoundBinaryOperator node)
+        {
+            if (node.Left.Kind != BoundKind.BinaryOperator)
+            {
+                return base.VisitBinaryOperator(node);
+            }
+
+            var rightOperands = ArrayBuilder<BoundExpression>.GetInstance();
+
+            rightOperands.Push(node.Right);
+
+            var binary = (BoundBinaryOperator)node.Left;
+
+            rightOperands.Push(binary.Right);
+
+            BoundExpression current = binary.Left;
+
+            while (current.Kind == BoundKind.BinaryOperator)
+            {
+                binary = (BoundBinaryOperator)current;
+                rightOperands.Push(binary.Right);
+                current = binary.Left;
+            }
+
+            this.Visit(current);
+
+            while (rightOperands.Count > 0)
+            {
+                this.Visit(rightOperands.Pop());
+            }
+
+            rightOperands.Free();
+            return null;
         }
     }
 }

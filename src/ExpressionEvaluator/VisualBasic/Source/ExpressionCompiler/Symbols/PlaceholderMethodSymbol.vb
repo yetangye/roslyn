@@ -1,71 +1,41 @@
-﻿Imports System.Collections.Immutable
+﻿' Licensed to the .NET Foundation under one or more agreements.
+' The .NET Foundation licenses this file to you under the MIT license.
+' See the LICENSE file in the project root for more information.
+
+Imports System.Collections.Immutable
 Imports System.Runtime.InteropServices
 Imports Microsoft.CodeAnalysis.VisualBasic.Symbols
 Imports Roslyn.Utilities
 
 Namespace Microsoft.CodeAnalysis.VisualBasic.ExpressionEvaluator
 
+    ''' <summary>
+    ''' Represents an intrinsic debugger method with byref return type.
+    ''' </summary>
     Friend NotInheritable Class PlaceholderMethodSymbol
         Inherits SynthesizedMethodBase
-        Implements Cci.ISignature
 
         Friend Delegate Function GetTypeParameters(method As PlaceholderMethodSymbol) As ImmutableArray(Of TypeParameterSymbol)
         Friend Delegate Function GetParameters(method As PlaceholderMethodSymbol) As ImmutableArray(Of ParameterSymbol)
         Friend Delegate Function GetReturnType(method As PlaceholderMethodSymbol) As TypeSymbol
 
-        Private ReadOnly _syntax As VisualBasicSyntaxNode
         Private ReadOnly _name As String
-        Private ReadOnly _locations As ImmutableArray(Of Location)
         Private ReadOnly _typeParameters As ImmutableArray(Of TypeParameterSymbol)
         Private ReadOnly _parameters As ImmutableArray(Of ParameterSymbol)
         Private ReadOnly _returnType As TypeSymbol
-        Private ReadOnly _returnValueIsByRef As Boolean
 
         Friend Sub New(
-            container As EENamedTypeSymbol,
-            syntax As VisualBasicSyntaxNode,
+            container As NamedTypeSymbol,
             name As String,
             getTypeParameters As GetTypeParameters,
             getReturnType As GetReturnType,
-            getParameters As GetParameters,
-            returnValueIsByRef As Boolean)
+            getParameters As GetParameters)
 
-            MyClass.New(container, syntax, name)
-
+            MyBase.New(container)
+            _name = name
             _typeParameters = getTypeParameters(Me)
             _returnType = getReturnType(Me)
             _parameters = getParameters(Me)
-            _returnValueIsByRef = returnValueIsByRef
-        End Sub
-
-        Friend Sub New(
-            container As EENamedTypeSymbol,
-            syntax As VisualBasicSyntaxNode,
-            name As String,
-            returnType As TypeSymbol,
-            getParameters As GetParameters)
-
-            MyClass.New(container, syntax, name)
-
-            Debug.Assert(
-                (returnType.SpecialType = SpecialType.System_Void) OrElse
-                (returnType.SpecialType = SpecialType.System_Object) OrElse
-                (returnType.Name = "Exception"))
-
-            _typeParameters = ImmutableArray(Of TypeParameterSymbol).Empty
-            _returnType = returnType
-            _parameters = getParameters(Me)
-        End Sub
-
-        Private Sub New(
-            container As EENamedTypeSymbol,
-            syntax As VisualBasicSyntaxNode,
-            name As String)
-
-            MyBase.New(container)
-            _syntax = syntax
-            _name = name
-            _locations = ImmutableArray.Create(syntax.GetLocation())
         End Sub
 
         Public Overrides ReadOnly Property Arity As Integer
@@ -124,7 +94,7 @@ Namespace Microsoft.CodeAnalysis.VisualBasic.ExpressionEvaluator
 
         Public Overrides ReadOnly Property IsSub As Boolean
             Get
-                Return _returnType.SpecialType = SpecialType.System_Void
+                Return False
             End Get
         End Property
 
@@ -137,12 +107,6 @@ Namespace Microsoft.CodeAnalysis.VisualBasic.ExpressionEvaluator
         Public Overrides ReadOnly Property ReturnType As TypeSymbol
             Get
                 Return _returnType
-            End Get
-        End Property
-
-        Private ReadOnly Property ReturnValueIsByRef As Boolean Implements Cci.ISignature.ReturnValueIsByRef
-            Get
-                Return _returnValueIsByRef
             End Get
         End Property
 
@@ -166,7 +130,7 @@ Namespace Microsoft.CodeAnalysis.VisualBasic.ExpressionEvaluator
 
         Public Overrides ReadOnly Property Locations As ImmutableArray(Of Location)
             Get
-                Return _locations
+                Return ImmutableArray(Of Location).Empty
             End Get
         End Property
 
@@ -175,15 +139,6 @@ Namespace Microsoft.CodeAnalysis.VisualBasic.ExpressionEvaluator
                 Return True
             End Get
         End Property
-
-        Friend Overrides Function GetBoundMethodBody(diagnostics As DiagnosticBag, <Out> ByRef Optional methodBodyBinder As Binder = Nothing) As BoundBlock
-            ' The method body is "throw null;" although the body
-            ' is arbitrary since the method will not be invoked.
-            Dim exceptionType = DeclaringCompilation.GetWellKnownType(WellKnownType.System_Exception)
-            Dim value = New BoundLiteral(_syntax, ConstantValue.Nothing, exceptionType)
-            Dim statement As BoundStatement = New BoundThrowStatement(_syntax, value)
-            Return New BoundBlock(_syntax, Nothing, ImmutableArray(Of LocalSymbol).Empty, ImmutableArray.Create(statement)).MakeCompilerGenerated()
-        End Function
 
         Friend Overrides ReadOnly Property GenerateDebugInfoImpl As Boolean
             Get
@@ -194,6 +149,36 @@ Namespace Microsoft.CodeAnalysis.VisualBasic.ExpressionEvaluator
         Friend Overrides Function CalculateLocalSyntaxOffset(localPosition As Integer, localTree As SyntaxTree) As Integer
             Throw ExceptionUtilities.Unreachable
         End Function
+
+#If DEBUG Then
+        Protected Overrides Function CreateCciAdapter() As MethodSymbolAdapter
+            Return New PlaceholderMethodSymbolAdapter(Me)
+        End Function
+#End If
+    End Class
+
+#If DEBUG Then
+    Friend NotInheritable Class PlaceholderMethodSymbolAdapter
+        Inherits MethodSymbolAdapter
+
+        Friend Sub New(underlying As PlaceholderMethodSymbol)
+            MyBase.New(underlying)
+        End Sub
+    End Class
+#End If
+
+#If DEBUG Then
+    Partial Friend Class PlaceholderMethodSymbolAdapter
+#Else
+    Partial Friend Class PlaceholderMethodSymbol
+#End If
+        Implements Cci.ISignature
+
+        Private ReadOnly Property ReturnValueIsByRef As Boolean Implements Cci.ISignature.ReturnValueIsByRef
+            Get
+                Return True
+            End Get
+        End Property
     End Class
 
 End Namespace

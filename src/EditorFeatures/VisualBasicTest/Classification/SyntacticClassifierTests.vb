@@ -1,640 +1,687 @@
-' Copyright (c) Microsoft.  All Rights Reserved.  Licensed under the Apache License, Version 2.0.  See License.txt in the project root for license information.
+﻿' Licensed to the .NET Foundation under one or more agreements.
+' The .NET Foundation licenses this file to you under the MIT license.
+' See the LICENSE file in the project root for more information.
 
-Imports System.Threading
+Imports System.Collections.Immutable
 Imports Microsoft.CodeAnalysis.Classification
-Imports Microsoft.CodeAnalysis.Editor.UnitTests.Workspaces
+Imports Microsoft.CodeAnalysis.Editor.UnitTests.Classification.FormattedClassifications
+Imports Microsoft.CodeAnalysis.Remote.Testing
 Imports Microsoft.CodeAnalysis.Text
 
 Namespace Microsoft.CodeAnalysis.Editor.VisualBasic.UnitTests.Classification
+    <Trait(Traits.Feature, Traits.Features.Classification)>
     Public Class SyntacticClassifierTests
         Inherits AbstractVisualBasicClassifierTests
 
-        Friend Overrides Function GetClassificationSpans(code As String, textSpan As TextSpan) As IEnumerable(Of ClassifiedSpan)
-            Using Workspace = VisualBasicWorkspaceFactory.CreateWorkspaceFromFile(code)
-                Dim document = Workspace.CurrentSolution.Projects.First().Documents.First()
-                Dim tree = document.GetSyntaxTreeAsync().Result
-
-                Dim service = document.GetLanguageService(Of IClassificationService)()
-                Dim result = New List(Of ClassifiedSpan)
-                service.AddSyntacticClassifications(tree, textSpan, result, CancellationToken.None)
-
-                Return result
+        Protected Overrides Async Function GetClassificationSpansAsync(code As String, span As TextSpan, parseOptions As ParseOptions, testHost As TestHost) As Task(Of ImmutableArray(Of ClassifiedSpan))
+            Using workspace = CreateWorkspace(code, testHost)
+                Dim document = workspace.CurrentSolution.Projects.First().Documents.First()
+                Return Await GetSyntacticClassificationsAsync(document, span)
             End Using
         End Function
 
-        <Fact, Trait(Traits.Feature, Traits.Features.Classification)>
-        Public Sub XmlStartElementName1()
-            TestInExpression("<foo></foo>",
-                             VBXmlDelimiter("<"),
-                             VBXmlName("foo"),
-                             VBXmlDelimiter(">"),
-                             VBXmlDelimiter("</"),
-                             VBXmlName("foo"),
-                             VBXmlDelimiter(">"))
-        End Sub
-
-        <Fact, Trait(Traits.Feature, Traits.Features.Classification)>
-        Public Sub XmlStartElementName2()
-            TestInExpression("<foo",
-                             VBXmlDelimiter("<"),
-                             VBXmlName("foo"))
-        End Sub
-
-        <Fact, Trait(Traits.Feature, Traits.Features.Classification)>
-        Public Sub XmlStartElementName3()
-            TestInExpression("<foo>",
-                             VBXmlDelimiter("<"),
-                             VBXmlName("foo"),
-                             VBXmlDelimiter(">"))
-        End Sub
-
-        <Fact, Trait(Traits.Feature, Traits.Features.Classification)>
-        Public Sub XmlStartElementName4()
-            TestInExpression("<foo.",
-                             VBXmlDelimiter("<"),
-                             VBXmlName("foo."))
-        End Sub
-
-        <Fact, Trait(Traits.Feature, Traits.Features.Classification)>
-        Public Sub XmlStartElementName5()
-            TestInExpression("<foo.b",
-                             VBXmlDelimiter("<"),
-                             VBXmlName("foo.b"))
-        End Sub
-
-        <Fact, Trait(Traits.Feature, Traits.Features.Classification)>
-        Public Sub XmlStartElementName6()
-            TestInExpression("<foo.b>",
-                             VBXmlDelimiter("<"),
-                             VBXmlName("foo.b"),
-                             VBXmlDelimiter(">"))
-        End Sub
-
-        <Fact, Trait(Traits.Feature, Traits.Features.Classification)>
-        Public Sub XmlStartElementName7()
-            TestInExpression("<foo:",
-                             VBXmlDelimiter("<"),
-                             VBXmlName("foo"),
-                             VBXmlName(":"))
-        End Sub
-
-        <Fact, Trait(Traits.Feature, Traits.Features.Classification)>
-        Public Sub XmlStartElementName8()
-            TestInExpression("<foo:b",
-                             VBXmlDelimiter("<"),
-                             VBXmlName("foo"),
-                             VBXmlName(":"),
-                             VBXmlName("b"))
-        End Sub
-
-        <Fact, Trait(Traits.Feature, Traits.Features.Classification)>
-        Public Sub XmlStartElementName9()
-            TestInExpression("<foo:b>",
-                             VBXmlDelimiter("<"),
-                             VBXmlName("foo"),
-                             VBXmlName(":"),
-                             VBXmlName("b"),
-                             VBXmlDelimiter(">"))
-        End Sub
-
-        <Fact, Trait(Traits.Feature, Traits.Features.Classification)>
-        Public Sub XmlEmptyElementName1()
-            TestInExpression("<foo/>",
-                             VBXmlDelimiter("<"),
-                             VBXmlName("foo"),
-                             VBXmlDelimiter("/>"))
-        End Sub
-
-        <Fact, Trait(Traits.Feature, Traits.Features.Classification)>
-        Public Sub XmlEmptyElementName2()
-            TestInExpression("<foo. />",
-                             VBXmlDelimiter("<"),
-                             VBXmlName("foo."),
-                             VBXmlDelimiter("/>"))
-        End Sub
-
-        <Fact, Trait(Traits.Feature, Traits.Features.Classification)>
-        Public Sub XmlEmptyElementName3()
-            TestInExpression("<foo.bar />",
-                             VBXmlDelimiter("<"),
-                             VBXmlName("foo.bar"),
-                             VBXmlDelimiter("/>"))
-        End Sub
-
-        <Fact, Trait(Traits.Feature, Traits.Features.Classification)>
-        Public Sub XmlEmptyElementName4()
-            TestInExpression("<foo: />",
-                             VBXmlDelimiter("<"),
-                             VBXmlName("foo"),
-                             VBXmlName(":"),
-                             VBXmlDelimiter("/>"))
-        End Sub
-
-        <Fact, Trait(Traits.Feature, Traits.Features.Classification)>
-        Public Sub XmlEmptyElementName5()
-            TestInExpression("<foo:bar />",
-                             VBXmlDelimiter("<"),
-                             VBXmlName("foo"),
-                             VBXmlName(":"),
-                             VBXmlName("bar"),
-                             VBXmlDelimiter("/>"))
-        End Sub
-
-        <Fact, Trait(Traits.Feature, Traits.Features.Classification)>
-        Public Sub XmlAttributeName1()
-            TestInExpression("<foo b",
-                             VBXmlDelimiter("<"),
-                             VBXmlName("foo"),
-                             VBXmlAttributeName("b"))
-        End Sub
-
-        <Fact, Trait(Traits.Feature, Traits.Features.Classification)>
-        Public Sub XmlAttributeName2()
-            TestInExpression("<foo ba",
-                             VBXmlDelimiter("<"),
-                             VBXmlName("foo"),
-                             VBXmlAttributeName("ba"))
-        End Sub
-
-        <Fact, Trait(Traits.Feature, Traits.Features.Classification)>
-        Public Sub XmlAttributeName3()
-            TestInExpression("<foo bar=",
-                             VBXmlDelimiter("<"),
-                             VBXmlName("foo"),
-                             VBXmlAttributeName("bar"),
-                             VBXmlDelimiter("="))
-        End Sub
-
-        <Fact, Trait(Traits.Feature, Traits.Features.Classification)>
-        Public Sub XmlAttributeValue1()
-            TestInExpression("<foo bar=""",
-                             VBXmlDelimiter("<"),
-                             VBXmlName("foo"),
-                             VBXmlAttributeName("bar"),
-                             VBXmlDelimiter("="),
-                             VBXmlAttributeQuotes(""""))
-        End Sub
-
-        <Fact, Trait(Traits.Feature, Traits.Features.Classification)>
-        Public Sub XmlAttributeValue2()
-            TestInExpression("<foo bar=""b",
-                             VBXmlDelimiter("<"),
-                             VBXmlName("foo"),
-                             VBXmlAttributeName("bar"),
-                             VBXmlDelimiter("="),
-                             VBXmlAttributeQuotes(""""),
-                             VBXmlAttributeValue("b" & vbCrLf))
-        End Sub
-
-        <Fact, Trait(Traits.Feature, Traits.Features.Classification)>
-        Public Sub XmlAttributeValue3()
-            TestInExpression("<foo bar=""ba",
-                             VBXmlDelimiter("<"),
-                             VBXmlName("foo"),
-                             VBXmlAttributeName("bar"),
-                             VBXmlDelimiter("="),
-                             VBXmlAttributeQuotes(""""),
-                             VBXmlAttributeValue("ba" & vbCrLf))
-        End Sub
-
-        <Fact, Trait(Traits.Feature, Traits.Features.Classification)>
-        Public Sub XmlAttributeValue4()
-            TestInExpression("<foo bar=""ba""",
-                             VBXmlDelimiter("<"),
-                             VBXmlName("foo"),
-                             VBXmlAttributeName("bar"),
-                             VBXmlDelimiter("="),
-                             VBXmlAttributeQuotes(""""),
-                             VBXmlAttributeValue("ba"),
-                             VBXmlAttributeQuotes(""""))
-        End Sub
-
-        <Fact, Trait(Traits.Feature, Traits.Features.Classification)>
-        Public Sub XmlAttributeValue5()
-            TestInExpression("<foo bar=""""",
-                             VBXmlDelimiter("<"),
-                             VBXmlName("foo"),
-                             VBXmlAttributeName("bar"),
-                             VBXmlDelimiter("="),
-                             VBXmlAttributeQuotes(""""),
-                             VBXmlAttributeQuotes(""""))
-        End Sub
-
-        <Fact, Trait(Traits.Feature, Traits.Features.Classification)>
-        Public Sub XmlAttributeValue6()
-            TestInExpression("<foo bar=""b""",
-                             VBXmlDelimiter("<"),
-                             VBXmlName("foo"),
-                             VBXmlAttributeName("bar"),
-                             VBXmlDelimiter("="),
-                             VBXmlAttributeQuotes(""""),
-                             VBXmlAttributeValue("b"),
-                             VBXmlAttributeQuotes(""""))
-        End Sub
-
-        <Fact, Trait(Traits.Feature, Traits.Features.Classification)>
-        Public Sub XmlAttributeValue7()
-            TestInExpression("<foo bar=""ba""",
-                             VBXmlDelimiter("<"),
-                             VBXmlName("foo"),
-                             VBXmlAttributeName("bar"),
-                             VBXmlDelimiter("="),
-                             VBXmlAttributeQuotes(""""),
-                             VBXmlAttributeValue("ba"),
-                             VBXmlAttributeQuotes(""""))
-        End Sub
-
-        <Fact, Trait(Traits.Feature, Traits.Features.Classification)>
-        Public Sub XmlAttributeValueMultiple1()
-            TestInExpression("<foo bar=""ba"" baz="""" ",
-                             VBXmlDelimiter("<"),
-                             VBXmlName("foo"),
-                             VBXmlAttributeName("bar"),
-                             VBXmlDelimiter("="),
-                             VBXmlAttributeQuotes(""""),
-                             VBXmlAttributeValue("ba"),
-                             VBXmlAttributeQuotes(""""),
-                             VBXmlAttributeName("baz"),
-                             VBXmlDelimiter("="),
-                             VBXmlAttributeQuotes(""""),
-                             VBXmlAttributeQuotes(""""))
-        End Sub
-
-        <Fact, Trait(Traits.Feature, Traits.Features.Classification)>
-        Public Sub XmlAttributeValueMultiple2()
-            TestInExpression("<foo bar=""ba"" baz=""a"" ",
-                             VBXmlDelimiter("<"),
-                             VBXmlName("foo"),
-                             VBXmlAttributeName("bar"),
-                             VBXmlDelimiter("="),
-                             VBXmlAttributeQuotes(""""),
-                             VBXmlAttributeValue("ba"),
-                             VBXmlAttributeQuotes(""""),
-                             VBXmlAttributeName("baz"),
-                             VBXmlDelimiter("="),
-                             VBXmlAttributeQuotes(""""),
-                             VBXmlAttributeValue("a"),
-                             VBXmlAttributeQuotes(""""))
-        End Sub
-
-        <Fact, Trait(Traits.Feature, Traits.Features.Classification)>
-        Public Sub XmlElementContent1()
-            TestInExpression("<f>&l</f>",
-                             VBXmlDelimiter("<"),
-                             VBXmlName("f"),
-                             VBXmlDelimiter(">"),
-                             VBXmlEntityReference("&"),
-                             VBXmlText("l"),
-                             VBXmlDelimiter("</"),
-                             VBXmlName("f"),
-                             VBXmlDelimiter(">"))
-        End Sub
-
-        <Fact, Trait(Traits.Feature, Traits.Features.Classification)>
-        Public Sub XmlElementContent2()
-            TestInExpression("<f>foo</f>",
-                             VBXmlDelimiter("<"),
-                             VBXmlName("f"),
-                             VBXmlDelimiter(">"),
-                             VBXmlText("foo"),
-                             VBXmlDelimiter("</"),
-                             VBXmlName("f"),
-                             VBXmlDelimiter(">"))
-        End Sub
-
-        <Fact, Trait(Traits.Feature, Traits.Features.Classification)>
-        Public Sub XmlElementContent3()
-            TestInExpression("<f>&#x03C0;</f>",
-                             VBXmlDelimiter("<"),
-                             VBXmlName("f"),
-                             VBXmlDelimiter(">"),
-                             VBXmlEntityReference("&#x03C0;"),
-                             VBXmlDelimiter("</"),
-                             VBXmlName("f"),
-                             VBXmlDelimiter(">"))
-        End Sub
-
-        <Fact, Trait(Traits.Feature, Traits.Features.Classification)>
-        Public Sub XmlElementContent4()
-            TestInExpression("<f>foo &#x03C0;</f>",
-                             VBXmlDelimiter("<"),
-                             VBXmlName("f"),
-                             VBXmlDelimiter(">"),
-                             VBXmlText("foo "),
-                             VBXmlEntityReference("&#x03C0;"),
-                             VBXmlDelimiter("</"),
-                             VBXmlName("f"),
-                             VBXmlDelimiter(">"))
-        End Sub
-
-        <Fact, Trait(Traits.Feature, Traits.Features.Classification)>
-        Public Sub XmlElementContent5()
-            TestInExpression("<f>foo &lt;</f>",
-                             VBXmlDelimiter("<"),
-                             VBXmlName("f"),
-                             VBXmlDelimiter(">"),
-                             VBXmlText("foo "),
-                             VBXmlEntityReference("&lt;"),
-                             VBXmlDelimiter("</"),
-                             VBXmlName("f"),
-                             VBXmlDelimiter(">"))
-        End Sub
-
-        <Fact, Trait(Traits.Feature, Traits.Features.Classification)>
-        Public Sub XmlElementContent6()
-            TestInExpression("<f>foo &lt; bar</f>",
-                             VBXmlDelimiter("<"),
-                             VBXmlName("f"),
-                             VBXmlDelimiter(">"),
-                             VBXmlText("foo "),
-                             VBXmlEntityReference("&lt;"),
-                             VBXmlText(" bar"),
-                             VBXmlDelimiter("</"),
-                             VBXmlName("f"),
-                             VBXmlDelimiter(">"))
-        End Sub
-
-        <Fact, Trait(Traits.Feature, Traits.Features.Classification)>
-        Public Sub XmlElementContent7()
-            TestInExpression("<f>foo &lt;",
-                             VBXmlDelimiter("<"),
-                             VBXmlName("f"),
-                             VBXmlDelimiter(">"),
-                             VBXmlText("foo "),
-                             VBXmlEntityReference("&lt;"))
-        End Sub
-
-        <Fact, Trait(Traits.Feature, Traits.Features.Classification)>
-        Public Sub XmlCData1()
-            TestInExpression("<f><![CDATA[bar]]></f>",
-                             VBXmlDelimiter("<"),
-                             VBXmlName("f"),
-                             VBXmlDelimiter(">"),
-                             VBXmlDelimiter("<![CDATA["),
-                             VBXmlCDataSection("bar"),
-                             VBXmlDelimiter("]]>"),
-                             VBXmlDelimiter("</"),
-                             VBXmlName("f"),
-                             VBXmlDelimiter(">"))
-
-        End Sub
-
-        <Fact, Trait(Traits.Feature, Traits.Features.Classification)>
-        Public Sub XmlCData4()
-            TestInExpression("<f><![CDATA[bar]]>",
-                             VBXmlDelimiter("<"),
-                             VBXmlName("f"),
-                             VBXmlDelimiter(">"),
-                             VBXmlDelimiter("<![CDATA["),
-                             VBXmlCDataSection("bar"),
-                             VBXmlDelimiter("]]>"))
-        End Sub
-
-        <Fact, Trait(Traits.Feature, Traits.Features.Classification)>
-        Public Sub XmlCData5()
-            TestInExpression("<f><![CDATA[<>/]]>",
-                             VBXmlDelimiter("<"),
-                             VBXmlName("f"),
-                             VBXmlDelimiter(">"),
-                             VBXmlDelimiter("<![CDATA["),
-                             VBXmlCDataSection("<>/"),
-                             VBXmlDelimiter("]]>"))
-        End Sub
-
-        <Fact, Trait(Traits.Feature, Traits.Features.Classification)>
-        Public Sub XmlCData6()
-            Dim expr = StringFromLines(
-                "<f><![CDATA[foo",
-                "baz]]></f>")
-            TestInExpression(expr,
-                             VBXmlDelimiter("<"),
-                             VBXmlName("f"),
-                             VBXmlDelimiter(">"),
-                             VBXmlDelimiter("<![CDATA["),
-                             VBXmlCDataSection("foo" & vbCrLf),
-                             VBXmlCDataSection("baz"),
-                             VBXmlDelimiter("]]>"),
-                             VBXmlDelimiter("</"),
-                             VBXmlName("f"),
-                             VBXmlDelimiter(">"))
-        End Sub
-
-        <Fact, Trait(Traits.Feature, Traits.Features.Classification)>
-        Public Sub XmlEmbeddedExpressionAtElementName1()
-            TestInExpression("<<%= ",
-                             VBXmlDelimiter("<"),
-                             VBXmlEmbeddedExpression("<%="))
-        End Sub
-
-        <Fact, Trait(Traits.Feature, Traits.Features.Classification)>
-        Public Sub XmlEmbeddedExpressionAtElementName2()
-            TestInExpression("<<%= %>",
-                             VBXmlDelimiter("<"),
-                             VBXmlEmbeddedExpression("<%="),
-                             VBXmlEmbeddedExpression("%>"))
-        End Sub
-
-        <Fact, Trait(Traits.Feature, Traits.Features.Classification)>
-        Public Sub XmlEmbeddedExpressionAtElementName3()
-            TestInExpression("<<%= bar %>",
-                             VBXmlDelimiter("<"),
-                             VBXmlEmbeddedExpression("<%="),
-                             Identifier("bar"),
-                             VBXmlEmbeddedExpression("%>"))
-        End Sub
-
-        <Fact, Trait(Traits.Feature, Traits.Features.Classification)>
-        Public Sub XmlEmbeddedExpressionAtElementName4()
-            TestInExpression("<<%= bar.Baz() %>",
-                             VBXmlDelimiter("<"),
-                             VBXmlEmbeddedExpression("<%="),
-                             Identifier("bar"),
-                             Operators.Dot,
-                             Identifier("Baz"),
-                             Punctuation.OpenParen,
-                             Punctuation.CloseParen,
-                             VBXmlEmbeddedExpression("%>"))
-        End Sub
-
-        <Fact, Trait(Traits.Feature, Traits.Features.Classification)>
-        Public Sub XmlEmbeddedExpressionAtElementName5()
-            TestInExpression("<<%= bar.Baz() %> />",
-                             VBXmlDelimiter("<"),
-                             VBXmlEmbeddedExpression("<%="),
-                             Identifier("bar"),
-                             Operators.Dot,
-                             Identifier("Baz"),
-                             Punctuation.OpenParen,
-                             Punctuation.CloseParen,
-                             VBXmlEmbeddedExpression("%>"),
-                             VBXmlDelimiter("/>"))
-        End Sub
-
-        <Fact, Trait(Traits.Feature, Traits.Features.Classification)>
-        Public Sub XmlEmbeddedExpressionAtElementName6()
-            TestInExpression("<<%= bar %> />",
-                             VBXmlDelimiter("<"),
-                             VBXmlEmbeddedExpression("<%="),
-                             Identifier("bar"),
-                             VBXmlEmbeddedExpression("%>"),
-                             VBXmlDelimiter("/>"))
-        End Sub
-
-        <Fact, Trait(Traits.Feature, Traits.Features.Classification)>
-        Public Sub XmlEmbeddedExpressionAsAttribute1()
-            TestInExpression("<foo <%= bar %>>",
-                             VBXmlDelimiter("<"),
-                             VBXmlName("foo"),
-                             VBXmlEmbeddedExpression("<%="),
-                             Identifier("bar"),
-                             VBXmlEmbeddedExpression("%>"),
-                             VBXmlDelimiter(">"))
-        End Sub
-
-        <Fact, Trait(Traits.Feature, Traits.Features.Classification)>
-        Public Sub XmlEmbeddedExpressionAsAttribute2()
-            TestInExpression("<foo <%= bar %>",
-                             VBXmlDelimiter("<"),
-                             VBXmlName("foo"),
-                             VBXmlEmbeddedExpression("<%="),
-                             Identifier("bar"),
-                             VBXmlEmbeddedExpression("%>"))
-        End Sub
-
-        <Fact, Trait(Traits.Feature, Traits.Features.Classification)>
-        Public Sub XmlEmbeddedExpressionAsAttribute3()
-            TestInExpression("<foo <%= bar %>></foo>",
-                             VBXmlDelimiter("<"),
-                             VBXmlName("foo"),
-                             VBXmlEmbeddedExpression("<%="),
-                             Identifier("bar"),
-                             VBXmlEmbeddedExpression("%>"),
-                             VBXmlDelimiter(">"),
-                             VBXmlDelimiter("</"),
-                             VBXmlName("foo"),
-                             VBXmlDelimiter(">"))
-        End Sub
-
-        <Fact, Trait(Traits.Feature, Traits.Features.Classification)>
-        Public Sub XmlEmbeddedExpressionAsAttribute4()
-            TestInExpression("<foo <%= bar %> />",
-                             VBXmlDelimiter("<"),
-                             VBXmlName("foo"),
-                             VBXmlEmbeddedExpression("<%="),
-                             Identifier("bar"),
-                             VBXmlEmbeddedExpression("%>"),
-                             VBXmlDelimiter("/>"))
-        End Sub
-
-        <Fact, Trait(Traits.Feature, Traits.Features.Classification)>
-        Public Sub XmlEmbeddedExpressionAsAttributeValue1()
-            Dim exprText = "<foo bar=<%=baz >"
-            TestInExpression(exprText,
-                             VBXmlDelimiter("<"),
-                             VBXmlName("foo"),
-                             VBXmlAttributeName("bar"),
-                             VBXmlDelimiter("="),
-                             VBXmlEmbeddedExpression("<%="),
-                             Identifier("baz"),
-                             Operators.GreaterThan)
-        End Sub
-
-        <Fact, Trait(Traits.Feature, Traits.Features.Classification)>
-        Public Sub XmlEmbeddedExpressionAsAttributeValue2()
-            Dim exprText = "<foo bar=<%=baz %> >"
-            TestInExpression(exprText,
-                             VBXmlDelimiter("<"),
-                             VBXmlName("foo"),
-                             VBXmlAttributeName("bar"),
-                             VBXmlDelimiter("="),
-                             VBXmlEmbeddedExpression("<%="),
-                             Identifier("baz"),
-                             VBXmlEmbeddedExpression("%>"),
-                             VBXmlDelimiter(">"))
-        End Sub
-
-        <Fact, Trait(Traits.Feature, Traits.Features.Classification)>
-        Public Sub XmlEmbeddedExpressionAsAttributeValue3()
-            Dim exprText = "<foo bar=<%=baz.Foo %> >"
-            TestInExpression(exprText,
-                             VBXmlDelimiter("<"),
-                             VBXmlName("foo"),
-                             VBXmlAttributeName("bar"),
-                             VBXmlDelimiter("="),
-                             VBXmlEmbeddedExpression("<%="),
-                             Identifier("baz"),
-                             Operators.Dot,
-                             Identifier("Foo"),
-                             VBXmlEmbeddedExpression("%>"),
-                             VBXmlDelimiter(">"))
-        End Sub
-
-        <Fact, Trait(Traits.Feature, Traits.Features.Classification)>
-        Public Sub XmlEmbeddedExpressionAsElementContent1()
-            Dim exprText = "<f><%= bar %></f>"
-            TestInExpression(exprText,
-                             VBXmlDelimiter("<"),
-                             VBXmlName("f"),
-                             VBXmlDelimiter(">"),
-                             VBXmlEmbeddedExpression("<%="),
-                             Identifier("bar"),
-                             VBXmlEmbeddedExpression("%>"),
-                             VBXmlDelimiter("</"),
-                             VBXmlName("f"),
-                             VBXmlDelimiter(">"))
-        End Sub
-
-        <Fact, Trait(Traits.Feature, Traits.Features.Classification)>
-        Public Sub XmlEmbeddedExpressionAsElementContent2()
-            Dim exprText = "<f><%= bar.Foo %></f>"
-            TestInExpression(exprText,
-                             VBXmlDelimiter("<"),
-                             VBXmlName("f"),
-                             VBXmlDelimiter(">"),
-                             VBXmlEmbeddedExpression("<%="),
-                             Identifier("bar"),
-                             Operators.Dot,
-                             Identifier("Foo"),
-                             VBXmlEmbeddedExpression("%>"),
-                             VBXmlDelimiter("</"),
-                             VBXmlName("f"),
-                             VBXmlDelimiter(">"))
-        End Sub
-
-        <Fact, Trait(Traits.Feature, Traits.Features.Classification)>
-        Public Sub XmlEmbeddedExpressionAsElementContent3()
-            Dim exprText = "<f><%= bar.Foo %> jaz</f>"
-            TestInExpression(exprText,
-                             VBXmlDelimiter("<"),
-                             VBXmlName("f"),
-                             VBXmlDelimiter(">"),
-                             VBXmlEmbeddedExpression("<%="),
-                             Identifier("bar"),
-                             Operators.Dot,
-                             Identifier("Foo"),
-                             VBXmlEmbeddedExpression("%>"),
-                             VBXmlText(" jaz"),
-                             VBXmlDelimiter("</"),
-                             VBXmlName("f"),
-                             VBXmlDelimiter(">"))
-        End Sub
-
-        <Fact, Trait(Traits.Feature, Traits.Features.Classification)>
-        Public Sub XmlEmbeddedExpressionAsElementContentNested()
-            Dim text = StringFromLines(
-                "Dim doc = _",
-                "    <foo>",
-                "        <%= <bug141>",
-                "                <a>hello</a>",
-                "            </bug141> %>",
-                "    </foo>")
-            TestInMethod(text,
-                Keyword("Dim"),
-                Identifier("doc"),
-                Operators.Equals,
-                Punctuation.Text("_"),
+        <Theory, CombinatorialData>
+        Public Async Function TestXmlStartElementName1(testHost As TestHost) As Task
+            Await TestInExpressionAsync("<goo></goo>",
+                testHost,
                 VBXmlDelimiter("<"),
-                VBXmlName("foo"),
+                VBXmlName("goo"),
+                VBXmlDelimiter(">"),
+                VBXmlDelimiter("</"),
+                VBXmlName("goo"),
+                VBXmlDelimiter(">"))
+        End Function
+
+        <Theory, CombinatorialData>
+        Public Async Function TestXmlStartElementName2(testHost As TestHost) As Task
+            Await TestInExpressionAsync("<goo",
+                testHost,
+                VBXmlDelimiter("<"),
+                VBXmlName("goo"))
+        End Function
+
+        <Theory, CombinatorialData>
+        Public Async Function TestXmlStartElementName3(testHost As TestHost) As Task
+            Await TestInExpressionAsync("<goo>",
+                testHost,
+                VBXmlDelimiter("<"),
+                VBXmlName("goo"),
+                VBXmlDelimiter(">"))
+        End Function
+
+        <Theory, CombinatorialData>
+        Public Async Function TestXmlStartElementName4(testHost As TestHost) As Task
+            Await TestInExpressionAsync("<goo.",
+                testHost,
+                VBXmlDelimiter("<"),
+                VBXmlName("goo."))
+        End Function
+
+        <Theory, CombinatorialData>
+        Public Async Function TestXmlStartElementName5(testHost As TestHost) As Task
+            Await TestInExpressionAsync("<goo.b",
+                testHost,
+                VBXmlDelimiter("<"),
+                VBXmlName("goo.b"))
+        End Function
+
+        <Theory, CombinatorialData>
+        Public Async Function TestXmlStartElementName6(testHost As TestHost) As Task
+            Await TestInExpressionAsync("<goo.b>",
+                testHost,
+                VBXmlDelimiter("<"),
+                VBXmlName("goo.b"),
+                VBXmlDelimiter(">"))
+        End Function
+
+        <Theory, CombinatorialData>
+        Public Async Function TestXmlStartElementName7(testHost As TestHost) As Task
+            Await TestInExpressionAsync("<goo:",
+                testHost,
+                VBXmlDelimiter("<"),
+                VBXmlName("goo"),
+                VBXmlName(":"))
+        End Function
+
+        <Theory, CombinatorialData>
+        Public Async Function TestXmlStartElementName8(testHost As TestHost) As Task
+            Await TestInExpressionAsync("<goo:b",
+                testHost,
+                VBXmlDelimiter("<"),
+                VBXmlName("goo"),
+                VBXmlName(":"),
+                VBXmlName("b"))
+        End Function
+
+        <Theory, CombinatorialData>
+        Public Async Function TestXmlStartElementName9(testHost As TestHost) As Task
+            Await TestInExpressionAsync("<goo:b>",
+                testHost,
+                VBXmlDelimiter("<"),
+                VBXmlName("goo"),
+                VBXmlName(":"),
+                VBXmlName("b"),
+                VBXmlDelimiter(">"))
+        End Function
+
+        <Theory, CombinatorialData>
+        Public Async Function TestXmlEmptyElementName1(testHost As TestHost) As Task
+            Await TestInExpressionAsync("<goo/>",
+                testHost,
+                VBXmlDelimiter("<"),
+                VBXmlName("goo"),
+                VBXmlDelimiter("/>"))
+        End Function
+
+        <Theory, CombinatorialData>
+        Public Async Function TestXmlEmptyElementName2(testHost As TestHost) As Task
+            Await TestInExpressionAsync("<goo. />",
+                testHost,
+                VBXmlDelimiter("<"),
+                VBXmlName("goo."),
+                VBXmlDelimiter("/>"))
+        End Function
+
+        <Theory, CombinatorialData>
+        Public Async Function TestXmlEmptyElementName3(testHost As TestHost) As Task
+            Await TestInExpressionAsync("<goo.bar />",
+                testHost,
+                VBXmlDelimiter("<"),
+                VBXmlName("goo.bar"),
+                VBXmlDelimiter("/>"))
+        End Function
+
+        <Theory, CombinatorialData>
+        Public Async Function TestXmlEmptyElementName4(testHost As TestHost) As Task
+            Await TestInExpressionAsync("<goo: />",
+                testHost,
+                VBXmlDelimiter("<"),
+                VBXmlName("goo"),
+                VBXmlName(":"),
+                VBXmlDelimiter("/>"))
+        End Function
+
+        <Theory, CombinatorialData>
+        Public Async Function TestXmlEmptyElementName5(testHost As TestHost) As Task
+            Await TestInExpressionAsync("<goo:bar />",
+                testHost,
+                VBXmlDelimiter("<"),
+                VBXmlName("goo"),
+                VBXmlName(":"),
+                VBXmlName("bar"),
+                VBXmlDelimiter("/>"))
+        End Function
+
+        <Theory, CombinatorialData>
+        Public Async Function TestXmlAttributeName1(testHost As TestHost) As Task
+            Await TestInExpressionAsync("<goo b",
+                testHost,
+                VBXmlDelimiter("<"),
+                VBXmlName("goo"),
+                VBXmlAttributeName("b"))
+        End Function
+
+        <Theory, CombinatorialData>
+        Public Async Function TestXmlAttributeName2(testHost As TestHost) As Task
+            Await TestInExpressionAsync("<goo ba",
+                testHost,
+                VBXmlDelimiter("<"),
+                VBXmlName("goo"),
+                VBXmlAttributeName("ba"))
+        End Function
+
+        <Theory, CombinatorialData>
+        Public Async Function TestXmlAttributeName3(testHost As TestHost) As Task
+            Await TestInExpressionAsync("<goo bar=",
+                testHost,
+                VBXmlDelimiter("<"),
+                VBXmlName("goo"),
+                VBXmlAttributeName("bar"),
+                VBXmlDelimiter("="))
+        End Function
+
+        <Theory, CombinatorialData>
+        Public Async Function TestXmlAttributeValue1(testHost As TestHost) As Task
+            Await TestInExpressionAsync("<goo bar=""",
+                testHost,
+                VBXmlDelimiter("<"),
+                VBXmlName("goo"),
+                VBXmlAttributeName("bar"),
+                VBXmlDelimiter("="),
+                VBXmlAttributeQuotes(""""))
+        End Function
+
+        <Theory, CombinatorialData>
+        Public Async Function TestXmlAttributeValue2(testHost As TestHost) As Task
+            Await TestInExpressionAsync("<goo bar=""b",
+                testHost,
+                VBXmlDelimiter("<"),
+                VBXmlName("goo"),
+                VBXmlAttributeName("bar"),
+                VBXmlDelimiter("="),
+                VBXmlAttributeQuotes(""""),
+                VBXmlAttributeValue("b" & vbCrLf))
+        End Function
+
+        <Theory, CombinatorialData>
+        Public Async Function TestXmlAttributeValue3(testHost As TestHost) As Task
+            Await TestInExpressionAsync("<goo bar=""ba",
+                testHost,
+                VBXmlDelimiter("<"),
+                VBXmlName("goo"),
+                VBXmlAttributeName("bar"),
+                VBXmlDelimiter("="),
+                VBXmlAttributeQuotes(""""),
+                VBXmlAttributeValue("ba" & vbCrLf))
+        End Function
+
+        <Theory, CombinatorialData>
+        Public Async Function TestXmlAttributeValue4(testHost As TestHost) As Task
+            Await TestInExpressionAsync("<goo bar=""ba""",
+                testHost,
+                VBXmlDelimiter("<"),
+                VBXmlName("goo"),
+                VBXmlAttributeName("bar"),
+                VBXmlDelimiter("="),
+                VBXmlAttributeQuotes(""""),
+                VBXmlAttributeValue("ba"),
+                VBXmlAttributeQuotes(""""))
+        End Function
+
+        <Theory, CombinatorialData>
+        Public Async Function TestXmlAttributeValue5(testHost As TestHost) As Task
+            Await TestInExpressionAsync("<goo bar=""""",
+                testHost,
+                VBXmlDelimiter("<"),
+                VBXmlName("goo"),
+                VBXmlAttributeName("bar"),
+                VBXmlDelimiter("="),
+                VBXmlAttributeQuotes(""""),
+                VBXmlAttributeQuotes(""""))
+        End Function
+
+        <Theory, CombinatorialData>
+        Public Async Function TestXmlAttributeValue6(testHost As TestHost) As Task
+            Await TestInExpressionAsync("<goo bar=""b""",
+                testHost,
+                VBXmlDelimiter("<"),
+                VBXmlName("goo"),
+                VBXmlAttributeName("bar"),
+                VBXmlDelimiter("="),
+                VBXmlAttributeQuotes(""""),
+                VBXmlAttributeValue("b"),
+                VBXmlAttributeQuotes(""""))
+        End Function
+
+        <Theory, CombinatorialData>
+        Public Async Function TestXmlAttributeValue7(testHost As TestHost) As Task
+            Await TestInExpressionAsync("<goo bar=""ba""",
+                testHost,
+                VBXmlDelimiter("<"),
+                VBXmlName("goo"),
+                VBXmlAttributeName("bar"),
+                VBXmlDelimiter("="),
+                VBXmlAttributeQuotes(""""),
+                VBXmlAttributeValue("ba"),
+                VBXmlAttributeQuotes(""""))
+        End Function
+
+        <Theory, CombinatorialData>
+        Public Async Function TestXmlAttributeValueMultiple1(testHost As TestHost) As Task
+            Await TestInExpressionAsync("<goo bar=""ba"" baz="""" ",
+                testHost,
+                VBXmlDelimiter("<"),
+                VBXmlName("goo"),
+                VBXmlAttributeName("bar"),
+                VBXmlDelimiter("="),
+                VBXmlAttributeQuotes(""""),
+                VBXmlAttributeValue("ba"),
+                VBXmlAttributeQuotes(""""),
+                VBXmlAttributeName("baz"),
+                VBXmlDelimiter("="),
+                VBXmlAttributeQuotes(""""),
+                VBXmlAttributeQuotes(""""))
+        End Function
+
+        <Theory, CombinatorialData>
+        Public Async Function TestXmlAttributeValueMultiple2(testHost As TestHost) As Task
+            Await TestInExpressionAsync("<goo bar=""ba"" baz=""a"" ",
+                testHost,
+                VBXmlDelimiter("<"),
+                VBXmlName("goo"),
+                VBXmlAttributeName("bar"),
+                VBXmlDelimiter("="),
+                VBXmlAttributeQuotes(""""),
+                VBXmlAttributeValue("ba"),
+                VBXmlAttributeQuotes(""""),
+                VBXmlAttributeName("baz"),
+                VBXmlDelimiter("="),
+                VBXmlAttributeQuotes(""""),
+                VBXmlAttributeValue("a"),
+                VBXmlAttributeQuotes(""""))
+        End Function
+
+        <Theory, CombinatorialData>
+        Public Async Function TestXmlElementContent1(testHost As TestHost) As Task
+            Await TestInExpressionAsync("<f>&l</f>",
+                testHost,
+                VBXmlDelimiter("<"),
+                VBXmlName("f"),
+                VBXmlDelimiter(">"),
+                VBXmlEntityReference("&"),
+                VBXmlText("l"),
+                VBXmlDelimiter("</"),
+                VBXmlName("f"),
+                VBXmlDelimiter(">"))
+        End Function
+
+        <Theory, CombinatorialData>
+        Public Async Function TestXmlElementContent2(testHost As TestHost) As Task
+            Await TestInExpressionAsync("<f>goo</f>",
+                testHost,
+                VBXmlDelimiter("<"),
+                VBXmlName("f"),
+                VBXmlDelimiter(">"),
+                VBXmlText("goo"),
+                VBXmlDelimiter("</"),
+                VBXmlName("f"),
+                VBXmlDelimiter(">"))
+        End Function
+
+        <Theory, CombinatorialData>
+        Public Async Function TestXmlElementContent3(testHost As TestHost) As Task
+            Await TestInExpressionAsync("<f>&#x03C0;</f>",
+                testHost,
+                VBXmlDelimiter("<"),
+                VBXmlName("f"),
+                VBXmlDelimiter(">"),
+                VBXmlEntityReference("&#x03C0;"),
+                VBXmlDelimiter("</"),
+                VBXmlName("f"),
+                VBXmlDelimiter(">"))
+        End Function
+
+        <Theory, CombinatorialData>
+        Public Async Function TestXmlElementContent4(testHost As TestHost) As Task
+            Await TestInExpressionAsync("<f>goo &#x03C0;</f>",
+                testHost,
+                VBXmlDelimiter("<"),
+                VBXmlName("f"),
+                VBXmlDelimiter(">"),
+                VBXmlText("goo "),
+                VBXmlEntityReference("&#x03C0;"),
+                VBXmlDelimiter("</"),
+                VBXmlName("f"),
+                VBXmlDelimiter(">"))
+        End Function
+
+        <Theory, CombinatorialData>
+        Public Async Function TestXmlElementContent5(testHost As TestHost) As Task
+            Await TestInExpressionAsync("<f>goo &lt;</f>",
+                testHost,
+                VBXmlDelimiter("<"),
+                VBXmlName("f"),
+                VBXmlDelimiter(">"),
+                VBXmlText("goo "),
+                VBXmlEntityReference("&lt;"),
+                VBXmlDelimiter("</"),
+                VBXmlName("f"),
+                VBXmlDelimiter(">"))
+        End Function
+
+        <Theory, CombinatorialData>
+        Public Async Function TestXmlElementContent6(testHost As TestHost) As Task
+            Await TestInExpressionAsync("<f>goo &lt; bar</f>",
+                testHost,
+                VBXmlDelimiter("<"),
+                VBXmlName("f"),
+                VBXmlDelimiter(">"),
+                VBXmlText("goo "),
+                VBXmlEntityReference("&lt;"),
+                VBXmlText(" bar"),
+                VBXmlDelimiter("</"),
+                VBXmlName("f"),
+                VBXmlDelimiter(">"))
+        End Function
+
+        <Theory, CombinatorialData>
+        Public Async Function TestXmlElementContent7(testHost As TestHost) As Task
+            Await TestInExpressionAsync("<f>goo &lt;",
+                testHost,
+                VBXmlDelimiter("<"),
+                VBXmlName("f"),
+                VBXmlDelimiter(">"),
+                VBXmlText("goo "),
+                VBXmlEntityReference("&lt;"))
+        End Function
+
+        <Theory, CombinatorialData>
+        Public Async Function TestXmlCData1(testHost As TestHost) As Task
+            Await TestInExpressionAsync("<f><![CDATA[bar]]></f>",
+                testHost,
+                VBXmlDelimiter("<"),
+                VBXmlName("f"),
+                VBXmlDelimiter(">"),
+                VBXmlDelimiter("<![CDATA["),
+                VBXmlCDataSection("bar"),
+                VBXmlDelimiter("]]>"),
+                VBXmlDelimiter("</"),
+                VBXmlName("f"),
+                VBXmlDelimiter(">"))
+        End Function
+
+        <Theory, CombinatorialData>
+        Public Async Function TestXmlCData4(testHost As TestHost) As Task
+            Await TestInExpressionAsync("<f><![CDATA[bar]]>",
+                testHost,
+                VBXmlDelimiter("<"),
+                VBXmlName("f"),
+                VBXmlDelimiter(">"),
+                VBXmlDelimiter("<![CDATA["),
+                VBXmlCDataSection("bar"),
+                VBXmlDelimiter("]]>"))
+        End Function
+
+        <Theory, CombinatorialData>
+        Public Async Function TestXmlCData5(testHost As TestHost) As Task
+            Await TestInExpressionAsync("<f><![CDATA[<>/]]>",
+                testHost,
+                VBXmlDelimiter("<"),
+                VBXmlName("f"),
+                VBXmlDelimiter(">"),
+                VBXmlDelimiter("<![CDATA["),
+                VBXmlCDataSection("<>/"),
+                VBXmlDelimiter("]]>"))
+        End Function
+
+        <Theory, CombinatorialData>
+        Public Async Function TestXmlCData6(testHost As TestHost) As Task
+            Dim code =
+"<f><![CDATA[goo
+baz]]></f>"
+
+            Await TestInExpressionAsync(code,
+                testHost,
+                VBXmlDelimiter("<"),
+                VBXmlName("f"),
+                VBXmlDelimiter(">"),
+                VBXmlDelimiter("<![CDATA["),
+                VBXmlCDataSection("goo" & vbCrLf),
+                VBXmlCDataSection("baz"),
+                VBXmlDelimiter("]]>"),
+                VBXmlDelimiter("</"),
+                VBXmlName("f"),
+                VBXmlDelimiter(">"))
+        End Function
+
+        <Theory, CombinatorialData>
+        Public Async Function TestXmlEmbeddedExpressionAtElementName1(testHost As TestHost) As Task
+            Await TestInExpressionAsync("<<%= ",
+                testHost,
+                VBXmlDelimiter("<"),
+                VBXmlEmbeddedExpression("<%="))
+        End Function
+
+        <Theory, CombinatorialData>
+        Public Async Function TestXmlEmbeddedExpressionAtElementName2(testHost As TestHost) As Task
+            Await TestInExpressionAsync("<<%= %>",
+                testHost,
+                VBXmlDelimiter("<"),
+                VBXmlEmbeddedExpression("<%="),
+                VBXmlEmbeddedExpression("%>"))
+        End Function
+
+        <Theory, CombinatorialData>
+        Public Async Function TestXmlEmbeddedExpressionAtElementName3(testHost As TestHost) As Task
+            Await TestInExpressionAsync("<<%= bar %>",
+                testHost,
+                VBXmlDelimiter("<"),
+                VBXmlEmbeddedExpression("<%="),
+                Identifier("bar"),
+                VBXmlEmbeddedExpression("%>"))
+        End Function
+
+        <Theory, CombinatorialData>
+        Public Async Function TestXmlEmbeddedExpressionAtElementName4(testHost As TestHost) As Task
+            Await TestInExpressionAsync("<<%= bar.Baz() %>",
+                testHost,
+                VBXmlDelimiter("<"),
+                VBXmlEmbeddedExpression("<%="),
+                Identifier("bar"),
+                Operators.Dot,
+                Identifier("Baz"),
+                Punctuation.OpenParen,
+                Punctuation.CloseParen,
+                VBXmlEmbeddedExpression("%>"))
+        End Function
+
+        <Theory, CombinatorialData>
+        Public Async Function TestXmlEmbeddedExpressionAtElementName5(testHost As TestHost) As Task
+            Await TestInExpressionAsync("<<%= bar.Baz() %> />",
+                testHost,
+                VBXmlDelimiter("<"),
+                VBXmlEmbeddedExpression("<%="),
+                Identifier("bar"),
+                Operators.Dot,
+                Identifier("Baz"),
+                Punctuation.OpenParen,
+                Punctuation.CloseParen,
+                VBXmlEmbeddedExpression("%>"),
+                VBXmlDelimiter("/>"))
+        End Function
+
+        <Theory, CombinatorialData>
+        Public Async Function TestXmlEmbeddedExpressionAtElementName6(testHost As TestHost) As Task
+            Await TestInExpressionAsync("<<%= bar %> />",
+                testHost,
+                VBXmlDelimiter("<"),
+                VBXmlEmbeddedExpression("<%="),
+                Identifier("bar"),
+                VBXmlEmbeddedExpression("%>"),
+                VBXmlDelimiter("/>"))
+        End Function
+
+        <Theory, CombinatorialData>
+        Public Async Function TestXmlEmbeddedExpressionAsAttribute1(testHost As TestHost) As Task
+            Await TestInExpressionAsync("<goo <%= bar %>>",
+                testHost,
+                VBXmlDelimiter("<"),
+                VBXmlName("goo"),
+                VBXmlEmbeddedExpression("<%="),
+                Identifier("bar"),
+                VBXmlEmbeddedExpression("%>"),
+                VBXmlDelimiter(">"))
+        End Function
+
+        <Theory, CombinatorialData>
+        Public Async Function TestXmlEmbeddedExpressionAsAttribute2(testHost As TestHost) As Task
+            Await TestInExpressionAsync("<goo <%= bar %>",
+                testHost,
+                VBXmlDelimiter("<"),
+                VBXmlName("goo"),
+                VBXmlEmbeddedExpression("<%="),
+                Identifier("bar"),
+                VBXmlEmbeddedExpression("%>"))
+        End Function
+
+        <Theory, CombinatorialData>
+        Public Async Function TestXmlEmbeddedExpressionAsAttribute3(testHost As TestHost) As Task
+            Await TestInExpressionAsync("<goo <%= bar %>></goo>",
+                testHost,
+                VBXmlDelimiter("<"),
+                VBXmlName("goo"),
+                VBXmlEmbeddedExpression("<%="),
+                Identifier("bar"),
+                VBXmlEmbeddedExpression("%>"),
+                VBXmlDelimiter(">"),
+                VBXmlDelimiter("</"),
+                VBXmlName("goo"),
+                VBXmlDelimiter(">"))
+        End Function
+
+        <Theory, CombinatorialData>
+        Public Async Function TestXmlEmbeddedExpressionAsAttribute4(testHost As TestHost) As Task
+            Await TestInExpressionAsync("<goo <%= bar %> />",
+                testHost,
+                VBXmlDelimiter("<"),
+                VBXmlName("goo"),
+                VBXmlEmbeddedExpression("<%="),
+                Identifier("bar"),
+                VBXmlEmbeddedExpression("%>"),
+                VBXmlDelimiter("/>"))
+        End Function
+
+        <Theory, CombinatorialData>
+        Public Async Function TestXmlEmbeddedExpressionAsAttributeValue1(testHost As TestHost) As Task
+            Await TestInExpressionAsync("<goo bar=<%=baz >",
+                testHost,
+                VBXmlDelimiter("<"),
+                VBXmlName("goo"),
+                VBXmlAttributeName("bar"),
+                VBXmlDelimiter("="),
+                VBXmlEmbeddedExpression("<%="),
+                Identifier("baz"),
+                Operators.GreaterThan)
+        End Function
+
+        <Theory, CombinatorialData>
+        Public Async Function TestXmlEmbeddedExpressionAsAttributeValue2(testHost As TestHost) As Task
+            Await TestInExpressionAsync("<goo bar=<%=baz %> >",
+                testHost,
+                VBXmlDelimiter("<"),
+                VBXmlName("goo"),
+                VBXmlAttributeName("bar"),
+                VBXmlDelimiter("="),
+                VBXmlEmbeddedExpression("<%="),
+                Identifier("baz"),
+                VBXmlEmbeddedExpression("%>"),
+                VBXmlDelimiter(">"))
+        End Function
+
+        <Theory, CombinatorialData>
+        Public Async Function TestXmlEmbeddedExpressionAsAttributeValue3(testHost As TestHost) As Task
+            Await TestInExpressionAsync("<goo bar=<%=baz.Goo %> >",
+                testHost,
+                VBXmlDelimiter("<"),
+                VBXmlName("goo"),
+                VBXmlAttributeName("bar"),
+                VBXmlDelimiter("="),
+                VBXmlEmbeddedExpression("<%="),
+                Identifier("baz"),
+                Operators.Dot,
+                Identifier("Goo"),
+                VBXmlEmbeddedExpression("%>"),
+                VBXmlDelimiter(">"))
+        End Function
+
+        <Theory, CombinatorialData>
+        Public Async Function TestXmlEmbeddedExpressionAsElementContent1(testHost As TestHost) As Task
+            Await TestInExpressionAsync("<f><%= bar %></f>",
+                testHost,
+                VBXmlDelimiter("<"),
+                VBXmlName("f"),
+                VBXmlDelimiter(">"),
+                VBXmlEmbeddedExpression("<%="),
+                Identifier("bar"),
+                VBXmlEmbeddedExpression("%>"),
+                VBXmlDelimiter("</"),
+                VBXmlName("f"),
+                VBXmlDelimiter(">"))
+        End Function
+
+        <Theory, CombinatorialData>
+        Public Async Function TestXmlEmbeddedExpressionAsElementContent2(testHost As TestHost) As Task
+            Await TestInExpressionAsync("<f><%= bar.Goo %></f>",
+                testHost,
+                VBXmlDelimiter("<"),
+                VBXmlName("f"),
+                VBXmlDelimiter(">"),
+                VBXmlEmbeddedExpression("<%="),
+                Identifier("bar"),
+                Operators.Dot,
+                Identifier("Goo"),
+                VBXmlEmbeddedExpression("%>"),
+                VBXmlDelimiter("</"),
+                VBXmlName("f"),
+                VBXmlDelimiter(">"))
+        End Function
+
+        <Theory, CombinatorialData>
+        Public Async Function TestXmlEmbeddedExpressionAsElementContent3(testHost As TestHost) As Task
+            Await TestInExpressionAsync("<f><%= bar.Goo %> jaz</f>",
+                testHost,
+                VBXmlDelimiter("<"),
+                VBXmlName("f"),
+                VBXmlDelimiter(">"),
+                VBXmlEmbeddedExpression("<%="),
+                Identifier("bar"),
+                Operators.Dot,
+                Identifier("Goo"),
+                VBXmlEmbeddedExpression("%>"),
+                VBXmlText(" jaz"),
+                VBXmlDelimiter("</"),
+                VBXmlName("f"),
+                VBXmlDelimiter(">"))
+        End Function
+
+        <Theory, CombinatorialData>
+        Public Async Function TestXmlEmbeddedExpressionAsElementContentNested(testHost As TestHost) As Task
+            Dim code =
+"Dim doc = _
+    <goo>
+        <%= <bug141>
+                <a>hello</a>
+            </bug141> %>
+    </goo>"
+
+            Await TestInMethodAsync(code,
+                testHost,
+                Keyword("Dim"),
+                Local("doc"),
+                Operators.Equals,
+                LineContinuation,
+                VBXmlDelimiter("<"),
+                VBXmlName("goo"),
                 VBXmlDelimiter(">"),
                 VBXmlEmbeddedExpression("<%="),
                 VBXmlDelimiter("<"),
@@ -652,24 +699,66 @@ Namespace Microsoft.CodeAnalysis.Editor.VisualBasic.UnitTests.Classification
                 VBXmlDelimiter(">"),
                 VBXmlEmbeddedExpression("%>"),
                 VBXmlDelimiter("</"),
-                VBXmlName("foo"),
+                VBXmlName("goo"),
                 VBXmlDelimiter(">"))
-        End Sub
+        End Function
 
-        <Fact, Trait(Traits.Feature, Traits.Features.Classification)>
-        Public Sub XmlLiteralsInLambdas()
-            Dim text = StringFromLines(
-                "Dim x = Function() _",
-                "                    <element val=""something""/>",
-                "        Dim y = Function() <element val=""something""/>")
-            Test(text,
+        <Theory, CombinatorialData>
+        Public Async Function TestXmlEmbeddedExpressionAsElementContentNestedCommentsAfterLineContinuation(testHost As TestHost) As Task
+            Dim code =
+"Dim doc = _ ' Test
+    <goo>
+        <%= <bug141>
+                <a>hello</a>
+            </bug141> %>
+    </goo>"
+
+            Await TestInMethodAsync(code,
+                testHost,
                 Keyword("Dim"),
-                Identifier("x"),
+                Local("doc"),
+                Operators.Equals,
+                LineContinuation,
+                Comment("' Test"),
+                VBXmlDelimiter("<"),
+                VBXmlName("goo"),
+                VBXmlDelimiter(">"),
+                VBXmlEmbeddedExpression("<%="),
+                VBXmlDelimiter("<"),
+                VBXmlName("bug141"),
+                VBXmlDelimiter(">"),
+                VBXmlDelimiter("<"),
+                VBXmlName("a"),
+                VBXmlDelimiter(">"),
+                VBXmlText("hello"),
+                VBXmlDelimiter("</"),
+                VBXmlName("a"),
+                VBXmlDelimiter(">"),
+                VBXmlDelimiter("</"),
+                VBXmlName("bug141"),
+                VBXmlDelimiter(">"),
+                VBXmlEmbeddedExpression("%>"),
+                VBXmlDelimiter("</"),
+                VBXmlName("goo"),
+                VBXmlDelimiter(">"))
+        End Function
+
+        <Theory, CombinatorialData>
+        Public Async Function TestXmlLiteralsInLambdas(testHost As TestHost) As Task
+            Dim code =
+"Dim x = Function() _
+                    <element val=""something""/>
+Dim y = Function() <element val=""something""/>"
+
+            Await TestAsync(code,
+                testHost,
+                Keyword("Dim"),
+                Field("x"),
                 Operators.Equals,
                 Keyword("Function"),
                 Punctuation.OpenParen,
                 Punctuation.CloseParen,
-                Punctuation.Text("_"),
+                LineContinuation,
                 VBXmlDelimiter("<"),
                 VBXmlName("element"),
                 VBXmlAttributeName("val"),
@@ -679,7 +768,7 @@ Namespace Microsoft.CodeAnalysis.Editor.VisualBasic.UnitTests.Classification
                 VBXmlAttributeQuotes(""""),
                 VBXmlDelimiter("/>"),
                 Keyword("Dim"),
-                Identifier("y"),
+                Field("y"),
                 Operators.Equals,
                 Keyword("Function"),
                 Punctuation.OpenParen,
@@ -692,48 +781,91 @@ Namespace Microsoft.CodeAnalysis.Editor.VisualBasic.UnitTests.Classification
                 VBXmlAttributeValue("something"),
                 VBXmlAttributeQuotes(""""),
                 VBXmlDelimiter("/>"))
-        End Sub
+        End Function
 
-        <Fact, Trait(Traits.Feature, Traits.Features.Classification)>
-        Public Sub XmlDocumentPrologue()
-            Dim exprText = "<?xml version=""1.0"" encoding=""UTF-8"" standalone=""yes""?>"
-            TestInExpression(exprText,
-                             VBXmlDelimiter("<?"),
-                             VBXmlName("xml"),
-                             VBXmlAttributeName("version"),
-                             VBXmlDelimiter("="),
-                             VBXmlAttributeQuotes(""""),
-                             VBXmlAttributeValue("1.0"),
-                             VBXmlAttributeQuotes(""""),
-                             VBXmlAttributeName("encoding"),
-                             VBXmlDelimiter("="),
-                             VBXmlAttributeQuotes(""""),
-                             VBXmlAttributeValue("UTF-8"),
-                             VBXmlAttributeQuotes(""""),
-                             VBXmlAttributeName("standalone"),
-                             VBXmlDelimiter("="),
-                             VBXmlAttributeQuotes(""""),
-                             VBXmlAttributeValue("yes"),
-                             VBXmlAttributeQuotes(""""),
-                             VBXmlDelimiter("?>"))
-        End Sub
+        <Theory, CombinatorialData>
+        Public Async Function TestXmlLiteralsInLambdasCommentsAfterLineContinuation(testHost As TestHost) As Task
+            Dim code =
+"Dim x = Function() _ 'Test
+                    <element val=""something""/>
+Dim y = Function() <element val=""something""/>"
 
-        <Fact, Trait(Traits.Feature, Traits.Features.Classification)>
-        Public Sub XmlLiterals1()
-            Dim text = StringFromLines(
-                "Dim a = <Customer id1=""1"" id2=""2"" id3=<%= n2 %> id4="""">",
-                "                    <!-- This is a simple Xml element with all of the node types -->",
-                "                    <Name>Me</Name>",
-                "                    <NameUsingExpression><%= n1 %></NameUsingExpression>",
-                "                    <Street>10802 177th CT NE</Street>",
-                "                    <Misc><![CDATA[Let's add some CDATA",
-                " for fun. ]]>",
-                "                    </Misc>",
-                "                    <Empty><%= Nothing %></Empty>",
-                "                </Customer>")
-            TestInMethod(text,
+            Await TestAsync(code,
+                testHost,
                 Keyword("Dim"),
-                Identifier("a"),
+                Field("x"),
+                Operators.Equals,
+                Keyword("Function"),
+                Punctuation.OpenParen,
+                Punctuation.CloseParen,
+                LineContinuation,
+                Comment("'Test"),
+                VBXmlDelimiter("<"),
+                VBXmlName("element"),
+                VBXmlAttributeName("val"),
+                VBXmlDelimiter("="),
+                VBXmlAttributeQuotes(""""),
+                VBXmlAttributeValue("something"),
+                VBXmlAttributeQuotes(""""),
+                VBXmlDelimiter("/>"),
+                Keyword("Dim"),
+                Field("y"),
+                Operators.Equals,
+                Keyword("Function"),
+                Punctuation.OpenParen,
+                Punctuation.CloseParen,
+                VBXmlDelimiter("<"),
+                VBXmlName("element"),
+                VBXmlAttributeName("val"),
+                VBXmlDelimiter("="),
+                VBXmlAttributeQuotes(""""),
+                VBXmlAttributeValue("something"),
+                VBXmlAttributeQuotes(""""),
+                VBXmlDelimiter("/>"))
+        End Function
+
+        <Theory, CombinatorialData>
+        Public Async Function TestXmlDocumentPrologue(testHost As TestHost) As Task
+            Await TestInExpressionAsync("<?xml version=""1.0"" encoding=""UTF-8"" standalone=""yes""?>",
+                testHost,
+                VBXmlDelimiter("<?"),
+                VBXmlName("xml"),
+                VBXmlAttributeName("version"),
+                VBXmlDelimiter("="),
+                VBXmlAttributeQuotes(""""),
+                VBXmlAttributeValue("1.0"),
+                VBXmlAttributeQuotes(""""),
+                VBXmlAttributeName("encoding"),
+                VBXmlDelimiter("="),
+                VBXmlAttributeQuotes(""""),
+                VBXmlAttributeValue("UTF-8"),
+                VBXmlAttributeQuotes(""""),
+                VBXmlAttributeName("standalone"),
+                VBXmlDelimiter("="),
+                VBXmlAttributeQuotes(""""),
+                VBXmlAttributeValue("yes"),
+                VBXmlAttributeQuotes(""""),
+                VBXmlDelimiter("?>"))
+        End Function
+
+        <Theory, CombinatorialData>
+        Public Async Function TestXmlLiterals1(testHost As TestHost) As Task
+            Dim code =
+"Dim a = <Customer id1=""1"" id2=""2"" id3=<%= n2 %> id4="""">
+                    <!-- This is a simple Xml element with all of the node types -->
+                    <Name>Me</Name>
+                    <NameUsingExpression><%= n1 %></NameUsingExpression>
+                    <Street>10802 177th CT NE</Street>
+                    <Misc><![CDATA[Let's add some CDATA
+ for fun. ]]>
+                    </Misc>
+                    <Empty><%= Nothing %></Empty>
+                </Customer>"
+
+            Await TestInMethodAsync(code,
+                testHost,
+                Keyword("Dim"),
+                Local("a"),
                 Operators.Equals,
                 VBXmlDelimiter("<"),
                 VBXmlName("Customer"),
@@ -805,27 +937,29 @@ Namespace Microsoft.CodeAnalysis.Editor.VisualBasic.UnitTests.Classification
                 VBXmlDelimiter("</"),
                 VBXmlName("Customer"),
                 VBXmlDelimiter(">"))
-        End Sub
+        End Function
 
-        <Fact, Trait(Traits.Feature, Traits.Features.Classification)>
-        Public Sub XmlLiterals2()
-            Dim text = StringFromLines(
-                "Dim b = <?xml version=""1.0""?>",
-                "                <!-- comment before the root -->",
-                "                <?my-PI PI before the root ?>",
-                "                <p:Customer id1=""1"" id2=""2"" id3=<%= n2 %> id4="""">",
-                "                    <!-- This is a simple Xml element with all of the node types -->",
-                "                    <q:Name>Me</q:Name>",
-                "                    <s:NameUsingExpression><%= n1 %></s:NameUsingExpression>",
-                "                    <t:Street>10802 177th CT NE</t:Street>",
-                "                    <p:Misc><![CDATA[Let's add some CDATA  for fun. ]]>",
-                "                    </p:Misc>",
-                "                    <Empty><%= Nothing %></Empty>",
-                "                    <entity>hello&#x7b;world</entity>",
-                "                </p:Customer>")
-            TestInMethod(text,
+        <Theory, CombinatorialData>
+        Public Async Function TestXmlLiterals2(testHost As TestHost) As Task
+            Dim code =
+"Dim b = <?xml version=""1.0""?>
+         <!-- comment before the root -->
+         <?my-PI PI before the root ?>
+         <p:Customer id1=""1"" id2=""2"" id3=<%= n2 %> id4="""">
+             <!-- This is a simple Xml element with all of the node types -->
+             <q:Name>Me</q:Name>
+             <s:NameUsingExpression><%= n1 %></s:NameUsingExpression>
+             <t:Street>10802 177th CT NE</t:Street>
+             <p:Misc><![CDATA[Let's add some CDATA  for fun. ]]>
+             </p:Misc>
+             <Empty><%= Nothing %></Empty>
+             <entity>hello&#x7b;world</entity>
+         </p:Customer>"
+
+            Await TestInMethodAsync(code,
+                testHost,
                 Keyword("Dim"),
-                Identifier("b"),
+                Local("b"),
                 Operators.Equals,
                 VBXmlDelimiter("<?"),
                 VBXmlName("xml"),
@@ -940,16 +1074,18 @@ Namespace Microsoft.CodeAnalysis.Editor.VisualBasic.UnitTests.Classification
                 VBXmlName(":"),
                 VBXmlName("Customer"),
                 VBXmlDelimiter(">"))
-        End Sub
+        End Function
 
-        <Fact, Trait(Traits.Feature, Traits.Features.Classification)>
-        Public Sub XmlLiterals3()
-            Dim text = StringFromLines(
-                "Dim c = <p:x xmlns:p=""abc",
-                "123""/>")
-            TestInMethod(text,
+        <Theory, CombinatorialData>
+        Public Async Function TestXmlLiterals3(testHost As TestHost) As Task
+            Dim code =
+"Dim c = <p:x xmlns:p=""abc
+123""/>"
+
+            Await TestInMethodAsync(code,
+                testHost,
                 Keyword("Dim"),
-                Identifier("c"),
+                Local("c"),
                 Operators.Equals,
                 VBXmlDelimiter("<"),
                 VBXmlName("p"),
@@ -964,19 +1100,21 @@ Namespace Microsoft.CodeAnalysis.Editor.VisualBasic.UnitTests.Classification
                 VBXmlAttributeValue("123"),
                 VBXmlAttributeQuotes(""""),
                 VBXmlDelimiter("/>"))
-        End Sub
+        End Function
 
-        <Fact, Trait(Traits.Feature, Traits.Features.Classification)>
-        Public Sub XmlLiterals4()
-            Dim text = StringFromLines(
-                "Dim d = _",
-                "        <?xml version=""1.0""?>",
-                "        <a/>")
-            TestInMethod(text,
+        <Theory, CombinatorialData>
+        Public Async Function TestXmlLiterals4(testHost As TestHost) As Task
+            Dim code =
+"Dim d = _
+        <?xml version=""1.0""?>
+        <a/>"
+
+            Await TestInMethodAsync(code,
+                testHost,
                 Keyword("Dim"),
-                Identifier("d"),
+                Local("d"),
                 Operators.Equals,
-                Punctuation.Text("_"),
+                LineContinuation,
                 VBXmlDelimiter("<?"),
                 VBXmlName("xml"),
                 VBXmlAttributeName("version"),
@@ -988,30 +1126,59 @@ Namespace Microsoft.CodeAnalysis.Editor.VisualBasic.UnitTests.Classification
                 VBXmlDelimiter("<"),
                 VBXmlName("a"),
                 VBXmlDelimiter("/>"))
-        End Sub
+        End Function
 
-        <Fact, Trait(Traits.Feature, Traits.Features.Classification)>
-        Public Sub XmlLiterals5()
-            Dim text = StringFromLines(
-                "Dim i = 100",
-                "        Process( _",
-                "                <Customer ID=<%= i + 1000 %> a="""">",
-                "                </Customer>)")
-            TestInMethod(text,
+        <Theory, CombinatorialData>
+        Public Async Function TestXmlLiterals4CommentsAfterLineContinuation(testHost As TestHost) As Task
+            Dim code =
+"Dim d = _ ' Test
+        <?xml version=""1.0""?>
+        <a/>"
+
+            Await TestInMethodAsync(code,
+                testHost,
                 Keyword("Dim"),
-                Identifier("i"),
+                Local("d"),
+                Operators.Equals,
+                LineContinuation,
+                Comment("' Test"),
+                VBXmlDelimiter("<?"),
+                VBXmlName("xml"),
+                VBXmlAttributeName("version"),
+                VBXmlDelimiter("="),
+                VBXmlAttributeQuotes(""""),
+                VBXmlAttributeValue("1.0"),
+                VBXmlAttributeQuotes(""""),
+                VBXmlDelimiter("?>"),
+                VBXmlDelimiter("<"),
+                VBXmlName("a"),
+                VBXmlDelimiter("/>"))
+        End Function
+
+        <Theory, CombinatorialData>
+        Public Async Function TestXmlLiterals5(testHost As TestHost) As Task
+            Dim code =
+"Dim i = 100
+        Process( _
+                <Customer ID=<%= i + 1000 %> a="""">
+                </Customer>)"
+
+            Await TestInMethodAsync(code,
+                testHost,
+                Keyword("Dim"),
+                Local("i"),
                 Operators.Equals,
                 Number("100"),
                 Identifier("Process"),
                 Punctuation.OpenParen,
-                Punctuation.Text("_"),
+                LineContinuation,
                 VBXmlDelimiter("<"),
                 VBXmlName("Customer"),
                 VBXmlAttributeName("ID"),
                 VBXmlDelimiter("="),
                 VBXmlEmbeddedExpression("<%="),
                 Identifier("i"),
-                Operators.Text("+"),
+                Operators.Plus,
                 Number("1000"),
                 VBXmlEmbeddedExpression("%>"),
                 VBXmlAttributeName("a"),
@@ -1023,25 +1190,65 @@ Namespace Microsoft.CodeAnalysis.Editor.VisualBasic.UnitTests.Classification
                 VBXmlName("Customer"),
                 VBXmlDelimiter(">"),
                 Punctuation.CloseParen)
-        End Sub
+        End Function
 
-        <Fact, Trait(Traits.Feature, Traits.Features.Classification)>
-        Public Sub XmlLiterals6()
-            Dim text = StringFromLines(
-                "Dim xmlwithkeywords = <MODULE>",
-                "                                  <CLASS>",
-                "                                      <FUNCTION>",
-                "                                          <DIM i=""1""/>",
-                "                                          <FOR j=""1"" to=""i"">",
-                "                                              <NEXT/>",
-                "                                          </FOR>",
-                "                                          <END/>",
-                "                                      </FUNCTION>",
-                "                                  </CLASS>",
-                "                              </MODULE>")
-            TestInMethod(text,
+        <Theory, CombinatorialData>
+        Public Async Function TestXmlLiterals5CommentsAfterLineContinuation(testHost As TestHost) As Task
+            Dim code =
+"Dim i = 100
+        Process( _ '    Test
+                <Customer ID=<%= i + 1000 %> a="""">
+                </Customer>)"
+
+            Await TestInMethodAsync(code,
+                testHost,
                 Keyword("Dim"),
-                Identifier("xmlwithkeywords"),
+                Local("i"),
+                Operators.Equals,
+                Number("100"),
+                Identifier("Process"),
+                Punctuation.OpenParen,
+                LineContinuation,
+                Comment("'    Test"),
+                VBXmlDelimiter("<"),
+                VBXmlName("Customer"),
+                VBXmlAttributeName("ID"),
+                VBXmlDelimiter("="),
+                VBXmlEmbeddedExpression("<%="),
+                Identifier("i"),
+                Operators.Plus,
+                Number("1000"),
+                VBXmlEmbeddedExpression("%>"),
+                VBXmlAttributeName("a"),
+                VBXmlDelimiter("="),
+                VBXmlAttributeQuotes(""""),
+                VBXmlAttributeQuotes(""""),
+                VBXmlDelimiter(">"),
+                VBXmlDelimiter("</"),
+                VBXmlName("Customer"),
+                VBXmlDelimiter(">"),
+                Punctuation.CloseParen)
+        End Function
+
+        <Theory, CombinatorialData>
+        Public Async Function TestXmlLiterals6(testHost As TestHost) As Task
+            Dim code =
+"Dim xmlwithkeywords = <MODULE>
+                           <CLASS>
+                               <FUNCTION>
+                                   <DIM i=""1""/>
+                                   <FOR j=""1"" to=""i"">
+                                       <NEXT/>
+                                   </FOR>
+                                   <END/>
+                               </FUNCTION>
+                           </CLASS>
+                       </MODULE>"
+
+            Await TestInMethodAsync(code,
+                testHost,
+                Keyword("Dim"),
+                Local("xmlwithkeywords"),
                 Operators.Equals,
                 VBXmlDelimiter("<"),
                 VBXmlName("MODULE"),
@@ -1091,16 +1298,18 @@ Namespace Microsoft.CodeAnalysis.Editor.VisualBasic.UnitTests.Classification
                 VBXmlDelimiter("</"),
                 VBXmlName("MODULE"),
                 VBXmlDelimiter(">"))
-        End Sub
+        End Function
 
-        <Fact, Trait(Traits.Feature, Traits.Features.Classification)>
-        Public Sub XmlLiterals7()
-            Dim text = StringFromLines(
-                "Dim spacetest = <a b=""1"" c=""2"">",
-                "                        </a>")
-            TestInMethod(text,
+        <Theory, CombinatorialData>
+        Public Async Function TestXmlLiterals7(testHost As TestHost) As Task
+            Dim code =
+"Dim spacetest = <a b=""1"" c=""2"">
+                 </a>"
+
+            Await TestInMethodAsync(code,
+                testHost,
                 Keyword("Dim"),
-                Identifier("spacetest"),
+                Local("spacetest"),
                 Operators.Equals,
                 VBXmlDelimiter("<"),
                 VBXmlName("a"),
@@ -1118,61 +1327,67 @@ Namespace Microsoft.CodeAnalysis.Editor.VisualBasic.UnitTests.Classification
                 VBXmlDelimiter("</"),
                 VBXmlName("a"),
                 VBXmlDelimiter(">"))
-        End Sub
+        End Function
 
-        <Fact, Trait(Traits.Feature, Traits.Features.Classification)>
-        Public Sub OptionKeywordsInClassContext()
-            Dim text = StringFromLines(
-                "Class OptionNoContext",
-                "    Dim Infer",
-                "    Dim Explicit",
-                "    Dim Strict",
-                "    Dim Off",
-                "    Dim Compare",
-                "    Dim Text",
-                "    Dim Binary",
-                "End Class")
-            Test(text,
+        <Theory, CombinatorialData>
+        Public Async Function TestOptionKeywordsInClassContext(testHost As TestHost) As Task
+            Dim code =
+"Class OptionNoContext
+    Dim Infer
+    Dim Explicit
+    Dim Strict
+    Dim Off
+    Dim Compare
+    Dim Text
+    Dim Binary
+End Class"
+
+            Await TestAsync(code,
+                testHost,
                 Keyword("Class"),
                 [Class]("OptionNoContext"),
                 Keyword("Dim"),
-                Identifier("Infer"),
+                Field("Infer"),
                 Keyword("Dim"),
-                Identifier("Explicit"),
+                Field("Explicit"),
                 Keyword("Dim"),
-                Identifier("Strict"),
+                Field("Strict"),
                 Keyword("Dim"),
-                Identifier("Off"),
+                Field("Off"),
                 Keyword("Dim"),
-                Identifier("Compare"),
+                Field("Compare"),
                 Keyword("Dim"),
-                Identifier("Text"),
+                Field("Text"),
                 Keyword("Dim"),
-                Identifier("Binary"),
+                Field("Binary"),
                 Keyword("End"),
                 Keyword("Class"))
-        End Sub
+        End Function
 
-        <Fact, Trait(Traits.Feature, Traits.Features.Classification)>
-        Public Sub OptionInferAndExplicit()
-            Dim text = StringFromLines(
-                "Option Infer On",
-                "Option Explicit Off")
-            Test(text,
+        <Theory, CombinatorialData>
+        Public Async Function TestOptionInferAndExplicit(testHost As TestHost) As Task
+            Dim text =
+"Option Infer On
+Option Explicit Off"
+
+            Await TestAsync(text,
+                testHost,
                 Keyword("Option"),
                 Keyword("Infer"),
                 Keyword("On"),
                 Keyword("Option"),
                 Keyword("Explicit"),
                 Keyword("Off"))
-        End Sub
+        End Function
 
-        <Fact, Trait(Traits.Feature, Traits.Features.Classification)>
-        Public Sub OptionCompareTextBinary()
-            Dim text = StringFromLines(
-                "Option Compare Text ' comment",
-                "Option Compare Binary ")
-            Test(text,
+        <Theory, CombinatorialData>
+        Public Async Function TestOptionCompareTextBinary(testHost As TestHost) As Task
+            Dim code =
+"Option Compare Text ' comment
+Option Compare Binary "
+
+            Await TestAsync(code,
+                testHost,
                 Keyword("Option"),
                 Keyword("Compare"),
                 Keyword("Text"),
@@ -1180,184 +1395,196 @@ Namespace Microsoft.CodeAnalysis.Editor.VisualBasic.UnitTests.Classification
                 Keyword("Option"),
                 Keyword("Compare"),
                 Keyword("Binary"))
-        End Sub
+        End Function
 
-        <Fact, Trait(Traits.Feature, Traits.Features.Classification)>
-        Public Sub OptionInfer1()
-            Test("Option Infer",
-                 Keyword("Option"),
-                 Keyword("Infer"))
-        End Sub
+        <Theory, CombinatorialData>
+        Public Async Function TestOptionInfer1(testHost As TestHost) As Task
+            Await TestAsync("Option Infer",
+                testHost,
+                Keyword("Option"),
+                Keyword("Infer"))
+        End Function
 
-        <Fact, Trait(Traits.Feature, Traits.Features.Classification)>
-        Public Sub OptionExplicit1()
-            Test("Option Explicit",
-                 Keyword("Option"),
-                 Keyword("Explicit"))
-        End Sub
+        <Theory, CombinatorialData>
+        Public Async Function TestOptionExplicit1(testHost As TestHost) As Task
+            Await TestAsync("Option Explicit",
+                testHost,
+                Keyword("Option"),
+                Keyword("Explicit"))
+        End Function
 
-        <Fact, Trait(Traits.Feature, Traits.Features.Classification)>
-        Public Sub OptionStrict1()
-            Test("Option Strict",
-                 Keyword("Option"),
-                 Keyword("Strict"))
-        End Sub
+        <Theory, CombinatorialData>
+        Public Async Function TestOptionStrict1(testHost As TestHost) As Task
+            Await TestAsync("Option Strict",
+                testHost,
+                Keyword("Option"),
+                Keyword("Strict"))
+        End Function
 
-        <Fact, Trait(Traits.Feature, Traits.Features.Classification)>
-        Public Sub LinqContextualKeywords()
-            Dim text = StringFromLines(
-                "Dim from = 0",
-                "Dim aggregate = 0",
-                "Dim ascending = 0",
-                "Dim descending = 0",
-                "Dim distinct = 0",
-                "Dim by = 0",
-                "Shadows equals = 0",
-                "Dim group = 0",
-                "Dim into = 0",
-                "Dim join = 0",
-                "Dim skip = 0",
-                "Dim take = 0",
-                "Dim where = 0",
-                "Dim order = 0")
-            TestInClass(text,
+        <Theory, CombinatorialData>
+        Public Async Function TestLinqContextualKeywords(testHost As TestHost) As Task
+            Dim code =
+"Dim from = 0
+Dim aggregate = 0
+Dim ascending = 0
+Dim descending = 0
+Dim distinct = 0
+Dim by = 0
+Shadows equals = 0
+Dim group = 0
+Dim into = 0
+Dim join = 0
+Dim skip = 0
+Dim take = 0
+Dim where = 0
+Dim order = 0"
+
+            Await TestInClassAsync(code,
+                testHost,
                 Keyword("Dim"),
-                Identifier("from"),
+                Field("from"),
                 Operators.Equals,
                 Number("0"),
                 Keyword("Dim"),
-                Identifier("aggregate"),
+                Field("aggregate"),
                 Operators.Equals,
                 Number("0"),
                 Keyword("Dim"),
-                Identifier("ascending"),
+                Field("ascending"),
                 Operators.Equals,
                 Number("0"),
                 Keyword("Dim"),
-                Identifier("descending"),
+                Field("descending"),
                 Operators.Equals,
                 Number("0"),
                 Keyword("Dim"),
-                Identifier("distinct"),
+                Field("distinct"),
                 Operators.Equals,
                 Number("0"),
                 Keyword("Dim"),
-                Identifier("by"),
+                Field("by"),
                 Operators.Equals,
                 Number("0"),
                 Keyword("Shadows"),
-                Identifier("equals"),
+                Field("equals"),
                 Operators.Equals,
                 Number("0"),
                 Keyword("Dim"),
-                Identifier("group"),
+                Field("group"),
                 Operators.Equals,
                 Number("0"),
                 Keyword("Dim"),
-                Identifier("into"),
+                Field("into"),
                 Operators.Equals,
                 Number("0"),
                 Keyword("Dim"),
-                Identifier("join"),
+                Field("join"),
                 Operators.Equals,
                 Number("0"),
                 Keyword("Dim"),
-                Identifier("skip"),
+                Field("skip"),
                 Operators.Equals,
                 Number("0"),
                 Keyword("Dim"),
-                Identifier("take"),
+                Field("take"),
                 Operators.Equals,
                 Number("0"),
                 Keyword("Dim"),
-                Identifier("where"),
+                Field("where"),
                 Operators.Equals,
                 Number("0"),
                 Keyword("Dim"),
-                Identifier("order"),
+                Field("order"),
                 Operators.Equals,
                 Number("0"))
-        End Sub
+        End Function
 
-        <Fact, Trait(Traits.Feature, Traits.Features.Classification)>
-        Public Sub FromLinqExpression1()
-            TestInExpression("From it in foo",
-                 Keyword("From"),
-                 Identifier("it"),
-                 Keyword("in"),
-                 Identifier("foo"))
-        End Sub
+        <Theory, CombinatorialData>
+        Public Async Function TestFromLinqExpression1(testHost As TestHost) As Task
+            Await TestInExpressionAsync("From it in goo",
+                testHost,
+                Keyword("From"),
+                Identifier("it"),
+                Keyword("in"),
+                Identifier("goo"))
+        End Function
 
-        <Fact, Trait(Traits.Feature, Traits.Features.Classification)>
-        Public Sub FromLinqExpression2()
-            TestInExpression("From it in foofooo.Foo",
-                 Keyword("From"),
-                 Identifier("it"),
-                 Keyword("in"),
-                 Identifier("foofooo"),
-                 Operators.Dot,
-                 Identifier("Foo"))
-        End Sub
+        <Theory, CombinatorialData>
+        Public Async Function TestFromLinqExpression2(testHost As TestHost) As Task
+            Await TestInExpressionAsync("From it in goofooo.Goo",
+                testHost,
+                Keyword("From"),
+                Identifier("it"),
+                Keyword("in"),
+                Identifier("goofooo"),
+                Operators.Dot,
+                Identifier("Goo"))
+        End Function
 
-        <Fact, Trait(Traits.Feature, Traits.Features.Classification)>
-        Public Sub FromLinqExpression3()
-            TestInExpression("From it ",
-                 Keyword("From"),
-                 Identifier("it"))
-        End Sub
+        <Theory, CombinatorialData>
+        Public Async Function TestFromLinqExpression3(testHost As TestHost) As Task
+            Await TestInExpressionAsync("From it ",
+                testHost,
+                Keyword("From"),
+                Identifier("it"))
+        End Function
 
-        <Fact, Trait(Traits.Feature, Traits.Features.Classification)>
-        Public Sub FromNotInContext1()
-            Dim code = StringFromLines(
-                "Class From",
-                "End Class")
-            Test(code,
-                 Keyword("Class"),
-                 [Class]("From"),
-                 Keyword("End"),
-                 Keyword("Class"))
-        End Sub
+        <Theory, CombinatorialData>
+        Public Async Function TestFromNotInContext1(testHost As TestHost) As Task
+            Dim code =
+"Class From
+End Class"
 
-        <Fact, Trait(Traits.Feature, Traits.Features.Classification)>
-        Public Sub FromNotInContext2()
-            Dim val = "Dim from = 42"
-            TestInMethod(val,
-                         Keyword("Dim"),
-                         Identifier("from"),
-                         Operators.Equals,
-                         Number("42"))
-        End Sub
+            Await TestAsync(code,
+                testHost,
+                Keyword("Class"),
+                [Class]("From"),
+                Keyword("End"),
+                Keyword("Class"))
+        End Function
 
-        <Fact, Trait(Traits.Feature, Traits.Features.Classification)>
-        Public Sub WhereLinqExpression1()
-            Dim exprTest = "From it in foo Where it <> 4"
-            TestInExpression(exprTest,
-                 Keyword("From"),
-                 Identifier("it"),
-                 Keyword("in"),
-                 Identifier("foo"),
-                 Keyword("Where"),
-                 Identifier("it"),
-                 Operators.LessThanGreaterThan,
-                 Number("4"))
-        End Sub
-
-        <Fact, Trait(Traits.Feature, Traits.Features.Classification)>
-        Public Sub LinqQuery1()
-            Dim text = StringFromLines(
-                "            Dim src = New List(Of Boolean)",
-                "            Dim var3 = 1",
-                "            Dim q = From var1 In src Where var1 And True _",
-                "                    Order By var1 Ascending Order By var1 Descending _",
-                "                    Select var1 Distinct _",
-                "                    Join var2 In src On var1 Equals var2 _",
-                "                    Skip var3 Skip While var3 Take var3 Take While var3 _",
-                "                    Aggregate var4 In src _",
-                "                    Group var4 By var4 Into var5 = Count() _",
-                "                    Group Join var6 In src On var6 Equals var5 Into var7 Into var8 = Count()")
-            TestInMethod(text,
+        <Theory, CombinatorialData>
+        Public Async Function TestFromNotInContext2(testHost As TestHost) As Task
+            Await TestInMethodAsync("Dim from = 42",
+                testHost,
                 Keyword("Dim"),
-                Identifier("src"),
+                Local("from"),
+                Operators.Equals,
+                Number("42"))
+        End Function
+
+        <Theory, CombinatorialData>
+        Public Async Function TestWhereLinqExpression1(testHost As TestHost) As Task
+            Await TestInExpressionAsync("From it in goo Where it <> 4",
+                testHost,
+                Keyword("From"),
+                Identifier("it"),
+                Keyword("in"),
+                Identifier("goo"),
+                Keyword("Where"),
+                Identifier("it"),
+                Operators.LessThanGreaterThan,
+                Number("4"))
+        End Function
+
+        <Theory, CombinatorialData>
+        Public Async Function TestLinqQuery1(testHost As TestHost) As Task
+            Dim code =
+"Dim src = New List(Of Boolean)
+Dim var3 = 1
+Dim q = From var1 In src Where var1 And True _
+        Order By var1 Ascending Order By var1 Descending _
+        Select var1 Distinct _
+        Join var2 In src On var1 Equals var2 _
+        Skip var3 Skip While var3 Take var3 Take While var3 _
+        Aggregate var4 In src _
+        Group var4 By var4 Into var5 = Count() _
+        Group Join var6 In src On var6 Equals var5 Into var7 Into var8 = Count()"
+
+            Await TestInMethodAsync(code,
+                testHost,
+                Keyword("Dim"),
+                Local("src"),
                 Operators.Equals,
                 Keyword("New"),
                 Identifier("List"),
@@ -1366,11 +1593,11 @@ Namespace Microsoft.CodeAnalysis.Editor.VisualBasic.UnitTests.Classification
                 Keyword("Boolean"),
                 Punctuation.CloseParen,
                 Keyword("Dim"),
-                Identifier("var3"),
+                Local("var3"),
                 Operators.Equals,
                 Number("1"),
                 Keyword("Dim"),
-                Identifier("q"),
+                Local("q"),
                 Operators.Equals,
                 Keyword("From"),
                 Identifier("var1"),
@@ -1380,7 +1607,7 @@ Namespace Microsoft.CodeAnalysis.Editor.VisualBasic.UnitTests.Classification
                 Identifier("var1"),
                 Keyword("And"),
                 Keyword("True"),
-                Punctuation.Text("_"),
+                LineContinuation,
                 Keyword("Order"),
                 Keyword("By"),
                 Identifier("var1"),
@@ -1389,11 +1616,11 @@ Namespace Microsoft.CodeAnalysis.Editor.VisualBasic.UnitTests.Classification
                 Keyword("By"),
                 Identifier("var1"),
                 Keyword("Descending"),
-                Punctuation.Text("_"),
+                LineContinuation,
                 Keyword("Select"),
                 Identifier("var1"),
                 Keyword("Distinct"),
-                Punctuation.Text("_"),
+                LineContinuation,
                 Keyword("Join"),
                 Identifier("var2"),
                 Keyword("In"),
@@ -1402,7 +1629,7 @@ Namespace Microsoft.CodeAnalysis.Editor.VisualBasic.UnitTests.Classification
                 Identifier("var1"),
                 Keyword("Equals"),
                 Identifier("var2"),
-                Punctuation.Text("_"),
+                LineContinuation,
                 Keyword("Skip"),
                 Identifier("var3"),
                 Keyword("Skip"),
@@ -1413,12 +1640,12 @@ Namespace Microsoft.CodeAnalysis.Editor.VisualBasic.UnitTests.Classification
                 Keyword("Take"),
                 Keyword("While"),
                 Identifier("var3"),
-                Punctuation.Text("_"),
+                LineContinuation,
                 Keyword("Aggregate"),
                 Identifier("var4"),
                 Keyword("In"),
                 Identifier("src"),
-                Punctuation.Text("_"),
+                LineContinuation,
                 Keyword("Group"),
                 Identifier("var4"),
                 Keyword("By"),
@@ -1429,7 +1656,7 @@ Namespace Microsoft.CodeAnalysis.Editor.VisualBasic.UnitTests.Classification
                 Identifier("Count"),
                 Punctuation.OpenParen,
                 Punctuation.CloseParen,
-                Punctuation.Text("_"),
+                LineContinuation,
                 Keyword("Group"),
                 Keyword("Join"),
                 Identifier("var6"),
@@ -1447,17 +1674,135 @@ Namespace Microsoft.CodeAnalysis.Editor.VisualBasic.UnitTests.Classification
                 Identifier("Count"),
                 Punctuation.OpenParen,
                 Punctuation.CloseParen)
-        End Sub
+        End Function
 
-        <WorkItem(542387)>
-        <Fact, Trait(Traits.Feature, Traits.Features.Classification)>
-        Public Sub TestFromInQuery()
-            Dim text = StringFromLines(
-                "Dim From = New List(Of Integer)",
-                "Dim result = From s In From Select s")
-            TestInMethod(text,
+        <Theory, CombinatorialData>
+        Public Async Function TestLinqQuery1CommentsAfterLineContinuation(testHost As TestHost) As Task
+            Dim code =
+"Dim src = New List(Of Boolean)
+Dim var3 = 1
+Dim q = From var1 In src Where var1 And True _ ' Test 1 space
+        Order By var1 Ascending Order By var1 Descending _  ' Test 2 space
+        Select var1 Distinct _   ' Test 3 space
+        Join var2 In src On var1 Equals var2 _   ' Test 4 space
+        Skip var3 Skip While var3 Take var3 Take While var3 _ ' Test 1 space
+        Aggregate var4 In src _ ' Test 1 space
+        Group var4 By var4 Into var5 = Count() _ ' Test 1 space
+        Group Join var6 In src On var6 Equals var5 Into var7 Into var8 = Count()"
+
+            Await TestInMethodAsync(code,
+                testHost,
                 Keyword("Dim"),
-                Identifier("From"),
+                Local("src"),
+                Operators.Equals,
+                Keyword("New"),
+                Identifier("List"),
+                Punctuation.OpenParen,
+                Keyword("Of"),
+                Keyword("Boolean"),
+                Punctuation.CloseParen,
+                Keyword("Dim"),
+                Local("var3"),
+                Operators.Equals,
+                Number("1"),
+                Keyword("Dim"),
+                Local("q"),
+                Operators.Equals,
+                Keyword("From"),
+                Identifier("var1"),
+                Keyword("In"),
+                Identifier("src"),
+                Keyword("Where"),
+                Identifier("var1"),
+                Keyword("And"),
+                Keyword("True"),
+                LineContinuation,
+                Comment("' Test 1 space"),
+                Keyword("Order"),
+                Keyword("By"),
+                Identifier("var1"),
+                Keyword("Ascending"),
+                Keyword("Order"),
+                Keyword("By"),
+                Identifier("var1"),
+                Keyword("Descending"),
+                LineContinuation,
+                Comment("' Test 2 space"),
+                Keyword("Select"),
+                Identifier("var1"),
+                Keyword("Distinct"),
+                LineContinuation,
+                Comment("' Test 3 space"),
+                Keyword("Join"),
+                Identifier("var2"),
+                Keyword("In"),
+                Identifier("src"),
+                Keyword("On"),
+                Identifier("var1"),
+                Keyword("Equals"),
+                Identifier("var2"),
+                LineContinuation,
+                Comment("' Test 4 space"),
+                Keyword("Skip"),
+                Identifier("var3"),
+                Keyword("Skip"),
+                Keyword("While"),
+                Identifier("var3"),
+                Keyword("Take"),
+                Identifier("var3"),
+                Keyword("Take"),
+                Keyword("While"),
+                Identifier("var3"),
+                LineContinuation,
+                Comment("' Test 1 space"),
+                Keyword("Aggregate"),
+                Identifier("var4"),
+                Keyword("In"),
+                Identifier("src"),
+                LineContinuation,
+                Comment("' Test 1 space"),
+                Keyword("Group"),
+                Identifier("var4"),
+                Keyword("By"),
+                Identifier("var4"),
+                Keyword("Into"),
+                Identifier("var5"),
+                Operators.Equals,
+                Identifier("Count"),
+                Punctuation.OpenParen,
+                Punctuation.CloseParen,
+                LineContinuation,
+                Comment("' Test 1 space"),
+                Keyword("Group"),
+                Keyword("Join"),
+                Identifier("var6"),
+                Keyword("In"),
+                Identifier("src"),
+                Keyword("On"),
+                Identifier("var6"),
+                Keyword("Equals"),
+                Identifier("var5"),
+                Keyword("Into"),
+                Identifier("var7"),
+                Keyword("Into"),
+                Identifier("var8"),
+                Operators.Equals,
+                Identifier("Count"),
+                Punctuation.OpenParen,
+                Punctuation.CloseParen)
+        End Function
+
+        <WorkItem(542387, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/542387")>
+        <Theory, CombinatorialData>
+        Public Async Function TestFromInQuery(testHost As TestHost) As Task
+            Dim code =
+"Dim From = New List(Of Integer)
+Dim result = From s In From Select s"
+
+            Await TestInMethodAsync(code,
+                testHost,
+                Keyword("Dim"),
+                Local("From"),
                 Operators.Equals,
                 Keyword("New"),
                 Identifier("List"),
@@ -1466,7 +1811,7 @@ Namespace Microsoft.CodeAnalysis.Editor.VisualBasic.UnitTests.Classification
                 Keyword("Integer"),
                 Punctuation.CloseParen,
                 Keyword("Dim"),
-                Identifier("result"),
+                Local("result"),
                 Operators.Equals,
                 Keyword("From"),
                 Identifier("s"),
@@ -1474,47 +1819,49 @@ Namespace Microsoft.CodeAnalysis.Editor.VisualBasic.UnitTests.Classification
                 Identifier("From"),
                 Keyword("Select"),
                 Identifier("s"))
-        End Sub
+        End Function
 
-        <Fact, Trait(Traits.Feature, Traits.Features.Classification)>
-        Public Sub KeyKeyword1()
-            Dim text = StringFromLines(
-                "Dim Value = ""Test""",
-                "            Dim Key As String = Key.Length & (Key.Length)",
-                "            Dim Array As String() = { Key, Key.Length }",
-                "            Dim o = New With {Key Key.Length, Key .Id = 1, Key Key, Key Value, Key.Empty}",
-                "            o = New With {Key _",
-                "                          Key.Length, _",
-                "                          Key _",
-                "                          .Id = 1, _",
-                "                          Key _",
-                "                          Key, _",
-                "                          Key _",
-                "                          Value, _",
-                "                          Key Key. _",
-                "                          Empty _",
-                "                          }")
-            TestInMethod(text,
+        <Theory, CombinatorialData>
+        Public Async Function TestKeyKeyword1(testHost As TestHost) As Task
+            Dim code =
+"Dim Value = ""Test""
+Dim Key As String = Key.Length & (Key.Length)
+Dim Array As String() = { Key, Key.Length }
+Dim o = New With {Key Key.Length, Key .Id = 1, Key Key, Key Value, Key.Empty}
+o = New With {Key _
+                Key.Length, _
+                Key _
+                .Id = 1, _
+                Key _
+                Key, _
+                Key _
+                Value, _
+                Key Key. _
+                Empty _
+                }"
+
+            Await TestInMethodAsync(code,
+                testHost,
                 Keyword("Dim"),
-                Identifier("Value"),
+                Local("Value"),
                 Operators.Equals,
                 [String]("""Test"""),
                 Keyword("Dim"),
-                Identifier("Key"),
+                Local("Key"),
                 Keyword("As"),
                 Keyword("String"),
                 Operators.Equals,
                 Identifier("Key"),
                 Operators.Dot,
                 Identifier("Length"),
-                Operators.Text("&"),
+                Operators.Ampersand,
                 Punctuation.OpenParen,
                 Identifier("Key"),
                 Operators.Dot,
                 Identifier("Length"),
                 Punctuation.CloseParen,
                 Keyword("Dim"),
-                Identifier("Array"),
+                Local("Array"),
                 Keyword("As"),
                 Keyword("String"),
                 Punctuation.OpenParen,
@@ -1528,7 +1875,7 @@ Namespace Microsoft.CodeAnalysis.Editor.VisualBasic.UnitTests.Classification
                 Identifier("Length"),
                 Punctuation.CloseCurly,
                 Keyword("Dim"),
-                Identifier("o"),
+                Local("o"),
                 Operators.Equals,
                 Keyword("New"),
                 Keyword("With"),
@@ -1560,66 +1907,197 @@ Namespace Microsoft.CodeAnalysis.Editor.VisualBasic.UnitTests.Classification
                 Keyword("With"),
                 Punctuation.OpenCurly,
                 Keyword("Key"),
-                Punctuation.Text("_"),
+                LineContinuation,
                 Identifier("Key"),
                 Operators.Dot,
                 Identifier("Length"),
                 Punctuation.Comma,
-                Punctuation.Text("_"),
+                LineContinuation,
                 Keyword("Key"),
-                Punctuation.Text("_"),
+                LineContinuation,
                 Operators.Dot,
                 Identifier("Id"),
                 Operators.Equals,
                 Number("1"),
                 Punctuation.Comma,
-                Punctuation.Text("_"),
+                LineContinuation,
                 Keyword("Key"),
-                Punctuation.Text("_"),
+                LineContinuation,
                 Identifier("Key"),
                 Punctuation.Comma,
-                Punctuation.Text("_"),
+                LineContinuation,
                 Keyword("Key"),
-                Punctuation.Text("_"),
+                LineContinuation,
                 Identifier("Value"),
                 Punctuation.Comma,
-                Punctuation.Text("_"),
+                LineContinuation,
                 Keyword("Key"),
                 Identifier("Key"),
                 Operators.Dot,
-                Punctuation.Text("_"),
+                LineContinuation,
                 Identifier("Empty"),
-                Punctuation.Text("_"),
+                LineContinuation,
                 Punctuation.CloseCurly)
-        End Sub
+        End Function
 
-        <Fact, Trait(Traits.Feature, Traits.Features.Classification)>
-        Public Sub KeyKeyword2()
-            Dim text = StringFromLines(
-                "Dim k = 10",
-                "Dim x = New With {Key If(k > 3, 2, -2).GetTypeCode}",
-                "Dim y = New With {Key DirectCast(New Object(), Integer).GetTypeCode}",
-                "Dim z1 = New With {Key If(True, 1,2).GetTypeCode()}",
-                "Dim z2 = New With {Key CType(Nothing, Integer).GetTypeCode()}",
-                "Dim Key As Integer",
-                "If Key Or True Or Key = 1 Then Console.WriteLine()",
-                "Dim z3() = { Key Or True, Key = 1 }",
-                "Dim z4 = New List(Of Integer) From {1, 2, 3}",
-                "Dim z5 As New List(Of Integer) From {1, 2, 3}",
-                "Dim z6 = New List(Of Integer) With {.Capacity = 2}")
-            TestInMethod(text,
+        <Theory, CombinatorialData>
+        Public Async Function TestKeyKeyword1CommentsAfterLineContinuation(testHost As TestHost) As Task
+            Dim code =
+"Dim Value = ""Test""
+Dim Key As String = Key.Length & (Key.Length)
+Dim Array As String() = { Key, Key.Length }
+Dim o = New With {Key Key.Length, Key .Id = 1, Key Key, Key Value, Key.Empty}
+o = New With {Key _ ' Test
+                Key.Length, _ ' Test
+                Key _ ' Test
+                .Id = 1, _ ' Test
+                Key _ ' Test
+                Key, _ ' Test
+                Key _ ' Test
+                Value, _ ' Test
+                Key Key. _ ' Test
+                Empty _ ' Test
+                }"
+
+            Await TestInMethodAsync(code,
+                testHost,
                 Keyword("Dim"),
-                Identifier("k"),
+                Local("Value"),
+                Operators.Equals,
+                [String]("""Test"""),
+                Keyword("Dim"),
+                Local("Key"),
+                Keyword("As"),
+                Keyword("String"),
+                Operators.Equals,
+                Identifier("Key"),
+                Operators.Dot,
+                Identifier("Length"),
+                Operators.Ampersand,
+                Punctuation.OpenParen,
+                Identifier("Key"),
+                Operators.Dot,
+                Identifier("Length"),
+                Punctuation.CloseParen,
+                Keyword("Dim"),
+                Local("Array"),
+                Keyword("As"),
+                Keyword("String"),
+                Punctuation.OpenParen,
+                Punctuation.CloseParen,
+                Operators.Equals,
+                Punctuation.OpenCurly,
+                Identifier("Key"),
+                Punctuation.Comma,
+                Identifier("Key"),
+                Operators.Dot,
+                Identifier("Length"),
+                Punctuation.CloseCurly,
+                Keyword("Dim"),
+                Local("o"),
+                Operators.Equals,
+                Keyword("New"),
+                Keyword("With"),
+                Punctuation.OpenCurly,
+                Keyword("Key"),
+                Identifier("Key"),
+                Operators.Dot,
+                Identifier("Length"),
+                Punctuation.Comma,
+                Keyword("Key"),
+                Operators.Dot,
+                Identifier("Id"),
+                Operators.Equals,
+                Number("1"),
+                Punctuation.Comma,
+                Keyword("Key"),
+                Identifier("Key"),
+                Punctuation.Comma,
+                Keyword("Key"),
+                Identifier("Value"),
+                Punctuation.Comma,
+                Keyword("Key"),
+                Operators.Dot,
+                Identifier("Empty"),
+                Punctuation.CloseCurly,
+                Identifier("o"),
+                Operators.Equals,
+                Keyword("New"),
+                Keyword("With"),
+                Punctuation.OpenCurly,
+                Keyword("Key"),
+                LineContinuation,
+                Comment("' Test"),
+                Identifier("Key"),
+                Operators.Dot,
+                Identifier("Length"),
+                Punctuation.Comma,
+                LineContinuation,
+                Comment("' Test"),
+                Keyword("Key"),
+                LineContinuation,
+                Comment("' Test"),
+                Operators.Dot,
+                Identifier("Id"),
+                Operators.Equals,
+                Number("1"),
+                Punctuation.Comma,
+                LineContinuation,
+                Comment("' Test"),
+                Keyword("Key"),
+                LineContinuation,
+                Comment("' Test"),
+                Identifier("Key"),
+                Punctuation.Comma,
+                LineContinuation,
+                Comment("' Test"),
+                Keyword("Key"),
+                LineContinuation,
+                Comment("' Test"),
+                Identifier("Value"),
+                Punctuation.Comma,
+                LineContinuation,
+                Comment("' Test"),
+                Keyword("Key"),
+                Identifier("Key"),
+                Operators.Dot,
+                LineContinuation,
+                Comment("' Test"),
+                Identifier("Empty"),
+                LineContinuation,
+                Comment("' Test"),
+                Punctuation.CloseCurly)
+        End Function
+
+        <Theory, CombinatorialData>
+        Public Async Function TestKeyKeyword2(testHost As TestHost) As Task
+            Dim code =
+"Dim k = 10
+Dim x = New With {Key If(k > 3, 2, -2).GetTypeCode}
+Dim y = New With {Key DirectCast(New Object(), Integer).GetTypeCode}
+Dim z1 = New With {Key If(True, 1,2).GetTypeCode()}
+Dim z2 = New With {Key CType(Nothing, Integer).GetTypeCode()}
+Dim Key As Integer
+If Key Or True Or Key = 1 Then Console.WriteLine()
+Dim z3() = { Key Or True, Key = 1 }
+Dim z4 = New List(Of Integer) From {1, 2, 3}
+Dim z5 As New List(Of Integer) From {1, 2, 3}
+Dim z6 = New List(Of Integer) With {.Capacity = 2}"
+
+            Await TestInMethodAsync(code,
+                testHost,
+                Keyword("Dim"),
+                Local("k"),
                 Operators.Equals,
                 Number("10"),
                 Keyword("Dim"),
-                Identifier("x"),
+                Local("x"),
                 Operators.Equals,
                 Keyword("New"),
                 Keyword("With"),
                 Punctuation.OpenCurly,
                 Keyword("Key"),
-                Keyword("If"),
+                ControlKeyword("If"),
                 Punctuation.OpenParen,
                 Identifier("k"),
                 Operators.GreaterThan,
@@ -1627,14 +2105,14 @@ Namespace Microsoft.CodeAnalysis.Editor.VisualBasic.UnitTests.Classification
                 Punctuation.Comma,
                 Number("2"),
                 Punctuation.Comma,
-                Operators.Text("-"),
+                Operators.Minus,
                 Number("2"),
                 Punctuation.CloseParen,
                 Operators.Dot,
                 Identifier("GetTypeCode"),
                 Punctuation.CloseCurly,
                 Keyword("Dim"),
-                Identifier("y"),
+                Local("y"),
                 Operators.Equals,
                 Keyword("New"),
                 Keyword("With"),
@@ -1653,13 +2131,13 @@ Namespace Microsoft.CodeAnalysis.Editor.VisualBasic.UnitTests.Classification
                 Identifier("GetTypeCode"),
                 Punctuation.CloseCurly,
                 Keyword("Dim"),
-                Identifier("z1"),
+                Local("z1"),
                 Operators.Equals,
                 Keyword("New"),
                 Keyword("With"),
                 Punctuation.OpenCurly,
                 Keyword("Key"),
-                Keyword("If"),
+                ControlKeyword("If"),
                 Punctuation.OpenParen,
                 Keyword("True"),
                 Punctuation.Comma,
@@ -1673,7 +2151,7 @@ Namespace Microsoft.CodeAnalysis.Editor.VisualBasic.UnitTests.Classification
                 Punctuation.CloseParen,
                 Punctuation.CloseCurly,
                 Keyword("Dim"),
-                Identifier("z2"),
+                Local("z2"),
                 Operators.Equals,
                 Keyword("New"),
                 Keyword("With"),
@@ -1691,10 +2169,10 @@ Namespace Microsoft.CodeAnalysis.Editor.VisualBasic.UnitTests.Classification
                 Punctuation.CloseParen,
                 Punctuation.CloseCurly,
                 Keyword("Dim"),
-                Identifier("Key"),
+                Local("Key"),
                 Keyword("As"),
                 Keyword("Integer"),
-                Keyword("If"),
+                ControlKeyword("If"),
                 Identifier("Key"),
                 Keyword("Or"),
                 Keyword("True"),
@@ -1702,14 +2180,14 @@ Namespace Microsoft.CodeAnalysis.Editor.VisualBasic.UnitTests.Classification
                 Identifier("Key"),
                 Operators.Equals,
                 Number("1"),
-                Keyword("Then"),
+                ControlKeyword("Then"),
                 Identifier("Console"),
                 Operators.Dot,
                 Identifier("WriteLine"),
                 Punctuation.OpenParen,
                 Punctuation.CloseParen,
                 Keyword("Dim"),
-                Identifier("z3"),
+                Local("z3"),
                 Punctuation.OpenParen,
                 Punctuation.CloseParen,
                 Operators.Equals,
@@ -1723,7 +2201,7 @@ Namespace Microsoft.CodeAnalysis.Editor.VisualBasic.UnitTests.Classification
                 Number("1"),
                 Punctuation.CloseCurly,
                 Keyword("Dim"),
-                Identifier("z4"),
+                Local("z4"),
                 Operators.Equals,
                 Keyword("New"),
                 Identifier("List"),
@@ -1740,7 +2218,7 @@ Namespace Microsoft.CodeAnalysis.Editor.VisualBasic.UnitTests.Classification
                 Number("3"),
                 Punctuation.CloseCurly,
                 Keyword("Dim"),
-                Identifier("z5"),
+                Local("z5"),
                 Keyword("As"),
                 Keyword("New"),
                 Identifier("List"),
@@ -1757,7 +2235,7 @@ Namespace Microsoft.CodeAnalysis.Editor.VisualBasic.UnitTests.Classification
                 Number("3"),
                 Punctuation.CloseCurly,
                 Keyword("Dim"),
-                Identifier("z6"),
+                Local("z6"),
                 Operators.Equals,
                 Keyword("New"),
                 Identifier("List"),
@@ -1772,452 +2250,558 @@ Namespace Microsoft.CodeAnalysis.Editor.VisualBasic.UnitTests.Classification
                 Operators.Equals,
                 Number("2"),
                 Punctuation.CloseCurly)
-        End Sub
+        End Function
 
-        <Fact, Trait(Traits.Feature, Traits.Features.Classification)>
-        Public Sub ClassDeclaration1()
-            Dim val = "Class C1"
-            Test(val,
-                 Keyword("Class"),
-                 [Class]("C1"))
-        End Sub
+        <Theory, CombinatorialData>
+        Public Async Function TestNamespaceDeclaration(testHost As TestHost) As Task
+            Dim code =
+"Namespace N1.N2
+End Namespace"
 
-        <Fact, Trait(Traits.Feature, Traits.Features.Classification)>
-        Public Sub ClassDeclaration2()
-            Dim val = StringFromLines(
-                "Class C1",
-                "End Class")
-            Test(val,
-                 Keyword("Class"),
-                 [Class]("C1"),
-                 Keyword("End"),
-                 Keyword("Class"))
-        End Sub
+            Await TestAsync(code,
+                testHost,
+                Keyword("Namespace"),
+                [Namespace]("N1"),
+                Operators.Dot,
+                [Namespace]("N2"),
+                Keyword("End"),
+                Keyword("Namespace"))
+        End Function
 
-        <Fact, Trait(Traits.Feature, Traits.Features.Classification)>
-        Public Sub ClassDeclaration3()
-            Dim val = "Class C1 : End Class"
-            Test(val,
-                 Keyword("Class"),
-                 [Class]("C1"),
-                 Punctuation.Colon,
-                 Keyword("End"),
-                 Keyword("Class"))
-        End Sub
+        <Theory, CombinatorialData>
+        Public Async Function TestClassDeclaration1(testHost As TestHost) As Task
+            Dim code = "Class C1"
 
-        <Fact, Trait(Traits.Feature, Traits.Features.Classification)>
-        Public Sub StructDeclaration1()
-            Dim val = "Structure S1"
-            Test(val,
-                 Keyword("Structure"),
-                 Struct("S1"))
-        End Sub
+            Await TestAsync(code,
+                testHost,
+                Keyword("Class"),
+                [Class]("C1"))
+        End Function
 
-        <Fact, Trait(Traits.Feature, Traits.Features.Classification)>
-        Public Sub StructDeclaration2()
-            Dim val = "Structure S1 : End Structure"
-            Test(val,
-                 Keyword("Structure"),
-                 Struct("S1"),
-                 Punctuation.Colon,
-                 Keyword("End"),
-                 Keyword("Structure"))
-        End Sub
+        <Theory, CombinatorialData>
+        Public Async Function TestClassDeclaration2(testHost As TestHost) As Task
+            Dim code =
+"Class C1
+End Class"
 
-        <Fact, Trait(Traits.Feature, Traits.Features.Classification)>
-        Public Sub StructDeclaration3()
-            Dim val = StringFromLines(
-                "Structure S1",
-                "End Structure")
-            Test(val,
-                 Keyword("Structure"),
-                 Struct("S1"),
-                 Keyword("End"),
-                 Keyword("Structure"))
-        End Sub
+            Await TestAsync(code,
+                testHost,
+                Keyword("Class"),
+                [Class]("C1"),
+                Keyword("End"),
+                Keyword("Class"))
+        End Function
 
-        <Fact, Trait(Traits.Feature, Traits.Features.Classification)>
-        Public Sub InterfaceDeclaration1()
-            Dim val = "Interface I1"
-            Test(val,
-                 Keyword("Interface"),
-                 [Interface]("I1"))
-        End Sub
+        <Theory, CombinatorialData>
+        Public Async Function TestClassDeclaration3(testHost As TestHost) As Task
+            Dim code = "Class C1 : End Class"
 
-        <Fact, Trait(Traits.Feature, Traits.Features.Classification)>
-        Public Sub InterfaceDeclaration2()
-            Dim val = "Interface I1 : End Interface"
-            Test(val,
-                 Keyword("Interface"),
-                 [Interface]("I1"),
-                 Punctuation.Colon,
-                 Keyword("End"),
-                 Keyword("Interface"))
-        End Sub
+            Await TestAsync(code,
+                testHost,
+                Keyword("Class"),
+                [Class]("C1"),
+                Punctuation.Colon,
+                Keyword("End"),
+                Keyword("Class"))
+        End Function
 
-        <Fact, Trait(Traits.Feature, Traits.Features.Classification)>
-        Public Sub InterfaceDeclaration3()
-            Dim val = StringFromLines(
-                "Interface I1",
-                "End Interface")
-            Test(val,
-                 Keyword("Interface"),
-                 [Interface]("I1"),
-                 Keyword("End"),
-                 Keyword("Interface"))
-        End Sub
+        <Theory, CombinatorialData>
+        Public Async Function TestStructDeclaration1(testHost As TestHost) As Task
+            Dim code = "Structure S1"
 
-        <Fact, Trait(Traits.Feature, Traits.Features.Classification)>
-        Public Sub EnumDeclaration1()
-            Dim val = "Enum E1"
-            Test(val,
-                 Keyword("Enum"),
-                 [Enum]("E1"))
-        End Sub
+            Await TestAsync(code,
+                testHost,
+                Keyword("Structure"),
+                Struct("S1"))
+        End Function
 
-        <Fact, Trait(Traits.Feature, Traits.Features.Classification)>
-        Public Sub EnumDeclaration2()
-            Dim val = "Enum E1 : End Enum"
-            Test(val,
-                 Keyword("Enum"),
-                 [Enum]("E1"),
-                 Punctuation.Colon,
-                 Keyword("End"),
-                 Keyword("Enum"))
-        End Sub
+        <Theory, CombinatorialData>
+        Public Async Function TestStructDeclaration2(testHost As TestHost) As Task
+            Dim code = "Structure S1 : End Structure"
 
-        <Fact, Trait(Traits.Feature, Traits.Features.Classification)>
-        Public Sub EnumDeclaration3()
-            Dim val = StringFromLines(
-                "Enum E1",
-                "End Enum")
-            Test(val,
-                 Keyword("Enum"),
-                 [Enum]("E1"),
-                 Keyword("End"),
-                 Keyword("Enum"))
-        End Sub
+            Await TestAsync(code,
+                testHost,
+                Keyword("Structure"),
+                Struct("S1"),
+                Punctuation.Colon,
+                Keyword("End"),
+                Keyword("Structure"))
+        End Function
 
-        <Fact, Trait(Traits.Feature, Traits.Features.Classification)>
-        Public Sub DelegateSubDeclaration1()
-            Dim val = StringFromLines("Public Delegate Sub Foo()")
-            Test(val,
-                 Keyword("Public"),
-                 Keyword("Delegate"),
-                 Keyword("Sub"),
-                 [Delegate]("Foo"),
-                 Punctuation.OpenParen,
-                 Punctuation.CloseParen)
-        End Sub
+        <Theory, CombinatorialData>
+        Public Async Function TestStructDeclaration3(testHost As TestHost) As Task
+            Dim code =
+"Structure S1
+End Structure"
 
-        <Fact, Trait(Traits.Feature, Traits.Features.Classification)>
-        Public Sub DelegateFunctionDeclaration1()
-            Dim val = StringFromLines("Public Delegate Function Foo() As Integer")
-            Test(val,
-                 Keyword("Public"),
-                 Keyword("Delegate"),
-                 Keyword("Function"),
-                 [Delegate]("Foo"),
-                 Punctuation.OpenParen,
-                 Punctuation.CloseParen,
-                 Keyword("As"),
-                 Keyword("Integer"))
-        End Sub
+            Await TestAsync(code,
+                testHost,
+                Keyword("Structure"),
+                Struct("S1"),
+                Keyword("End"),
+                Keyword("Structure"))
+        End Function
 
-        <Fact, Trait(Traits.Feature, Traits.Features.Classification)>
-        Public Sub FloatLiteral()
-            TestInExpression("1.0",
+        <Theory, CombinatorialData>
+        Public Async Function TestInterfaceDeclaration1(testHost As TestHost) As Task
+            Dim code = "Interface I1"
+
+            Await TestAsync(code,
+                testHost,
+                Keyword("Interface"),
+                [Interface]("I1"))
+        End Function
+
+        <Theory, CombinatorialData>
+        Public Async Function TestInterfaceDeclaration2(testHost As TestHost) As Task
+            Dim code = "Interface I1 : End Interface"
+
+            Await TestAsync(code,
+                testHost,
+                Keyword("Interface"),
+                [Interface]("I1"),
+                Punctuation.Colon,
+                Keyword("End"),
+                Keyword("Interface"))
+        End Function
+
+        <Theory, CombinatorialData>
+        Public Async Function TestInterfaceDeclaration3(testHost As TestHost) As Task
+            Dim code =
+"Interface I1
+End Interface"
+
+            Await TestAsync(code,
+                testHost,
+                Keyword("Interface"),
+                [Interface]("I1"),
+                Keyword("End"),
+                Keyword("Interface"))
+        End Function
+
+        <Theory, CombinatorialData>
+        Public Async Function TestEnumDeclaration1(testHost As TestHost) As Task
+            Dim code = "Enum E1"
+
+            Await TestAsync(code,
+                testHost,
+                Keyword("Enum"),
+                [Enum]("E1"))
+        End Function
+
+        <Theory, CombinatorialData>
+        Public Async Function TestEnumDeclaration2(testHost As TestHost) As Task
+            Dim code = "Enum E1 : End Enum"
+
+            Await TestAsync(code,
+                testHost,
+                Keyword("Enum"),
+                [Enum]("E1"),
+                Punctuation.Colon,
+                Keyword("End"),
+                Keyword("Enum"))
+        End Function
+
+        <Theory, CombinatorialData>
+        Public Async Function TestEnumDeclaration3(testHost As TestHost) As Task
+            Dim code =
+"Enum E1
+End Enum"
+
+            Await TestAsync(code,
+                testHost,
+                Keyword("Enum"),
+                [Enum]("E1"),
+                Keyword("End"),
+                Keyword("Enum"))
+        End Function
+
+        <Theory, CombinatorialData>
+        Public Async Function TestDelegateSubDeclaration1(testHost As TestHost) As Task
+            Dim code = "Public Delegate Sub Goo()"
+
+            Await TestAsync(code,
+                testHost,
+                Keyword("Public"),
+                Keyword("Delegate"),
+                Keyword("Sub"),
+                [Delegate]("Goo"),
+                Punctuation.OpenParen,
+                Punctuation.CloseParen)
+        End Function
+
+        <Theory, CombinatorialData>
+        Public Async Function TestDelegateFunctionDeclaration1(testHost As TestHost) As Task
+            Dim code = "Public Delegate Function Goo() As Integer"
+
+            Await TestAsync(code,
+                testHost,
+                Keyword("Public"),
+                Keyword("Delegate"),
+                Keyword("Function"),
+                [Delegate]("Goo"),
+                Punctuation.OpenParen,
+                Punctuation.CloseParen,
+                Keyword("As"),
+                Keyword("Integer"))
+        End Function
+
+        <Theory, CombinatorialData>
+        Public Async Function TestTernaryConditionalExpression(testHost As TestHost) As Task
+            Dim code = "Dim i = If(True, 1, 2)"
+
+            Await TestInMethodAsync(code,
+                testHost,
+                Keyword("Dim"),
+                Local("i"),
+                Operators.Equals,
+                ControlKeyword("If"),
+                Punctuation.OpenParen,
+                Keyword("True"),
+                Punctuation.Comma,
+                Number("1"),
+                Punctuation.Comma,
+                Number("2"),
+                Punctuation.CloseParen)
+        End Function
+
+        <Theory, CombinatorialData>
+        Public Async Function TestForStatement(testHost As TestHost) As Task
+            Dim code =
+"For i = 0 To 10
+Exit For"
+            Await TestInMethodAsync(code,
+                testHost,
+                ControlKeyword("For"),
+                Identifier("i"),
+                Operators.Equals,
+                Number("0"),
+                ControlKeyword("To"),
+                Number("10"),
+                ControlKeyword("Exit"),
+                ControlKeyword("For"))
+        End Function
+
+        <Theory, CombinatorialData>
+        Public Async Function TestFloatLiteral(testHost As TestHost) As Task
+            Await TestInExpressionAsync("1.0",
+                testHost,
                 Number("1.0"))
-        End Sub
+        End Function
 
-        <Fact, Trait(Traits.Feature, Traits.Features.Classification)>
-        Public Sub IntLiteral()
-            TestInExpression("1",
+        <Theory, CombinatorialData>
+        Public Async Function TestIntLiteral(testHost As TestHost) As Task
+            Await TestInExpressionAsync("1",
+                testHost,
                 Number("1"))
-        End Sub
+        End Function
 
-        <Fact, Trait(Traits.Feature, Traits.Features.Classification)>
-        Public Sub DecimalLiteral()
-            TestInExpression("123D",
+        <Theory, CombinatorialData>
+        Public Async Function TestDecimalLiteral(testHost As TestHost) As Task
+            Await TestInExpressionAsync("123D",
+                testHost,
                 Number("123D"))
-        End Sub
+        End Function
 
-        <Fact, Trait(Traits.Feature, Traits.Features.Classification)>
-        Public Sub StringLiterals1()
-            Dim exprText = """foo"""
-            TestInExpression(exprText,
-                             [String]("""foo"""))
-        End Sub
+        <Theory, CombinatorialData>
+        Public Async Function TestStringLiterals1(testHost As TestHost) As Task
+            Await TestInExpressionAsync("""goo""",
+                testHost,
+                [String]("""goo"""))
+        End Function
 
-        <Fact, Trait(Traits.Feature, Traits.Features.Classification)>
-        Public Sub CharacterLiteral()
-            Dim exprText = """f""c"
-            TestInExpression(exprText,
-                             [String]("""f""c"))
-        End Sub
+        <Theory, CombinatorialData>
+        Public Async Function TestCharacterLiteral(testHost As TestHost) As Task
+            Await TestInExpressionAsync("""f""c",
+                testHost,
+                [String]("""f""c"))
+        End Function
 
-        <Fact, Trait(Traits.Feature, Traits.Features.Classification)>
-        Public Sub Regression_DoUntil1()
-            Dim val = "Do Until True"
-            TestInMethod(val,
-                         Keyword("Do"),
-                         Keyword("Until"),
-                         Keyword("True"))
-        End Sub
+        <Theory, CombinatorialData>
+        Public Async Function TestRegression_DoUntil1(testHost As TestHost) As Task
+            Dim code = "Do Until True"
+            Await TestInMethodAsync(code,
+                testHost,
+                ControlKeyword("Do"),
+                ControlKeyword("Until"),
+                Keyword("True"))
+        End Function
 
-        <Fact, Trait(Traits.Feature, Traits.Features.Classification)>
-        Public Sub Comment1()
-            Dim code = "'foo"
-            Test(code,
-                 Comment("'foo"))
-        End Sub
+        <Theory, CombinatorialData>
+        Public Async Function TestComment1(testHost As TestHost) As Task
+            Dim code = "'goo"
 
-        <Fact, Trait(Traits.Feature, Traits.Features.Classification)>
-        Public Sub Comment2()
-            Dim val = StringFromLines(
-                "Class C1",
-                "'hello")
-            Test(val,
-                 Keyword("Class"),
-                 [Class]("C1"),
-                 Comment("'hello"))
-        End Sub
+            Await TestAsync(code,
+                testHost,
+                Comment("'goo"))
+        End Function
 
-        <Fact, Trait(Traits.Feature, Traits.Features.Classification)>
-        Public Sub XmlDocComment_SingleLine()
-            Dim val = StringFromLines(
-                "'''<summary>something</summary>",
-                "Class Bar",
-                "End Class")
-            Test(val,
-                 XmlDoc.Delimiter("'''"),
-                 XmlDoc.Delimiter("<"),
-                 XmlDoc.Name("summary"),
-                 XmlDoc.Delimiter(">"),
-                 XmlDoc.Text("something"),
-                 XmlDoc.Delimiter("</"),
-                 XmlDoc.Name("summary"),
-                 XmlDoc.Delimiter(">"),
-                 Keyword("Class"),
-                 [Class]("Bar"),
-                 Keyword("End"),
-                 Keyword("Class"))
-        End Sub
+        <Theory, CombinatorialData>
+        Public Async Function TestComment2(testHost As TestHost) As Task
+            Dim code =
+"Class C1
+'hello"
 
-        <Fact, Trait(Traits.Feature, Traits.Features.Classification)>
-        Public Sub XmlDocComment_ExteriorTrivia()
-            Dim val = StringFromLines(
-                "''' <summary>",
-                "''' something",
-                "''' </summary>",
-                "Class Bar",
-                "End Class")
-            Test(val,
-                 XmlDoc.Delimiter("'''"),
-                 XmlDoc.Text(" "),
-                 XmlDoc.Delimiter("<"),
-                 XmlDoc.Name("summary"),
-                 XmlDoc.Delimiter(">"),
-                 XmlDoc.Delimiter("'''"),
-                 XmlDoc.Text(" something"),
-                 XmlDoc.Delimiter("'''"),
-                 XmlDoc.Text(" "),
-                 XmlDoc.Delimiter("</"),
-                 XmlDoc.Name("summary"),
-                 XmlDoc.Delimiter(">"),
-                 Keyword("Class"),
-                 [Class]("Bar"),
-                 Keyword("End"),
-                 Keyword("Class"))
-        End Sub
+            Await TestAsync(code,
+                testHost,
+                Keyword("Class"),
+                [Class]("C1"),
+                Comment("'hello"))
+        End Function
 
-        <Fact, Trait(Traits.Feature, Traits.Features.Classification)>
-        Public Sub XmlDocComment_ExteriorTriviaInsideEndTag()
-            Dim val = StringFromLines(
-                "''' <summary></",
-                "''' summary>",
-                "Class Bar",
-                "End Class")
-            Test(val,
-                 XmlDoc.Delimiter("'''"),
-                 XmlDoc.Text(" "),
-                 XmlDoc.Delimiter("<"),
-                 XmlDoc.Name("summary"),
-                 XmlDoc.Delimiter(">"),
-                 XmlDoc.Delimiter("</"),
-                 XmlDoc.Delimiter("'''"),
-                 XmlDoc.Name(" "),
-                 XmlDoc.Name("summary"),
-                 XmlDoc.Delimiter(">"),
-                 Keyword("Class"),
-                 [Class]("Bar"),
-                 Keyword("End"),
-                 Keyword("Class"))
-        End Sub
+        <Theory, CombinatorialData>
+        Public Async Function TestXmlDocComment_SingleLine(testHost As TestHost) As Task
+            Dim code =
+"'''<summary>something</summary>
+Class Bar
+End Class"
 
-        <Fact, Trait(Traits.Feature, Traits.Features.Classification)>
-        Public Sub XmlDocComment_AttributesWithExteriorTrivia()
-            Dim val = StringFromLines(
-                "''' <summary att1=""value1""",
-                "''' att2=""value2"">",
-                "''' something",
-                "''' </summary>",
-                "Class Bar",
-                "End Class")
-            Test(val,
-                 XmlDoc.Delimiter("'''"),
-                 XmlDoc.Text(" "),
-                 XmlDoc.Delimiter("<"),
-                 XmlDoc.Name("summary"),
-                 XmlDoc.Name(" "),
-                 XmlDoc.AttributeName("att1"),
-                 XmlDoc.Delimiter("="),
-                 XmlDoc.AttributeQuotes(""""),
-                 XmlDoc.AttributeValue("value1"),
-                 XmlDoc.AttributeQuotes(""""),
-                 XmlDoc.Delimiter("'''"),
-                 XmlDoc.AttributeName(" "),
-                 XmlDoc.AttributeName("att2"),
-                 XmlDoc.Delimiter("="),
-                 XmlDoc.AttributeQuotes(""""),
-                 XmlDoc.AttributeValue("value2"),
-                 XmlDoc.AttributeQuotes(""""),
-                 XmlDoc.Delimiter(">"),
-                 XmlDoc.Delimiter("'''"),
-                 XmlDoc.Text(" something"),
-                 XmlDoc.Delimiter("'''"),
-                 XmlDoc.Text(" "),
-                 XmlDoc.Delimiter("</"),
-                 XmlDoc.Name("summary"),
-                 XmlDoc.Delimiter(">"),
-                 Keyword("Class"),
-                 [Class]("Bar"),
-                 Keyword("End"),
-                 Keyword("Class"))
-        End Sub
+            Await TestAsync(code,
+                testHost,
+                XmlDoc.Delimiter("'''"),
+                XmlDoc.Delimiter("<"),
+                XmlDoc.Name("summary"),
+                XmlDoc.Delimiter(">"),
+                XmlDoc.Text("something"),
+                XmlDoc.Delimiter("</"),
+                XmlDoc.Name("summary"),
+                XmlDoc.Delimiter(">"),
+                Keyword("Class"),
+                [Class]("Bar"),
+                Keyword("End"),
+                Keyword("Class"))
+        End Function
 
-        <Fact, Trait(Traits.Feature, Traits.Features.Classification)>
-        Public Sub XmlDocComment_EmptyElementAttributesWithExteriorTrivia()
-            Dim val = StringFromLines(
-                "''' <summary att1=""value1""",
-                "''' att2=""value2"" />",
-                "Class Bar",
-                "End Class")
-            Test(val,
-                 XmlDoc.Delimiter("'''"),
-                 XmlDoc.Text(" "),
-                 XmlDoc.Delimiter("<"),
-                 XmlDoc.Name("summary"),
-                 XmlDoc.Name(" "),
-                 XmlDoc.AttributeName("att1"),
-                 XmlDoc.Delimiter("="),
-                 XmlDoc.AttributeQuotes(""""),
-                 XmlDoc.AttributeValue("value1"),
-                 XmlDoc.AttributeQuotes(""""),
-                 XmlDoc.Delimiter("'''"),
-                 XmlDoc.AttributeName(" "),
-                 XmlDoc.AttributeName("att2"),
-                 XmlDoc.Delimiter("="),
-                 XmlDoc.AttributeQuotes(""""),
-                 XmlDoc.AttributeValue("value2"),
-                 XmlDoc.AttributeQuotes(""""),
-                 XmlDoc.AttributeQuotes(" "),
-                 XmlDoc.Delimiter("/>"),
-                 Keyword("Class"),
-                 [Class]("Bar"),
-                 Keyword("End"),
-                 Keyword("Class"))
-        End Sub
+        <Theory, CombinatorialData>
+        Public Async Function TestXmlDocComment_ExteriorTrivia(testHost As TestHost) As Task
+            Dim code =
+"''' <summary>
+''' something
+''' </summary>
+Class Bar
+End Class"
 
-        <Fact, Trait(Traits.Feature, Traits.Features.Classification)>
-        Public Sub XmlDocComment_XmlCommentWithExteriorTrivia()
-            Dim val = StringFromLines(
-                "'''<summary>",
-                "'''<!--first",
-                "'''second-->",
-                "'''</summary>",
-                "Class Bar",
-                "End Class")
-            Test(val,
-                 XmlDoc.Delimiter("'''"),
-                 XmlDoc.Delimiter("<"),
-                 XmlDoc.Name("summary"),
-                 XmlDoc.Delimiter(">"),
-                 XmlDoc.Delimiter("'''"),
-                 XmlDoc.Delimiter("<!--"),
-                 XmlDoc.Comment("first" & vbCrLf),
-                 XmlDoc.Delimiter("'''"),
-                 XmlDoc.Comment("second"),
-                 XmlDoc.Delimiter("-->"),
-                 XmlDoc.Delimiter("'''"),
-                 XmlDoc.Delimiter("</"),
-                 XmlDoc.Name("summary"),
-                 XmlDoc.Delimiter(">"),
-                 Keyword("Class"),
-                 [Class]("Bar"),
-                 Keyword("End"),
-                 Keyword("Class"))
-        End Sub
+            Await TestAsync(code,
+                testHost,
+                XmlDoc.Delimiter("'''"),
+                XmlDoc.Text(" "),
+                XmlDoc.Delimiter("<"),
+                XmlDoc.Name("summary"),
+                XmlDoc.Delimiter(">"),
+                XmlDoc.Delimiter("'''"),
+                XmlDoc.Text(" something"),
+                XmlDoc.Delimiter("'''"),
+                XmlDoc.Text(" "),
+                XmlDoc.Delimiter("</"),
+                XmlDoc.Name("summary"),
+                XmlDoc.Delimiter(">"),
+                Keyword("Class"),
+                [Class]("Bar"),
+                Keyword("End"),
+                Keyword("Class"))
+        End Function
 
-        <Fact, Trait(Traits.Feature, Traits.Features.Classification)>
-        Public Sub XmlDocComment_CDataWithExteriorTrivia()
-            Dim val = StringFromLines(
-                "'''<summary>",
-                "'''<![CDATA[first",
-                "'''second]]>",
-                "'''</summary>",
-                "Class Bar",
-                "End Class")
-            Test(val,
-                 XmlDoc.Delimiter("'''"),
-                 XmlDoc.Delimiter("<"),
-                 XmlDoc.Name("summary"),
-                 XmlDoc.Delimiter(">"),
-                 XmlDoc.Delimiter("'''"),
-                 XmlDoc.Delimiter("<![CDATA["),
-                 XmlDoc.CDataSection("first" & vbCrLf),
-                 XmlDoc.Delimiter("'''"),
-                 XmlDoc.CDataSection("second"),
-                 XmlDoc.Delimiter("]]>"),
-                 XmlDoc.Delimiter("'''"),
-                 XmlDoc.Delimiter("</"),
-                 XmlDoc.Name("summary"),
-                 XmlDoc.Delimiter(">"),
-                 Keyword("Class"),
-                 [Class]("Bar"),
-                 Keyword("End"),
-                 Keyword("Class"))
-        End Sub
+        <Theory, CombinatorialData>
+        Public Async Function TestXmlDocComment_ExteriorTriviaInsideEndTag(testHost As TestHost) As Task
+            Dim code =
+"''' <summary></
+''' summary>
+Class Bar
+End Class"
 
-        <Fact, Trait(Traits.Feature, Traits.Features.Classification)>
-        Public Sub XmlDocComment_PreprocessingInstruction1()
-            Test("''' <?",
+            Await TestAsync(code,
+                testHost,
+                XmlDoc.Delimiter("'''"),
+                XmlDoc.Text(" "),
+                XmlDoc.Delimiter("<"),
+                XmlDoc.Name("summary"),
+                XmlDoc.Delimiter(">"),
+                XmlDoc.Delimiter("</"),
+                XmlDoc.Delimiter("'''"),
+                XmlDoc.Name(" "),
+                XmlDoc.Name("summary"),
+                XmlDoc.Delimiter(">"),
+                Keyword("Class"),
+                [Class]("Bar"),
+                Keyword("End"),
+                Keyword("Class"))
+        End Function
+
+        <Theory, CombinatorialData>
+        Public Async Function TestXmlDocComment_AttributesWithExteriorTrivia(testHost As TestHost) As Task
+            Dim code =
+"''' <summary att1=""value1""
+''' att2=""value2"">
+''' something
+''' </summary>
+Class Bar
+End Class"
+
+            Await TestAsync(code,
+                testHost,
+                XmlDoc.Delimiter("'''"),
+                XmlDoc.Text(" "),
+                XmlDoc.Delimiter("<"),
+                XmlDoc.Name("summary"),
+                XmlDoc.Name(" "),
+                XmlDoc.AttributeName("att1"),
+                XmlDoc.Delimiter("="),
+                XmlDoc.AttributeQuotes(""""),
+                XmlDoc.AttributeValue("value1"),
+                XmlDoc.AttributeQuotes(""""),
+                XmlDoc.Delimiter("'''"),
+                XmlDoc.AttributeName(" "),
+                XmlDoc.AttributeName("att2"),
+                XmlDoc.Delimiter("="),
+                XmlDoc.AttributeQuotes(""""),
+                XmlDoc.AttributeValue("value2"),
+                XmlDoc.AttributeQuotes(""""),
+                XmlDoc.Delimiter(">"),
+                XmlDoc.Delimiter("'''"),
+                XmlDoc.Text(" something"),
+                XmlDoc.Delimiter("'''"),
+                XmlDoc.Text(" "),
+                XmlDoc.Delimiter("</"),
+                XmlDoc.Name("summary"),
+                XmlDoc.Delimiter(">"),
+                Keyword("Class"),
+                [Class]("Bar"),
+                Keyword("End"),
+                Keyword("Class"))
+        End Function
+
+        <Theory, CombinatorialData>
+        Public Async Function TestXmlDocComment_EmptyElementAttributesWithExteriorTrivia(testHost As TestHost) As Task
+            Dim code =
+"''' <summary att1=""value1""
+''' att2=""value2"" />
+Class Bar
+End Class"
+
+            Await TestAsync(code,
+                testHost,
+                XmlDoc.Delimiter("'''"),
+                XmlDoc.Text(" "),
+                XmlDoc.Delimiter("<"),
+                XmlDoc.Name("summary"),
+                XmlDoc.Name(" "),
+                XmlDoc.AttributeName("att1"),
+                XmlDoc.Delimiter("="),
+                XmlDoc.AttributeQuotes(""""),
+                XmlDoc.AttributeValue("value1"),
+                XmlDoc.AttributeQuotes(""""),
+                XmlDoc.Delimiter("'''"),
+                XmlDoc.AttributeName(" "),
+                XmlDoc.AttributeName("att2"),
+                XmlDoc.Delimiter("="),
+                XmlDoc.AttributeQuotes(""""),
+                XmlDoc.AttributeValue("value2"),
+                XmlDoc.AttributeQuotes(""""),
+                XmlDoc.AttributeQuotes(" "),
+                XmlDoc.Delimiter("/>"),
+                Keyword("Class"),
+                [Class]("Bar"),
+                Keyword("End"),
+                Keyword("Class"))
+        End Function
+
+        <Theory, CombinatorialData>
+        Public Async Function TestXmlDocComment_XmlCommentWithExteriorTrivia(testHost As TestHost) As Task
+            Dim code =
+"'''<summary>
+'''<!--first
+'''second-->
+'''</summary>
+Class Bar
+End Class"
+
+            Await TestAsync(code,
+                testHost,
+                XmlDoc.Delimiter("'''"),
+                XmlDoc.Delimiter("<"),
+                XmlDoc.Name("summary"),
+                XmlDoc.Delimiter(">"),
+                XmlDoc.Delimiter("'''"),
+                XmlDoc.Delimiter("<!--"),
+                XmlDoc.Comment("first" & vbCrLf),
+                XmlDoc.Delimiter("'''"),
+                XmlDoc.Comment("second"),
+                XmlDoc.Delimiter("-->"),
+                XmlDoc.Delimiter("'''"),
+                XmlDoc.Delimiter("</"),
+                XmlDoc.Name("summary"),
+                XmlDoc.Delimiter(">"),
+                Keyword("Class"),
+                [Class]("Bar"),
+                Keyword("End"),
+                Keyword("Class"))
+        End Function
+
+        <Theory, CombinatorialData>
+        Public Async Function TestXmlDocComment_CDataWithExteriorTrivia(testHost As TestHost) As Task
+            Dim code =
+"'''<summary>
+'''<![CDATA[first
+'''second]]>
+'''</summary>
+Class Bar
+End Class"
+
+            Await TestAsync(code,
+                testHost,
+                XmlDoc.Delimiter("'''"),
+                XmlDoc.Delimiter("<"),
+                XmlDoc.Name("summary"),
+                XmlDoc.Delimiter(">"),
+                XmlDoc.Delimiter("'''"),
+                XmlDoc.Delimiter("<![CDATA["),
+                XmlDoc.CDataSection("first" & vbCrLf),
+                XmlDoc.Delimiter("'''"),
+                XmlDoc.CDataSection("second"),
+                XmlDoc.Delimiter("]]>"),
+                XmlDoc.Delimiter("'''"),
+                XmlDoc.Delimiter("</"),
+                XmlDoc.Name("summary"),
+                XmlDoc.Delimiter(">"),
+                Keyword("Class"),
+                [Class]("Bar"),
+                Keyword("End"),
+                Keyword("Class"))
+        End Function
+
+        <Theory, CombinatorialData>
+        Public Async Function TestXmlDocComment_PreprocessingInstruction1(testHost As TestHost) As Task
+            Await TestAsync("''' <?",
+                testHost,
                 XmlDoc.Delimiter("'''"),
                 XmlDoc.Text(" "),
                 XmlDoc.ProcessingInstruction("<?"))
-        End Sub
+        End Function
 
-        <Fact, Trait(Traits.Feature, Traits.Features.Classification)>
-        Public Sub XmlDocComment_PreprocessingInstruction2()
-            Test("''' <??>",
+        <Theory, CombinatorialData>
+        Public Async Function TestXmlDocComment_PreprocessingInstruction2(testHost As TestHost) As Task
+            Await TestAsync("''' <??>",
+                testHost,
                 XmlDoc.Delimiter("'''"),
                 XmlDoc.Text(" "),
                 XmlDoc.ProcessingInstruction("<?"),
                 XmlDoc.ProcessingInstruction("?>"))
-        End Sub
+        End Function
 
-        <Fact, Trait(Traits.Feature, Traits.Features.Classification)>
-        Public Sub XmlDocComment_PreprocessingInstruction3()
-            Test("''' <?xml",
+        <Theory, CombinatorialData>
+        Public Async Function TestXmlDocComment_PreprocessingInstruction3(testHost As TestHost) As Task
+            Await TestAsync("''' <?xml",
+                testHost,
                 XmlDoc.Delimiter("'''"),
                 XmlDoc.Text(" "),
                 XmlDoc.ProcessingInstruction("<?"),
                 XmlDoc.ProcessingInstruction("xml"))
-        End Sub
+        End Function
 
-        <Fact, Trait(Traits.Feature, Traits.Features.Classification)>
-        Public Sub XmlDocComment_PreprocessingInstruction4()
-            Test("''' <?xml version=""1.0""?>",
+        <Theory, CombinatorialData>
+        Public Async Function TestXmlDocComment_PreprocessingInstruction4(testHost As TestHost) As Task
+            Await TestAsync("''' <?xml version=""1.0""?>",
+                testHost,
                 XmlDoc.Delimiter("'''"),
                 XmlDoc.Text(" "),
                 XmlDoc.ProcessingInstruction("<?"),
@@ -2225,497 +2809,631 @@ Namespace Microsoft.CodeAnalysis.Editor.VisualBasic.UnitTests.Classification
                 XmlDoc.ProcessingInstruction(" "),
                 XmlDoc.ProcessingInstruction("version=""1.0"""),
                 XmlDoc.ProcessingInstruction("?>"))
-        End Sub
+        End Function
 
-        <Fact, Trait(Traits.Feature, Traits.Features.Classification)>
-        Public Sub XmlDocComment_PreprocessingInstruction5()
-            Test("''' <?foo?>",
+        <Theory, CombinatorialData>
+        Public Async Function TestXmlDocComment_PreprocessingInstruction5(testHost As TestHost) As Task
+            Await TestAsync("''' <?goo?>",
+                testHost,
                 XmlDoc.Delimiter("'''"),
                 XmlDoc.Text(" "),
                 XmlDoc.ProcessingInstruction("<?"),
-                XmlDoc.ProcessingInstruction("foo"),
+                XmlDoc.ProcessingInstruction("goo"),
                 XmlDoc.ProcessingInstruction("?>"))
-        End Sub
+        End Function
 
-        <Fact, Trait(Traits.Feature, Traits.Features.Classification)>
-        Public Sub XmlDocComment_PreprocessingInstruction6()
-            Test("''' <?foo bar?>",
+        <Theory, CombinatorialData>
+        Public Async Function TestXmlDocComment_PreprocessingInstruction6(testHost As TestHost) As Task
+            Await TestAsync("''' <?goo bar?>",
+                testHost,
                 XmlDoc.Delimiter("'''"),
                 XmlDoc.Text(" "),
                 XmlDoc.ProcessingInstruction("<?"),
-                XmlDoc.ProcessingInstruction("foo"),
+                XmlDoc.ProcessingInstruction("goo"),
                 XmlDoc.ProcessingInstruction(" "),
                 XmlDoc.ProcessingInstruction("bar"),
                 XmlDoc.ProcessingInstruction("?>"))
-        End Sub
+        End Function
 
-        <Fact, Trait(Traits.Feature, Traits.Features.Classification)>
-        Public Sub IsTrue()
-            TestInClass("    Public Shared Operator IsTrue(c As C) As Boolean",
-                        Keyword("Public"),
-                        Keyword("Shared"),
-                        Keyword("Operator"),
-                        Keyword("IsTrue"),
-                        Punctuation.OpenParen,
-                        Identifier("c"),
-                        Keyword("As"),
-                        Identifier("C"),
-                        Punctuation.CloseParen,
-                        Keyword("As"),
-                        Keyword("Boolean"))
-        End Sub
+        <Theory, CombinatorialData>
+        Public Async Function TestIsTrue(testHost As TestHost) As Task
+            Await TestInClassAsync("    Public Shared Operator IsTrue(c As C) As Boolean",
+                testHost,
+                Keyword("Public"),
+                Keyword("Shared"),
+                Keyword("Operator"),
+                Keyword("IsTrue"),
+                Punctuation.OpenParen,
+                Parameter("c"),
+                Keyword("As"),
+                Identifier("C"),
+                Punctuation.CloseParen,
+                Keyword("As"),
+                Keyword("Boolean"))
+        End Function
 
-        <Fact, Trait(Traits.Feature, Traits.Features.Classification)>
-        Public Sub IsFalse()
-            TestInClass("    Public Shared Operator IsFalse(c As C) As Boolean",
-                        Keyword("Public"),
-                        Keyword("Shared"),
-                        Keyword("Operator"),
-                        Keyword("IsFalse"),
-                        Punctuation.OpenParen,
-                        Identifier("c"),
-                        Keyword("As"),
-                        Identifier("C"),
-                        Punctuation.CloseParen,
-                        Keyword("As"),
-                        Keyword("Boolean"))
-        End Sub
+        <Theory, CombinatorialData>
+        Public Async Function TestIsFalse(testHost As TestHost) As Task
+            Await TestInClassAsync("    Public Shared Operator IsFalse(c As C) As Boolean",
+                testHost,
+                Keyword("Public"),
+                Keyword("Shared"),
+                Keyword("Operator"),
+                Keyword("IsFalse"),
+                Punctuation.OpenParen,
+                Parameter("c"),
+                Keyword("As"),
+                Identifier("C"),
+                Punctuation.CloseParen,
+                Keyword("As"),
+                Keyword("Boolean"))
+        End Function
 
-        <Fact, Trait(Traits.Feature, Traits.Features.Classification)>
-        Public Sub Delegate1()
-            Test("Delegate Sub Foo()",
-                 Keyword("Delegate"),
-                 Keyword("Sub"),
-                 [Delegate]("Foo"),
-                 Punctuation.OpenParen,
-                 Punctuation.CloseParen)
-        End Sub
+        <Theory, CombinatorialData>
+        Public Async Function TestDelegate1(testHost As TestHost) As Task
+            Await TestAsync("Delegate Sub Goo()",
+                testHost,
+                Keyword("Delegate"),
+                Keyword("Sub"),
+                [Delegate]("Goo"),
+                Punctuation.OpenParen,
+                Punctuation.CloseParen)
+        End Function
 
-        <Fact, Trait(Traits.Feature, Traits.Features.Classification)>
-        Public Sub Imports1()
-            Dim code = StringFromLines(
-            "Imports Foo",
-            "Imports Bar")
-            Test(code,
-                 Keyword("Imports"),
-                 Identifier("Foo"),
-                 Keyword("Imports"),
-                 Identifier("Bar"))
-        End Sub
+        <Theory, CombinatorialData>
+        Public Async Function TestImports1(testHost As TestHost) As Task
+            Dim code =
+"Imports Goo
+Imports Bar"
+
+            Await TestAsync(code,
+                testHost,
+                Keyword("Imports"),
+                Identifier("Goo"),
+                Keyword("Imports"),
+                Identifier("Bar"))
+        End Function
 
         ''' <summary>
         ''' Clear Syntax Error
         ''' </summary>
-        <Fact, Trait(Traits.Feature, Traits.Features.Classification)>
-        Public Sub Imports2()
-            Dim code = StringFromLines(
-            "Imports",
-            "Imports Bar")
-            Test(code,
-                 Keyword("Imports"),
-                 Keyword("Imports"),
-                 Identifier("Bar"))
-        End Sub
+        <Theory, CombinatorialData>
+        Public Async Function TestImports2(testHost As TestHost) As Task
+            Dim code =
+"Imports
+Imports Bar"
 
-        <Fact, Trait(Traits.Feature, Traits.Features.Classification)>
-        Public Sub Imports3()
-            Dim code = StringFromLines(
-            "Imports Foo=Baz",
-            "Imports Bar=Quux")
-            Test(code,
-                 Keyword("Imports"),
-                 Identifier("Foo"),
-                 Operators.Equals,
-                 Identifier("Baz"),
-                 Keyword("Imports"),
-                 Identifier("Bar"),
-                 Operators.Equals,
-                 Identifier("Quux"))
-        End Sub
+            Await TestAsync(code,
+                testHost,
+                Keyword("Imports"),
+                Keyword("Imports"),
+                Identifier("Bar"))
+        End Function
 
-        <Fact, Trait(Traits.Feature, Traits.Features.Classification)>
-        Public Sub Imports4()
+        <Theory, CombinatorialData>
+        Public Async Function TestImports3(testHost As TestHost) As Task
+            Dim code =
+"Imports Goo=Baz
+Imports Bar=Quux"
+
+            Await TestAsync(code,
+                testHost,
+                Keyword("Imports"),
+                Identifier("Goo"),
+                Operators.Equals,
+                Identifier("Baz"),
+                Keyword("Imports"),
+                Identifier("Bar"),
+                Operators.Equals,
+                Identifier("Quux"))
+        End Function
+
+        <Theory, CombinatorialData>
+        Public Async Function TestImports4(testHost As TestHost) As Task
             Dim code = "Imports System.Text"
-            Test(code,
-                 Keyword("Imports"),
-                 Identifier("System"),
-                 Operators.Dot,
-                 Identifier("Text"))
-        End Sub
 
-        <Fact, Trait(Traits.Feature, Traits.Features.Classification)>
-        Public Sub XmlElement1()
-            TestInExpression("<foo></foo>",
-                             VBXmlDelimiter("<"),
-                             VBXmlName("foo"),
-                             VBXmlDelimiter(">"),
-                             VBXmlDelimiter("</"),
-                             VBXmlName("foo"),
-                             VBXmlDelimiter(">"))
-        End Sub
+            Await TestAsync(code,
+                testHost,
+                Keyword("Imports"),
+                Identifier("System"),
+                Operators.Dot,
+                Identifier("Text"))
+        End Function
+
+        <Theory, CombinatorialData>
+        Public Async Function TestXmlElement1(testHost As TestHost) As Task
+            Await TestInExpressionAsync("<goo></goo>",
+                testHost,
+                VBXmlDelimiter("<"),
+                VBXmlName("goo"),
+                VBXmlDelimiter(">"),
+                VBXmlDelimiter("</"),
+                VBXmlName("goo"),
+                VBXmlDelimiter(">"))
+        End Function
 
         '''<summary>
         ''' Broken XmlElement should classify
         ''' </summary>
-        <Fact, Trait(Traits.Feature, Traits.Features.Classification)>
-        Public Sub XmlElement3()
-            TestInExpression("<foo>",
-                             VBXmlDelimiter("<"),
-                             VBXmlName("foo"),
-                             VBXmlDelimiter(">"))
-        End Sub
+        <Theory, CombinatorialData>
+        Public Async Function TestXmlElement3(testHost As TestHost) As Task
+            Await TestInExpressionAsync("<goo>",
+                testHost,
+                VBXmlDelimiter("<"),
+                VBXmlName("goo"),
+                VBXmlDelimiter(">"))
+        End Function
 
         '''<summary>
         ''' Broken end only element should still classify
         ''' </summary>
-        <Fact, Trait(Traits.Feature, Traits.Features.Classification)>
-        Public Sub XmlElement4()
-            TestInExpression("</foo>",
-                             VBXmlDelimiter("</"),
-                             VBXmlName("foo"),
-                             VBXmlDelimiter(">"))
-        End Sub
+        <Theory, CombinatorialData>
+        Public Async Function TestXmlElement4(testHost As TestHost) As Task
+            Await TestInExpressionAsync("</goo>",
+                testHost,
+                VBXmlDelimiter("</"),
+                VBXmlName("goo"),
+                VBXmlDelimiter(">"))
+        End Function
 
-        <Fact, Trait(Traits.Feature, Traits.Features.Classification)>
-        Public Sub XmlElement5()
-            TestInExpression("<foo.bar></foo.bar>",
-                             VBXmlDelimiter("<"),
-                             VBXmlName("foo.bar"),
-                             VBXmlDelimiter(">"),
-                             VBXmlDelimiter("</"),
-                             VBXmlName("foo.bar"),
-                             VBXmlDelimiter(">"))
-        End Sub
+        <Theory, CombinatorialData>
+        Public Async Function TestXmlElement5(testHost As TestHost) As Task
+            Await TestInExpressionAsync("<goo.bar></goo.bar>",
+                testHost,
+                VBXmlDelimiter("<"),
+                VBXmlName("goo.bar"),
+                VBXmlDelimiter(">"),
+                VBXmlDelimiter("</"),
+                VBXmlName("goo.bar"),
+                VBXmlDelimiter(">"))
+        End Function
 
-        <Fact, Trait(Traits.Feature, Traits.Features.Classification)>
-        Public Sub XmlElement6()
-            TestInExpression("<foo:bar>hello</foo:bar>",
-                             VBXmlDelimiter("<"),
-                             VBXmlName("foo"),
-                             VBXmlName(":"),
-                             VBXmlName("bar"),
-                             VBXmlDelimiter(">"),
-                             VBXmlText("hello"),
-                             VBXmlDelimiter("</"),
-                             VBXmlName("foo"),
-                             VBXmlName(":"),
-                             VBXmlName("bar"),
-                             VBXmlDelimiter(">"))
-        End Sub
+        <Theory, CombinatorialData>
+        Public Async Function TestXmlElement6(testHost As TestHost) As Task
+            Await TestInExpressionAsync("<goo:bar>hello</goo:bar>",
+                testHost,
+                VBXmlDelimiter("<"),
+                VBXmlName("goo"),
+                VBXmlName(":"),
+                VBXmlName("bar"),
+                VBXmlDelimiter(">"),
+                VBXmlText("hello"),
+                VBXmlDelimiter("</"),
+                VBXmlName("goo"),
+                VBXmlName(":"),
+                VBXmlName("bar"),
+                VBXmlDelimiter(">"))
+        End Function
 
-        <Fact, Trait(Traits.Feature, Traits.Features.Classification)>
-        Public Sub XmlElement7()
-            TestInExpression("<foo.bar />",
-                             VBXmlDelimiter("<"),
-                             VBXmlName("foo.bar"),
-                             VBXmlDelimiter("/>"))
-        End Sub
+        <Theory, CombinatorialData>
+        Public Async Function TestXmlElement7(testHost As TestHost) As Task
+            Await TestInExpressionAsync("<goo.bar />",
+                testHost,
+                VBXmlDelimiter("<"),
+                VBXmlName("goo.bar"),
+                VBXmlDelimiter("/>"))
+        End Function
 
-        <Fact, Trait(Traits.Feature, Traits.Features.Classification)>
-        Public Sub XmlEmbedded1()
-            TestInExpression("<foo><%= bar %></foo>",
-                             VBXmlDelimiter("<"),
-                             VBXmlName("foo"),
-                             VBXmlDelimiter(">"),
-                             VBXmlEmbeddedExpression("<%="),
-                             Identifier("bar"),
-                             VBXmlEmbeddedExpression("%>"),
-                             VBXmlDelimiter("</"),
-                             VBXmlName("foo"),
-                             VBXmlDelimiter(">"))
-        End Sub
+        <Theory, CombinatorialData>
+        Public Async Function TestXmlEmbedded1(testHost As TestHost) As Task
+            Await TestInExpressionAsync("<goo><%= bar %></goo>",
+                testHost,
+                VBXmlDelimiter("<"),
+                VBXmlName("goo"),
+                VBXmlDelimiter(">"),
+                VBXmlEmbeddedExpression("<%="),
+                Identifier("bar"),
+                VBXmlEmbeddedExpression("%>"),
+                VBXmlDelimiter("</"),
+                VBXmlName("goo"),
+                VBXmlDelimiter(">"))
+        End Function
 
-        <Fact, Trait(Traits.Feature, Traits.Features.Classification)>
-        Public Sub XmlEmbedded3()
-            TestInExpression("<<%= bar %>/>",
-                             VBXmlDelimiter("<"),
-                             VBXmlEmbeddedExpression("<%="),
-                             Identifier("bar"),
-                             VBXmlEmbeddedExpression("%>"),
-                             VBXmlDelimiter("/>"))
-        End Sub
+        <Theory, CombinatorialData>
+        Public Async Function TestXmlEmbedded3(testHost As TestHost) As Task
+            Await TestInExpressionAsync("<<%= bar %>/>",
+                testHost,
+                VBXmlDelimiter("<"),
+                VBXmlEmbeddedExpression("<%="),
+                Identifier("bar"),
+                VBXmlEmbeddedExpression("%>"),
+                VBXmlDelimiter("/>"))
+        End Function
 
-        <Fact, Trait(Traits.Feature, Traits.Features.Classification)>
-        Public Sub XmlEmbedded4()
-            TestInExpression("<foo <%= bar %>=""42""/>",
-                             VBXmlDelimiter("<"),
-                             VBXmlName("foo"),
-                             VBXmlEmbeddedExpression("<%="),
-                             Identifier("bar"),
-                             VBXmlEmbeddedExpression("%>"),
-                             VBXmlDelimiter("="),
-                             VBXmlAttributeQuotes(""""),
-                             VBXmlAttributeValue("42"),
-                             VBXmlAttributeQuotes(""""),
-                             VBXmlDelimiter("/>"))
-        End Sub
+        <Theory, CombinatorialData>
+        Public Async Function TestXmlEmbedded4(testHost As TestHost) As Task
+            Await TestInExpressionAsync("<goo <%= bar %>=""42""/>",
+                testHost,
+                VBXmlDelimiter("<"),
+                VBXmlName("goo"),
+                VBXmlEmbeddedExpression("<%="),
+                Identifier("bar"),
+                VBXmlEmbeddedExpression("%>"),
+                VBXmlDelimiter("="),
+                VBXmlAttributeQuotes(""""),
+                VBXmlAttributeValue("42"),
+                VBXmlAttributeQuotes(""""),
+                VBXmlDelimiter("/>"))
+        End Function
 
-        <Fact, Trait(Traits.Feature, Traits.Features.Classification)>
-        Public Sub XmlEmbedded5()
-            TestInExpression("<foo a1=<%= bar %>/>",
-                             VBXmlDelimiter("<"),
-                             VBXmlName("foo"),
-                             VBXmlAttributeName("a1"),
-                             VBXmlDelimiter("="),
-                             VBXmlEmbeddedExpression("<%="),
-                             Identifier("bar"),
-                             VBXmlEmbeddedExpression("%>"),
-                             VBXmlDelimiter("/>"))
-        End Sub
+        <Theory, CombinatorialData>
+        Public Async Function TestXmlEmbedded5(testHost As TestHost) As Task
+            Await TestInExpressionAsync("<goo a1=<%= bar %>/>",
+                testHost,
+                VBXmlDelimiter("<"),
+                VBXmlName("goo"),
+                VBXmlAttributeName("a1"),
+                VBXmlDelimiter("="),
+                VBXmlEmbeddedExpression("<%="),
+                Identifier("bar"),
+                VBXmlEmbeddedExpression("%>"),
+                VBXmlDelimiter("/>"))
+        End Function
 
-        <Fact, Trait(Traits.Feature, Traits.Features.Classification)>
-        Public Sub XmlComment1()
-            TestInExpression("<!---->",
-                             VBXmlDelimiter("<!--"),
-                             VBXmlDelimiter("-->"))
-        End Sub
+        <Theory, CombinatorialData>
+        Public Async Function TestXmlComment1(testHost As TestHost) As Task
+            Await TestInExpressionAsync("<!---->",
+                testHost,
+                VBXmlDelimiter("<!--"),
+                VBXmlDelimiter("-->"))
+        End Function
 
-        <Fact, Trait(Traits.Feature, Traits.Features.Classification)>
-        Public Sub XmlComment2()
-            TestInExpression("<!--foo-->",
-                             VBXmlDelimiter("<!--"),
-                             VBXmlComment("foo"),
-                             VBXmlDelimiter("-->"))
-        End Sub
+        <Theory, CombinatorialData>
+        Public Async Function TestXmlComment2(testHost As TestHost) As Task
+            Await TestInExpressionAsync("<!--goo-->",
+                testHost,
+                VBXmlDelimiter("<!--"),
+                VBXmlComment("goo"),
+                VBXmlDelimiter("-->"))
+        End Function
 
-        <Fact, Trait(Traits.Feature, Traits.Features.Classification)>
-        Public Sub XmlComment3()
-            Dim tree = ParseExpression("<a><!--foo--></a>")
-            TestInExpression("<a><!--foo--></a>",
-                             VBXmlDelimiter("<"),
-                             VBXmlName("a"),
-                             VBXmlDelimiter(">"),
-                             VBXmlDelimiter("<!--"),
-                             VBXmlComment("foo"),
-                             VBXmlDelimiter("-->"),
-                             VBXmlDelimiter("</"),
-                             VBXmlName("a"),
-                             VBXmlDelimiter(">"))
-        End Sub
+        <Theory, CombinatorialData>
+        Public Async Function TestXmlComment3(testHost As TestHost) As Task
+            Await TestInExpressionAsync("<a><!--goo--></a>",
+                testHost,
+                VBXmlDelimiter("<"),
+                VBXmlName("a"),
+                VBXmlDelimiter(">"),
+                VBXmlDelimiter("<!--"),
+                VBXmlComment("goo"),
+                VBXmlDelimiter("-->"),
+                VBXmlDelimiter("</"),
+                VBXmlName("a"),
+                VBXmlDelimiter(">"))
+        End Function
 
-        <Fact, Trait(Traits.Feature, Traits.Features.Classification)>
-        Public Sub XmlPreprocessingInstruction2()
-            TestInExpression("<a><?pi value=2?></a>",
-                             VBXmlDelimiter("<"),
-                             VBXmlName("a"),
-                             VBXmlDelimiter(">"),
-                             VBXmlDelimiter("<?"),
-                             VBXmlName("pi"),
-                             VBXmlProcessingInstruction("value=2"),
-                             VBXmlDelimiter("?>"),
-                             VBXmlDelimiter("</"),
-                             VBXmlName("a"),
-                             VBXmlDelimiter(">"))
-        End Sub
+        <Theory, CombinatorialData>
+        Public Async Function TestXmlPreprocessingInstruction2(testHost As TestHost) As Task
+            Await TestInExpressionAsync("<a><?pi value=2?></a>",
+                testHost,
+                VBXmlDelimiter("<"),
+                VBXmlName("a"),
+                VBXmlDelimiter(">"),
+                VBXmlDelimiter("<?"),
+                VBXmlName("pi"),
+                VBXmlProcessingInstruction("value=2"),
+                VBXmlDelimiter("?>"),
+                VBXmlDelimiter("</"),
+                VBXmlName("a"),
+                VBXmlDelimiter(">"))
+        End Function
 
-        <Fact, Trait(Traits.Feature, Traits.Features.Classification)>
-        Public Sub XmlDescendantsMemberAccess1()
-            TestInExpression("x...<foo>",
-                             Identifier("x"),
-                             VBXmlDelimiter("."),
-                             VBXmlDelimiter("."),
-                             VBXmlDelimiter("."),
-                             VBXmlDelimiter("<"),
-                             VBXmlName("foo"),
-                             VBXmlDelimiter(">"))
-        End Sub
+        <Theory, CombinatorialData>
+        Public Async Function TestXmlDescendantsMemberAccess1(testHost As TestHost) As Task
+            Await TestInExpressionAsync("x...<goo>",
+                testHost,
+                Identifier("x"),
+                VBXmlDelimiter("."),
+                VBXmlDelimiter("."),
+                VBXmlDelimiter("."),
+                VBXmlDelimiter("<"),
+                VBXmlName("goo"),
+                VBXmlDelimiter(">"))
+        End Function
 
-        <Fact, Trait(Traits.Feature, Traits.Features.Classification)>
-        Public Sub XmlElementMemberAccess1()
-            TestInExpression("x.<foo>",
-                             Identifier("x"),
-                             VBXmlDelimiter("."),
-                             VBXmlDelimiter("<"),
-                             VBXmlName("foo"),
-                             VBXmlDelimiter(">"))
-        End Sub
+        <Theory, CombinatorialData>
+        Public Async Function TestXmlElementMemberAccess1(testHost As TestHost) As Task
+            Await TestInExpressionAsync("x.<goo>",
+                testHost,
+                Identifier("x"),
+                VBXmlDelimiter("."),
+                VBXmlDelimiter("<"),
+                VBXmlName("goo"),
+                VBXmlDelimiter(">"))
+        End Function
 
-        <Fact, Trait(Traits.Feature, Traits.Features.Classification)>
-        Public Sub XmlAttributeMemberAccess1()
-            TestInExpression("x.@foo",
-                             Identifier("x"),
-                             VBXmlDelimiter("."),
-                             VBXmlDelimiter("@"),
-                             VBXmlAttributeName("foo"))
-        End Sub
+        <Theory, CombinatorialData>
+        Public Async Function TestXmlAttributeMemberAccess1(testHost As TestHost) As Task
+            Await TestInExpressionAsync("x.@goo",
+                testHost,
+                Identifier("x"),
+                VBXmlDelimiter("."),
+                VBXmlDelimiter("@"),
+                VBXmlAttributeName("goo"))
+        End Function
 
-        <Fact, Trait(Traits.Feature, Traits.Features.Classification)>
-        Public Sub XmlAttributeMemberAccess2()
-            TestInExpression("x.@foo:bar",
-                             Identifier("x"),
-                             VBXmlDelimiter("."),
-                             VBXmlDelimiter("@"),
-                             VBXmlAttributeName("foo"),
-                             VBXmlAttributeName(":"),
-                             VBXmlAttributeName("bar"))
-        End Sub
+        <Theory, CombinatorialData>
+        Public Async Function TestXmlAttributeMemberAccess2(testHost As TestHost) As Task
+            Await TestInExpressionAsync("x.@goo:bar",
+                testHost,
+                Identifier("x"),
+                VBXmlDelimiter("."),
+                VBXmlDelimiter("@"),
+                VBXmlAttributeName("goo"),
+                VBXmlAttributeName(":"),
+                VBXmlAttributeName("bar"))
+        End Function
 
-        <Fact, Trait(Traits.Feature, Traits.Features.Classification)>
-        Public Sub PreprocessorConst1()
-            TestInNamespace("#Const Foo = 1",
-                            PPKeyword("#"),
-                            PPKeyword("Const"),
-                            Identifier("Foo"),
-                            Operators.Equals,
-                            Number("1"))
-        End Sub
+        <Theory, CombinatorialData>
+        Public Async Function TestPreprocessorReference(testHost As TestHost) As Task
+            Await TestInNamespaceAsync("#R ""Ref""",
+                testHost,
+                PPKeyword("#"),
+                PPKeyword("R"),
+                [String]("""Ref"""))
+        End Function
 
-        <Fact, Trait(Traits.Feature, Traits.Features.Classification)>
-        Public Sub PreprocessorConst2()
-            TestInNamespace("#Const DebugCode = True",
-                            PPKeyword("#"),
-                            PPKeyword("Const"),
-                            Identifier("DebugCode"),
-                            Operators.Equals,
-                            Keyword("True"))
-        End Sub
+        <Theory, CombinatorialData>
+        Public Async Function TestPreprocessorConst1(testHost As TestHost) As Task
+            Await TestInNamespaceAsync("#Const Goo = 1",
+                testHost,
+                PPKeyword("#"),
+                PPKeyword("Const"),
+                Identifier("Goo"),
+                Operators.Equals,
+                Number("1"))
+        End Function
 
-        <Fact, Trait(Traits.Feature, Traits.Features.Classification)>
-        Public Sub PreprocessorIfThen1()
-            TestInNamespace("#If Foo Then",
-                            PPKeyword("#"),
-                            PPKeyword("If"),
-                            Identifier("Foo"),
-                            PPKeyword("Then"))
-        End Sub
+        Public Async Function TestPreprocessorConst2(testHost As TestHost) As Task
+            Await TestInNamespaceAsync("#Const DebugCode = True",
+                testHost,
+                PPKeyword("#"),
+                PPKeyword("Const"),
+                Identifier("DebugCode"),
+                Operators.Equals,
+                Keyword("True"))
+        End Function
 
-        <Fact, Trait(Traits.Feature, Traits.Features.Classification)>
-        Public Sub PreprocessorElseIf1()
-            TestInNamespace("#ElseIf Foo Then",
-                            PPKeyword("#"),
-                            PPKeyword("ElseIf"),
-                            Identifier("Foo"),
-                            PPKeyword("Then"))
-        End Sub
+        <Theory, CombinatorialData>
+        Public Async Function TestPreprocessorIfThen1(testHost As TestHost) As Task
+            Await TestInNamespaceAsync("#If Goo Then",
+                testHost,
+                PPKeyword("#"),
+                PPKeyword("If"),
+                Identifier("Goo"),
+                PPKeyword("Then"))
+        End Function
 
-        <Fact, Trait(Traits.Feature, Traits.Features.Classification)>
-        Public Sub PreprocessorElse1()
-            TestInNamespace("#Else",
-                            PPKeyword("#"),
-                            PPKeyword("Else"))
-        End Sub
+        <Theory, CombinatorialData>
+        Public Async Function TestPreprocessorElseIf1(testHost As TestHost) As Task
+            Await TestInNamespaceAsync("#ElseIf Goo Then",
+                testHost,
+                PPKeyword("#"),
+                PPKeyword("ElseIf"),
+                Identifier("Goo"),
+                PPKeyword("Then"))
+        End Function
 
-        <Fact, Trait(Traits.Feature, Traits.Features.Classification)>
-        Public Sub PreprocessorEndIf1()
-            TestInNamespace("#End If",
-                            PPKeyword("#"),
-                            PPKeyword("End"),
-                            PPKeyword("If"))
-        End Sub
+        <Theory, CombinatorialData>
+        Public Async Function TestPreprocessorElse1(testHost As TestHost) As Task
+            Await TestInNamespaceAsync("#Else",
+                testHost,
+                PPKeyword("#"),
+                PPKeyword("Else"))
+        End Function
 
-        <Fact, Trait(Traits.Feature, Traits.Features.Classification)>
-        Public Sub PreprocessorExternalSource1()
-            TestInNamespace("#ExternalSource(""c:\wwwroot\inetpub\test.aspx"", 30)",
-                            PPKeyword("#"),
-                            PPKeyword("ExternalSource"),
-                            Punctuation.OpenParen,
-                            [String]("""c:\wwwroot\inetpub\test.aspx"""),
-                            Punctuation.Comma,
-                            Number("30"),
-                            Punctuation.CloseParen)
-        End Sub
+        <Theory, CombinatorialData>
+        Public Async Function TestPreprocessorEndIf1(testHost As TestHost) As Task
+            Await TestInNamespaceAsync("#End If",
+                testHost,
+                PPKeyword("#"),
+                PPKeyword("End"),
+                PPKeyword("If"))
+        End Function
 
-        <Fact, Trait(Traits.Feature, Traits.Features.Classification)>
-        Public Sub PreprocessorExternalChecksum1()
-            Dim val = StringFromLines("#ExternalChecksum(""c:\wwwroot\inetpub\test.aspx"", _",
-                                      """{12345678-1234-1234-1234-123456789abc}"", _",
-                                      """1a2b3c4e5f617239a49b9a9c0391849d34950f923fab9484"")")
-            TestInNamespace(val,
-                            PPKeyword("#"),
-                            PPKeyword("ExternalChecksum"),
-                            Punctuation.OpenParen,
-                            [String]("""c:\wwwroot\inetpub\test.aspx"""),
-                            Punctuation.Comma,
-                            LineContinuation,
-                            [String]("""{12345678-1234-1234-1234-123456789abc}"""),
-                            Punctuation.Comma,
-                            LineContinuation,
-                            [String]("""1a2b3c4e5f617239a49b9a9c0391849d34950f923fab9484"""),
-                            Punctuation.CloseParen)
-        End Sub
+        <Theory, CombinatorialData>
+        Public Async Function TestPreprocessorExternalSource1(testHost As TestHost) As Task
+            Await TestInNamespaceAsync("#ExternalSource(""c:\wwwroot\inetpub\test.aspx"", 30)",
+                testHost,
+                PPKeyword("#"),
+                PPKeyword("ExternalSource"),
+                Punctuation.OpenParen,
+                [String]("""c:\wwwroot\inetpub\test.aspx"""),
+                Punctuation.Comma,
+                Number("30"),
+                Punctuation.CloseParen)
+        End Function
 
-        <Fact, Trait(Traits.Feature, Traits.Features.Classification)>
-        Public Sub PreprocessorExternalChecksum2()
-            Dim val = StringFromLines("#ExternalChecksum(""c:\wwwroot\inetpub\test.aspx"", _",
-                                      """{12345678-1234-1234-1234-123456789abc}"", _",
-                                      """1a2b3c4e5f617239a49b9a9c0391849d34950f923fab9484"")",
-                                      "Module Test",
-                                      "    Sub Main()",
-                                      "#ExternalSource(""c:\wwwroot\inetpub\test.aspx"", 30)",
-                                      "        Console.WriteLine(""In test.aspx"")",
-                                      "#End ExternalSource",
-                                      "    End Sub",
-                                      "End Module")
-            TestInNamespace(val,
-                            PPKeyword("#"),
-                            PPKeyword("ExternalChecksum"),
-                            Punctuation.OpenParen,
-                            [String]("""c:\wwwroot\inetpub\test.aspx"""),
-                            Punctuation.Comma,
-                            LineContinuation,
-                            [String]("""{12345678-1234-1234-1234-123456789abc}"""),
-                            Punctuation.Comma,
-                            LineContinuation,
-                            [String]("""1a2b3c4e5f617239a49b9a9c0391849d34950f923fab9484"""),
-                            Punctuation.CloseParen,
-                            Keyword("Module"),
-                            [Module]("Test"),
-                            Keyword("Sub"),
-                            Identifier("Main"),
-                            Punctuation.OpenParen,
-                            Punctuation.CloseParen,
-                            PPKeyword("#"),
-                            PPKeyword("ExternalSource"),
-                            Punctuation.OpenParen,
-                            [String]("""c:\wwwroot\inetpub\test.aspx"""),
-                            Punctuation.Comma,
-                            Number("30"),
-                            Punctuation.CloseParen,
-                            Identifier("Console"),
-                            Operators.Dot,
-                            Identifier("WriteLine"),
-                            Punctuation.OpenParen,
-                            [String]("""In test.aspx"""),
-                            Punctuation.CloseParen,
-                            PPKeyword("#"),
-                            PPKeyword("End"),
-                            PPKeyword("ExternalSource"),
-                            Keyword("End"),
-                            Keyword("Sub"),
-                            Keyword("End"),
-                            Keyword("Module"))
-        End Sub
+        <Theory, CombinatorialData>
+        Public Async Function TestPreprocessorExternalChecksum1(testHost As TestHost) As Task
+            Dim code =
+"#ExternalChecksum(""c:\wwwroot\inetpub\test.aspx"", _
+""{12345678-1234-1234-1234-123456789abc}"", _
+""1a2b3c4e5f617239a49b9a9c0391849d34950f923fab9484"")"
 
-        <Fact, Trait(Traits.Feature, Traits.Features.Classification)>
-        Public Sub Bug2641_1()
-            Dim text = StringFromLines(
-                "Class PreprocessorNoContext",
-                "Dim Region",
-                "Dim ExternalSource",
-                "End Class",
-                "#Region ""Test""",
-                "#End Region",
-                "#Region ""Test"" ' comment",
-                "#End Region ' comment",
-                "#Region ""Test"" REM comment",
-                "#End Region REM comment",
-                "# _",
-                "Region ""Test""",
-                "# _",
-                "End Region",
-                "# _",
-                "Region _",
-                """Test""",
-                "# _",
-                "End _",
-                "Region")
-            Test(text,
+            Await TestInNamespaceAsync(code,
+                testHost,
+                PPKeyword("#"),
+                PPKeyword("ExternalChecksum"),
+                Punctuation.OpenParen,
+                [String]("""c:\wwwroot\inetpub\test.aspx"""),
+                Punctuation.Comma,
+                LineContinuation,
+                [String]("""{12345678-1234-1234-1234-123456789abc}"""),
+                Punctuation.Comma,
+                LineContinuation,
+                [String]("""1a2b3c4e5f617239a49b9a9c0391849d34950f923fab9484"""),
+                Punctuation.CloseParen)
+        End Function
+
+        <Theory, CombinatorialData>
+        Public Async Function TestPreprocessorExternalChecksum1CommentsAfterLineContinuation(testHost As TestHost) As Task
+            Dim code =
+"#ExternalChecksum(""c:\wwwroot\inetpub\test.aspx"", _ ' Test
+""{12345678-1234-1234-1234-123456789abc}"", _ ' Test
+""1a2b3c4e5f617239a49b9a9c0391849d34950f923fab9484"")"
+
+            Await TestInNamespaceAsync(code,
+                testHost,
+                PPKeyword("#"),
+                PPKeyword("ExternalChecksum"),
+                Punctuation.OpenParen,
+                [String]("""c:\wwwroot\inetpub\test.aspx"""),
+                Punctuation.Comma,
+                LineContinuation,
+                Comment("' Test"),
+                [String]("""{12345678-1234-1234-1234-123456789abc}"""),
+                Punctuation.Comma,
+                LineContinuation,
+                Comment("' Test"),
+                [String]("""1a2b3c4e5f617239a49b9a9c0391849d34950f923fab9484"""),
+                Punctuation.CloseParen)
+        End Function
+
+        <Theory, CombinatorialData>
+        Public Async Function TestPreprocessorExternalChecksum2(testHost As TestHost) As Task
+            Dim code =
+"#ExternalChecksum(""c:\wwwroot\inetpub\test.aspx"", _
+""{12345678-1234-1234-1234-123456789abc}"", _
+""1a2b3c4e5f617239a49b9a9c0391849d34950f923fab9484"")
+Module Test
+    Sub Main()
+#ExternalSource(""c:\wwwroot\inetpub\test.aspx"", 30)
+        Console.WriteLine(""In test.aspx"")
+#End ExternalSource
+    End Sub
+End Module"
+
+            Await TestInNamespaceAsync(code,
+                testHost,
+                PPKeyword("#"),
+                PPKeyword("ExternalChecksum"),
+                Punctuation.OpenParen,
+                [String]("""c:\wwwroot\inetpub\test.aspx"""),
+                Punctuation.Comma,
+                LineContinuation,
+                [String]("""{12345678-1234-1234-1234-123456789abc}"""),
+                Punctuation.Comma,
+                LineContinuation,
+                [String]("""1a2b3c4e5f617239a49b9a9c0391849d34950f923fab9484"""),
+                Punctuation.CloseParen,
+                Keyword("Module"),
+                [Module]("Test"),
+                Keyword("Sub"),
+                Method("Main"),
+                Punctuation.OpenParen,
+                Punctuation.CloseParen,
+                PPKeyword("#"),
+                PPKeyword("ExternalSource"),
+                Punctuation.OpenParen,
+                [String]("""c:\wwwroot\inetpub\test.aspx"""),
+                Punctuation.Comma,
+                Number("30"),
+                Punctuation.CloseParen,
+                Identifier("Console"),
+                Operators.Dot,
+                Identifier("WriteLine"),
+                Punctuation.OpenParen,
+                [String]("""In test.aspx"""),
+                Punctuation.CloseParen,
+                PPKeyword("#"),
+                PPKeyword("End"),
+                PPKeyword("ExternalSource"),
+                Keyword("End"),
+                Keyword("Sub"),
+                Keyword("End"),
+                Keyword("Module"))
+        End Function
+
+        <Theory, CombinatorialData>
+        Public Async Function TestPreprocessorExternalChecksum2CommentsAfterLineContinuation(testHost As TestHost) As Task
+            Dim code =
+"#ExternalChecksum(""c:\wwwroot\inetpub\test.aspx"", _ ' Test 1
+""{12345678-1234-1234-1234-123456789abc}"", _ ' Test 2
+""1a2b3c4e5f617239a49b9a9c0391849d34950f923fab9484"")
+Module Test
+    Sub Main()
+#ExternalSource(""c:\wwwroot\inetpub\test.aspx"", 30)
+        Console.WriteLine(""In test.aspx"")
+#End ExternalSource
+    End Sub
+End Module"
+
+            Await TestInNamespaceAsync(code,
+                testHost,
+                PPKeyword("#"),
+                PPKeyword("ExternalChecksum"),
+                Punctuation.OpenParen,
+                [String]("""c:\wwwroot\inetpub\test.aspx"""),
+                Punctuation.Comma,
+                LineContinuation,
+                Comment("' Test 1"),
+                [String]("""{12345678-1234-1234-1234-123456789abc}"""),
+                Punctuation.Comma,
+                LineContinuation,
+                Comment("' Test 2"),
+                [String]("""1a2b3c4e5f617239a49b9a9c0391849d34950f923fab9484"""),
+                Punctuation.CloseParen,
+                Keyword("Module"),
+                [Module]("Test"),
+                Keyword("Sub"),
+                Method("Main"),
+                Punctuation.OpenParen,
+                Punctuation.CloseParen,
+                PPKeyword("#"),
+                PPKeyword("ExternalSource"),
+                Punctuation.OpenParen,
+                [String]("""c:\wwwroot\inetpub\test.aspx"""),
+                Punctuation.Comma,
+                Number("30"),
+                Punctuation.CloseParen,
+                Identifier("Console"),
+                Operators.Dot,
+                Identifier("WriteLine"),
+                Punctuation.OpenParen,
+                [String]("""In test.aspx"""),
+                Punctuation.CloseParen,
+                PPKeyword("#"),
+                PPKeyword("End"),
+                PPKeyword("ExternalSource"),
+                Keyword("End"),
+                Keyword("Sub"),
+                Keyword("End"),
+                Keyword("Module"))
+        End Function
+
+        <Theory, CombinatorialData>
+        Public Async Function TestBug2641_1(testHost As TestHost) As Task
+            Dim code =
+"Class PreprocessorNoContext
+Dim Region
+Dim ExternalSource
+End Class
+#Region ""Test""
+#End Region
+#Region ""Test"" ' comment
+#End Region ' comment
+#Region ""Test"" REM comment
+#End Region REM comment
+# _
+Region ""Test""
+# _
+End Region
+# _
+Region _
+""Test""
+# _
+End _
+Region"
+
+            Await TestAsync(code,
+                testHost,
                 Keyword("Class"),
                 [Class]("PreprocessorNoContext"),
                 Keyword("Dim"),
-                Identifier("Region"),
+                Field("Region"),
                 Keyword("Dim"),
-                Identifier("ExternalSource"),
+                Field("ExternalSource"),
                 Keyword("End"),
                 Keyword("Class"),
                 PPKeyword("#"),
@@ -2741,42 +3459,126 @@ Namespace Microsoft.CodeAnalysis.Editor.VisualBasic.UnitTests.Classification
                 PPKeyword("Region"),
                 Comment("REM comment"),
                 PPKeyword("#"),
-                Punctuation.Text("_"),
+                LineContinuation,
                 PPKeyword("Region"),
                 [String]("""Test"""),
                 PPKeyword("#"),
-                Punctuation.Text("_"),
+                LineContinuation,
                 PPKeyword("End"),
                 PPKeyword("Region"),
                 PPKeyword("#"),
-                Punctuation.Text("_"),
+                LineContinuation,
                 PPKeyword("Region"),
-                Punctuation.Text("_"),
+                LineContinuation,
                 [String]("""Test"""),
                 PPKeyword("#"),
-                Punctuation.Text("_"),
+                LineContinuation,
                 PPKeyword("End"),
-                Punctuation.Text("_"),
+                LineContinuation,
                 PPKeyword("Region"))
-        End Sub
+        End Function
 
-        <Fact, Trait(Traits.Feature, Traits.Features.Classification)>
-        Public Sub Bug2641_2()
-            Dim text = StringFromLines(
-                "#ExternalSource(""Test.vb"", 123)",
-                "#End ExternalSource",
-                "#ExternalSource(""Test.vb"", 123) ' comment",
-                "#End ExternalSource REM comment",
-                "# _",
-                "ExternalSource _",
-                "( _",
-                """Test.vb"" _",
-                ", _",
-                "123)",
-                "# _",
-                "End _",
-                "ExternalSource")
-            Test(text,
+        <Theory, CombinatorialData>
+        Public Async Function TestBug2641_1CommentsAfterLineContinuation(testHost As TestHost) As Task
+            Dim code =
+"Class PreprocessorNoContext
+Dim Region
+Dim ExternalSource
+End Class
+#Region ""Test""
+#End Region
+#Region ""Test"" ' comment
+#End Region ' comment
+#Region ""Test"" REM comment
+#End Region REM comment
+# _ ' Test 1
+Region ""Test""
+# _ ' Test 2
+End Region
+# _ ' Test 3
+Region _ ' Test 4
+""Test""
+# _ ' Test 5
+End _ ' Test 6
+Region"
+
+            Await TestAsync(code,
+                testHost,
+                Keyword("Class"),
+                [Class]("PreprocessorNoContext"),
+                Keyword("Dim"),
+                Field("Region"),
+                Keyword("Dim"),
+                Field("ExternalSource"),
+                Keyword("End"),
+                Keyword("Class"),
+                PPKeyword("#"),
+                PPKeyword("Region"),
+                [String]("""Test"""),
+                PPKeyword("#"),
+                PPKeyword("End"),
+                PPKeyword("Region"),
+                PPKeyword("#"),
+                PPKeyword("Region"),
+                [String]("""Test"""),
+                Comment("' comment"),
+                PPKeyword("#"),
+                PPKeyword("End"),
+                PPKeyword("Region"),
+                Comment("' comment"),
+                PPKeyword("#"),
+                PPKeyword("Region"),
+                [String]("""Test"""),
+                Comment("REM comment"),
+                PPKeyword("#"),
+                PPKeyword("End"),
+                PPKeyword("Region"),
+                Comment("REM comment"),
+                PPKeyword("#"),
+                LineContinuation,
+                Comment("' Test 1"),
+                PPKeyword("Region"),
+                [String]("""Test"""),
+                PPKeyword("#"),
+                LineContinuation,
+                 Comment("' Test 2"),
+               PPKeyword("End"),
+                PPKeyword("Region"),
+                PPKeyword("#"),
+                LineContinuation,
+                Comment("' Test 3"),
+                PPKeyword("Region"),
+                LineContinuation,
+                Comment("' Test 4"),
+                [String]("""Test"""),
+                PPKeyword("#"),
+                LineContinuation,
+                Comment("' Test 5"),
+                PPKeyword("End"),
+                LineContinuation,
+                Comment("' Test 6"),
+                PPKeyword("Region"))
+        End Function
+
+        <Theory, CombinatorialData>
+        Public Async Function TestBug2641_2(testHost As TestHost) As Task
+            Dim code =
+"#ExternalSource(""Test.vb"", 123)
+#End ExternalSource
+#ExternalSource(""Test.vb"", 123) ' comment
+#End ExternalSource REM comment
+# _
+ExternalSource _
+( _
+""Test.vb"" _
+, _
+123)
+# _
+End _
+ExternalSource"
+
+            Await TestAsync(code,
+                testHost,
                 PPKeyword("#"),
                 PPKeyword("ExternalSource"),
                 Punctuation.OpenParen,
@@ -2800,99 +3602,105 @@ Namespace Microsoft.CodeAnalysis.Editor.VisualBasic.UnitTests.Classification
                 PPKeyword("ExternalSource"),
                 Comment("REM comment"),
                 PPKeyword("#"),
-                Punctuation.Text("_"),
+                LineContinuation,
                 PPKeyword("ExternalSource"),
-                Punctuation.Text("_"),
+                LineContinuation,
                 Punctuation.OpenParen,
-                Punctuation.Text("_"),
+                LineContinuation,
                 [String]("""Test.vb"""),
-                Punctuation.Text("_"),
+                LineContinuation,
                 Punctuation.Comma,
-                Punctuation.Text("_"),
+                LineContinuation,
                 Number("123"),
                 Punctuation.CloseParen,
                 PPKeyword("#"),
-                Punctuation.Text("_"),
+                LineContinuation,
                 PPKeyword("End"),
-                Punctuation.Text("_"),
+                LineContinuation,
                 PPKeyword("ExternalSource"))
-        End Sub
+        End Function
 
-        <Fact, Trait(Traits.Feature, Traits.Features.Classification)>
-        Public Sub Bug2640()
-            Dim text = StringFromLines(
-                "# _",
-                "Region ""Test""",
-                "# _",
-                "End Region",
-                "# _",
-                "Region _",
-                """Test""",
-                "# _",
-                "End _",
-                "Region")
-            Test(text,
+        <Theory, CombinatorialData>
+        Public Async Function TestBug2640(testHost As TestHost) As Task
+            Dim code =
+"# _
+Region ""Test""
+# _
+End Region
+# _
+Region _
+""Test""
+# _
+End _
+Region"
+
+            Await TestAsync(code,
+                testHost,
                 PPKeyword("#"),
-                Punctuation.Text("_"),
+                LineContinuation,
                 PPKeyword("Region"),
                 [String]("""Test"""),
                 PPKeyword("#"),
-                Punctuation.Text("_"),
+                LineContinuation,
                 PPKeyword("End"),
                 PPKeyword("Region"),
                 PPKeyword("#"),
-                Punctuation.Text("_"),
+                LineContinuation,
                 PPKeyword("Region"),
-                Punctuation.Text("_"),
+                LineContinuation,
                 [String]("""Test"""),
                 PPKeyword("#"),
-                Punctuation.Text("_"),
+                LineContinuation,
                 PPKeyword("End"),
-                Punctuation.Text("_"),
+                LineContinuation,
                 PPKeyword("Region"))
-        End Sub
+        End Function
 
-        <Fact, Trait(Traits.Feature, Traits.Features.Classification)>
-        Public Sub Bug2638()
-            Dim text = StringFromLines(
-                "Module M",
-                "    Sub Main()",
-                "        Dim dt = #1/1/2000#",
-                "    End Sub",
-                "End Module")
-            Test(text,
+        <Theory, CombinatorialData>
+        Public Async Function TestBug2638(testHost As TestHost) As Task
+            Dim code =
+"Module M
+    Sub Main()
+        Dim dt = #1/1/2000#
+    End Sub
+End Module"
+
+            Await TestAsync(code,
+                testHost,
                 Keyword("Module"),
                 [Module]("M"),
                 Keyword("Sub"),
-                Identifier("Main"),
+                Method("Main"),
                 Punctuation.OpenParen,
                 Punctuation.CloseParen,
                 Keyword("Dim"),
-                Identifier("dt"),
+                Local("dt"),
                 Operators.Equals,
                 Number("#1/1/2000#"),
                 Keyword("End"),
                 Keyword("Sub"),
                 Keyword("End"),
                 Keyword("Module"))
-        End Sub
+        End Function
 
-        <Fact, Trait(Traits.Feature, Traits.Features.Classification)>
-        Public Sub Bug2562()
-            Dim text = StringFromLines(
-                "Module Program",
-                "  Sub Main(args As String())",
-                "    #region ""Foo""",
-                "    #End region REM dfkjslfkdsjf",
-                "  End Sub",
-                "End Module")
-            Test(text,
+        <Theory, CombinatorialData>
+        Public Async Function TestBug2562(testHost As TestHost) As Task
+            Dim code =
+"Module Program
+  Sub Main(args As String())
+    #region ""Goo""
+    #End region REM dfkjslfkdsjf
+  End Sub
+End Module"
+
+            Await TestAsync(code,
+                testHost,
                 Keyword("Module"),
                 [Module]("Program"),
                 Keyword("Sub"),
-                Identifier("Main"),
+                Method("Main"),
                 Punctuation.OpenParen,
-                Identifier("args"),
+                Parameter("args"),
                 Keyword("As"),
                 Keyword("String"),
                 Punctuation.OpenParen,
@@ -2900,7 +3708,7 @@ Namespace Microsoft.CodeAnalysis.Editor.VisualBasic.UnitTests.Classification
                 Punctuation.CloseParen,
                 PPKeyword("#"),
                 PPKeyword("region"),
-                [String]("""Foo"""),
+                [String]("""Goo"""),
                 PPKeyword("#"),
                 PPKeyword("End"),
                 PPKeyword("region"),
@@ -2909,17 +3717,19 @@ Namespace Microsoft.CodeAnalysis.Editor.VisualBasic.UnitTests.Classification
                 Keyword("Sub"),
                 Keyword("End"),
                 Keyword("Module"))
-        End Sub
+        End Function
 
-        <Fact, Trait(Traits.Feature, Traits.Features.Classification)>
-        Public Sub Bug3004()
-            Dim text = StringFromLines(
-                "''' <summary>",
-                "''' &#65;",
-                "''' </summary>",
-                "Module M",
-                "End Module")
-            Test(text,
+        <Theory, CombinatorialData>
+        Public Async Function TestBug3004(testHost As TestHost) As Task
+            Dim code =
+"''' <summary>
+''' &#65;
+''' </summary>
+Module M
+End Module"
+
+            Await TestAsync(code,
+                testHost,
                 XmlDoc.Delimiter("'''"),
                 XmlDoc.Text(" "),
                 XmlDoc.Delimiter("<"),
@@ -2937,14 +3747,16 @@ Namespace Microsoft.CodeAnalysis.Editor.VisualBasic.UnitTests.Classification
                 [Module]("M"),
                 Keyword("End"),
                 Keyword("Module"))
-        End Sub
+        End Function
 
-        <Fact, Trait(Traits.Feature, Traits.Features.Classification)>
-        Public Sub Bug3006()
-            Dim text = StringFromLines(
-                "#If True Then ' comment",
-                "#End If")
-            Test(text,
+        <Theory, CombinatorialData>
+        Public Async Function TestBug3006(testHost As TestHost) As Task
+            Dim code =
+"#If True Then ' comment
+#End If"
+
+            Await TestAsync(code,
+                testHost,
                 PPKeyword("#"),
                 PPKeyword("If"),
                 Keyword("True"),
@@ -2953,14 +3765,16 @@ Namespace Microsoft.CodeAnalysis.Editor.VisualBasic.UnitTests.Classification
                 PPKeyword("#"),
                 PPKeyword("End"),
                 PPKeyword("If"))
-        End Sub
+        End Function
 
-        <Fact, Trait(Traits.Feature, Traits.Features.Classification)>
-        Public Sub Bug3008()
-            Dim text = StringFromLines(
-                "#If #12/2/2010# = #12/2/2010# Then",
-                "#End If")
-            Test(text,
+        <Theory, CombinatorialData>
+        Public Async Function TestBug3008(testHost As TestHost) As Task
+            Dim code =
+"#If #12/2/2010# = #12/2/2010# Then
+#End If"
+
+            Await TestAsync(code,
+                testHost,
                 PPKeyword("#"),
                 PPKeyword("If"),
                 Number("#12/2/2010#"),
@@ -2970,40 +3784,47 @@ Namespace Microsoft.CodeAnalysis.Editor.VisualBasic.UnitTests.Classification
                 PPKeyword("#"),
                 PPKeyword("End"),
                 PPKeyword("If"))
-        End Sub
+        End Function
 
-        <Fact, Trait(Traits.Feature, Traits.Features.Classification)>
-        Public Sub TestBug927678()
-            Dim val = StringFromLines(
-                "'This is not usually a ",
-                "'collapsable comment block",
-                "x = 2")
+        <Theory, CombinatorialData>
+        Public Async Function TestBug927678(testHost As TestHost) As Task
+            Dim code =
+            "'This is not usually a " & vbCrLf &
+            "'collapsible comment block" & vbCrLf &
+            "x = 2"
 
-            TestInMethod(val,
-                         Comment("'This is not usually a "),
-                         Comment("'collapsable comment block"),
+            Await TestInMethodAsync(code,
+                testHost,
+                Comment("'This is not usually a "),
+                         Comment("'collapsible comment block"),
                          Identifier("x"),
                          Operators.Equals,
                          Number("2"))
-        End Sub
+        End Function
 
-        <Fact, Trait(Traits.Feature, Traits.Features.Classification)>
-        Public Sub Attribute()
-            Dim code = "<Assembly: Foo()>"
-            Test(code,
-                 Punctuation.OpenAngle,
+        <Theory, CombinatorialData>
+        Public Async Function TestAttribute(testHost As TestHost) As Task
+            Dim code = "<Assembly: Goo()>"
+
+            Await TestAsync(code,
+                testHost,
+                Punctuation.OpenAngle,
                  Keyword("Assembly"),
                  Punctuation.Colon,
-                 Identifier("Foo"),
+                 Identifier("Goo"),
                  Punctuation.OpenParen,
                  Punctuation.CloseParen,
                  Punctuation.CloseAngle)
-        End Sub
+        End Function
 
-        <Fact, Trait(Traits.Feature, Traits.Features.Classification)>
-        Public Sub TestAngleBracketsOnGenericConstraints_Bug932262()
-            Test(StringFromLines("Class C(Of T As A(Of T))",
-                                 "End Class"),
+        <Theory, CombinatorialData>
+        Public Async Function TestAngleBracketsOnGenericConstraints_Bug932262(testHost As TestHost) As Task
+            Dim code =
+"Class C(Of T As A(Of T))
+End Class"
+
+            Await TestAsync(code,
+                testHost,
                 Keyword("Class"),
                 [Class]("C"),
                 Punctuation.OpenParen,
@@ -3018,72 +3839,121 @@ Namespace Microsoft.CodeAnalysis.Editor.VisualBasic.UnitTests.Classification
                 Punctuation.CloseParen,
                 Keyword("End"),
                 Keyword("Class"))
-        End Sub
+        End Function
 
-        <Fact, Trait(Traits.Feature, Traits.Features.Classification)>
-        Public Sub IntegerAsContextualKeyword()
-            Dim text = StringFromLines(
-                "    Sub CallMeInteger(ByVal [Integer] As Integer)",
-                "        CallMeInteger(Integer:=1)",
-                "        CallMeInteger(Integer _",
-                "                      := _",
-                "                      1)",
-                "    End Sub",
-                "    Dim [Class] As Integer")
-            TestInClass(text,
+        <Theory, CombinatorialData>
+        Public Async Function TestIntegerAsContextualKeyword(testHost As TestHost) As Task
+            Dim code =
+"Sub CallMeInteger(ByVal [Integer] As Integer)
+    CallMeInteger(Integer:=1)
+    CallMeInteger(Integer _
+                    := _
+                    1)
+End Sub
+Dim [Class] As Integer"
+
+            Await TestInClassAsync(code,
+                testHost,
                 Keyword("Sub"),
-                Identifier("CallMeInteger"),
+                Method("CallMeInteger"),
                 Punctuation.OpenParen,
                 Keyword("ByVal"),
-                Identifier("[Integer]"),
+                Parameter("[Integer]"),
                 Keyword("As"),
                 Keyword("Integer"),
                 Punctuation.CloseParen,
                 Identifier("CallMeInteger"),
                 Punctuation.OpenParen,
                 Identifier("Integer"),
-                Operators.Text(":="),
+                Operators.ColonEquals,
                 Number("1"),
                 Punctuation.CloseParen,
                 Identifier("CallMeInteger"),
                 Punctuation.OpenParen,
                 Identifier("Integer"),
-                Punctuation.Text("_"),
-                Operators.Text(":="),
-                Punctuation.Text("_"),
+                LineContinuation,
+                Operators.ColonEquals,
+                LineContinuation,
                 Number("1"),
                 Punctuation.CloseParen,
                 Keyword("End"),
                 Keyword("Sub"),
                 Keyword("Dim"),
-                Identifier("[Class]"),
+                Field("[Class]"),
                 Keyword("As"),
                 Keyword("Integer"))
-        End Sub
+        End Function
 
-        <Fact, Trait(Traits.Feature, Traits.Features.Classification)>
-        Public Sub IndexStrings()
-            Dim text = StringFromLines(
-                "Default ReadOnly Property IndexMe(ByVal arg As String) As Integer",
-                "        Get",
-                "            With Me",
-                "                Dim t = !String",
-                "                t = ! _",
-                "                    String",
-                "                t = .Class",
-                "                t = . _",
-                "                    Class",
-                "            End With",
-                "        End Get",
-                "    End Property")
-            Test(text,
+        <Theory, CombinatorialData>
+        Public Async Function TestIntegerAsContextualKeywordCommentsAfterLineContinuation(testHost As TestHost) As Task
+            Dim code =
+"Sub CallMeInteger(ByVal [Integer] As Integer)
+    CallMeInteger(Integer:=1)
+    CallMeInteger(Integer _ ' Test 1
+                    := _ ' Test 2
+                    1)
+End Sub
+Dim [Class] As Integer"
+
+            Await TestInClassAsync(code,
+                testHost,
+                Keyword("Sub"),
+                Method("CallMeInteger"),
+                Punctuation.OpenParen,
+                Keyword("ByVal"),
+                Parameter("[Integer]"),
+                Keyword("As"),
+                Keyword("Integer"),
+                Punctuation.CloseParen,
+                Identifier("CallMeInteger"),
+                Punctuation.OpenParen,
+                Identifier("Integer"),
+                Operators.ColonEquals,
+                Number("1"),
+                Punctuation.CloseParen,
+                Identifier("CallMeInteger"),
+                Punctuation.OpenParen,
+                Identifier("Integer"),
+                LineContinuation,
+                Comment("' Test 1"),
+                Operators.ColonEquals,
+                LineContinuation,
+                 Comment("' Test 2"),
+               Number("1"),
+                Punctuation.CloseParen,
+                Keyword("End"),
+                Keyword("Sub"),
+                Keyword("Dim"),
+                Field("[Class]"),
+                Keyword("As"),
+                Keyword("Integer"))
+        End Function
+
+        <Theory, CombinatorialData>
+        Public Async Function TestIndexStrings(testHost As TestHost) As Task
+            Dim code =
+"Default ReadOnly Property IndexMe(ByVal arg As String) As Integer
+    Get
+        With Me
+            Dim t = !String
+            t = ! _
+                String
+            t = .Class
+            t = . _
+                Class
+        End With
+    End Get
+End Property"
+
+            Await TestAsync(code,
+                testHost,
                 Keyword("Default"),
                 Keyword("ReadOnly"),
                 Keyword("Property"),
-                Identifier("IndexMe"),
+                [Property]("IndexMe"),
                 Punctuation.OpenParen,
                 Keyword("ByVal"),
-                Identifier("arg"),
+                Parameter("arg"),
                 Keyword("As"),
                 Keyword("String"),
                 Punctuation.CloseParen,
@@ -3093,14 +3963,14 @@ Namespace Microsoft.CodeAnalysis.Editor.VisualBasic.UnitTests.Classification
                 Keyword("With"),
                 Keyword("Me"),
                 Keyword("Dim"),
-                Identifier("t"),
+                Local("t"),
                 Operators.Equals,
                 Operators.Exclamation,
                 Identifier("String"),
                 Identifier("t"),
                 Operators.Equals,
                 Operators.Exclamation,
-                Punctuation.Text("_"),
+                LineContinuation,
                 Identifier("String"),
                 Identifier("t"),
                 Operators.Equals,
@@ -3109,7 +3979,7 @@ Namespace Microsoft.CodeAnalysis.Editor.VisualBasic.UnitTests.Classification
                 Identifier("t"),
                 Operators.Equals,
                 Operators.Dot,
-                Punctuation.Text("_"),
+                LineContinuation,
                 Identifier("Class"),
                 Keyword("End"),
                 Keyword("With"),
@@ -3117,41 +3987,105 @@ Namespace Microsoft.CodeAnalysis.Editor.VisualBasic.UnitTests.Classification
                 Keyword("Get"),
                 Keyword("End"),
                 Keyword("Property"))
-        End Sub
+        End Function
 
-        <Fact, Trait(Traits.Feature, Traits.Features.Classification)>
-        Public Sub MyIsIdentifierOnSyntaxLevel()
-            Dim text = StringFromLines(
-                "Dim My",
-                "    Dim var = My.Application.GetEnvironmentVariable(""test"")",
-                "    Sub CallMeMy(ByVal My As Integer)",
-                "        CallMeMy(My:=1)",
-                "        CallMeMy(My _",
-                "                 := _",
-                "                 1)",
-                "        My.ToString()",
-                "        With Me",
-                "            .My = 1",
-                "            . _",
-                "            My _",
-                "            = 1",
-                "            !My = Nothing",
-                "            ! _",
-                "            My _",
-                "            = Nothing",
-                "        End With",
-                "        Me.My.ToString()",
-                "        Me. _",
-                "        My.ToString()",
-                "        Me.My = 1",
-                "        Me. _",
-                "        My = 1",
-                "    End Sub")
-            TestInClass(text,
+        <Theory, CombinatorialData>
+        Public Async Function TestIndexStringsCommentsAfterLineContinuation(testHost As TestHost) As Task
+            Dim code =
+"Default ReadOnly Property IndexMe(ByVal arg As String) As Integer
+    Get
+        With Me
+            Dim t = !String
+            t = ! _ ' Test 1
+                String
+            t = .Class
+            t = . _ ' Test 2
+                Class
+        End With
+    End Get
+End Property"
+
+            Await TestAsync(code,
+                testHost,
+                Keyword("Default"),
+                Keyword("ReadOnly"),
+                Keyword("Property"),
+                [Property]("IndexMe"),
+                Punctuation.OpenParen,
+                Keyword("ByVal"),
+                Parameter("arg"),
+                Keyword("As"),
+                Keyword("String"),
+                Punctuation.CloseParen,
+                Keyword("As"),
+                Keyword("Integer"),
+                Keyword("Get"),
+                Keyword("With"),
+                Keyword("Me"),
                 Keyword("Dim"),
-                Identifier("My"),
+                Local("t"),
+                Operators.Equals,
+                Operators.Exclamation,
+                Identifier("String"),
+                Identifier("t"),
+                Operators.Equals,
+                Operators.Exclamation,
+                LineContinuation,
+                Comment("' Test 1"),
+                Identifier("String"),
+                Identifier("t"),
+                Operators.Equals,
+                Operators.Dot,
+                Identifier("Class"),
+                Identifier("t"),
+                Operators.Equals,
+                Operators.Dot,
+                LineContinuation,
+                Comment("' Test 2"),
+                Identifier("Class"),
+                Keyword("End"),
+                Keyword("With"),
+                Keyword("End"),
+                Keyword("Get"),
+                Keyword("End"),
+                Keyword("Property"))
+        End Function
+
+        <Theory, CombinatorialData>
+        Public Async Function TestMyIsIdentifierOnSyntaxLevel(testHost As TestHost) As Task
+            Dim code =
+"Dim My
+Dim var = My.Application.GetEnvironmentVariable(""test"")
+Sub CallMeMy(ByVal My As Integer)
+    CallMeMy(My:=1)
+    CallMeMy(My _
+                := _
+                1)
+    My.ToString()
+    With Me
+        .My = 1
+        . _
+        My _
+        = 1
+        !My = Nothing
+        ! _
+        My _
+        = Nothing
+    End With
+    Me.My.ToString()
+    Me. _
+    My.ToString()
+    Me.My = 1
+    Me. _
+    My = 1
+End Sub"
+
+            Await TestInClassAsync(code,
+                testHost,
                 Keyword("Dim"),
-                Identifier("var"),
+                Field("My"),
+                Keyword("Dim"),
+                Field("var"),
                 Operators.Equals,
                 Identifier("My"),
                 Operators.Dot,
@@ -3162,25 +4096,25 @@ Namespace Microsoft.CodeAnalysis.Editor.VisualBasic.UnitTests.Classification
                 [String]("""test"""),
                 Punctuation.CloseParen,
                 Keyword("Sub"),
-                Identifier("CallMeMy"),
+                Method("CallMeMy"),
                 Punctuation.OpenParen,
                 Keyword("ByVal"),
-                Identifier("My"),
+                Parameter("My"),
                 Keyword("As"),
                 Keyword("Integer"),
                 Punctuation.CloseParen,
                 Identifier("CallMeMy"),
                 Punctuation.OpenParen,
                 Identifier("My"),
-                Operators.Text(":="),
+                Operators.ColonEquals,
                 Number("1"),
                 Punctuation.CloseParen,
                 Identifier("CallMeMy"),
                 Punctuation.OpenParen,
                 Identifier("My"),
-                Punctuation.Text("_"),
-                Operators.Text(":="),
-                Punctuation.Text("_"),
+                LineContinuation,
+                Operators.ColonEquals,
+                LineContinuation,
                 Number("1"),
                 Punctuation.CloseParen,
                 Identifier("My"),
@@ -3195,9 +4129,9 @@ Namespace Microsoft.CodeAnalysis.Editor.VisualBasic.UnitTests.Classification
                 Operators.Equals,
                 Number("1"),
                 Operators.Dot,
-                Punctuation.Text("_"),
+                LineContinuation,
                 Identifier("My"),
-                Punctuation.Text("_"),
+                LineContinuation,
                 Operators.Equals,
                 Number("1"),
                 Operators.Exclamation,
@@ -3205,9 +4139,9 @@ Namespace Microsoft.CodeAnalysis.Editor.VisualBasic.UnitTests.Classification
                 Operators.Equals,
                 Keyword("Nothing"),
                 Operators.Exclamation,
-                Punctuation.Text("_"),
+                LineContinuation,
                 Identifier("My"),
-                Punctuation.Text("_"),
+                LineContinuation,
                 Operators.Equals,
                 Keyword("Nothing"),
                 Keyword("End"),
@@ -3221,7 +4155,7 @@ Namespace Microsoft.CodeAnalysis.Editor.VisualBasic.UnitTests.Classification
                 Punctuation.CloseParen,
                 Keyword("Me"),
                 Operators.Dot,
-                Punctuation.Text("_"),
+                LineContinuation,
                 Identifier("My"),
                 Operators.Dot,
                 Identifier("ToString"),
@@ -3234,38 +4168,173 @@ Namespace Microsoft.CodeAnalysis.Editor.VisualBasic.UnitTests.Classification
                 Number("1"),
                 Keyword("Me"),
                 Operators.Dot,
-                Punctuation.Text("_"),
+                LineContinuation,
                 Identifier("My"),
                 Operators.Equals,
                 Number("1"),
                 Keyword("End"),
                 Keyword("Sub"))
-        End Sub
+        End Function
 
-        <Fact, Trait(Traits.Feature, Traits.Features.Classification)>
-        Public Sub IsTrueIsFalse()
-            Dim text = StringFromLines(
-                "Class IsTrueIsFalseTests",
-                "    Dim IsTrue",
-                "    Dim IsFalse",
-                "    Shared Operator IsTrue(ByVal x As IsTrueIsFalseTests) As Boolean",
-                "    End Operator",
-                "    Shared Operator IsFalse(ByVal x As IsTrueIsFalseTests) As Boolean",
-                "    End Operator",
-                "End Class")
-            TestInClass(text,
+        <Theory, CombinatorialData>
+        Public Async Function TestMyIsIdentifierOnSyntaxLevelCommentsAfterLineContinuation(testHost As TestHost) As Task
+            Dim code =
+"Dim My
+Dim var = My.Application.GetEnvironmentVariable(""test"")
+Sub CallMeMy(ByVal My As Integer)
+    CallMeMy(My:=1)
+    CallMeMy(My _ ' Test 1
+                := _ ' Test 2
+                1)
+    My.ToString()
+    With Me
+        .My = 1
+        . _ ' Test 3
+        My _ ' Test 4
+        = 1
+        !My = Nothing
+        ! _ ' Test 5
+        My _ ' Test 6
+        = Nothing
+    End With
+    Me.My.ToString()
+    Me. _ ' Test 7
+    My.ToString()
+    Me.My = 1
+    Me. _ ' Test 8
+    My = 1
+End Sub"
+
+            Await TestInClassAsync(code,
+                testHost,
+                Keyword("Dim"),
+                Field("My"),
+                Keyword("Dim"),
+                Field("var"),
+                Operators.Equals,
+                Identifier("My"),
+                Operators.Dot,
+                Identifier("Application"),
+                Operators.Dot,
+                Identifier("GetEnvironmentVariable"),
+                Punctuation.OpenParen,
+                [String]("""test"""),
+                Punctuation.CloseParen,
+                Keyword("Sub"),
+                Method("CallMeMy"),
+                Punctuation.OpenParen,
+                Keyword("ByVal"),
+                Parameter("My"),
+                Keyword("As"),
+                Keyword("Integer"),
+                Punctuation.CloseParen,
+                Identifier("CallMeMy"),
+                Punctuation.OpenParen,
+                Identifier("My"),
+                Operators.ColonEquals,
+                Number("1"),
+                Punctuation.CloseParen,
+                Identifier("CallMeMy"),
+                Punctuation.OpenParen,
+                Identifier("My"),
+                LineContinuation,
+                Comment("' Test 1"),
+                Operators.ColonEquals,
+                LineContinuation,
+                Comment("' Test 2"),
+                Number("1"),
+                Punctuation.CloseParen,
+                Identifier("My"),
+                Operators.Dot,
+                Identifier("ToString"),
+                Punctuation.OpenParen,
+                Punctuation.CloseParen,
+                Keyword("With"),
+                Keyword("Me"),
+                Operators.Dot,
+                Identifier("My"),
+                Operators.Equals,
+                Number("1"),
+                Operators.Dot,
+                LineContinuation,
+                Comment("' Test 3"),
+                Identifier("My"),
+                LineContinuation,
+                Comment("' Test 4"),
+                Operators.Equals,
+                Number("1"),
+                Operators.Exclamation,
+                Identifier("My"),
+                Operators.Equals,
+                Keyword("Nothing"),
+                Operators.Exclamation,
+                LineContinuation,
+                Comment("' Test 5"),
+                Identifier("My"),
+                LineContinuation,
+                Comment("' Test 6"),
+                Operators.Equals,
+                Keyword("Nothing"),
+                Keyword("End"),
+                Keyword("With"),
+                Keyword("Me"),
+                Operators.Dot,
+                Identifier("My"),
+                Operators.Dot,
+                Identifier("ToString"),
+                Punctuation.OpenParen,
+                Punctuation.CloseParen,
+                Keyword("Me"),
+                Operators.Dot,
+                LineContinuation,
+                Comment("' Test 7"),
+                Identifier("My"),
+                Operators.Dot,
+                Identifier("ToString"),
+                Punctuation.OpenParen,
+                Punctuation.CloseParen,
+                Keyword("Me"),
+                Operators.Dot,
+                Identifier("My"),
+                Operators.Equals,
+                Number("1"),
+                Keyword("Me"),
+                Operators.Dot,
+                LineContinuation,
+                Comment("' Test 8"),
+                Identifier("My"),
+                Operators.Equals,
+                Number("1"),
+                Keyword("End"),
+                Keyword("Sub"))
+        End Function
+
+        <Theory, CombinatorialData>
+        Public Async Function TestIsTrueIsFalse(testHost As TestHost) As Task
+            Dim code =
+"Class IsTrueIsFalseTests
+    Dim IsTrue
+    Dim IsFalse
+    Shared Operator IsTrue(ByVal x As IsTrueIsFalseTests) As Boolean
+    End Operator
+    Shared Operator IsFalse(ByVal x As IsTrueIsFalseTests) As Boolean
+    End Operator
+End Class"
+
+            Await TestInClassAsync(code,
+                testHost,
                 Keyword("Class"),
                 [Class]("IsTrueIsFalseTests"),
                 Keyword("Dim"),
-                Identifier("IsTrue"),
+                Field("IsTrue"),
                 Keyword("Dim"),
-                Identifier("IsFalse"),
+                Field("IsFalse"),
                 Keyword("Shared"),
                 Keyword("Operator"),
                 Keyword("IsTrue"),
                 Punctuation.OpenParen,
                 Keyword("ByVal"),
-                Identifier("x"),
+                Parameter("x"),
                 Keyword("As"),
                 Identifier("IsTrueIsFalseTests"),
                 Punctuation.CloseParen,
@@ -3278,7 +4347,7 @@ Namespace Microsoft.CodeAnalysis.Editor.VisualBasic.UnitTests.Classification
                 Keyword("IsFalse"),
                 Punctuation.OpenParen,
                 Keyword("ByVal"),
-                Identifier("x"),
+                Parameter("x"),
                 Keyword("As"),
                 Identifier("IsTrueIsFalseTests"),
                 Punctuation.CloseParen,
@@ -3288,34 +4357,36 @@ Namespace Microsoft.CodeAnalysis.Editor.VisualBasic.UnitTests.Classification
                 Keyword("Operator"),
                 Keyword("End"),
                 Keyword("Class"))
-        End Sub
+        End Function
 
-        <Fact, Trait(Traits.Feature, Traits.Features.Classification)>
-        Public Sub DeclareAnsiAutoUnicode()
-            Dim text = StringFromLines(
-                "    Dim Ansi",
-                "    Dim Unicode",
-                "    Dim Auto",
-                "    Declare Ansi Sub AnsiTest Lib ""Test.dll"" ()",
-                "    Declare Auto Sub AutoTest Lib ""Test.dll"" ()",
-                "    Declare Unicode Sub UnicodeTest Lib ""Test.dll"" ()",
-                "    Declare _",
-                "        Ansi Sub AnsiTest2 Lib ""Test.dll"" ()",
-                "    Declare _",
-                "        Auto Sub AutoTest2 Lib ""Test.dll"" ()",
-                "    Declare _",
-                "        Unicode Sub UnicodeTest2 Lib ""Test.dll"" ()")
-            TestInClass(text,
+        <Theory, CombinatorialData>
+        Public Async Function TestDeclareAnsiAutoUnicode(testHost As TestHost) As Task
+            Dim code =
+"    Dim Ansi
+    Dim Unicode
+    Dim Auto
+    Declare Ansi Sub AnsiTest Lib ""Test.dll"" ()
+    Declare Auto Sub AutoTest Lib ""Test.dll"" ()
+    Declare Unicode Sub UnicodeTest Lib ""Test.dll"" ()
+    Declare _
+        Ansi Sub AnsiTest2 Lib ""Test.dll"" ()
+    Declare _
+        Auto Sub AutoTest2 Lib ""Test.dll"" ()
+    Declare _
+        Unicode Sub UnicodeTest2 Lib ""Test.dll"" ()"
+
+            Await TestInClassAsync(code,
+                testHost,
                 Keyword("Dim"),
-                Identifier("Ansi"),
+                Field("Ansi"),
                 Keyword("Dim"),
-                Identifier("Unicode"),
+                Field("Unicode"),
                 Keyword("Dim"),
-                Identifier("Auto"),
+                Field("Auto"),
                 Keyword("Declare"),
                 Keyword("Ansi"),
                 Keyword("Sub"),
-                Identifier("AnsiTest"),
+                Method("AnsiTest"),
                 Keyword("Lib"),
                 [String]("""Test.dll"""),
                 Punctuation.OpenParen,
@@ -3323,7 +4394,7 @@ Namespace Microsoft.CodeAnalysis.Editor.VisualBasic.UnitTests.Classification
                 Keyword("Declare"),
                 Keyword("Auto"),
                 Keyword("Sub"),
-                Identifier("AutoTest"),
+                Method("AutoTest"),
                 Keyword("Lib"),
                 [String]("""Test.dll"""),
                 Punctuation.OpenParen,
@@ -3331,104 +4402,237 @@ Namespace Microsoft.CodeAnalysis.Editor.VisualBasic.UnitTests.Classification
                 Keyword("Declare"),
                 Keyword("Unicode"),
                 Keyword("Sub"),
-                Identifier("UnicodeTest"),
+                Method("UnicodeTest"),
                 Keyword("Lib"),
                 [String]("""Test.dll"""),
                 Punctuation.OpenParen,
                 Punctuation.CloseParen,
                 Keyword("Declare"),
-                Punctuation.Text("_"),
+                LineContinuation,
                 Keyword("Ansi"),
                 Keyword("Sub"),
-                Identifier("AnsiTest2"),
+                Method("AnsiTest2"),
                 Keyword("Lib"),
                 [String]("""Test.dll"""),
                 Punctuation.OpenParen,
                 Punctuation.CloseParen,
                 Keyword("Declare"),
-                Punctuation.Text("_"),
+                LineContinuation,
                 Keyword("Auto"),
                 Keyword("Sub"),
-                Identifier("AutoTest2"),
+                Method("AutoTest2"),
                 Keyword("Lib"),
                 [String]("""Test.dll"""),
                 Punctuation.OpenParen,
                 Punctuation.CloseParen,
                 Keyword("Declare"),
-                Punctuation.Text("_"),
+                LineContinuation,
                 Keyword("Unicode"),
                 Keyword("Sub"),
-                Identifier("UnicodeTest2"),
+                Method("UnicodeTest2"),
                 Keyword("Lib"),
                 [String]("""Test.dll"""),
                 Punctuation.OpenParen,
                 Punctuation.CloseParen)
-        End Sub
+        End Function
 
-        <Fact, Trait(Traits.Feature, Traits.Features.Classification)>
-        Public Sub Until()
-            Dim text = StringFromLines(
-                "    Dim Until",
-                "    Sub TestSub()",
-                "        Do",
-                "        Loop Until True",
-                "        Do",
-                "        Loop _",
-                "        Until True",
-                "        Do Until True",
-                "        Loop",
-                "        Do _",
-                "        Until True",
-                "        Loop",
-                "    End Sub")
-            TestInClass(text,
+        <Theory, CombinatorialData>
+        Public Async Function TestDeclareAnsiAutoUnicodeCommentsAfterLineContinuation(testHost As TestHost) As Task
+            Dim code =
+"    Dim Ansi
+    Dim Unicode
+    Dim Auto
+    Declare Ansi Sub AnsiTest Lib ""Test.dll"" ()
+    Declare Auto Sub AutoTest Lib ""Test.dll"" ()
+    Declare Unicode Sub UnicodeTest Lib ""Test.dll"" ()
+    Declare _ ' Test 1
+        Ansi Sub AnsiTest2 Lib ""Test.dll"" ()
+    Declare _ ' Test 2
+        Auto Sub AutoTest2 Lib ""Test.dll"" ()
+    Declare _ ' Test 3
+        Unicode Sub UnicodeTest2 Lib ""Test.dll"" ()"
+
+            Await TestInClassAsync(code,
+                testHost,
                 Keyword("Dim"),
-                Identifier("Until"),
+                Field("Ansi"),
+                Keyword("Dim"),
+                Field("Unicode"),
+                Keyword("Dim"),
+                Field("Auto"),
+                Keyword("Declare"),
+                Keyword("Ansi"),
                 Keyword("Sub"),
-                Identifier("TestSub"),
+                Method("AnsiTest"),
+                Keyword("Lib"),
+                [String]("""Test.dll"""),
                 Punctuation.OpenParen,
                 Punctuation.CloseParen,
-                Keyword("Do"),
-                Keyword("Loop"),
-                Keyword("Until"),
+                Keyword("Declare"),
+                Keyword("Auto"),
+                Keyword("Sub"),
+                Method("AutoTest"),
+                Keyword("Lib"),
+                [String]("""Test.dll"""),
+                Punctuation.OpenParen,
+                Punctuation.CloseParen,
+                Keyword("Declare"),
+                Keyword("Unicode"),
+                Keyword("Sub"),
+                Method("UnicodeTest"),
+                Keyword("Lib"),
+                [String]("""Test.dll"""),
+                Punctuation.OpenParen,
+                Punctuation.CloseParen,
+                Keyword("Declare"),
+                LineContinuation,
+                Comment("' Test 1"),
+                Keyword("Ansi"),
+                Keyword("Sub"),
+                Method("AnsiTest2"),
+                Keyword("Lib"),
+                [String]("""Test.dll"""),
+                Punctuation.OpenParen,
+                Punctuation.CloseParen,
+                Keyword("Declare"),
+                LineContinuation,
+                Comment("' Test 2"),
+                Keyword("Auto"),
+                Keyword("Sub"),
+                Method("AutoTest2"),
+                Keyword("Lib"),
+                [String]("""Test.dll"""),
+                Punctuation.OpenParen,
+                Punctuation.CloseParen,
+                Keyword("Declare"),
+                LineContinuation,
+                Comment("' Test 3"),
+                Keyword("Unicode"),
+                Keyword("Sub"),
+                Method("UnicodeTest2"),
+                Keyword("Lib"),
+                [String]("""Test.dll"""),
+                Punctuation.OpenParen,
+                Punctuation.CloseParen)
+        End Function
+
+        <Theory, CombinatorialData>
+        Public Async Function TestUntil(testHost As TestHost) As Task
+            Dim code =
+"    Dim Until
+    Sub TestSub()
+        Do
+        Loop Until True
+        Do
+        Loop _
+        Until True
+        Do Until True
+        Loop
+        Do _
+        Until True
+        Loop
+    End Sub"
+
+            Await TestInClassAsync(code,
+                testHost,
+                Keyword("Dim"),
+                Field("Until"),
+                Keyword("Sub"),
+                Method("TestSub"),
+                Punctuation.OpenParen,
+                Punctuation.CloseParen,
+                ControlKeyword("Do"),
+                ControlKeyword("Loop"),
+                ControlKeyword("Until"),
                 Keyword("True"),
-                Keyword("Do"),
-                Keyword("Loop"),
-                Punctuation.Text("_"),
-                Keyword("Until"),
+                ControlKeyword("Do"),
+                ControlKeyword("Loop"),
+                LineContinuation,
+                ControlKeyword("Until"),
                 Keyword("True"),
-                Keyword("Do"),
-                Keyword("Until"),
+                ControlKeyword("Do"),
+                ControlKeyword("Until"),
                 Keyword("True"),
-                Keyword("Loop"),
-                Keyword("Do"),
-                Punctuation.Text("_"),
-                Keyword("Until"),
+                ControlKeyword("Loop"),
+                ControlKeyword("Do"),
+                LineContinuation,
+                ControlKeyword("Until"),
                 Keyword("True"),
-                Keyword("Loop"),
+                ControlKeyword("Loop"),
                 Keyword("End"),
                 Keyword("Sub"))
-        End Sub
+        End Function
 
-        <Fact, Trait(Traits.Feature, Traits.Features.Classification)>
-        Public Sub Preserve()
-            Dim text = StringFromLines(
-                "    Dim Preserve",
-                "    Sub TestSub()",
-                "        Dim arr As Integer() = Nothing",
-                "        ReDim Preserve arr(0)",
-                "        ReDim _",
-                "        Preserve arr(0)",
-                "    End Sub")
-            TestInClass(text,
+        <Theory, CombinatorialData>
+        Public Async Function TestUntilCommentsAfterLineContinuation(testHost As TestHost) As Task
+            Dim code =
+"    Dim Until
+    Sub TestSub()
+        Do
+        Loop Until True
+        Do
+        Loop _ ' Test 1
+        Until True
+        Do Until True
+        Loop
+        Do _ ' Test 2
+        Until True
+        Loop
+    End Sub"
+
+            Await TestInClassAsync(code,
+                testHost,
                 Keyword("Dim"),
-                Identifier("Preserve"),
+                Field("Until"),
                 Keyword("Sub"),
-                Identifier("TestSub"),
+                Method("TestSub"),
+                Punctuation.OpenParen,
+                Punctuation.CloseParen,
+                ControlKeyword("Do"),
+                ControlKeyword("Loop"),
+                ControlKeyword("Until"),
+                Keyword("True"),
+                ControlKeyword("Do"),
+                ControlKeyword("Loop"),
+                LineContinuation,
+                Comment("' Test 1"),
+                ControlKeyword("Until"),
+                Keyword("True"),
+                ControlKeyword("Do"),
+                ControlKeyword("Until"),
+                Keyword("True"),
+                ControlKeyword("Loop"),
+                ControlKeyword("Do"),
+                LineContinuation,
+                Comment("' Test 2"),
+                ControlKeyword("Until"),
+                Keyword("True"),
+                ControlKeyword("Loop"),
+                Keyword("End"),
+                Keyword("Sub"))
+        End Function
+
+        <Theory, CombinatorialData>
+        Public Async Function TestPreserve(testHost As TestHost) As Task
+            Dim code =
+"    Dim Preserve
+    Sub TestSub()
+        Dim arr As Integer() = Nothing
+        ReDim Preserve arr(0)
+        ReDim _
+        Preserve arr(0)
+    End Sub"
+
+            Await TestInClassAsync(code,
+                testHost,
+                Keyword("Dim"),
+                Field("Preserve"),
+                Keyword("Sub"),
+                Method("TestSub"),
                 Punctuation.OpenParen,
                 Punctuation.CloseParen,
                 Keyword("Dim"),
-                Identifier("arr"),
+                Local("arr"),
                 Keyword("As"),
                 Keyword("Integer"),
                 Punctuation.OpenParen,
@@ -3442,7 +4646,7 @@ Namespace Microsoft.CodeAnalysis.Editor.VisualBasic.UnitTests.Classification
                 Number("0"),
                 Punctuation.CloseParen,
                 Keyword("ReDim"),
-                Punctuation.Text("_"),
+                LineContinuation,
                 Keyword("Preserve"),
                 Identifier("arr"),
                 Punctuation.OpenParen,
@@ -3450,207 +4654,270 @@ Namespace Microsoft.CodeAnalysis.Editor.VisualBasic.UnitTests.Classification
                 Punctuation.CloseParen,
                 Keyword("End"),
                 Keyword("Sub"))
-        End Sub
+        End Function
 
-        <Fact, Trait(Traits.Feature, Traits.Features.Classification)>
-        Public Sub SkippedTextAsTokens()
-            Dim text = StringFromLines(
-                "Module Program",
-                "    Sub Test(ByVal readOnly As Boolean)",
-                "    End Sub",
-                "End Module")
-            Test(text,
+        <Theory, CombinatorialData>
+        Public Async Function TestPreserveCommentsAfterLineContinuation(testHost As TestHost) As Task
+            Dim code =
+"    Dim Preserve
+    Sub TestSub()
+        Dim arr As Integer() = Nothing
+        ReDim Preserve arr(0)
+        ReDim _ ' Test
+        Preserve arr(0)
+    End Sub"
+
+            Await TestInClassAsync(code,
+                testHost,
+                Keyword("Dim"),
+                Field("Preserve"),
+                Keyword("Sub"),
+                Method("TestSub"),
+                Punctuation.OpenParen,
+                Punctuation.CloseParen,
+                Keyword("Dim"),
+                Local("arr"),
+                Keyword("As"),
+                Keyword("Integer"),
+                Punctuation.OpenParen,
+                Punctuation.CloseParen,
+                Operators.Equals,
+                Keyword("Nothing"),
+                Keyword("ReDim"),
+                Keyword("Preserve"),
+                Identifier("arr"),
+                Punctuation.OpenParen,
+                Number("0"),
+                Punctuation.CloseParen,
+                Keyword("ReDim"),
+                LineContinuation,
+                Comment("' Test"),
+                Keyword("Preserve"),
+                Identifier("arr"),
+                Punctuation.OpenParen,
+                Number("0"),
+                Punctuation.CloseParen,
+                Keyword("End"),
+                Keyword("Sub"))
+        End Function
+
+        <Theory, CombinatorialData>
+        Public Async Function TestSkippedTextAsTokens(testHost As TestHost) As Task
+            Dim code =
+"Module Program
+    Sub Test(ByVal readOnly As Boolean)
+    End Sub
+End Module"
+
+            Await TestAsync(code,
+                testHost,
                 Keyword("Module"),
                 [Module]("Program"),
                 Keyword("Sub"),
-                Identifier("Test"),
+                Method("Test"),
                 Punctuation.OpenParen,
                 Keyword("ByVal"),
                 Keyword("readOnly"),
-                Identifier("As"),
+                Parameter("As"),
                 Keyword("Boolean"),
                 Punctuation.CloseParen,
                 Keyword("End"),
                 Keyword("Sub"),
                 Keyword("End"),
                 Keyword("Module"))
-        End Sub
+        End Function
 
-        <Fact, Trait(Traits.Feature, Traits.Features.Classification)>
-        <WorkItem(538647)>
-        Public Sub Regression4315_VariableNamesClassifiedAsType()
-            Dim text = StringFromLines(
-                "Module M",
-                "    Sub S()",
-                "        Dim foo",
-                "    End Sub",
-                "End Module")
-            Test(text,
+        <Theory, CombinatorialData>
+        <WorkItem(538647, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/538647")>
+        Public Async Function TestRegression4315_VariableNamesClassifiedAsType(testHost As TestHost) As Task
+            Dim code =
+"Module M
+    Sub S()
+        Dim goo
+    End Sub
+End Module"
+
+            Await TestAsync(code,
+                testHost,
                 Keyword("Module"),
                 [Module]("M"),
                 Keyword("Sub"),
-                Identifier("S"),
+                Method("S"),
                 Punctuation.OpenParen,
                 Punctuation.CloseParen,
                 Keyword("Dim"),
-                Identifier("foo"),
+                Local("goo"),
                 Keyword("End"),
                 Keyword("Sub"),
                 Keyword("End"),
                 Keyword("Module"))
-        End Sub
+        End Function
 
-        <Fact, Trait(Traits.Feature, Traits.Features.Classification)>
-        <WorkItem(539203)>
-        Public Sub ColonTrivia()
-            TestInMethod("    : Console.WriteLine()",
-                         Punctuation.Colon,
-                         Identifier("Console"),
-                         Operators.Dot,
-                         Identifier("WriteLine"),
-                         Punctuation.OpenParen,
-                         Punctuation.CloseParen)
-        End Sub
+        <Theory, CombinatorialData>
+        <WorkItem(539203, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/539203")>
+        Public Async Function TestColonTrivia(testHost As TestHost) As Task
+            Await TestInMethodAsync("    : Console.WriteLine()",
+                testHost,
+                Punctuation.Colon,
+                Identifier("Console"),
+                Operators.Dot,
+                Identifier("WriteLine"),
+                Punctuation.OpenParen,
+                Punctuation.CloseParen)
+        End Function
 
-        <Fact, Trait(Traits.Feature, Traits.Features.Classification)>
-        <WorkItem(539642)>
-        Public Sub FromInCollectionInitializer1()
-            TestInMethod("Dim y = New Foo() From",
-                         Keyword("Dim"),
-                         Identifier("y"),
-                         Operators.Equals,
-                         Keyword("New"),
-                         Identifier("Foo"),
-                         Punctuation.OpenParen,
-                         Punctuation.CloseParen,
-                         Keyword("From"))
-        End Sub
+        <Theory, CombinatorialData>
+        <WorkItem(539642, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/539642")>
+        Public Async Function TestFromInCollectionInitializer1(testHost As TestHost) As Task
+            Await TestInMethodAsync("Dim y = New Goo() From",
+                testHost,
+                Keyword("Dim"),
+                Local("y"),
+                Operators.Equals,
+                Keyword("New"),
+                Identifier("Goo"),
+                Punctuation.OpenParen,
+                Punctuation.CloseParen,
+                Keyword("From"))
+        End Function
 
-        <Fact, Trait(Traits.Feature, Traits.Features.Classification)>
-        <WorkItem(539642)>
-        Public Sub FromInCollectionInitializer2()
-            TestInMethod("Dim y As New Foo() From",
-                         Keyword("Dim"),
-                         Identifier("y"),
-                         Keyword("As"),
-                         Keyword("New"),
-                         Identifier("Foo"),
-                         Punctuation.OpenParen,
-                         Punctuation.CloseParen,
-                         Keyword("From"))
-        End Sub
+        <Theory, CombinatorialData>
+        <WorkItem(539642, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/539642")>
+        Public Async Function TestFromInCollectionInitializer2(testHost As TestHost) As Task
+            Await TestInMethodAsync("Dim y As New Goo() From",
+                testHost,
+                Keyword("Dim"),
+                Local("y"),
+                Keyword("As"),
+                Keyword("New"),
+                Identifier("Goo"),
+                Punctuation.OpenParen,
+                Punctuation.CloseParen,
+                Keyword("From"))
+        End Function
 
-        <Fact, Trait(Traits.Feature, Traits.Features.Classification)>
-        <WorkItem(539779)>
-        Public Sub TestPartiallyTypedXmlNamespaceImport1()
-            Test("Imports <x",
-                 Keyword("Imports"),
-                 VBXmlDelimiter("<"),
-                 VBXmlName("x"))
-        End Sub
+        <Theory, CombinatorialData>
+        <WorkItem(539779, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/539779")>
+        Public Async Function TestPartiallyTypedXmlNamespaceImport1(testHost As TestHost) As Task
+            Await TestAsync("Imports <x",
+                testHost,
+                Keyword("Imports"),
+                VBXmlDelimiter("<"),
+                VBXmlName("x"))
+        End Function
 
-        <Fact, Trait(Traits.Feature, Traits.Features.Classification)>
-        <WorkItem(539779)>
-        Public Sub TestPartiallyTypedXmlNamespaceImport2()
-            Test("Imports <xml",
-                 Keyword("Imports"),
-                 VBXmlDelimiter("<"),
-                 VBXmlName("xml"))
-        End Sub
+        <Theory, CombinatorialData>
+        <WorkItem(539779, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/539779")>
+        Public Async Function TestPartiallyTypedXmlNamespaceImport2(testHost As TestHost) As Task
+            Await TestAsync("Imports <xml",
+                testHost,
+                Keyword("Imports"),
+                VBXmlDelimiter("<"),
+                VBXmlName("xml"))
+        End Function
 
-        <Fact, Trait(Traits.Feature, Traits.Features.Classification)>
-        <WorkItem(539779)>
-        Public Sub TestPartiallyTypedXmlNamespaceImport3()
-            Test("Imports <xmlns",
-                 Keyword("Imports"),
-                 VBXmlDelimiter("<"),
-                 VBXmlAttributeName("xmlns"))
-        End Sub
+        <Theory, CombinatorialData>
+        <WorkItem(539779, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/539779")>
+        Public Async Function TestPartiallyTypedXmlNamespaceImport3(testHost As TestHost) As Task
+            Await TestAsync("Imports <xmlns",
+                testHost,
+                Keyword("Imports"),
+                VBXmlDelimiter("<"),
+                VBXmlAttributeName("xmlns"))
+        End Function
 
-        <Fact, Trait(Traits.Feature, Traits.Features.Classification)>
-        <WorkItem(539779)>
-        Public Sub TestPartiallyTypedXmlNamespaceImport4()
-            Test("Imports <xmlns:",
-                 Keyword("Imports"),
-                 VBXmlDelimiter("<"),
-                 VBXmlAttributeName("xmlns"),
-                 VBXmlAttributeName(":"))
-        End Sub
+        <Theory, CombinatorialData>
+        <WorkItem(539779, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/539779")>
+        Public Async Function TestPartiallyTypedXmlNamespaceImport4(testHost As TestHost) As Task
+            Await TestAsync("Imports <xmlns:",
+                testHost,
+                Keyword("Imports"),
+                VBXmlDelimiter("<"),
+                VBXmlAttributeName("xmlns"),
+                VBXmlAttributeName(":"))
+        End Function
 
-        <Fact, Trait(Traits.Feature, Traits.Features.Classification)>
-        <WorkItem(539779)>
-        Public Sub TestPartiallyTypedXmlNamespaceImport5()
-            Test("Imports <xmlns:ns",
-                 Keyword("Imports"),
-                 VBXmlDelimiter("<"),
-                 VBXmlAttributeName("xmlns"),
-                 VBXmlAttributeName(":"),
-                 VBXmlAttributeName("ns"))
-        End Sub
+        <Theory, CombinatorialData>
+        <WorkItem(539779, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/539779")>
+        Public Async Function TestPartiallyTypedXmlNamespaceImport5(testHost As TestHost) As Task
+            Await TestAsync("Imports <xmlns:ns",
+                testHost,
+                Keyword("Imports"),
+                VBXmlDelimiter("<"),
+                VBXmlAttributeName("xmlns"),
+                VBXmlAttributeName(":"),
+                VBXmlAttributeName("ns"))
+        End Function
 
-        <Fact, Trait(Traits.Feature, Traits.Features.Classification)>
-        <WorkItem(539779)>
-        Public Sub TestPartiallyTypedXmlNamespaceImport6()
-            Test("Imports <xmlns:ns=",
-                 Keyword("Imports"),
-                 VBXmlDelimiter("<"),
-                 VBXmlAttributeName("xmlns"),
-                 VBXmlAttributeName(":"),
-                 VBXmlAttributeName("ns"),
-                 VBXmlDelimiter("="))
-        End Sub
+        <Theory, CombinatorialData>
+        <WorkItem(539779, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/539779")>
+        Public Async Function TestPartiallyTypedXmlNamespaceImport6(testHost As TestHost) As Task
+            Await TestAsync("Imports <xmlns:ns=",
+                testHost,
+                Keyword("Imports"),
+                VBXmlDelimiter("<"),
+                VBXmlAttributeName("xmlns"),
+                VBXmlAttributeName(":"),
+                VBXmlAttributeName("ns"),
+                VBXmlDelimiter("="))
+        End Function
 
-        <Fact, Trait(Traits.Feature, Traits.Features.Classification)>
-        <WorkItem(539779)>
-        Public Sub TestPartiallyTypedXmlNamespaceImport7()
-            Test("Imports <xmlns:ns=""http://foo""",
-                 Keyword("Imports"),
-                 VBXmlDelimiter("<"),
-                 VBXmlAttributeName("xmlns"),
-                 VBXmlAttributeName(":"),
-                 VBXmlAttributeName("ns"),
-                 VBXmlDelimiter("="),
-                 VBXmlAttributeQuotes(""""),
-                 VBXmlAttributeValue("http://foo"),
-                 VBXmlAttributeQuotes(""""))
-        End Sub
+        <Theory, CombinatorialData>
+        <WorkItem(539779, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/539779")>
+        Public Async Function TestPartiallyTypedXmlNamespaceImport7(testHost As TestHost) As Task
+            Await TestAsync("Imports <xmlns:ns=""http://goo""",
+                testHost,
+                Keyword("Imports"),
+                VBXmlDelimiter("<"),
+                VBXmlAttributeName("xmlns"),
+                VBXmlAttributeName(":"),
+                VBXmlAttributeName("ns"),
+                VBXmlDelimiter("="),
+                VBXmlAttributeQuotes(""""),
+                VBXmlAttributeValue("http://goo"),
+                VBXmlAttributeQuotes(""""))
+        End Function
 
-        <Fact, Trait(Traits.Feature, Traits.Features.Classification)>
-        <WorkItem(539779)>
-        Public Sub TestFullyTypedXmlNamespaceImport()
-            Test("Imports <xmlns:ns=""http://foo"">",
-                 Keyword("Imports"),
-                 VBXmlDelimiter("<"),
-                 VBXmlAttributeName("xmlns"),
-                 VBXmlAttributeName(":"),
-                 VBXmlAttributeName("ns"),
-                 VBXmlDelimiter("="),
-                 VBXmlAttributeQuotes(""""),
-                 VBXmlAttributeValue("http://foo"),
-                 VBXmlAttributeQuotes(""""),
-                 VBXmlDelimiter(">"))
-        End Sub
+        <Theory, CombinatorialData>
+        <WorkItem(539779, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/539779")>
+        Public Async Function TestFullyTypedXmlNamespaceImport(testHost As TestHost) As Task
+            Await TestAsync("Imports <xmlns:ns=""http://goo"">",
+                testHost,
+                Keyword("Imports"),
+                VBXmlDelimiter("<"),
+                VBXmlAttributeName("xmlns"),
+                VBXmlAttributeName(":"),
+                VBXmlAttributeName("ns"),
+                VBXmlDelimiter("="),
+                VBXmlAttributeQuotes(""""),
+                VBXmlAttributeValue("http://goo"),
+                VBXmlAttributeQuotes(""""),
+                VBXmlDelimiter(">"))
+        End Function
 
-        <Fact, Trait(Traits.Feature, Traits.Features.Classification)>
-        Public Sub TestGetXmlNamespaceExpression()
-            TestInExpression("GetXmlNamespace(Name)",
+        <Theory, CombinatorialData>
+        Public Async Function TestGetXmlNamespaceExpression(testHost As TestHost) As Task
+            Await TestInExpressionAsync("GetXmlNamespace(Name)",
+                testHost,
                 Keyword("GetXmlNamespace"),
                 Punctuation.OpenParen,
                 VBXmlName("Name"),
                 Punctuation.CloseParen)
-        End Sub
+        End Function
 
-        <Fact, Trait(Traits.Feature, Traits.Features.Classification)>
-        Public Sub TestGetXmlNamespaceExpressionWithNoName()
-            TestInExpression("GetXmlNamespace()",
+        <Theory, CombinatorialData>
+        Public Async Function TestGetXmlNamespaceExpressionWithNoName(testHost As TestHost) As Task
+            Await TestInExpressionAsync("GetXmlNamespace()",
+                testHost,
                 Keyword("GetXmlNamespace"),
                 Punctuation.OpenParen,
                 Punctuation.CloseParen)
-        End Sub
+        End Function
 
-        <Fact, Trait(Traits.Feature, Traits.Features.Classification)>
-        Public Sub TestClassifyXmlDocumentFollowingMisc()
-            TestInExpression("<?xml ?><x></x><!--h-->",
+        <Theory, CombinatorialData>
+        Public Async Function TestClassifyXmlDocumentFollowingMisc(testHost As TestHost) As Task
+            Await TestInExpressionAsync("<?xml ?><x></x><!--h-->",
+                testHost,
                 VBXmlDelimiter("<?"),
                 VBXmlName("xml"),
                 VBXmlDelimiter("?>"),
@@ -3663,11 +4930,12 @@ Namespace Microsoft.CodeAnalysis.Editor.VisualBasic.UnitTests.Classification
                 VBXmlDelimiter("<!--"),
                 VBXmlComment("h"),
                 VBXmlDelimiter("-->"))
-        End Sub
+        End Function
 
-        <Fact, Trait(Traits.Feature, Traits.Features.Classification)>
-        Public Sub TestXmlDeclaration()
-            TestInExpression("<?xml version=""1.0""?>",
+        <Theory, CombinatorialData>
+        Public Async Function TestXmlDeclaration(testHost As TestHost) As Task
+            Await TestInExpressionAsync("<?xml version=""1.0""?>",
+                testHost,
                 VBXmlDelimiter("<?"),
                 VBXmlName("xml"),
                 VBXmlAttributeName("version"),
@@ -3676,159 +4944,521 @@ Namespace Microsoft.CodeAnalysis.Editor.VisualBasic.UnitTests.Classification
                 VBXmlAttributeValue("1.0"),
                 VBXmlAttributeQuotes(""""),
                 VBXmlDelimiter("?>"))
-        End Sub
+        End Function
 
-        <Fact, Trait(Traits.Feature, Traits.Features.Classification)>
-        Public Sub TestEnableWarningDirective()
-            Dim text = StringFromLines(
-                "Module Program",
-                "    Sub Main",
-                "#Enable Warning BC123, [bc456], SomeId",
-                "    End Sub",
-                "End Module")
-            Test(text,
-                 Keyword("Module"),
-                 [Module]("Program"),
-                 Keyword("Sub"),
-                 Identifier("Main"),
-                 PPKeyword("#"),
-                 PPKeyword("Enable"),
-                 PPKeyword("Warning"),
-                 Identifier("BC123"),
-                 Punctuation.Comma,
-                 Identifier("[bc456]"),
-                 Punctuation.Comma,
-                 Identifier("SomeId"),
-                 Keyword("End"),
-                 Keyword("Sub"),
-                 Keyword("End"),
-                 Keyword("Module"))
-        End Sub
+        <Theory, CombinatorialData>
+        Public Async Function TestEnableWarningDirective(testHost As TestHost) As Task
+            Dim code =
+"Module Program
+    Sub Main
+#Enable Warning BC123, [bc456], SomeId
+    End Sub
+End Module"
 
-        <Fact, Trait(Traits.Feature, Traits.Features.Classification)>
-        Public Sub TestDisableWarningDirective()
-            Dim text = StringFromLines(
-                "Module Program",
-                "    Sub Main",
-                "#Disable Warning",
-                "    End Sub",
-                "End Module")
-            Test(text,
-                 Keyword("Module"),
-                 [Module]("Program"),
-                 Keyword("Sub"),
-                 Identifier("Main"),
-                 PPKeyword("#"),
-                 PPKeyword("Disable"),
-                 PPKeyword("Warning"),
-                 Keyword("End"),
-                 Keyword("Sub"),
-                 Keyword("End"),
-                 Keyword("Module"))
-        End Sub
+            Await TestAsync(code,
+                testHost,
+                Keyword("Module"),
+                [Module]("Program"),
+                Keyword("Sub"),
+                Method("Main"),
+                PPKeyword("#"),
+                PPKeyword("Enable"),
+                PPKeyword("Warning"),
+                Identifier("BC123"),
+                Punctuation.Comma,
+                Identifier("[bc456]"),
+                Punctuation.Comma,
+                Identifier("SomeId"),
+                Keyword("End"),
+                Keyword("Sub"),
+                Keyword("End"),
+                Keyword("Module"))
+        End Function
 
-        <Fact, Trait(Traits.Feature, Traits.Features.Classification)>
-        Public Sub TestBadWarningDirectives()
-            Dim text = StringFromLines(
-                "Module Program",
-                "    Sub Main",
-                "#warning",
-                "    End Sub",
-                "#Enable blah Warning",
-                "End Module",
-                "#Disable bc123 Warning",
-                "#Enable",
-                "#Disable Warning blah")
-            Test(text,
-                 Keyword("Module"),
-                 [Module]("Program"),
-                 Keyword("Sub"),
-                 Identifier("Main"),
-                 PPKeyword("#"),
-                 Identifier("warning"),
-                 Keyword("End"),
-                 Keyword("Sub"),
-                 PPKeyword("#"),
-                 PPKeyword("Enable"),
-                 Identifier("blah"),
-                 Identifier("Warning"),
-                 Keyword("End"),
-                 Keyword("Module"),
-                 PPKeyword("#"),
-                 PPKeyword("Disable"),
-                 Identifier("bc123"),
-                 Identifier("Warning"),
-                 PPKeyword("#"),
-                 PPKeyword("Enable"),
-                 PPKeyword("#"),
-                 PPKeyword("Disable"),
-                 PPKeyword("Warning"),
-                 Identifier("blah"))
-        End Sub
+        <Theory, CombinatorialData>
+        Public Async Function TestDisableWarningDirective(testHost As TestHost) As Task
+            Dim code =
+"Module Program
+    Sub Main
+#Disable Warning
+    End Sub
+End Module"
 
-        <Fact, Trait(Traits.Feature, Traits.Features.Classification)>
-        Public Sub TestInterpolatedString1()
-            Dim text = StringFromLines(
-                "Module Program",
-                "    Sub Main",
-                "        Dim s = $""Hello, {name,10:F}.""",
-                "    End Sub",
-                "End Module")
-            Test(text,
-                 Keyword("Module"),
-                 [Module]("Program"),
-                 Keyword("Sub"),
-                 Identifier("Main"),
-                 Keyword("Dim"),
-                 Identifier("s"),
-                 Operators.Equals,
-                 [String]("$"""),
-                 [String]("Hello, "),
-                 Punctuation.OpenCurly,
-                 Identifier("name"),
-                 Punctuation.Comma,
-                 Number("10"),
-                 Punctuation.Colon,
-                 [String]("F"),
-                 Punctuation.CloseCurly,
-                 [String]("."),
-                 [String](""""),
-                 Keyword("End"),
-                 Keyword("Sub"),
-                 Keyword("End"),
-                 Keyword("Module"))
-        End Sub
+            Await TestAsync(code,
+                testHost,
+                Keyword("Module"),
+                [Module]("Program"),
+                Keyword("Sub"),
+                Method("Main"),
+                PPKeyword("#"),
+                PPKeyword("Disable"),
+                PPKeyword("Warning"),
+                Keyword("End"),
+                Keyword("Sub"),
+                Keyword("End"),
+                Keyword("Module"))
+        End Function
 
-        <Fact, Trait(Traits.Feature, Traits.Features.Classification)>
-        Public Sub TestInterpolatedString2()
-            Dim text = StringFromLines(
-                "Module Program",
-                "    Sub Main",
-                "        Dim s = $""{x}, {y}""",
-                "    End Sub",
-                "End Module")
-            Test(text,
-                 Keyword("Module"),
-                 [Module]("Program"),
-                 Keyword("Sub"),
-                 Identifier("Main"),
-                 Keyword("Dim"),
-                 Identifier("s"),
-                 Operators.Equals,
-                 [String]("$"""),
-                 Punctuation.OpenCurly,
-                 Identifier("x"),
-                 Punctuation.CloseCurly,
-                 [String](", "),
-                 Punctuation.OpenCurly,
-                 Identifier("y"),
-                 Punctuation.CloseCurly,
-                 [String](""""),
-                 Keyword("End"),
-                 Keyword("Sub"),
-                 Keyword("End"),
-                 Keyword("Module"))
-        End Sub
+        <Theory, CombinatorialData>
+        Public Async Function TestBadWarningDirectives(testHost As TestHost) As Task
+            Dim code =
+"Module Program
+    Sub Main
+#warning
+    End Sub
+#Enable blah Warning
+End Module
+#Disable bc123 Warning
+#Enable
+#Disable Warning blah"
 
+            Await TestAsync(code,
+                testHost,
+                Keyword("Module"),
+                [Module]("Program"),
+                Keyword("Sub"),
+                Method("Main"),
+                PPKeyword("#"),
+                Identifier("warning"),
+                Keyword("End"),
+                Keyword("Sub"),
+                PPKeyword("#"),
+                PPKeyword("Enable"),
+                Identifier("blah"),
+                Identifier("Warning"),
+                Keyword("End"),
+                Keyword("Module"),
+                PPKeyword("#"),
+                PPKeyword("Disable"),
+                Identifier("bc123"),
+                Identifier("Warning"),
+                PPKeyword("#"),
+                PPKeyword("Enable"),
+                PPKeyword("#"),
+                PPKeyword("Disable"),
+                PPKeyword("Warning"),
+                Identifier("blah"))
+        End Function
+
+        <Theory, CombinatorialData>
+        Public Async Function TestInterpolatedString1(testHost As TestHost) As Task
+            Dim code =
+"Module Program
+    Sub Main
+        Dim s = $""Hello, {name,10:F}.""
+    End Sub
+End Module"
+
+            Await TestAsync(code,
+                testHost,
+                Keyword("Module"),
+                [Module]("Program"),
+                Keyword("Sub"),
+                Method("Main"),
+                Keyword("Dim"),
+                Local("s"),
+                Operators.Equals,
+                [String]("$"""),
+                [String]("Hello, "),
+                Punctuation.OpenCurly,
+                Identifier("name"),
+                Punctuation.Comma,
+                Number("10"),
+                Punctuation.Colon,
+                [String]("F"),
+                Punctuation.CloseCurly,
+                [String]("."),
+                [String](""""),
+                Keyword("End"),
+                Keyword("Sub"),
+                Keyword("End"),
+                Keyword("Module"))
+        End Function
+
+        <Theory, CombinatorialData>
+        Public Async Function TestInterpolatedString2(testHost As TestHost) As Task
+            Dim code =
+"Module Program
+    Sub Main
+        Dim s = $""{x}, {y}""
+    End Sub
+End Module"
+
+            Await TestAsync(code,
+                testHost,
+                Keyword("Module"),
+                [Module]("Program"),
+                Keyword("Sub"),
+                Method("Main"),
+                Keyword("Dim"),
+                Local("s"),
+                Operators.Equals,
+                [String]("$"""),
+                Punctuation.OpenCurly,
+                Identifier("x"),
+                Punctuation.CloseCurly,
+                [String](", "),
+                Punctuation.OpenCurly,
+                Identifier("y"),
+                Punctuation.CloseCurly,
+                [String](""""),
+                Keyword("End"),
+                Keyword("Sub"),
+                Keyword("End"),
+                Keyword("Module"))
+        End Function
+
+        <Theory, CombinatorialData>
+        <WorkItem(2126, "https://github.com/dotnet/roslyn/issues/2126")>
+        Public Async Function CommentBeforeXmlAccessExpression(testHost As TestHost) As Task
+            Dim code =
+" ' Comment
+  x.@Name = ""Text""
+' Comment"
+
+            Await TestInMethodAsync(
+                className:="C",
+                methodName:="M",
+                code,
+                testHost,
+                Comment("' Comment"),
+                Identifier("x"),
+                VBXmlDelimiter("."),
+                VBXmlDelimiter("@"),
+                VBXmlAttributeName("Name"),
+                Operators.Equals,
+                [String]("""Text"""),
+                Comment("' Comment"))
+        End Function
+
+        <Theory, CombinatorialData>
+        <WorkItem(3291, "https://github.com/dotnet/roslyn/issues/3291")>
+        Public Async Function TestCommentOnCollapsedEndRegion(testHost As TestHost) As Task
+            Dim code =
+"#Region ""Stuff""
+#End Region ' Stuff"
+
+            Await TestAsync(
+                code,
+                testHost,
+                PPKeyword("#"),
+                PPKeyword("Region"),
+                [String]("""Stuff"""),
+                PPKeyword("#"),
+                PPKeyword("End"),
+                PPKeyword("Region"),
+                Comment("' Stuff"))
+        End Function
+
+        <Theory, CombinatorialData>
+        Public Async Function TestConflictMarkers1(testHost As TestHost) As Task
+            Dim code =
+"interface I
+<<<<<<< Start
+    sub Goo()
+=======
+    sub Bar()
+>>>>>>> End
+end interface"
+
+            Await TestAsync(
+                code,
+                testHost,
+                Keyword("interface"),
+                [Interface]("I"),
+                Comment("<<<<<<< Start"),
+                Keyword("sub"),
+                Method("Goo"),
+                Punctuation.OpenParen,
+                Punctuation.CloseParen,
+                Comment("======="),
+                Keyword("sub"),
+                Identifier("Bar"),
+                Punctuation.OpenParen,
+                Punctuation.CloseParen,
+                Comment(">>>>>>> End"),
+                Keyword("end"),
+                Keyword("interface"))
+        End Function
+
+        <Theory, CombinatorialData>
+        Public Async Function TestConstField(testHost As TestHost) As Task
+            Dim code = "Const Number = 42"
+
+            Await TestInClassAsync(code,
+                testHost,
+                Keyword("Const"),
+                Constant("Number"),
+                [Static]("Number"),
+                Operators.Equals,
+                Number("42"))
+        End Function
+
+        <Theory, CombinatorialData>
+        Public Async Function TestLocalConst(testHost As TestHost) As Task
+            Dim code = "Const Number = 42"
+
+            Await TestInMethodAsync(code,
+                testHost,
+                Keyword("Const"),
+                Constant("Number"),
+                Operators.Equals,
+                Number("42"))
+        End Function
+
+        <Theory, CombinatorialData>
+        Public Async Function TestModifiedIdentifiersInLocals(testHost As TestHost) As Task
+            Dim code =
+"Dim x$ = ""23""
+x$ = ""19"""
+
+            Await TestInMethodAsync(code,
+                testHost,
+                Keyword("Dim"),
+                Local("x$"),
+                Operators.Equals,
+                [String]("""23"""),
+                Identifier("x$"),
+                Operators.Equals,
+                [String]("""19"""))
+        End Function
+
+        <Theory, CombinatorialData>
+        Public Async Function TestModifiedIdentifiersInFields(testHost As TestHost) As Task
+            Dim code =
+"Const x$ = ""23""
+Dim y$ = x$"
+
+            Await TestInClassAsync(code,
+                testHost,
+                Keyword("Const"),
+                Constant("x$"),
+                [Static]("x$"),
+                Operators.Equals,
+                [String]("""23"""),
+                Keyword("Dim"),
+                Field("y$"),
+                Operators.Equals,
+                Identifier("x$"))
+        End Function
+
+        <Theory, CombinatorialData>
+        Public Async Function TestFunctionNamesWithTypeCharacters(testHost As TestHost) As Task
+            Dim code =
+"Function x%()
+    x% = 42
+End Function"
+
+            Await TestInClassAsync(code,
+                testHost,
+                Keyword("Function"),
+                Method("x%"),
+                Punctuation.OpenParen,
+                Punctuation.CloseParen,
+                Identifier("x%"),
+                Operators.Equals,
+                Number("42"),
+                Keyword("End"),
+                Keyword("Function"))
+        End Function
+
+        <Theory, CombinatorialData>
+        Public Async Function TestExtensionMethod(testHost As TestHost) As Task
+            Dim code = "
+Imports System.Runtime.CompilerServices
+
+Module M
+    <Extension>
+    Sub Square(ByRef x As Integer)
+        x = x * x
+    End Sub
+End Module
+
+Class C
+    Sub Test()
+        Dim x = 42
+        x.Square()
+        M.Square(x)
+    End Sub
+End Class"
+
+            Await TestAsync(code,
+                testHost,
+                Keyword("Imports"),
+                Identifier("System"),
+                Operators.Dot,
+                Identifier("Runtime"),
+                Operators.Dot,
+                Identifier("CompilerServices"),
+                Keyword("Module"),
+                [Module]("M"),
+                Punctuation.OpenAngle,
+                Identifier("Extension"),
+                Punctuation.CloseAngle,
+                Keyword("Sub"),
+                Method("Square"),
+                Punctuation.OpenParen,
+                Keyword("ByRef"),
+                Parameter("x"),
+                Keyword("As"),
+                Keyword("Integer"),
+                Punctuation.CloseParen,
+                Identifier("x"),
+                Operators.Equals,
+                Identifier("x"),
+                Operators.Asterisk,
+                Identifier("x"),
+                Keyword("End"),
+                Keyword("Sub"),
+                Keyword("End"),
+                Keyword("Module"),
+                Keyword("Class"),
+                [Class]("C"),
+                Keyword("Sub"),
+                Method("Test"),
+                Punctuation.OpenParen,
+                Punctuation.CloseParen,
+                Keyword("Dim"),
+                Local("x"),
+                Operators.Equals,
+                Number("42"),
+                Identifier("x"),
+                Operators.Dot,
+                Identifier("Square"),
+                Punctuation.OpenParen,
+                Punctuation.CloseParen,
+                Identifier("M"),
+                Operators.Dot,
+                Identifier("Square"),
+                Punctuation.OpenParen,
+                Identifier("x"),
+                Punctuation.CloseParen,
+                Keyword("End"),
+                Keyword("Sub"),
+                Keyword("End"),
+                Keyword("Class"))
+        End Function
+
+        <Theory, CombinatorialData>
+        Public Async Function TestSimpleEvent(testHost As TestHost) As Task
+            Dim code = "
+Event E(x As Integer)
+
+Sub M()
+    RaiseEvent E(42)
+End Sub"
+
+            Await TestInClassAsync(code,
+                testHost,
+                Keyword("Event"),
+                [Event]("E"),
+                Punctuation.OpenParen,
+                Parameter("x"),
+                Keyword("As"),
+                Keyword("Integer"),
+                Punctuation.CloseParen,
+                Keyword("Sub"),
+                Method("M"),
+                Punctuation.OpenParen,
+                Punctuation.CloseParen,
+                Keyword("RaiseEvent"),
+                Identifier("E"),
+                Punctuation.OpenParen,
+                Number("42"),
+                Punctuation.CloseParen,
+                Keyword("End"),
+                Keyword("Sub"))
+        End Function
+
+        <Theory, CombinatorialData>
+        Public Async Function TestOperators(testHost As TestHost) As Task
+            Dim code = "
+Public Shared Operator Not(t As Test) As Test
+    Return New Test()
+End Operator
+Public Shared Operator +(t1 As Test, t2 As Test) As Integer
+    Return 1
+End Operator"
+
+            Await TestInClassAsync(code,
+                testHost,
+                Keyword("Public"),
+                Keyword("Shared"),
+                Keyword("Operator"),
+                Keyword("Not"),
+                Punctuation.OpenParen,
+                Parameter("t"),
+                Keyword("As"),
+                Identifier("Test"),
+                Punctuation.CloseParen,
+                Keyword("As"),
+                Identifier("Test"),
+                ControlKeyword("Return"),
+                Keyword("New"),
+                Identifier("Test"),
+                Punctuation.OpenParen,
+                Punctuation.CloseParen,
+                Keyword("End"),
+                Keyword("Operator"),
+                Keyword("Public"),
+                Keyword("Shared"),
+                Keyword("Operator"),
+                Operators.Plus,
+                Punctuation.OpenParen,
+                Parameter("t1"),
+                Keyword("As"),
+                Identifier("Test"),
+                Punctuation.Comma,
+                Parameter("t2"),
+                Keyword("As"),
+                Identifier("Test"),
+                Punctuation.CloseParen,
+                Keyword("As"),
+                Keyword("Integer"),
+                ControlKeyword("Return"),
+                Number("1"),
+                Keyword("End"),
+                Keyword("Operator"))
+        End Function
+
+        <Theory, CombinatorialData>
+        Public Async Function TestLabelName(testHost As TestHost) As Task
+            Dim code =
+"Sub Main
+E:
+    GoTo E
+End Sub"
+
+            Await TestAsync(code,
+                testHost,
+                Keyword("Sub"),
+                Method("Main"),
+                Label("E"),
+                Punctuation.Colon,
+                ControlKeyword("GoTo"),
+                Identifier("E"),
+                Keyword("End"),
+                Keyword("Sub"))
+        End Function
+
+        <Theory, CombinatorialData>
+        Public Async Function TestCatchStatement(testHost As TestHost) As Task
+            Dim code =
+"Try
+
+Catch ex As Exception
+
+End Try"
+
+            Await TestInMethodAsync(code,
+                testHost,
+                ControlKeyword("Try"),
+                ControlKeyword("Catch"),
+                Local("ex"),
+                Keyword("As"),
+                Identifier("Exception"),
+                ControlKeyword("End"),
+                ControlKeyword("Try"))
+        End Function
     End Class
 End Namespace

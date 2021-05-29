@@ -1,4 +1,6 @@
-﻿' Copyright (c) Microsoft.  All Rights Reserved.  Licensed under the Apache License, Version 2.0.  See License.txt in the project root for license information.
+﻿' Licensed to the .NET Foundation under one or more agreements.
+' The .NET Foundation licenses this file to you under the MIT license.
+' See the LICENSE file in the project root for more information.
 
 Namespace Microsoft.CodeAnalysis.VisualBasic.Syntax.InternalSyntax
 
@@ -9,10 +11,10 @@ Namespace Microsoft.CodeAnalysis.VisualBasic.Syntax.InternalSyntax
         Protected ReadOnly _errid As ERRID
         Protected ReadOnly _diagnosticArguments As Object()
 
-        Sub New()
+        Public Sub New()
         End Sub
 
-        Sub New(id As ERRID, ParamArray diagnosticArguments As Object())
+        Public Sub New(id As ERRID, ParamArray diagnosticArguments As Object())
             DiagnosticInfo.AssertMessageSerializable(diagnosticArguments)
 
             _errid = id
@@ -164,7 +166,7 @@ Namespace Microsoft.CodeAnalysis.VisualBasic.Syntax.InternalSyntax
 
         Public ReadOnly Property ErrorArgs As Object()
             Get
-                Return If(_diagnosticArguments, SpecializedCollections.EmptyObjects)
+                Return If(_diagnosticArguments, Array.Empty(Of Object))
             End Get
         End Property
     End Class
@@ -216,7 +218,11 @@ Namespace Microsoft.CodeAnalysis.VisualBasic.Syntax.InternalSyntax
     Friend Class BadCConst
         Inherits CConst
 
-        Sub New(id As ERRID, ParamArray args As Object())
+        Public Sub New(id As ERRID)
+            MyBase.New(id)
+        End Sub
+
+        Public Sub New(id As ERRID, ParamArray args As Object())
             MyBase.New(id, args)
         End Sub
 

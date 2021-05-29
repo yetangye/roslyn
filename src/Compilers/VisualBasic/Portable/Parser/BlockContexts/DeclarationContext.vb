@@ -1,4 +1,6 @@
-﻿' Copyright (c) Microsoft.  All Rights Reserved.  Licensed under the Apache License, Version 2.0.  See License.txt in the project root for license information.
+﻿' Licensed to the .NET Foundation under one or more agreements.
+' The .NET Foundation licenses this file to you under the MIT license.
+' See the LICENSE file in the project root for more information.
 
 Imports Microsoft.CodeAnalysis.Text
 Imports Microsoft.CodeAnalysis.VisualBasic.Syntax
@@ -119,7 +121,7 @@ HandleMethodBase:
                             ' Mustoverride mean that the property doesn't have any implementation
                             ' This cannot be an auto property so the property may not be initialized.
 
-                            ' Check if initializer exists.  Only auto proeprties may have initialization.
+                            ' Check if initializer exists.  Only auto properties may have initialization.
                             node = PropertyBlockContext.ReportErrorIfHasInitializer(DirectCast(node, PropertyStatementSyntax))
 
                             Add(node)
@@ -328,9 +330,9 @@ HandleMethodBase:
                     newContext = Me
                     Return LinkResult.Crumble
 
-                    ' single line If gets parsed as unexpected If + some garbage
-                    ' when in declaration context so cannot be reused
-                    ' see bug 901645 
+                ' single line If gets parsed as unexpected If + some garbage
+                ' when in declaration context so cannot be reused
+                ' see bug 901645 
                 Case SyntaxKind.SingleLineIfStatement
                     newContext = Me
                     Return LinkResult.Crumble
@@ -340,8 +342,8 @@ HandleMethodBase:
                     newContext = Me
                     Return LinkResult.Crumble
 
-                    ' TODO: need to add all executable statements that ParseDeclarationStatement handle as unexpected executables
-                    ' Move error reporting from ParseDeclarationStatement to the context.
+                ' TODO: need to add all executable statements that ParseDeclarationStatement handle as unexpected executables
+                ' Move error reporting from ParseDeclarationStatement to the context.
                 Case SyntaxKind.IfStatement
                     node = Parser.ReportSyntaxError(node, ERRID.ERR_ExecutableAsDeclaration)
                     Return TryUseStatement(node, newContext)

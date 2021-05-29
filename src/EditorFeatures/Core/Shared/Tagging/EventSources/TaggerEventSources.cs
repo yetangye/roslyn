@@ -1,11 +1,18 @@
-// Copyright (c) Microsoft.  All Rights Reserved.  Licensed under the Apache License, Version 2.0.  See License.txt in the project root for license information.
+﻿// Licensed to the .NET Foundation under one or more agreements.
+// The .NET Foundation licenses this file to you under the MIT license.
+// See the LICENSE file in the project root for more information.
 
+using System.Collections.Generic;
+using System.Linq;
 using Microsoft.CodeAnalysis.Diagnostics;
+using Microsoft.CodeAnalysis.Editor.Shared.Utilities;
 using Microsoft.CodeAnalysis.Editor.Tagging;
 using Microsoft.CodeAnalysis.Notification;
 using Microsoft.CodeAnalysis.Options;
+using Microsoft.CodeAnalysis.Shared.TestHooks;
 using Microsoft.VisualStudio.Language.Intellisense;
 using Microsoft.VisualStudio.Text;
+using Microsoft.VisualStudio.Text.Classification;
 using Microsoft.VisualStudio.Text.Editor;
 using Roslyn.Utilities;
 
@@ -19,35 +26,30 @@ namespace Microsoft.CodeAnalysis.Editor.Shared.Tagging
             return new CompositionEventSource(eventSources);
         }
 
+        public static ITaggerEventSource Compose(IEnumerable<ITaggerEventSource> eventSources)
+            => new CompositionEventSource(eventSources.ToArray());
+
         public static ITaggerEventSource OnCaretPositionChanged(ITextView textView, ITextBuffer subjectBuffer, TaggerDelay delay)
-        {
-            return new CaretPositionChangedEventSource(textView, subjectBuffer, delay);
-        }
+            => new CaretPositionChangedEventSource(textView, subjectBuffer, delay);
 
-        public static ITaggerEventSource OnCompletionClosed(
-            ITextView textView,
-            IIntellisenseSessionStack sessionStack,
-            TaggerDelay delay)
-        {
-            return new CompletionClosedEventSource(textView, sessionStack, delay);
-        }
-
-        public static ITaggerEventSource OnTextChanged(ITextBuffer subjectBuffer, TaggerDelay delay, bool reportChangedSpans = false)
+        public static ITaggerEventSource OnTextChanged(ITextBuffer subjectBuffer, TaggerDelay delay)
         {
             Contract.ThrowIfNull(subjectBuffer);
 
-            return new TextChangedEventSource(subjectBuffer, delay, reportChangedSpans);
+            return new TextChangedEventSource(subjectBuffer, delay);
         }
 
-        public static ITaggerEventSource OnSemanticChanged(ITextBuffer subjectBuffer, TaggerDelay delay, ISemanticChangeNotificationService notificationService)
+        /// <summary>
+        /// Reports an event any time the workspace changes.
+        /// </summary>
+        public static ITaggerEventSource OnWorkspaceChanged(
+            ITextBuffer subjectBuffer, TaggerDelay delay, IAsynchronousOperationListener listener)
         {
-            return new SemanticChangedEventSource(subjectBuffer, delay, notificationService);
+            return new WorkspaceChangedEventSource(subjectBuffer, delay, listener);
         }
 
         public static ITaggerEventSource OnDocumentActiveContextChanged(ITextBuffer subjectBuffer, TaggerDelay delay)
-        {
-            return new DocumentActiveContextChangedEventSource(subjectBuffer, delay);
-        }
+            => new DocumentActiveContextChangedEventSource(subjectBuffer, delay);
 
         public static ITaggerEventSource OnSelectionChanged(
             ITextView textView,
@@ -87,8 +89,9 @@ namespace Microsoft.CodeAnalysis.Editor.Shared.Tagging
         }
 
         public static ITaggerEventSource OnWorkspaceRegistrationChanged(ITextBuffer subjectBuffer, TaggerDelay delay)
-        {
-            return new WorkspaceRegistrationChangedEventSource(subjectBuffer, delay);
-        }
+            => new WorkspaceRegistrationChangedEventSource(subjectBuffer, delay);
+
+        public static ITaggerEventSource OnViewSpanChanged(IThreadingContext threadingContext, ITextView textView, TaggerDelay textChangeDelay, TaggerDelay scrollChangeDelay)
+            => new ViewSpanChangedEventSource(threadingContext, textView, textChangeDelay, scrollChangeDelay);
     }
 }

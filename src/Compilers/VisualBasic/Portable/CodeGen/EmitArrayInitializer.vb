@@ -1,20 +1,15 @@
-﻿' Copyright (c) Microsoft.  All Rights Reserved.  Licensed under the Apache License, Version 2.0.  See License.txt in the project root for license information.
+﻿' Licensed to the .NET Foundation under one or more agreements.
+' The .NET Foundation licenses this file to you under the MIT license.
+' See the LICENSE file in the project root for more information.
 
-Imports System
-Imports System.Collections.Generic
 Imports System.Collections.Immutable
-Imports System.Diagnostics
-Imports System.Linq
-Imports System.Runtime.InteropServices
-Imports Microsoft.CodeAnalysis.CodeGen
-Imports Microsoft.CodeAnalysis.Text
+Imports System.Reflection.Metadata
+Imports Microsoft.CodeAnalysis.PooledObjects
 Imports Microsoft.CodeAnalysis.VisualBasic.Symbols
-Imports Microsoft.CodeAnalysis.VisualBasic.Syntax
-Imports TypeKind = Microsoft.CodeAnalysis.TypeKind
 
 Namespace Microsoft.CodeAnalysis.VisualBasic.CodeGen
 
-    Partial Class CodeGenerator
+    Partial Friend Class CodeGenerator
 
         Private Enum ArrayInitializerStyle
             ' Initialize every element
@@ -25,7 +20,7 @@ Namespace Microsoft.CodeAnalysis.VisualBasic.CodeGen
 
             ' Mixed case where there are some initializers that are constants and
             ' there is enough of them so that it makes sense to use block initialization
-            ' followed by individual initialization of nonconstant elements
+            ' followed by individual initialization of non-constant elements
             Mixed
         End Enum
 
@@ -59,13 +54,13 @@ Namespace Microsoft.CodeAnalysis.VisualBasic.CodeGen
                                             includeConstants As Boolean)
 
             If Not IsMultidimensionalInitializer(inits) Then
-                EmitVectorElementInitializers(arrayType, inits, includeConstants)
+                EmitOnedimensionalElementInitializers(arrayType, inits, includeConstants)
             Else
                 EmitMultidimensionalElementInitializers(arrayType, inits, includeConstants)
             End If
         End Sub
 
-        Private Sub EmitVectorElementInitializers(arrayType As ArrayTypeSymbol,
+        Private Sub EmitOnedimensionalElementInitializers(arrayType As ArrayTypeSymbol,
                                     inits As ImmutableArray(Of BoundExpression),
                                     includeConstants As Boolean)
 
@@ -75,7 +70,7 @@ Namespace Microsoft.CodeAnalysis.VisualBasic.CodeGen
                     _builder.EmitOpCode(ILOpCode.Dup)
                     _builder.EmitIntConstant(i)
                     EmitExpression(init, True)
-                    EmitVectorElementStore(arrayType, init.Syntax)
+                    EmitArrayElementStore(arrayType, init.Syntax)
                 End If
             Next i
         End Sub
@@ -245,7 +240,7 @@ Namespace Microsoft.CodeAnalysis.VisualBasic.CodeGen
                     InitializerCountRecursive(asArrayInit.Initializers, initCount, constInits)
                 Else
                     ' NOTE Default values Do Not need To be initialized. 
-                    '       .Net arrays are always zero-inited.
+                    '       .NET arrays are always zero-inited.
                     If Not init.IsDefaultValue() Then
                         initCount += 1
                         If init.ConstantValueOpt IsNot Nothing Then
@@ -258,21 +253,22 @@ Namespace Microsoft.CodeAnalysis.VisualBasic.CodeGen
 
         ''' <summary>
         ''' Produces a serialized blob of all constant initializers.
-        ''' Nonconstat initializers are matched with a zero of corresponding size.
+        ''' Non-constant initializers are matched with a zero of corresponding size.
         ''' </summary>
         Private Function GetRawData(initializers As ImmutableArray(Of BoundExpression)) As ImmutableArray(Of Byte)
             ' the initial size is a guess.
             ' there is no point to be precise here as MemoryStream always has N + 1 storage 
             ' and will need to be trimmed regardless
-            Dim stream As New Cci.MemoryStream(CUInt(initializers.Length * 4))
-            Dim writer As New Cci.BinaryWriter(stream)
+            Dim writer = Cci.PooledBlobBuilder.GetInstance(initializers.Length * 4)
 
             SerializeArrayRecursive(writer, initializers)
 
-            Return ImmutableArray.Create(stream.Buffer, 0, CInt(stream.Position))
+            Dim result = writer.ToImmutableArray()
+            writer.Free()
+            Return result
         End Function
 
-        Private Sub SerializeArrayRecursive(bw As Cci.BinaryWriter, inits As ImmutableArray(Of BoundExpression))
+        Private Sub SerializeArrayRecursive(bw As BlobBuilder, inits As ImmutableArray(Of BoundExpression))
             If inits.Length <> 0 Then
                 If inits(0).Kind = BoundKind.ArrayInitialization Then
                     For Each init In inits

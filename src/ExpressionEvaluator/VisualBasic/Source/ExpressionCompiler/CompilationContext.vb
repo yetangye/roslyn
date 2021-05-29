@@ -1,23 +1,27 @@
-' Copyright (c) Microsoft.  All Rights Reserved.  Licensed under the Apache License, Version 2.0.  See License.txt in the project root for license information.
+﻿' Licensed to the .NET Foundation under one or more agreements.
+' The .NET Foundation licenses this file to you under the MIT license.
+' See the LICENSE file in the project root for more information.
 
 Imports System
 Imports System.Collections.Immutable
 Imports System.Runtime.InteropServices
 Imports System.Threading
 Imports Microsoft.CodeAnalysis.Collections
+Imports Microsoft.CodeAnalysis.Debugging
 Imports Microsoft.CodeAnalysis.Emit
 Imports Microsoft.CodeAnalysis.ExpressionEvaluator
+Imports Microsoft.CodeAnalysis.PooledObjects
 Imports Microsoft.CodeAnalysis.VisualBasic.Symbols
 Imports Microsoft.CodeAnalysis.VisualBasic.Symbols.Metadata.PE
 Imports Microsoft.CodeAnalysis.VisualBasic.Syntax
+Imports Microsoft.VisualStudio.Debugger.Clr
 Imports Microsoft.VisualStudio.Debugger.Evaluation.ClrCompilation
-Imports Microsoft.VisualStudio.SymReaderInterop
 Imports Roslyn.Utilities
 
 Namespace Microsoft.CodeAnalysis.VisualBasic.ExpressionEvaluator
     Friend NotInheritable Class CompilationContext
 
-        Private Shared ReadOnly FullNameFormat As New SymbolDisplayFormat(
+        Private Shared ReadOnly s_fullNameFormat As New SymbolDisplayFormat(
             globalNamespaceStyle:=SymbolDisplayGlobalNamespaceStyle.Omitted,
             typeQualificationStyle:=SymbolDisplayTypeQualificationStyle.NameAndContainingTypesAndNamespaces,
             genericsOptions:=SymbolDisplayGenericsOptions.IncludeTypeParameters,
@@ -28,46 +32,54 @@ Namespace Microsoft.CodeAnalysis.VisualBasic.ExpressionEvaluator
         Friend ReadOnly Compilation As VisualBasicCompilation
         Friend ReadOnly NamespaceBinder As Binder ' Internal for test purposes.
 
-        Private ReadOnly _metadataDecoder As MetadataDecoder
         Private ReadOnly _currentFrame As MethodSymbol
         Private ReadOnly _locals As ImmutableArray(Of LocalSymbol)
         Private ReadOnly _displayClassVariables As ImmutableDictionary(Of String, DisplayClassVariable)
-        Private ReadOnly _hoistedParameterNames As ImmutableHashSet(Of String)
+        Private ReadOnly _sourceMethodParametersInOrder As ImmutableArray(Of String)
         Private ReadOnly _localsForBinding As ImmutableArray(Of LocalSymbol)
-        Private ReadOnly _syntax As ExecutableStatementSyntax
         Private ReadOnly _methodNotType As Boolean
         Private ReadOnly _voidType As NamedTypeSymbol
 
         ''' <summary>
         ''' Create a context to compile expressions within a method scope.
-        ''' Include imports if <paramref name="importStrings"/> is set.
         ''' </summary>
         Friend Sub New(
             compilation As VisualBasicCompilation,
-            metadataDecoder As MetadataDecoder,
             currentFrame As MethodSymbol,
+            currentSourceMethod As MethodSymbol,
             locals As ImmutableArray(Of LocalSymbol),
-            hoistedLocalFieldNames As ImmutableHashSet(Of String),
-            importStrings As ImmutableArray(Of String),
-            syntax As ExecutableStatementSyntax)
+            inScopeHoistedLocalSlots As ImmutableSortedSet(Of Integer),
+            methodDebugInfo As MethodDebugInfo(Of TypeSymbol, LocalSymbol),
+            withSyntax As Boolean)
 
-            _syntax = syntax
             _currentFrame = currentFrame
 
             Debug.Assert(compilation.Options.RootNamespace = "") ' Default value.
-
-            Dim defaultNamespaceName As String = GetDefaultNamespaceName(importStrings)
+            Debug.Assert(methodDebugInfo.ExternAliasRecords.IsDefaultOrEmpty)
 
             Dim originalCompilation = compilation
-            If syntax IsNot Nothing Then
-                compilation = compilation.AddSyntaxTrees(syntax.SyntaxTree)
+
+            If withSyntax AndAlso
+                compilation.Options.SuppressEmbeddedDeclarations AndAlso
+                compilation.SyntaxTrees.IsEmpty Then
+                ' We need to add an empty tree to the compilation as 
+                ' a workaround for https://github.com/dotnet/roslyn/issues/16885.
+                compilation = compilation.AddSyntaxTrees(VisualBasicSyntaxTree.Dummy)
             End If
-            If defaultNamespaceName IsNot Nothing Then
+
+            Dim defaultNamespaceName As String = methodDebugInfo.DefaultNamespaceName
+
+            ' Note We don't need to try to bind this string because this is analogous to passing
+            ' a command-line argument - as long as the syntax is valid, an appropriate symbol will
+            ' be created for us.
+            If defaultNamespaceName IsNot Nothing AndAlso TryParseDottedName(defaultNamespaceName, Nothing) Then
                 compilation = compilation.WithOptions(compilation.Options.WithRootNamespace(defaultNamespaceName))
             End If
+
             If compilation Is originalCompilation Then
                 compilation = compilation.Clone()
             End If
+
             Me.Compilation = compilation
 
             ' Each expression compile should use a unique compilation
@@ -75,12 +87,10 @@ Namespace Microsoft.CodeAnalysis.VisualBasic.ExpressionEvaluator
             ' added (anonymous types, for instance).
             Debug.Assert(Me.Compilation IsNot originalCompilation)
 
-            _metadataDecoder = metadataDecoder
-
             NamespaceBinder = CreateBinderChain(
                 Me.Compilation,
                 currentFrame.ContainingNamespace,
-                importStrings)
+                methodDebugInfo.ImportRecordGroups)
 
             _voidType = Me.Compilation.GetSpecialType(SpecialType.System_Void)
 
@@ -88,8 +98,16 @@ Namespace Microsoft.CodeAnalysis.VisualBasic.ExpressionEvaluator
 
             If _methodNotType Then
                 _locals = locals
+                _sourceMethodParametersInOrder = GetSourceMethodParametersInOrder(currentFrame, currentSourceMethod)
                 Dim displayClassVariableNamesInOrder As ImmutableArray(Of String) = Nothing
-                GetDisplayClassVariables(currentFrame, locals, hoistedLocalFieldNames, displayClassVariableNamesInOrder, _displayClassVariables, _hoistedParameterNames)
+                GetDisplayClassVariables(
+                    currentFrame,
+                    currentSourceMethod,
+                    locals,
+                    inScopeHoistedLocalSlots,
+                    _sourceMethodParametersInOrder,
+                    displayClassVariableNamesInOrder,
+                    _displayClassVariables)
                 Debug.Assert(displayClassVariableNamesInOrder.Length = _displayClassVariables.Count)
                 _localsForBinding = GetLocalsForBinding(locals, displayClassVariableNamesInOrder, _displayClassVariables)
             Else
@@ -105,40 +123,36 @@ Namespace Microsoft.CodeAnalysis.VisualBasic.ExpressionEvaluator
         End Sub
 
         Friend Function Compile(
-            inspectionContext As InspectionContext,
+            syntax As ExecutableStatementSyntax,
             typeName As String,
             methodName As String,
+            aliases As ImmutableArray(Of [Alias]),
             testData As Microsoft.CodeAnalysis.CodeGen.CompilationTestData,
             diagnostics As DiagnosticBag,
-            <Out> ByRef resultProperties As ResultProperties) As CommonPEModuleBuilder
+            <Out> ByRef synthesizedMethod As EEMethodSymbol) As CommonPEModuleBuilder
 
-            Debug.Assert(inspectionContext IsNot Nothing)
-
-            Dim properties As ResultProperties = Nothing
             Dim objectType = Me.Compilation.GetSpecialType(SpecialType.System_Object)
             Dim synthesizedType = New EENamedTypeSymbol(
                 Me.Compilation.SourceAssembly.GlobalNamespace,
                 objectType,
-                _syntax,
+                syntax,
                 _currentFrame,
                 typeName,
                 methodName,
                 Me,
-                Function(method, diags)
+                Function(method As EEMethodSymbol, diags As DiagnosticBag, ByRef properties As ResultProperties)
                     Dim hasDisplayClassMe = _displayClassVariables.ContainsKey(StringConstants.HoistedMeName)
-                    Dim bindAsExpression = _syntax.Kind = SyntaxKind.PrintStatement
+                    Dim bindAsExpression = syntax.Kind = SyntaxKind.PrintStatement
                     Dim binder = ExtendBinderChain(
-                        inspectionContext,
-                        Compilation,
-                        _metadataDecoder,
+                        aliases,
                         method,
                         NamespaceBinder,
                         hasDisplayClassMe,
                         _methodNotType,
                         allowImplicitDeclarations:=Not bindAsExpression)
                     Return If(bindAsExpression,
-                        BindExpression(binder, DirectCast(_syntax, PrintStatementSyntax).Expression, diags, properties),
-                        BindStatement(binder, _syntax, diags, properties))
+                        BindExpression(binder, DirectCast(syntax, PrintStatementSyntax).Expression, diags, properties),
+                        BindStatement(binder, syntax, diags, properties))
                 End Function)
 
             Dim moduleBuilder = CreateModuleBuilder(
@@ -152,26 +166,17 @@ Namespace Microsoft.CodeAnalysis.VisualBasic.ExpressionEvaluator
 
             Me.Compilation.Compile(
                 moduleBuilder,
-                win32Resources:=Nothing,
-                xmlDocStream:=Nothing,
-                generateDebugInfo:=False,
+                emittingPdb:=False,
                 diagnostics:=diagnostics,
                 filterOpt:=Nothing,
                 cancellationToken:=CancellationToken.None)
 
             If diagnostics.HasAnyErrors() Then
-                resultProperties = Nothing
+                synthesizedMethod = Nothing
                 Return Nothing
             End If
 
-#If DEBUG Then
-            Dim m = synthesizedType.GetMembers()(0)
-            ' Should be no name mangling since the caller provided explicit names.
-            Debug.Assert(m.ContainingType.MetadataName = typeName)
-            Debug.Assert(m.MetadataName = methodName)
-#End If
-
-            resultProperties = properties
+            synthesizedMethod = DirectCast(synthesizedType.Methods(0), EEMethodSymbol)
             Return moduleBuilder
         End Function
 
@@ -188,12 +193,14 @@ Namespace Microsoft.CodeAnalysis.VisualBasic.ExpressionEvaluator
             typeName As String,
             localBuilder As ArrayBuilder(Of LocalAndMethod),
             argumentsOnly As Boolean,
+            aliases As ImmutableArray(Of [Alias]),
             testData As Microsoft.CodeAnalysis.CodeGen.CompilationTestData,
             diagnostics As DiagnosticBag) As CommonPEModuleBuilder
 
             Dim objectType = Me.Compilation.GetSpecialType(SpecialType.System_Object)
             Dim allTypeParameters = GetAllTypeParameters(_currentFrame)
             Dim additionalTypes = ArrayBuilder(Of NamedTypeSymbol).GetInstance()
+            Dim syntax = SyntaxFactory.IdentifierName(SyntaxFactory.MissingToken(SyntaxKind.IdentifierToken))
 
             Dim typeVariablesType As EENamedTypeSymbol = Nothing
             If Not argumentsOnly AndAlso allTypeParameters.Length > 0 Then
@@ -203,7 +210,7 @@ Namespace Microsoft.CodeAnalysis.VisualBasic.ExpressionEvaluator
                 typeVariablesType = New EENamedTypeSymbol(
                     Me.Compilation.SourceModule.GlobalNamespace,
                     objectType,
-                    _syntax,
+                    syntax,
                     _currentFrame,
                     ExpressionCompilerConstants.TypeVariablesClassName,
                     Function(m, t)
@@ -219,57 +226,98 @@ Namespace Microsoft.CodeAnalysis.VisualBasic.ExpressionEvaluator
             Dim synthesizedType As New EENamedTypeSymbol(
                 Me.Compilation.SourceModule.GlobalNamespace,
                 objectType,
-                _syntax,
+                syntax,
                 _currentFrame,
                 typeName,
                 Function(m, container)
                     Dim methodBuilder = ArrayBuilder(Of MethodSymbol).GetInstance()
 
                     If Not argumentsOnly Then
+                        If aliases.Length > 0 Then
+                            ' Pseudo-variables: $exception, $ReturnValue, etc.
+                            Dim typeNameDecoder = New EETypeNameDecoder(Me.Compilation, DirectCast(_currentFrame.ContainingModule, PEModuleSymbol))
+                            For Each [alias] As [Alias] In aliases
+                                If [alias].IsReturnValueWithoutIndex() Then
+                                    Debug.Assert(aliases.Count(Function(a) a.Kind = DkmClrAliasKind.ReturnValue) > 1)
+                                    Continue For
+                                End If
+
+                                Dim methodName = GetNextMethodName(methodBuilder)
+                                Dim local = PlaceholderLocalSymbol.Create(typeNameDecoder, _currentFrame, [alias])
+                                ' Skip pseudo-variables with errors.
+                                If local.GetUseSiteInfo().DiagnosticInfo?.Severity = DiagnosticSeverity.Error Then
+                                    Continue For
+                                End If
+                                Dim aliasMethod = Me.CreateMethod(
+                                    container,
+                                    methodName,
+                                    syntax,
+                                    Function(method As EEMethodSymbol, diags As DiagnosticBag, ByRef properties As ResultProperties)
+                                        Dim expression = New BoundLocal(syntax, local, isLValue:=False, type:=local.Type)
+                                        properties = Nothing
+                                        Return New BoundReturnStatement(syntax, expression, Nothing, Nothing).MakeCompilerGenerated()
+                                    End Function)
+                                localBuilder.Add(MakeLocalAndMethod(local, aliasMethod, If(local.IsReadOnly, DkmClrCompilationResultFlags.ReadOnlyResult, DkmClrCompilationResultFlags.None)))
+                                methodBuilder.Add(aliasMethod)
+                            Next
+                        End If
+
                         ' "Me" for non-shared methods that are not display class methods
                         ' or display class methods where the display class contains "$VB$Me".
                         If Not m.IsShared AndAlso (Not m.ContainingType.IsClosureOrStateMachineType() OrElse _displayClassVariables.ContainsKey(GeneratedNames.MakeStateMachineCapturedMeName())) Then
                             Dim methodName = GetNextMethodName(methodBuilder)
                             Dim method = Me.GetMeMethod(container, methodName)
-                            localBuilder.Add(New LocalAndMethod("Me", methodName, DkmClrCompilationResultFlags.None)) ' NOTE: writable in Dev11.
+                            localBuilder.Add(New VisualBasicLocalAndMethod("Me", "Me", method, DkmClrCompilationResultFlags.None)) ' NOTE: writable in Dev11.
                             methodBuilder.Add(method)
                         End If
                     End If
 
-                    ' Hoisted method parameters (represented as locals in the EE).
-                    Dim ordinal As Integer = 0
-                    If Not _hoistedParameterNames.IsEmpty Then
-                        For Each local In _localsForBinding
-                            ' Since we are showing hoisted method parameters first, the parameters may appear out of order
-                            ' in the Locals window if only some of the parameters are hoisted.  This is consistent with the
-                            ' behavior of the old EE.
-                            Dim localName = local.Name
-                            If _hoistedParameterNames.Contains(local.Name) Then
-                                AppendLocalAndMethod(localBuilder, methodBuilder, localName, AddressOf Me.GetLocalMethod, container, ordinal, GetLocalResultFlags(local))
-                            End If
-                            ordinal += 1
-                        Next
-                    End If
+                    Dim itemsAdded = PooledHashSet(Of String).GetInstance()
 
-                    ' Method parameters (except those that have been hoisted).
-                    ordinal = If(m.IsShared, 0, 1)
+                    ' Method parameters
+                    Dim parameterIndex = If(m.IsShared, 0, 1)
                     For Each parameter In m.Parameters
-                        Dim parameterName = parameter.Name
-                        If Not _hoistedParameterNames.Contains(parameterName) Then
-                            AppendLocalAndMethod(localBuilder, methodBuilder, parameterName, AddressOf Me.GetParameterMethod, container, ordinal, DkmClrCompilationResultFlags.None)
+                        Dim parameterName As String = parameter.Name
+                        If GeneratedNames.GetKind(parameterName) = GeneratedNameKind.None Then
+                            AppendParameterAndMethod(localBuilder, methodBuilder, parameter, container, parameterIndex)
+                            itemsAdded.Add(parameterName)
                         End If
-                        ordinal += 1
+
+                        parameterIndex += 1
                     Next
+
+                    ' In case of iterator Or async state machine, the 'm' method has no parameters
+                    ' but the source method can have parameters to iterate over.
+                    If itemsAdded.Count = 0 AndAlso _sourceMethodParametersInOrder.Length <> 0 Then
+                        Dim localsDictionary = PooledDictionary(Of String, (LocalSymbol, Integer)).GetInstance()
+                        Dim localIndex = 0
+                        For Each local In _localsForBinding
+                            localsDictionary.Add(local.Name, (local, localIndex))
+                            localIndex += 1
+                        Next
+
+                        For Each argumentName In _sourceMethodParametersInOrder
+
+                            Dim localSymbolAndIndex As (LocalSymbol, Integer) = Nothing
+                            If localsDictionary.TryGetValue(argumentName, localSymbolAndIndex) Then
+                                itemsAdded.Add(argumentName)
+                                Dim local = localSymbolAndIndex.Item1
+                                AppendLocalAndMethod(localBuilder, methodBuilder, local, container, localSymbolAndIndex.Item2, GetLocalResultFlags(local))
+                            End If
+                        Next
+
+                        localsDictionary.Free()
+                    End If
 
                     If Not argumentsOnly Then
                         ' Locals.
-                        ordinal = 0
+                        Dim localIndex As Integer = 0
                         For Each local In _localsForBinding
-                            Dim localName = local.Name
-                            If Not _hoistedParameterNames.Contains(localName) Then
-                                AppendLocalAndMethod(localBuilder, methodBuilder, localName, AddressOf Me.GetLocalMethod, container, ordinal, GetLocalResultFlags(local))
+                            If Not itemsAdded.Contains(local.Name) Then
+                                AppendLocalAndMethod(localBuilder, methodBuilder, local, container, localIndex, GetLocalResultFlags(local))
                             End If
-                            ordinal += 1
+
+                            localIndex += 1
                         Next
 
                         ' "Type variables".
@@ -277,11 +325,16 @@ Namespace Microsoft.CodeAnalysis.VisualBasic.ExpressionEvaluator
                             Dim methodName = GetNextMethodName(methodBuilder)
                             Dim returnType = typeVariablesType.Construct(ImmutableArrayExtensions.Cast(Of TypeParameterSymbol, TypeSymbol)(allTypeParameters))
                             Dim method = Me.GetTypeVariableMethod(container, methodName, returnType)
-                            localBuilder.Add(New LocalAndMethod(ExpressionCompilerConstants.TypeVariablesLocalName, methodName, DkmClrCompilationResultFlags.ReadOnlyResult))
+                            localBuilder.Add(New VisualBasicLocalAndMethod(
+                                             ExpressionCompilerConstants.TypeVariablesLocalName,
+                                             ExpressionCompilerConstants.TypeVariablesLocalName,
+                                             method,
+                                             DkmClrCompilationResultFlags.ReadOnlyResult))
                             methodBuilder.Add(method)
                         End If
                     End If
 
+                    itemsAdded.Free()
                     Return methodBuilder.ToImmutableAndFree()
                 End Function)
 
@@ -298,9 +351,7 @@ Namespace Microsoft.CodeAnalysis.VisualBasic.ExpressionEvaluator
 
             Me.Compilation.Compile(
                 moduleBuilder,
-                win32Resources:=Nothing,
-                xmlDocStream:=Nothing,
-                generateDebugInfo:=False,
+                emittingPdb:=False,
                 diagnostics:=diagnostics,
                 filterOpt:=Nothing,
                 cancellationToken:=CancellationToken.None)
@@ -308,24 +359,45 @@ Namespace Microsoft.CodeAnalysis.VisualBasic.ExpressionEvaluator
             Return If(diagnostics.HasAnyErrors(), Nothing, moduleBuilder)
         End Function
 
-        Private Shared Sub AppendLocalAndMethod(
+        Private Sub AppendLocalAndMethod(
             localBuilder As ArrayBuilder(Of LocalAndMethod),
             methodBuilder As ArrayBuilder(Of MethodSymbol),
-            name As String,
-            getMethod As Func(Of EENamedTypeSymbol, String, String, Integer, MethodSymbol),
+            local As LocalSymbol,
             container As EENamedTypeSymbol,
-            ordinal As Integer,
+            localIndex As Integer,
             resultFlags As DkmClrCompilationResultFlags)
+
+            Dim methodName = GetNextMethodName(methodBuilder)
+            Dim method = Me.GetLocalMethod(container, methodName, local.Name, localIndex)
+            localBuilder.Add(MakeLocalAndMethod(local, method, resultFlags))
+            methodBuilder.Add(method)
+        End Sub
+
+        Private Sub AppendParameterAndMethod(
+            localBuilder As ArrayBuilder(Of LocalAndMethod),
+            methodBuilder As ArrayBuilder(Of MethodSymbol),
+            parameter As ParameterSymbol,
+            container As EENamedTypeSymbol,
+            parameterIndex As Integer)
 
             ' Note: The native EE doesn't do this, but if we don't escape keyword identifiers,
             ' the ResultProvider needs to be able to disambiguate cases Like "Me" And "[Me]",
             ' which it can't do correctly without semantic information.
-            name = SyntaxHelpers.EscapeKeywordIdentifiers(name)
+            Dim name = SyntaxHelpers.EscapeKeywordIdentifiers(parameter.Name)
             Dim methodName = GetNextMethodName(methodBuilder)
-            Dim method = getMethod(container, methodName, name, ordinal)
-            localBuilder.Add(New LocalAndMethod(name, methodName, resultFlags))
+            Dim method = Me.GetParameterMethod(container, methodName, parameter.Name, parameterIndex)
+            localBuilder.Add(New VisualBasicLocalAndMethod(name, name, method, DkmClrCompilationResultFlags.None))
             methodBuilder.Add(method)
         End Sub
+
+        Private Shared Function MakeLocalAndMethod(local As LocalSymbol, method As MethodSymbol, flags As DkmClrCompilationResultFlags) As LocalAndMethod
+            ' Note: The native EE doesn't do this, but if we don't escape keyword identifiers,
+            ' the ResultProvider needs to be able to disambiguate cases Like "Me" And "[Me]",
+            ' which it can't do correctly without semantic information.
+            Dim escapedName = SyntaxHelpers.EscapeKeywordIdentifiers(local.Name)
+            Dim displayName = If(TryCast(local, PlaceholderLocalSymbol)?.DisplayName, escapedName)
+            Return New VisualBasicLocalAndMethod(escapedName, displayName, method, flags)
+        End Function
 
         Private Shared Function CreateModuleBuilder(
             compilation As VisualBasicCompilation,
@@ -360,28 +432,30 @@ Namespace Microsoft.CodeAnalysis.VisualBasic.ExpressionEvaluator
                 generateMethodBody)
         End Function
 
-        Private Function GetLocalMethod(container As EENamedTypeSymbol, methodName As String, localName As String, index As Integer) As EEMethodSymbol
+        Private Function GetLocalMethod(container As EENamedTypeSymbol, methodName As String, localName As String, localIndex As Integer) As EEMethodSymbol
             Dim syntax = SyntaxFactory.IdentifierName(localName)
             Return Me.CreateMethod(
                 container,
                 methodName,
                 syntax,
-                Function(method, diagnostics)
-                    Dim local = method.LocalsForBinding(index)
-                    Dim expression = New BoundLocal(syntax, local, isLValue:=False, type:=local.Type).MakeCompilerGenerated()
+                Function(method As EEMethodSymbol, diagnostics As DiagnosticBag, ByRef properties As ResultProperties)
+                    Dim local = method.LocalsForBinding(localIndex)
+                    Dim expression = New BoundLocal(syntax, local, isLValue:=False, type:=local.Type)
+                    properties = Nothing
                     Return New BoundReturnStatement(syntax, expression, Nothing, Nothing).MakeCompilerGenerated()
                 End Function)
         End Function
 
-        Private Function GetParameterMethod(container As EENamedTypeSymbol, methodName As String, parameterName As String, index As Integer) As EEMethodSymbol
+        Private Function GetParameterMethod(container As EENamedTypeSymbol, methodName As String, parameterName As String, parameterIndex As Integer) As EEMethodSymbol
             Dim syntax = SyntaxFactory.IdentifierName(parameterName)
             Return Me.CreateMethod(
                 container,
                 methodName,
                 syntax,
-                Function(method, diagnostics)
-                    Dim parameter = method.Parameters(index)
-                    Dim expression = New BoundParameter(syntax, parameter, isLValue:=False, type:=parameter.Type).MakeCompilerGenerated()
+                Function(method As EEMethodSymbol, diagnostics As DiagnosticBag, ByRef properties As ResultProperties)
+                    Dim parameter = method.Parameters(parameterIndex)
+                    Dim expression = New BoundParameter(syntax, parameter, isLValue:=False, type:=parameter.Type)
+                    properties = Nothing
                     Return New BoundReturnStatement(syntax, expression, Nothing, Nothing).MakeCompilerGenerated()
                 End Function)
         End Function
@@ -392,40 +466,48 @@ Namespace Microsoft.CodeAnalysis.VisualBasic.ExpressionEvaluator
                 container,
                 methodName,
                 syntax,
-                Function(method, diagnostics)
-                    Dim expression = New BoundMeReference(syntax, GetNonClosureOrStateMachineContainer(container.SubstitutedSourceType)).MakeCompilerGenerated()
+                Function(method As EEMethodSymbol, diagnostics As DiagnosticBag, ByRef properties As ResultProperties)
+                    Dim expression = New BoundMeReference(syntax, GetNonClosureOrStateMachineContainer(container.SubstitutedSourceType))
+                    properties = Nothing
                     Return New BoundReturnStatement(syntax, expression, Nothing, Nothing).MakeCompilerGenerated()
                 End Function)
         End Function
 
         Private Function GetTypeVariableMethod(container As EENamedTypeSymbol, methodName As String, typeVariablesType As NamedTypeSymbol) As EEMethodSymbol
-            Dim syntax = SyntaxFactory.IdentifierName("")
+            Dim syntax = SyntaxFactory.IdentifierName(SyntaxFactory.MissingToken(SyntaxKind.IdentifierToken))
             Return Me.CreateMethod(
                 container,
                 methodName,
                 syntax,
-                Function(method, diagnostics)
+                Function(method As EEMethodSymbol, diagnostics As DiagnosticBag, ByRef properties As ResultProperties)
                     Dim type = method.TypeMap.SubstituteNamedType(typeVariablesType)
-                    Dim expression = New BoundObjectCreationExpression(syntax, type.InstanceConstructors(0), ImmutableArray(Of BoundExpression).Empty, Nothing, type).MakeCompilerGenerated()
+                    Dim expression = New BoundObjectCreationExpression(syntax, type.InstanceConstructors(0), ImmutableArray(Of BoundExpression).Empty, Nothing, type)
+                    properties = Nothing
                     Return New BoundReturnStatement(syntax, expression, Nothing, Nothing).MakeCompilerGenerated()
                 End Function)
         End Function
 
         Private Shared Function BindExpression(binder As Binder, syntax As ExpressionSyntax, diagnostics As DiagnosticBag, <Out> ByRef resultProperties As ResultProperties) As BoundStatement
-            Dim expression = binder.BindExpression(syntax, diagnostics)
+            Dim bindingDiagnostics = New BindingDiagnosticBag(diagnostics)
+            Dim expression = binder.BindExpression(syntax, bindingDiagnostics)
 
             Dim flags = DkmClrCompilationResultFlags.None
             If Not IsAssignableExpression(binder, expression) Then
                 flags = flags Or DkmClrCompilationResultFlags.ReadOnlyResult
             End If
-            If MayHaveSideEffectsVisitor.MayHaveSideEffects(expression) Then
-                flags = flags Or DkmClrCompilationResultFlags.PotentialSideEffect
-            End If
+
+            Try
+                If MayHaveSideEffectsVisitor.MayHaveSideEffects(expression) Then
+                    flags = flags Or DkmClrCompilationResultFlags.PotentialSideEffect
+                End If
+            Catch ex As BoundTreeVisitor.CancelledByStackGuardException
+                ex.AddAnError(diagnostics)
+            End Try
 
             If IsStatement(expression) Then
-                expression = binder.ReclassifyInvocationExpressionAsStatement(expression, diagnostics)
+                expression = binder.ReclassifyInvocationExpressionAsStatement(expression, bindingDiagnostics)
             Else
-                expression = binder.MakeRValue(expression, diagnostics)
+                expression = binder.MakeRValue(expression, bindingDiagnostics)
             End If
 
             Select Case expression.Type.SpecialType
@@ -442,7 +524,7 @@ Namespace Microsoft.CodeAnalysis.VisualBasic.ExpressionEvaluator
         End Function
 
         Private Shared Function IsAssignableExpression(binder As Binder, expression As BoundExpression) As Boolean
-            Dim diagnostics = DiagnosticBag.GetInstance()
+            Dim diagnostics = New BindingDiagnosticBag(DiagnosticBag.GetInstance())
             Dim value = binder.ReclassifyAsValue(expression, diagnostics)
             Dim result = False
             If Binder.IsValidAssignmentTarget(value) AndAlso Not diagnostics.HasAnyErrors() Then
@@ -473,21 +555,21 @@ Namespace Microsoft.CodeAnalysis.VisualBasic.ExpressionEvaluator
 
         Private Shared Function BindStatement(binder As Binder, syntax As StatementSyntax, diagnostics As DiagnosticBag, <Out> ByRef resultProperties As ResultProperties) As BoundStatement
             resultProperties = New ResultProperties(DkmClrCompilationResultFlags.PotentialSideEffect Or DkmClrCompilationResultFlags.ReadOnlyResult)
-            Return binder.BindStatement(syntax, diagnostics).MakeCompilerGenerated()
+            Return binder.BindStatement(syntax, New BindingDiagnosticBag(diagnostics)).MakeCompilerGenerated()
         End Function
 
         Private Shared Function CreateBinderChain(
             compilation As VisualBasicCompilation,
             [namespace] As NamespaceSymbol,
-            importStrings As ImmutableArray(Of String)) As Binder
+            importRecordGroups As ImmutableArray(Of ImmutableArray(Of ImportRecord))) As Binder
 
             Dim binder = BackstopBinder
-            binder = New SuppressObsoleteDiagnosticsBinder(binder)
+            binder = New SuppressDiagnosticsBinder(binder)
             binder = New IgnoreAccessibilityBinder(binder)
             binder = New SourceModuleBinder(binder, DirectCast(compilation.Assembly.Modules(0), SourceModuleSymbol))
 
-            If Not importStrings.IsDefault Then
-                binder = BuildImportedSymbolsBinder(binder, importStrings, New NamespaceBinder(binder, compilation.GlobalNamespace))
+            If Not importRecordGroups.IsEmpty Then
+                binder = BuildImportedSymbolsBinder(binder, New NamespaceBinder(binder, compilation.GlobalNamespace), importRecordGroups)
             End If
 
             Dim stack = ArrayBuilder(Of String).GetInstance()
@@ -498,7 +580,7 @@ Namespace Microsoft.CodeAnalysis.VisualBasic.ExpressionEvaluator
             End While
 
             ' PERF: we used to call compilation.GetCompilationNamespace on every iteration,
-            ' but that involved walking up to the global namesapce, which we have to do
+            ' but that involved walking up to the global namespace, which we have to do
             ' anyway.  Instead, we'll inline the functionality into our own walk of the
             ' namespace chain.
             [namespace] = compilation.GlobalNamespace
@@ -523,9 +605,7 @@ Namespace Microsoft.CodeAnalysis.VisualBasic.ExpressionEvaluator
         End Function
 
         Private Shared Function ExtendBinderChain(
-            inspectionContext As InspectionContext,
-            compilation As VisualBasicCompilation,
-            metadataDecoder As MetadataDecoder,
+            aliases As ImmutableArray(Of [Alias]),
             method As EEMethodSymbol,
             binder As Binder,
             hasDisplayClassMe As Boolean,
@@ -557,7 +637,8 @@ Namespace Microsoft.CodeAnalysis.VisualBasic.ExpressionEvaluator
             ' We have chosen to explicitly disallow pseudo variables in that scenario.
             If methodNotType Then
                 ' Method locals and parameters shadow pseudo-variables.
-                binder = New PlaceholderLocalBinder(inspectionContext, New EETypeNameDecoder(compilation, metadataDecoder.ModuleSymbol), method, allowImplicitDeclarations, binder)
+                Dim typeNameDecoder = New EETypeNameDecoder(binder.Compilation, DirectCast(substitutedSourceMethod.ContainingModule, PEModuleSymbol))
+                binder = New PlaceholderLocalBinder(aliases, method, typeNameDecoder, allowImplicitDeclarations, binder)
             End If
 
             ' Even if there are no parameters or locals, this has the effect of setting
@@ -569,8 +650,8 @@ Namespace Microsoft.CodeAnalysis.VisualBasic.ExpressionEvaluator
 
         Private Shared Function BuildImportedSymbolsBinder(
             containingBinder As Binder,
-            importStrings As ImmutableArray(Of String),
-            importBinder As Binder) As Binder
+            importBinder As Binder,
+            importRecordGroups As ImmutableArray(Of ImmutableArray(Of ImportRecord))) As Binder
 
             Dim projectLevelImportsBuilder As ArrayBuilder(Of NamespaceOrTypeAndImportsClausePosition) = Nothing
             Dim fileLevelImportsBuilder As ArrayBuilder(Of NamespaceOrTypeAndImportsClausePosition) = Nothing
@@ -581,121 +662,37 @@ Namespace Microsoft.CodeAnalysis.VisualBasic.ExpressionEvaluator
             Dim projectLevelXmlImports As Dictionary(Of String, XmlNamespaceAndImportsClausePosition) = Nothing
             Dim fileLevelXmlImports As Dictionary(Of String, XmlNamespaceAndImportsClausePosition) = Nothing
 
+            Debug.Assert(importRecordGroups.Length = 2) ' First file-level, then project-level.
+            Dim fileLevelImportRecords = importRecordGroups(0)
+            Dim projectLevelImportRecords = importRecordGroups(1)
+
             ' Use this to give the imports different positions
             Dim position = 0
-            For Each importString As String In importStrings
-                Debug.Assert(importString IsNot Nothing)
 
-                Dim [alias] As String = Nothing
-                Dim target As String = Nothing
-                Dim kind As ImportTargetKind = Nothing
-                Dim scope As ImportScope = Nothing
-                If Not CustomDebugInfoReader.TryParseVisualBasicImportString(importString, [alias], target, kind, scope) Then
-                    Debug.WriteLine("Unable to parse import string '{0}'", importString)
-                    Continue For
-                ElseIf kind = ImportTargetKind.Defunct Then
-                    Continue For
+            For Each importRecord As ImportRecord In projectLevelImportRecords
+                If AddImportForRecord(
+                    importRecord,
+                    importBinder,
+                    position,
+                    projectLevelImportsBuilder,
+                    projectLevelAliases,
+                    projectLevelXmlImports) Then
+
+                    position += 1
                 End If
+            Next
 
-                ' NB: It appears that imports of generic types are not included in the PDB, so we never have to worry about parsing them.
-                ' NB: Unlike in C# PDBs, the assembly name will not be present, so we have to just bind the string.
-                Dim targetSyntax As NameSyntax = Nothing
-                If Not String.IsNullOrEmpty(target) AndAlso ' CurrentNamespace may be an empty string.
-                    kind <> ImportTargetKind.XmlNamespace AndAlso
-                    Not TryParseDottedName(target, targetSyntax) Then
+            For Each importRecord As ImportRecord In fileLevelImportRecords
+                If AddImportForRecord(
+                    importRecord,
+                    importBinder,
+                    position,
+                    fileLevelImportsBuilder,
+                    fileLevelAliases,
+                    fileLevelXmlImports) Then
 
-                    Debug.WriteLine("Import string '{0}' has syntactically invalid target '{1}'", importString, target)
-                    Continue For
+                    position += 1
                 End If
-
-                Dim aliasSyntax As IdentifierNameSyntax = Nothing
-                If Not String.IsNullOrEmpty([alias]) Then
-                    Dim aliasNameSyntax As NameSyntax = Nothing
-                    If Not TryParseDottedName([alias], aliasNameSyntax) OrElse aliasNameSyntax.Kind <> SyntaxKind.IdentifierName Then
-                        Debug.WriteLine("Import string '{0}' has syntactically invalid alias '{1}'", importString, [alias])
-                        Continue For
-                    Else
-                        aliasSyntax = DirectCast(aliasNameSyntax, IdentifierNameSyntax)
-                    End If
-                End If
-
-                Select Case kind
-                    ' Dev12 treats the current namespace the same as any other namespace (see ProcedureContext::LoadImportsAndDefaultNamespaceNormal).
-                    ' It seems pointless to add an import for the namespace in which we are binding expressions, but the native source gives
-                    ' the impression that other namespaces may take the same form in Everett PDBs.
-                    Case ImportTargetKind.CurrentNamespace, ImportTargetKind.Namespace, ImportTargetKind.Type ' Unaliased namespace or type
-                        Debug.Assert([alias] Is Nothing) ' Aliased types and namespaces are handled by ImportTargetKind.NamespaceOrType
-                        Debug.Assert(target IsNot Nothing)
-
-                        If target = "" Then
-                            Debug.Assert(kind = ImportTargetKind.CurrentNamespace) ' The current namespace can be empty.
-                            Continue For
-                        End If
-
-                        Debug.Assert(targetSyntax IsNot Nothing)
-
-                        Dim unusedDiagnostics = DiagnosticBag.GetInstance()
-                        Dim namespaceOrTypeSymbol = importBinder.BindNamespaceOrTypeSyntax(targetSyntax, unusedDiagnostics)
-                        unusedDiagnostics.Free()
-
-                        Debug.Assert(namespaceOrTypeSymbol IsNot Nothing)
-
-                        If namespaceOrTypeSymbol.Kind = SymbolKind.ErrorType Then
-                            ' Type is unrecognized.  The import may have been
-                            ' valid in the original source but unnecessary.
-                            Continue For ' Don't add anything for this import.
-                        End If
-
-                        Dim selectedImportsBuilder = SelectAndInitializeCollection(scope, projectLevelImportsBuilder, fileLevelImportsBuilder, Function() ArrayBuilder(Of NamespaceOrTypeAndImportsClausePosition).GetInstance())
-
-                        ' There's no real syntax, so there's no real position.  We'll give them separate numbers though.
-                        selectedImportsBuilder.Add(New NamespaceOrTypeAndImportsClausePosition(namespaceOrTypeSymbol, position))
-                    Case ImportTargetKind.NamespaceOrType ' Unaliased namespace or type
-                        Debug.Assert([alias] IsNot Nothing)
-                        Debug.Assert(target IsNot Nothing)
-                        Debug.Assert(targetSyntax IsNot Nothing)
-
-                        Dim unusedDiagnostics = DiagnosticBag.GetInstance()
-                        Dim namespaceOrTypeSymbol = importBinder.BindNamespaceOrTypeSyntax(targetSyntax, unusedDiagnostics)
-                        unusedDiagnostics.Free()
-
-                        Debug.Assert(namespaceOrTypeSymbol IsNot Nothing)
-
-                        If namespaceOrTypeSymbol.Kind = SymbolKind.ErrorType Then
-                            ' Type is unrecognized.  The import may have been
-                            ' valid in the original source but unnecessary.
-                            Continue For ' Don't add anything for this import.
-                        End If
-
-                        Dim aliasSymbol As New AliasSymbol(importBinder.Compilation, importBinder.ContainingNamespaceOrType, [alias], namespaceOrTypeSymbol, NoLocation.Singleton)
-
-                        Dim selectedAliases = SelectAndInitializeCollection(scope, projectLevelAliases, fileLevelAliases, Function() New Dictionary(Of String, AliasAndImportsClausePosition))
-
-                        ' There's no real syntax, so there's no real position.  We'll give them separate numbers though.
-                        selectedAliases([alias]) = New AliasAndImportsClausePosition(aliasSymbol, position)
-                    Case ImportTargetKind.XmlNamespace
-                        Debug.Assert(target IsNot Nothing)
-
-                        Dim selectedXmlImports = SelectAndInitializeCollection(scope, projectLevelXmlImports, fileLevelXmlImports, Function() New Dictionary(Of String, XmlNamespaceAndImportsClausePosition))
-
-                        ' There's no real syntax, so there's no real position.  We'll give them separate numbers though.
-                        selectedXmlImports([alias]) = New XmlNamespaceAndImportsClausePosition(target, position)
-                    Case ImportTargetKind.DefaultNamespace
-                        ' Processed ahead of time so that it can be incorporated into the compilation before
-                        ' constructing the binder chain.
-                        Continue For
-                    Case ImportTargetKind.MethodToken ' forwarding
-                        ' One level of forwarding is pre-processed away, but invalid PDBs might contain
-                        ' chains.  Just ignore them (as in Dev12).
-                        Continue For
-                    Case ImportTargetKind.Assembly
-                        ' VB doesn't have extern aliases.
-                        Throw ExceptionUtilities.UnexpectedValue(kind)
-                    Case Else
-                        Throw ExceptionUtilities.UnexpectedValue(kind)
-                End Select
-
-                position += 1
             Next
 
             ' BinderBuilder.CreateBinderForSourceFile creates separate binders for the project- and file-level
@@ -734,6 +731,162 @@ Namespace Microsoft.CodeAnalysis.VisualBasic.ExpressionEvaluator
             Return binder
         End Function
 
+        Private Shared Function AddImportForRecord(
+            importRecord As ImportRecord,
+            importBinder As Binder,
+            position As Integer,
+            ByRef importsBuilder As ArrayBuilder(Of NamespaceOrTypeAndImportsClausePosition),
+            ByRef aliases As Dictionary(Of String, AliasAndImportsClausePosition),
+            ByRef xmlImports As Dictionary(Of String, XmlNamespaceAndImportsClausePosition)) As Boolean
+
+            Dim targetString = importRecord.TargetString
+
+            ' NB: It appears that imports of generic types are not included in the PDB, so we never have to worry about parsing them.
+            ' NB: Unlike in C# PDBs, the assembly name will not be present, so we have to just bind the string.
+            Dim targetSyntax As NameSyntax = Nothing
+            If Not String.IsNullOrEmpty(targetString) AndAlso ' CurrentNamespace may be an empty string, new-format types may be null.
+                    importRecord.TargetKind <> ImportTargetKind.XmlNamespace AndAlso
+                    Not TryParseDottedName(targetString, targetSyntax) Then
+
+                Debug.WriteLine($"Import record '{importRecord}' has syntactically invalid target '{targetString}'")
+                Return False
+            End If
+
+            ' Check for syntactically invalid aliases.
+            Dim [alias] = importRecord.Alias
+            If Not String.IsNullOrEmpty([alias]) Then
+                Dim aliasNameSyntax As NameSyntax = Nothing
+                If Not TryParseDottedName([alias], aliasNameSyntax) OrElse aliasNameSyntax.Kind <> SyntaxKind.IdentifierName Then
+                    Debug.WriteLine($"Import record '{importRecord}' has syntactically invalid alias '{[alias]}'")
+                    Return False
+                End If
+            End If
+
+            Select Case importRecord.TargetKind
+                Case ImportTargetKind.Type
+                    Dim typeSymbol As TypeSymbol
+                    If importRecord.TargetType IsNot Nothing Then
+                        typeSymbol = DirectCast(importRecord.TargetType, TypeSymbol)
+                    Else
+                        Debug.Assert(importRecord.Alias Is Nothing) ' Represented as ImportTargetKind.NamespaceOrType in old-format PDBs.
+
+                        typeSymbol = importBinder.BindTypeSyntax(targetSyntax, BindingDiagnosticBag.Discarded)
+
+                        Debug.Assert(typeSymbol IsNot Nothing)
+
+                        If typeSymbol.Kind = SymbolKind.ErrorType Then
+                            ' Type is unrecognized.  The import may have been
+                            ' valid in the original source but unnecessary.
+                            Return False ' Don't add anything for this import.
+                        End If
+                    End If
+
+                    If [alias] IsNot Nothing Then
+                        Dim aliasSymbol As New AliasSymbol(importBinder.Compilation, importBinder.ContainingNamespaceOrType, [alias], typeSymbol, NoLocation.Singleton)
+
+                        If aliases Is Nothing Then
+                            aliases = New Dictionary(Of String, AliasAndImportsClausePosition)()
+                        End If
+
+                        ' There's no real syntax, so there's no real position.  We'll give them separate numbers though.
+                        aliases([alias]) = New AliasAndImportsClausePosition(aliasSymbol, position, ImmutableArray(Of AssemblySymbol).Empty)
+                    Else
+                        If importsBuilder Is Nothing Then
+                            importsBuilder = ArrayBuilder(Of NamespaceOrTypeAndImportsClausePosition).GetInstance()
+                        End If
+
+                        ' There's no real syntax, so there's no real position.  We'll give them separate numbers though.
+                        importsBuilder.Add(New NamespaceOrTypeAndImportsClausePosition(typeSymbol, position, ImmutableArray(Of AssemblySymbol).Empty))
+                    End If
+
+                ' Dev12 treats the current namespace the same as any other namespace (see ProcedureContext::LoadImportsAndDefaultNamespaceNormal).
+                ' It seems pointless to add an import for the namespace in which we are binding expressions, but the native source gives
+                ' the impression that other namespaces may take the same form in Everett PDBs.
+                Case ImportTargetKind.CurrentNamespace, ImportTargetKind.Namespace ' Unaliased namespace or type
+                    If targetString = "" Then
+                        Debug.Assert(importRecord.TargetKind = ImportTargetKind.CurrentNamespace) ' The current namespace can be empty.
+                        Return False
+                    End If
+
+                    Dim namespaceOrTypeSymbol = importBinder.BindNamespaceOrTypeSyntax(targetSyntax, BindingDiagnosticBag.Discarded)
+
+                    Debug.Assert(namespaceOrTypeSymbol IsNot Nothing)
+
+                    If namespaceOrTypeSymbol.Kind = SymbolKind.ErrorType Then
+                        ' Namespace is unrecognized.  The import may have been
+                        ' valid in the original source but unnecessary.
+                        Return False ' Don't add anything for this import.
+                    End If
+
+                    ' Native PDBs: aliased namespace is stored as NamespaceOrType
+                    ' Portable PDBs: aliased namespace is stored as Namespace
+                    If [alias] Is Nothing Then
+                        If importsBuilder Is Nothing Then
+                            importsBuilder = ArrayBuilder(Of NamespaceOrTypeAndImportsClausePosition).GetInstance()
+                        End If
+
+                        ' There's no real syntax, so there's no real position.  We'll give them separate numbers though.
+                        importsBuilder.Add(New NamespaceOrTypeAndImportsClausePosition(namespaceOrTypeSymbol, position, ImmutableArray(Of AssemblySymbol).Empty))
+                    Else
+                        Dim aliasSymbol As New AliasSymbol(importBinder.Compilation, importBinder.ContainingNamespaceOrType, [alias], namespaceOrTypeSymbol, NoLocation.Singleton)
+
+                        If aliases Is Nothing Then
+                            aliases = New Dictionary(Of String, AliasAndImportsClausePosition)()
+                        End If
+
+                        ' There's no real syntax, so there's no real position.  We'll give them separate numbers though.
+                        aliases([alias]) = New AliasAndImportsClausePosition(aliasSymbol, position, ImmutableArray(Of AssemblySymbol).Empty)
+                    End If
+
+                Case ImportTargetKind.NamespaceOrType ' Aliased namespace or type (native PDB only)
+                    Dim namespaceOrTypeSymbol = importBinder.BindNamespaceOrTypeSyntax(targetSyntax, BindingDiagnosticBag.Discarded)
+
+                    Debug.Assert(namespaceOrTypeSymbol IsNot Nothing)
+
+                    If namespaceOrTypeSymbol.Kind = SymbolKind.ErrorType Then
+                        ' Type is unrecognized.  The import may have been
+                        ' valid in the original source but unnecessary.
+                        Return False ' Don't add anything for this import.
+                    End If
+
+                    Debug.Assert([alias] IsNot Nothing) ' Implied by TargetKind
+
+                    Dim aliasSymbol As New AliasSymbol(importBinder.Compilation, importBinder.ContainingNamespaceOrType, [alias], namespaceOrTypeSymbol, NoLocation.Singleton)
+
+                    If aliases Is Nothing Then
+                        aliases = New Dictionary(Of String, AliasAndImportsClausePosition)()
+                    End If
+
+                    ' There's no real syntax, so there's no real position.  We'll give them separate numbers though.
+                    aliases([alias]) = New AliasAndImportsClausePosition(aliasSymbol, position, ImmutableArray(Of AssemblySymbol).Empty)
+
+                Case ImportTargetKind.XmlNamespace
+                    If xmlImports Is Nothing Then
+                        xmlImports = New Dictionary(Of String, XmlNamespaceAndImportsClausePosition)()
+                    End If
+
+                    ' There's no real syntax, so there's no real position.  We'll give them separate numbers though.
+                    xmlImports(importRecord.Alias) = New XmlNamespaceAndImportsClausePosition(importRecord.TargetString, position)
+                Case ImportTargetKind.DefaultNamespace
+                    ' Processed ahead of time so that it can be incorporated into the compilation before
+                    ' constructing the binder chain.
+                    Return False
+                Case ImportTargetKind.MethodToken ' forwarding
+                    ' One level of forwarding is pre-processed away, but invalid PDBs might contain
+                    ' chains.  Just ignore them (as in Dev12).
+                    Return False
+                Case ImportTargetKind.Defunct
+                    Return False
+                Case ImportTargetKind.Assembly
+                    ' VB doesn't have extern aliases.
+                    Throw ExceptionUtilities.UnexpectedValue(importRecord.TargetKind)
+                Case Else
+                    Throw ExceptionUtilities.UnexpectedValue(importRecord.TargetKind)
+            End Select
+
+            Return True
+        End Function
+
         Private Shared Function MergeAliases(Of T)(projectLevel As Dictionary(Of String, T), fileLevel As Dictionary(Of String, T)) As Dictionary(Of String, T)
             If projectLevel Is Nothing Then
                 Return fileLevel
@@ -753,19 +906,19 @@ Namespace Microsoft.CodeAnalysis.VisualBasic.ExpressionEvaluator
         End Function
 
         Private Shared Function SelectAndInitializeCollection(Of T)(
-            scope As ImportScope,
+            scope As VBImportScopeKind,
             ByRef projectLevelCollection As T,
             ByRef fileLevelCollection As T,
             initializeCollection As Func(Of T)) As T
 
-            If scope = ImportScope.Project Then
+            If scope = VBImportScopeKind.Project Then
                 If projectLevelCollection Is Nothing Then
                     projectLevelCollection = initializeCollection()
                 End If
 
                 Return projectLevelCollection
             Else
-                Debug.Assert(scope = ImportScope.File OrElse scope = ImportScope.Unspecified)
+                Debug.Assert(scope = VBImportScopeKind.File OrElse scope = VBImportScopeKind.Unspecified)
 
                 If fileLevelCollection Is Nothing Then
                     fileLevelCollection = initializeCollection()
@@ -779,7 +932,7 @@ Namespace Microsoft.CodeAnalysis.VisualBasic.ExpressionEvaluator
         ''' We don't want to use the real scanner because we want to treat keywords as identifiers.
         ''' Since the inputs are so simple, we'll just do the scanning ourselves.
         ''' </summary>
-        Private Shared Function TryParseDottedName(input As String, <Out> ByRef output As NameSyntax) As Boolean
+        Friend Shared Function TryParseDottedName(input As String, <Out> ByRef output As NameSyntax) As Boolean
             Dim pooled = PooledStringBuilder.GetInstance()
             Try
                 Dim builder = pooled.Builder
@@ -827,46 +980,6 @@ Namespace Microsoft.CodeAnalysis.VisualBasic.ExpressionEvaluator
             End Try
         End Function
 
-        Private Shared Function GetDefaultNamespaceName(importStrings As ImmutableArray(Of String)) As String
-            Dim defaultNamespaceName As String = Nothing
-            If Not importStrings.IsDefault Then
-                For Each importString As String In importStrings
-                    Debug.Assert(importString IsNot Nothing)
-                    If importString.Length > 0 AndAlso importString(0) = "*"c Then
-                        Dim [alias] As String = Nothing
-                        Dim target As String = Nothing
-                        Dim kind As ImportTargetKind = Nothing
-                        Dim scope As ImportScope = Nothing
-                        If Not CustomDebugInfoReader.TryParseVisualBasicImportString(importString, [alias], target, kind, scope) Then
-                            Debug.WriteLine("Unable to parse import string '{0}'", importString)
-                            Continue For
-                        ElseIf kind = ImportTargetKind.Defunct
-                            Continue For
-                        End If
-
-                        Debug.Assert([alias] Is Nothing) ' The default namespace is never aliased.
-                        Debug.Assert(target IsNot Nothing)
-                        Debug.Assert(kind = ImportTargetKind.DefaultNamespace)
-
-                        ' We only expect to see one of these, but it looks like ProcedureContext::LoadImportsAndDefaultNamespaceNormal
-                        ' implicitly uses the last one if there are multiple.
-                        Debug.Assert(defaultNamespaceName Is Nothing)
-
-                        defaultNamespaceName = target
-                    End If
-                Next
-            End If
-
-            ' Note: We don't need to try to bind this string because this is analogous to passing
-            ' a command-line argument - as long as the syntax is valid, an appropriate symbol will
-            ' be created for us.
-            If String.IsNullOrEmpty(defaultNamespaceName) OrElse Not TryParseDottedName(defaultNamespaceName, Nothing) Then
-                Return ""
-            Else
-                Return defaultNamespaceName
-            End If
-        End Function
-
         Friend ReadOnly Property MessageProvider As CommonMessageProvider
             Get
                 Return Me.Compilation.MessageProvider
@@ -899,6 +1012,47 @@ Namespace Microsoft.CodeAnalysis.VisualBasic.ExpressionEvaluator
             Return builder.ToImmutableAndFree()
         End Function
 
+        Private Shared Function GetSourceMethodParametersInOrder(
+            method As MethodSymbol,
+            sourceMethod As MethodSymbol) As ImmutableArray(Of String)
+
+            Dim containingType = method.ContainingType
+            Dim isIteratorOrAsyncMethod = containingType.IsClosureOrStateMachineType() AndAlso containingType.IsStateMachineType()
+
+            Dim parameterNamesInOrder = ArrayBuilder(Of String).GetInstance()
+
+            ' For version before .NET 4.5, we cannot find the sourceMethod properly:
+            ' The source method coincides with the original method in the case.
+            ' Here, we have to get parameters from the containingType.
+            ' This does not guarantee the proper order of parameters.
+            If isIteratorOrAsyncMethod AndAlso method = sourceMethod Then
+                Debug.Assert(containingType.IsClosureOrStateMachineType())
+
+                For Each member In containingType.GetMembers
+                    ' All iterator and async state machine fields in VB have mangled names.
+                    ' The ones beginning with "$VB$Local_" are the hoisted parameters.
+                    If member.Kind <> SymbolKind.Field Then
+                        Continue For
+                    End If
+
+                    Dim field = DirectCast(member, FieldSymbol)
+                    Dim fieldName = field.Name
+                    Dim parameterName As String = Nothing
+                    If GeneratedNames.TryParseHoistedUserVariableName(fieldName, parameterName) Then
+                        parameterNamesInOrder.Add(parameterName)
+                    End If
+                Next
+            Else
+                If sourceMethod <> Nothing Then
+                    For Each parameter In sourceMethod.Parameters
+                        parameterNamesInOrder.Add(parameter.Name)
+                    Next
+                End If
+            End If
+
+            Return parameterNamesInOrder.ToImmutableAndFree()
+        End Function
+
         ''' <summary>
         ''' Return a mapping of captured variables (parameters, locals, and "Me") to locals.
         ''' The mapping is needed to expose the original local identifiers (those from source)
@@ -906,96 +1060,87 @@ Namespace Microsoft.CodeAnalysis.VisualBasic.ExpressionEvaluator
         ''' </summary>
         Private Shared Sub GetDisplayClassVariables(
             method As MethodSymbol,
+            sourceMethod As MethodSymbol,
             locals As ImmutableArray(Of LocalSymbol),
-            hoistedLocalFieldNames As ImmutableHashSet(Of String),
+            inScopeHoistedLocalSlots As ImmutableSortedSet(Of Integer),
+            sourceMethodParametersInOrder As ImmutableArray(Of String),
             <Out> ByRef displayClassVariableNamesInOrder As ImmutableArray(Of String),
-            <Out> ByRef displayClassVariables As ImmutableDictionary(Of String, DisplayClassVariable),
-            <Out> ByRef hoistedParameterNames As ImmutableHashSet(Of String))
+            <Out> ByRef displayClassVariables As ImmutableDictionary(Of String, DisplayClassVariable))
 
-            ' Calculated the shortest paths from locals to instances of display classes.
+            ' Calculate the shortest paths from locals to instances of display classes.
             ' There should not be two instances of the same display class immediately
             ' within any particular method.
-            Dim displayClassTypes = PooledHashSet(Of NamedTypeSymbol).GetInstance()
             Dim displayClassInstances = ArrayBuilder(Of DisplayClassInstanceAndFields).GetInstance()
 
-            ' Add any display class instances from locals (these will contain any hoisted locals).
-            For Each local As LocalSymbol In locals
-                Dim localName = local.Name
-                If localName IsNot Nothing AndAlso IsDisplayClassInstanceLocalName(localName) Then
-                    Dim instance As New DisplayClassInstanceFromLocal(DirectCast(local, EELocalSymbol))
-                    displayClassTypes.Add(instance.Type)
+            For Each parameter As ParameterSymbol In method.Parameters
+                If GeneratedNames.GetKind(parameter.Name) = GeneratedNameKind.TransparentIdentifier Then
+                    Dim instance As New DisplayClassInstanceFromParameter(parameter)
                     displayClassInstances.Add(New DisplayClassInstanceAndFields(instance))
                 End If
             Next
 
-            Dim containingType = method.ContainingType
-            Dim isIteratorOrAsyncMethod = False
-            If containingType.IsClosureOrStateMachineType() Then
+            If method.ContainingType.IsClosureOrStateMachineType() Then
                 If Not method.IsShared Then
                     ' Add "Me" display class instance.
-                    Dim instance As New DisplayClassInstanceFromMe(method.MeParameter)
-                    displayClassTypes.Add(instance.Type)
+                    Dim instance As New DisplayClassInstanceFromParameter(method.MeParameter)
                     displayClassInstances.Add(New DisplayClassInstanceAndFields(instance))
                 End If
-
-                isIteratorOrAsyncMethod = containingType.IsStateMachineType()
             End If
 
-            If displayClassInstances.Any() Then
-                ' Find any additional display class instances breadth first.
-                Dim depth = 0
-                While GetDisplayClassInstances(displayClassTypes, displayClassInstances, depth) > 0
-                    depth += 1
-                End While
+            Dim displayClassTypes = PooledHashSet(Of TypeSymbol).GetInstance()
+            For Each instance In displayClassInstances
+                displayClassTypes.Add(instance.Instance.Type)
+            Next
 
+            ' Find any additional display class instances.
+            GetAdditionalDisplayClassInstances(displayClassTypes, displayClassInstances, startIndex:=0)
+
+            ' Add any display class instances from locals (these will contain any hoisted locals).
+            ' Locals are only added after finding all display class instances reachable from
+            ' parameters because locals may be null (temporary locals in async state machine
+            ' for instance) so we prefer parameters to locals.
+            Dim startIndex = displayClassInstances.Count
+            For Each local As LocalSymbol In locals
+                Dim localName = local.Name
+                If localName IsNot Nothing AndAlso IsDisplayClassInstanceLocalName(localName) Then
+                    If displayClassTypes.Add(local.Type) Then
+                        Dim instance As New DisplayClassInstanceFromLocal(DirectCast(local, EELocalSymbol))
+                        displayClassInstances.Add(New DisplayClassInstanceAndFields(instance))
+                    End If
+                End If
+            Next
+            GetAdditionalDisplayClassInstances(displayClassTypes, displayClassInstances, startIndex)
+
+            displayClassTypes.Free()
+
+            If displayClassInstances.Any() Then
                 ' The locals are the set of all fields from the display classes.
                 Dim displayClassVariableNamesInOrderBuilder = ArrayBuilder(Of String).GetInstance()
                 Dim displayClassVariablesBuilder = PooledDictionary(Of String, DisplayClassVariable).GetInstance()
 
                 Dim parameterNames = PooledHashSet(Of String).GetInstance()
-                If isIteratorOrAsyncMethod Then
-                    Debug.Assert(containingType.IsClosureOrStateMachineType())
+                For Each p In sourceMethodParametersInOrder
+                    parameterNames.Add(p)
+                Next
 
-                    For Each field In containingType.GetMembers.OfType(Of FieldSymbol)()
-                        ' All iterator and async state machine fields in VB have mangled names.
-                        ' The ones beginning with "$VB$Local_" are the hoisted parameters.
-                        Dim fieldName = field.Name
-                        Dim parameterName As String = Nothing
-                        If GeneratedNames.TryParseHoistedUserVariableName(fieldName, parameterName) Then
-                            parameterNames.Add(parameterName)
-                        End If
-                    Next
-                Else
-                    For Each parameter In method.Parameters
-                        parameterNames.Add(parameter.Name)
-                    Next
-                End If
-
-                Dim pooledHoistedParameterNames = PooledHashSet(Of String).GetInstance()
                 For Each instance In displayClassInstances
                     GetDisplayClassVariables(
                         displayClassVariableNamesInOrderBuilder,
                         displayClassVariablesBuilder,
                         parameterNames,
-                        hoistedLocalFieldNames,
-                        instance,
-                        pooledHoistedParameterNames)
+                        inScopeHoistedLocalSlots,
+                        instance)
                 Next
-
-                hoistedParameterNames = pooledHoistedParameterNames.ToImmutableHashSet()
-                pooledHoistedParameterNames.Free()
-                parameterNames.Free()
 
                 displayClassVariableNamesInOrder = displayClassVariableNamesInOrderBuilder.ToImmutableAndFree()
                 displayClassVariables = displayClassVariablesBuilder.ToImmutableDictionary()
                 displayClassVariablesBuilder.Free()
+                parameterNames.Free()
             Else
-                hoistedParameterNames = ImmutableHashSet(Of String).Empty
                 displayClassVariableNamesInOrder = ImmutableArray(Of String).Empty
                 displayClassVariables = ImmutableDictionary(Of String, DisplayClassVariable).Empty
             End If
 
-            displayClassTypes.Free()
             displayClassInstances.Free()
         End Sub
 
@@ -1026,6 +1171,19 @@ Namespace Microsoft.CodeAnalysis.VisualBasic.ExpressionEvaluator
                 name.StartsWith(StringConstants.HoistedSpecialVariablePrefix & StringConstants.DisplayClassPrefix, StringComparison.Ordinal) ' Async lambda case
         End Function
 
+        Private Shared Function IsTransparentIdentifierField(field As FieldSymbol) As Boolean
+            Dim fieldName = field.Name
+
+            Dim unmangledName As String = Nothing
+            If GeneratedNames.TryParseHoistedUserVariableName(fieldName, unmangledName) Then
+                fieldName = unmangledName
+            ElseIf field.IsAnonymousTypeField(unmangledName) Then
+                fieldName = unmangledName
+            End If
+
+            Return GeneratedNames.GetKind(fieldName) = GeneratedNameKind.TransparentIdentifier
+        End Function
+
         Private Shared Function IsGeneratedLocalName(name As String) As Boolean
             Debug.Assert(name IsNot Nothing) ' Verified by caller.
             ' If a local's name contains "$", then it is a generated local.
@@ -1040,38 +1198,25 @@ Namespace Microsoft.CodeAnalysis.VisualBasic.ExpressionEvaluator
                 DkmClrCompilationResultFlags.None)
         End Function
 
-        ''' <summary>
-        ''' Return the set of display class instances that can be reached from the given local.
-        ''' A particular display class may be reachable from multiple locals.  In those cases,
-        ''' the instance from the shortest path (fewest intermediate fields) is returned.
-        ''' </summary>
-        Private Shared Function GetDisplayClassInstances(
-            displayClassTypes As HashSet(Of NamedTypeSymbol),
+        Private Shared Sub GetAdditionalDisplayClassInstances(
+            displayClassTypes As HashSet(Of TypeSymbol),
             displayClassInstances As ArrayBuilder(Of DisplayClassInstanceAndFields),
-            depth As Integer) As Integer
+            startIndex As Integer)
 
-            Debug.Assert(displayClassInstances.All(Function(p) p.Depth <= depth))
+            ' Find any additional display class instances breadth first.
+            Dim i = startIndex
+            While i < displayClassInstances.Count()
+                GetDisplayClassInstances(displayClassTypes, displayClassInstances, displayClassInstances(i))
+                i += 1
+            End While
+        End Sub
 
-            Dim atDepth = ArrayBuilder(Of DisplayClassInstanceAndFields).GetInstance()
-            atDepth.AddRange(displayClassInstances.Where(Function(p) p.Depth = depth))
-            Debug.Assert(atDepth.Count > 0)
-
-            Dim n = 0
-            For Each instance In atDepth
-                n += GetDisplayClassInstances(displayClassTypes, displayClassInstances, instance)
-            Next
-
-            atDepth.Free()
-            Return n
-        End Function
-
-        Private Shared Function GetDisplayClassInstances(
-            displayClassTypes As HashSet(Of NamedTypeSymbol),
+        Private Shared Sub GetDisplayClassInstances(
+            displayClassTypes As HashSet(Of TypeSymbol),
             displayClassInstances As ArrayBuilder(Of DisplayClassInstanceAndFields),
-            instance As DisplayClassInstanceAndFields) As Integer
+            instance As DisplayClassInstanceAndFields)
 
             ' Display class instance.  The display class fields are variables.
-            Dim n = 0
             For Each member In instance.Type.GetMembers()
                 If member.Kind <> SymbolKind.Field Then
                     Continue For
@@ -1079,26 +1224,24 @@ Namespace Microsoft.CodeAnalysis.VisualBasic.ExpressionEvaluator
                 Dim field = DirectCast(member, FieldSymbol)
                 Dim fieldType = field.Type
                 Dim fieldName As String = field.Name
-                If IsDisplayClassInstanceFieldName(fieldName) Then
+                If IsDisplayClassInstanceFieldName(fieldName) OrElse
+                    IsTransparentIdentifierField(field) Then
                     Debug.Assert(Not field.IsShared)
                     ' A local that is itself a display class instance.
-                    If displayClassTypes.Add(DirectCast(fieldType, NamedTypeSymbol)) Then
+                    If displayClassTypes.Add(fieldType) Then
                         Dim other = instance.FromField(field)
                         displayClassInstances.Add(other)
-                        n += 1
                     End If
                 End If
             Next
-            Return n
-        End Function
+        End Sub
 
         Private Shared Sub GetDisplayClassVariables(
             displayClassVariableNamesInOrder As ArrayBuilder(Of String),
             displayClassVariablesBuilder As Dictionary(Of String, DisplayClassVariable),
             parameterNames As HashSet(Of String),
-            hoistedLocalFieldNames As ImmutableHashSet(Of String),
-            instance As DisplayClassInstanceAndFields,
-            hoistedParameterNames As HashSet(Of String))
+            inScopeHoistedLocalSlots As ImmutableSortedSet(Of Integer),
+            instance As DisplayClassInstanceAndFields)
 
             ' Display class instance.  The display class fields are variables.
             For Each member In instance.Type.GetMembers()
@@ -1109,8 +1252,15 @@ Namespace Microsoft.CodeAnalysis.VisualBasic.ExpressionEvaluator
                 Dim field = DirectCast(member, FieldSymbol)
                 Dim fieldName = field.Name
 
+                Dim unmangledName As String = Nothing
+                If field.IsAnonymousTypeField(unmangledName) Then
+                    fieldName = unmangledName
+                End If
+
                 Dim variableKind As DisplayClassVariableKind
                 Dim variableName As String
+                Dim hoistedLocalName As String = Nothing
+                Dim hoistedLocalSlotIndex As Integer = 0
 
                 If fieldName.StartsWith(StringConstants.HoistedUserVariablePrefix, StringComparison.Ordinal) Then
                     Debug.Assert(Not field.IsShared)
@@ -1120,20 +1270,26 @@ Namespace Microsoft.CodeAnalysis.VisualBasic.ExpressionEvaluator
                     Debug.Assert(Not field.IsShared)
                     variableKind = DisplayClassVariableKind.Local
                     variableName = fieldName.Substring(StringConstants.HoistedSpecialVariablePrefix.Length)
-                ElseIf fieldName.StartsWith(StringConstants.StateMachineHoistedUserVariablePrefix, StringComparison.Ordinal) Then
+                ElseIf GeneratedNames.TryParseStateMachineHoistedUserVariableName(fieldName, hoistedLocalName, hoistedLocalSlotIndex) Then
                     Debug.Assert(Not field.IsShared)
-                    variableKind = DisplayClassVariableKind.Local
-                    variableName = Nothing
-                    Dim unusedIndex As Integer = Nothing
-                    If Not hoistedLocalFieldNames.Contains(fieldName) OrElse Not GeneratedNames.TryParseStateMachineHoistedUserVariableName(fieldName, variableName, unusedIndex) Then
+
+                    If Not inScopeHoistedLocalSlots.Contains(hoistedLocalSlotIndex) Then
                         Continue For
                     End If
+
+                    variableKind = DisplayClassVariableKind.Local
+                    variableName = hoistedLocalName
+
                 ElseIf IsHoistedMeFieldName(fieldName) Then
                     Debug.Assert(Not field.IsShared)
                     ' A reference to "Me".
                     variableKind = DisplayClassVariableKind.Me
                     variableName = fieldName ' As in C#, we retain the mangled name.  It shouldn't be used, other than as a dictionary key.
                 ElseIf fieldName.StartsWith(StringConstants.LambdaCacheFieldPrefix, StringComparison.Ordinal) Then
+                    Continue For
+                ElseIf GeneratedNames.GetKind(fieldName) = GeneratedNameKind.TransparentIdentifier Then
+                    ' A transparent identifier (field) in an anonymous type synthesized for a transparent identifier.
+                    Debug.Assert(Not field.IsShared)
                     Continue For
                 Else
                     variableKind = DisplayClassVariableKind.Local
@@ -1146,16 +1302,31 @@ Namespace Microsoft.CodeAnalysis.VisualBasic.ExpressionEvaluator
 
                 If variableKind = DisplayClassVariableKind.Local AndAlso parameterNames.Contains(variableName) Then
                     variableKind = DisplayClassVariableKind.Parameter
-                    hoistedParameterNames.Add(variableName)
                 End If
 
                 If displayClassVariablesBuilder.ContainsKey(variableName) Then
-                    ' There are two ways names could collide:
-                    '   1) hoisted state machine locals in different scopes
-                    '   2) hoisted state machine parameters that are also captured by lambdas
-                    ' The former should be impossible since we dropped out-of-scope hoisted
-                    ' locals above.  We assert that we are seeing the latter.
-                    Debug.Assert(variableKind = DisplayClassVariableKind.Parameter)
+                    ' Only expecting duplicates for async state machine
+                    ' fields (that should be at the top-level).
+                    Debug.Assert(displayClassVariablesBuilder(variableName).DisplayClassFields.Count() = 1)
+
+                    If Not instance.Fields.Any() Then
+                        ' Prefer parameters over locals.
+                        Debug.Assert(TypeOf instance.Instance Is DisplayClassInstance)
+                    Else
+                        Debug.Assert(instance.Fields.Count() >= 1) ' greater depth
+                        ' There are two ways names could collide:
+                        '   1) hoisted state machine locals in different scopes
+                        '   2) hoisted state machine parameters that are also captured by lambdas
+                        ' The former should be impossible since we dropped out-of-scope hoisted
+                        ' locals above.  We assert that we are seeing the latter.
+                        Debug.Assert((variableKind = DisplayClassVariableKind.Parameter) OrElse
+                        (variableKind = DisplayClassVariableKind.Me))
+
+                        If variableKind = DisplayClassVariableKind.Parameter AndAlso GeneratedNames.GetKind(instance.Type.Name) = GeneratedNameKind.LambdaDisplayClass Then
+                            displayClassVariablesBuilder(variableName) = instance.ToVariable(variableName, variableKind, field)
+                        End If
+                    End If
+
                 Else
                     displayClassVariableNamesInOrder.Add(variableName)
                     displayClassVariablesBuilder.Add(variableName, instance.ToVariable(variableName, variableKind, field))
@@ -1170,7 +1341,7 @@ Namespace Microsoft.CodeAnalysis.VisualBasic.ExpressionEvaluator
         ''' The symbol of the method that is currently on top of the callstack, with
         ''' EE type parameters substituted in place of the original type parameters.
         ''' </param>
-        ''' <param name="hasDisplayClassMe">
+        ''' <param name="sourceMethodMustBeInstance">
         ''' True if "Me" is available via a display class in the current context
         ''' </param>
         ''' <returns>
@@ -1179,7 +1350,7 @@ Namespace Microsoft.CodeAnalysis.VisualBasic.ExpressionEvaluator
         ''' generated.  For example, if <paramref name="candidateSubstitutedSourceMethod"/>
         ''' is a state machine MoveNext method, then we will try to find the iterator or
         ''' async method for which it was generated.  if we are able to find the original
-        ''' method, then we will substitue in the EE type parameters.  Otherwise, we will
+        ''' method, then we will substitute in the EE type parameters.  Otherwise, we will
         ''' return <paramref name="candidateSubstitutedSourceMethod"/>.
         ''' </returns>
         ''' <remarks>
@@ -1194,7 +1365,7 @@ Namespace Microsoft.CodeAnalysis.VisualBasic.ExpressionEvaluator
         ''' </remarks>
         Friend Shared Function GetSubstitutedSourceMethod(
             candidateSubstitutedSourceMethod As MethodSymbol,
-            hasDisplayClassMe As Boolean) As MethodSymbol
+            sourceMethodMustBeInstance As Boolean) As MethodSymbol
 
             Dim candidateSubstitutedSourceType = candidateSubstitutedSourceMethod.ContainingType
             Dim candidateSourceTypeName = candidateSubstitutedSourceType.Name
@@ -1211,28 +1382,20 @@ Namespace Microsoft.CodeAnalysis.VisualBasic.ExpressionEvaluator
                     Debug.Assert(containing IsNot Nothing)
                     If containing.IsClosureType() Then
                         candidateSubstitutedSourceType = containing
-                        hasDisplayClassMe = candidateSubstitutedSourceType.MemberNames.Contains(StringConstants.HoistedMeName, StringComparer.Ordinal)
+                        sourceMethodMustBeInstance = candidateSubstitutedSourceType.MemberNames.Contains(StringConstants.HoistedMeName, StringComparer.Ordinal)
                     End If
                 End If
 
                 Dim desiredTypeParameters = candidateSubstitutedSourceType.OriginalDefinition.TypeParameters
 
-                ' We need to use a ThreeState, rather than a Boolean, because we can't distinguish between
-                ' a roslyn lambda that only captures "Me" and a dev12 lambda that captures nothing (neither
-                ' introduces a display class).  This is unnecessary in the state machine case, because then
-                ' "Me" is hoisted unconditionally.
-                Dim isDesiredMethodShared = If(hasDisplayClassMe,
-                    ThreeState.False,
-                    If(candidateSubstitutedSourceType.IsStateMachineType(), ThreeState.True, ThreeState.Unknown))
-
                 ' Type containing the original iterator, async, or lambda-containing method.
                 Dim substitutedSourceType = GetNonClosureOrStateMachineContainer(candidateSubstitutedSourceType)
 
                 For Each candidateMethod In substitutedSourceType.GetMembers().OfType(Of MethodSymbol)()
-                    If IsViableSourceMethod(candidateMethod, desiredMethodName, desiredTypeParameters, isDesiredMethodShared) Then
+                    If IsViableSourceMethod(candidateMethod, desiredMethodName, desiredTypeParameters, sourceMethodMustBeInstance) Then
                         Return If(desiredTypeParameters.Length = 0,
                             candidateMethod,
-                            candidateMethod.Construct(candidateSubstitutedSourceType.TypeArguments))
+                            candidateMethod.Construct(candidateSubstitutedSourceType.TypeArgumentsNoUseSiteDiagnostics))
                     End If
                 Next
 
@@ -1259,11 +1422,11 @@ Namespace Microsoft.CodeAnalysis.VisualBasic.ExpressionEvaluator
             candidateMethod As MethodSymbol,
             desiredMethodName As String,
             desiredTypeParameters As ImmutableArray(Of TypeParameterSymbol),
-            desiredMethodIsShared As ThreeState) As Boolean
+            desiredMethodMustBeInstance As Boolean) As Boolean
 
             Return _
                 Not candidateMethod.IsMustOverride AndAlso
-                (desiredMethodIsShared = ThreeState.Unknown OrElse desiredMethodIsShared.Value() = candidateMethod.IsShared) AndAlso
+                (Not (desiredMethodMustBeInstance AndAlso candidateMethod.IsShared)) AndAlso
                 (desiredMethodName Is Nothing OrElse desiredMethodName = candidateMethod.Name) AndAlso
                 HasDesiredConstraints(candidateMethod, desiredTypeParameters)
         End Function
@@ -1304,13 +1467,15 @@ Namespace Microsoft.CodeAnalysis.VisualBasic.ExpressionEvaluator
             Return True
         End Function
 
+        <DebuggerDisplay("{GetDebuggerDisplay(), nq}")>
         Private Structure DisplayClassInstanceAndFields
             Friend ReadOnly Instance As DisplayClassInstance
             Friend ReadOnly Fields As ConsList(Of FieldSymbol)
 
             Friend Sub New(instance As DisplayClassInstance)
                 MyClass.New(instance, ConsList(Of FieldSymbol).Empty)
-                Debug.Assert(instance.Type.IsClosureOrStateMachineType())
+                Debug.Assert(instance.Type.IsClosureOrStateMachineType() OrElse
+                             GeneratedNames.GetKind(instance.Type.Name) = GeneratedNameKind.AnonymousType)
             End Sub
 
             Private Sub New(instance As DisplayClassInstance, fields As ConsList(Of FieldSymbol))
@@ -1318,9 +1483,9 @@ Namespace Microsoft.CodeAnalysis.VisualBasic.ExpressionEvaluator
                 Me.Fields = fields
             End Sub
 
-            Friend ReadOnly Property Type As NamedTypeSymbol
+            Friend ReadOnly Property Type As TypeSymbol
                 Get
-                    Return If(Me.Fields.Any(), DirectCast(Me.Fields.Head.Type, NamedTypeSymbol), Me.Instance.Type)
+                    Return If(Me.Fields.Any(), Me.Fields.Head.Type, Me.Instance.Type)
                 End Get
             End Property
 
@@ -1331,12 +1496,17 @@ Namespace Microsoft.CodeAnalysis.VisualBasic.ExpressionEvaluator
             End Property
 
             Friend Function FromField(field As FieldSymbol) As DisplayClassInstanceAndFields
-                Debug.Assert(field.Type.IsClosureOrStateMachineType())
+                Debug.Assert(field.Type.IsClosureOrStateMachineType() OrElse
+                             GeneratedNames.GetKind(field.Type.Name) = GeneratedNameKind.AnonymousType)
                 Return New DisplayClassInstanceAndFields(Me.Instance, Me.Fields.Prepend(field))
             End Function
 
             Friend Function ToVariable(name As String, kind As DisplayClassVariableKind, field As FieldSymbol) As DisplayClassVariable
                 Return New DisplayClassVariable(name, kind, Me.Instance, Me.Fields.Prepend(field))
+            End Function
+
+            Private Function GetDebuggerDisplay() As String
+                Return Instance.GetDebuggerDisplay(Fields)
             End Function
         End Structure
     End Class

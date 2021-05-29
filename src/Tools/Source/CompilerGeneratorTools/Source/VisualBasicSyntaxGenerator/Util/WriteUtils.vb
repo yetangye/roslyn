@@ -1,4 +1,6 @@
-﻿' Copyright (c) Microsoft.  All Rights Reserved.  Licensed under the Apache License, Version 2.0.  See License.txt in the project root for license information.
+﻿' Licensed to the .NET Foundation under one or more agreements.
+' The .NET Foundation licenses this file to you under the MIT license.
+' See the LICENSE file in the project root for more information.
 
 '-----------------------------------------------------------------------------------------------------------
 ' Defines a base class that is inherited by the writing classes that defines a bunch of utility
@@ -51,7 +53,7 @@ Public MustInherit Class WriteUtils
 #If OLDSTYLE Then
         Return nodeStructure.Name
 #Else
-        If nodeStructure.Name.EndsWith("Syntax") Then
+        If nodeStructure.Name.EndsWith("Syntax", StringComparison.Ordinal) Then
             Return nodeStructure.Name.Substring(0, nodeStructure.Name.Length - 6)
         Else
             Return nodeStructure.Name
@@ -103,7 +105,7 @@ Public MustInherit Class WriteUtils
     ' If conflictName is not nothing, make sure the name doesn't conflict with that name.
     Protected Function FieldParamName(nodeField As ParseNodeField, Optional conflictName As String = Nothing) As String
         Dim name As String = nodeField.Name
-        If String.Equals(name, conflictName, StringComparison.InvariantCultureIgnoreCase) Then
+        If String.Equals(name, conflictName, StringComparison.OrdinalIgnoreCase) Then
             name += "Parameter"
         End If
         Return Ident(LowerFirstCharacter(name))
@@ -113,7 +115,7 @@ Public MustInherit Class WriteUtils
     ' If conflictName is not nothing, make sure the name doesn't conflict with that name.
     Protected Function ChildParamName(nodeChild As ParseNodeChild, Optional conflictName As String = Nothing) As String
         Dim name As String = OptionalChildName(nodeChild)
-        If String.Equals(name, conflictName, StringComparison.InvariantCultureIgnoreCase) Then
+        If String.Equals(name, conflictName, StringComparison.OrdinalIgnoreCase) Then
             name += "Parameter"
         End If
         Return Ident(LowerFirstCharacter(name))
@@ -177,7 +179,7 @@ Public MustInherit Class WriteUtils
             End If
             Return UpperFirstCharacter(nodeChild.SeparatorsName)
         Else
-            Throw New ApplicationException("Shouldn't get here")
+            Throw New InvalidOperationException("Shouldn't get here")
         End If
     End Function
 
@@ -254,7 +256,11 @@ Public MustInherit Class WriteUtils
         End If
 
         If isGreen Then
-            Return String.Format("InternalSyntax.{0}", result)
+            If nodeChild.IsList Then
+                Return String.Format("Global.Microsoft.CodeAnalysis.Syntax.InternalSyntax.{0}", result)
+            Else
+                Return String.Format("InternalSyntax.{0}", result)
+            End If
         End If
 
         Return result
@@ -307,13 +313,13 @@ Public MustInherit Class WriteUtils
         If nodeChild.IsList Then
             If nodeChild.IsSeparated Then
                 If isGreen Then
-                    Return String.Format("InternalSyntax.SeparatedSyntaxList(of InternalSyntax.{0})", BaseTypeReference(nodeChild))
+                    Return String.Format("Global.Microsoft.CodeAnalysis.Syntax.InternalSyntax.SeparatedSyntaxList(of GreenNode)", BaseTypeReference(nodeChild))
                 Else
                     Return String.Format("SeparatedSyntaxList(Of {0})", BaseTypeReference(nodeChild))
                 End If
             Else
                 If isGreen Then
-                    Return String.Format("InternalSyntax.SyntaxList(of InternalSyntax.{0})", StructureTypeName(_parseTree.RootStructure))
+                    Return String.Format("Global.Microsoft.CodeAnalysis.Syntax.InternalSyntax.SyntaxList(of GreenNode)", StructureTypeName(_parseTree.RootStructure))
                 Else
                     If KindTypeStructure(nodeChild.ChildKind).IsToken Then
                         Return String.Format("SyntaxTokenList")
@@ -425,7 +431,7 @@ Public MustInherit Class WriteUtils
             Case SimpleType.NodeKind
                 Return NodeKindString
             Case Else
-                Throw New ApplicationException("Unexpected simple type")
+                Throw New InvalidOperationException("Unexpected simple type")
         End Select
 
     End Function
@@ -443,7 +449,7 @@ Public MustInherit Class WriteUtils
     ' The name of the visitor method for a structure type
     Protected Function VisitorMethodName(nodeStructure As ParseNodeStructure) As String
         Dim nodeName = nodeStructure.Name
-        If nodeName.EndsWith("Syntax") Then nodeName = nodeName.Substring(0, nodeName.Length - 6)
+        If nodeName.EndsWith("Syntax", StringComparison.Ordinal) Then nodeName = nodeName.Substring(0, nodeName.Length - 6)
 
         Return "Visit" + nodeName
     End Function
@@ -456,7 +462,7 @@ Public MustInherit Class WriteUtils
     ' Given a list of ParseNodeKinds, find the common structure that encapsulates all
     ' of them, or else return Nothing if there is no common structure.
     Protected Function GetCommonStructure(kindList As List(Of ParseNodeKind)) As ParseNodeStructure
-        Dim structList = kindList.ConvertAll(Function(kind) kind.NodeStructure) ' list of the structures.
+        Dim structList = kindList.Select(Function(kind) kind.NodeStructure).ToList() ' list of the structures.
 
         ' Any candidate ancestor is an ancestor (or same) of the first element
         Dim candidate As ParseNodeStructure = structList(0)
@@ -555,7 +561,7 @@ Public MustInherit Class WriteUtils
         text = text.Trim()
 
         While text.Length >= LineLength
-            Dim split As Integer = text.Substring(0, LineLength).LastIndexOf(" ")
+            Dim split As Integer = text.Substring(0, LineLength).LastIndexOf(" "c)
             If split < 0 Then split = LineLength
 
             Dim line As String = text.Substring(0, split).Trim()
@@ -571,15 +577,17 @@ Public MustInherit Class WriteUtils
         Return lines
     End Function
 
-
-
     ' Create a description XML comment with the given tag, indented the given number of characters
-    Private Sub GenerateXmlCommentPart(writer As TextWriter, text As String, xmlTag As String, indent As Integer)
+    Private Sub GenerateXmlCommentPart(writer As TextWriter, text As String, xmlTag As String, indent As Integer, Optional escape As Boolean = True)
         If String.IsNullOrWhiteSpace(text) Then Return
 
-        text = XmlEscape(text)
-
-        Dim lines = WordWrap(text)
+        Dim lines As List(Of String)
+        If escape Then
+            text = XmlEscape(text)
+            lines = WordWrap(text)
+        Else
+            lines = text.Replace(vbCrLf, vbLf).Replace(vbCr, vbLf).Split(vbLf).ToList()
+        End If
 
         lines.Insert(0, "<" & xmlTag & ">")
         lines.Add("</" & xmlTag & ">")
@@ -640,22 +648,32 @@ Public MustInherit Class WriteUtils
         writer.WriteLine(prefix & "</typeparam>")
     End Sub
 
-
-
-    ' Generate and XML comment with the given description and remarks sections. If emtpy, the sections are ommitted.
+    ' Generate and XML comment with the given description and remarks sections. If empty, the sections are omitted.
     Protected Sub GenerateXmlComment(writer As TextWriter, descriptionText As String, remarksText As String, indent As Integer)
         GenerateXmlCommentPart(writer, descriptionText, "summary", indent)
-        GenerateXmlCommentPart(writer, remarksText, "remarks", indent)
+        GenerateXmlCommentPart(writer, remarksText, "remarks", indent, escape:=False)
     End Sub
 
     ' Generate XML comment for a structure
-    Protected Sub GenerateXmlComment(writer As TextWriter, struct As ParseNodeStructure, indent As Integer)
+    Protected Sub GenerateXmlComment(writer As TextWriter, struct As ParseNodeStructure, indent As Integer, includeRemarks As Boolean)
         Dim descriptionText As String = struct.Description
+
         Dim remarksText As String = Nothing
+        If includeRemarks AndAlso struct.NodeKinds.Any() Then
+            remarksText += "<para>This node is associated with the following syntax kinds:</para>" & vbCrLf &
+                "<list type=""bullet"">" & vbCrLf
+
+            For Each kind In struct.NodeKinds
+                remarksText += $"<item><description><see cref=""SyntaxKind.{kind.Name}""/></description></item>" & vbCrLf
+            Next
+
+            remarksText += "</list>"
+        End If
+
         GenerateXmlComment(writer, descriptionText, remarksText, indent)
     End Sub
 
-    ' Generate XML comment for an child
+    ' Generate XML comment for a child
     Protected Sub GenerateXmlComment(writer As TextWriter, child As ParseNodeChild, indent As Integer)
         Dim descriptionText As String = child.Description
         Dim remarksText As String = Nothing
@@ -669,21 +687,21 @@ Public MustInherit Class WriteUtils
         GenerateXmlComment(writer, descriptionText, remarksText, indent)
     End Sub
 
-    ' Generate XML comment for an child
+    ' Generate XML comment for a child
     Protected Sub GenerateWithXmlComment(writer As TextWriter, child As ParseNodeChild, indent As Integer)
         Dim descriptionText As String = "Returns a copy of this with the " + ChildPropertyName(child) + " property changed to the specified value. Returns this instance if the specified value is the same as the current value."
         Dim remarksText As String = Nothing
         GenerateXmlComment(writer, descriptionText, remarksText, indent)
     End Sub
 
-    ' Generate XML comment for an field
+    ' Generate XML comment for a field
     Protected Sub GenerateXmlComment(writer As TextWriter, field As ParseNodeField, indent As Integer)
         Dim descriptionText As String = field.Description
         Dim remarksText As String = Nothing
         GenerateXmlComment(writer, descriptionText, remarksText, indent)
     End Sub
 
-    ' Generate XML comment for an kind
+    ' Generate XML comment for a kind
     Protected Sub GenerateXmlComment(writer As TextWriter, kind As ParseNodeKind, indent As Integer)
         Dim descriptionText As String = kind.Description
         Dim remarksText As String = Nothing
@@ -704,7 +722,7 @@ Public MustInherit Class WriteUtils
         GenerateXmlComment(writer, descriptionText, remarksText, indent)
     End Sub
 
-    Private VBKeywords As String() = {
+    Private ReadOnly _VBKeywords As String() = {
         "ADDHANDLER",
         "ADDRESSOF",
         "ALIAS",
@@ -860,7 +878,7 @@ Public MustInherit Class WriteUtils
 
     ' If the string is a keyword, escape it. Otherwise just return it.
     Protected Function Ident(id As String) As String
-        If VBKeywords.Contains(id.ToUpperInvariant()) Then
+        If _VBKeywords.Contains(id.ToUpperInvariant()) Then
             Return "[" + id + "]"
         Else
             Return id
@@ -881,7 +899,6 @@ Public MustInherit Class WriteUtils
         End If
         Return s
     End Function
-
 
     Public Function GetChildNodeKind(nodeKind As ParseNodeKind, child As ParseNodeChild) As ParseNodeKind
         Dim childNodeKind = TryCast(child.ChildKind, ParseNodeKind)

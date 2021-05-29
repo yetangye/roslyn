@@ -1,124 +1,130 @@
-' Copyright (c) Microsoft.  All Rights Reserved.  Licensed under the Apache License, Version 2.0.  See License.txt in the project root for license information.
+﻿' Licensed to the .NET Foundation under one or more agreements.
+' The .NET Foundation licenses this file to you under the MIT license.
+' See the LICENSE file in the project root for more information.
 
+Imports System.Threading
 Imports Microsoft.CodeAnalysis
 Imports Microsoft.CodeAnalysis.Editor.UnitTests.Workspaces
-Imports Microsoft.CodeAnalysis.Editor.VisualBasic.Formatting.Indentation
 Imports Microsoft.CodeAnalysis.Formatting
+Imports Microsoft.CodeAnalysis.Options
+Imports Microsoft.CodeAnalysis.Text
 Imports Microsoft.CodeAnalysis.Text.Shared.Extensions
+Imports Microsoft.CodeAnalysis.VisualBasic.Indentation
 Imports Microsoft.CodeAnalysis.VisualBasic.Syntax
 Imports Microsoft.VisualStudio.Text.Editor
 Imports Moq
 
 Namespace Microsoft.CodeAnalysis.Editor.VisualBasic.UnitTests.Formatting.Indentation
+    <[UseExportProvider]>
     Public Class SmartTokenFormatter_FormatTokenTests
         <Fact>
         <Trait(Traits.Feature, Traits.Features.SmartTokenFormatting)>
-        Public Sub Test1()
+        Public Async Function Test1() As Task
             Dim code = "$$"
 
-            ExpectException_Test(code, indentation:=0)
-        End Sub
+            Await ExpectException_TestAsync(code, indentation:=0)
+        End Function
 
         <Fact>
         <Trait(Traits.Feature, Traits.Features.SmartTokenFormatting)>
-        Public Sub Test2()
+        Public Async Function Test2() As Task
             Dim code = "$$Namespace"
 
-            ExpectException_Test(code, indentation:=0)
-        End Sub
+            Await ExpectException_TestAsync(code, indentation:=0)
+        End Function
 
         <Fact>
         <Trait(Traits.Feature, Traits.Features.SmartTokenFormatting)>
-        Public Sub FirstTokenInParameterList1()
+        Public Async Function FirstTokenInParameterList1() As Task
             Dim code = <code>Class C
     Sub Method(
 $$i As Test)
     End Sub
 End Class</code>.Value.Replace(vbLf, vbCrLf)
 
-            Test(code, indentation:=14)
-        End Sub
+            Await TestAsync(code, indentation:=14)
+        End Function
 
         <Fact>
         <Trait(Traits.Feature, Traits.Features.SmartTokenFormatting)>
-        Public Sub FirstTokenInParameterList2()
+        Public Async Function FirstTokenInParameterList2() As Task
             Dim code = <code>Class C
     Sub Method(
 $$)
     End Sub
 End Class</code>.Value.Replace(vbLf, vbCrLf)
 
-            Test(code, indentation:=14)
-        End Sub
+            Await TestAsync(code, indentation:=14)
+        End Function
 
         <Fact>
         <Trait(Traits.Feature, Traits.Features.SmartTokenFormatting)>
-        Public Sub FirstTokenInTypeParameterList()
+        Public Async Function FirstTokenInTypeParameterList() As Task
             Dim code = <code>Class C
     Sub Method(
 $$Of T)(i As Test)
     End Sub
 End Class</code>.Value.Replace(vbLf, vbCrLf)
 
-            Test(code, indentation:=14)
-        End Sub
+            Await TestAsync(code, indentation:=14)
+        End Function
 
         <Fact>
         <Trait(Traits.Feature, Traits.Features.SmartTokenFormatting)>
-        Public Sub FirstTokenInArrayRank1()
+        Public Async Function FirstTokenInArrayRank1() As Task
             Dim code = <code>Class C
     Sub Method(i As Test(
 $$))
     End Sub
 End Class</code>.Value.Replace(vbLf, vbCrLf)
 
-            Test(code, indentation:=24)
-        End Sub
+            Await TestAsync(code, indentation:=24)
+        End Function
 
         <Fact>
         <Trait(Traits.Feature, Traits.Features.SmartTokenFormatting)>
-        Public Sub FirstTokenInArrayRank2()
+        Public Async Function FirstTokenInArrayRank2() As Task
             Dim code = <code>Class C
     Sub Method(i As Test(
 $$,))
     End Sub
 End Class</code>.Value.Replace(vbLf, vbCrLf)
 
-            Test(code, indentation:=24)
-        End Sub
+            Await TestAsync(code, indentation:=24)
+        End Function
 
         <Fact>
         <Trait(Traits.Feature, Traits.Features.SmartTokenFormatting)>
-        Public Sub Attribute()
+        Public Async Function Attribute() As Task
             Dim code = My.Resources.XmlLiterals.TokenFormatter2
-            Test(code, indentation:=4)
-        End Sub
+            Await TestAsync(code, indentation:=4)
+        End Function
 
         <Fact>
         <Trait(Traits.Feature, Traits.Features.SmartTokenFormatting)>
-        Public Sub XmlLiterals1()
+        Public Async Function XmlLiterals1() As Task
             Dim code = My.Resources.XmlLiterals.TokenFormatter1
-            Test(code, indentation:=12)
-        End Sub
+            Await TestAsync(code, indentation:=12)
+        End Function
 
         <Fact>
         <Trait(Traits.Feature, Traits.Features.SmartTokenFormatting)>
-        Public Sub XmlLiterals2()
+        Public Async Function XmlLiterals2() As Task
             Dim code = My.Resources.XmlLiterals.XmlTest1_TokenFormat
-            Test(code, indentation:=19)
-        End Sub
+            Await TestAsync(code, indentation:=19)
+        End Function
 
         <Fact>
         <Trait(Traits.Feature, Traits.Features.SmartTokenFormatting)>
-        Public Sub EnterBetweenXmlLiterals()
+        Public Async Function EnterBetweenXmlLiterals() As Task
             Dim code = My.Resources.XmlLiterals.XmlTest9
-            Test(code, indentation:=30)
-        End Sub
+            Await TestAsync(code, indentation:=30)
+        End Function
 
-        <WorkItem(542240)>
+        <WorkItem(542240, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/542240")>
         <Fact>
         <Trait(Traits.Feature, Traits.Features.SmartTokenFormatting)>
-        Public Sub MissingEndStatement()
+        Public Async Function MissingEndStatement() As Task
             Dim code = <code>Module Module1
     Sub Main()
         If True Then
@@ -127,19 +133,19 @@ End Class</code>.Value.Replace(vbLf, vbCrLf)
     $$End Sub
 End Module</code>.Value.Replace(vbLf, vbCrLf)
 
-            Test(code, indentation:=4)
-        End Sub
+            Await TestAsync(code, indentation:=4)
+        End Function
 
-        <WorkItem(542240)>
+        <WorkItem(542240, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/542240")>
         <Fact>
         <Trait(Traits.Feature, Traits.Features.SmartTokenFormatting)>
-        Public Sub EmptyElement1()
-            Test(My.Resources.XmlLiterals.EmptyElement1, indentation:=23)
-        End Sub
+        Public Async Function EmptyElement1() As Task
+            Await TestAsync(My.Resources.XmlLiterals.EmptyElement1, indentation:=23)
+        End Function
 
         <Fact>
         <Trait(Traits.Feature, Traits.Features.SmartIndent)>
-        Public Sub BlockIndentation()
+        Public Async Function BlockIndentation() As Task
             Dim code = <code>Class C
     Sub Method(
 $$)
@@ -147,12 +153,12 @@ $$)
 End Class
 </code>.Value.Replace(vbLf, vbCrLf)
 
-            ExpectException_Test(code, 4, FormattingOptions.IndentStyle.Block)
-        End Sub
+            Await ExpectException_TestAsync(code, 4, FormattingOptions.IndentStyle.Block)
+        End Function
 
         <Fact>
         <Trait(Traits.Feature, Traits.Features.SmartIndent)>
-        Public Sub NoIndentation()
+        Public Async Function NoIndentation() As Task
             Dim code = <code>Class C
     Sub Method(
 $$)
@@ -160,31 +166,34 @@ $$)
 End Class
 </code>.Value.Replace(vbLf, vbCrLf)
 
-            ExpectException_Test(code, indentation:=0, indentStyle:=FormattingOptions.IndentStyle.None)
-        End Sub
+            Await ExpectException_TestAsync(code, indentation:=0, indentStyle:=FormattingOptions.IndentStyle.None)
+        End Function
 
-        Private Sub ExpectException_Test(codeWithMarkup As String, indentation As Integer, Optional indentStyle As FormattingOptions.IndentStyle = FormattingOptions.IndentStyle.Smart)
-            Assert.NotNull(Record.Exception(Sub() Test(codeWithMarkup, indentation, indentStyle:=indentStyle)))
-        End Sub
+        Private Shared Async Function ExpectException_TestAsync(codeWithMarkup As String, indentation As Integer, Optional indentStyle As FormattingOptions.IndentStyle = FormattingOptions.IndentStyle.Smart) As Task
+            Assert.NotNull(Await Record.ExceptionAsync(Function() TestAsync(codeWithMarkup, indentation, indentStyle:=indentStyle)))
+        End Function
 
-        Private Sub Test(codeWithMarkup As String, indentation As Integer, Optional indentStyle As FormattingOptions.IndentStyle = FormattingOptions.IndentStyle.Smart)
+        Private Shared Async Function TestAsync(codeWithMarkup As String, indentation As Integer, Optional indentStyle As FormattingOptions.IndentStyle = FormattingOptions.IndentStyle.Smart) As Threading.Tasks.Task
             Dim code As String = Nothing
             Dim position As Integer = 0
             MarkupTestFile.GetPosition(codeWithMarkup, code, position)
 
-            Using workspace = VisualBasicWorkspaceFactory.CreateWorkspaceFromLines(code)
+            Using workspace = TestWorkspace.CreateVisualBasic(code)
+                workspace.TryApplyChanges(workspace.CurrentSolution.WithOptions(workspace.Options _
+                    .WithChangedOption(FormattingOptions.SmartIndent, LanguageNames.VisualBasic, indentStyle)))
+
                 Dim hostdoc = workspace.Documents.First()
                 Dim buffer = hostdoc.GetTextBuffer()
-
-                SmartIndenterTests.SetIndentStyle(buffer, indentStyle)
 
                 Dim snapshot = buffer.CurrentSnapshot
                 Dim line = snapshot.GetLineFromPosition(position)
 
                 Dim document = workspace.CurrentSolution.GetDocument(hostdoc.Id)
-                Dim root = DirectCast(document.GetSyntaxRootAsync().Result, CompilationUnitSyntax)
+                Dim root = DirectCast(Await document.GetSyntaxRootAsync(), CompilationUnitSyntax)
+                Dim options = Await document.GetOptionsAsync()
+                Dim documentIndentStyle = options.GetOption(FormattingOptions.SmartIndent, root.Language)
 
-                Dim formattingRules = (New SpecialFormattingRule()).Concat(Formatter.GetDefaultFormattingRules(document))
+                Dim formattingRules = New SpecialFormattingRule(documentIndentStyle).Concat(Formatter.GetDefaultFormattingRules(document))
 
                 ' get token
                 Dim token = root.FindToken(position)
@@ -192,10 +201,14 @@ End Class
                 Dim previousToken = token.GetPreviousToken(includeZeroWidth:=True)
                 Dim ignoreMissingToken = previousToken.IsMissing AndAlso line.Start.Position = position
 
-                Assert.True(VisualBasicIndentationService.ShouldUseSmartTokenFormatterInsteadOfIndenter(formattingRules, root, line, workspace.Options, Nothing, ignoreMissingToken))
+                Dim optionService = workspace.Services.GetRequiredService(Of IOptionService)()
 
-                Dim smartFormatter = New SmartTokenFormatter(workspace.Options, formattingRules, root)
-                Dim changes = smartFormatter.FormatToken(workspace, token, Nothing)
+                Assert.True(VisualBasicIndentationService.ShouldUseSmartTokenFormatterInsteadOfIndenter(
+                            formattingRules, root, line.AsTextLine, optionService, workspace.Options,
+                            Nothing, ignoreMissingToken))
+
+                Dim smartFormatter = New VisualBasicSmartTokenFormatter(Await document.GetOptionsAsync(CancellationToken.None), formattingRules, root)
+                Dim changes = Await smartFormatter.FormatTokenAsync(workspace, token, Nothing)
 
                 Using edit = buffer.CreateEdit()
                     For Each change In changes
@@ -214,6 +227,6 @@ End Class
 
                 Assert.Equal(indentation, actualIndentation)
             End Using
-        End Sub
+        End Function
     End Class
 End Namespace

@@ -1,19 +1,26 @@
-﻿' Copyright (c) Microsoft.  All Rights Reserved.  Licensed under the Apache License, Version 2.0.  See License.txt in the project root for license information.
+﻿' Licensed to the .NET Foundation under one or more agreements.
+' The .NET Foundation licenses this file to you under the MIT license.
+' See the LICENSE file in the project root for more information.
 
 Imports System.Globalization
 
 Namespace Microsoft.CodeAnalysis.VisualBasic
 
-    Partial Class GlobalImport
+    Partial Public Class GlobalImport
 
         ' A special Diagnostic info that wraps a particular diagnostic but customized the message with 
         ' the text of the import.
         Private Class ImportDiagnosticInfo
             Inherits DiagnosticInfo
 
-            Private _importText As String
-            Private _startIndex, _length As Integer
-            Private _wrappedDiagnostic As DiagnosticInfo
+            Shared Sub New()
+                ObjectBinder.RegisterTypeReader(GetType(ImportDiagnosticInfo), Function(r) New ImportDiagnosticInfo(r))
+            End Sub
+
+            Private ReadOnly _importText As String
+            Private ReadOnly _startIndex As Integer
+            Private ReadOnly _length As Integer
+            Private ReadOnly _wrappedDiagnostic As DiagnosticInfo
 
             Private Sub New(reader As ObjectReader)
                 MyBase.New(reader)
@@ -22,10 +29,6 @@ Namespace Microsoft.CodeAnalysis.VisualBasic
                 Me._length = reader.ReadInt32()
                 Me._wrappedDiagnostic = DirectCast(reader.ReadValue(), DiagnosticInfo)
             End Sub
-
-            Protected Overrides Function GetReader() As Func(Of ObjectReader, Object)
-                Return Function(r) New ImportDiagnosticInfo(r)
-            End Function
 
             Protected Overrides Sub WriteTo(writer As ObjectWriter)
                 MyBase.WriteTo(writer)

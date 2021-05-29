@@ -1,164 +1,166 @@
-' Copyright (c) Microsoft.  All Rights Reserved.  Licensed under the Apache License, Version 2.0.  See License.txt in the project root for license information.
+﻿' Licensed to the .NET Foundation under one or more agreements.
+' The .NET Foundation licenses this file to you under the MIT license.
+' See the LICENSE file in the project root for more information.
 
 Namespace Microsoft.CodeAnalysis.Editor.VisualBasic.UnitTests.Recommendations.Declarations
     Public Class FunctionKeywordRecommenderTests
 
         <Fact, Trait(Traits.Feature, Traits.Features.KeywordRecommending)>
-        Public Sub FunctionInClassDeclaration()
+        Public Sub FunctionInClassDeclarationTest()
             VerifyRecommendationsContain(<ClassDeclaration>|</ClassDeclaration>, "Function")
         End Sub
 
         <Fact, Trait(Traits.Feature, Traits.Features.KeywordRecommending)>
-        Public Sub FunctionNotInMethodDeclaration()
+        Public Sub FunctionNotInMethodDeclarationTest()
             VerifyRecommendationsMissing(<MethodBody>|</MethodBody>, "Function")
         End Sub
 
         <Fact, Trait(Traits.Feature, Traits.Features.KeywordRecommending)>
-        Public Sub FunctionNotInNamespace()
+        Public Sub FunctionNotInNamespaceTest()
             VerifyRecommendationsMissing(<NamespaceDeclaration>|</NamespaceDeclaration>, "Function")
         End Sub
 
         <Fact, Trait(Traits.Feature, Traits.Features.KeywordRecommending)>
-        Public Sub FunctionInInterface()
+        Public Sub FunctionInInterfaceTest()
             VerifyRecommendationsContain(<InterfaceDeclaration>|</InterfaceDeclaration>, "Function")
         End Sub
 
         <Fact, Trait(Traits.Feature, Traits.Features.KeywordRecommending)>
-        Public Sub FunctionNotInEnum()
+        Public Sub FunctionNotInEnumTest()
             VerifyRecommendationsMissing(<EnumDeclaration>|</EnumDeclaration>, "Function")
         End Sub
 
         <Fact, Trait(Traits.Feature, Traits.Features.KeywordRecommending)>
-        Public Sub FunctionInStructure()
+        Public Sub FunctionInStructureTest()
             VerifyRecommendationsContain(<StructureDeclaration>|</StructureDeclaration>, "Function")
         End Sub
 
         <Fact, Trait(Traits.Feature, Traits.Features.KeywordRecommending)>
-        Public Sub FunctionInModule()
+        Public Sub FunctionInModuleTest()
             VerifyRecommendationsContain(<ModuleDeclaration>|</ModuleDeclaration>, "Function")
         End Sub
 
         <Fact, Trait(Traits.Feature, Traits.Features.KeywordRecommending)>
-        Public Sub FunctionAfterPublic()
+        Public Sub FunctionAfterPublicTest()
             VerifyRecommendationsContain(<ClassDeclaration>Public |</ClassDeclaration>, "Function")
         End Sub
 
         <Fact, Trait(Traits.Feature, Traits.Features.KeywordRecommending)>
-        Public Sub FunctionAfterProtected()
+        Public Sub FunctionAfterProtectedTest()
             VerifyRecommendationsContain(<ClassDeclaration>Protected |</ClassDeclaration>, "Function")
         End Sub
 
         <Fact, Trait(Traits.Feature, Traits.Features.KeywordRecommending)>
-        Public Sub FunctionAfterFriend()
+        Public Sub FunctionAfterFriendTest()
             VerifyRecommendationsContain(<ClassDeclaration>Friend |</ClassDeclaration>, "Function")
         End Sub
 
         <Fact, Trait(Traits.Feature, Traits.Features.KeywordRecommending)>
-        Public Sub FunctionAfterPrivate()
+        Public Sub FunctionAfterPrivateTest()
             VerifyRecommendationsContain(<ClassDeclaration>Private |</ClassDeclaration>, "Function")
         End Sub
 
         <Fact, Trait(Traits.Feature, Traits.Features.KeywordRecommending)>
-        Public Sub FunctionAfterProtectedFriend()
+        Public Sub FunctionAfterProtectedFriendTest()
             VerifyRecommendationsContain(<ClassDeclaration>Protected Friend |</ClassDeclaration>, "Function")
         End Sub
 
         <Fact, Trait(Traits.Feature, Traits.Features.KeywordRecommending)>
-        Public Sub FunctionAfterOverloads()
+        Public Sub FunctionAfterOverloadsTest()
             VerifyRecommendationsContain(<ClassDeclaration>Overloads |</ClassDeclaration>, "Function")
         End Sub
 
         <Fact, Trait(Traits.Feature, Traits.Features.KeywordRecommending)>
-        Public Sub FunctionAfterOverrides()
+        Public Sub FunctionAfterOverridesTest()
             VerifyRecommendationsContain(<ClassDeclaration>Overrides |</ClassDeclaration>, "Function")
         End Sub
 
         <Fact, Trait(Traits.Feature, Traits.Features.KeywordRecommending)>
-        Public Sub FunctionAfterOverridable()
+        Public Sub FunctionAfterOverridableTest()
             VerifyRecommendationsContain(<ClassDeclaration>Overridable |</ClassDeclaration>, "Function")
         End Sub
 
         <Fact, Trait(Traits.Feature, Traits.Features.KeywordRecommending)>
-        Public Sub FunctionAfterNotOverridable()
+        Public Sub FunctionAfterNotOverridableTest()
             VerifyRecommendationsContain(<ClassDeclaration>NotOverridable |</ClassDeclaration>, "Function")
         End Sub
 
         <Fact, Trait(Traits.Feature, Traits.Features.KeywordRecommending)>
-        Public Sub FunctionAfterMustOverride()
+        Public Sub FunctionAfterMustOverrideTest()
             VerifyRecommendationsContain(<ClassDeclaration>MustOverride |</ClassDeclaration>, "Function")
         End Sub
 
         <Fact, Trait(Traits.Feature, Traits.Features.KeywordRecommending)>
-        Public Sub FunctionAfterMustOverrideOverrides()
+        Public Sub FunctionAfterMustOverrideOverridesTest()
             VerifyRecommendationsContain(<ClassDeclaration>MustOverride Overrides |</ClassDeclaration>, "Function")
         End Sub
 
         <Fact, Trait(Traits.Feature, Traits.Features.KeywordRecommending)>
-        Public Sub FunctionAfterNotOverridableOverrides()
+        Public Sub FunctionAfterNotOverridableOverridesTest()
             VerifyRecommendationsContain(<ClassDeclaration>NotOverridable Overrides |</ClassDeclaration>, "Function")
         End Sub
 
         <Fact, Trait(Traits.Feature, Traits.Features.KeywordRecommending)>
-        Public Sub FunctionNotAfterConst()
+        Public Sub FunctionNotAfterConstTest()
             VerifyRecommendationsMissing(<ClassDeclaration>Const |</ClassDeclaration>, "Function")
         End Sub
 
         <Fact, Trait(Traits.Feature, Traits.Features.KeywordRecommending)>
-        Public Sub FunctionNotAfterDefault()
+        Public Sub FunctionNotAfterDefaultTest()
             VerifyRecommendationsMissing(<ClassDeclaration>Default |</ClassDeclaration>, "Function")
         End Sub
 
         <Fact, Trait(Traits.Feature, Traits.Features.KeywordRecommending)>
-        Public Sub FunctionNotAfterMustInherit()
+        Public Sub FunctionNotAfterMustInheritTest()
             VerifyRecommendationsMissing(<ClassDeclaration>MustInherit |</ClassDeclaration>, "Function")
         End Sub
 
         <Fact, Trait(Traits.Feature, Traits.Features.KeywordRecommending)>
-        Public Sub FunctionNotAfterNotInheritable()
+        Public Sub FunctionNotAfterNotInheritableTest()
             VerifyRecommendationsMissing(<ClassDeclaration>NotInheritable |</ClassDeclaration>, "Function")
         End Sub
 
         <Fact, Trait(Traits.Feature, Traits.Features.KeywordRecommending)>
-        Public Sub FunctionNotAfterNarrowing()
+        Public Sub FunctionNotAfterNarrowingTest()
             VerifyRecommendationsMissing(<ClassDeclaration>Narrowing |</ClassDeclaration>, "Function")
         End Sub
 
         <Fact, Trait(Traits.Feature, Traits.Features.KeywordRecommending)>
-        Public Sub FunctionNotAfterWidening()
+        Public Sub FunctionNotAfterWideningTest()
             VerifyRecommendationsMissing(<ClassDeclaration>Widening |</ClassDeclaration>, "Function")
         End Sub
 
         <Fact, Trait(Traits.Feature, Traits.Features.KeywordRecommending)>
-        Public Sub FunctionNotAfterReadOnly()
+        Public Sub FunctionNotAfterReadOnlyTest()
             VerifyRecommendationsMissing(<ClassDeclaration>ReadOnly |</ClassDeclaration>, "Function")
         End Sub
 
         <Fact, Trait(Traits.Feature, Traits.Features.KeywordRecommending)>
-        Public Sub FunctionNotAfterWriteOnly()
+        Public Sub FunctionNotAfterWriteOnlyTest()
             VerifyRecommendationsMissing(<ClassDeclaration>WriteOnly |</ClassDeclaration>, "Function")
         End Sub
 
         <Fact, Trait(Traits.Feature, Traits.Features.KeywordRecommending)>
-        Public Sub FunctionNotAfterCustom()
+        Public Sub FunctionNotAfterCustomTest()
             VerifyRecommendationsMissing(<ClassDeclaration>Custom |</ClassDeclaration>, "Function")
         End Sub
 
         <Fact, Trait(Traits.Feature, Traits.Features.KeywordRecommending)>
-        Public Sub FunctionAfterShared()
+        Public Sub FunctionAfterSharedTest()
             VerifyRecommendationsContain(<ClassDeclaration>Shared |</ClassDeclaration>, "Function")
         End Sub
 
-        <WorkItem(543270)>
+        <WorkItem(543270, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/543270")>
         <Fact, Trait(Traits.Feature, Traits.Features.KeywordRecommending)>
-        Public Sub FunctionInDelegateCreation()
+        Public Sub FunctionInDelegateCreationTest()
             Dim code =
 <ModuleDeclaration>
 Module Program
     Sub Main(args As String())
-        Dim f1 As New Foo2( |
+        Dim f1 As New Goo2( |
     End Sub
  
-    Delegate Sub Foo2()
+    Delegate Sub Goo2()
  
     Function Bar2() As Object
         Return Nothing
@@ -166,17 +168,16 @@ Module Program
 End Module
 </ModuleDeclaration>
 
-
             VerifyRecommendationsContain(code, "Function")
         End Sub
 
         <Fact, Trait(Traits.Feature, Traits.Features.KeywordRecommending)>
-        Public Sub FunctionAfterOverridesModifier()
+        Public Sub FunctionAfterOverridesModifierTest()
             VerifyRecommendationsContain(<ClassDeclaration>Overrides Public |</ClassDeclaration>, "Function")
         End Sub
 
         <Fact, Trait(Traits.Feature, Traits.Features.KeywordRecommending)>
-        Public Sub NotAfterExitInFinallyBlock()
+        Public Sub NotAfterExitInFinallyBlockTest()
             Dim code =
 <ClassDeclaration>
 Function M() As Boolean
@@ -188,9 +189,9 @@ Function M() As Boolean
             VerifyRecommendationsMissing(code, "Function")
         End Sub
 
-        <WorkItem(530953)>
+        <WorkItem(530953, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/530953")>
         <Fact, Trait(Traits.Feature, Traits.Features.KeywordRecommending)>
-        Public Sub NotAfterEol()
+        Public Sub NotAfterEolTest()
             VerifyRecommendationsMissing(
 <ClassDeclaration>
 Function M() As Boolean
@@ -199,9 +200,9 @@ Function M() As Boolean
 </ClassDeclaration>, "Function")
         End Sub
 
-        <WorkItem(530953)>
+        <WorkItem(530953, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/530953")>
         <Fact, Trait(Traits.Feature, Traits.Features.KeywordRecommending)>
-        Public Sub AfterExplicitLineContinuation()
+        Public Sub AfterExplicitLineContinuationTest()
             VerifyRecommendationsContain(
 <ClassDeclaration>
 Function M() As Boolean
@@ -210,24 +211,34 @@ Function M() As Boolean
 </ClassDeclaration>, "Function")
         End Sub
 
-        <WorkItem(547254)>
         <Fact, Trait(Traits.Feature, Traits.Features.KeywordRecommending)>
-        Public Sub AfterAsync()
+        Public Sub AfterExplicitLineContinuationTestCommentsAfterLineContinuation()
+            VerifyRecommendationsContain(
+<ClassDeclaration>
+Function M() As Boolean
+        Exit _ ' Test
+ |
+</ClassDeclaration>, "Function")
+        End Sub
+
+        <WorkItem(547254, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/547254")>
+        <Fact, Trait(Traits.Feature, Traits.Features.KeywordRecommending)>
+        Public Sub AfterAsyncTest()
             VerifyRecommendationsContain(<ClassDeclaration>Async |</ClassDeclaration>, "Function")
         End Sub
 
         <Fact, Trait(Traits.Feature, Traits.Features.KeywordRecommending)>
-        Public Sub AfterIterator()
+        Public Sub AfterIteratorTest()
             VerifyRecommendationsContain(<ClassDeclaration>Iterator |</ClassDeclaration>, "Function")
         End Sub
 
-        <WorkItem(531638)>
+        <WorkItem(531638, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/531638")>
         <Fact, Trait(Traits.Feature, Traits.Features.KeywordRecommending)>
-        Public Sub InModuleAfterMethod()
+        Public Sub InModuleAfterMethodTest()
             VerifyRecommendationsContain(
 <File>
 Module Program
-    Sub foo()
+    Sub goo()
 
     End Sub
     |
@@ -235,9 +246,9 @@ End Module
 </File>, "Function")
         End Sub
 
-        <WorkItem(674791)>
+        <WorkItem(674791, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/674791")>
         <Fact, Trait(Traits.Feature, Traits.Features.KeywordRecommending)>
-        Public Sub NotAfterHash()
+        Public Sub NotAfterHashTest()
             VerifyRecommendationsMissing(<File>
 Imports System
 
@@ -250,5 +261,10 @@ End Module
 </File>, "Function")
         End Sub
 
+        <WorkItem(20837, "https://github.com/dotnet/roslyn/issues/20837")>
+        <Fact, Trait(Traits.Feature, Traits.Features.KeywordRecommending)>
+        Public Sub AfterExtensionAttribute()
+            VerifyRecommendationsContain(<ClassDeclaration>&lt;Extension&gt; |</ClassDeclaration>, "Function")
+        End Sub
     End Class
 End Namespace

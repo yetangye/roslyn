@@ -1,15 +1,14 @@
-' Copyright (c) Microsoft.  All Rights Reserved.  Licensed under the Apache License, Version 2.0.  See License.txt in the project root for license information.
-
-Imports Microsoft.CodeAnalysis.Text
-Imports Roslyn.Test.Utilities
+﻿' Licensed to the .NET Foundation under one or more agreements.
+' The .NET Foundation licenses this file to you under the MIT license.
+' See the LICENSE file in the project root for more information.
 
 Namespace Microsoft.CodeAnalysis.Editor.VisualBasic.UnitTests.Recommendations.Expressions
     Public Class AwaitKeywordRecommenderTests
         <Fact, Trait(Traits.Feature, Traits.Features.KeywordRecommending)>
-        Public Sub InSynchronousMethod()
+        Public Sub InSynchronousMethodTest()
             VerifyRecommendationsContain(<File>
 Class C
-     Sub Foo()
+     Sub Goo()
         Dim z = |
     End Sub
 End Class
@@ -17,10 +16,10 @@ End Class
         End Sub
 
         <Fact, Trait(Traits.Feature, Traits.Features.KeywordRecommending)>
-        Public Sub InMethodStatement()
+        Public Sub InMethodStatementTest()
             VerifyRecommendationsContain(<File>
 Class C
-    Async Sub Foo()
+    Async Sub Goo()
         |
     End Sub
 End Class
@@ -28,10 +27,10 @@ End Class
         End Sub
 
         <Fact, Trait(Traits.Feature, Traits.Features.KeywordRecommending)>
-        Public Sub InMethodExpression()
+        Public Sub InMethodExpressionTest()
             VerifyRecommendationsContain(<File>
 Class C
-    Async Sub Foo()
+    Async Sub Goo()
         Dim z = |
     End Sub
 End Class
@@ -39,10 +38,10 @@ End Class
         End Sub
 
         <Fact, Trait(Traits.Feature, Traits.Features.KeywordRecommending)>
-        Public Sub NotInCatch()
+        Public Sub NotInCatchTest()
             VerifyRecommendationsMissing(<File>
 Class C
-    Async Sub Foo()
+    Async Sub Goo()
         Try
         Catch
             Dim z = |
@@ -54,10 +53,10 @@ End Class
         End Sub
 
         <Fact, Trait(Traits.Feature, Traits.Features.KeywordRecommending)>
-        Public Sub NotInCatchExceptionFilter()
+        Public Sub NotInCatchExceptionFilterTest()
             VerifyRecommendationsMissing(<File>
 Class C
-    Async Sub Foo()
+    Async Sub Goo()
         Try
         Catch When Err = |
         End Try
@@ -68,10 +67,10 @@ End Class
         End Sub
 
         <Fact, Trait(Traits.Feature, Traits.Features.KeywordRecommending)>
-        Public Sub InCatchNestedDelegate()
+        Public Sub InCatchNestedDelegateTest()
             VerifyRecommendationsContain(<File>
 Class C
-    Async Sub Foo()
+    Async Sub Goo()
         Try
         Catch
             Dim z = Function() |
@@ -83,10 +82,10 @@ End Class
         End Sub
 
         <Fact, Trait(Traits.Feature, Traits.Features.KeywordRecommending)>
-        Public Sub NotInFinally()
+        Public Sub NotInFinallyTest()
             VerifyRecommendationsMissing(<File>
 Class C
-    Async Sub Foo()
+    Async Sub Goo()
         Try
         Finally
             Dim z = |
@@ -98,10 +97,10 @@ End Class
         End Sub
 
         <Fact, Trait(Traits.Feature, Traits.Features.KeywordRecommending)>
-        Public Sub NotInSyncLock()
+        Public Sub NotInSyncLockTest()
             VerifyRecommendationsMissing(<File>
 Class C
-    Async Sub Foo()
+    Async Sub Goo()
         SyncLock True
             Dim z = |
         End SyncLock

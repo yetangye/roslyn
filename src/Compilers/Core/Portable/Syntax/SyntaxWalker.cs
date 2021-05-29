@@ -1,6 +1,6 @@
-﻿// Copyright (c) Microsoft.  All Rights Reserved.  Licensed under the Apache License, Version 2.0.  See License.txt in the project root for license information.
-
-using Microsoft.CodeAnalysis.Text;
+﻿// Licensed to the .NET Foundation under one or more agreements.
+// The .NET Foundation licenses this file to you under the MIT license.
+// See the LICENSE file in the project root for more information.
 
 namespace Microsoft.CodeAnalysis
 {
@@ -11,15 +11,14 @@ namespace Microsoft.CodeAnalysis
     public abstract class SyntaxWalker
     {
         /// <summary>
-        /// True if this walker will descend into structured trivia.
+        /// Syntax the <see cref="SyntaxWalker"/> should descend into.
         /// </summary>
-        protected readonly SyntaxWalkerDepth Depth;
+        protected SyntaxWalkerDepth Depth { get; }
 
         /// <summary>
         /// Creates a new walker instance.
         /// </summary>
-        /// <param name="depth">specify how much this walker will descent into
-        /// trivia.</param>
+        /// <param name="depth">Syntax the <see cref="SyntaxWalker"/> should descend into.</param>
         protected SyntaxWalker(SyntaxWalkerDepth depth = SyntaxWalkerDepth.Node)
         {
             this.Depth = depth;
@@ -39,7 +38,7 @@ namespace Microsoft.CodeAnalysis
                 {
                     if (this.Depth >= SyntaxWalkerDepth.Node)
                     {
-                        Visit(child.AsNode());
+                        Visit(child.AsNode()!);
                     }
                 }
                 else if (child.IsToken)
@@ -67,7 +66,7 @@ namespace Microsoft.CodeAnalysis
             }
         }
 
-        private void VisitLeadingTrivia(SyntaxToken token)
+        private void VisitLeadingTrivia(in SyntaxToken token)
         {
             if (token.HasLeadingTrivia)
             {
@@ -78,7 +77,7 @@ namespace Microsoft.CodeAnalysis
             }
         }
 
-        private void VisitTrailingTrivia(SyntaxToken token)
+        private void VisitTrailingTrivia(in SyntaxToken token)
         {
             if (token.HasTrailingTrivia)
             {
@@ -99,7 +98,7 @@ namespace Microsoft.CodeAnalysis
         {
             if (this.Depth >= SyntaxWalkerDepth.StructuredTrivia && trivia.HasStructure)
             {
-                this.Visit(trivia.GetStructure());
+                this.Visit(trivia.GetStructure()!);
             }
         }
     }

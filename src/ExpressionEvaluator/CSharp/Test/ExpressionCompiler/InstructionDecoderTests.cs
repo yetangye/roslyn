@@ -1,4 +1,8 @@
-// Copyright (c) Microsoft.  All Rights Reserved.  Licensed under the Apache License, Version 2.0.  See License.txt in the project root for license information.
+﻿// Licensed to the .NET Foundation under one or more agreements.
+// The .NET Foundation licenses this file to you under the MIT license.
+// See the LICENSE file in the project root for more information.
+
+#nullable disable
 
 using System;
 using System.Diagnostics;
@@ -8,17 +12,17 @@ using Microsoft.CodeAnalysis.CSharp.Symbols;
 using Microsoft.CodeAnalysis.CSharp.Symbols.Metadata.PE;
 using Microsoft.CodeAnalysis.ExpressionEvaluator;
 using Microsoft.CodeAnalysis.CSharp.Test.Utilities;
-using Microsoft.CodeAnalysis.CSharp.UnitTests;
+using Microsoft.CodeAnalysis.PooledObjects;
 using Microsoft.VisualStudio.Debugger.Evaluation;
 using Roslyn.Test.Utilities;
 using Xunit;
 
-namespace Microsoft.CodeAnalysis.CSharp.ExpressionEvaluator
+namespace Microsoft.CodeAnalysis.CSharp.ExpressionEvaluator.UnitTests
 {
     public class InstructionDecoderTests : ExpressionCompilerTestBase
     {
         [Fact]
-        void GetNameGenerics()
+        public void GetNameGenerics()
         {
             var source = @"
 using System;
@@ -61,7 +65,7 @@ class Class1<T>
         }
 
         [Fact]
-        void GetNameNullTypeArguments()
+        public void GetNameNullTypeArguments()
         {
             var source = @"
 using System;
@@ -86,7 +90,7 @@ class Class1<T>
         }
 
         [Fact]
-        void GetNameGenericArgumentTypeNotInReferences()
+        public void GetNameGenericArgumentTypeNotInReferences()
         {
             var source = @"
 class Class1
@@ -99,8 +103,8 @@ class Class1
                 GetName(source, "System.Collections.Generic.Comparer.Create", DkmVariableInfoFlags.Names | DkmVariableInfoFlags.Types, typeArguments: new[] { serializedTypeArgumentName }));
         }
 
-        [Fact, WorkItem(1107977)]
-        void GetNameGenericAsync()
+        [Fact, WorkItem(1107977, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/1107977")]
+        public void GetNameGenericAsync()
         {
             var source = @"
 using System.Threading.Tasks;
@@ -119,7 +123,7 @@ class C
         }
 
         [Fact]
-        void GetNameLambda()
+        public void GetNameLambda()
         {
             var source = @"
 using System;
@@ -137,7 +141,7 @@ class C
         }
 
         [Fact]
-        void GetNameGenericLambda()
+        public void GetNameGenericLambda()
         {
             var source = @"
 using System;
@@ -155,7 +159,7 @@ class C<T>
         }
 
         [Fact]
-        void GetNameProperties()
+        public void GetNameProperties()
         {
             var source = @"
 class C
@@ -186,7 +190,7 @@ class C
         }
 
         [Fact]
-        void GetNameExplicitInterfaceImplementation()
+        public void GetNameExplicitInterfaceImplementation()
         {
             var source = @"
 using System;
@@ -201,7 +205,7 @@ class C : IDisposable
         }
 
         [Fact]
-        void GetNameExtensionMethod()
+        public void GetNameExtensionMethod()
         {
             var source = @"
 static class Extensions
@@ -215,7 +219,7 @@ static class Extensions
         }
 
         [Fact]
-        void GetNameArgumentFlagsNone()
+        public void GetNameArgumentFlagsNone()
         {
             var source = @"
 static class C
@@ -233,8 +237,98 @@ static class C
                 GetName(source, "C.M2", DkmVariableInfoFlags.None));
         }
 
+        [Fact, WorkItem(1107978, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/1107978")]
+        public void GetNameRefAndOutParameters()
+        {
+            var source = @"
+class C
+{
+    static void M(ref int x, out int y)
+    {
+        y = x;
+    }
+}";
+
+            Assert.Equal(
+                "C.M",
+                GetName(source, "C.M", DkmVariableInfoFlags.None));
+
+            Assert.Equal(
+                "C.M(1, 2)",
+                GetName(source, "C.M", DkmVariableInfoFlags.None, argumentValues: new[] { "1", "2" }));
+
+            Assert.Equal(
+                "C.M(ref int, out int)",
+                GetName(source, "C.M", DkmVariableInfoFlags.Types));
+
+            Assert.Equal(
+                "C.M(x, y)",
+                GetName(source, "C.M", DkmVariableInfoFlags.Names));
+
+            Assert.Equal(
+                "C.M(ref int x, out int y)",
+                GetName(source, "C.M", DkmVariableInfoFlags.Types | DkmVariableInfoFlags.Names));
+        }
+
         [Fact]
-        void GetReturnTypeNamePrimitive()
+        public void GetNameParamsParameters()
+        {
+            var source = @"
+class C
+{
+    static void M(params int[] x)
+    {
+    }
+}";
+
+            Assert.Equal(
+                "C.M(int[] x)",
+                GetName(source, "C.M", DkmVariableInfoFlags.Types | DkmVariableInfoFlags.Names));
+        }
+
+        [Fact, WorkItem(1154945, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/1154945")]
+        public void GetNameIncorrectNumberOfArgumentValues()
+        {
+            var source = @"
+class C
+{
+    void M(int x, int y)
+    {
+    }
+}";
+            var expected = "C.M(int x, int y)";
+
+            Assert.Equal(expected,
+                GetName(source, "C.M", DkmVariableInfoFlags.Types | DkmVariableInfoFlags.Names, argumentValues: new string[] { }));
+
+            Assert.Equal(expected,
+                GetName(source, "C.M", DkmVariableInfoFlags.Types | DkmVariableInfoFlags.Names, argumentValues: new string[] { "1" }));
+
+            Assert.Equal(expected,
+                GetName(source, "C.M", DkmVariableInfoFlags.Types | DkmVariableInfoFlags.Names, argumentValues: new string[] { "1", "2", "3" }));
+        }
+
+        [Fact, WorkItem(1134081, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/1134081")]
+        public void GetFileNameWithoutExtension()
+        {
+            Assert.Equal(".", MetadataUtilities.GetFileNameWithoutExtension("."));
+            Assert.Equal(".a", MetadataUtilities.GetFileNameWithoutExtension(".a"));
+            Assert.Equal("a.", MetadataUtilities.GetFileNameWithoutExtension("a."));
+            Assert.Equal(".dll.", MetadataUtilities.GetFileNameWithoutExtension(".dll."));
+            Assert.Equal("a.b", MetadataUtilities.GetFileNameWithoutExtension("a.b"));
+            Assert.Equal("a", MetadataUtilities.GetFileNameWithoutExtension("a.dll"));
+            Assert.Equal("a", MetadataUtilities.GetFileNameWithoutExtension("a.exe"));
+            Assert.Equal("a", MetadataUtilities.GetFileNameWithoutExtension("a.netmodule"));
+            Assert.Equal("a", MetadataUtilities.GetFileNameWithoutExtension("a.winmd"));
+            Assert.Equal("a.b.c", MetadataUtilities.GetFileNameWithoutExtension("a.b.c"));
+            Assert.Equal("a.b.c", MetadataUtilities.GetFileNameWithoutExtension("a.b.c.dll"));
+            Assert.Equal("mscorlib.nlp", MetadataUtilities.GetFileNameWithoutExtension("mscorlib.nlp"));
+            Assert.Equal("Microsoft.CodeAnalysis", MetadataUtilities.GetFileNameWithoutExtension("Microsoft.CodeAnalysis"));
+            Assert.Equal("Microsoft.CodeAnalysis", MetadataUtilities.GetFileNameWithoutExtension("Microsoft.CodeAnalysis.dll"));
+        }
+
+        [Fact]
+        public void GetReturnTypeNamePrimitive()
         {
             var source = @"
 static class C
@@ -246,7 +340,7 @@ static class C
         }
 
         [Fact]
-        void GetReturnTypeNameNested()
+        public void GetReturnTypeNameNested()
         {
             var source = @"
 static class C
@@ -267,7 +361,7 @@ namespace N
         }
 
         [Fact]
-        void GetReturnTypeNameGenericOfPrimitive()
+        public void GetReturnTypeNameGenericOfPrimitive()
         {
             var source = @"
 using System;
@@ -280,7 +374,7 @@ class C
         }
 
         [Fact]
-        void GetReturnTypeNameGenericOfNested()
+        public void GetReturnTypeNameGenericOfNested()
         {
             var source = @"
 using System;
@@ -296,7 +390,7 @@ class C
         }
 
         [Fact]
-        void GetReturnTypeNameGenericOfGeneric()
+        public void GetReturnTypeNameGenericOfGeneric()
         {
             var source = @"
 using System;
@@ -327,7 +421,6 @@ class C
             ArrayBuilder<string> builder = null;
             if (argumentValues != null)
             {
-                Assert.InRange(argumentValues.Length, 1, int.MaxValue);
                 builder = ArrayBuilder<string>.GetInstance();
                 builder.AddRange(argumentValues);
             }
@@ -356,7 +449,7 @@ class C
             var runtime = CreateRuntimeInstance(compilation);
             var moduleInstances = runtime.Modules;
             var blocks = moduleInstances.SelectAsArray(m => m.MetadataBlock);
-            compilation = blocks.ToCompilation();
+            compilation = blocks.ToCompilation(default(Guid), MakeAssemblyReferencesKind.AllAssemblies);
             var frame = (PEMethodSymbol)GetMethodOrTypeBySignature(compilation, methodName);
 
             // Once we have the method token, we want to look up the method (again)
@@ -364,13 +457,12 @@ class C
             // async/iterator "MoveNext" methods to the original source method.
             MethodSymbol method = compilation.GetSourceMethod(
                 ((PEModuleSymbol)frame.ContainingModule).Module.GetModuleVersionIdOrThrow(),
-                MetadataTokens.GetToken(frame.Handle));
+                frame.Handle);
             if (serializedTypeArgumentNames != null)
             {
                 Assert.NotEmpty(serializedTypeArgumentNames);
                 var typeParameters = instructionDecoder.GetAllTypeParameters(method);
                 Assert.NotEmpty(typeParameters);
-                var typeNameDecoder = new EETypeNameDecoder(compilation, (PEModuleSymbol)method.ContainingModule);
                 // Use the same helper method as the FrameDecoder to get the TypeSymbols for the
                 // generic type arguments (rather than using EETypeNameDecoder directly).
                 var typeArguments = instructionDecoder.GetTypeSymbols(compilation, method, serializedTypeArgumentNames);

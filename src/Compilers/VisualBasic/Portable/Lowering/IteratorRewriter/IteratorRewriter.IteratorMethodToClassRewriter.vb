@@ -1,15 +1,11 @@
-﻿' Copyright (c) Microsoft.  All Rights Reserved.  Licensed under the Apache License, Version 2.0.  See License.txt in the project root for license information.
+﻿' Licensed to the .NET Foundation under one or more agreements.
+' The .NET Foundation licenses this file to you under the MIT license.
+' See the LICENSE file in the project root for more information.
 
-Imports System.Collections.Generic
 Imports System.Collections.Immutable
-Imports System.Threading
-Imports Microsoft.Cci
-Imports Microsoft.CodeAnalysis
 Imports Microsoft.CodeAnalysis.CodeGen
-Imports Microsoft.CodeAnalysis.Collections
-Imports Microsoft.CodeAnalysis.Text
+Imports Microsoft.CodeAnalysis.PooledObjects
 Imports Microsoft.CodeAnalysis.VisualBasic.Symbols
-Imports Microsoft.CodeAnalysis.VisualBasic.Syntax
 
 Namespace Microsoft.CodeAnalysis.VisualBasic
 
@@ -23,7 +19,6 @@ Namespace Microsoft.CodeAnalysis.VisualBasic
             ''' The field of the generated iterator class that underlies the Current property.
             ''' </summary>
             Private ReadOnly _current As FieldSymbol
-            Private ReadOnly _originalMethodDeclaration As VisualBasicSyntaxNode
 
             Private _exitLabel As LabelSymbol
             Private _methodValue As LocalSymbol
@@ -33,23 +28,21 @@ Namespace Microsoft.CodeAnalysis.VisualBasic
                            F As SyntheticBoundNodeFactory,
                            state As FieldSymbol,
                            current As FieldSymbol,
-                           HoistedVariables As IReadOnlySet(Of Symbol),
+                           hoistedVariables As IReadOnlySet(Of Symbol),
                            localProxies As Dictionary(Of Symbol, FieldSymbol),
                            SynthesizedLocalOrdinals As SynthesizedLocalOrdinalsDispenser,
                            slotAllocatorOpt As VariableSlotAllocator,
                            nextFreeHoistedLocalSlot As Integer,
-                           diagnostics As DiagnosticBag)
+                           diagnostics As BindingDiagnosticBag)
 
-                MyBase.New(F, state, HoistedVariables, localProxies, SynthesizedLocalOrdinals, slotAllocatorOpt, nextFreeHoistedLocalSlot, diagnostics)
+                MyBase.New(F, state, hoistedVariables, localProxies, SynthesizedLocalOrdinals, slotAllocatorOpt, nextFreeHoistedLocalSlot, diagnostics)
 
                 Me._current = current
-
-                Me._originalMethodDeclaration = method.DeclaringSyntaxReferences(0).GetVisualBasicSyntax
             End Sub
 
-            Sub GenerateMoveNextAndDispose(Body As BoundStatement,
-                                           moveNextMethod As SynthesizedStateMachineMethod,
-                                           disposeMethod As SynthesizedStateMachineMethod)
+            Public Sub GenerateMoveNextAndDispose(Body As BoundStatement,
+                                           moveNextMethod As SynthesizedMethod,
+                                           disposeMethod As SynthesizedMethod)
 
                 ' Generate the body for MoveNext()
                 F.CurrentMethod = moveNextMethod
@@ -76,13 +69,12 @@ Namespace Microsoft.CodeAnalysis.VisualBasic
                 F.CloseMethod(
                     F.Block(
                         ImmutableArray.Create(Me._methodValue, Me.CachedState),
-                        F.HiddenSequencePoint(),
+                        SyntheticBoundNodeFactory.HiddenSequencePoint(),
                         F.Assignment(Me.F.Local(Me.CachedState, True), F.Field(F.Me, Me.StateField, False)),
                         Dispatch(),
                         GenerateReturn(finished:=True),
                         F.Label(initialLabel),
                         F.Assignment(F.Field(F.Me, Me.StateField, True), Me.F.AssignmentExpression(Me.F.Local(Me.CachedState, True), Me.F.Literal(StateMachineStates.NotStartedStateMachine))),
-                        F.SequencePoint(_originalMethodDeclaration),
                         newBody,
                         HandleReturn()
                     ))
@@ -119,13 +111,13 @@ Namespace Microsoft.CodeAnalysis.VisualBasic
             Private Function HandleReturn() As BoundStatement
                 If Me._exitLabel Is Nothing Then
                     ' did not see indirect returns
-                    Return F.Block()
+                    Return F.StatementList()
                 Else
                     '  _methodValue = False
                     ' exitlabel:
                     '  Return _methodValue
                     Return F.Block(
-                            F.HiddenSequencePoint(),
+                            SyntheticBoundNodeFactory.HiddenSequencePoint(),
                             F.Assignment(F.Local(Me._methodValue, True), F.Literal(True)),
                             F.Label(Me._exitLabel),
                             F.Return(Me.F.Local(Me._methodValue, False))
@@ -209,7 +201,7 @@ Namespace Microsoft.CodeAnalysis.VisualBasic
             End Sub
 
             Protected Overrides Function MaterializeProxy(origExpression As BoundExpression, proxy As FieldSymbol) As BoundNode
-                Dim syntax As VisualBasicSyntaxNode = Me.F.Syntax
+                Dim syntax As SyntaxNode = Me.F.Syntax
                 Dim framePointer As BoundExpression = Me.FramePointer(syntax, proxy.ContainingType)
                 Dim proxyFieldParented = proxy.AsMember(DirectCast(framePointer.Type, NamedTypeSymbol))
                 Return Me.F.Field(framePointer, proxyFieldParented, origExpression.IsLValue)

@@ -1,4 +1,6 @@
-﻿' Copyright (c) Microsoft.  All Rights Reserved.  Licensed under the Apache License, Version 2.0.  See License.txt in the project root for license information.
+﻿' Licensed to the .NET Foundation under one or more agreements.
+' The .NET Foundation licenses this file to you under the MIT license.
+' See the LICENSE file in the project root for more information.
 
 Imports System.Collections.Immutable
 Imports System.IO
@@ -19,9 +21,9 @@ Namespace Microsoft.CodeAnalysis.VisualBasic.UnitTests.Semantics
     Public Class ArrayLiteralTests
         Inherits BasicTestBase
 
-        Dim strictOff As VisualBasicCompilationOptions = New VisualBasicCompilationOptions(OutputKind.ConsoleApplication).WithOptionStrict(OptionStrict.Off)
-        Dim strictOn As VisualBasicCompilationOptions = New VisualBasicCompilationOptions(OutputKind.ConsoleApplication).WithOptionStrict(OptionStrict.On)
-        Dim strictCustom As VisualBasicCompilationOptions = New VisualBasicCompilationOptions(OutputKind.ConsoleApplication).WithOptionStrict(OptionStrict.Custom)
+        Private ReadOnly _strictOff As VisualBasicCompilationOptions = New VisualBasicCompilationOptions(OutputKind.ConsoleApplication).WithOptionStrict(OptionStrict.Off)
+        Private ReadOnly _strictOn As VisualBasicCompilationOptions = New VisualBasicCompilationOptions(OutputKind.ConsoleApplication).WithOptionStrict(OptionStrict.On)
+        Private ReadOnly _strictCustom As VisualBasicCompilationOptions = New VisualBasicCompilationOptions(OutputKind.ConsoleApplication).WithOptionStrict(OptionStrict.Custom)
 
         <Fact()>
         Public Sub TestArrayLiteralInferredType()
@@ -50,7 +52,7 @@ Module Program
 End Module
 ]]></file>
 </compilation>
-            Dim comp = CompilationUtils.CreateCompilationWithMscorlibAndVBRuntimeAndReferences(source, options:=strictOff)
+            Dim comp = CompilationUtils.CreateCompilationWithMscorlib40AndVBRuntimeAndReferences(source, options:=_strictOff)
             CompileAndVerify(comp,
                              expectedOutput:=<![CDATA[
 System.Int32[]
@@ -59,7 +61,7 @@ System.Decimal[]
 System.Int32[][]
             ]]>)
 
-            comp = comp.WithOptions(strictOn)
+            comp = comp.WithOptions(_strictOn)
             CompileAndVerify(comp,
                              expectedOutput:=<![CDATA[
 System.Int32[]
@@ -85,12 +87,12 @@ Module Program
 End Module
 ]]></file>
 </compilation>
-            Dim comp = CompilationUtils.CreateCompilationWithMscorlibAndVBRuntimeAndReferences(source, options:=strictOff)
+            Dim comp = CompilationUtils.CreateCompilationWithMscorlib40AndVBRuntimeAndReferences(source, options:=_strictOff)
             CompileAndVerify(comp,
      expectedOutput:=<![CDATA[
             ]]>)
 
-            comp = comp.WithOptions(strictOn)
+            comp = comp.WithOptions(_strictOn)
             comp.VerifyDiagnostics(
                 Diagnostic(ERRID.ERR_ArrayInitNoTypeObjectDisallowed, "{}"),
                 Diagnostic(ERRID.ERR_ArrayInitNoTypeObjectDisallowed, "{{}}"),
@@ -100,6 +102,7 @@ End Module
         End Sub
 
         <Fact()>
+        <CompilerTrait(CompilerFeature.IOperation)>
         Public Sub TestNestedEmptyArrayLiteralWithObject()
             Dim source =
 <compilation name="TestNestedEmptyArrayLiteral">
@@ -136,12 +139,30 @@ Module Program
 End Module
 ]]></file>
 </compilation>
-            Dim comp = CompilationUtils.CreateCompilationWithMscorlibAndVBRuntimeAndReferences(source, options:=strictOff)
+            Dim comp = CompilationUtils.CreateCompilationWithMscorlib40AndVBRuntimeAndReferences(source, options:=_strictOff)
             CompileAndVerify(comp,
      expectedOutput:=<![CDATA[
                                ]]>)
 
-            comp = comp.WithOptions(strictOn)
+            Dim tree = comp.SyntaxTrees.Single()
+            Dim node = tree.GetRoot().DescendantNodes().OfType(Of LocalDeclarationStatementSyntax)().ElementAt(7)
+
+            Assert.Equal("Dim j3(,) As Object = {}", node.ToString())
+
+            comp.VerifyOperationTree(node.Declarators.Last.Initializer.Value, expectedOperationTree:=
+            <![CDATA[
+IArrayCreationOperation (OperationKind.ArrayCreation, Type: System.Object(,)) (Syntax: '{}')
+  Dimension Sizes(2):
+      ILiteralOperation (OperationKind.Literal, Type: System.Int32, Constant: 0, IsImplicit) (Syntax: '{}')
+      ILiteralOperation (OperationKind.Literal, Type: System.Int32, Constant: 0, IsImplicit) (Syntax: '{}')
+  Initializer: 
+    IArrayInitializerOperation (1 elements) (OperationKind.ArrayInitializer, Type: null, IsImplicit) (Syntax: '{}')
+      Element Values(1):
+          IArrayInitializerOperation (0 elements) (OperationKind.ArrayInitializer, Type: null, IsImplicit) (Syntax: '{}')
+            Element Values(0)
+]]>.Value)
+
+            comp = comp.WithOptions(_strictOn)
             comp.VerifyDiagnostics(
     Diagnostic(ERRID.ERR_ArrayInitNoTypeObjectDisallowed, "{}"),
     Diagnostic(ERRID.ERR_ArrayInitNoTypeObjectDisallowed, "{}"),
@@ -180,12 +201,12 @@ Module Program
 End Module
 ]]></file>
 </compilation>
-            Dim comp = CompilationUtils.CreateCompilationWithMscorlibAndVBRuntimeAndReferences(source, options:=strictOff)
+            Dim comp = CompilationUtils.CreateCompilationWithMscorlib40AndVBRuntimeAndReferences(source, options:=_strictOff)
             CompileAndVerify(comp,
      expectedOutput:=<![CDATA[
             ]]>)
 
-            comp = comp.WithOptions(strictOn)
+            comp = comp.WithOptions(_strictOn)
             CompileAndVerify(comp,
      expectedOutput:=<![CDATA[
             ]]>)
@@ -215,19 +236,19 @@ Module Program
 End Module
 ]]></file>
 </compilation>
-            Dim comp = CompilationUtils.CreateCompilationWithMscorlibAndVBRuntimeAndReferences(source, options:=strictOff)
+            Dim comp = CompilationUtils.CreateCompilationWithMscorlib40AndVBRuntimeAndReferences(source, options:=_strictOff)
             CompileAndVerify(comp,
      expectedOutput:=<![CDATA[
             ]]>)
 
-            comp = comp.WithOptions(strictOn)
+            comp = comp.WithOptions(_strictOn)
             CompileAndVerify(comp,
      expectedOutput:=<![CDATA[
             ]]>)
         End Sub
 
         <Fact()>
-        Public Sub TestArrayLiteralDimensionMistach()
+        Public Sub TestArrayLiteralDimensionMismatch()
             Dim source =
 <compilation name="TestArrayLiteralWithTargetType">
     <file name="a.vb">
@@ -245,21 +266,46 @@ Module Program
 End Module
 ]]></file>
 </compilation>
-            Dim comp = CompilationUtils.CreateCompilationWithMscorlibAndVBRuntimeAndReferences(source, options:=strictOff)
-            comp.VerifyDiagnostics(
-                    Diagnostic(ERRID.ERR_TypeInferenceArrayRankMismatch1, "a1()").WithArguments("a1"),
-                    Diagnostic(ERRID.ERR_ConvertObjectArrayMismatch3, "{{1}}").WithArguments("Integer(*,*)", "Object()", "Integer"),
-                    Diagnostic(ERRID.ERR_ArrayInitializerTooManyDimensions, "{2}"),
-                    Diagnostic(ERRID.ERR_ArrayInitializerTooFewDimensions, "2"),
-                    Diagnostic(ERRID.ERR_TypeMismatch2, "{{1}}").WithArguments("Integer(*,*)", "System.Collections.Generic.IEnumerable(Of Double)"))
-
-            comp = comp.WithOptions(strictOn)
-            comp.VerifyDiagnostics(
-                     Diagnostic(ERRID.ERR_TypeInferenceArrayRankMismatch1, "a1()").WithArguments("a1"),
-                     Diagnostic(ERRID.ERR_ConvertObjectArrayMismatch3, "{{1}}").WithArguments("Integer(*,*)", "Object()", "Integer"),
-                     Diagnostic(ERRID.ERR_ArrayInitializerTooManyDimensions, "{2}"),
-                     Diagnostic(ERRID.ERR_ArrayInitializerTooFewDimensions, "2"),
-                     Diagnostic(ERRID.ERR_TypeMismatch2, "{{1}}").WithArguments("Integer(*,*)", "System.Collections.Generic.IEnumerable(Of Double)"))
+            Dim comp = CompilationUtils.CreateCompilationWithMscorlib40AndVBRuntimeAndReferences(source, options:=_strictOff)
+            comp.AssertTheseDiagnostics(
+<expected>
+BC36909: Cannot infer a data type for 'a1' because the array dimensions do not match.
+        dim a1() = {{1}}
+            ~~~~
+BC30414: Value of type 'Integer(*,*)' cannot be converted to 'Object()' because the array types have different numbers of dimensions.
+        dim a1() = {{1}}
+                   ~~~~~
+BC30566: Array initializer has too many dimensions.
+        dim a2 = {1, {2}}
+                     ~~~
+BC30565: Array initializer has too few dimensions.
+        dim a3(,) = {{{1}}, 2}
+                            ~
+BC30311: Value of type 'Integer(*,*)' cannot be converted to 'IEnumerable(Of Double)'.
+        dim i2 as IEnumerable(of Double) = {{1}}
+                                           ~~~~~
+</expected>
+            )
+            comp = comp.WithOptions(_strictOn)
+            comp.AssertTheseDiagnostics(
+<expected>
+BC36909: Cannot infer a data type for 'a1' because the array dimensions do not match.
+        dim a1() = {{1}}
+            ~~~~
+BC30414: Value of type 'Integer(*,*)' cannot be converted to 'Object()' because the array types have different numbers of dimensions.
+        dim a1() = {{1}}
+                   ~~~~~
+BC30566: Array initializer has too many dimensions.
+        dim a2 = {1, {2}}
+                     ~~~
+BC30565: Array initializer has too few dimensions.
+        dim a3(,) = {{{1}}, 2}
+                            ~
+BC30311: Value of type 'Integer(*,*)' cannot be converted to 'IEnumerable(Of Double)'.
+        dim i2 as IEnumerable(of Double) = {{1}}
+                                           ~~~~~
+</expected>
+            )
 
         End Sub
 
@@ -282,20 +328,20 @@ Module Module1
 
     Sub Main()
         Dim c1 as C = {1}
-        Dim c2 = DirectCast({1}, C) 'Should fail, user defined conversion should not be appled.
-        Dim c3 = TryCast({1}, C)    'Should fail, user defined conversion should not be appled.
+        Dim c2 = DirectCast({1}, C) 'Should fail, user defined conversion should not be applied.
+        Dim c3 = TryCast({1}, C)    'Should fail, user defined conversion should not be applied.
     End Sub
 
 End Module
 ]]>
     </file>
 </compilation>
-            Dim comp = CompilationUtils.CreateCompilationWithMscorlibAndVBRuntimeAndReferences(source, options:=strictOff)
+            Dim comp = CompilationUtils.CreateCompilationWithMscorlib40AndVBRuntimeAndReferences(source, options:=_strictOff)
             comp.VerifyDiagnostics(
                    Diagnostic(ERRID.ERR_TypeMismatch2, "{1}").WithArguments("Integer()", "Module1.C"),
                    Diagnostic(ERRID.ERR_TypeMismatch2, "{1}").WithArguments("Integer()", "Module1.C"))
 
-            comp = comp.WithOptions(strictOn)
+            comp = comp.WithOptions(_strictOn)
             comp.VerifyDiagnostics(
                    Diagnostic(ERRID.ERR_TypeMismatch2, "{1}").WithArguments("Integer()", "Module1.C"),
                    Diagnostic(ERRID.ERR_TypeMismatch2, "{1}").WithArguments("Integer()", "Module1.C"))
@@ -326,13 +372,13 @@ End Module
 ]]>
     </file>
 </compilation>
-            Dim comp = CompilationUtils.CreateCompilationWithMscorlibAndVBRuntimeAndReferences(source, options:=strictOff)
+            Dim comp = CompilationUtils.CreateCompilationWithMscorlib40AndVBRuntimeAndReferences(source, options:=_strictOff)
 
             CompileAndVerify(comp,
      expectedOutput:=<![CDATA[
             ]]>)
 
-            comp = comp.WithOptions(strictOn)
+            comp = comp.WithOptions(_strictOn)
             CompileAndVerify(comp,
      expectedOutput:=<![CDATA[
             ]]>)
@@ -365,14 +411,14 @@ End Module
 ]]>
     </file>
 </compilation>
-            Dim comp = CompilationUtils.CreateCompilationWithMscorlibAndVBRuntimeAndReferences(source, options:=strictOff)
+            Dim comp = CompilationUtils.CreateCompilationWithMscorlib40AndVBRuntimeAndReferences(source, options:=_strictOff)
 
             CompileAndVerify(comp,
      expectedOutput:=<![CDATA[
 using widening operator CType(i() as integer) as C
             ]]>)
 
-            comp = comp.WithOptions(strictOn)
+            comp = comp.WithOptions(_strictOn)
             CompileAndVerify(comp,
      expectedOutput:=<![CDATA[
 using widening operator CType(i() as integer) as C
@@ -406,14 +452,14 @@ End Module
 ]]>
     </file>
 </compilation>
-            Dim comp = CompilationUtils.CreateCompilationWithMscorlibAndVBRuntimeAndReferences(source, options:=strictOff)
+            Dim comp = CompilationUtils.CreateCompilationWithMscorlib40AndVBRuntimeAndReferences(source, options:=_strictOff)
 
             CompileAndVerify(comp,
      expectedOutput:=<![CDATA[
             using widening operator CType(i() as integer) as C
                         ]]>)
 
-            comp = comp.WithOptions(strictOn)
+            comp = comp.WithOptions(_strictOn)
             comp.VerifyDiagnostics(Diagnostic(ERRID.ERR_NarrowingConversionDisallowed2, """1""").WithArguments("String", "Integer"))
 
         End Sub
@@ -450,7 +496,7 @@ End Module
 ]]>
     </file>
 </compilation>
-            Dim comp = CompilationUtils.CreateCompilationWithMscorlibAndVBRuntimeAndReferences(source, options:=strictOff)
+            Dim comp = CompilationUtils.CreateCompilationWithMscorlib40AndVBRuntimeAndReferences(source, options:=_strictOff)
 
             CompileAndVerify(comp,
      expectedOutput:=<![CDATA[
@@ -461,7 +507,7 @@ using narrowing operator CType(i() as integer) as C
 using narrowing operator CType(i() as integer) as C
                         ]]>)
 
-            comp = comp.WithOptions(strictOn)
+            comp = comp.WithOptions(_strictOn)
             comp.VerifyDiagnostics(
                 Diagnostic(ERRID.ERR_NarrowingConversionDisallowed2, "{1S}").WithArguments("Integer()", "Module1.C"),
                 Diagnostic(ERRID.ERR_NarrowingConversionDisallowed2, "{1}").WithArguments("Integer()", "Module1.C"),
@@ -493,19 +539,19 @@ End Module
 ]]>
     </file>
 </compilation>
-            Dim comp = CompilationUtils.CreateCompilationWithMscorlibAndVBRuntimeAndReferences(source, options:=strictOff)
+            Dim comp = CompilationUtils.CreateCompilationWithMscorlib40AndVBRuntimeAndReferences(source, options:=_strictOff)
             comp.VerifyDiagnostics(
                 Diagnostic(ERRID.ERR_RestrictedType1, "= {a}").WithArguments("System.ArgIterator"),
                 Diagnostic(ERRID.ERR_RestrictedType1, "{a}").WithArguments("System.ArgIterator"))
 
-            comp = comp.WithOptions(strictOn)
+            comp = comp.WithOptions(_strictOn)
             comp.VerifyDiagnostics(
                 Diagnostic(ERRID.ERR_RestrictedType1, "= {a}").WithArguments("System.ArgIterator"),
                 Diagnostic(ERRID.ERR_RestrictedType1, "{a}").WithArguments("System.ArgIterator"),
                 Diagnostic(ERRID.ERR_ArrayInitTooManyTypesObjectDisallowed, "{1, 1D, ""a""}"),
                 Diagnostic(ERRID.ERR_ArrayInitNoTypeObjectDisallowed, "{""a"", New c}"))
 
-            comp = comp.WithOptions(strictCustom)
+            comp = comp.WithOptions(_strictCustom)
             comp.VerifyDiagnostics(
                 Diagnostic(ERRID.ERR_RestrictedType1, "= {a}").WithArguments("System.ArgIterator"),
                 Diagnostic(ERRID.ERR_RestrictedType1, "{a}").WithArguments("System.ArgIterator"),
@@ -513,14 +559,13 @@ End Module
                 Diagnostic(ERRID.WRN_ObjectAssumed1, "{""a"", New c}").WithArguments("Cannot infer an element type; 'Object' assumed."))
         End Sub
 
-        <Fact(Skip:="529377")>
-        Public Sub TestArrayLiteralInferredElementArgIterator()
+        <Fact>
+        Public Sub TestArrayLiteralInferredElementArgIterator_1()
             Dim source =
 <compilation name="TestArrayLiteralInferredElementTypeDiagnostics">
     <file name="a.vb">
         <![CDATA[
-        Imports System
-Imports System.Collections.Generic
+Imports System
 
 Module Program
     Class c
@@ -528,20 +573,65 @@ Module Program
 
     Sub Main(args As String())
         Dim a As ArgIterator = Nothing
-        Dim x as ArgIterator= {a} ' Error should be reported on ArgIterator not the array literal
+        Dim x as ArgIterator= {a} 
     End Sub
 End Module
 ]]>
     </file>
 </compilation>
-            Dim comp = CompilationUtils.CreateCompilationWithMscorlibAndVBRuntimeAndReferences(source, options:=strictOff)
+            Dim comp = CompilationUtils.CreateCompilationWithMscorlib40AndVBRuntimeAndReferences(source, options:=_strictOff)
 
-            comp = comp.WithOptions(strictOn)
-            comp.VerifyDiagnostics() ' Error should be reported on ArgIterator not the array literal
+            Dim expected =
+<expected>
+	BC30311: Value of type 'ArgIterator()' cannot be converted to 'ArgIterator'.
+        Dim x as ArgIterator= {a} 
+                              ~~~
+</expected>
+            comp.AssertTheseDiagnostics(expected)
 
-            comp = comp.WithOptions(strictCustom)
-            comp.VerifyDiagnostics() ' Error should be reported on ArgIterator not the array literal
+            comp = comp.WithOptions(_strictOn)
+            comp.AssertTheseDiagnostics(expected)
 
+            comp = comp.WithOptions(_strictCustom)
+            comp.AssertTheseDiagnostics(expected)
+        End Sub
+
+        <Fact>
+        <WorkItem(529377, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/529377")>
+        Public Sub TestArrayLiteralInferredElementArgIterator_2()
+            Dim source =
+<compilation name="TestArrayLiteralInferredElementTypeDiagnostics">
+    <file name="a.vb">
+        <![CDATA[
+Imports System
+
+Module Program
+    Class c
+    End Class
+
+    Sub Main(args As String())
+        Dim a As ArgIterator = Nothing
+        Dim x as ArgIterator() = {a} 
+    End Sub
+End Module
+]]>
+    </file>
+</compilation>
+            Dim comp = CompilationUtils.CreateCompilationWithMscorlib40AndVBRuntimeAndReferences(source, options:=_strictOff)
+
+            Dim expected =
+<expected>
+BC31396: 'ArgIterator' cannot be made nullable, and cannot be used as the data type of an array element, field, anonymous type member, type argument, 'ByRef' parameter, or return statement.
+        Dim x as ArgIterator() = {a} 
+                 ~~~~~~~~~~~~~
+</expected>
+            comp.AssertTheseDiagnostics(expected)
+
+            comp = comp.WithOptions(_strictOn)
+            comp.AssertTheseDiagnostics(expected)
+
+            comp = comp.WithOptions(_strictCustom)
+            comp.AssertTheseDiagnostics(expected)
         End Sub
 
         <Fact()>
@@ -564,13 +654,13 @@ End Module
 ]]>
     </file>
 </compilation>
-            Dim comp = CompilationUtils.CreateCompilationWithMscorlibAndVBRuntimeAndReferences(source, options:=strictOff)
+            Dim comp = CompilationUtils.CreateCompilationWithMscorlib40AndVBRuntimeAndReferences(source, options:=_strictOff)
 
             CompileAndVerify(comp,
      expectedOutput:=<![CDATA[
                         ]]>)
 
-            comp = comp.WithOptions(strictOn)
+            comp = comp.WithOptions(_strictOn)
             comp.VerifyDiagnostics(
                 Diagnostic(ERRID.ERR_NarrowingConversionDisallowed2, "1D").WithArguments("Decimal", "Integer")
                        )
@@ -593,7 +683,7 @@ End Module
 ]]>
     </file>
 </compilation>
-            Dim comp = CompilationUtils.CreateCompilationWithMscorlibAndVBRuntimeAndReferences(source, options:=strictOff)
+            Dim comp = CompilationUtils.CreateCompilationWithMscorlib40AndVBRuntimeAndReferences(source, options:=_strictOff)
 
             comp.VerifyDiagnostics(
                 Diagnostic(ERRID.ERR_ArrayInitNoType, "{Addressof Main}"),
@@ -601,7 +691,7 @@ End Module
                 Diagnostic(ERRID.ERR_UndefinedType1, "Action").WithArguments("Action")
                 )
 
-            comp = comp.WithOptions(strictOn)
+            comp = comp.WithOptions(_strictOn)
             comp.VerifyDiagnostics(
                 Diagnostic(ERRID.ERR_ArrayInitNoType, "{Addressof Main}"),
                 Diagnostic(ERRID.ERR_AddressOfNotDelegate1, "Addressof Main").WithArguments("Object"),
@@ -627,14 +717,14 @@ End Module
 ]]>
     </file>
 </compilation>
-            Dim comp = CompilationUtils.CreateCompilationWithMscorlibAndVBRuntimeAndReferences(source, options:=strictOff)
+            Dim comp = CompilationUtils.CreateCompilationWithMscorlib40AndVBRuntimeAndReferences(source, options:=_strictOff)
 
             comp.VerifyDiagnostics(
                 Diagnostic(ERRID.ERR_ArrayInitNoType, "{Addressof Main}"),
                 Diagnostic(ERRID.ERR_AddressOfNotDelegate1, "Addressof Main").WithArguments("Object")
                 )
 
-            comp = comp.WithOptions(strictOn)
+            comp = comp.WithOptions(_strictOn)
             comp.VerifyDiagnostics(
                     Diagnostic(ERRID.ERR_ArrayInitNoType, "{Addressof Main}"),
                     Diagnostic(ERRID.ERR_AddressOfNotDelegate1, "Addressof Main").WithArguments("Object")
@@ -672,7 +762,7 @@ End Module
 ]]>
     </file>
 </compilation>
-            Dim comp = CompilationUtils.CreateCompilationWithMscorlibAndVBRuntimeAndReferences(source, options:=strictOff)
+            Dim comp = CompilationUtils.CreateCompilationWithMscorlib40AndVBRuntimeAndReferences(source, options:=_strictOff)
 
             CompileAndVerify(comp,
           expectedOutput:=<![CDATA[
@@ -680,7 +770,7 @@ Public Shared Narrowing Operator CType(ByVal x As Integer()) As C
                              ]]>)
 
 
-            comp = comp.WithOptions(strictOn)
+            comp = comp.WithOptions(_strictOn)
             comp.VerifyDiagnostics(
                 Diagnostic(ERRID.ERR_NarrowingConversionDisallowed2, "{1, 2, 3, 4, 5}").WithArguments("Integer()", "Module1.C")
                 )
@@ -715,7 +805,7 @@ End Module
 
             Dim strictOffOverflowChecksOff = New VisualBasicCompilationOptions(OutputKind.ConsoleApplication).WithOptionStrict(OptionStrict.Off).WithOverflowChecks(False)
 
-            Dim comp = CompilationUtils.CreateCompilationWithMscorlibAndVBRuntimeAndReferences(source, options:=strictOffOverflowChecksOff)
+            Dim comp = CompilationUtils.CreateCompilationWithMscorlib40AndVBRuntimeAndReferences(source, options:=strictOffOverflowChecksOff)
             CompileAndVerify(comp, expectedOutput:=<![CDATA[
 Test2(x As Byte(), y As Byte)
             ]]>)
@@ -757,7 +847,7 @@ End Module
 
             Dim strictOffOverflowChecksOff = New VisualBasicCompilationOptions(OutputKind.ConsoleApplication).WithOptionStrict(OptionStrict.Off).WithOverflowChecks(False)
 
-            Dim comp = CompilationUtils.CreateCompilationWithMscorlibAndVBRuntimeAndReferences(source, options:=strictOffOverflowChecksOff)
+            Dim comp = CompilationUtils.CreateCompilationWithMscorlib40AndVBRuntimeAndReferences(source, options:=strictOffOverflowChecksOff)
             CompileAndVerify(comp, expectedOutput:=<![CDATA[
 Test2(x As Short(), y As Byte)
             ]]>)
@@ -799,18 +889,18 @@ End Module
 
             Dim strictOffOverflowChecksOff = New VisualBasicCompilationOptions(OutputKind.ConsoleApplication).WithOptionStrict(OptionStrict.Off).WithOverflowChecks(False)
 
-            Dim comp = CompilationUtils.CreateCompilationWithMscorlibAndVBRuntimeAndReferences(source, options:=strictOffOverflowChecksOff)
+            Dim comp = CompilationUtils.CreateCompilationWithMscorlib40AndVBRuntimeAndReferences(source, options:=strictOffOverflowChecksOff)
             comp.VerifyDiagnostics(
-                   Diagnostic(ERRID.ERR_NoNonNarrowingOverloadCandidates2, "Test2").WithArguments("Test2", vbCrLf &
-            "    'Public Sub Test2(x As Integer(), y As Integer)': Argument matching parameter 'x' narrows to 'Integer()'." & vbCrLf &
+                   Diagnostic(ERRID.ERR_NoNonNarrowingOverloadCandidates2, "Test2").WithArguments("Test2", Environment.NewLine &
+            "    'Public Sub Test2(x As Integer(), y As Integer)': Argument matching parameter 'x' narrows to 'Integer()'." & Environment.NewLine &
             "    'Public Sub Test2(x As Short(), y As Byte)': Argument matching parameter 'x' narrows to 'Short()'."))
 
             Dim strictOnOverflowChecksOff = New VisualBasicCompilationOptions(OutputKind.ConsoleApplication).WithOptionStrict(OptionStrict.On).WithOverflowChecks(False)
 
             comp = comp.WithOptions(strictOnOverflowChecksOff)
             comp.VerifyDiagnostics(
-                 Diagnostic(ERRID.ERR_NoCallableOverloadCandidates2, "Test2").WithArguments("Test2", vbCrLf &
-          "    'Public Sub Test2(x As Integer(), y As Integer)': Option Strict On disallows implicit conversions from 'Double' to 'Integer'." & vbCrLf &
+                 Diagnostic(ERRID.ERR_NoCallableOverloadCandidates2, "Test2").WithArguments("Test2", Environment.NewLine &
+          "    'Public Sub Test2(x As Integer(), y As Integer)': Option Strict On disallows implicit conversions from 'Double' to 'Integer'." & Environment.NewLine &
           "    'Public Sub Test2(x As Short(), y As Byte)': Option Strict On disallows implicit conversions from 'Double' to 'Short'."))
         End Sub
 
@@ -832,10 +922,10 @@ End Module
 ]]></file>
 </compilation>
 
-            Dim comp = CompilationUtils.CreateCompilationWithMscorlibAndVBRuntimeAndReferences(source, options:=strictOff)
+            Dim comp = CompilationUtils.CreateCompilationWithMscorlib40AndVBRuntimeAndReferences(source, options:=_strictOff)
             comp.VerifyDiagnostics(Diagnostic(ERRID.ERR_CharToIntegralTypeMismatch1, """a""c").WithArguments("Short"))
 
-            comp = comp.WithOptions(strictOn)
+            comp = comp.WithOptions(_strictOn)
             comp.VerifyDiagnostics(
                 Diagnostic(ERRID.ERR_NarrowingConversionDisallowed2, "1000.0").WithArguments("Double", "Short"),
                 Diagnostic(ERRID.ERR_CharToIntegralTypeMismatch1, """a""c").WithArguments("Short"),
@@ -870,12 +960,12 @@ End Module
     </file>
 </compilation>
 
-            Dim comp = CompilationUtils.CreateCompilationWithMscorlibAndVBRuntimeAndReferences(source, options:=strictOff)
+            Dim comp = CompilationUtils.CreateCompilationWithMscorlib40AndVBRuntimeAndReferences(source, options:=_strictOff)
             CompileAndVerify(comp, expectedOutput:=<![CDATA[
 Public Shared Narrowing Operator CType(i() As Short) As C
             ]]>)
 
-            comp = comp.WithOptions(strictOn)
+            comp = comp.WithOptions(_strictOn)
             comp.VerifyDiagnostics(
                      Diagnostic(ERRID.ERR_NarrowingConversionDisallowed2, "{10S, 10, 10L}").WithArguments("Short()", "Module1.C")
                )
@@ -922,14 +1012,14 @@ End Module
             ' See comments above.  Two of the calls differ from Dev10.  Roslyn considers user defined conversions for array literal arguments
             ' when doing overload resolution.  Dev10 does not.
 
-            Dim comp = CompilationUtils.CreateCompilationWithMscorlibAndVBRuntimeAndReferences(source, options:=strictOff)
+            Dim comp = CompilationUtils.CreateCompilationWithMscorlib40AndVBRuntimeAndReferences(source, options:=_strictOff)
             CompileAndVerify(comp, expectedOutput:=<![CDATA[
 Test2(x As B2)
 Test2(x As B2)
 Test2(x As B1)
             ]]>)
 
-            comp = comp.WithOptions(strictOn)
+            comp = comp.WithOptions(_strictOn)
             CompileAndVerify(comp, expectedOutput:=<![CDATA[
 Test2(x As B2)
 Test2(x As B2)
@@ -974,16 +1064,16 @@ End Module
     </file>
 </compilation>
 
-            Dim comp = CompilationUtils.CreateCompilationWithMscorlibAndVBRuntimeAndReferences(source, options:=strictOff)
+            Dim comp = CompilationUtils.CreateCompilationWithMscorlib40AndVBRuntimeAndReferences(source, options:=_strictOff)
             comp.VerifyDiagnostics(
-            Diagnostic(ERRID.ERR_NoNonNarrowingOverloadCandidates2, "Test2").WithArguments("Test2", vbCrLf &
-     "    'Public Sub Test2(x As m.B1, y As Integer)': Argument matching parameter 'x' narrows to 'm.B1'." & vbCrLf &
+            Diagnostic(ERRID.ERR_NoNonNarrowingOverloadCandidates2, "Test2").WithArguments("Test2", Environment.NewLine &
+     "    'Public Sub Test2(x As m.B1, y As Integer)': Argument matching parameter 'x' narrows to 'm.B1'." & Environment.NewLine &
      "    'Public Sub Test2(x As m.B2, y As Byte)': Argument matching parameter 'x' narrows to 'm.B2'."))
 
-            comp = comp.WithOptions(strictOn)
+            comp = comp.WithOptions(_strictOn)
             comp.VerifyDiagnostics(
-            Diagnostic(ERRID.ERR_NoCallableOverloadCandidates2, "Test2").WithArguments("Test2", vbCrLf &
-     "    'Public Sub Test2(x As m.B1, y As Integer)': Option Strict On disallows implicit conversions from 'Integer' to 'Short'." & vbCrLf &
+            Diagnostic(ERRID.ERR_NoCallableOverloadCandidates2, "Test2").WithArguments("Test2", Environment.NewLine &
+     "    'Public Sub Test2(x As m.B1, y As Integer)': Option Strict On disallows implicit conversions from 'Integer' to 'Short'." & Environment.NewLine &
      "    'Public Sub Test2(x As m.B2, y As Byte)': Option Strict On disallows implicit conversions from 'Integer' to 'Byte'."))
         End Sub
 
@@ -1001,21 +1091,21 @@ Module Module1
             Console.WriteLine(msg)
         End Sub
 
-        Public Shared Sub foo(ByVal ParamArray z As String())
+        Public Shared Sub goo(ByVal ParamArray z As String())
             StrReturnMethod("string()")
         End Sub
 
-        Public Shared Sub foo(ByVal z As Char())
+        Public Shared Sub goo(ByVal z As Char())
             StrReturnMethod("char()")
         End Sub
 
-        Public Shared Sub foo(ByVal z As String)
+        Public Shared Sub goo(ByVal z As String)
             StrReturnMethod("string")
         End Sub
     End Class
 
     Sub Main()
-        c1.foo({"a"c}) '//Char()
+        c1.goo({"a"c}) '//Char()
     End Sub
 
 End Module
@@ -1023,12 +1113,12 @@ End Module
     </file>
 </compilation>
 
-            Dim comp = CompilationUtils.CreateCompilationWithMscorlibAndVBRuntimeAndReferences(source, options:=strictOff)
+            Dim comp = CompilationUtils.CreateCompilationWithMscorlib40AndVBRuntimeAndReferences(source, options:=_strictOff)
             CompileAndVerify(comp, expectedOutput:=<![CDATA[
 char()
             ]]>)
 
-            comp = comp.WithOptions(strictOn)
+            comp = comp.WithOptions(_strictOn)
             CompileAndVerify(comp, expectedOutput:=<![CDATA[
 char()
             ]]>)
@@ -1070,12 +1160,12 @@ End Module
     </file>
 </compilation>
 
-            Dim comp = CompilationUtils.CreateCompilationWithMscorlibAndVBRuntimeAndReferences(source, options:=strictOff)
+            Dim comp = CompilationUtils.CreateCompilationWithMscorlib40AndVBRuntimeAndReferences(source, options:=_strictOff)
             CompileAndVerify(comp, expectedOutput:=<![CDATA[
 Widening Operator CType(ByVal x As Short())
             ]]>)
 
-            comp = comp.WithOptions(strictOn)
+            comp = comp.WithOptions(_strictOn)
             CompileAndVerify(comp, expectedOutput:=<![CDATA[
 Widening Operator CType(ByVal x As Short())
             ]]>)
@@ -1108,12 +1198,12 @@ End Module
     </file>
 </compilation>
 
-            Dim comp = CompilationUtils.CreateCompilationWithMscorlibAndVBRuntimeAndReferences(source, options:=strictOff)
+            Dim comp = CompilationUtils.CreateCompilationWithMscorlib40AndVBRuntimeAndReferences(source, options:=_strictOff)
             CompileAndVerify(comp, expectedOutput:=<![CDATA[
 SubExpectingFuncOfT - Array
             ]]>)
 
-            comp = comp.WithOptions(strictOn)
+            comp = comp.WithOptions(_strictOn)
             CompileAndVerify(comp, expectedOutput:=<![CDATA[
 SubExpectingFuncOfT - Array
             ]]>)
@@ -1130,12 +1220,12 @@ Imports System
 Module m
 
     Sub Main()
-        Foo2Params({1, 2, 3}, {1.1, 2.2, 3.3})
-        Foo2Params({1, 2, 3}, {1L, 2L, 3L})
+        Goo2Params({1, 2, 3}, {1.1, 2.2, 3.3})
+        Goo2Params({1, 2, 3}, {1L, 2L, 3L})
     End Sub
 
-    Function Foo2Params(Of t)(x As t, y As t) As String
-        Console.WriteLine("Function Foo2Param(of {0})(x as {0}, y as {0})", x.getType())
+    Function Goo2Params(Of t)(x As t, y As t) As String
+        Console.WriteLine("Function Goo2Param(of {0})(x as {0}, y as {0})", x.getType())
         Return Nothing
     End Function
 End Module
@@ -1143,16 +1233,16 @@ End Module
     </file>
 </compilation>
 
-            Dim comp = CompilationUtils.CreateCompilationWithMscorlibAndVBRuntimeAndReferences(source, options:=strictOff)
+            Dim comp = CompilationUtils.CreateCompilationWithMscorlib40AndVBRuntimeAndReferences(source, options:=_strictOff)
             CompileAndVerify(comp, expectedOutput:=<![CDATA[
-Function Foo2Param(of System.Double[])(x as System.Double[], y as System.Double[])
-Function Foo2Param(of System.Int64[])(x as System.Int64[], y as System.Int64[])
+Function Goo2Param(of System.Double[])(x as System.Double[], y as System.Double[])
+Function Goo2Param(of System.Int64[])(x as System.Int64[], y as System.Int64[])
             ]]>)
 
-            comp = comp.WithOptions(strictOn)
+            comp = comp.WithOptions(_strictOn)
             CompileAndVerify(comp, expectedOutput:=<![CDATA[
-Function Foo2Param(of System.Double[])(x as System.Double[], y as System.Double[])
-Function Foo2Param(of System.Int64[])(x as System.Int64[], y as System.Int64[])
+Function Goo2Param(of System.Double[])(x as System.Double[], y as System.Double[])
+Function Goo2Param(of System.Int64[])(x as System.Int64[], y as System.Int64[])
             ]]>)
 
         End Sub
@@ -1167,11 +1257,11 @@ Imports System
 Module m
 
     Sub Main()
-       Foo2ParamsArray({1, 2, 3}, 3L)
+       Goo2ParamsArray({1, 2, 3}, 3L)
     End Sub
 
-   Function Foo2ParamsArray(Of t)(x() As t, y As t) As String
-     Console.WriteLine("Function Foo2Param(of {0})(x as {0}, y as {0})", x.getType())
+   Function Goo2ParamsArray(Of t)(x() As t, y As t) As String
+     Console.WriteLine("Function Goo2Param(of {0})(x as {0}, y as {0})", x.getType())
      return nothing
     End Function
 
@@ -1180,14 +1270,14 @@ End Module
     </file>
 </compilation>
 
-            Dim comp = CompilationUtils.CreateCompilationWithMscorlibAndVBRuntimeAndReferences(source, options:=strictOff)
+            Dim comp = CompilationUtils.CreateCompilationWithMscorlib40AndVBRuntimeAndReferences(source, options:=_strictOff)
             CompileAndVerify(comp, expectedOutput:=<![CDATA[
-Function Foo2Param(of System.Int64[])(x as System.Int64[], y as System.Int64[])
+Function Goo2Param(of System.Int64[])(x as System.Int64[], y as System.Int64[])
             ]]>)
 
-            comp = comp.WithOptions(strictOn)
+            comp = comp.WithOptions(_strictOn)
             CompileAndVerify(comp, expectedOutput:=<![CDATA[
-Function Foo2Param(of System.Int64[])(x as System.Int64[], y as System.Int64[])
+Function Goo2Param(of System.Int64[])(x as System.Int64[], y as System.Int64[])
             ]]>)
 
         End Sub
@@ -1210,17 +1300,17 @@ Module m
     End Class
 
     Sub Main()
-        Foo({1, 2})
-        Foo2Params({1, 2, 3}, New C())
+        Goo({1, 2})
+        Goo2Params({1, 2, 3}, New C())
     End Sub
 
-    Function Foo(Of t)(ByVal x As t) As String
-        Console.WriteLine("Function Foo(of {0})(x as {0})", x.getType())
+    Function Goo(Of t)(ByVal x As t) As String
+        Console.WriteLine("Function Goo(of {0})(x as {0})", x.getType())
         Return nothing
     End Function
 
-   Function Foo2Params(Of t)(x As t, y As t) As String
-     Console.WriteLine("Function Foo2Params(of {0})(x as {0}, y as {1})", x.getType(), y.GetType())
+   Function Goo2Params(Of t)(x As t, y As t) As String
+     Console.WriteLine("Function Goo2Params(of {0})(x as {0}, y as {1})", x.getType(), y.GetType())
      return nothing
     End Function
 
@@ -1229,27 +1319,27 @@ End Module
     </file>
 </compilation>
 
-            Dim comp = CompilationUtils.CreateCompilationWithMscorlibAndVBRuntimeAndReferences(source, options:=strictOff)
+            Dim comp = CompilationUtils.CreateCompilationWithMscorlib40AndVBRuntimeAndReferences(source, options:=_strictOff)
             CompileAndVerify(comp, expectedOutput:=<![CDATA[
-Function Foo(of System.Int32[])(x as System.Int32[])
+Function Goo(of System.Int32[])(x as System.Int32[])
 Widening Operator CType(ByVal x As Integer())
-Function Foo2Params(of m+C)(x as m+C, y as m+C)
+Function Goo2Params(of m+C)(x as m+C, y as m+C)
             ]]>)
 
-            comp = comp.WithOptions(strictOn)
+            comp = comp.WithOptions(_strictOn)
             CompileAndVerify(comp, expectedOutput:=<![CDATA[
-Function Foo(of System.Int32[])(x as System.Int32[])
+Function Goo(of System.Int32[])(x as System.Int32[])
 Widening Operator CType(ByVal x As Integer())
-Function Foo2Params(of m+C)(x as m+C, y as m+C)
+Function Goo2Params(of m+C)(x as m+C, y as m+C)
             ]]>)
 
         End Sub
 
         ' Tests dominant type when array is converted to c via user defined function
         <Fact()>
-        Public Sub TestArrayLiteralDominantTyperAndUserDefinedConversion()
+        Public Sub TestArrayLiteralDominantTypeAndUserDefinedConversion()
             Dim source =
-<compilation name="TestArrayLiteralDominantTyperAndUserDefinedConversion">
+<compilation>
     <file name="a.vb">
         <![CDATA[
 Imports System
@@ -1271,14 +1361,14 @@ End Module
     </file>
 </compilation>
 
-            Dim comp = CompilationUtils.CreateCompilationWithMscorlibAndVBRuntimeAndReferences(source, options:=strictOff)
+            Dim comp = CompilationUtils.CreateCompilationWithMscorlib40AndVBRuntimeAndReferences(source, options:=_strictOff)
             CompileAndVerify(comp, expectedOutput:=<![CDATA[
 Widening Operator CType(ByVal x As Integer())
 m+C[]
             ]]>)
 
 
-            comp = comp.WithOptions(strictOn)
+            comp = comp.WithOptions(_strictOn)
             CompileAndVerify(comp, expectedOutput:=<![CDATA[
 Widening Operator CType(ByVal x As Integer())
 m+C[]
@@ -1286,7 +1376,7 @@ m+C[]
 
         End Sub
 
-        <WorkItem(544203, "DevDiv")>
+        <WorkItem(544203, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/544203")>
         <Fact()>
         Public Sub ArrayLiteralInferenceBug12426()
             Dim source =
@@ -1331,13 +1421,13 @@ End Class
     </file>
 </compilation>
 
-            Dim comp = CompilationUtils.CreateCompilationWithMscorlibAndVBRuntimeAndReferences(source, options:=strictOff)
+            Dim comp = CompilationUtils.CreateCompilationWithMscorlib40AndVBRuntimeAndReferences(source, options:=_strictOff)
             CompileAndVerify(comp, expectedOutput:=<![CDATA[
 Public Shared Function CreateFrom(ParamArray items() As BoundStatement) As ImmutableArray(Of BoundStatement)
 ImmutableArray`1[BoundStatement]
             ]]>)
 
-            comp = comp.WithOptions(strictOn)
+            comp = comp.WithOptions(_strictOn)
             CompileAndVerify(comp, expectedOutput:=<![CDATA[
 Public Shared Function CreateFrom(ParamArray items() As BoundStatement) As ImmutableArray(Of BoundStatement)
 ImmutableArray`1[BoundStatement]
@@ -1345,7 +1435,7 @@ ImmutableArray`1[BoundStatement]
 
         End Sub
 
-        <WorkItem(544381, "DevDiv")>
+        <WorkItem(544381, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/544381")>
         <Fact()>
         Public Sub ArrayLiteralInferenceBug12679()
             Dim source =
@@ -1373,13 +1463,13 @@ End Module
     </file>
 </compilation>
 
-            Dim comp = CompilationUtils.CreateCompilationWithMscorlibAndVBRuntimeAndReferences(source, options:=strictOff)
+            Dim comp = CompilationUtils.CreateCompilationWithMscorlib40AndVBRuntimeAndReferences(source, options:=_strictOff)
             CompileAndVerify(comp, expectedOutput:=<![CDATA[
 Friend Sub VerifyValue(Of T)(i As Integer, kind As TypedConstantKind, v As System.Object[])
 Friend Sub VerifyValue(Of T)(i As Integer, kind As TypedConstantKind, v As System.Object[])
                         ]]>)
 
-            comp = comp.WithOptions(strictOn)
+            comp = comp.WithOptions(_strictOn)
             comp.VerifyDiagnostics(
                 Diagnostic(ERRID.WRN_TypeInferenceAssumed3, "{1, ""two"", GetType(String), 3.1415926}").WithArguments("T", "Friend Sub VerifyValue(Of T)(i As Integer, kind As Module1.TypedConstantKind, v As T)", "Object()"),
                 Diagnostic(ERRID.WRN_TypeInferenceAssumed3, "{}").WithArguments("T", "Friend Sub VerifyValue(Of T)(i As Integer, kind As Module1.TypedConstantKind, v As T)", "Object()"))
@@ -1392,7 +1482,7 @@ Friend Sub VerifyValue(Of T)(i As Integer, kind As TypedConstantKind, v As Syste
 
         <Fact>
         Public Sub TestSemanticInfoTooDeeplyNestedArrayLiteral()
-            Dim compilation = CreateCompilationWithMscorlib(
+            Dim compilation = CreateCompilationWithMscorlib40(
 <compilation>
     <file name="a.vb"><![CDATA[
 Imports System
@@ -1426,59 +1516,69 @@ End Module
             Assert.False(semanticSummary.ConstantValue.HasValue)
         End Sub
 
-        <WorkItem(544363, "DevDiv")>
+        <WorkItem(544363, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/544363")>
         <Fact()>
         Public Sub TestArrayLiteralWithAmbiguousOverloadWithParamArray()
-            Dim compilation = CreateCompilationWithMscorlibAndVBRuntime(
+            Dim compilation = CreateCompilationWithMscorlib40AndVBRuntime(
 <compilation>
     <file name="a.vb"><![CDATA[
 Module Program
     Sub Main(ByVal args As String())
-        fooModules({"1"}, {1})
+        gooModules({"1"}, {1})
     End Sub
-    Public Sub fooModules(Of T)(ByVal ParamArray z As T())
+    Public Sub gooModules(Of T)(ByVal ParamArray z As T())
     End Sub
-    Public Sub fooModules(ByVal ParamArray z As String())
+    Public Sub gooModules(ByVal ParamArray z As String())
     End Sub
 End Module
     ]]></file>
 </compilation>)
 
-            compilation.VerifyDiagnostics(Diagnostic(ERRID.ERR_TypeInferenceFailureAmbiguous2, "fooModules").WithArguments("Public Sub fooModules(Of T)(ParamArray z As T())"))
+            Dim expected =
+<expected>
+BC30311: Value of type 'String()' cannot be converted to 'String'.
+        gooModules({"1"}, {1})
+                   ~~~~~
+BC30311: Value of type 'Integer()' cannot be converted to 'String'.
+        gooModules({"1"}, {1})
+                          ~~~
+</expected>
 
-            compilation = compilation.WithOptions(strictOn)
-            compilation.VerifyDiagnostics(Diagnostic(ERRID.ERR_TypeInferenceFailureAmbiguous2, "fooModules").WithArguments("Public Sub fooModules(Of T)(ParamArray z As T())"))
+            AssertTheseDiagnostics(compilation, expected)
+
+            compilation = compilation.WithOptions(_strictOn)
+            AssertTheseDiagnostics(compilation, expected)
         End Sub
 
-        <WorkItem(544352, "DevDiv")>
+        <WorkItem(544352, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/544352")>
         <Fact()>
         Public Sub TestArrayLiteralErrorMsgArrayOfDelegate()
-            Dim compilation = CreateCompilationWithMscorlibAndVBRuntime(
+            Dim compilation = CreateCompilationWithMscorlib40AndVBRuntime(
 <compilation>
     <file name="a.vb"><![CDATA[
 Imports System
 Module Program
     Sub Main(ByVal args As String())
-        Dim x1 As Func(Of Integer) = {AddressOf Foo}
+        Dim x1 As Func(Of Integer) = {AddressOf Goo}
     End Sub
  
-    Sub Foo()
+    Sub Goo()
     End Sub
 End Module
     ]]></file>
 </compilation>)
 
-            compilation.VerifyDiagnostics(Diagnostic(ERRID.ERR_ArrayInitNoType, "{AddressOf Foo}"))
+            compilation.VerifyDiagnostics(Diagnostic(ERRID.ERR_ArrayInitNoType, "{AddressOf Goo}"))
 
-            compilation = compilation.WithOptions(strictOn)
-            compilation.VerifyDiagnostics(Diagnostic(ERRID.ERR_ArrayInitNoType, "{AddressOf Foo}"))
+            compilation = compilation.WithOptions(_strictOn)
+            compilation.VerifyDiagnostics(Diagnostic(ERRID.ERR_ArrayInitNoType, "{AddressOf Goo}"))
         End Sub
 
 
-        <WorkItem(544566, "DevDiv")>
+        <WorkItem(544566, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/544566")>
         <Fact()>
         Public Sub TestArrayLiteralInTernaryIf()
-            Dim comp = CompilationUtils.CreateCompilationWithMscorlibAndVBRuntime(
+            Dim comp = CompilationUtils.CreateCompilationWithMscorlib40AndVBRuntime(
 <compilation>
     <file name="a.vb"><![CDATA[
 Option Infer On
@@ -1499,14 +1599,14 @@ End Sub
 End Module
 
     ]]></file>
-</compilation>, options:=strictOff)
+</compilation>, options:=_strictOff)
             CompileAndVerify(comp, expectedOutput:=<![CDATA[
 System.Int32[]
 System.Int64[]
 System.Int64[]
                         ]]>)
 
-            comp = comp.WithOptions(strictOn)
+            comp = comp.WithOptions(_strictOn)
             CompileAndVerify(comp, expectedOutput:=<![CDATA[
 System.Int32[]
 System.Int64[]
@@ -1514,10 +1614,10 @@ System.Int64[]
                         ]]>)
         End Sub
 
-        <WorkItem(529543, "DevDiv")>
+        <WorkItem(529543, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/529543")>
         <Fact()>
         Public Sub TestArrayLiteralSemanticModelCTypeLongConversion()
-            Dim compilation = CreateCompilationWithMscorlib(
+            Dim compilation = CreateCompilationWithMscorlib40(
  <compilation>
      <file name="a.vb"><![CDATA[
 Imports System
@@ -1558,7 +1658,7 @@ End Module
 
         <Fact()>
         Public Sub TestArrayLiteralSemanticModelUserDefinedConversion()
-            Dim compilation = CreateCompilationWithMscorlib(
+            Dim compilation = CreateCompilationWithMscorlib40(
 <compilation>
     <file name="a.vb"><![CDATA[
 Imports System
@@ -1571,17 +1671,17 @@ Module m
     End Class
 
     Sub Main()
-        Foo({1, 2})
-        Foo2Params({1, 2, 3}, New C())'BIND:"{1, 2, 3}"
+        Goo({1, 2})
+        Goo2Params({1, 2, 3}, New C())'BIND:"{1, 2, 3}"
     End Sub
 
-    Function Foo(Of t)(ByVal x As t) As String
-        Console.WriteLine("Function Foo(of {0})(x as {0})", x.GetType())
+    Function Goo(Of t)(ByVal x As t) As String
+        Console.WriteLine("Function Goo(of {0})(x as {0})", x.GetType())
         Return Nothing
     End Function
 
-    Function Foo2Params(Of t)(x As t, y As t) As String
-        Console.WriteLine("Function Foo2Params(of {0})(x as {0}, y as {1})", x.GetType(), y.GetType())
+    Function Goo2Params(Of t)(x As t, y As t) As String
+        Console.WriteLine("Function Goo2Params(of {0})(x as {0}, y as {1})", x.GetType(), y.GetType())
         Return Nothing
     End Function
 
@@ -1608,7 +1708,7 @@ End Module
 
         <Fact()>
         Public Sub TestArrayLiteralSemanticModelCharArrayConversion()
-            Dim compilation = CreateCompilationWithMscorlib(
+            Dim compilation = CreateCompilationWithMscorlib40(
 <compilation>
     <file name="a.vb"><![CDATA[
 Imports System
@@ -1641,7 +1741,7 @@ End Module
             Assert.False(semanticSummary.ConstantValue.HasValue)
         End Sub
 
-        <WorkItem(545375, "DevDiv")>
+        <WorkItem(545375, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/545375")>
         <Fact()>
         Public Sub TestArrayLiteralInferTypeInIf()
             Dim source =
@@ -1660,20 +1760,20 @@ Module Program
 End Module
 ]]></file>
 </compilation>
-            Dim comp = CompilationUtils.CreateCompilationWithMscorlibAndVBRuntimeAndReferences(source, options:=strictOff)
+            Dim comp = CompilationUtils.CreateCompilationWithMscorlib40AndVBRuntimeAndReferences(source, options:=_strictOff)
             CompileAndVerify(comp,
                              expectedOutput:=<![CDATA[
             System.Object[]
                         ]]>)
 
-            comp = comp.WithOptions(strictOn)
+            comp = comp.WithOptions(_strictOn)
             CompileAndVerify(comp,
                              expectedOutput:=<![CDATA[
             System.Object[]
                         ]]>)
         End Sub
 
-        <WorkItem(545517, "DevDiv")>
+        <WorkItem(545517, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/545517")>
         <Fact()>
         Public Sub TestArrayLiteralInferTypeInWithinParens1()
             Dim source =
@@ -1684,31 +1784,31 @@ Imports System
 Imports System.Collections.Generic
 Module M
     Sub Main()
-       Foo({({1})})
+       Goo({({1})})
     End Sub
-    Sub Foo(Of T As Structure)(x As T?()())
-        Console.WriteLine("Sub Foo(Of T As Structure)(x As T?()())")
+    Sub Goo(Of T As Structure)(x As T?()())
+        Console.WriteLine("Sub Goo(Of T As Structure)(x As T?()())")
     End Sub
-    Sub Foo(Of T)(x As IList(Of T)())
-        Console.WriteLine("Sub Foo(Of T)(x As IList(Of T)())")
+    Sub Goo(Of T)(x As IList(Of T)())
+        Console.WriteLine("Sub Goo(Of T)(x As IList(Of T)())")
     End Sub
 End Module
 ]]></file>
 </compilation>
-            Dim comp = CompilationUtils.CreateCompilationWithMscorlibAndVBRuntimeAndReferences(source, options:=strictOff)
+            Dim comp = CompilationUtils.CreateCompilationWithMscorlib40AndVBRuntimeAndReferences(source, options:=_strictOff)
             CompileAndVerify(comp,
                              expectedOutput:=<![CDATA[
-Sub Foo(Of T)(x As IList(Of T)())
+Sub Goo(Of T)(x As IList(Of T)())
                         ]]>)
 
-            comp = comp.WithOptions(strictOn)
+            comp = comp.WithOptions(_strictOn)
             CompileAndVerify(comp,
                              expectedOutput:=<![CDATA[
-Sub Foo(Of T)(x As IList(Of T)())
+Sub Goo(Of T)(x As IList(Of T)())
                         ]]>)
         End Sub
 
-        <WorkItem(545517, "DevDiv")>
+        <WorkItem(545517, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/545517")>
         <Fact()>
         Public Sub TestArrayLiteralInferTypeInWithinParens2()
             Dim source =
@@ -1723,15 +1823,15 @@ Module M
 End Module
 ]]></file>
 </compilation>
-            Dim comp = CompilationUtils.CreateCompilationWithMscorlibAndVBRuntimeAndReferences(source, options:=strictOff)
+            Dim comp = CompilationUtils.CreateCompilationWithMscorlib40AndVBRuntimeAndReferences(source, options:=_strictOff)
             comp.VerifyDiagnostics(Diagnostic(ERRID.ERR_ConvertArrayMismatch4, "({1})").WithArguments("Integer()", "Integer?()", "Integer", "Integer?"))
 
-            comp = comp.WithOptions(strictOn)
+            comp = comp.WithOptions(_strictOn)
             comp.VerifyDiagnostics(Diagnostic(ERRID.ERR_ConvertArrayMismatch4, "({1})").WithArguments("Integer()", "Integer?()", "Integer", "Integer?"))
 
         End Sub
 
-        <WorkItem(530876, "DevDiv")>
+        <WorkItem(530876, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/530876")>
         <Fact()>
         Public Sub Bug17124()
             Dim source =
@@ -1745,11 +1845,11 @@ Module Program
 End Module
 ]]></file>
 </compilation>
-            Dim comp = CompilationUtils.CreateCompilationWithMscorlibAndVBRuntime(source, TestOptions.ReleaseExe)
+            Dim comp = CompilationUtils.CreateCompilationWithMscorlib40AndVBRuntime(source, TestOptions.ReleaseExe)
             CompileAndVerify(comp)
         End Sub
 
-        <WorkItem(796610, "DevDiv")>
+        <WorkItem(796610, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/796610")>
         <Fact()>
         Public Sub Bug796610_1()
             Dim source =
@@ -1770,9 +1870,9 @@ Module M
         Dim a1 = If(True, {<basic xmlns="">true</basic>}, {Nothing})
         Validate(a1)
         Validate({<basic xmlns="">true</basic>}, {Nothing})
-        Dim a3 = If({"foo"}, {Nothing})
+        Dim a3 = If({"goo"}, {Nothing})
         Validate(a3)
-        Validate({"foo"}, {Nothing})
+        Validate({"goo"}, {Nothing})
         System.Console.WriteLine("--------------")
 
         Dim b1 = If(True, {New Animal, New Mammal}, {New Fish, New Mammal})
@@ -1782,11 +1882,11 @@ Module M
         Validate({New Animal, New Mammal}, {New Fish, New Mammal})
         System.Console.WriteLine("--------------")
 
-        Dim x5 = If(True, {CType(New Bar(1), Foo)}, {Nothing})
+        Dim x5 = If(True, {CType(New Bar(1), Goo)}, {Nothing})
         Validate(x5)
-        Validate({CType(New Bar(1), Foo)}, {Nothing})
+        Validate({CType(New Bar(1), Goo)}, {Nothing})
 
-        System.Console.WriteLine("======================" & vbCrLf)
+        System.Console.WriteLine("======================" & Environment.NewLine)
         Dim obj2 = If(True, {Nothing}, {Nothing, New With {.a = 1}})
         Validate(obj2)
         Validate({Nothing}, {Nothing, New With {.a = 1}})
@@ -1843,13 +1943,13 @@ Class Animal : End Class
 Class Mammal : Inherits Animal : End Class
 Class Fish : Inherits Animal : End Class
 
-Class Foo
+Class Goo
     Sub New(ByVal x As Integer)
         Field = x
     End Sub
     Public Field As Integer
-    Public Overloads Shared Widening Operator CType(ByVal x As Bar) As Foo
-        Return New Foo(x.Field)
+    Public Overloads Shared Widening Operator CType(ByVal x As Bar) As Goo
+        Return New Goo(x.Field)
     End Operator
 End Class
 Class Bar
@@ -1857,13 +1957,13 @@ Class Bar
     Sub New(ByVal x As Integer)
         Field = x
     End Sub
-    Public Overloads Shared Widening Operator CType(ByVal x As Foo) As Bar
+    Public Overloads Shared Widening Operator CType(ByVal x As Goo) As Bar
         Return New Bar(x.Field)
     End Operator
 End Class
 ]]></file>
 </compilation>
-            Dim comp = CompilationUtils.CreateCompilationWithMscorlibAndVBRuntimeAndReferences(source, XmlReferences, TestOptions.ReleaseExe)
+            Dim comp = CompilationUtils.CreateCompilationWithMscorlib40AndVBRuntimeAndReferences(source, XmlReferences, TestOptions.ReleaseExe)
             CompileAndVerify(comp,
             <![CDATA[
 Static=VB$AnonymousType_0`1[System.Int32][], Runtime=VB$AnonymousType_0`1[System.Int32][]
@@ -1878,8 +1978,8 @@ Static=Animal[], Runtime=Animal[]
 Static=Animal[], Runtime=Animal[]
 Static=Animal[], Runtime x=Animal[], Runtime y=Animal[]
 --------------
-Static=Foo[], Runtime=Foo[]
-Static=Foo[], Runtime x=Foo[], Runtime y=Foo[]
+Static=Goo[], Runtime=Goo[]
+Static=Goo[], Runtime x=Goo[], Runtime y=Goo[]
 ======================
 
 Static=VB$AnonymousType_0`1[System.Int32][], Runtime=VB$AnonymousType_0`1[System.Int32][]
@@ -1912,20 +2012,20 @@ Static=System.Object[,], Runtime x=System.Object[,], Runtime y=Nothing
 ]]>)
         End Sub
 
-        <WorkItem(796610, "DevDiv")>
+        <WorkItem(796610, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/796610")>
         <Fact()>
         Public Sub Bug796610_2()
-            Dim compilation = CreateCompilationWithMscorlibAndVBRuntime(
+            Dim compilation = CreateCompilationWithMscorlib40AndVBRuntime(
 <compilation>
     <file name="a.vb"><![CDATA[
 Module Program
     Sub Main(ByVal args As String())
-        fooModules({"1"}, {})
+        gooModules({"1"}, {})
     End Sub
-    Public Sub fooModules(Of T)(ByVal ParamArray z As T())
+    Public Sub gooModules(Of T)(ByVal ParamArray z As T())
         System.Console.WriteLine(GetType(T))
     End Sub
-    Public Sub fooModules(ByVal ParamArray z As String())
+    Public Sub gooModules(ByVal ParamArray z As String())
     End Sub
 End Module
     ]]></file>
@@ -1933,14 +2033,14 @@ End Module
 
             CompileAndVerify(compilation, <![CDATA[System.String[]]]>)
 
-            compilation = compilation.WithOptions(strictOn)
+            compilation = compilation.WithOptions(_strictOn)
             CompileAndVerify(compilation, <![CDATA[System.String[]]]>)
         End Sub
 
-        <WorkItem(116)>
+        <WorkItem(116, "https://github.com/dotnet/roslyn/issues/116")>
         <Fact()>
         Public Sub TestArrayLiteralSemanticModelImplicitConversion()
-            Dim compilation = CreateCompilationWithMscorlib(
+            Dim compilation = CreateCompilationWithMscorlib40(
  <compilation>
      <file name="a.vb"><![CDATA[
 Imports System
@@ -1970,10 +2070,10 @@ End Module
             Assert.False(semanticSummary.ConstantValue.HasValue)
         End Sub
 
-        <WorkItem(799045)>
+        <WorkItem(799045, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/799045")>
         <Fact()>
         Public Sub TestArrayLiteralSemanticModelImplicitConversionParenthesized()
-            Dim compilation = CreateCompilationWithMscorlib(
+            Dim compilation = CreateCompilationWithMscorlib40(
  <compilation>
      <file name="a.vb"><![CDATA[
 Imports System

@@ -1,15 +1,14 @@
-﻿// Copyright (c) Microsoft.  All Rights Reserved.  Licensed under the Apache License, Version 2.0.  See License.txt in the project root for license information.
+﻿// Licensed to the .NET Foundation under one or more agreements.
+// The .NET Foundation licenses this file to you under the MIT license.
+// See the LICENSE file in the project root for more information.
 
 namespace Microsoft.CodeAnalysis
 {
     public abstract class SymbolVisitor
     {
-        public virtual void Visit(ISymbol symbol)
+        public virtual void Visit(ISymbol? symbol)
         {
-            if (symbol != null)
-            {
-                symbol.Accept(this);
-            }
+            symbol?.Accept(this);
         }
 
         public virtual void DefaultVisit(ISymbol symbol)
@@ -27,6 +26,11 @@ namespace Microsoft.CodeAnalysis
         }
 
         public virtual void VisitAssembly(IAssemblySymbol symbol)
+        {
+            DefaultVisit(symbol);
+        }
+
+        public virtual void VisitDiscard(IDiscardSymbol symbol)
         {
             DefaultVisit(symbol);
         }
@@ -82,6 +86,11 @@ namespace Microsoft.CodeAnalysis
         }
 
         public virtual void VisitPointerType(IPointerTypeSymbol symbol)
+        {
+            DefaultVisit(symbol);
+        }
+
+        public virtual void VisitFunctionPointerType(IFunctionPointerTypeSymbol symbol)
         {
             DefaultVisit(symbol);
         }

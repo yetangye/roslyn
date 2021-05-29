@@ -1,35 +1,42 @@
-﻿// Copyright (c) Microsoft.  All Rights Reserved.  Licensed under the Apache License, Version 2.0.  See License.txt in the project root for license information.
+﻿// Licensed to the .NET Foundation under one or more agreements.
+// The .NET Foundation licenses this file to you under the MIT license.
+// See the LICENSE file in the project root for more information.
 
-using System;
+#nullable disable
+
 using System.Collections.Immutable;
-using System.IO;
+using System.Threading;
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.Navigation;
-using Microsoft.CodeAnalysis.Shared.Extensions;
 using Microsoft.CodeAnalysis.Text;
-using Microsoft.VisualStudio.Shell.Interop;
-using Microsoft.VisualStudio.TableManager;
+using Microsoft.VisualStudio.Shell.TableManager;
 using Microsoft.VisualStudio.Text;
 
 namespace Microsoft.VisualStudio.LanguageServices.Implementation.TableDataSource
 {
-    internal abstract class AbstractTableEntriesSnapshot<TData> : ITableEntriesSnapshot
+    /// <summary>
+    /// Base implementation of ITableEntriesSnapshot
+    /// </summary>
+    internal abstract class AbstractTableEntriesSnapshot<TItem> : ITableEntriesSnapshot
+        where TItem : TableItem
     {
+        // TODO : remove these once we move to new drop which contains API change from editor team
+        protected const string ProjectNames = StandardTableKeyNames.ProjectName + "s";
+        protected const string ProjectGuids = StandardTableKeyNames.ProjectGuid + "s";
+
         private readonly int _version;
-        private readonly ImmutableArray<TData> _items;
+        private readonly ImmutableArray<TItem> _items;
         private ImmutableArray<ITrackingPoint> _trackingPoints;
 
-        protected AbstractTableEntriesSnapshot(int version, ImmutableArray<TData> items, ImmutableArray<ITrackingPoint> trackingPoints)
+        protected AbstractTableEntriesSnapshot(int version, ImmutableArray<TItem> items, ImmutableArray<ITrackingPoint> trackingPoints)
         {
             _version = version;
             _items = items;
             _trackingPoints = trackingPoints;
         }
 
-        public abstract object SnapshotIdentity { get; }
-        public abstract bool TryNavigateTo(int index, bool previewTab);
+        public abstract bool TryNavigateTo(int index, bool previewTab, bool activate, CancellationToken cancellationToken);
         public abstract bool TryGetValue(int index, string columnName, out object content);
-        protected abstract bool IsEquivalent(TData item1, TData item2);
 
         public int VersionNumber
         {
@@ -47,7 +54,7 @@ namespace Microsoft.VisualStudio.LanguageServices.Implementation.TableDataSource
             }
         }
 
-        public int TranslateTo(int index, ITableEntriesSnapshot newerSnapshot)
+        public int IndexOf(int index, ITableEntriesSnapshot newerSnapshot)
         {
             var item = GetItem(index);
             if (item == null)
@@ -55,15 +62,14 @@ namespace Microsoft.VisualStudio.LanguageServices.Implementation.TableDataSource
                 return -1;
             }
 
-            var ourSnapshot = newerSnapshot as AbstractTableEntriesSnapshot<TData>;
-            if (ourSnapshot == null || ourSnapshot.Count == 0)
+            if (!(newerSnapshot is AbstractTableEntriesSnapshot<TItem> ourSnapshot) || ourSnapshot.Count == 0)
             {
                 // not ours, we don't know how to track index
                 return -1;
             }
 
             // quick path - this will deal with a case where we update data without any actual change
-            if (this.Count == ourSnapshot.Count)
+            if (Count == ourSnapshot.Count)
             {
                 var newItem = ourSnapshot.GetItem(index);
                 if (newItem != null && newItem.Equals(item))
@@ -73,11 +79,10 @@ namespace Microsoft.VisualStudio.LanguageServices.Implementation.TableDataSource
             }
 
             // slow path.
-            var bestMatch = Tuple.Create(-1, int.MaxValue);
             for (var i = 0; i < ourSnapshot.Count; i++)
             {
                 var newItem = ourSnapshot.GetItem(i);
-                if (IsEquivalent(item, newItem))
+                if (item.EqualsIgnoringLocation(newItem))
                 {
                     return i;
                 }
@@ -90,42 +95,31 @@ namespace Microsoft.VisualStudio.LanguageServices.Implementation.TableDataSource
         public void StopTracking()
         {
             // remove tracking points
-            _trackingPoints = default(ImmutableArray<ITrackingPoint>);
+            _trackingPoints = default;
         }
 
         public void Dispose()
-        {
-            StopTracking();
-        }
+            => StopTracking();
 
-        protected TData GetItem(int index)
+        internal TItem GetItem(int index)
         {
             if (index < 0 || _items.Length <= index)
             {
-                return default(TData);
+                return null;
             }
 
             return _items[index];
         }
 
-        protected LinePosition GetTrackingLineColumn(Workspace workspace, DocumentId documentId, int index)
+        protected LinePosition GetTrackingLineColumn(Document document, int index)
         {
-            if (documentId == null || _trackingPoints.IsDefaultOrEmpty)
-            {
-                return LinePosition.Zero;
-            }
-
-            var solution = workspace.CurrentSolution;
-            var document = solution.GetDocument(documentId);
-            if (document == null || !document.IsOpen())
+            if (_trackingPoints.IsDefaultOrEmpty)
             {
                 return LinePosition.Zero;
             }
 
             var trackingPoint = _trackingPoints[index];
-
-            SourceText text;
-            if (!document.TryGetText(out text))
+            if (!document.TryGetText(out var text))
             {
                 return LinePosition.Zero;
             }
@@ -143,10 +137,10 @@ namespace Microsoft.VisualStudio.LanguageServices.Implementation.TableDataSource
             }
 
             var currentSnapshot = textBuffer.CurrentSnapshot;
-            return GetLinePosition(snapshot, trackingPoint);
+            return GetLinePosition(currentSnapshot, trackingPoint);
         }
 
-        private LinePosition GetLinePosition(ITextSnapshot snapshot, ITrackingPoint trackingPoint)
+        private static LinePosition GetLinePosition(ITextSnapshot snapshot, ITrackingPoint trackingPoint)
         {
             var point = trackingPoint.GetPoint(snapshot);
             var line = point.GetContainingLine();
@@ -154,61 +148,85 @@ namespace Microsoft.VisualStudio.LanguageServices.Implementation.TableDataSource
             return new LinePosition(line.LineNumber, point.Position - line.Start);
         }
 
-        protected bool TryNavigateTo(Workspace workspace, DocumentId documentId, int line, int column, bool previewTab)
+        protected static bool TryNavigateTo(Workspace workspace, DocumentId documentId, LinePosition position, bool previewTab, bool activate, CancellationToken cancellationToken)
         {
-            var document = workspace.CurrentSolution.GetDocument(documentId);
-            if (document == null)
-            {
-                // document could be already removed from the solution
-                return false;
-            }
-
             var navigationService = workspace.Services.GetService<IDocumentNavigationService>();
             if (navigationService == null)
             {
                 return false;
             }
 
-            if (navigationService.TryNavigateToLineAndOffset(workspace, documentId, line, column, usePreviewTab: previewTab))
+            var options = workspace.Options.WithChangedOption(NavigationOptions.PreferProvisionalTab, previewTab)
+                                           .WithChangedOption(NavigationOptions.ActivateTab, activate);
+            return navigationService.TryNavigateToLineAndOffset(workspace, documentId, position.Line, position.Character, options, cancellationToken);
+        }
+
+        protected bool TryNavigateToItem(int index, bool previewTab, bool activate, CancellationToken cancellationToken)
+        {
+            var item = GetItem(index);
+            var documentId = item?.DocumentId;
+            if (documentId == null)
             {
+                return false;
+            }
+
+            var workspace = item.Workspace;
+            var solution = workspace.CurrentSolution;
+            var document = solution.GetDocument(documentId);
+            if (document == null)
+            {
+                return false;
+            }
+
+            LinePosition position;
+            LinePosition trackingLinePosition;
+
+            if (workspace.IsDocumentOpen(documentId) &&
+                (trackingLinePosition = GetTrackingLineColumn(document, index)) != LinePosition.Zero)
+            {
+                position = trackingLinePosition;
+            }
+            else
+            {
+                position = item.GetOriginalPosition();
+            }
+
+            return TryNavigateTo(workspace, documentId, position, previewTab, activate, cancellationToken);
+        }
+
+        protected static string GetFileName(string original, string mapped)
+            => mapped == null ? original : original == null ? mapped : Combine(original, mapped);
+
+        private static string Combine(string path1, string path2)
+        {
+            if (TryCombine(path1, path2, out var result))
+            {
+                return result;
+            }
+
+            return string.Empty;
+        }
+
+        public static bool TryCombine(string path1, string path2, out string result)
+        {
+            try
+            {
+                // don't throw exception when either path1 or path2 contains illegal path char
+                result = System.IO.Path.Combine(path1, path2);
                 return true;
             }
-
-            return false;
-        }
-
-        protected string GetFileName(string original, string mapped)
-        {
-            return mapped == null ? original : original == null ? mapped : Path.Combine(original, mapped);
-        }
-
-        protected string GetProjectName(Workspace workspace, ProjectId projectId)
-        {
-            var project = workspace.CurrentSolution.GetProject(projectId);
-            if (project == null)
+            catch
             {
-                return null;
+                result = null;
+                return false;
             }
-
-            return project.Name;
-        }
-
-        protected IVsHierarchy GetHierarchy(Workspace workspace, ProjectId projectId)
-        {
-            var vsWorkspace = workspace as VisualStudioWorkspace;
-            if (vsWorkspace == null)
-            {
-                return null;
-            }
-
-            return vsWorkspace.GetHierarchy(projectId);
         }
 
         // we don't use these
+#pragma warning disable IDE0060 // Remove unused parameter - Implements interface method for sub-type
         public object Identity(int index)
-        {
-            return null;
-        }
+#pragma warning restore IDE0060 // Remove unused parameter
+            => null;
 
         public void StartCaching()
         {

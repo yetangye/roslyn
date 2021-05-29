@@ -1,50 +1,50 @@
-﻿// Copyright (c) Microsoft.  All Rights Reserved.  Licensed under the Apache License, Version 2.0.  See License.txt in the project root for license information.
+﻿// Licensed to the .NET Foundation under one or more agreements.
+// The .NET Foundation licenses this file to you under the MIT license.
+// See the LICENSE file in the project root for more information.
+
+#nullable disable
 
 using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Threading;
-using Microsoft.CodeAnalysis;
+using System.Threading.Tasks;
 using Microsoft.CodeAnalysis.CSharp;
-using Microsoft.CodeAnalysis.CSharp.Symbols;
+using Microsoft.CodeAnalysis.CSharp.Indentation;
 using Microsoft.CodeAnalysis.CSharp.Syntax;
 using Microsoft.CodeAnalysis.CSharp.Utilities;
-using Microsoft.CodeAnalysis.Editor.Commands;
-using Microsoft.CodeAnalysis.Editor.CSharp.Formatting;
-using Microsoft.CodeAnalysis.Editor.CSharp.Formatting.Indentation;
 using Microsoft.CodeAnalysis.Editor.Implementation.Formatting;
-using Microsoft.CodeAnalysis.Editor.Shared.Extensions;
 using Microsoft.CodeAnalysis.Editor.UnitTests.Utilities;
 using Microsoft.CodeAnalysis.Editor.UnitTests.Workspaces;
 using Microsoft.CodeAnalysis.Formatting;
 using Microsoft.CodeAnalysis.Formatting.Rules;
-using Microsoft.CodeAnalysis.Host;
 using Microsoft.CodeAnalysis.Options;
+using Microsoft.CodeAnalysis.Test.Utilities;
 using Microsoft.CodeAnalysis.Text;
 using Microsoft.CodeAnalysis.Text.Shared.Extensions;
 using Microsoft.VisualStudio.Text;
-using Microsoft.VisualStudio.Text.Operations;
-using Moq;
+using Microsoft.VisualStudio.Text.Editor.Commanding.Commands;
 using Roslyn.Test.Utilities;
 using Xunit;
 
 namespace Microsoft.CodeAnalysis.Editor.CSharp.UnitTests.Formatting.Indentation
 {
+    [UseExportProvider]
     public class SmartTokenFormatterFormatRangeTests
     {
         [Fact]
         [Trait(Traits.Feature, Traits.Features.SmartTokenFormatting)]
-        public void BegininngOfFile()
+        public async Task BeginningOfFile()
         {
             var code = @"        using System;$$";
             var expected = @"        using System;";
 
-            Assert.NotNull(Record.Exception(() => AutoFormatOnSemicolon(code, expected, SyntaxKind.None)));
+            Assert.NotNull(await Record.ExceptionAsync(() => AutoFormatOnSemicolonAsync(code, expected, SyntaxKind.None)));
         }
 
-        [Fact]
+        [WpfFact]
         [Trait(Traits.Feature, Traits.Features.SmartTokenFormatting)]
-        public void Namespace1()
+        public async Task Namespace1()
         {
             var code = @"using System;
 namespace NS
@@ -58,12 +58,12 @@ namespace NS
 
 }";
 
-            AutoFormatOnCloseBrace(code, expected, SyntaxKind.SemicolonToken);
+            await AutoFormatOnCloseBraceAsync(code, expected, SyntaxKind.SemicolonToken);
         }
 
-        [Fact]
+        [WpfFact]
         [Trait(Traits.Feature, Traits.Features.SmartTokenFormatting)]
-        public void Namespace2()
+        public async Task Namespace2()
         {
             var code = @"using System;
 namespace NS
@@ -81,12 +81,12 @@ namespace NS
     }
 }";
 
-            AutoFormatOnCloseBrace(code, expected, SyntaxKind.SemicolonToken);
+            await AutoFormatOnCloseBraceAsync(code, expected, SyntaxKind.SemicolonToken);
         }
 
-        [Fact]
+        [WpfFact]
         [Trait(Traits.Feature, Traits.Features.SmartTokenFormatting)]
-        public void Namespace3()
+        public async Task Namespace3()
         {
             var code = @"using System;
 namespace NS { }$$";
@@ -94,12 +94,12 @@ namespace NS { }$$";
             var expected = @"using System;
 namespace NS { }";
 
-            AutoFormatOnCloseBrace(code, expected, SyntaxKind.SemicolonToken);
+            await AutoFormatOnCloseBraceAsync(code, expected, SyntaxKind.SemicolonToken);
         }
 
-        [Fact]
+        [WpfFact]
         [Trait(Traits.Feature, Traits.Features.SmartTokenFormatting)]
-        public void Namespace4()
+        public async Task Namespace4()
         {
             var code = @"using System;
 namespace NS { 
@@ -110,12 +110,12 @@ namespace NS
 {
 }";
 
-            AutoFormatOnCloseBrace(code, expected, SyntaxKind.SemicolonToken);
+            await AutoFormatOnCloseBraceAsync(code, expected, SyntaxKind.SemicolonToken);
         }
 
-        [Fact]
+        [WpfFact]
         [Trait(Traits.Feature, Traits.Features.SmartTokenFormatting)]
-        public void Namespace5()
+        public async Task Namespace5()
         {
             var code = @"using System;
 namespace NS
@@ -129,12 +129,12 @@ namespace NS
     class Class { }
 }";
 
-            AutoFormatOnCloseBrace(code, expected, SyntaxKind.SemicolonToken);
+            await AutoFormatOnCloseBraceAsync(code, expected, SyntaxKind.SemicolonToken);
         }
 
-        [Fact]
+        [WpfFact]
         [Trait(Traits.Feature, Traits.Features.SmartTokenFormatting)]
-        public void Namespace6()
+        public async Task Namespace6()
         {
             var code = @"using System;
 namespace NS
@@ -151,12 +151,12 @@ namespace NS
     }
 }";
 
-            AutoFormatOnCloseBrace(code, expected, SyntaxKind.SemicolonToken);
+            await AutoFormatOnCloseBraceAsync(code, expected, SyntaxKind.SemicolonToken);
         }
 
-        [Fact]
+        [WpfFact]
         [Trait(Traits.Feature, Traits.Features.SmartTokenFormatting)]
-        public void Namespace7()
+        public async Task Namespace7()
         {
             var code = @"using System;
 namespace NS
@@ -177,12 +177,12 @@ namespace NS
     { }
 }";
 
-            AutoFormatOnCloseBrace(code, expected, SyntaxKind.SemicolonToken);
+            await AutoFormatOnCloseBraceAsync(code, expected, SyntaxKind.SemicolonToken);
         }
 
-        [Fact]
+        [WpfFact]
         [Trait(Traits.Feature, Traits.Features.SmartTokenFormatting)]
-        public void Namespace8()
+        public async Task Namespace8()
         {
             var code = @"using System;
 namespace NS { class Class { } namespace NS2 { } }$$";
@@ -190,12 +190,12 @@ namespace NS { class Class { } namespace NS2 { } }$$";
             var expected = @"using System;
 namespace NS { class Class { } namespace NS2 { } }";
 
-            AutoFormatOnCloseBrace(code, expected, SyntaxKind.SemicolonToken);
+            await AutoFormatOnCloseBraceAsync(code, expected, SyntaxKind.SemicolonToken);
         }
 
-        [Fact]
+        [WpfFact]
         [Trait(Traits.Feature, Traits.Features.SmartTokenFormatting)]
-        public void Class1()
+        public async Task Class1()
         {
             var code = @"using System;
     class Class { 
@@ -206,12 +206,12 @@ class Class
 {
 }";
 
-            AutoFormatOnCloseBrace(code, expected, SyntaxKind.SemicolonToken);
+            await AutoFormatOnCloseBraceAsync(code, expected, SyntaxKind.SemicolonToken);
         }
 
-        [Fact]
+        [WpfFact]
         [Trait(Traits.Feature, Traits.Features.SmartTokenFormatting)]
-        public void Class2()
+        public async Task Class2()
         {
             var code = @"using System;
     class Class
@@ -228,12 +228,12 @@ class Class
     }
 }";
 
-            AutoFormatOnCloseBrace(code, expected, SyntaxKind.SemicolonToken);
+            await AutoFormatOnCloseBraceAsync(code, expected, SyntaxKind.SemicolonToken);
         }
 
-        [Fact]
+        [WpfFact]
         [Trait(Traits.Feature, Traits.Features.SmartTokenFormatting)]
-        public void Class3()
+        public async Task Class3()
         {
             var code = @"using System;
     class Class
@@ -247,12 +247,12 @@ class Class
     void Method(int i) { }
 }";
 
-            AutoFormatOnCloseBrace(code, expected, SyntaxKind.SemicolonToken);
+            await AutoFormatOnCloseBraceAsync(code, expected, SyntaxKind.SemicolonToken);
         }
 
-        [Fact]
+        [WpfFact]
         [Trait(Traits.Feature, Traits.Features.SmartTokenFormatting)]
-        public void Class4()
+        public async Task Class4()
         {
             var code = @"using System;
     class Class
@@ -266,12 +266,12 @@ class Class
     delegate void Test(int i);
 }";
 
-            AutoFormatOnCloseBrace(code, expected, SyntaxKind.SemicolonToken);
+            await AutoFormatOnCloseBraceAsync(code, expected, SyntaxKind.SemicolonToken);
         }
 
-        [Fact]
+        [WpfFact]
         [Trait(Traits.Feature, Traits.Features.SmartTokenFormatting)]
-        public void Class5()
+        public async Task Class5()
         {
             var code = @"using System;
     class Class
@@ -291,12 +291,12 @@ class Class
     }
 }";
 
-            AutoFormatOnCloseBrace(code, expected, SyntaxKind.SemicolonToken);
+            await AutoFormatOnCloseBraceAsync(code, expected, SyntaxKind.SemicolonToken);
         }
 
-        [Fact]
+        [WpfFact]
         [Trait(Traits.Feature, Traits.Features.SmartTokenFormatting)]
-        public void Interface1()
+        public async Task Interface1()
         {
             var code = @"using System;
     interface II
@@ -312,12 +312,12 @@ interface II
     int Prop { get; set; }
 }";
 
-            AutoFormatOnCloseBrace(code, expected, SyntaxKind.SemicolonToken);
+            await AutoFormatOnCloseBraceAsync(code, expected, SyntaxKind.SemicolonToken);
         }
 
-        [Fact]
+        [WpfFact]
         [Trait(Traits.Feature, Traits.Features.SmartTokenFormatting)]
-        public void Struct1()
+        public async Task Struct1()
         {
             var code = @"using System;
     struct Struct
@@ -335,12 +335,12 @@ struct Struct
     }
 }";
 
-            AutoFormatOnCloseBrace(code, expected, SyntaxKind.SemicolonToken);
+            await AutoFormatOnCloseBraceAsync(code, expected, SyntaxKind.SemicolonToken);
         }
 
-        [Fact]
+        [WpfFact]
         [Trait(Traits.Feature, Traits.Features.SmartTokenFormatting)]
-        public void Enum1()
+        public async Task Enum1()
         {
             var code = @"using System;
     enum Enum
@@ -356,12 +356,12 @@ enum Enum
     C = 3
 }";
 
-            AutoFormatOnCloseBrace(code, expected, SyntaxKind.SemicolonToken);
+            await AutoFormatOnCloseBraceAsync(code, expected, SyntaxKind.SemicolonToken);
         }
 
-        [Fact]
+        [WpfFact]
         [Trait(Traits.Feature, Traits.Features.SmartTokenFormatting)]
-        public void AccessorList1()
+        public async Task AccessorList1()
         {
             var code = @"using System;
 class Class
@@ -373,12 +373,12 @@ class Class
 {
     int Prop { get { return 1; }";
 
-            AutoFormatOnCloseBrace(code, expected, SyntaxKind.OpenBraceToken);
+            await AutoFormatOnCloseBraceAsync(code, expected, SyntaxKind.OpenBraceToken);
         }
 
-        [Fact]
+        [WpfFact]
         [Trait(Traits.Feature, Traits.Features.SmartTokenFormatting)]
-        public void AccessorList2()
+        public async Task AccessorList2()
         {
             var code = @"using System;
 class Class
@@ -390,12 +390,12 @@ class Class
 {
     int Prop { get { return 1; } }";
 
-            AutoFormatOnCloseBrace(code, expected, SyntaxKind.IntKeyword);
+            await AutoFormatOnCloseBraceAsync(code, expected, SyntaxKind.IntKeyword);
         }
 
-        [Fact]
+        [WpfFact]
         [Trait(Traits.Feature, Traits.Features.SmartTokenFormatting)]
-        public void AccessorList3()
+        public async Task AccessorList3()
         {
             var code = @"using System;
 class Class
@@ -411,12 +411,12 @@ class Class
         get { return 1; }
     }";
 
-            AutoFormatOnCloseBrace(code, expected, SyntaxKind.IntKeyword);
+            await AutoFormatOnCloseBraceAsync(code, expected, SyntaxKind.IntKeyword);
         }
 
-        [Fact]
+        [WpfFact]
         [Trait(Traits.Feature, Traits.Features.SmartTokenFormatting)]
-        public void AccessorList4()
+        public async Task AccessorList4()
         {
             var code = @"using System;
 class Class
@@ -432,12 +432,12 @@ class Class
             return 1;
         }";
 
-            AutoFormatOnCloseBrace(code, expected, SyntaxKind.GetKeyword);
+            await AutoFormatOnCloseBraceAsync(code, expected, SyntaxKind.GetKeyword);
         }
 
-        [Fact]
+        [WpfFact]
         [Trait(Traits.Feature, Traits.Features.SmartTokenFormatting)]
-        public void AccessorList5()
+        public async Task AccessorList5()
         {
             var code = @"using System;
 class Class
@@ -450,17 +450,43 @@ class Class
 class Class
 {
     int Prop {
+        get { return 1;
+        }";
+
+            await AutoFormatOnCloseBraceAsync(code, expected, SyntaxKind.OpenBraceToken);
+        }
+
+        [WpfFact]
+        [WorkItem(16984, "https://github.com/dotnet/roslyn/issues/16984")]
+        [Trait(Traits.Feature, Traits.Features.SmartTokenFormatting)]
+        public async Task AccessorList5b()
+        {
+            var code = @"using System;
+class Class
+{
+    int Prop {
+        get { return 1;   
+}$$
+}
+}";
+
+            var expected = @"using System;
+class Class
+{
+    int Prop {
         get
         {
             return 1;
-        }";
+        }
+}
+}";
 
-            AutoFormatOnCloseBrace(code, expected, SyntaxKind.GetKeyword);
+            await AutoFormatOnCloseBraceAsync(code, expected, SyntaxKind.OpenBraceToken);
         }
 
-        [Fact]
+        [WpfFact]
         [Trait(Traits.Feature, Traits.Features.SmartTokenFormatting)]
-        public void AccessorList6()
+        public async Task AccessorList6()
         {
             var code = @"using System;
 class Class
@@ -481,12 +507,12 @@ class Class
         }
     }";
 
-            AutoFormatOnCloseBrace(code, expected, SyntaxKind.IntKeyword);
+            await AutoFormatOnCloseBraceAsync(code, expected, SyntaxKind.IntKeyword);
         }
 
-        [Fact]
+        [WpfFact]
         [Trait(Traits.Feature, Traits.Features.SmartTokenFormatting)]
-        public void AccessorList7()
+        public async Task AccessorList7()
         {
             var code = @"using System;
 class Class
@@ -510,12 +536,144 @@ class Class
         }
     }";
 
-            AutoFormatOnSemicolon(code, expected, SyntaxKind.OpenBraceToken);
+            await AutoFormatOnSemicolonAsync(code, expected, SyntaxKind.OpenBraceToken);
         }
 
-        [Fact]
+        [WpfFact]
+        [WorkItem(16984, "https://github.com/dotnet/roslyn/issues/16984")]
         [Trait(Traits.Feature, Traits.Features.SmartTokenFormatting)]
-        public void Block1()
+        public async Task AccessorList8()
+        {
+            var code = @"class C
+{
+    int Prop
+    {
+get
+        {
+            return 0;
+        }$$
+    }
+}";
+
+            var expected = @"class C
+{
+    int Prop
+    {
+        get
+        {
+            return 0;
+        }
+    }
+}";
+
+            await AutoFormatOnCloseBraceAsync(code, expected, SyntaxKind.OpenBraceToken);
+        }
+
+        [WpfFact]
+        [WorkItem(16984, "https://github.com/dotnet/roslyn/issues/16984")]
+        [Trait(Traits.Feature, Traits.Features.SmartTokenFormatting)]
+        public async Task AccessorList9()
+        {
+            var code = @"class C
+{
+    int Prop
+    {
+set
+        {
+            ;
+        }$$
+    }
+}";
+
+            var expected = @"class C
+{
+    int Prop
+    {
+        set
+        {
+            ;
+        }
+    }
+}";
+
+            await AutoFormatOnCloseBraceAsync(code, expected, SyntaxKind.OpenBraceToken);
+        }
+
+        [WpfFact]
+        [WorkItem(16984, "https://github.com/dotnet/roslyn/issues/16984")]
+        [Trait(Traits.Feature, Traits.Features.SmartTokenFormatting)]
+        public async Task AccessorList10()
+        {
+            var code = @"class C
+{
+    event EventHandler E
+    {
+add
+        {
+        }$$
+        remove
+        {
+        }
+    }
+
+}";
+
+            var expected = @"class C
+{
+    event EventHandler E
+    {
+        add
+        {
+        }
+        remove
+        {
+        }
+    }
+
+}";
+
+            await AutoFormatOnCloseBraceAsync(code, expected, SyntaxKind.OpenBraceToken);
+        }
+
+        [WpfFact]
+        [WorkItem(16984, "https://github.com/dotnet/roslyn/issues/16984")]
+        [Trait(Traits.Feature, Traits.Features.SmartTokenFormatting)]
+        public async Task AccessorList11()
+        {
+            var code = @"class C
+{
+    event EventHandler E
+    {
+        add
+        {
+        }
+remove
+        {
+        }$$
+    }
+
+}";
+
+            var expected = @"class C
+{
+    event EventHandler E
+    {
+        add
+        {
+        }
+        remove
+        {
+        }
+    }
+
+}";
+
+            await AutoFormatOnCloseBraceAsync(code, expected, SyntaxKind.CloseBraceToken);
+        }
+
+        [WpfFact]
+        [Trait(Traits.Feature, Traits.Features.SmartTokenFormatting)]
+        public async Task Block1()
         {
             var code = @"using System;
 class Class
@@ -529,12 +687,12 @@ class Class
     public int Method()
     { }";
 
-            AutoFormatOnCloseBrace(code, expected, SyntaxKind.OpenBraceToken);
+            await AutoFormatOnCloseBraceAsync(code, expected, SyntaxKind.OpenBraceToken);
         }
 
-        [Fact]
+        [WpfFact]
         [Trait(Traits.Feature, Traits.Features.SmartTokenFormatting)]
-        public void Block2()
+        public async Task Block2()
         {
             var code = @"using System;
 class Class
@@ -546,12 +704,12 @@ class Class
 {
     public int Method() { }";
 
-            AutoFormatOnCloseBrace(code, expected, SyntaxKind.OpenBraceToken);
+            await AutoFormatOnCloseBraceAsync(code, expected, SyntaxKind.OpenBraceToken);
         }
 
-        [Fact]
+        [WpfFact]
         [Trait(Traits.Feature, Traits.Features.SmartTokenFormatting)]
-        public void Block3()
+        public async Task Block3()
         {
             var code = @"using System;
 class Class
@@ -568,12 +726,12 @@ class Class
     }
 }";
 
-            AutoFormatOnCloseBrace(code, expected, SyntaxKind.OpenBraceToken);
+            await AutoFormatOnCloseBraceAsync(code, expected, SyntaxKind.OpenBraceToken);
         }
 
-        [Fact]
+        [WpfFact]
         [Trait(Traits.Feature, Traits.Features.SmartTokenFormatting)]
-        public void Block4()
+        public async Task Block4()
         {
             var code = @"using System;
 class Class
@@ -590,12 +748,12 @@ class Class
     }
 }";
 
-            AutoFormatOnCloseBrace(code, expected, SyntaxKind.OpenBraceToken);
+            await AutoFormatOnCloseBraceAsync(code, expected, SyntaxKind.OpenBraceToken);
         }
 
-        [Fact]
+        [WpfFact]
         [Trait(Traits.Feature, Traits.Features.SmartTokenFormatting)]
-        public void Block5()
+        public async Task Block5()
         {
             var code = @"using System;
 class Class
@@ -611,12 +769,12 @@ class Class
     {
         { }";
 
-            AutoFormatOnCloseBrace(code, expected, SyntaxKind.OpenBraceToken);
+            await AutoFormatOnCloseBraceAsync(code, expected, SyntaxKind.OpenBraceToken);
         }
 
-        [Fact]
+        [WpfFact]
         [Trait(Traits.Feature, Traits.Features.SmartTokenFormatting)]
-        public void Block6()
+        public async Task Block6()
         {
             var code = @"using System;
 class Class
@@ -634,12 +792,12 @@ class Class
         {
         }";
 
-            AutoFormatOnCloseBrace(code, expected, SyntaxKind.OpenBraceToken);
+            await AutoFormatOnCloseBraceAsync(code, expected, SyntaxKind.OpenBraceToken);
         }
 
-        [Fact]
+        [WpfFact]
         [Trait(Traits.Feature, Traits.Features.SmartTokenFormatting)]
-        public void Block7()
+        public async Task Block7()
         {
             var code = @"using System;
 class Class
@@ -655,12 +813,12 @@ class Class
     {
         { { }";
 
-            AutoFormatOnCloseBrace(code, expected, SyntaxKind.OpenBraceToken);
+            await AutoFormatOnCloseBraceAsync(code, expected, SyntaxKind.OpenBraceToken);
         }
 
-        [Fact]
+        [WpfFact]
         [Trait(Traits.Feature, Traits.Features.SmartTokenFormatting)]
-        public void Block8()
+        public async Task Block8()
         {
             var code = @"using System;
 class Class
@@ -681,12 +839,12 @@ class Class
             }
         }";
 
-            AutoFormatOnCloseBrace(code, expected, SyntaxKind.OpenBraceToken);
+            await AutoFormatOnCloseBraceAsync(code, expected, SyntaxKind.OpenBraceToken);
         }
 
-        [Fact]
+        [WpfFact]
         [Trait(Traits.Feature, Traits.Features.SmartTokenFormatting)]
-        public void SwitchStatement1()
+        public async Task SwitchStatement1()
         {
             var code = @"using System;
 class Class
@@ -713,12 +871,12 @@ class Class
     }
 }";
 
-            AutoFormatOnCloseBrace(code, expected, SyntaxKind.OpenBraceToken);
+            await AutoFormatOnCloseBraceAsync(code, expected, SyntaxKind.OpenBraceToken);
         }
 
-        [Fact]
+        [WpfFact]
         [Trait(Traits.Feature, Traits.Features.SmartTokenFormatting)]
-        public void SwitchStatement2()
+        public async Task SwitchStatement2()
         {
             var code = @"using System;
 class Class
@@ -734,12 +892,12 @@ class Class
     {
         switch (true) { }";
 
-            AutoFormatOnCloseBrace(code, expected, SyntaxKind.OpenBraceToken);
+            await AutoFormatOnCloseBraceAsync(code, expected, SyntaxKind.OpenBraceToken);
         }
 
-        [Fact]
+        [WpfFact]
         [Trait(Traits.Feature, Traits.Features.SmartTokenFormatting)]
-        public void SwitchStatement3()
+        public async Task SwitchStatement3()
         {
             var code = @"using System;
 class Class
@@ -759,12 +917,12 @@ class Class
         {
             case 1: { }";
 
-            AutoFormatOnCloseBrace(code, expected, SyntaxKind.ColonToken);
+            await AutoFormatOnCloseBraceAsync(code, expected, SyntaxKind.ColonToken);
         }
 
-        [Fact]
+        [WpfFact]
         [Trait(Traits.Feature, Traits.Features.SmartTokenFormatting)]
-        public void SwitchStatement4()
+        public async Task SwitchStatement4()
         {
             var code = @"using System;
 class Class
@@ -787,12 +945,12 @@ class Class
                 {
                 }";
 
-            AutoFormatOnCloseBrace(code, expected, SyntaxKind.ColonToken);
+            await AutoFormatOnCloseBraceAsync(code, expected, SyntaxKind.ColonToken);
         }
 
-        [Fact]
+        [WpfFact]
         [Trait(Traits.Feature, Traits.Features.SmartTokenFormatting)]
-        public void Initializer1()
+        public async Task Initializer1()
         {
             var code = @"using System;
 class Class
@@ -808,12 +966,12 @@ class Class
     {
         var arr = new int[] { }";
 
-            AutoFormatOnCloseBrace(code, expected, SyntaxKind.NewKeyword);
+            await AutoFormatOnCloseBraceAsync(code, expected, SyntaxKind.NewKeyword);
         }
 
-        [Fact]
+        [WpfFact]
         [Trait(Traits.Feature, Traits.Features.SmartTokenFormatting)]
-        public void Initializer2()
+        public async Task Initializer2()
         {
             var code = @"using System;
 class Class
@@ -831,12 +989,12 @@ class Class
         var arr = new int[] {
 }";
 
-            AutoFormatOnCloseBrace(code, expected, SyntaxKind.NewKeyword);
+            await AutoFormatOnCloseBraceAsync(code, expected, SyntaxKind.NewKeyword);
         }
 
-        [Fact]
+        [WpfFact]
         [Trait(Traits.Feature, Traits.Features.SmartTokenFormatting)]
-        public void Initializer3()
+        public async Task Initializer3()
         {
             var code = @"using System;
 class Class
@@ -857,12 +1015,12 @@ class Class
             B = 2
         }";
 
-            AutoFormatOnCloseBrace(code, expected, SyntaxKind.NewKeyword);
+            await AutoFormatOnCloseBraceAsync(code, expected, SyntaxKind.NewKeyword);
         }
 
-        [Fact]
+        [WpfFact]
         [Trait(Traits.Feature, Traits.Features.SmartTokenFormatting)]
-        public void Initializer4()
+        public async Task Initializer4()
         {
             var code = @"using System;
 class Class
@@ -878,12 +1036,12 @@ class Class
     {
         var arr = new { A = 1, B = 2 }";
 
-            AutoFormatOnCloseBrace(code, expected, SyntaxKind.NewKeyword);
+            await AutoFormatOnCloseBraceAsync(code, expected, SyntaxKind.NewKeyword);
         }
 
-        [Fact]
+        [WpfFact]
         [Trait(Traits.Feature, Traits.Features.SmartTokenFormatting)]
-        public void Initializer5()
+        public async Task Initializer5()
         {
             var code = @"using System;
 class Class
@@ -903,12 +1061,12 @@ class Class
             1, 2, 3, 4,
             5 }";
 
-            AutoFormatOnCloseBrace(code, expected, SyntaxKind.NewKeyword);
+            await AutoFormatOnCloseBraceAsync(code, expected, SyntaxKind.NewKeyword);
         }
 
-        [Fact]
+        [WpfFact]
         [Trait(Traits.Feature, Traits.Features.SmartTokenFormatting)]
-        public void Initializer6()
+        public async Task Initializer6()
         {
             var code = @"using System;
 class Class
@@ -928,12 +1086,12 @@ class Class
             1, 2, 3, 4,
             5 }";
 
-            AutoFormatOnCloseBrace(code, expected, SyntaxKind.NewKeyword);
+            await AutoFormatOnCloseBraceAsync(code, expected, SyntaxKind.NewKeyword);
         }
 
-        [Fact]
+        [WpfFact]
         [Trait(Traits.Feature, Traits.Features.SmartTokenFormatting)]
-        public void EmbeddedStatement1()
+        public async Task EmbeddedStatement1()
         {
             var code = @"using System;
 class Class
@@ -949,12 +1107,12 @@ class Class
     {
         if (true) { }";
 
-            AutoFormatOnCloseBrace(code, expected, SyntaxKind.OpenBraceToken);
+            await AutoFormatOnCloseBraceAsync(code, expected, SyntaxKind.OpenBraceToken);
         }
 
-        [Fact]
+        [WpfFact]
         [Trait(Traits.Feature, Traits.Features.SmartTokenFormatting)]
-        public void EmbeddedStatement2()
+        public async Task EmbeddedStatement2()
         {
             var code = @"using System;
 class Class
@@ -975,12 +1133,12 @@ class Class
         }
     }";
 
-            AutoFormatOnCloseBrace(code, expected, SyntaxKind.OpenBraceToken);
+            await AutoFormatOnCloseBraceAsync(code, expected, SyntaxKind.OpenBraceToken);
         }
 
-        [Fact]
+        [WpfFact]
         [Trait(Traits.Feature, Traits.Features.SmartTokenFormatting)]
-        public void EmbeddedStatement3()
+        public async Task EmbeddedStatement3()
         {
             var code = @"using System;
 class Class
@@ -998,12 +1156,12 @@ class Class
         if (true)
         { }";
 
-            AutoFormatOnCloseBrace(code, expected, SyntaxKind.OpenBraceToken);
+            await AutoFormatOnCloseBraceAsync(code, expected, SyntaxKind.OpenBraceToken);
         }
 
-        [Fact]
+        [WpfFact]
         [Trait(Traits.Feature, Traits.Features.SmartTokenFormatting)]
-        public void EmbeddedStatement4()
+        public async Task EmbeddedStatement4()
         {
             var code = @"using System;
 class Class
@@ -1024,12 +1182,41 @@ class Class
         }
     }";
 
-            AutoFormatOnCloseBrace(code, expected, SyntaxKind.OpenBraceToken);
+            await AutoFormatOnCloseBraceAsync(code, expected, SyntaxKind.OpenBraceToken);
         }
 
-        [Fact]
+        [WpfFact]
+        [WorkItem(8413, "https://github.com/dotnet/roslyn/issues/8413")]
         [Trait(Traits.Feature, Traits.Features.SmartTokenFormatting)]
-        public void EmbeddedStatement5()
+        public async Task EmbeddedStatementDoBlockAlone()
+        {
+            var code = @"using System;
+class Class
+{
+    void Method()
+    {
+        do {
+}$$
+    }
+}";
+
+            var expected = @"using System;
+class Class
+{
+    void Method()
+    {
+        do
+        {
+        }
+    }
+}";
+
+            await AutoFormatOnCloseBraceAsync(code, expected, SyntaxKind.OpenBraceToken);
+        }
+
+        [WpfFact]
+        [Trait(Traits.Feature, Traits.Features.SmartTokenFormatting)]
+        public async Task EmbeddedStatement5()
         {
             var code = @"using System;
 class Class
@@ -1052,12 +1239,12 @@ class Class
     }
 }";
 
-            AutoFormatOnSemicolon(code, expected, SyntaxKind.OpenBraceToken);
+            await AutoFormatOnSemicolonAsync(code, expected, SyntaxKind.OpenBraceToken);
         }
 
-        [Fact]
+        [WpfFact]
         [Trait(Traits.Feature, Traits.Features.SmartTokenFormatting)]
-        public void EmbeddedStatement6()
+        public async Task EmbeddedStatement6()
         {
             var code = @"using System;
 class Class
@@ -1078,12 +1265,12 @@ class Class
         }
     }";
 
-            AutoFormatOnCloseBrace(code, expected, SyntaxKind.OpenBraceToken);
+            await AutoFormatOnCloseBraceAsync(code, expected, SyntaxKind.OpenBraceToken);
         }
 
-        [Fact]
+        [WpfFact]
         [Trait(Traits.Feature, Traits.Features.SmartTokenFormatting)]
-        public void EmbeddedStatement7()
+        public async Task EmbeddedStatement7()
         {
             var code = @"using System;
 class Class
@@ -1104,12 +1291,12 @@ class Class
         }
     }";
 
-            AutoFormatOnCloseBrace(code, expected, SyntaxKind.OpenBraceToken);
+            await AutoFormatOnCloseBraceAsync(code, expected, SyntaxKind.OpenBraceToken);
         }
 
-        [Fact]
+        [WpfFact]
         [Trait(Traits.Feature, Traits.Features.SmartTokenFormatting)]
-        public void EmbeddedStatement8()
+        public async Task EmbeddedStatement8()
         {
             var code = @"using System;
 class Class
@@ -1130,12 +1317,12 @@ class Class
         }
     }";
 
-            AutoFormatOnCloseBrace(code, expected, SyntaxKind.OpenBraceToken);
+            await AutoFormatOnCloseBraceAsync(code, expected, SyntaxKind.OpenBraceToken);
         }
 
-        [Fact]
+        [WpfFact]
         [Trait(Traits.Feature, Traits.Features.SmartTokenFormatting)]
-        public void EmbeddedStatement9()
+        public async Task EmbeddedStatement9()
         {
             var code = @"using System;
 class Class
@@ -1153,12 +1340,12 @@ class Class
         if (true)
             int i = 10;";
 
-            AutoFormatOnSemicolon(code, expected, SyntaxKind.OpenBraceToken);
+            await AutoFormatOnSemicolonAsync(code, expected, SyntaxKind.OpenBraceToken);
         }
 
-        [Fact]
+        [WpfFact]
         [Trait(Traits.Feature, Traits.Features.SmartTokenFormatting)]
-        public void FieldlInitializer()
+        public async Task FieldlInitializer()
         {
             var code = @"using System;
 class Class
@@ -1172,12 +1359,12 @@ class Class
     string str = Console.Title;
 ";
 
-            AutoFormatOnSemicolon(code, expected, SyntaxKind.OpenBraceToken);
+            await AutoFormatOnSemicolonAsync(code, expected, SyntaxKind.OpenBraceToken);
         }
 
-        [Fact]
+        [WpfFact]
         [Trait(Traits.Feature, Traits.Features.SmartTokenFormatting)]
-        public void ArrayFieldlInitializer()
+        public async Task ArrayFieldlInitializer()
         {
             var code = @"using System;
 namespace NS
@@ -1195,12 +1382,31 @@ namespace NS
         string[] strArr = { ""1"", ""2"" };
 ";
 
-            AutoFormatOnSemicolon(code, expected, SyntaxKind.OpenBraceToken);
+            await AutoFormatOnSemicolonAsync(code, expected, SyntaxKind.OpenBraceToken);
         }
 
-        [Fact]
+        [WpfFact]
         [Trait(Traits.Feature, Traits.Features.SmartTokenFormatting)]
-        public void EmbeddedStatement10()
+        public async Task ExpressionValuedPropertyInitializer()
+        {
+            var code = @"using System;
+class Class
+{
+          public int  Three =>   1+2;$$
+";
+
+            var expected = @"using System;
+class Class
+{
+    public int Three => 1 + 2;
+";
+
+            await AutoFormatOnSemicolonAsync(code, expected, SyntaxKind.OpenBraceToken);
+        }
+
+        [WpfFact]
+        [Trait(Traits.Feature, Traits.Features.SmartTokenFormatting)]
+        public async Task EmbeddedStatement10()
         {
             var code = @"using System;
 class Class
@@ -1220,12 +1426,12 @@ class Class
             int i = 10;
     }";
 
-            AutoFormatOnSemicolon(code, expected, SyntaxKind.OpenBraceToken);
+            await AutoFormatOnSemicolonAsync(code, expected, SyntaxKind.OpenBraceToken);
         }
 
-        [Fact]
+        [WpfFact]
         [Trait(Traits.Feature, Traits.Features.SmartTokenFormatting)]
-        public void EmbeddedStatement11()
+        public async Task EmbeddedStatement11()
         {
             var code = @"using System;
 class Class
@@ -1241,12 +1447,12 @@ class Class
     {
         using (var resource = GetResource()) resource.Do();";
 
-            AutoFormatOnSemicolon(code, expected, SyntaxKind.OpenBraceToken);
+            await AutoFormatOnSemicolonAsync(code, expected, SyntaxKind.OpenBraceToken);
         }
 
-        [Fact]
+        [WpfFact]
         [Trait(Traits.Feature, Traits.Features.SmartTokenFormatting)]
-        public void EmbeddedStatement12()
+        public async Task EmbeddedStatement12()
         {
             var code = @"using System;
 class Class
@@ -1264,12 +1470,12 @@ class Class
         using (var resource = GetResource())
             resource.Do();";
 
-            AutoFormatOnSemicolon(code, expected, SyntaxKind.OpenBraceToken);
+            await AutoFormatOnSemicolonAsync(code, expected, SyntaxKind.OpenBraceToken);
         }
 
-        [Fact]
+        [WpfFact]
         [Trait(Traits.Feature, Traits.Features.SmartTokenFormatting)]
-        public void EmbeddedStatement13()
+        public async Task EmbeddedStatement13()
         {
             var code = @"using System;
 class Class
@@ -1289,12 +1495,12 @@ class Class
             resource.Do();
     }";
 
-            AutoFormatOnSemicolon(code, expected, SyntaxKind.OpenBraceToken);
+            await AutoFormatOnSemicolonAsync(code, expected, SyntaxKind.OpenBraceToken);
         }
 
-        [Fact]
+        [WpfFact]
         [Trait(Traits.Feature, Traits.Features.SmartTokenFormatting)]
-        public void EmbeddedStatement14()
+        public async Task EmbeddedStatement14()
         {
             var code = @"using System;
 class Class
@@ -1310,12 +1516,12 @@ class Class
     {
         do i = 10;";
 
-            AutoFormatOnSemicolon(code, expected, SyntaxKind.OpenBraceToken);
+            await AutoFormatOnSemicolonAsync(code, expected, SyntaxKind.OpenBraceToken);
         }
 
-        [Fact]
+        [WpfFact]
         [Trait(Traits.Feature, Traits.Features.SmartTokenFormatting)]
-        public void EmbeddedStatement15()
+        public async Task EmbeddedStatement15()
         {
             var code = @"using System;
 class Class
@@ -1333,12 +1539,12 @@ class Class
         do
             i = 10;";
 
-            AutoFormatOnSemicolon(code, expected, SyntaxKind.OpenBraceToken);
+            await AutoFormatOnSemicolonAsync(code, expected, SyntaxKind.OpenBraceToken);
         }
 
-        [Fact]
+        [WpfFact]
         [Trait(Traits.Feature, Traits.Features.SmartTokenFormatting)]
-        public void EmbeddedStatement16()
+        public async Task EmbeddedStatement16()
         {
             var code = @"using System;
 class Class
@@ -1358,12 +1564,12 @@ class Class
             i = 10;
     }";
 
-            AutoFormatOnSemicolon(code, expected, SyntaxKind.OpenBraceToken);
+            await AutoFormatOnSemicolonAsync(code, expected, SyntaxKind.OpenBraceToken);
         }
 
-        [Fact]
+        [WpfFact]
         [Trait(Traits.Feature, Traits.Features.SmartTokenFormatting)]
-        public void EmbeddedStatement17()
+        public async Task EmbeddedStatement17()
         {
             var code = @"using System;
 class Class
@@ -1385,12 +1591,12 @@ class Class
         while (true);
     }";
 
-            AutoFormatOnSemicolon(code, expected, SyntaxKind.OpenBraceToken);
+            await AutoFormatOnSemicolonAsync(code, expected, SyntaxKind.OpenBraceToken);
         }
 
-        [Fact]
+        [WpfFact]
         [Trait(Traits.Feature, Traits.Features.SmartTokenFormatting)]
-        public void FollowPreviousElement1()
+        public async Task FollowPreviousElement1()
         {
             var code = @"using System;
 class Class
@@ -1404,12 +1610,12 @@ class Class
                     int i = 10;
     int i2 = 10;";
 
-            AutoFormatOnSemicolon(code, expected, SyntaxKind.SemicolonToken);
+            await AutoFormatOnSemicolonAsync(code, expected, SyntaxKind.SemicolonToken);
         }
 
-        [Fact]
+        [WpfFact]
         [Trait(Traits.Feature, Traits.Features.SmartTokenFormatting)]
-        public void FollowPreviousElement2()
+        public async Task FollowPreviousElement2()
         {
             var code = @"using System;
 class Class
@@ -1435,12 +1641,12 @@ class Class
     }
 }";
 
-            AutoFormatOnCloseBrace(code, expected, SyntaxKind.CloseBraceToken);
+            await AutoFormatOnCloseBraceAsync(code, expected, SyntaxKind.CloseBraceToken);
         }
 
-        [Fact]
+        [WpfFact]
         [Trait(Traits.Feature, Traits.Features.SmartTokenFormatting)]
-        public void FollowPreviousElement3()
+        public async Task FollowPreviousElement3()
         {
             var code = @"using System;
 class Class
@@ -1470,12 +1676,12 @@ class Class
     };
 }";
 
-            AutoFormatOnSemicolon(code, expected, SyntaxKind.CloseBraceToken);
+            await AutoFormatOnSemicolonAsync(code, expected, SyntaxKind.CloseBraceToken);
         }
 
-        [Fact]
+        [WpfFact]
         [Trait(Traits.Feature, Traits.Features.SmartTokenFormatting)]
-        public void FollowPreviousElement4()
+        public async Task FollowPreviousElement4()
         {
             var code = @"using System;
 class Class
@@ -1493,12 +1699,12 @@ class Class
                         int i = 10;
         int i2 = 10;";
 
-            AutoFormatOnSemicolon(code, expected, SyntaxKind.SemicolonToken);
+            await AutoFormatOnSemicolonAsync(code, expected, SyntaxKind.SemicolonToken);
         }
 
-        [Fact]
+        [WpfFact]
         [Trait(Traits.Feature, Traits.Features.SmartTokenFormatting)]
-        public void FollowPreviousElement5()
+        public async Task FollowPreviousElement5()
         {
             var code = @"using System;
 class Class
@@ -1518,12 +1724,12 @@ class Class
         if (true)
             i = 50;";
 
-            AutoFormatOnSemicolon(code, expected, SyntaxKind.SemicolonToken);
+            await AutoFormatOnSemicolonAsync(code, expected, SyntaxKind.SemicolonToken);
         }
 
-        [Fact]
+        [WpfFact]
         [Trait(Traits.Feature, Traits.Features.SmartTokenFormatting)]
-        public void FollowPreviousElement6()
+        public async Task FollowPreviousElement6()
         {
             var code = @"        using System;
         using System.Linq;$$";
@@ -1531,12 +1737,12 @@ class Class
             var expected = @"        using System;
 using System.Linq;";
 
-            AutoFormatOnSemicolon(code, expected, SyntaxKind.SemicolonToken);
+            await AutoFormatOnSemicolonAsync(code, expected, SyntaxKind.SemicolonToken);
         }
 
-        [Fact]
+        [WpfFact]
         [Trait(Traits.Feature, Traits.Features.SmartTokenFormatting)]
-        public void FollowPreviousElement7()
+        public async Task FollowPreviousElement7()
         {
             var code = @"            using System;
 
@@ -1558,12 +1764,12 @@ namespace NS2
 {
 }";
 
-            AutoFormatOnCloseBrace(code, expected, SyntaxKind.CloseBraceToken);
+            await AutoFormatOnCloseBraceAsync(code, expected, SyntaxKind.CloseBraceToken);
         }
 
-        [Fact]
+        [WpfFact]
         [Trait(Traits.Feature, Traits.Features.SmartTokenFormatting)]
-        public void FollowPreviousElement8()
+        public async Task FollowPreviousElement8()
         {
             var code = @"using System;
 
@@ -1591,12 +1797,12 @@ namespace NS
     }
 }";
 
-            AutoFormatOnCloseBrace(code, expected, SyntaxKind.CloseBraceToken);
+            await AutoFormatOnCloseBraceAsync(code, expected, SyntaxKind.CloseBraceToken);
         }
 
-        [Fact]
+        [WpfFact]
         [Trait(Traits.Feature, Traits.Features.SmartTokenFormatting)]
-        public void IfStatement1()
+        public async Task IfStatement1()
         {
             var code = @"using System;
 
@@ -1618,12 +1824,12 @@ class Class
         {
         }";
 
-            AutoFormatOnCloseBrace(code, expected, SyntaxKind.OpenBraceToken);
+            await AutoFormatOnCloseBraceAsync(code, expected, SyntaxKind.OpenBraceToken);
         }
 
-        [Fact]
+        [WpfFact]
         [Trait(Traits.Feature, Traits.Features.SmartTokenFormatting)]
-        public void IfStatement2()
+        public async Task IfStatement2()
         {
             var code = @"using System;
 
@@ -1651,12 +1857,12 @@ class Class
         {
         }";
 
-            AutoFormatOnCloseBrace(code, expected, SyntaxKind.OpenBraceToken);
+            await AutoFormatOnCloseBraceAsync(code, expected, SyntaxKind.OpenBraceToken);
         }
 
-        [Fact]
+        [WpfFact]
         [Trait(Traits.Feature, Traits.Features.SmartTokenFormatting)]
-        public void IfStatement3()
+        public async Task IfStatement3()
         {
             var code = @"using System;
 
@@ -1684,12 +1890,12 @@ class Class
         {
         }";
 
-            AutoFormatOnCloseBrace(code, expected, SyntaxKind.OpenBraceToken);
+            await AutoFormatOnCloseBraceAsync(code, expected, SyntaxKind.OpenBraceToken);
         }
 
-        [Fact]
+        [WpfFact]
         [Trait(Traits.Feature, Traits.Features.SmartTokenFormatting)]
-        public void IfStatement4()
+        public async Task IfStatement4()
         {
             var code = @"using System;
 
@@ -1713,12 +1919,12 @@ class Class
         else if (false)
             return;";
 
-            AutoFormatOnSemicolon(code, expected, SyntaxKind.OpenBraceToken);
+            await AutoFormatOnSemicolonAsync(code, expected, SyntaxKind.OpenBraceToken);
         }
 
-        [Fact]
+        [WpfFact]
         [Trait(Traits.Feature, Traits.Features.SmartTokenFormatting)]
-        public void TryStatement1()
+        public async Task TryStatement1()
         {
             var code = @"using System;
 
@@ -1740,12 +1946,12 @@ class Class
         {
         }";
 
-            AutoFormatOnCloseBrace(code, expected, SyntaxKind.OpenBraceToken);
+            await AutoFormatOnCloseBraceAsync(code, expected, SyntaxKind.OpenBraceToken);
         }
 
-        [Fact]
+        [WpfFact]
         [Trait(Traits.Feature, Traits.Features.SmartTokenFormatting)]
-        public void TryStatement2()
+        public async Task TryStatement2()
         {
             var code = @"using System;
 
@@ -1773,12 +1979,12 @@ class Class
         {
         }";
 
-            AutoFormatOnCloseBrace(code, expected, SyntaxKind.OpenBraceToken);
+            await AutoFormatOnCloseBraceAsync(code, expected, SyntaxKind.OpenBraceToken);
         }
 
-        [Fact]
+        [WpfFact]
         [Trait(Traits.Feature, Traits.Features.SmartTokenFormatting)]
-        public void TryStatement3()
+        public async Task TryStatement3()
         {
             var code = @"using System;
 
@@ -1812,12 +2018,12 @@ class Class
         {
         }";
 
-            AutoFormatOnCloseBrace(code, expected, SyntaxKind.OpenBraceToken);
+            await AutoFormatOnCloseBraceAsync(code, expected, SyntaxKind.OpenBraceToken);
         }
 
-        [Fact]
+        [WpfFact]
         [Trait(Traits.Feature, Traits.Features.SmartTokenFormatting)]
-        public void TryStatement4()
+        public async Task TryStatement4()
         {
             var code = @"using System;
 
@@ -1845,73 +2051,105 @@ class Class
         {
         }";
 
-            AutoFormatOnCloseBrace(code, expected, SyntaxKind.OpenBraceToken);
+            await AutoFormatOnCloseBraceAsync(code, expected, SyntaxKind.OpenBraceToken);
         }
 
-        [Fact]
+        [WpfFact]
+        [WorkItem(6645, "https://github.com/dotnet/roslyn/issues/6645")]
         [Trait(Traits.Feature, Traits.Features.SmartTokenFormatting)]
-        [WorkItem(537555)]
-        public void SingleLine()
+        public async Task TryStatement5()
+        {
+            var code = @"using System;
+
+class Class
+{
+    void Method()
+    {
+        try {
+        }$$
+    }
+}";
+
+            var expected = @"using System;
+
+class Class
+{
+    void Method()
+    {
+        try
+        {
+        }
+    }
+}";
+
+            await AutoFormatOnCloseBraceAsync(code, expected, SyntaxKind.OpenBraceToken);
+        }
+
+        [WpfFact]
+        [Trait(Traits.Feature, Traits.Features.SmartTokenFormatting)]
+        [WorkItem(537555, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/537555")]
+        public async Task SingleLine()
         {
             var code = @"class C { void M() { C.M(    );$$ } }";
 
             var expected = @"class C { void M() { C.M(); } }";
 
-            AutoFormatOnSemicolon(code, expected, SyntaxKind.OpenBraceToken);
+            await AutoFormatOnSemicolonAsync(code, expected, SyntaxKind.OpenBraceToken);
         }
 
         [Fact]
         [Trait(Traits.Feature, Traits.Features.SmartTokenFormatting)]
-        public void StringLiterals()
+        public async Task StringLiterals()
         {
             var code = @"class C { void M() { C.M(""Test {0}$$";
 
             var expected = string.Empty;
-            AutoFormatOnMarker(code, expected, SyntaxKind.StringLiteralToken, SyntaxKind.None);
+            await AutoFormatOnMarkerAsync(code, expected, SyntaxKind.StringLiteralToken, SyntaxKind.None);
         }
 
         [Fact]
         [Trait(Traits.Feature, Traits.Features.SmartTokenFormatting)]
-        public void CharLiterals()
+        public async Task CharLiterals()
         {
             var code = @"class C { void M() { C.M('}$$";
 
             var expected = string.Empty;
-            AutoFormatOnMarker(code, expected, SyntaxKind.CharacterLiteralToken, SyntaxKind.None);
+            await AutoFormatOnMarkerAsync(code, expected, SyntaxKind.CharacterLiteralToken, SyntaxKind.None);
         }
 
         [Fact]
         [Trait(Traits.Feature, Traits.Features.SmartTokenFormatting)]
-        public void CharLiterals1()
+        [WorkItem(44423, "https://github.com/dotnet/roslyn/issues/44423")]
+        public async Task CharLiterals1()
         {
-            var code = @"''';$$";
+            var code = @"';$$";
 
             var expected = string.Empty;
-            AutoFormatOnMarker(code, expected, SyntaxKind.EndOfFileToken, SyntaxKind.None);
+            await AutoFormatOnMarkerAsync(code, expected, SyntaxKind.CharacterLiteralToken, SyntaxKind.None);
         }
 
         [Fact]
         [Trait(Traits.Feature, Traits.Features.SmartTokenFormatting)]
-        public void Comments()
+        public async Task Comments()
         {
             var code = @"class C { void M() { // { }$$";
 
             var expected = string.Empty;
-            AutoFormatOnMarker(code, expected, SyntaxKind.OpenBraceToken, SyntaxKind.OpenBraceToken);
+            await AutoFormatOnMarkerAsync(code, expected, SyntaxKind.OpenBraceToken, SyntaxKind.OpenBraceToken);
         }
 
-        [Fact]
+        [WpfFact]
         [Trait(Traits.Feature, Traits.Features.SmartTokenFormatting)]
-        public void FirstLineInFile()
+        public async Task FirstLineInFile()
         {
             var code = @"using System;$$";
 
-            AutoFormatOnSemicolon(code, "using System;", SyntaxKind.UsingKeyword);
+            await AutoFormatOnSemicolonAsync(code, "using System;", SyntaxKind.UsingKeyword);
         }
 
-        [Fact]
+        [WpfFact]
         [Trait(Traits.Feature, Traits.Features.SmartTokenFormatting)]
-        public void Label1()
+        public async Task Label1()
         {
             var code = @"class C
 {
@@ -1927,12 +2165,12 @@ class Class
     L: int i = 20;
     }
 }";
-            AutoFormatOnSemicolon(code, expected, SyntaxKind.OpenBraceToken);
+            await AutoFormatOnSemicolonAsync(code, expected, SyntaxKind.OpenBraceToken);
         }
 
-        [Fact]
+        [WpfFact]
         [Trait(Traits.Feature, Traits.Features.SmartTokenFormatting)]
-        public void Label2()
+        public async Task Label2()
         {
             var code = @"class C
 {
@@ -1950,12 +2188,12 @@ int             i               =               20;$$
         int i = 20;
     }
 }";
-            AutoFormatOnSemicolon(code, expected, SyntaxKind.OpenBraceToken);
+            await AutoFormatOnSemicolonAsync(code, expected, SyntaxKind.OpenBraceToken);
         }
 
-        [Fact]
+        [WpfFact]
         [Trait(Traits.Feature, Traits.Features.SmartTokenFormatting)]
-        public void Label3()
+        public async Task Label3()
         {
             var code = @"class C
 {
@@ -1975,12 +2213,12 @@ int             i               =               20;$$
         int i = 20;
     }
 }";
-            AutoFormatOnSemicolon(code, expected, SyntaxKind.SemicolonToken);
+            await AutoFormatOnSemicolonAsync(code, expected, SyntaxKind.SemicolonToken);
         }
 
-        [Fact]
+        [WpfFact]
         [Trait(Traits.Feature, Traits.Features.SmartTokenFormatting)]
-        public void Label4()
+        public async Task Label4()
         {
             var code = @"class C
 {
@@ -2002,12 +2240,12 @@ int         nextLine            =           30          ;$$
         int nextLine = 30;
     }
 }";
-            AutoFormatOnSemicolon(code, expected, SyntaxKind.SemicolonToken);
+            await AutoFormatOnSemicolonAsync(code, expected, SyntaxKind.SemicolonToken);
         }
 
-        [Fact]
+        [WpfFact]
         [Trait(Traits.Feature, Traits.Features.SmartTokenFormatting)]
-        public void Label6()
+        public async Task Label6()
         {
             var code = @"class C
 {
@@ -2027,41 +2265,41 @@ int         nextLine            =           30          ;$$
         int nextLine = 30;
     }
 }";
-            AutoFormatOnSemicolon(code, expected, SyntaxKind.OpenBraceToken);
+            await AutoFormatOnSemicolonAsync(code, expected, SyntaxKind.OpenBraceToken);
         }
 
-        [WorkItem(537776)]
-        [Fact]
+        [WorkItem(537776, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/537776")]
+        [WpfFact]
         [Trait(Traits.Feature, Traits.Features.SmartTokenFormatting)]
-        public void DisappearedTokens()
+        public async Task DisappearedTokens()
         {
             var code = @"class Class1
 {
-    int foo()
+    int goo()
         return 0;
         }$$
 }";
 
             var expected = @"class Class1
 {
-    int foo()
+    int goo()
         return 0;
         }
 }";
-            AutoFormatOnCloseBrace(
+            await AutoFormatOnCloseBraceAsync(
                 code,
                 expected,
                 SyntaxKind.ClassKeyword);
         }
 
-        [WorkItem(537779)]
+        [WorkItem(537779, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/537779")]
         [Fact]
         [Trait(Traits.Feature, Traits.Features.SmartTokenFormatting)]
-        public void DisappearedTokens2()
+        public async Task DisappearedTokens2()
         {
             var code = @"class Class1
 {
-    void Foo()
+    void Goo()
     {
         Object o=new Object);$$
     }
@@ -2069,36 +2307,36 @@ int         nextLine            =           30          ;$$
 
             var expected = @"class Class1
 {
-    void Foo()
+    void Goo()
     {
         Object o=new Object);
     }
 }";
-            AutoFormatOnSemicolon(
+            await AutoFormatOnSemicolonAsync(
                 code,
                 expected,
                 SyntaxKind.SemicolonToken);
         }
 
-        [WorkItem(537793)]
-        [Fact]
+        [WorkItem(537793, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/537793")]
+        [WpfFact]
         [Trait(Traits.Feature, Traits.Features.SmartTokenFormatting)]
-        public void Delegate1()
+        public async Task Delegate1()
         {
             var code = @"delegate void MyDelegate(int a,int b);$$";
 
             var expected = @"delegate void MyDelegate(int a, int b);";
 
-            AutoFormatOnSemicolon(
+            await AutoFormatOnSemicolonAsync(
                 code,
                 expected,
                 SyntaxKind.DelegateKeyword);
         }
 
-        [WorkItem(537827)]
-        [Fact]
+        [WorkItem(537827, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/537827")]
+        [WpfFact]
         [Trait(Traits.Feature, Traits.Features.SmartTokenFormatting)]
-        public void DoubleInitializer()
+        public async Task DoubleInitializer()
         {
             var code = @"class C
 {
@@ -2116,16 +2354,16 @@ int         nextLine            =           30          ;$$
     }
 }";
 
-            AutoFormatOnCloseBrace(
+            await AutoFormatOnCloseBraceAsync(
                 code,
                 expected,
                 SyntaxKind.OpenBraceToken);
         }
 
-        [WorkItem(537825)]
-        [Fact]
+        [WorkItem(537825, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/537825")]
+        [WpfFact]
         [Trait(Traits.Feature, Traits.Features.SmartTokenFormatting)]
-        public void MissingToken1()
+        public async Task MissingToken1()
         {
             var code = @"public class Class1
 {
@@ -2137,15 +2375,15 @@ int         nextLine            =           30          ;$$
     int a = 1};
 }";
 
-            AutoFormatOnCloseBrace(
+            await AutoFormatOnCloseBraceAsync(
                 code,
                 expected,
                 SyntaxKind.PublicKeyword);
         }
 
-        [Fact]
+        [WpfFact]
         [Trait(Traits.Feature, Traits.Features.SmartTokenFormatting)]
-        public void ArrayInitializer1()
+        public async Task ArrayInitializer1()
         {
             var code = @"public class Class1
 {
@@ -2163,15 +2401,15 @@ int         nextLine            =           30          ;$$
         }
 }";
 
-            AutoFormatOnCloseBrace(
+            await AutoFormatOnCloseBraceAsync(
                 code,
                 expected,
                 SyntaxKind.NewKeyword);
         }
 
-        [Fact]
+        [WpfFact]
         [Trait(Traits.Feature, Traits.Features.SmartTokenFormatting)]
-        public void ArrayInitializer2()
+        public async Task ArrayInitializer2()
         {
             var code = @"public class Class1
 {
@@ -2189,16 +2427,16 @@ int         nextLine            =           30          ;$$
         };
 }";
 
-            AutoFormatOnSemicolon(
+            await AutoFormatOnSemicolonAsync(
                 code,
                 expected,
                 SyntaxKind.OpenBraceToken);
         }
 
-        [Fact]
-        [WorkItem(537825)]
+        [WpfFact]
+        [WorkItem(537825, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/537825")]
         [Trait(Traits.Feature, Traits.Features.SmartTokenFormatting)]
-        public void MalformedCode()
+        public async Task MalformedCode()
         {
             var code = @"namespace ClassLibrary1
 {
@@ -2216,16 +2454,16 @@ int         nextLine            =           30          ;$$
     }
 }";
 
-            AutoFormatOnCloseBrace(
+            await AutoFormatOnCloseBraceAsync(
                 code,
                 expected,
                 SyntaxKind.OpenBraceToken);
         }
 
-        [Fact]
-        [WorkItem(537804)]
+        [WpfFact]
+        [WorkItem(537804, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/537804")]
         [Trait(Traits.Feature, Traits.Features.SmartTokenFormatting)]
-        public void Colon_SwitchLabel()
+        public async Task Colon_SwitchLabel()
         {
             var code = @"namespace ClassLibrary1
 {
@@ -2255,16 +2493,16 @@ int         nextLine            =           30          ;$$
     }
 }";
 
-            AutoFormatOnColon(
+            await AutoFormatOnColonAsync(
                 code,
                 expected,
                 SyntaxKind.OpenBraceToken);
         }
 
-        [Fact]
-        [WorkItem(584599)]
+        [WpfFact]
+        [WorkItem(584599, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/584599")]
         [Trait(Traits.Feature, Traits.Features.SmartTokenFormatting)]
-        public void Colon_SwitchLabel_Comment()
+        public async Task Colon_SwitchLabel_Comment()
         {
             var code = @"namespace ClassLibrary1
 {
@@ -2296,16 +2534,16 @@ int         nextLine            =           30          ;$$
     }
 }";
 
-            AutoFormatOnColon(
+            await AutoFormatOnColonAsync(
                 code,
                 expected,
                 SyntaxKind.OpenBraceToken);
         }
 
-        [Fact]
-        [WorkItem(584599)]
+        [WpfFact]
+        [WorkItem(584599, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/584599")]
         [Trait(Traits.Feature, Traits.Features.SmartTokenFormatting)]
-        public void Colon_SwitchLabel_Comment2()
+        public async Task Colon_SwitchLabel_Comment2()
         {
             var code = @"namespace ClassLibrary1
 {
@@ -2339,16 +2577,16 @@ int         nextLine            =           30          ;$$
     }
 }";
 
-            AutoFormatOnColon(
+            await AutoFormatOnColonAsync(
                 code,
                 expected,
                 SyntaxKind.ColonToken);
         }
 
         [Fact]
-        [WorkItem(537804)]
+        [WorkItem(537804, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/537804")]
         [Trait(Traits.Feature, Traits.Features.SmartTokenFormatting)]
-        public void Colon_Label()
+        public async Task Colon_Label()
         {
             var code = @"namespace ClassLibrary1
 {
@@ -2372,16 +2610,16 @@ int         nextLine            =           30          ;$$
     }
 }";
 
-            AutoFormatOnColon(
+            await AutoFormatOnColonAsync(
                 code,
                 expected,
                 SyntaxKind.None);
         }
 
-        [Fact]
-        [WorkItem(538793)]
+        [WpfFact]
+        [WorkItem(538793, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/538793")]
         [Trait(Traits.Feature, Traits.Features.SmartTokenFormatting)]
-        public void Colon_Labe2()
+        public async Task Colon_Label2()
         {
             var code = @"namespace ClassLibrary1
 {
@@ -2405,16 +2643,16 @@ int         nextLine            =           30          ;$$
     }
 }";
 
-            AutoFormatOnSemicolon(
+            await AutoFormatOnSemicolonAsync(
                 code,
                 expected,
                 SyntaxKind.OpenBraceToken);
         }
 
-        [Fact]
+        [WpfFact]
         [WorkItem(3186, "DevDiv_Projects/Roslyn")]
         [Trait(Traits.Feature, Traits.Features.SmartTokenFormatting)]
-        public void SemicolonInElseIfStatement()
+        public async Task SemicolonInElseIfStatement()
         {
             var code = @"using System;
 using System.Collections.Generic;
@@ -2454,16 +2692,16 @@ class Program
     }
 }";
 
-            AutoFormatOnSemicolon(
+            await AutoFormatOnSemicolonAsync(
                 code,
                 expected,
                 SyntaxKind.SemicolonToken);
         }
 
-        [Fact]
-        [WorkItem(538391)]
+        [WpfFact]
+        [WorkItem(538391, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/538391")]
         [Trait(Traits.Feature, Traits.Features.SmartTokenFormatting)]
-        public void SemicolonInElseIfStatement2()
+        public async Task SemicolonInElseIfStatement2()
         {
             var code = @"public class Class1
 {
@@ -2489,16 +2727,16 @@ class Program
     }
 }";
 
-            AutoFormatOnSemicolon(
+            await AutoFormatOnSemicolonAsync(
                 code,
                 expected,
                 SyntaxKind.SemicolonToken);
         }
 
-        [Fact]
+        [WpfFact]
         [WorkItem(8385, "DevDiv_Projects/Roslyn")]
         [Trait(Traits.Feature, Traits.Features.SmartTokenFormatting)]
-        public void NullCoalescingOperator()
+        public async Task NullCoalescingOperator()
         {
             var code = @"class C
 {
@@ -2516,16 +2754,16 @@ class Program
     }
 }";
 
-            AutoFormatOnSemicolon(
+            await AutoFormatOnSemicolonAsync(
                 code,
                 expected,
                 SyntaxKind.OpenBraceToken);
         }
 
-        [Fact]
-        [WorkItem(541517)]
+        [WpfFact]
+        [WorkItem(541517, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/541517")]
         [Trait(Traits.Feature, Traits.Features.SmartTokenFormatting)]
-        public void SwitchDefault()
+        public async Task SwitchDefault()
         {
             var code = @"using System;
 class Program
@@ -2561,16 +2799,16 @@ class Program
     }
 }";
 
-            AutoFormatOnColon(
+            await AutoFormatOnColonAsync(
                 code,
                 expected,
                 SyntaxKind.SemicolonToken);
         }
 
-        [Fact]
-        [WorkItem(542538)]
+        [WpfFact]
+        [WorkItem(542538, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/542538")]
         [Trait(Traits.Feature, Traits.Features.SmartTokenFormatting)]
-        public void MissingTokens1()
+        public async Task MissingTokens1()
         {
             var code = @"class Program
 {
@@ -2588,86 +2826,88 @@ class Program
     }
 }";
 
-            AutoFormatOnMarker(
+            await AutoFormatOnMarkerAsync(
                 code,
                 expected,
                 SyntaxKind.ColonColonToken,
                 SyntaxKind.OpenBraceToken);
         }
 
-        [Fact]
-        [WorkItem(542538)]
+        [WpfFact]
+        [WorkItem(542538, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/542538")]
         [Trait(Traits.Feature, Traits.Features.SmartTokenFormatting)]
-        public void MissingTokens2()
+        public async Task MissingTokens2()
         {
             var code = @"class C { void M() { M(() => { }$$ } }";
 
             var expected = @"class C { void M() { M(() => { } } }";
 
-            AutoFormatOnCloseBrace(
+            await AutoFormatOnCloseBraceAsync(
                 code,
                 expected,
                 SyntaxKind.EqualsGreaterThanToken);
         }
 
-        [Fact]
-        [WorkItem(542953)]
+        [WpfFact]
+        [WorkItem(542953, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/542953")]
         [Trait(Traits.Feature, Traits.Features.SmartTokenFormatting)]
-        public void UsingAlias()
+        public async Task UsingAlias()
         {
             var code = @"using Alias=System;$$";
 
             var expected = @"using Alias = System;";
 
-            AutoFormatOnSemicolon(
+            await AutoFormatOnSemicolonAsync(
                 code,
                 expected,
                 SyntaxKind.UsingKeyword);
         }
 
-        [Fact]
-        [WorkItem(542953)]
+        [WpfFact]
+        [WorkItem(542953, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/542953")]
         [Trait(Traits.Feature, Traits.Features.SmartTokenFormatting)]
-        public void NoLineChangeWithSyntaxError()
+        public async Task NoLineChangeWithSyntaxError()
         {
-            var code = @"struct Foo { public int member; }
+            var code = @"struct Goo { public int member; }
 class Program{
     void Main()
     {
-        var f = new Foo { member;$$ }
+        var f = new Goo { member;$$ }
     }
 }";
 
-            var expected = @"struct Foo { public int member; }
+            var expected = @"struct Goo { public int member; }
 class Program{
     void Main()
     {
-        var f = new Foo { member; }
+        var f = new Goo { member; }
     }
 }";
 
-            AutoFormatOnSemicolon(
+            await AutoFormatOnSemicolonAsync(
                 code,
                 expected,
                 SyntaxKind.OpenBraceToken);
         }
 
-        [Fact]
-        [WorkItem(620568)]
+        [WpfTheory]
+        [CombinatorialData]
+        [WorkItem(620568, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/620568")]
         [Trait(Traits.Feature, Traits.Features.SmartTokenFormatting)]
-        public void SkippedTokens1()
+        public void SkippedTokens1(bool useTabs)
         {
             var code = @";$$*";
 
             var expected = @";*";
 
-            AutoFormatToken(code, expected);
+            AutoFormatToken(code, expected, useTabs);
         }
 
-        [Fact]
-        [WorkItem(530830)]
+        [WpfTheory]
+        [CombinatorialData]
+        [WorkItem(530830, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/530830")]
         [Trait(Traits.Feature, Traits.Features.SmartTokenFormatting)]
-        public void AutoPropertyAccessor()
+        public void AutoPropertyAccessor(bool useTabs)
         {
             var code = @"class C
 {
@@ -2679,13 +2919,14 @@ class Program{
     int Prop {          get;
 }";
 
-            AutoFormatToken(code, expected);
+            AutoFormatToken(code, expected, useTabs);
         }
 
-        [Fact]
-        [WorkItem(530830)]
+        [WpfTheory]
+        [CombinatorialData]
+        [WorkItem(530830, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/530830")]
         [Trait(Traits.Feature, Traits.Features.SmartTokenFormatting)]
-        public void AutoPropertyAccessor2()
+        public void AutoPropertyAccessor2(bool useTabs)
         {
             var code = @"class C
 {
@@ -2697,13 +2938,14 @@ class Program{
     int Prop {          get;                set;
 }";
 
-            AutoFormatToken(code, expected);
+            AutoFormatToken(code, expected, useTabs);
         }
 
-        [Fact]
-        [WorkItem(530830)]
+        [WpfTheory]
+        [CombinatorialData]
+        [WorkItem(530830, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/530830")]
         [Trait(Traits.Feature, Traits.Features.SmartTokenFormatting)]
-        public void AutoPropertyAccessor3()
+        public void AutoPropertyAccessor3(bool useTabs)
         {
             var code = @"class C
 {
@@ -2715,13 +2957,14 @@ class Program{
     int Prop { get; set; }
 }";
 
-            AutoFormatToken(code, expected);
+            AutoFormatToken(code, expected, useTabs);
         }
 
-        [Fact]
-        [WorkItem(784674)]
+        [WpfTheory]
+        [CombinatorialData]
+        [WorkItem(784674, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/784674")]
         [Trait(Traits.Feature, Traits.Features.SmartTokenFormatting)]
-        public void AutoPropertyAccessor4()
+        public void AutoPropertyAccessor4(bool useTabs)
         {
             var code = @"class C
 {
@@ -2733,13 +2976,14 @@ class Program{
     int Prop { get; }
 }";
 
-            AutoFormatToken(code, expected);
+            AutoFormatToken(code, expected, useTabs);
         }
 
-        [Fact]
-        [WorkItem(924469)]
+        [WpfTheory]
+        [CombinatorialData]
+        [WorkItem(924469, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/924469")]
         [Trait(Traits.Feature, Traits.Features.SmartTokenFormatting)]
-        public void AutoPropertyAccessor5()
+        public void AutoPropertyAccessor5(bool useTabs)
         {
             var code = @"class C
 {
@@ -2750,13 +2994,14 @@ class Program{
 {
     int Prop { get; set; }
 }";
-            AutoFormatToken(code, expected);
+            AutoFormatToken(code, expected, useTabs);
         }
 
-        [Fact]
-        [WorkItem(924469)]
+        [WpfTheory]
+        [CombinatorialData]
+        [WorkItem(924469, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/924469")]
         [Trait(Traits.Feature, Traits.Features.SmartTokenFormatting)]
-        public void AutoPropertyAccessor6()
+        public void AutoPropertyAccessor6(bool useTabs)
         {
             var code = @"class C
 {
@@ -2768,13 +3013,14 @@ class Program{
     int Prop { get; set; }
 }";
 
-            AutoFormatToken(code, expected);
+            AutoFormatToken(code, expected, useTabs);
         }
 
-        [Fact]
-        [WorkItem(924469)]
+        [WpfTheory]
+        [CombinatorialData]
+        [WorkItem(924469, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/924469")]
         [Trait(Traits.Feature, Traits.Features.SmartTokenFormatting)]
-        public void AutoPropertyAccessor7()
+        public void AutoPropertyAccessor7(bool useTabs)
         {
             var code = @"class C
 {
@@ -2786,13 +3032,14 @@ class Program{
     int Prop     { get; set; }    
 }";
 
-            AutoFormatToken(code, expected);
+            AutoFormatToken(code, expected, useTabs);
         }
 
-        [Fact]
-        [WorkItem(912965)]
+        [WpfTheory]
+        [CombinatorialData]
+        [WorkItem(912965, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/912965")]
         [Trait(Traits.Feature, Traits.Features.SmartTokenFormatting)]
-        public void NestedUsingStatement()
+        public void NestedUsingStatement(bool useTabs)
         {
             var code = @"class C
 {
@@ -2812,13 +3059,14 @@ class Program{
     }
 }";
 
-            AutoFormatToken(code, expected);
+            AutoFormatToken(code, expected, useTabs);
         }
 
-        [Fact]
-        [WorkItem(912965)]
+        [WpfTheory]
+        [CombinatorialData]
+        [WorkItem(912965, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/912965")]
         [Trait(Traits.Feature, Traits.Features.SmartTokenFormatting)]
-        public void NestedNotUsingStatement()
+        public void NestedNotUsingStatement(bool useTabs)
         {
             var code = @"class C
 {
@@ -2838,13 +3086,220 @@ class Program{
     }
 }";
 
-            AutoFormatToken(code, expected);
+            AutoFormatToken(code, expected, useTabs);
         }
 
-        [Fact]
-        [WorkItem(954386)]
+        [WpfTheory]
+        [CombinatorialData]
         [Trait(Traits.Feature, Traits.Features.SmartTokenFormatting)]
-        public void FormattingRangeForFirstStatementOfBlock()
+        public void UsingStatementWithNestedFixedStatement(bool useTabs)
+        {
+            var code = @"class C
+{
+    public void M()
+    {
+        using (null)
+        fixed (void* ptr = &i)
+        {
+        }$$
+    }
+}";
+
+            var expected = @"class C
+{
+    public void M()
+    {
+        using (null)
+            fixed (void* ptr = &i)
+            {
+            }
+    }
+}";
+
+            AutoFormatToken(code, expected, useTabs);
+        }
+
+        [WpfTheory]
+        [CombinatorialData]
+        [Trait(Traits.Feature, Traits.Features.SmartTokenFormatting)]
+        public void UsingStatementWithNestedCheckedStatement(bool useTabs)
+        {
+            var code = @"class C
+{
+    public void M()
+    {
+        using (null)
+        checked
+        {
+        }$$
+    }
+}";
+
+            var expected = @"class C
+{
+    public void M()
+    {
+        using (null)
+            checked
+            {
+            }
+    }
+}";
+
+            AutoFormatToken(code, expected, useTabs);
+        }
+
+        [WpfTheory]
+        [CombinatorialData]
+        [Trait(Traits.Feature, Traits.Features.SmartTokenFormatting)]
+        public void UsingStatementWithNestedUncheckedStatement(bool useTabs)
+        {
+            var code = @"class C
+{
+    public void M()
+    {
+        using (null)
+        unchecked
+        {
+        }$$
+    }
+}";
+
+            var expected = @"class C
+{
+    public void M()
+    {
+        using (null)
+            unchecked
+            {
+            }
+    }
+}";
+
+            AutoFormatToken(code, expected, useTabs);
+        }
+
+        [WpfTheory]
+        [CombinatorialData]
+        [Trait(Traits.Feature, Traits.Features.SmartTokenFormatting)]
+        public void FixedStatementWithNestedUsingStatement(bool useTabs)
+        {
+            var code = @"class C
+{
+    public void M()
+    {
+        fixed (void* ptr = &i)
+        using (null)$$
+    }
+}";
+
+            var expected = @"class C
+{
+    public void M()
+    {
+        fixed (void* ptr = &i)
+            using (null)
+    }
+}";
+
+            AutoFormatToken(code, expected, useTabs);
+        }
+
+        [WpfTheory]
+        [CombinatorialData]
+        [Trait(Traits.Feature, Traits.Features.SmartTokenFormatting)]
+        public void FixedStatementWithNestedFixedStatement(bool useTabs)
+        {
+            var code = @"class C
+{
+    public void M()
+    {
+        fixed (void* ptr1 = &i)
+            fixed (void* ptr2 = &i)
+            {
+            }$$
+    }
+}";
+
+            var expected = @"class C
+{
+    public void M()
+    {
+        fixed (void* ptr1 = &i)
+        fixed (void* ptr2 = &i)
+        {
+        }
+    }
+}";
+
+            AutoFormatToken(code, expected, useTabs);
+        }
+
+        [WpfTheory]
+        [CombinatorialData]
+        [Trait(Traits.Feature, Traits.Features.SmartTokenFormatting)]
+        public void FixedStatementWithNestedNotFixedStatement(bool useTabs)
+        {
+            var code = @"class C
+{
+    public void M()
+    {
+        fixed (void* ptr = &i)
+        if (false)
+        {
+        }$$
+    }
+}";
+
+            var expected = @"class C
+{
+    public void M()
+    {
+        fixed (void* ptr = &i)
+            if (false)
+            {
+            }
+    }
+}";
+
+            AutoFormatToken(code, expected, useTabs);
+        }
+
+        [WpfTheory]
+        [CombinatorialData]
+        [Trait(Traits.Feature, Traits.Features.SmartTokenFormatting)]
+        public void NotFixedStatementWithNestedFixedStatement(bool useTabs)
+        {
+            var code = @"class C
+{
+    public void M()
+    {
+        if (false)
+        fixed (void* ptr = &i)
+        {
+        }$$
+    }
+}";
+
+            var expected = @"class C
+{
+    public void M()
+    {
+        if (false)
+            fixed (void* ptr = &i)
+            {
+            }
+    }
+}";
+
+            AutoFormatToken(code, expected, useTabs);
+        }
+
+        [WpfTheory]
+        [CombinatorialData]
+        [WorkItem(954386, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/954386")]
+        [Trait(Traits.Feature, Traits.Features.SmartTokenFormatting)]
+        public void FormattingRangeForFirstStatementOfBlock(bool useTabs)
         {
             var code = @"class C
 {
@@ -2861,13 +3316,14 @@ class Program{
     }
 }";
 
-            AutoFormatToken(code, expected);
+            AutoFormatToken(code, expected, useTabs);
         }
 
-        [Fact]
-        [WorkItem(954386)]
+        [WpfTheory]
+        [CombinatorialData]
+        [WorkItem(954386, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/954386")]
         [Trait(Traits.Feature, Traits.Features.SmartTokenFormatting)]
-        public void FormattingRangeForFirstMemberofType()
+        public void FormattingRangeForFirstMemberofType(bool useTabs)
         {
             var code = @"class C
 {int s;$$
@@ -2884,13 +3340,14 @@ class Program{
     }
 }";
 
-            AutoFormatToken(code, expected);
+            AutoFormatToken(code, expected, useTabs);
         }
 
-        [Fact]
-        [WorkItem(954386)]
+        [WpfTheory]
+        [CombinatorialData]
+        [WorkItem(954386, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/954386")]
         [Trait(Traits.Feature, Traits.Features.SmartTokenFormatting)]
-        public void FormattingRangeForFirstMethodMemberofType()
+        public void FormattingRangeForFirstMethodMemberofType(bool useTabs)
         {
             var code = @"interface C
 {void s();$$
@@ -2901,13 +3358,70 @@ class Program{
     void s();
 }";
 
-            AutoFormatToken(code, expected);
+            AutoFormatToken(code, expected, useTabs);
         }
 
-        [Fact]
-        [WorkItem(954386)]
+        [WpfTheory]
+        [CombinatorialData]
+        [WorkItem(17257, "https://github.com/dotnet/roslyn/issues/17257")]
         [Trait(Traits.Feature, Traits.Features.SmartTokenFormatting)]
-        public void FormattingRangeForFirstMemberOfNamespace()
+        public void FormattingRangeForConstructor(bool useTabs)
+        {
+            var code = @"class C
+{public C()=>f=1;$$
+}";
+
+            var expected = @"class C
+{
+    public C() => f = 1;
+}";
+
+            AutoFormatToken(code, expected, useTabs);
+        }
+
+        [WpfTheory]
+        [CombinatorialData]
+        [WorkItem(17257, "https://github.com/dotnet/roslyn/issues/17257")]
+        [Trait(Traits.Feature, Traits.Features.SmartTokenFormatting)]
+        public void FormattingRangeForDestructor(bool useTabs)
+        {
+            var code = @"class C
+{~C()=>f=1;$$
+}";
+
+            var expected = @"class C
+{
+    ~C() => f = 1;
+}";
+
+            AutoFormatToken(code, expected, useTabs);
+        }
+
+        [WpfTheory]
+        [CombinatorialData]
+        [WorkItem(17257, "https://github.com/dotnet/roslyn/issues/17257")]
+        [Trait(Traits.Feature, Traits.Features.SmartTokenFormatting)]
+        public void FormattingRangeForOperator(bool useTabs)
+        {
+            var code = @"class C
+{public static C operator +(C left, C right)=>field=1;$$
+    static int field;
+}";
+
+            var expected = @"class C
+{
+    public static C operator +(C left, C right) => field = 1;
+    static int field;
+}";
+
+            AutoFormatToken(code, expected, useTabs);
+        }
+
+        [WpfTheory]
+        [CombinatorialData]
+        [WorkItem(954386, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/954386")]
+        [Trait(Traits.Feature, Traits.Features.SmartTokenFormatting)]
+        public void FormattingRangeForFirstMemberOfNamespace(bool useTabs)
         {
             var code = @"namespace C
 {delegate void s();$$
@@ -2918,13 +3432,14 @@ class Program{
     delegate void s();
 }";
 
-            AutoFormatToken(code, expected);
+            AutoFormatToken(code, expected, useTabs);
         }
 
-        [WorkItem(981821)]
-        [Fact]
+        [WpfTheory]
+        [CombinatorialData]
+        [WorkItem(981821, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/981821")]
         [Trait(Traits.Feature, Traits.Features.Formatting)]
-        public void FormatDirectiveTriviaAlwaysToColumZero()
+        public void FormatDirectiveTriviaAlwaysToColumnZero(bool useTabs)
         {
             var code = @"class Program
 {
@@ -2946,13 +3461,14 @@ class Program{
 }
 ";
 
-            AutoFormatToken(code, expected);
+            AutoFormatToken(code, expected, useTabs);
         }
 
-        [WorkItem(981821)]
-        [Fact]
+        [WpfTheory]
+        [CombinatorialData]
+        [WorkItem(981821, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/981821")]
         [Trait(Traits.Feature, Traits.Features.Formatting)]
-        public void FormatDirectiveTriviaAlwaysToColumZeroWithCode()
+        public void FormatDirectiveTriviaAlwaysToColumnZeroWithCode(bool useTabs)
         {
             var code = @"class Program
 {
@@ -2976,13 +3492,14 @@ class Program{
 }
 ";
 
-            AutoFormatToken(code, expected);
+            AutoFormatToken(code, expected, useTabs);
         }
 
-        [WorkItem(981821)]
-        [Fact]
+        [WpfTheory]
+        [CombinatorialData]
+        [WorkItem(981821, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/981821")]
         [Trait(Traits.Feature, Traits.Features.Formatting)]
-        public void FormatDirectiveTriviaAlwaysToColumZeroWithBrokenElseDirective()
+        public void FormatDirectiveTriviaAlwaysToColumnZeroWithBrokenElseDirective(bool useTabs)
         {
             var code = @"class Program
 {
@@ -3004,91 +3521,95 @@ class Program{
 }
 ";
 
-            AutoFormatToken(code, expected);
+            AutoFormatToken(code, expected, useTabs);
         }
 
-        internal static void AutoFormatToken(string markup, string expected)
+        internal static void AutoFormatToken(string markup, string expected, bool useTabs)
         {
-            using (var workspace = CSharpWorkspaceFactory.CreateWorkspaceFromLines(new string[] { markup }))
+            if (useTabs)
             {
-                var subjectDocument = workspace.Documents.Single();
-
-                var optionService = workspace.Services.GetService<IOptionService>();
-                var textUndoHistory = new Mock<ITextUndoHistoryRegistry>();
-                var editorOperationsFactory = new Mock<IEditorOperationsFactoryService>();
-                var editorOperations = new Mock<IEditorOperations>();
-                editorOperationsFactory.Setup(x => x.GetEditorOperations(subjectDocument.GetTextView())).Returns(editorOperations.Object);
-
-                var commandHandler = new FormatCommandHandler(TestWaitIndicator.Default, textUndoHistory.Object, editorOperationsFactory.Object);
-                var typedChar = subjectDocument.GetTextBuffer().CurrentSnapshot.GetText(subjectDocument.CursorPosition.Value - 1, 1);
-                commandHandler.ExecuteCommand(new TypeCharCommandArgs(subjectDocument.GetTextView(), subjectDocument.TextBuffer, typedChar[0]), () => { });
-
-                var newSnapshot = subjectDocument.TextBuffer.CurrentSnapshot;
-
-                Assert.Equal(expected, newSnapshot.GetText());
+                markup = markup.Replace("    ", "\t");
+                expected = expected.Replace("    ", "\t");
             }
+
+            using var workspace = TestWorkspace.CreateCSharp(markup);
+
+            workspace.TryApplyChanges(workspace.CurrentSolution.WithOptions(workspace.Options
+                .WithChangedOption(FormattingOptions2.UseTabs, LanguageNames.CSharp, useTabs)));
+
+            var subjectDocument = workspace.Documents.Single();
+
+            var commandHandler = workspace.GetService<FormatCommandHandler>();
+            var typedChar = subjectDocument.GetTextBuffer().CurrentSnapshot.GetText(subjectDocument.CursorPosition.Value - 1, 1);
+            commandHandler.ExecuteCommand(new TypeCharCommandArgs(subjectDocument.GetTextView(), subjectDocument.GetTextBuffer(), typedChar[0]), () => { }, TestCommandExecutionContext.Create());
+
+            var newSnapshot = subjectDocument.GetTextBuffer().CurrentSnapshot;
+
+            Assert.Equal(expected, newSnapshot.GetText());
         }
 
-        private static Tuple<OptionSet, IEnumerable<IFormattingRule>> GetService(
+        private static Tuple<OptionSet, IEnumerable<AbstractFormattingRule>> GetService(
             TestWorkspace workspace)
         {
             var options = workspace.Options;
             return Tuple.Create(options, Formatter.GetDefaultFormattingRules(workspace, LanguageNames.CSharp));
         }
 
-        private void AutoFormatOnColon(string codeWithMarker, string expected, SyntaxKind startTokenKind)
+        private static Task AutoFormatOnColonAsync(string codeWithMarker, string expected, SyntaxKind startTokenKind)
+            => AutoFormatOnMarkerAsync(codeWithMarker, expected, SyntaxKind.ColonToken, startTokenKind);
+
+        private static Task AutoFormatOnSemicolonAsync(string codeWithMarker, string expected, SyntaxKind startTokenKind)
+            => AutoFormatOnMarkerAsync(codeWithMarker, expected, SyntaxKind.SemicolonToken, startTokenKind);
+
+        private static Task AutoFormatOnCloseBraceAsync(string codeWithMarker, string expected, SyntaxKind startTokenKind)
+            => AutoFormatOnMarkerAsync(codeWithMarker, expected, SyntaxKind.CloseBraceToken, startTokenKind);
+
+        private static async Task AutoFormatOnMarkerAsync(string initialMarkup, string expected, SyntaxKind tokenKind, SyntaxKind startTokenKind)
         {
-            AutoFormatOnMarker(codeWithMarker, expected, SyntaxKind.ColonToken, startTokenKind);
+            await AutoFormatOnMarkerAsync(initialMarkup, expected, useTabs: false, tokenKind, startTokenKind).ConfigureAwait(false);
+            await AutoFormatOnMarkerAsync(initialMarkup.Replace("    ", "\t"), expected.Replace("    ", "\t"), useTabs: true, tokenKind, startTokenKind).ConfigureAwait(false);
         }
 
-        private void AutoFormatOnSemicolon(string codeWithMarker, string expected, SyntaxKind startTokenKind)
+        private static async Task AutoFormatOnMarkerAsync(string initialMarkup, string expected, bool useTabs, SyntaxKind tokenKind, SyntaxKind startTokenKind)
         {
-            AutoFormatOnMarker(codeWithMarker, expected, SyntaxKind.SemicolonToken, startTokenKind);
-        }
+            using var workspace = TestWorkspace.CreateCSharp(initialMarkup);
 
-        private void AutoFormatOnCloseBrace(string codeWithMarker, string expected, SyntaxKind startTokenKind)
-        {
-            AutoFormatOnMarker(codeWithMarker, expected, SyntaxKind.CloseBraceToken, startTokenKind);
-        }
+            workspace.TryApplyChanges(workspace.CurrentSolution.WithOptions(workspace.Options
+                .WithChangedOption(FormattingOptions2.UseTabs, LanguageNames.CSharp, useTabs)));
 
-        private void AutoFormatOnMarker(string initialMarkup, string expected, SyntaxKind tokenKind, SyntaxKind startTokenKind)
-        {
-            using (var workspace = CSharpWorkspaceFactory.CreateWorkspaceFromLines(initialMarkup))
+            var tuple = GetService(workspace);
+            var testDocument = workspace.Documents.Single();
+            var buffer = testDocument.GetTextBuffer();
+            var position = testDocument.CursorPosition.Value;
+
+            var document = workspace.CurrentSolution.GetDocument(testDocument.Id);
+
+            var root = (CompilationUnitSyntax)await document.GetSyntaxRootAsync();
+            var endToken = root.FindToken(position);
+            if (position == endToken.SpanStart && !endToken.GetPreviousToken().IsKind(SyntaxKind.None))
             {
-                var tuple = GetService(workspace);
-                var testDocument = workspace.Documents.Single();
-                var buffer = testDocument.GetTextBuffer();
-                var position = testDocument.CursorPosition.Value;
-
-                var document = workspace.CurrentSolution.GetDocument(testDocument.Id);
-
-                var root = (CompilationUnitSyntax)document.GetSyntaxRootAsync().Result;
-                var endToken = root.FindToken(position);
-                if (position == endToken.SpanStart && !endToken.GetPreviousToken().IsKind(SyntaxKind.None))
-                {
-                    endToken = endToken.GetPreviousToken();
-                }
-
-                Assert.Equal(tokenKind, endToken.Kind());
-                var formatter = new SmartTokenFormatter(tuple.Item1, tuple.Item2, root);
-
-                var tokenRange = FormattingRangeHelper.FindAppropriateRange(endToken);
-                if (tokenRange == null)
-                {
-                    Assert.Equal(startTokenKind, SyntaxKind.None);
-                    return;
-                }
-
-                Assert.Equal(startTokenKind, tokenRange.Value.Item1.Kind());
-                if (tokenRange.Value.Item1.Equals(tokenRange.Value.Item2))
-                {
-                    return;
-                }
-
-                var changes = formatter.FormatRange(workspace, tokenRange.Value.Item1, tokenRange.Value.Item2, CancellationToken.None);
-                var actual = GetFormattedText(buffer, changes);
-                Assert.Equal(expected, actual);
+                endToken = endToken.GetPreviousToken();
             }
+
+            Assert.Equal(tokenKind, endToken.Kind());
+            var formatter = new CSharpSmartTokenFormatter(tuple.Item1, tuple.Item2, root);
+
+            var tokenRange = FormattingRangeHelper.FindAppropriateRange(endToken);
+            if (tokenRange == null)
+            {
+                Assert.Equal(SyntaxKind.None, startTokenKind);
+                return;
+            }
+
+            Assert.Equal(startTokenKind, tokenRange.Value.Item1.Kind());
+            if (tokenRange.Value.Item1.Equals(tokenRange.Value.Item2))
+            {
+                return;
+            }
+
+            var changes = formatter.FormatRange(workspace, tokenRange.Value.Item1, tokenRange.Value.Item2, CancellationToken.None);
+            var actual = GetFormattedText(buffer, changes);
+            Assert.Equal(expected, actual);
         }
 
         private static string GetFormattedText(ITextBuffer buffer, IList<TextChange> changes)

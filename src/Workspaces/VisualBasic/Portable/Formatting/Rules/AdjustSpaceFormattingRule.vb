@@ -1,13 +1,11 @@
-﻿' Copyright (c) Microsoft.  All Rights Reserved.  Licensed under the Apache License, Version 2.0.  See License.txt in the project root for license information.
+﻿' Licensed to the .NET Foundation under one or more agreements.
+' The .NET Foundation licenses this file to you under the MIT license.
+' See the LICENSE file in the project root for more information.
 
-Imports System.Composition
 Imports Microsoft.CodeAnalysis.Formatting.Rules
-Imports Microsoft.CodeAnalysis.Options
 Imports Microsoft.CodeAnalysis.VisualBasic.Syntax
 
 Namespace Microsoft.CodeAnalysis.VisualBasic.Formatting
-    <ExportFormattingRule(AdjustSpaceFormattingRule.Name, LanguageNames.VisualBasic), [Shared]>
-    <ExtensionOrder(After:=ElasticTriviaFormattingRule.Name)>
     Friend Class AdjustSpaceFormattingRule
         Inherits BaseFormattingRule
         Friend Const Name As String = "VisualBasic Adjust Space Formatting Rule"
@@ -15,7 +13,7 @@ Namespace Microsoft.CodeAnalysis.VisualBasic.Formatting
         Public Sub New()
         End Sub
 
-        Public Overrides Function GetAdjustSpacesOperation(previousToken As SyntaxToken, currentToken As SyntaxToken, optionSet As OptionSet, nextFunc As NextOperation(Of AdjustSpacesOperation)) As AdjustSpacesOperation
+        Public Overrides Function GetAdjustSpacesOperationSlow(ByRef previousToken As SyntaxToken, ByRef currentToken As SyntaxToken, ByRef nextFunc As NextGetAdjustSpacesOperation) As AdjustSpacesOperation
             ' * <end of file token>
             If currentToken.Kind = SyntaxKind.EndOfFileToken Then
                 Return CreateAdjustSpacesOperation(0, AdjustSpacesOption.ForceSpacesIfOnSingleLine)
@@ -23,11 +21,6 @@ Namespace Microsoft.CodeAnalysis.VisualBasic.Formatting
 
             ' ()
             If previousToken.Kind = SyntaxKind.OpenParenToken AndAlso currentToken.Kind = SyntaxKind.CloseParenToken Then
-                Return CreateAdjustSpacesOperation(0, AdjustSpacesOption.ForceSpacesIfOnSingleLine)
-            End If
-
-            ' ,,
-            If previousToken.Kind = SyntaxKind.CommaToken AndAlso currentToken.Kind = SyntaxKind.CommaToken Then
                 Return CreateAdjustSpacesOperation(0, AdjustSpacesOption.ForceSpacesIfOnSingleLine)
             End If
 
@@ -197,64 +190,32 @@ Namespace Microsoft.CodeAnalysis.VisualBasic.Formatting
                 Return CreateAdjustSpacesOperation(1, AdjustSpacesOption.ForceSpacesIfOnSingleLine)
             End If
 
-
             ' ? . [conditional access operator]
-            If previousToken.Kind = SyntaxKind.QuestionToken AndAlso currentToken.Kind = SyntaxKind.DotToken AndAlso
-                previousToken.Parent.IsKind(SyntaxKind.ConditionalAccessExpression) Then
+            ' ? ! [conditional access operator]
+            If previousToken.Kind = SyntaxKind.QuestionToken AndAlso currentToken.IsKind(SyntaxKind.DotToken, SyntaxKind.ExclamationToken) AndAlso
+               previousToken.Parent.IsKind(SyntaxKind.ConditionalAccessExpression) Then
                 Return CreateAdjustSpacesOperation(0, AdjustSpacesOption.ForceSpacesIfOnSingleLine)
             End If
 
-            ' identifier ? [conditional access operator]
-            If previousToken.Kind = SyntaxKind.IdentifierToken AndAlso currentToken.Kind = SyntaxKind.QuestionToken AndAlso
-                    currentToken.Parent.Kind = SyntaxKind.ConditionalAccessExpression Then
-
-                Return CreateAdjustSpacesOperation(0, AdjustSpacesOption.ForceSpacesIfOnSingleLine)
-            End If
-
-            ' Me ? [conditional access operator]
-            If previousToken.Kind = SyntaxKind.MeKeyword AndAlso currentToken.Kind = SyntaxKind.QuestionToken AndAlso
-                    currentToken.Parent.Kind = SyntaxKind.ConditionalAccessExpression Then
-
-                Return CreateAdjustSpacesOperation(0, AdjustSpacesOption.ForceSpacesIfOnSingleLine)
-            End If
-
-            ' MyBase ? [conditional access operator]
-            If previousToken.Kind = SyntaxKind.MyBaseKeyword AndAlso currentToken.Kind = SyntaxKind.QuestionToken AndAlso
-                    currentToken.Parent.Kind = SyntaxKind.ConditionalAccessExpression Then
-
-                Return CreateAdjustSpacesOperation(0, AdjustSpacesOption.ForceSpacesIfOnSingleLine)
-            End If
-
-            ' MyClass ? [conditional access operator]
-            If previousToken.Kind = SyntaxKind.MyClassExpression AndAlso currentToken.Kind = SyntaxKind.QuestionToken AndAlso
-                    currentToken.Parent.Kind = SyntaxKind.ConditionalAccessExpression Then
-
-                Return CreateAdjustSpacesOperation(0, AdjustSpacesOption.ForceSpacesIfOnSingleLine)
-            End If
-
-            ' } ? [conditional access operator after initializer]
-            If previousToken.Kind = SyntaxKind.CloseBraceToken AndAlso currentToken.Kind = SyntaxKind.QuestionToken AndAlso
-                    currentToken.Parent.Kind = SyntaxKind.ConditionalAccessExpression Then
-
-                Return CreateAdjustSpacesOperation(0, AdjustSpacesOption.ForceSpacesIfOnSingleLine)
-            End If
-
-            ' " ? [conditional access operator after string literal]
-            If previousToken.Kind = SyntaxKind.StringLiteralToken AndAlso currentToken.Kind = SyntaxKind.QuestionToken AndAlso
-                    currentToken.Parent.Kind = SyntaxKind.ConditionalAccessExpression Then
-
-                Return CreateAdjustSpacesOperation(0, AdjustSpacesOption.ForceSpacesIfOnSingleLine)
-            End If
-
-            ' ) ? [conditional access off invocation]
-            If previousToken.Kind = SyntaxKind.CloseParenToken AndAlso currentToken.Kind = SyntaxKind.QuestionToken AndAlso
-                    currentToken.Parent.Kind = SyntaxKind.ConditionalAccessExpression Then
-
+            ' * ?
+            If currentToken.Kind = SyntaxKind.QuestionToken AndAlso
+               currentToken.Parent.Kind = SyntaxKind.ConditionalAccessExpression Then
                 Return CreateAdjustSpacesOperation(0, AdjustSpacesOption.ForceSpacesIfOnSingleLine)
             End If
 
             ' * [member access dot without expression]
             If previousToken.Kind <> SyntaxKind.OpenParenToken AndAlso FormattingHelpers.IsMemberAccessDotWithoutExpression(currentToken) Then
+
+                ' label:     .X
+                If previousToken.Kind = SyntaxKind.ColonToken AndAlso TypeOf previousToken.Parent Is LabelStatementSyntax Then
+                    Return FormattingOperations.CreateAdjustSpacesOperation(1, AdjustSpacesOption.DynamicSpaceToIndentationIfOnSingleLine)
+                End If
+
+                Return CreateAdjustSpacesOperation(1, AdjustSpacesOption.ForceSpacesIfOnSingleLine)
+            End If
+
+            ' * [dictionary access exclamation without expression]
+            If previousToken.Kind <> SyntaxKind.OpenParenToken AndAlso FormattingHelpers.IsDictionaryAccessExclamationWithoutExpression(currentToken) Then
                 Return CreateAdjustSpacesOperation(1, AdjustSpacesOption.ForceSpacesIfOnSingleLine)
             End If
 
@@ -297,21 +258,42 @@ Namespace Microsoft.CodeAnalysis.VisualBasic.Formatting
             ' * ,
             ' * .
             ' * :=
+            ' * !
             Select Case currentToken.Kind
-                Case SyntaxKind.CloseBraceToken, SyntaxKind.CloseParenToken, SyntaxKind.CommaToken, SyntaxKind.ColonEqualsToken
+                Case SyntaxKind.CloseParenToken, SyntaxKind.CommaToken
+                    Return If(previousToken.Kind = SyntaxKind.EmptyToken AndAlso PrecedingTriviaContainsLineBreak(previousToken),
+                        CreateAdjustSpacesOperation(0, AdjustSpacesOption.PreserveSpaces),
+                        CreateAdjustSpacesOperation(0, AdjustSpacesOption.ForceSpacesIfOnSingleLine))
+
+                Case SyntaxKind.CloseBraceToken, SyntaxKind.ColonEqualsToken
                     Return CreateAdjustSpacesOperation(0, AdjustSpacesOption.ForceSpacesIfOnSingleLine)
 
                 Case SyntaxKind.DotToken
                     Dim space = If(previousToken.Kind = SyntaxKind.CallKeyword OrElse
-                                   previousToken.Kind = SyntaxKind.KeyKeyword, 1, 0)
+                                   previousToken.Kind = SyntaxKind.KeyKeyword,
+                                   1, 0)
+
                     Return CreateAdjustSpacesOperation(space, AdjustSpacesOption.ForceSpacesIfOnSingleLine)
+
+                Case SyntaxKind.ExclamationToken
+                    If IsExclamationInDictionaryAccess(currentToken) Then
+                        Dim space = If(currentToken.TrailingTrivia.Any(SyntaxKind.LineContinuationTrivia), 1, 0)
+
+                        Return CreateAdjustSpacesOperation(space, AdjustSpacesOption.ForceSpacesIfOnSingleLine)
+                    End If
             End Select
+
+            ' nullable ? case
+            If FormattingHelpers.IsQuestionInNullableType(currentToken) Then
+                Return CreateAdjustSpacesOperation(0, AdjustSpacesOption.ForceSpacesIfOnSingleLine)
+            End If
 
             ' { *
             ' ( *
             ' ) *
             ' . *
             ' := *
+            ' ! *
             Select Case previousToken.Kind
                 Case SyntaxKind.OpenBraceToken, SyntaxKind.OpenParenToken, SyntaxKind.DotToken, SyntaxKind.ColonEqualsToken
                     Return CreateAdjustSpacesOperation(0, AdjustSpacesOption.ForceSpacesIfOnSingleLine)
@@ -319,20 +301,12 @@ Namespace Microsoft.CodeAnalysis.VisualBasic.Formatting
                 Case SyntaxKind.CloseParenToken
                     Dim space = If(previousToken.Kind = currentToken.Kind, 0, 1)
                     Return CreateAdjustSpacesOperation(space, AdjustSpacesOption.ForceSpacesIfOnSingleLine)
+
+                Case SyntaxKind.ExclamationToken
+                    If IsExclamationInDictionaryAccess(previousToken) Then
+                        Return CreateAdjustSpacesOperation(0, AdjustSpacesOption.ForceSpacesIfOnSingleLine)
+                    End If
             End Select
-
-            ' dictionary member access ! case
-            If IsExclamationInDictionaryAccess(previousToken) Then
-                Return CreateAdjustSpacesOperation(0, AdjustSpacesOption.ForceSpacesIfOnSingleLine)
-            End If
-
-            If IsExclamationInDictionaryAccess(currentToken) Then
-                If Not currentToken.TrailingTrivia.Any(SyntaxKind.LineContinuationTrivia) AndAlso
-                   previousToken.Kind <> SyntaxKind.WithKeyword AndAlso
-                   previousToken.Kind <> SyntaxKind.EqualsToken Then
-                    Return CreateAdjustSpacesOperation(0, AdjustSpacesOption.ForceSpacesIfOnSingleLine)
-                End If
-            End If
 
             ' * </
             If currentToken.Kind = SyntaxKind.LessThanSlashToken AndAlso
@@ -355,11 +329,6 @@ Namespace Microsoft.CodeAnalysis.VisualBasic.Formatting
             If (previousToken.Kind = SyntaxKind.PlusToken OrElse
                 previousToken.Kind = SyntaxKind.MinusToken) AndAlso
                 TypeOf previousToken.Parent Is UnaryExpressionSyntax Then
-                Return CreateAdjustSpacesOperation(0, AdjustSpacesOption.ForceSpacesIfOnSingleLine)
-            End If
-
-            ' nullable ? case
-            If FormattingHelpers.IsQuestionInNullableType(currentToken) Then
                 Return CreateAdjustSpacesOperation(0, AdjustSpacesOption.ForceSpacesIfOnSingleLine)
             End If
 
@@ -387,7 +356,15 @@ Namespace Microsoft.CodeAnalysis.VisualBasic.Formatting
                 Return CreateAdjustSpacesOperation(0, AdjustSpacesOption.ForceSpacesIfOnSingleLine)
             End If
 
-            Return nextFunc.Invoke()
+            Return nextFunc.Invoke(previousToken, currentToken)
+        End Function
+
+        Private Shared Function PrecedingTriviaContainsLineBreak(previousToken As SyntaxToken) As Boolean
+            Return ContainsLineBreak(previousToken.LeadingTrivia) OrElse ContainsLineBreak(previousToken.GetPreviousToken(includeZeroWidth:=True).TrailingTrivia)
+        End Function
+
+        Private Shared Function ContainsLineBreak(triviaList As SyntaxTriviaList) As Boolean
+            Return triviaList.Any(Function(t) t.Kind = SyntaxKind.EndOfLineTrivia)
         End Function
     End Class
 End Namespace

@@ -1,4 +1,8 @@
-﻿// Copyright (c) Microsoft.  All Rights Reserved.  Licensed under the Apache License, Version 2.0.  See License.txt in the project root for license information.
+﻿// Licensed to the .NET Foundation under one or more agreements.
+// The .NET Foundation licenses this file to you under the MIT license.
+// See the LICENSE file in the project root for more information.
+
+#nullable disable
 
 using System;
 using System.Collections.Generic;
@@ -250,7 +254,7 @@ Base.Property.set(6)
 ");
         }
 
-        [Fact]
+        [ConditionalFact(typeof(ClrOnly), Reason = "https://github.com/mono/mono/issues/10837")]
         public void TestImplicitImplementationInBaseGenericType()
         {
             var source = @"
@@ -464,7 +468,6 @@ Base.Property.set(6)
 
             CompileAndVerify(
                 CreateCompilationWithMscorlibAndReference(libSource, exeSource),
-                emitOptions: TestEmitters.CCI, // TODO (tomat): Ref.Emit infrastructure doesn't support compilation references
                 expectedOutput: expectedOutput);
         }
 
@@ -528,7 +531,6 @@ Base.Property.set(6)
 
             CompileAndVerify(
                 CreateCompilationWithMscorlibAndReference(libSource, exeSource),
-                emitOptions: TestEmitters.CCI, // TODO (tomat): Ref.Emit infrastructure doesn't support compilation references
                 expectedOutput: expectedOutput);
         }
 
@@ -576,7 +578,6 @@ Base.Method(3)
 
             CompileAndVerify(
                  CreateCompilationWithMscorlibAndReference(libSource, exeSource),
-                 emitOptions: TestEmitters.CCI, // TODO (tomat): Ref.Emit infrastructure doesn't support compilation references
                  expectedOutput: expectedOutput);
         }
 
@@ -635,7 +636,6 @@ Base.Method(9)
 
             CompileAndVerify(
                 CreateCompilationWithMscorlibAndReference(libSource, exeSource),
-                emitOptions: TestEmitters.CCI, // TODO (tomat): Ref.Emit infrastructure doesn't support compilation references
                 expectedOutput: expectedOutput);
         }
 
@@ -649,7 +649,7 @@ Base.Method(9)
             var source = @"
 interface I1
 {
-    void foo();
+    void goo();
 }
 
 interface I2 : I1
@@ -659,17 +659,17 @@ interface I2 : I1
 
 class X : I1
 {
-    void I1.foo()
+    void I1.goo()
     {
-        System.Console.WriteLine(""X::I1.foo"");
+        System.Console.WriteLine(""X::I1.goo"");
     }
 }
 
 class Y : X, I2
 {
-    public virtual void foo()
+    public virtual void goo()
     {
-        System.Console.WriteLine(""Y.foo"");
+        System.Console.WriteLine(""Y.goo"");
     }
 
     void I2.bar()
@@ -682,11 +682,11 @@ class Program
     static void Main()
     {
         I2 b = new Y();
-        b.foo();
+        b.goo();
     }
 }
 ";
-            CompileAndVerify(source, expectedOutput: "Y.foo");
+            CompileAndVerify(source, expectedOutput: "Y.goo");
         }
 
         /// <summary>
@@ -748,9 +748,9 @@ Derived2.P.set";
             CompileAndVerify(source, expectedOutput: expectedOutput);
         }
 
-        [WorkItem(540410, "DevDiv")]
+        [WorkItem(540410, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/540410")]
         [Fact]
-        public void ImplementMulipleInterfaceWithSommonBase()
+        public void ImplementMultipleInterfaceWithCommonBase()
         {
             var source = @"
 interface IBase
@@ -775,7 +775,7 @@ class C1 : IBase1, IBase2
             Action<ModuleSymbol> validator = module =>
             {
                 var typeSymbol = module.GlobalNamespace.GetTypeMembers("C1").Single();
-                Assert.True(typeSymbol.Interfaces.All(iface => iface.Name == "IBase" || iface.Name == "IBase1" || iface.Name == "IBase2"));
+                Assert.True(typeSymbol.Interfaces().All(iface => iface.Name == "IBase" || iface.Name == "IBase1" || iface.Name == "IBase2"));
             };
 
             CompileAndVerify(source, sourceSymbolValidator: validator, symbolValidator: validator, expectedSignatures: new[]
@@ -792,51 +792,51 @@ class C1 : IBase1, IBase2
             var source = @"
 interface IBase1
 {
-    void BaseFoo();
+    void BaseGoo();
 }
 interface IBase2
 {
-    void BaseFoo();
+    void BaseGoo();
 }
 interface IInterface : IBase1, IBase2
 {
-    void InterfaceFoo();
+    void InterfaceGoo();
 }
 class C1 : IInterface
 {
-    public void BaseFoo() { System.Console.Write(""BaseFoo "");}
-    public void InterfaceFoo() { System.Console.Write(""InterfaceFoo ""); }
+    public void BaseGoo() { System.Console.Write(""BaseGoo "");}
+    public void InterfaceGoo() { System.Console.Write(""InterfaceGoo ""); }
     public void Test()
     {
         C1 c = new C1();
-        c.BaseFoo();
-        c.InterfaceFoo();
-        ((IBase1)c).BaseFoo();
-        ((IBase2)c).BaseFoo();
-        ((IInterface)c).InterfaceFoo();
-        ((IInterface)c).BaseFoo();
+        c.BaseGoo();
+        c.InterfaceGoo();
+        ((IBase1)c).BaseGoo();
+        ((IBase2)c).BaseGoo();
+        ((IInterface)c).InterfaceGoo();
+        ((IInterface)c).BaseGoo();
     }
 }
 ";
-            CreateCompilationWithMscorlib(source)
+            CreateCompilation(source)
                 .VerifyDiagnostics(
-                    // (26,9): error CS0121: The call is ambiguous between the following methods or properties: 'IBase1.BaseFoo()' and 'IBase2.BaseFoo()'
-                    //         ((IInterface)c).BaseFoo();
-                    Diagnostic(ErrorCode.ERR_AmbigCall, "BaseFoo").WithArguments("IBase1.BaseFoo()", "IBase2.BaseFoo()"));
+                    // (26,9): error CS0121: The call is ambiguous between the following methods or properties: 'IBase1.BaseGoo()' and 'IBase2.BaseGoo()'
+                    //         ((IInterface)c).BaseGoo();
+                    Diagnostic(ErrorCode.ERR_AmbigCall, "BaseGoo").WithArguments("IBase1.BaseGoo()", "IBase2.BaseGoo()"));
         }
 
-        [WorkItem(540410, "DevDiv")]
+        [WorkItem(540410, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/540410")]
         [Fact]
-        public void InterfaceDiamondInheritenceWithNewMember()
+        public void InterfaceDiamondInheritanceWithNewMember()
         {
             var source = @"
 interface IBase
 {
-    void Foo();
+    void Goo();
 }
 interface ILeft : IBase
 {
-    new void Foo();
+    new void Goo();
 }
 interface IRight : IBase
 {
@@ -847,18 +847,18 @@ class C1 : IDerived
 {
     public void Bar() { }
 
-    void IBase.Foo() { System.Console.Write(""IBase "");}
+    void IBase.Goo() { System.Console.Write(""IBase "");}
 
-    void ILeft.Foo() { System.Console.Write(""ILeft ""); }
+    void ILeft.Goo() { System.Console.Write(""ILeft ""); }
 }
 public static class MainClass
 {
     static void Test(IDerived d)
     {
-        d.Foo();           // Invokes ileft.foo()
-        ((IBase)d).Foo();  // Invokes ibase.foo()
-        ((ILeft)d).Foo();  // Invokes ileft.foo()
-        ((IRight)d).Foo(); // Invokes ibase.foo()
+        d.Goo();           // Invokes ileft.goo()
+        ((IBase)d).Goo();  // Invokes ibase.goo()
+        ((ILeft)d).Goo();  // Invokes ileft.goo()
+        ((IRight)d).Goo(); // Invokes ibase.goo()
     }
     public static void Main()
     {
@@ -873,19 +873,19 @@ public static class MainClass
   // Code size       25 (0x19)
   .maxstack  1
   IL_0000:  ldarg.0   
-  IL_0001:  callvirt   ""void ILeft.Foo()""
+  IL_0001:  callvirt   ""void ILeft.Goo()""
   IL_0006:  ldarg.0   
-  IL_0007:  callvirt   ""void IBase.Foo()""
+  IL_0007:  callvirt   ""void IBase.Goo()""
   IL_000c:  ldarg.0   
-  IL_000d:  callvirt   ""void ILeft.Foo()""
+  IL_000d:  callvirt   ""void ILeft.Goo()""
   IL_0012:  ldarg.0   
-  IL_0013:  callvirt   ""void IBase.Foo()""
+  IL_0013:  callvirt   ""void IBase.Goo()""
   IL_0018:  ret       
 }");
         }
 
         [Fact]
-        public void TestImplicitImplSigntureMismatches_ParamsAndOptionals()
+        public void TestImplicitImplSignatureMismatches_ParamsAndOptionals()
         {
             // Tests:
             // Replace params with non-params in signature of implemented member (and vice-versa)
@@ -1557,13 +1557,13 @@ Base.Method()");
             comp.VerifyDiagnostics(); // No errors
         }
 
-        [Fact]
+        [ConditionalFact(typeof(ClrOnly), Reason = "https://github.com/mono/mono/issues/10837")]
         public void TestImplicitImplementationInBaseGenericType2()
         {
             // Tests:
             // Implement I<string> implicitly in base class and I<int> implicitly in derived class –
             // assuming I<string> and I<int> have members with same signature (i.e. members 
-            // that don’t depend on generic-ness of the interface) test which (base / derived class) 
+            // that don't depend on generic-ness of the interface) test which (base / derived class) 
             // members are invoked when calling through each interface
 
             var source = @"
@@ -1625,7 +1625,7 @@ Derived`2.Method()");
             comp.VerifyDiagnostics(); // No errors
         }
 
-        [Fact]
+        [ConditionalFact(typeof(ClrOnly), Reason = "https://github.com/mono/mono/issues/10837")]
         public void TestImplicitImplementationInBaseGenericType3()
         {
             // Tests:
@@ -1690,7 +1690,7 @@ Derived.Method()");
             comp.VerifyDiagnostics(); // No errors
         }
 
-        [Fact]
+        [ConditionalFact(typeof(ClrOnly), Reason = "https://github.com/mono/mono/issues/10837")]
         public void TestImplicitImplementationInBaseGenericType4()
         {
             // Tests:
@@ -1753,11 +1753,12 @@ Derived`2.Method(U)
 Derived.Method()");
 
             comp.VerifyDiagnostics(
-                // (17,17): warning CS1956: Member 'Derived<int, string>.Method(int)' implements interface member 'Interface<int>.Method(int)' in type 'Derived'. There are multiple matches for the interface member at run-time. It is implementation dependent which method will be called.
-                Diagnostic(ErrorCode.WRN_MultipleRuntimeImplementationMatches, "Method").WithArguments("Derived<int, string>.Method(int)", "Interface<int>.Method(int)", "Derived")); // No errors
+                // (20,58): warning CS1956: Member 'Derived<int, string>.Method(int)' implements interface member 'Interface<int>.Method(int)' in type 'Derived'. There are multiple matches for the interface member at run-time. It is implementation dependent which method will be called.
+                // class Derived : Derived<int, string>, Interface<string>, Interface<int>
+                Diagnostic(ErrorCode.WRN_MultipleRuntimeImplementationMatches, "Interface<int>").WithArguments("Derived<int, string>.Method(int)", "Interface<int>.Method(int)", "Derived").WithLocation(20, 58)); // No errors
         }
 
-        [Fact]
+        [ConditionalFact(typeof(ClrOnly), Reason = "https://github.com/mono/mono/issues/10837")]
         public void TestImplicitImplementationInBaseGenericType5()
         {
             // Tests:
@@ -2291,10 +2292,10 @@ D.M").VerifyDiagnostics(); // No errors
         /// </summary>
         private static CSharpCompilation CreateCompilationWithMscorlibAndReference(string libSource, string exeSource)
         {
-            var libComp = CreateCompilationWithMscorlib(libSource, options: TestOptions.ReleaseDll, assemblyName: "OtherAssembly");
+            var libComp = CreateCompilation(libSource, options: TestOptions.ReleaseDll, assemblyName: "OtherAssembly");
             libComp.VerifyDiagnostics();
 
-            var exeComp = CreateCompilationWithMscorlib(exeSource, options: TestOptions.ReleaseExe, references: new[] { new CSharpCompilationReference(libComp) });
+            var exeComp = CreateCompilation(exeSource, options: TestOptions.ReleaseExe, references: new[] { new CSharpCompilationReference(libComp) });
             exeComp.VerifyDiagnostics();
 
             return exeComp;

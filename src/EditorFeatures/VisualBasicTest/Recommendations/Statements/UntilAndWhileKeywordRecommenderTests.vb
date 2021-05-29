@@ -1,29 +1,24 @@
-' Copyright (c) Microsoft.  All Rights Reserved.  Licensed under the Apache License, Version 2.0.  See License.txt in the project root for license information.
-
-Imports Microsoft.CodeAnalysis.Text
-Imports Microsoft.CodeAnalysis.VisualBasic
-Imports Microsoft.CodeAnalysis.VisualBasic.Symbols
-Imports Microsoft.CodeAnalysis.VisualBasic.Syntax
-Imports Roslyn.Test.Utilities
-Imports Xunit
+﻿' Licensed to the .NET Foundation under one or more agreements.
+' The .NET Foundation licenses this file to you under the MIT license.
+' See the LICENSE file in the project root for more information.
 
 Namespace Microsoft.CodeAnalysis.Editor.VisualBasic.UnitTests.Recommendations.Statements
     Public Class UntilAndWhileKeywordRecommenderTests
         <Fact>
         <Trait(Traits.Feature, Traits.Features.KeywordRecommending)>
-        Public Sub UntilAfterDo()
+        Public Sub UntilAfterDoTest()
             VerifyRecommendationsContain(<MethodBody>Do |</MethodBody>, "Until")
         End Sub
 
         <Fact>
         <Trait(Traits.Feature, Traits.Features.KeywordRecommending)>
-        Public Sub WhileAfterDo()
+        Public Sub WhileAfterDoTest()
             VerifyRecommendationsContain(<MethodBody>Do |</MethodBody>, "While")
         End Sub
 
         <Fact>
         <Trait(Traits.Feature, Traits.Features.KeywordRecommending)>
-        Public Sub UntilAfterLoop()
+        Public Sub UntilAfterLoopTest()
             VerifyRecommendationsContain(<MethodBody>
 Do
 Loop |</MethodBody>, "Until")
@@ -31,7 +26,7 @@ Loop |</MethodBody>, "Until")
 
         <Fact>
         <Trait(Traits.Feature, Traits.Features.KeywordRecommending)>
-        Public Sub WhileAfterLoop()
+        Public Sub WhileAfterLoopTest()
             VerifyRecommendationsContain(<MethodBody>
 Do
 Loop |</MethodBody>, "While")
@@ -39,7 +34,7 @@ Loop |</MethodBody>, "While")
 
         <Fact>
         <Trait(Traits.Feature, Traits.Features.KeywordRecommending)>
-        Public Sub UntilAndWhileMissingInDoLoopTopTestBlock()
+        Public Sub UntilAndWhileMissingInDoLoopTopTestBlockTest()
             VerifyRecommendationsMissing(<MethodBody>
 Do Until True
 Loop |</MethodBody>, "While", "Until")
@@ -47,25 +42,33 @@ Loop |</MethodBody>, "While", "Until")
 
         <Fact>
         <Trait(Traits.Feature, Traits.Features.KeywordRecommending)>
-        Public Sub UntilAndWhileMissingAfterInvalidLoop()
+        Public Sub UntilAndWhileMissingAfterInvalidLoopTest()
             VerifyRecommendationsMissing(<MethodBody>
 Loop |</MethodBody>, "While", "Until")
         End Sub
 
-        <WorkItem(530953)>
+        <WorkItem(530953, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/530953")>
         <Fact, Trait(Traits.Feature, Traits.Features.KeywordRecommending)>
-        Public Sub NotAfterEol()
+        Public Sub NotAfterEolTest()
             VerifyRecommendationsMissing(
 <MethodBody>Do 
 |</MethodBody>, "Until")
         End Sub
 
-        <WorkItem(530953)>
+        <WorkItem(530953, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/530953")>
         <Fact, Trait(Traits.Feature, Traits.Features.KeywordRecommending)>
-        Public Sub AfterExplicitLineContinuation()
+        Public Sub AfterExplicitLineContinuationTest()
             VerifyRecommendationsContain(
 <MethodBody>Do _
 |</MethodBody>, "Until")
         End Sub
+
+        <Fact, Trait(Traits.Feature, Traits.Features.KeywordRecommending)>
+        Public Sub AfterExplicitLineContinuationTestCommentsAfterLineContinuation()
+            VerifyRecommendationsContain(
+<MethodBody>Do _ ' Test
+|</MethodBody>, "Until")
+        End Sub
+
     End Class
 End Namespace

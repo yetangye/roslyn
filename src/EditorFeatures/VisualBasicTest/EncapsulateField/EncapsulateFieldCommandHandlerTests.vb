@@ -1,79 +1,90 @@
-' Copyright (c) Microsoft.  All Rights Reserved.  Licensed under the Apache License, Version 2.0.  See License.txt in the project root for license information.
+﻿' Licensed to the .NET Foundation under one or more agreements.
+' The .NET Foundation licenses this file to you under the MIT license.
+' See the LICENSE file in the project root for more information.
 
+Imports Microsoft.CodeAnalysis.Editor.Implementation.Interactive
+Imports Microsoft.CodeAnalysis.Editor.Shared.Utilities
+Imports Microsoft.CodeAnalysis.Editor.UnitTests
+Imports Microsoft.CodeAnalysis.Editor.UnitTests.Workspaces
+Imports Microsoft.CodeAnalysis.Editor.VisualBasic.EncapsulateField
 Imports Microsoft.CodeAnalysis.Editor.VisualBasic.UnitTests
+Imports Microsoft.CodeAnalysis.Shared.TestHooks
+Imports Microsoft.VisualStudio.Text.Editor.Commanding.Commands
+Imports Microsoft.VisualStudio.Text.Operations
 
 Namespace Microsoft.CodeAnalysis.Editor.VisualBasic.UnitTests.EncapsulateField
+    <[UseExportProvider]>
     Public Class EncapsulateFieldCommandHandlerTests
-        <Fact, Trait(Traits.Feature, Traits.Features.EncapsulateField)>
+        <WpfFact, Trait(Traits.Feature, Traits.Features.EncapsulateField)>
         Public Sub PrivateField()
             Dim text = <File>
 Class C
-    Private foo$$ As Integer
+    Private goo$$ As Integer
 
     Sub bar()
-        foo = 3
+        goo = 3
     End Sub
 End Class</File>.ConvertTestSourceTag()
 
             Dim expected = <File>
 Class C
-    Private foo As Integer
+    Private goo As Integer
 
-    Public Property Foo1 As Integer
+    Public Property Goo1 As Integer
         Get
-            Return foo
+            Return goo
         End Get
         Set(value As Integer)
-            foo = value
+            goo = value
         End Set
     End Property
 
     Sub bar()
-        Foo1 = 3
+        Goo1 = 3
     End Sub
 End Class</File>.ConvertTestSourceTag()
 
-            Using state = New EncapsulateFieldTestState(text)
+            Using state = EncapsulateFieldTestState.Create(text)
                 state.AssertEncapsulateAs(expected)
             End Using
         End Sub
 
-        <Fact, Trait(Traits.Feature, Traits.Features.EncapsulateField)>
+        <WpfFact, Trait(Traits.Feature, Traits.Features.EncapsulateField)>
         Public Sub NonPrivateField()
             Dim text = <File>
 Class C
-    Protected foo$$ As Integer
+    Protected goo$$ As Integer
 
     Sub bar()
-        foo = 3
+        goo = 3
     End Sub
 End Class</File>.ConvertTestSourceTag()
 
             Dim expected = <File>
 Class C
-    Private _foo As Integer
+    Private _goo As Integer
 
-    Protected Property Foo As Integer
+    Protected Property Goo As Integer
         Get
-            Return _foo
+            Return _goo
         End Get
         Set(value As Integer)
-            _foo = value
+            _goo = value
         End Set
     End Property
 
     Sub bar()
-        Foo = 3
+        Goo = 3
     End Sub
 End Class</File>.ConvertTestSourceTag()
 
-            Using state = New EncapsulateFieldTestState(text)
+            Using state = EncapsulateFieldTestState.Create(text)
                 state.AssertEncapsulateAs(expected)
             End Using
         End Sub
 
-        <WorkItem(1086632)>
-        <Fact, Trait(Traits.Feature, Traits.Features.EncapsulateField)>
+        <WorkItem(1086632, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/1086632")>
+        <WpfFact, Trait(Traits.Feature, Traits.Features.EncapsulateField)>
         Public Sub EncapsulateTwoFields()
             Dim text = "
 Class Program
@@ -116,8 +127,38 @@ Class Program
 End Class
 "
 
-            Using state = New EncapsulateFieldTestState(text)
+            Using state = EncapsulateFieldTestState.Create(text)
                 state.AssertEncapsulateAs(expected)
+            End Using
+        End Sub
+
+        <WpfFact>
+        <Trait(Traits.Feature, Traits.Features.EncapsulateField)>
+        <Trait(Traits.Feature, Traits.Features.Interactive)>
+        Public Sub EncapsulateFieldCommandDisabledInSubmission()
+            Using workspace = TestWorkspace.Create(
+                <Workspace>
+                    <Submission Language="Visual Basic" CommonReferences="true">  
+                        Class C
+                            Private $goo As Object
+                        End Class
+                    </Submission>
+                </Workspace>,
+                workspaceKind:=WorkspaceKind.Interactive,
+                composition:=EditorTestCompositions.EditorFeaturesWpf)
+
+                ' Force initialization.
+                workspace.GetOpenDocumentIds().Select(Function(id) workspace.GetTestDocument(id).GetTextView()).ToList()
+
+                Dim textView = workspace.Documents.Single().GetTextView()
+
+                Dim handler = New EncapsulateFieldCommandHandler(
+                    workspace.GetService(Of IThreadingContext),
+                    workspace.GetService(Of ITextBufferUndoManagerProvider),
+                    workspace.GetService(Of IAsynchronousOperationListenerProvider)())
+
+                Dim state = handler.GetCommandState(New EncapsulateFieldCommandArgs(textView, textView.TextBuffer))
+                Assert.True(state.IsUnspecified)
             End Using
         End Sub
     End Class

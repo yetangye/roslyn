@@ -1,4 +1,6 @@
-﻿' Copyright (c) Microsoft.  All Rights Reserved.  Licensed under the Apache License, Version 2.0.  See License.txt in the project root for license information.
+﻿' Licensed to the .NET Foundation under one or more agreements.
+' The .NET Foundation licenses this file to you under the MIT license.
+' See the LICENSE file in the project root for more information.
 
 Imports System.Runtime.InteropServices
 Imports Microsoft.CodeAnalysis.Text
@@ -15,12 +17,16 @@ Namespace Microsoft.CodeAnalysis.VisualBasic.CodeGen
     ''' <remarks></remarks>
     Partial Friend Class Optimizer
 
-        Public Shared Function Optimize(container As Symbol, src As BoundStatement, <Out> ByRef stackLocals As HashSet(Of LocalSymbol)) As BoundStatement
+        Public Shared Function Optimize(
+                         container As Symbol,
+                         src As BoundStatement,
+                         debugFriendly As Boolean,
+                         <Out> ByRef stackLocals As HashSet(Of LocalSymbol)) As BoundStatement
 
             ' TODO: run other optimizing passes here.
             '       stack scheduler must be the last one.
 
-            Return StackScheduler.OptimizeLocalsOut(container, src, stackLocals)
+            Return StackScheduler.OptimizeLocalsOut(container, src, debugFriendly, stackLocals)
         End Function
 
     End Class

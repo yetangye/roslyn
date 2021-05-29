@@ -1,73 +1,71 @@
-' Copyright (c) Microsoft.  All Rights Reserved.  Licensed under the Apache License, Version 2.0.  See License.txt in the project root for license information.
-
-Imports Microsoft.CodeAnalysis.Text
-Imports Roslyn.Test.Utilities
+﻿' Licensed to the .NET Foundation under one or more agreements.
+' The .NET Foundation licenses this file to you under the MIT license.
+' See the LICENSE file in the project root for more information.
 
 Namespace Microsoft.CodeAnalysis.Editor.VisualBasic.UnitTests.Recommendations.Declarations.ModifierKeywordRecommenderTests
     Public Class InsideModuleDeclaration
 
         <Fact>
-        <WorkItem(544630)>
+        <WorkItem(544630, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/544630")>
         <Trait(Traits.Feature, Traits.Features.KeywordRecommending)>
-        Public Sub DefaultNotInModule()
+        Public Sub DefaultNotInModuleTest()
             VerifyRecommendationsMissing(<ModuleDeclaration>|</ModuleDeclaration>, "Default")
         End Sub
 
         <Fact>
-        <WorkItem(544630)>
+        <WorkItem(544630, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/544630")>
         <Trait(Traits.Feature, Traits.Features.KeywordRecommending)>
-        Public Sub NarrowingNotInModule()
+        Public Sub NarrowingNotInModuleTest()
             VerifyRecommendationsMissing(<ModuleDeclaration>|</ModuleDeclaration>, "Narrowing")
         End Sub
 
         <Fact>
-        <WorkItem(544630)>
+        <WorkItem(544630, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/544630")>
         <Trait(Traits.Feature, Traits.Features.KeywordRecommending)>
-        Public Sub OverloadsNotInModule()
+        Public Sub OverloadsNotInModuleTest()
             VerifyRecommendationsMissing(<ModuleDeclaration>|</ModuleDeclaration>, "Overloads")
         End Sub
 
         <Fact>
-        <WorkItem(544630)>
+        <WorkItem(544630, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/544630")>
         <Trait(Traits.Feature, Traits.Features.KeywordRecommending)>
-        Public Sub OverridesNotInModule()
+        Public Sub OverridesNotInModuleTest()
             VerifyRecommendationsMissing(<ModuleDeclaration>|</ModuleDeclaration>, "Overrides")
         End Sub
 
         <Fact>
-        <WorkItem(544630)>
+        <WorkItem(544630, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/544630")>
         <Trait(Traits.Feature, Traits.Features.KeywordRecommending)>
-        Public Sub ShadowsNotInModule()
+        Public Sub ShadowsNotInModuleTest()
             VerifyRecommendationsMissing(<ModuleDeclaration>|</ModuleDeclaration>, "Shadows")
         End Sub
 
         <Fact>
-        <WorkItem(544630)>
+        <WorkItem(544630, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/544630")>
         <Trait(Traits.Feature, Traits.Features.KeywordRecommending)>
-        Public Sub SharedNotInModule()
+        Public Sub SharedNotInModuleTest()
             VerifyRecommendationsMissing(<ModuleDeclaration>|</ModuleDeclaration>, "Shared")
         End Sub
 
         <Fact>
-        <WorkItem(544630)>
+        <WorkItem(544630, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/544630")>
         <Trait(Traits.Feature, Traits.Features.KeywordRecommending)>
-        Public Sub WideningNotInModule()
+        Public Sub WideningNotInModuleTest()
             VerifyRecommendationsMissing(<ModuleDeclaration>|</ModuleDeclaration>, "Widening")
         End Sub
 
         <Fact>
-        <WorkItem(554103)>
+        <WorkItem(554103, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/554103")>
         <Trait(Traits.Feature, Traits.Features.KeywordRecommending)>
-        Public Sub PartialInModule()
+        Public Sub PartialInModuleTest()
             VerifyRecommendationsContain(<ModuleDeclaration>|</ModuleDeclaration>, "Partial")
         End Sub
 
         <Fact>
-        <WorkItem(554103)>
+        <WorkItem(554103, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/554103")>
         <Trait(Traits.Feature, Traits.Features.KeywordRecommending)>
-        Public Sub PartialAfterPrivate()
+        Public Sub PartialAfterPrivateTest()
             VerifyRecommendationsContain(<ModuleDeclaration>Private |</ModuleDeclaration>, "Partial")
         End Sub
-
     End Class
 End Namespace

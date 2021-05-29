@@ -1,4 +1,6 @@
-﻿' Copyright (c) Microsoft.  All Rights Reserved.  Licensed under the Apache License, Version 2.0.  See License.txt in the project root for license information.
+﻿' Licensed to the .NET Foundation under one or more agreements.
+' The .NET Foundation licenses this file to you under the MIT license.
+' See the LICENSE file in the project root for more information.
 
 Imports System
 Imports System.Collections.Immutable
@@ -24,7 +26,7 @@ Namespace Microsoft.CodeAnalysis.VisualBasic.Symbols
         ''' <remarks>
         ''' The contents are provided by ReferenceManager and may not be modified.
         ''' </remarks>
-        Private m_ModuleReferences As ModuleReferences(Of AssemblySymbol)
+        Private _moduleReferences As ModuleReferences(Of AssemblySymbol)
 
         ''' <summary>
         ''' Does this symbol represent a missing Module.
@@ -44,7 +46,7 @@ Namespace Microsoft.CodeAnalysis.VisualBasic.Symbols
         ''' </summary>
         Friend NotOverridable Overrides Function GetReferencedAssemblies() As ImmutableArray(Of AssemblyIdentity)
             AssertReferencesInitialized()
-            Return m_ModuleReferences.Names
+            Return _moduleReferences.Identities
         End Function
 
         ''' <summary>
@@ -52,18 +54,18 @@ Namespace Microsoft.CodeAnalysis.VisualBasic.Symbols
         ''' by this module. Items at the same position from GetReferencedAssemblies and 
         ''' from GetReferencedAssemblySymbols should correspond to each other. If reference is 
         ''' not resolved by compiler, GetReferencedAssemblySymbols returns MissingAssemblySymbol in the
-        ''' correspnding item.
+        ''' corresponding item.
         ''' 
         ''' The array and its content is provided by ReferenceManager and must not be modified.
         ''' </summary>
         Friend NotOverridable Overrides Function GetReferencedAssemblySymbols() As ImmutableArray(Of AssemblySymbol)
             AssertReferencesInitialized()
-            Return m_ModuleReferences.Symbols
+            Return _moduleReferences.Symbols
         End Function
 
         Friend Function GetUnifiedAssemblies() As ImmutableArray(Of UnifiedAssembly(Of AssemblySymbol))
             AssertReferencesInitialized()
-            Return m_ModuleReferences.UnifiedAssemblies
+            Return _moduleReferences.UnifiedAssemblies
         End Function
 
         Friend Overrides ReadOnly Property HasUnifiedReferences As Boolean
@@ -121,17 +123,17 @@ Namespace Microsoft.CodeAnalysis.VisualBasic.Symbols
 
             AssertReferencesUninitialized()
 
-            m_ModuleReferences = moduleReferences
+            _moduleReferences = moduleReferences
         End Sub
 
         <Conditional("DEBUG")>
         Friend Sub AssertReferencesUninitialized()
-            Debug.Assert(m_ModuleReferences Is Nothing)
+            Debug.Assert(_moduleReferences Is Nothing)
         End Sub
 
         <Conditional("DEBUG")>
         Friend Sub AssertReferencesInitialized()
-            Debug.Assert(m_ModuleReferences IsNot Nothing)
+            Debug.Assert(_moduleReferences IsNot Nothing)
         End Sub
 
         ''' <summary>

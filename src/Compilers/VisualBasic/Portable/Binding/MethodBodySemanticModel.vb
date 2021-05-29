@@ -1,4 +1,6 @@
-﻿' Copyright (c) Microsoft.  All Rights Reserved.  Licensed under the Apache License, Version 2.0.  See License.txt in the project root for license information.
+﻿' Licensed to the .NET Foundation under one or more agreements.
+' The .NET Foundation licenses this file to you under the MIT license.
+' See the LICENSE file in the project root for more information.
 
 Imports System.Runtime.InteropServices
 Imports Microsoft.CodeAnalysis.VisualBasic.Symbols
@@ -9,15 +11,21 @@ Namespace Microsoft.CodeAnalysis.VisualBasic
     Friend NotInheritable Class MethodBodySemanticModel
         Inherits MemberSemanticModel
 
-        Private Sub New(root As VisualBasicSyntaxNode, binder As Binder, Optional parentSemanticModelOpt As SyntaxTreeSemanticModel = Nothing, Optional speculatedPosition As Integer = 0)
-            MyBase.New(root, binder, parentSemanticModelOpt, speculatedPosition)
+        Private Sub New(root As SyntaxNode,
+                        binder As Binder,
+                        Optional containingSemanticModelOpt As SyntaxTreeSemanticModel = Nothing,
+                        Optional parentSemanticModelOpt As SyntaxTreeSemanticModel = Nothing,
+                        Optional speculatedPosition As Integer = 0,
+                        Optional ignoreAccessibility As Boolean = False)
+            MyBase.New(root, binder, containingSemanticModelOpt, parentSemanticModelOpt, speculatedPosition, ignoreAccessibility)
         End Sub
 
         ''' <summary>
-        ''' Creates an MethodBodySemanticModel that allows asking semantic questions about an attribute node.
+        ''' Creates a MethodBodySemanticModel that allows asking semantic questions about an attribute node.
         ''' </summary>
-        Friend Shared Function Create(binder As MethodBodyBinder) As MethodBodySemanticModel
-            Return New MethodBodySemanticModel(binder.Root, binder)
+        Friend Shared Function Create(containingSemanticModel As SyntaxTreeSemanticModel, binder As SubOrFunctionBodyBinder, Optional ignoreAccessibility As Boolean = False) As MethodBodySemanticModel
+            Debug.Assert(containingSemanticModel IsNot Nothing)
+            Return New MethodBodySemanticModel(binder.Root, binder, containingSemanticModel, ignoreAccessibility:=ignoreAccessibility)
         End Function
 
         ''' <summary>
@@ -29,22 +37,22 @@ Namespace Microsoft.CodeAnalysis.VisualBasic
             Debug.Assert(binder IsNot Nothing)
             Debug.Assert(binder.IsSemanticModelBinder)
 
-            Return New MethodBodySemanticModel(root, binder, parentSemanticModel, position)
+            Return New MethodBodySemanticModel(root, binder, parentSemanticModelOpt:=parentSemanticModel, speculatedPosition:=position)
         End Function
 
         Friend Overrides Function TryGetSpeculativeSemanticModelForMethodBodyCore(parentModel As SyntaxTreeSemanticModel, position As Integer, method As MethodBlockBaseSyntax, <Out> ByRef speculativeModel As SemanticModel) As Boolean
             ' CONSIDER: Do we want to ensure that speculated method and the original method have identical signatures?
 
             ' Create a speculative binder for the method body.
-            Dim methodSymbol = DirectCast(Me.MemberSymbol, MethodSymbol)
+            Dim methodSymbol = DirectCast(Me.MemberSymbol, methodSymbol)
 
-            Dim containingBinder As Binder = Me.RootBinder
+            Dim containingBinder As binder = Me.RootBinder
 
             ' Get up to the NamedTypeBinder
-            Dim namedTypeBinder As NamedTypeBinder
+            Dim namedTypeBinder As namedTypeBinder
 
             Do
-                namedTypeBinder = TryCast(containingBinder, NamedTypeBinder)
+                namedTypeBinder = TryCast(containingBinder, namedTypeBinder)
 
                 If namedTypeBinder IsNot Nothing Then
                     Exit Do
@@ -53,7 +61,7 @@ Namespace Microsoft.CodeAnalysis.VisualBasic
                 containingBinder = containingBinder.ContainingBinder
             Loop
 
-            Dim methodBodyBinder = BinderBuilder.CreateBinderForMethodBody(methodSymbol, method, SemanticModelBinder.Mark(namedTypeBinder))
+            Dim methodBodyBinder = BinderBuilder.CreateBinderForMethodBody(methodSymbol, method, SemanticModelBinder.Mark(namedTypeBinder, IgnoresAccessibility))
 
             ' Wrap this binder with a BlockBaseBinder to hold onto the locals declared within the statement.
             Dim binder = New StatementListBinder(methodBodyBinder, method.Statements)
@@ -79,30 +87,6 @@ Namespace Microsoft.CodeAnalysis.VisualBasic
 
             speculativeModel = CreateSpeculative(parentModel, statement, binder, position)
             Return True
-        End Function
-
-        Friend Overrides Function TryGetSpeculativeSemanticModelCore(parentModel As SyntaxTreeSemanticModel, position As Integer, initializer As EqualsValueSyntax, <Out> ByRef speculativeModel As SemanticModel) As Boolean
-            speculativeModel = Nothing
-            Return False
-        End Function
-    End Class
-
-    ' TODO (tomat): merge with MethodBodySemanticModel? C# doesn't have a separate class for top-level. Should it?
-    Friend NotInheritable Class TopLevelCodeSemanticModel
-        Inherits MemberSemanticModel
-
-        Public Sub New(binder As TopLevelCodeBinder)
-            MyBase.New(binder.Root, binder, parentSemanticModelOpt:=Nothing, speculatedPosition:=0)
-        End Sub
-
-        Friend Overrides Function TryGetSpeculativeSemanticModelForMethodBodyCore(parentModel As SyntaxTreeSemanticModel, position As Integer, method As MethodBlockBaseSyntax, <Out> ByRef speculativeModel As SemanticModel) As Boolean
-            speculativeModel = Nothing
-            Return False
-        End Function
-
-        Friend Overrides Function TryGetSpeculativeSemanticModelCore(parentModel As SyntaxTreeSemanticModel, position As Integer, statement As ExecutableStatementSyntax, <Out> ByRef speculativeModel As SemanticModel) As Boolean
-            speculativeModel = Nothing
-            Return False
         End Function
 
         Friend Overrides Function TryGetSpeculativeSemanticModelCore(parentModel As SyntaxTreeSemanticModel, position As Integer, initializer As EqualsValueSyntax, <Out> ByRef speculativeModel As SemanticModel) As Boolean

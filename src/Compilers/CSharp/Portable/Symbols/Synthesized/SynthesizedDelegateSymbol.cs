@@ -1,4 +1,8 @@
-﻿// Copyright (c) Microsoft.  All Rights Reserved.  Licensed under the Apache License, Version 2.0.  See License.txt in the project root for license information.
+﻿// Licensed to the .NET Foundation under one or more agreements.
+// The .NET Foundation licenses this file to you under the MIT license.
+// See the LICENSE file in the project root for more information.
+
+#nullable disable
 
 using System;
 using System.Collections.Generic;
@@ -8,13 +12,16 @@ using Roslyn.Utilities;
 
 namespace Microsoft.CodeAnalysis.CSharp.Symbols
 {
+    /// <summary>
+    /// Dynamic call-site delegate, for call-sites that do not
+    /// match System.Action or System.Func signatures.
+    /// </summary>
     internal sealed class SynthesizedDelegateSymbol : SynthesizedContainer
     {
         private readonly NamespaceOrTypeSymbol _containingSymbol;
         private readonly MethodSymbol _constructor;
         private readonly MethodSymbol _invoke;
 
-        // constructor for dynamic call-site delegate:
         public SynthesizedDelegateSymbol(
             NamespaceOrTypeSymbol containingSymbol,
             string name,
@@ -22,7 +29,7 @@ namespace Microsoft.CodeAnalysis.CSharp.Symbols
             TypeSymbol intPtrType,
             TypeSymbol voidReturnTypeOpt,
             int parameterCount,
-            BitArray byRefParameters)
+            BitVector byRefParameters)
             : base(name, parameterCount, returnsVoid: (object)voidReturnTypeOpt != null)
         {
             _containingSymbol = containingSymbol;
@@ -74,9 +81,15 @@ namespace Microsoft.CodeAnalysis.CSharp.Symbols
         }
 
         internal override NamedTypeSymbol BaseTypeNoUseSiteDiagnostics
+            => ContainingAssembly.GetSpecialType(SpecialType.System_MulticastDelegate);
+
+        public sealed override bool AreLocalsZeroed
         {
-            get { return ContainingAssembly.GetSpecialType(SpecialType.System_MulticastDelegate); }
+            get { throw ExceptionUtilities.Unreachable; }
         }
+
+        internal override bool IsRecord => false;
+        internal override bool HasPossibleWellKnownCloneMethod() => false;
 
         private sealed class DelegateConstructor : SynthesizedInstanceConstructor
         {
@@ -86,8 +99,8 @@ namespace Microsoft.CodeAnalysis.CSharp.Symbols
                 : base(containingType)
             {
                 _parameters = ImmutableArray.Create<ParameterSymbol>(
-                   new SynthesizedParameterSymbol(this, objectType, 0, RefKind.None, "object"),
-                   new SynthesizedParameterSymbol(this, intPtrType, 1, RefKind.None, "method"));
+                   SynthesizedParameterSymbol.Create(this, TypeWithAnnotations.Create(objectType), 0, RefKind.None, "object"),
+                   SynthesizedParameterSymbol.Create(this, TypeWithAnnotations.Create(intPtrType), 1, RefKind.None, "method"));
             }
 
             public override ImmutableArray<ParameterSymbol> Parameters
@@ -102,7 +115,7 @@ namespace Microsoft.CodeAnalysis.CSharp.Symbols
             private readonly TypeSymbol _containingType;
             private readonly TypeSymbol _returnType;
 
-            internal InvokeMethod(SynthesizedDelegateSymbol containingType, BitArray byRefParameters, TypeSymbol voidReturnTypeOpt)
+            internal InvokeMethod(SynthesizedDelegateSymbol containingType, BitVector byRefParameters, TypeSymbol voidReturnTypeOpt)
             {
                 var typeParams = containingType.TypeParameters;
 
@@ -117,7 +130,7 @@ namespace Microsoft.CodeAnalysis.CSharp.Symbols
                     // we don't need to distinguish between out and ref since this is an internal synthesized symbol:
                     var refKind = !byRefParameters.IsNull && byRefParameters[i] ? RefKind.Ref : RefKind.None;
 
-                    parameters[i] = new SynthesizedParameterSymbol(this, typeParams[i], i, refKind);
+                    parameters[i] = SynthesizedParameterSymbol.Create(this, TypeWithAnnotations.Create(typeParams[i]), i, refKind);
                 }
 
                 _parameters = parameters.AsImmutableOrNull();
@@ -208,7 +221,7 @@ namespace Microsoft.CodeAnalysis.CSharp.Symbols
 
             public override bool ReturnsVoid
             {
-                get { return _returnType.SpecialType == SpecialType.System_Void; }
+                get { return _returnType.IsVoidType(); }
             }
 
             public override bool IsAsync
@@ -216,14 +229,23 @@ namespace Microsoft.CodeAnalysis.CSharp.Symbols
                 get { return false; }
             }
 
-            public override TypeSymbol ReturnType
+            public override RefKind RefKind
             {
-                get { return _returnType; }
+                get { return RefKind.None; }
             }
 
-            public override ImmutableArray<TypeSymbol> TypeArguments
+            public override TypeWithAnnotations ReturnTypeWithAnnotations
             {
-                get { return ImmutableArray<TypeSymbol>.Empty; }
+                get { return TypeWithAnnotations.Create(_returnType); }
+            }
+
+            public override FlowAnalysisAnnotations ReturnTypeFlowAnalysisAnnotations => FlowAnalysisAnnotations.None;
+
+            public override ImmutableHashSet<string> ReturnNotNullIfParameterNotNull => ImmutableHashSet<string>.Empty;
+
+            public override ImmutableArray<TypeWithAnnotations> TypeArgumentsWithAnnotations
+            {
+                get { return ImmutableArray<TypeWithAnnotations>.Empty; }
             }
 
             public override ImmutableArray<TypeParameterSymbol> TypeParameters
@@ -241,7 +263,7 @@ namespace Microsoft.CodeAnalysis.CSharp.Symbols
                 get { return ImmutableArray<MethodSymbol>.Empty; }
             }
 
-            public override ImmutableArray<CustomModifier> ReturnTypeCustomModifiers
+            public override ImmutableArray<CustomModifier> RefCustomModifiers
             {
                 get { return ImmutableArray<CustomModifier>.Empty; }
             }
@@ -280,7 +302,7 @@ namespace Microsoft.CodeAnalysis.CSharp.Symbols
             {
                 get
                 {
-                    // Invoke method of a deelgate used in a dynamic call-site must be public 
+                    // Invoke method of a delegate used in a dynamic call-site must be public 
                     // since the DLR looks only for public Invoke methods:
                     return Accessibility.Public;
                 }

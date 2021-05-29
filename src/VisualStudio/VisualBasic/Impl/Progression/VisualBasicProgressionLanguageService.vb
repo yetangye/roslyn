@@ -1,4 +1,6 @@
-' Copyright (c) Microsoft.  All Rights Reserved.  Licensed under the Apache License, Version 2.0.  See License.txt in the project root for license information.
+﻿' Licensed to the .NET Foundation under one or more agreements.
+' The .NET Foundation licenses this file to you under the MIT license.
+' See the LICENSE file in the project root for more information.
 
 Imports System.Composition
 Imports System.Threading
@@ -13,6 +15,11 @@ Namespace Microsoft.VisualStudio.LanguageServices.VisualBasic.Progression
     <ExportLanguageService(GetType(IProgressionLanguageService), LanguageNames.VisualBasic), [Shared]>
     Partial Friend Class VisualBasicProgressionLanguageService
         Implements IProgressionLanguageService
+
+        <ImportingConstructor>
+        <Obsolete(MefConstruction.ImportingConstructorMessage, True)>
+        Public Sub New()
+        End Sub
 
         Public Function GetTopLevelNodesFromDocument(root As SyntaxNode, cancellationToken As CancellationToken) As IEnumerable(Of SyntaxNode) Implements IProgressionLanguageService.GetTopLevelNodesFromDocument
             ' TODO: Implement this lazily like in C#?
@@ -49,7 +56,7 @@ Namespace Microsoft.VisualStudio.LanguageServices.VisualBasic.Progression
             Return result
         End Function
 
-        Private Shared ReadOnly DescriptionFormat As SymbolDisplayFormat = New SymbolDisplayFormat(
+        Private Shared ReadOnly s_descriptionFormat As SymbolDisplayFormat = New SymbolDisplayFormat(
             globalNamespaceStyle:=SymbolDisplayGlobalNamespaceStyle.OmittedAsContaining,
             typeQualificationStyle:=SymbolDisplayTypeQualificationStyle.NameAndContainingTypesAndNamespaces,
             genericsOptions:=SymbolDisplayGenericsOptions.IncludeTypeParameters,
@@ -58,17 +65,17 @@ Namespace Microsoft.VisualStudio.LanguageServices.VisualBasic.Progression
             miscellaneousOptions:=SymbolDisplayMiscellaneousOptions.UseSpecialTypes)
 
         Public Function GetDescriptionForSymbol(symbol As ISymbol, includeContainingSymbol As Boolean) As String Implements IProgressionLanguageService.GetDescriptionForSymbol
-            Return GetSymbolText(symbol, False, DescriptionFormat)
+            Return GetSymbolText(symbol, False, s_descriptionFormat)
         End Function
 
-        Private Shared ReadOnly LabelFormat As SymbolDisplayFormat = New SymbolDisplayFormat(
+        Private Shared ReadOnly s_labelFormat As SymbolDisplayFormat = New SymbolDisplayFormat(
             genericsOptions:=SymbolDisplayGenericsOptions.IncludeTypeParameters,
             memberOptions:=SymbolDisplayMemberOptions.IncludeParameters Or SymbolDisplayMemberOptions.IncludeType,
             parameterOptions:=SymbolDisplayParameterOptions.IncludeType Or SymbolDisplayParameterOptions.IncludeParamsRefOut Or SymbolDisplayParameterOptions.IncludeOptionalBrackets,
             miscellaneousOptions:=SymbolDisplayMiscellaneousOptions.UseSpecialTypes)
 
         Public Function GetLabelForSymbol(symbol As ISymbol, includeContainingSymbol As Boolean) As String Implements IProgressionLanguageService.GetLabelForSymbol
-            Return GetSymbolText(symbol, includeContainingSymbol, LabelFormat)
+            Return GetSymbolText(symbol, includeContainingSymbol, s_labelFormat)
         End Function
 
         Private Function GetSymbolText(symbol As ISymbol, includeContainingSymbol As Boolean, displayFormat As SymbolDisplayFormat) As String

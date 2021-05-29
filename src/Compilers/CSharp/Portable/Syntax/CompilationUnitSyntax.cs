@@ -1,14 +1,13 @@
-﻿// Copyright (c) Microsoft.  All Rights Reserved.  Licensed under the Apache License, Version 2.0.  See License.txt in the project root for license information.
+﻿// Licensed to the .NET Foundation under one or more agreements.
+// The .NET Foundation licenses this file to you under the MIT license.
+// See the LICENSE file in the project root for more information.
 
 using System;
 using System.Collections.Generic;
-using Microsoft.CodeAnalysis.CSharp.Symbols;
-using Microsoft.CodeAnalysis.CSharp.Syntax;
-using Microsoft.CodeAnalysis.Text;
 
 namespace Microsoft.CodeAnalysis.CSharp.Syntax
 {
-    public sealed partial class CompilationUnitSyntax : CSharpSyntaxNode
+    public sealed partial class CompilationUnitSyntax : CSharpSyntaxNode, ICompilationUnitSyntax
     {
         /// <summary>
         /// Returns #r directives specified in the compilation.
@@ -18,11 +17,21 @@ namespace Microsoft.CodeAnalysis.CSharp.Syntax
             return GetReferenceDirectives(null);
         }
 
-        internal IList<ReferenceDirectiveTriviaSyntax> GetReferenceDirectives(Func<ReferenceDirectiveTriviaSyntax, bool> filter)
+        internal IList<ReferenceDirectiveTriviaSyntax> GetReferenceDirectives(Func<ReferenceDirectiveTriviaSyntax, bool>? filter)
         {
             // #r directives are always on the first token of the compilation unit.
             var firstToken = (SyntaxNodeOrToken)this.GetFirstToken(includeZeroWidth: true);
             return firstToken.GetDirectives<ReferenceDirectiveTriviaSyntax>(filter);
+        }
+
+        /// <summary>
+        /// Returns #load directives specified in the compilation.
+        /// </summary>
+        public IList<LoadDirectiveTriviaSyntax> GetLoadDirectives()
+        {
+            // #load directives are always on the first token of the compilation unit.
+            var firstToken = (SyntaxNodeOrToken)this.GetFirstToken(includeZeroWidth: true);
+            return firstToken.GetDirectives<LoadDirectiveTriviaSyntax>(filter: null);
         }
 
         internal Syntax.InternalSyntax.DirectiveStack GetConditionalDirectivesStack()

@@ -1,15 +1,19 @@
-﻿' Copyright (c) Microsoft.  All Rights Reserved.  Licensed under the Apache License, Version 2.0.  See License.txt in the project root for license information.
+﻿' Licensed to the .NET Foundation under one or more agreements.
+' The .NET Foundation licenses this file to you under the MIT license.
+' See the LICENSE file in the project root for more information.
 
-Imports Microsoft.CodeAnalysis.Test.Utilities
-Imports Microsoft.CodeAnalysis.VisualBasic.Symbols
-Imports Microsoft.CodeAnalysis.VisualBasic.Symbols.Metadata.PE
-Imports Roslyn.Test.Utilities
 Imports System.Collections.Immutable
 Imports System.Reflection
 Imports System.Reflection.Metadata
 Imports System.Reflection.Metadata.Ecma335
 Imports System.Runtime.InteropServices
 Imports System.Text
+Imports Microsoft.CodeAnalysis
+Imports Microsoft.CodeAnalysis.Test.Utilities
+Imports Microsoft.CodeAnalysis.VisualBasic.Symbols
+Imports Microsoft.CodeAnalysis.VisualBasic.Symbols.Metadata.PE
+Imports Microsoft.CodeAnalysis.VisualBasic.Syntax
+Imports Roslyn.Test.Utilities
 
 Namespace Microsoft.CodeAnalysis.VisualBasic.UnitTests.Semantics
     Public Class AttributeTests_WellKnownAttributes
@@ -30,7 +34,7 @@ Namespace Microsoft.CodeAnalysis.VisualBasic.UnitTests.Semantics
                 <InterfaceTypeAttribute(ComInterfaceType.InterfaceIsIUnknown)>
                 <TypeLibImportClass(GetType(Object)), TypeLibType(TypeLibTypeFlags.FAggregatable)>
                 <BestFitMapping(False, ThrowOnUnmappableChar:=True)>
-                Public Interface IFoo
+                Public Interface IGoo
 
                     <AllowReversePInvokeCalls()>
                     Sub DoSomething()
@@ -77,39 +81,39 @@ Namespace Microsoft.CodeAnalysis.VisualBasic.UnitTests.Semantics
                         Dim tLTypeSym = DirectCast(interopNS.GetTypeMember("TypeLibTypeAttribute"), NamedTypeSymbol)
                         Dim bfmSym = DirectCast(interopNS.GetTypeMember("BestFitMappingAttribute"), NamedTypeSymbol)
 
-                        ' IFoo
-                        Dim ifoo = DirectCast(m.GlobalNamespace.GetTypeMember("IFoo"), NamedTypeSymbol)
+                        ' IGoo
+                        Dim igoo = DirectCast(m.GlobalNamespace.GetTypeMember("IGoo"), NamedTypeSymbol)
 
-                        Assert.True(ifoo.IsComImport)
+                        Assert.True(igoo.IsComImport)
                         ' ComImportAttribute is a pseudo-custom attribute, which is not emitted.
                         If Not isFromSource Then
-                            Assert.Equal(5, ifoo.GetAttributes().Length)
+                            Assert.Equal(5, igoo.GetAttributes().Length)
                         Else
-                            Assert.Equal(6, ifoo.GetAttributes().Length)
+                            Assert.Equal(6, igoo.GetAttributes().Length)
 
                             ' get attr by NamedTypeSymbol
-                            attrSym = ifoo.GetAttribute(ciSym)
+                            attrSym = igoo.GetAttribute(ciSym)
                             Assert.Equal("ComImportAttribute", attrSym.AttributeClass.Name)
                             Assert.Equal(0, attrSym.CommonConstructorArguments.Length)
                             Assert.Equal(0, attrSym.CommonNamedArguments.Length)
                         End If
 
-                        attrSym = ifoo.GetAttribute(guidSym)
+                        attrSym = igoo.GetAttribute(guidSym)
                         Assert.Equal("String", attrSym.CommonConstructorArguments(0).Type.ToDisplayString)
                         Assert.Equal("ABCDEF5D-2448-447A-B786-64682CBEF123", attrSym.CommonConstructorArguments(0).Value)
 
                         ' get attr by ctor
-                        attrSym = ifoo.GetAttribute(itCtor)
+                        attrSym = igoo.GetAttribute(itCtor)
                         Assert.Equal("System.Runtime.InteropServices.ComInterfaceType", attrSym.CommonConstructorArguments(0).Type.ToDisplayString())
                         Assert.Equal(ComInterfaceType.InterfaceIsIUnknown, CType(attrSym.CommonConstructorArguments(0).Value, ComInterfaceType))
 
-                        attrSym = ifoo.GetAttribute(tLibSym)
+                        attrSym = igoo.GetAttribute(tLibSym)
                         Assert.Equal("Object", CType(attrSym.CommonConstructorArguments(0).Value, Symbol).ToDisplayString())
 
-                        attrSym = ifoo.GetAttribute(tLTypeSym)
+                        attrSym = igoo.GetAttribute(tLTypeSym)
                         Assert.Equal(TypeLibTypeFlags.FAggregatable, CType(attrSym.CommonConstructorArguments(0).Value, TypeLibTypeFlags))
 
-                        attrSym = ifoo.GetAttribute(bfmSym)
+                        attrSym = igoo.GetAttribute(bfmSym)
                         Assert.Equal(False, attrSym.CommonConstructorArguments(0).Value)
                         Assert.Equal(1, attrSym.CommonNamedArguments.Length)
                         Assert.Equal("Boolean", attrSym.CommonNamedArguments(0).Value.Type.ToDisplayString)
@@ -117,21 +121,21 @@ Namespace Microsoft.CodeAnalysis.VisualBasic.UnitTests.Semantics
                         Assert.Equal(True, attrSym.CommonNamedArguments(0).Value.Value)
 
                         ' =============================
-                        Dim mem = DirectCast(ifoo.GetMembers("DoSomething").First(), MethodSymbol)
+                        Dim mem = DirectCast(igoo.GetMembers("DoSomething").First(), MethodSymbol)
                         Assert.Equal(1, mem.GetAttributes().Length)
                         attrSym = mem.GetAttributes().First()
                         Assert.Equal("AllowReversePInvokeCallsAttribute", attrSym.AttributeClass.Name)
                         Assert.Equal(0, attrSym.CommonConstructorArguments.Length)
 
-                        mem = DirectCast(ifoo.GetMembers("Register").First(), MethodSymbol)
+                        mem = DirectCast(igoo.GetMembers("Register").First(), MethodSymbol)
                         attrSym = mem.GetAttributes().First()
                         Assert.Equal("ComRegisterFunctionAttribute", attrSym.AttributeClass.Name)
                         Assert.Equal(0, attrSym.CommonConstructorArguments.Length)
 
-                        mem = DirectCast(ifoo.GetMembers("UnRegister").First(), MethodSymbol)
+                        mem = DirectCast(igoo.GetMembers("UnRegister").First(), MethodSymbol)
                         Assert.Equal(1, mem.GetAttributes().Length)
 
-                        mem = DirectCast(ifoo.GetMembers("LibFunc").First(), MethodSymbol)
+                        mem = DirectCast(igoo.GetMembers("LibFunc").First(), MethodSymbol)
                         attrSym = mem.GetAttributes().First()
                         Assert.Equal(1, attrSym.CommonConstructorArguments.Length)
                         Assert.Equal(TypeLibFuncFlags.FDefaultBind, CType(attrSym.CommonConstructorArguments(0).Value, TypeLibFuncFlags)) ' 32
@@ -155,18 +159,18 @@ Namespace Microsoft.CodeAnalysis.VisualBasic.UnitTests.Semantics
 
                 <ComVisibleAttribute(False)>
                 <UnmanagedFunctionPointerAttribute(CallingConvention.StdCall, BestFitMapping:=True, CharSet:=CharSet.Ansi, SetLastError:=True, ThrowOnUnmappableChar:=True)>
-                Public Delegate Sub DFoo(p1 As Char, p2 As SByte)
+                Public Delegate Sub DGoo(p1 As Char, p2 As SByte)
 
                 <ComDefaultInterface(GetType(Object)), ProgId("ProgId")>
-                Public Class CFoo
+                Public Class CGoo
 
                    <DispIdAttribute(123)> <LCIDConversion(1), ComConversionLoss()>
                     Sub Method(p1 As SByte, p2 As String)
                     End Sub
                 End Class
 
-                <ComVisible(true), TypeIdentifier("1234C65D-1234-447A-B786-64682CBEF136", "EFoo, InteropAttribute, Version=1.0.0.0, Culture=neutral, PublicKeyToken=null")>
-                Public Enum EFoo
+                <ComVisible(true), TypeIdentifier("1234C65D-1234-447A-B786-64682CBEF136", "EGoo, InteropAttribute, Version=1.0.0.0, Culture=neutral, PublicKeyToken=null")>
+                Public Enum EGoo
                     One
                     <TypeLibVar(TypeLibVarFlags.FDisplayBind)>
                     Two
@@ -200,8 +204,8 @@ Namespace Microsoft.CodeAnalysis.VisualBasic.UnitTests.Semantics
 
                                          Dim moduleGlobalNS = m.GlobalNamespace
 
-                                         ' delegate DFoo
-                                         Dim type1 = DirectCast(moduleGlobalNS.GetTypeMember("DFoo"), NamedTypeSymbol)
+                                         ' delegate DGoo
+                                         Dim type1 = DirectCast(moduleGlobalNS.GetTypeMember("DGoo"), NamedTypeSymbol)
                                          Assert.Equal(2, type1.GetAttributes().Length)
 
                                          Dim attrSym = type1.GetAttribute(comvSym)
@@ -221,8 +225,8 @@ Namespace Microsoft.CodeAnalysis.VisualBasic.UnitTests.Semantics
                                          Assert.Equal("ThrowOnUnmappableChar", attrSym.CommonNamedArguments(3).Key)
                                          Assert.Equal(True, attrSym.CommonNamedArguments(3).Value.Value)
 
-                                         ' class CFoo
-                                         Dim type2 = DirectCast(moduleGlobalNS.GetTypeMember("CFoo"), NamedTypeSymbol)
+                                         ' class CGoo
+                                         Dim type2 = DirectCast(moduleGlobalNS.GetTypeMember("CGoo"), NamedTypeSymbol)
                                          Assert.Equal(2, type2.GetAttributes().Length)
 
                                          attrSym = type2.GetAttribute(comdSym)
@@ -240,10 +244,10 @@ Namespace Microsoft.CodeAnalysis.VisualBasic.UnitTests.Semantics
                                          attrSym = method.GetAttribute(comcSym)
                                          Assert.Equal(0, attrSym.CommonConstructorArguments.Length)
 
-                                         '' enum EFoo
+                                         '' enum EGoo
                                          If compilation IsNot Nothing Then
                                              ' Because this is a nopia local type it is only visible from the source assembly.
-                                             Dim type3 = DirectCast(globalNS.GetTypeMember("EFoo"), NamedTypeSymbol)
+                                             Dim type3 = DirectCast(globalNS.GetTypeMember("EGoo"), NamedTypeSymbol)
                                              Assert.Equal(2, type3.GetAttributes().Length)
 
                                              attrSym = type3.GetAttribute(comvSym)
@@ -251,7 +255,7 @@ Namespace Microsoft.CodeAnalysis.VisualBasic.UnitTests.Semantics
 
                                              attrSym = type3.GetAttribute(tidSym)
                                              Assert.Equal(2, attrSym.CommonConstructorArguments.Length)
-                                             Assert.Equal("EFoo, InteropAttribute, Version=1.0.0.0, Culture=neutral, PublicKeyToken=null", attrSym.CommonConstructorArguments(1).Value)
+                                             Assert.Equal("EGoo, InteropAttribute, Version=1.0.0.0, Culture=neutral, PublicKeyToken=null", attrSym.CommonConstructorArguments(1).Value)
 
                                              Dim field = DirectCast(type3.GetMembers("one").First(), FieldSymbol)
                                              Assert.Equal(0, field.GetAttributes().Length)
@@ -277,7 +281,7 @@ Namespace Microsoft.CodeAnalysis.VisualBasic.UnitTests.Semantics
             CompileAndVerify(source, sourceSymbolValidator:=attributeValidator, symbolValidator:=attributeValidator)
         End Sub
 
-        <WorkItem(540573, "DevDiv")>
+        <WorkItem(540573, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/540573")>
         <Fact()>
         Public Sub TestPseudoAttributes01()
             Dim source =
@@ -433,7 +437,429 @@ End Class
             CompileAndVerify(source, sourceSymbolValidator:=attributeValidator)
         End Sub
 
-        <WorkItem(531121, "DevDiv")>
+        <Fact>
+        <WorkItem(3898, "https://github.com/dotnet/roslyn/issues/3898")>
+        Sub SerializableFromPE()
+            Dim lib_vb =
+<compilation>
+    <file name="attr.vb"><![CDATA[
+Imports System
+<Serializable, Bob>
+Public Class C
+End Class
+
+<AttributeUsage(AttributeTargets.Class)>
+Public Class BobAttribute
+    Inherits Attribute
+End Class
+    ]]></file>
+</compilation>
+            Dim lib_comp = CreateCompilationWithMscorlib40AndVBRuntime(lib_vb)
+
+            Dim typeC As INamedTypeSymbol = lib_comp.GetTypeByMetadataName("C")
+            AssertEx.SetEqual({"System.SerializableAttribute", "BobAttribute"}, typeC.GetAttributes().Select(Function(a) a.ToString()))
+            Assert.True(typeC.IsSerializable)
+
+            Dim typeBobAttribute As INamedTypeSymbol = lib_comp.GetTypeByMetadataName("BobAttribute")
+            Assert.False(typeBobAttribute.IsSerializable)
+
+            Dim empty_vb =
+<compilation>
+    <file name="attr.vb"></file>
+</compilation>
+
+            Dim client1 = CreateCompilationWithMscorlib40AndVBRuntime(empty_vb, additionalRefs:={lib_comp.ToMetadataReference()})
+
+            Dim typeC1 As INamedTypeSymbol = client1.GetTypeByMetadataName("C")
+            AssertEx.SetEqual({"System.SerializableAttribute", "BobAttribute"}, typeC1.GetAttributes().Select(Function(a) a.ToString()))
+            Assert.True(typeC1.IsSerializable)
+
+            Dim typeBobAttribute1 As INamedTypeSymbol = client1.GetTypeByMetadataName("BobAttribute")
+            Assert.False(typeBobAttribute1.IsSerializable)
+
+            Dim client2 = CreateCompilationWithMscorlib40AndVBRuntime(empty_vb, additionalRefs:={lib_comp.EmitToImageReference()})
+
+            Dim typeC2 As INamedTypeSymbol = client2.GetTypeByMetadataName("C")
+            AssertEx.SetEqual({"BobAttribute"}, typeC2.GetAttributes().Select(Function(a) a.ToString()))
+            Assert.True(typeC2.IsSerializable)
+
+            Dim typeBobAttribute2 As INamedTypeSymbol = client2.GetTypeByMetadataName("BobAttribute")
+            Assert.False(typeBobAttribute2.IsSerializable)
+        End Sub
+
+        <Fact>
+        <WorkItem(3898, "https://github.com/dotnet/roslyn/issues/3898")>
+        Sub SerializableSubstitutedType()
+            Dim lib_vb =
+<compilation>
+    <file name="attr.vb"><![CDATA[
+Imports System
+
+<Serializable>
+Public Class C(Of T)
+End Class
+
+' Not serializable
+Public Class D(Of T)
+End Class
+
+Public Class C2
+    Inherits C(Of Integer)
+End Class
+Public Class D2
+    Inherits D(Of Integer)
+End Class
+            ]]></file>
+</compilation>
+            Dim comp = CreateCompilationWithMscorlib40AndVBRuntime(lib_vb)
+
+            Dim cOfInt = comp.GetTypeByMetadataName("C2").BaseType()
+            Assert.IsType(GetType(SubstitutedNamedType.ConstructedInstanceType), cOfInt)
+            Assert.True(DirectCast(cOfInt, INamedTypeSymbol).IsSerializable)
+            Assert.True(DirectCast(cOfInt.ConstructedFrom, INamedTypeSymbol).IsSerializable)
+
+            Dim dOfInt = comp.GetTypeByMetadataName("D2").BaseType()
+            Assert.IsType(GetType(SubstitutedNamedType.ConstructedInstanceType), dOfInt)
+            Assert.False(DirectCast(dOfInt, INamedTypeSymbol).IsSerializable)
+            Assert.False(DirectCast(dOfInt.ConstructedFrom, INamedTypeSymbol).IsSerializable)
+        End Sub
+
+        <WorkItem(217740, "https://devdiv.visualstudio.com/DefaultCollection/DevDiv/_workitems?id=217740")>
+        <Fact()>
+        Public Sub DateTimeConstantAttribute()
+            Dim source =
+<compilation>
+    <file name="attr.vb"><![CDATA[
+Imports System
+Imports System.Runtime.CompilerServices
+
+Public Class Bar
+    Sub Method(<DateTimeConstant(-1)> p1 As DateTime)
+    End Sub
+End Class
+]]>
+    </file>
+</compilation>
+
+            Dim symValidator As Action(Of ModuleSymbol) =
+                Sub(peModule)
+
+                    Dim bar = peModule.GlobalNamespace.GetMember(Of NamedTypeSymbol)("Bar")
+                    Dim method = bar.GetMember(Of MethodSymbol)("Method")
+                    Dim parameters = method.Parameters
+                    Dim theParameter = DirectCast(parameters(0), PEParameterSymbol)
+                    Dim peModuleSymbol = DirectCast(peModule, PEModuleSymbol)
+
+                    Assert.Equal(ParameterAttributes.None, theParameter.ParamFlags)
+
+                    ' let's find the attribute in the PE metadata
+                    Dim attributeInfo = CodeAnalysis.PEModule.FindTargetAttribute(peModuleSymbol.Module.MetadataReader, theParameter.Handle, AttributeDescription.DateTimeConstantAttribute)
+                    Assert.True(attributeInfo.HasValue)
+
+                    Dim attributeValue As Long
+                    Assert.True(peModuleSymbol.Module.TryExtractLongValueFromAttribute(attributeInfo.Handle, attributeValue))
+                    Assert.Equal(-1L, attributeValue)
+
+                    ' check .param has no value
+                    Dim constantHandle = peModuleSymbol.Module.MetadataReader.GetParameter(theParameter.Handle).GetDefaultValue()
+                    Assert.True(constantHandle.IsNil)
+                End Sub
+
+            CompileAndVerify(source, symbolValidator:=symValidator)
+        End Sub
+
+        <WorkItem(217740, "https://devdiv.visualstudio.com/DefaultCollection/DevDiv/_workitems?id=217740")>
+        <Fact()>
+        Public Sub DateTimeConstantAttributeWithBadDefaultValue()
+            Dim source =
+<compilation>
+    <file name="attr.vb"><![CDATA[
+Imports System
+Imports System.Runtime.CompilerServices
+
+Public Class Bar
+    Public Function Method(<DateTimeConstant(-1)> Optional p1 As DateTime = # 8/23/1970 3:45:39AM #) As DateTime
+        Return p1
+    End Function
+    Public Shared Sub Main()
+        Console.WriteLine(New Bar().Method().Ticks)
+    End Sub
+End Class
+]]>
+    </file>
+</compilation>
+
+            ' The native VB compiler emits this:
+            ' .method public instance void  Method([opt] valuetype [mscorlib]System.DateTime p1) cil managed
+            ' {
+            ' .param [1]
+            ' .custom instance void [mscorlib]System.Runtime.CompilerServices.DateTimeConstantAttribute:: .ctor(Int64) = (1 00 80 73 3E 42 F6 37 A0 08 00 00 )
+            ' .custom instance void [mscorlib]System.Runtime.CompilerServices.DateTimeConstantAttribute:: .ctor(Int64) = (1 00 FF FF FF FF FF FF FF FF 00 00 )
+
+            ' Using the native compiler, the code would output 621558279390000000
+
+            Dim comp = CreateCompilationWithMscorlib40(source)
+            AssertTheseDiagnostics(comp,
+                                   <expected><![CDATA[
+BC37226: The parameter has multiple distinct default values.
+    Public Function Method(<DateTimeConstant(-1)> Optional p1 As DateTime = # 8/23/1970 3:45:39AM #) As DateTime
+                                                                            ~~~~~~~~~~~~~~~~~~~~~~~
+]]></expected>)
+        End Sub
+
+        <WorkItem(217740, "https://devdiv.visualstudio.com/DefaultCollection/DevDiv/_workitems?id=217740")>
+        <Fact()>
+        Public Sub DateTimeConstantAttributeWithValidDefaultValue()
+            Dim source =
+<compilation>
+    <file name="attr.vb"><![CDATA[
+Imports System
+Imports System.Runtime.CompilerServices
+
+Public Class Bar
+    Public Function Method(<DateTimeConstant(42)> Optional p1 As DateTime = # 8/23/1970 3:45:39AM #) As DateTime
+        Return p1
+    End Function
+    Public Shared Sub Main()
+        Console.WriteLine(New Bar().Method().Ticks)
+    End Sub
+End Class
+]]>
+    </file>
+</compilation>
+
+            ' The native VB compiler emits this:
+            ' .method public instance valuetype [mscorlib]System.DateTime
+            ' Method([opt] valuetype [mscorlib]System.DateTime p1) cil managed
+            ' {
+            ' .param [1]
+            ' .custom instance void [mscorlib]System.Runtime.CompilerServices.DateTimeConstantAttribute:: .ctor(Int64) = (1 00 2A 00 00 00 00 00 00 00 00 00 )
+            ' .custom instance void [mscorlib]System.Runtime.CompilerServices.DateTimeConstantAttribute:: .ctor(Int64) = (1 00 80 73 3E 42 F6 37 A0 08 00 00 )
+
+            ' Using the native compiler, the code would output 621558279390000000
+
+            Dim comp = CreateCompilationWithMscorlib40(source)
+            AssertTheseDiagnostics(comp,
+                                   <expected><![CDATA[
+BC37226: The parameter has multiple distinct default values.
+    Public Function Method(<DateTimeConstant(42)> Optional p1 As DateTime = # 8/23/1970 3:45:39AM #) As DateTime
+                                                                            ~~~~~~~~~~~~~~~~~~~~~~~
+]]></expected>)
+        End Sub
+
+        <WorkItem(217740, "https://devdiv.visualstudio.com/DefaultCollection/DevDiv/_workitems?id=217740")>
+        <Fact()>
+        Public Sub DateTimeConstantAttributeWithBadDefaultValueOnField()
+            Dim source =
+<compilation>
+    <file name="attr.vb"><![CDATA[
+Imports System
+Imports System.Runtime.CompilerServices
+
+Public Class Bar
+    <DateTimeConstant(-1)>
+    Public Const F As DateTime = # 8/23/1970 3:45:39AM #
+
+    Public Shared Sub Main()
+        Console.WriteLine(Bar.F.Ticks)
+    End Sub
+End Class
+]]>
+    </file>
+</compilation>
+
+            ' The native compiler would output 621558279390000000
+            Dim comp = CreateCompilationWithMscorlib40(source)
+            comp.AssertTheseDiagnostics(<expected><![CDATA[
+BC37228: The field has multiple distinct constant values.
+    <DateTimeConstant(-1)>
+     ~~~~~~~~~~~~~~~~~~~~
+]]></expected>)
+
+        End Sub
+
+        <WorkItem(217740, "https://devdiv.visualstudio.com/DefaultCollection/DevDiv/_workitems?id=217740")>
+        <Fact()>
+        Public Sub DateTimeConstantAttributeWithValidDefaultValueOnField()
+            Dim source =
+<compilation>
+    <file name="attr.vb"><![CDATA[
+Imports System
+Imports System.Runtime.CompilerServices
+
+Public Class Bar
+    <DateTimeConstant(42)>
+    Public Const F As DateTime = # 8/23/1970 3:45:39AM #
+
+    Public Shared Sub Main()
+        Console.WriteLine(Bar.F.Ticks)
+    End Sub
+End Class
+]]>
+    </file>
+</compilation>
+
+            ' With the native VB compiler, this code outputs 621558279390000000
+            Dim comp = CreateCompilationWithMscorlib40(source)
+            comp.AssertTheseDiagnostics(<expected><![CDATA[
+BC37228: The field has multiple distinct constant values.
+    <DateTimeConstant(42)>
+     ~~~~~~~~~~~~~~~~~~~~
+]]></expected>)
+
+        End Sub
+
+        <WorkItem(217740, "https://devdiv.visualstudio.com/DefaultCollection/DevDiv/_workitems?id=217740")>
+        <Fact()>
+        Public Sub DateTimeConstantAttributeReferencedViaRef()
+            Dim source1 =
+<compilation>
+    <file name="attr.vb"><![CDATA[
+Imports System
+Imports System.Runtime.CompilerServices
+
+Public Class Bar
+    Public Sub Method(<DateTimeConstant(-1)> p1 As DateTime)
+    End Sub
+End Class
+]]>
+    </file>
+</compilation>
+
+            Dim source2 =
+<compilation>
+    <file name="attr.vb"><![CDATA[
+Public Class Consumer
+    Public Shared Sub Main()
+        Dim test = New Bar()
+        test.Method()
+    End Sub
+End Class
+]]>
+    </file>
+</compilation>
+
+            Dim libComp = CreateCompilationWithMscorlib40(source1)
+            Dim libCompRef = New VisualBasicCompilationReference(libComp)
+
+            Dim comp2 = CreateCompilationWithMscorlib40(source2, references:={libCompRef})
+            AssertTheseDiagnostics(comp2,
+                                   <expected><![CDATA[
+BC30455: Argument not specified for parameter 'p1' of 'Public Sub Method(p1 As Date)'.
+        test.Method()
+             ~~~~~~
+]]></expected>)
+
+            Dim libAssemblyRef = libComp.EmitToImageReference()
+            Dim comp3 = CreateCompilationWithMscorlib40(source2, references:={libAssemblyRef})
+            AssertTheseDiagnostics(comp3,
+                <expected><![CDATA[
+BC30455: Argument not specified for parameter 'p1' of 'Public Sub Method(p1 As Date)'.
+        test.Method()
+             ~~~~~~
+]]></expected>)
+        End Sub
+
+        <WorkItem(217740, "https://devdiv.visualstudio.com/DefaultCollection/DevDiv/_workitems?id=217740")>
+        <Fact()>
+        Public Sub LoadingDateTimeConstantWithBadValueOnField()
+            Dim ilSource = <![CDATA[
+.class public auto ansi C
+       extends [mscorlib]System.Object
+{
+  .field public static initonly valuetype [mscorlib]System.DateTime F
+  .custom instance void [mscorlib]System.Runtime.CompilerServices.DateTimeConstantAttribute::.ctor(int64) = ( 01 00 ff ff ff ff ff ff ff ff 00 00 )
+  .method public specialname rtspecialname
+          instance void  .ctor() cil managed
+  {
+    // Code size       7 (0x7)
+    .maxstack  8
+    IL_0000:  ldarg.0
+    IL_0001:  call       instance void [mscorlib]System.Object::.ctor()
+    IL_0006:  ret
+  } // end of method C::.ctor
+} // end of class C
+                ]]>
+
+            Dim source =
+<compilation>
+    <file name="attr.vb"><![CDATA[
+Public Class D
+    Shared Sub Main()
+        System.Console.WriteLine(C.F.Ticks)
+    End Sub
+End Class
+]]>
+    </file>
+</compilation>
+
+            ' Using the native compiler, this code crashed
+            Dim ilReference = CompileIL(ilSource.Value)
+            Dim comp = CreateCompilationWithMscorlib40(source, references:={ilReference})
+            AssertTheseDiagnostics(comp,
+                <expected><![CDATA[
+BC30799: Field 'C.F' has an invalid constant value.
+        System.Console.WriteLine(C.F.Ticks)
+                                 ~~~
+]]></expected>)
+        End Sub
+
+        <WorkItem(217740, "https://devdiv.visualstudio.com/DefaultCollection/DevDiv/_workitems?id=217740")>
+        <Fact()>
+        Public Sub LoadingDateTimeConstantWithBadValue()
+            Dim ilSource = <![CDATA[
+.class public auto ansi beforefieldinit C
+       extends [mscorlib]System.Object
+{
+  .method public hidebysig instance valuetype [mscorlib]System.DateTime
+          Method([opt] valuetype [mscorlib]System.DateTime p) cil managed
+  {
+    .param [1]
+    .custom instance void [mscorlib]System.Runtime.CompilerServices.DateTimeConstantAttribute::.ctor(int64) = ( 01 00 FF FF FF FF FF FF FF FF 00 00 )
+    // Code size       7 (0x7)
+    .maxstack  1
+    .locals init (valuetype [mscorlib]System.DateTime V_0)
+    IL_0000:  nop
+    IL_0001:  ldarg.1
+    IL_0002:  stloc.0
+    IL_0003:  br.s       IL_0005
+
+    IL_0005:  ldloc.0
+    IL_0006:  ret
+  } // end of method C::Method
+
+  .method public hidebysig specialname rtspecialname
+          instance void  .ctor() cil managed
+  {
+    // Code size       7 (0x7)
+    .maxstack  8
+    IL_0000:  ldarg.0
+    IL_0001:  call       instance void [mscorlib]System.Object::.ctor()
+    IL_0006:  ret
+  } // end of method C::.ctor
+
+} // end of class C
+                ]]>
+
+            Dim source =
+<compilation>
+    <file name="attr.vb"><![CDATA[
+Public Class D
+
+    Shared Sub Main()
+        System.Console.WriteLine(New C().Method().Ticks)
+    End Sub
+End Class
+]]>
+    </file>
+</compilation>
+
+            Dim ilReference = CompileIL(ilSource.Value)
+            CompileAndVerify(source, expectedOutput:="0", references:={ilReference})
+            ' The native compiler would produce a working exe, but that exe would fail at runtime
+        End Sub
+
+        <WorkItem(531121, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/531121")>
         <Fact()>
         Public Sub TestDecimalConstantAttribute()
             Dim source =
@@ -484,9 +910,9 @@ End Class
 #End Region
 
 #Region "DllImportAttribute, MethodImplAttribute, PreserveSigAttribute"
-        ''' 6879: Pseudo DllImport looks very different in metadata Metadata: pinvokeimpl(...) +
+        ''' 6879: Pseudo DllImport looks very different in metadata: pinvokeimpl(...) +
         ''' PreserveSig
-        <WorkItem(540573, "DevDiv")>
+        <WorkItem(540573, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/540573")>
         <Fact>
         Public Sub TestPseudoDllImport()
             Dim source =
@@ -577,7 +1003,7 @@ End Namespace
 ]]>
     </file>
 </compilation>
-            CreateCompilationWithMscorlib(source).VerifyDiagnostics(
+            CreateCompilationWithMscorlib40(source).VerifyDiagnostics(
                 Diagnostic(ERRID.ERR_AttributeMustInheritSysAttr, "DllImport").WithArguments("System.Runtime.InteropServices.DllImportAttribute"))
         End Sub
 
@@ -598,11 +1024,11 @@ Class C
     Public Shared Sub F2()
     End Sub
 
-    <DllImport("foo", EntryPoint:=Nothing)>
+    <DllImport("goo", EntryPoint:=Nothing)>
     Public Shared Sub F3()
     End Sub
 
-    <DllImport("foo", EntryPoint:="")>
+    <DllImport("goo", EntryPoint:="")>
     Public Shared Sub F4()
     End Sub
 
@@ -649,7 +1075,7 @@ End Class
 ]]>
     </file>
 </compilation>
-            CreateCompilationWithMscorlibAndVBRuntime(source).VerifyDiagnostics(
+            CreateCompilationWithMscorlib40AndVBRuntime(source).VerifyDiagnostics(
                 Diagnostic(ERRID.ERR_BadAttribute1, "Nothing").WithArguments("System.Runtime.InteropServices.DllImportAttribute"),
                 Diagnostic(ERRID.ERR_BadAttribute1, """""").WithArguments("System.Runtime.InteropServices.DllImportAttribute"),
                 Diagnostic(ERRID.ERR_BadAttribute1, "EntryPoint:=Nothing").WithArguments("System.Runtime.InteropServices.DllImportAttribute"),
@@ -693,7 +1119,7 @@ End Class
     </compilation>
 
             CompileAndVerify(source, validator:=
-                Sub(assembly, _omitted)
+                Sub(assembly)
                     Dim reader = assembly.GetMetadataReader()
                     Assert.Equal(3, reader.GetTableRowCount(TableIndex.ModuleRef))
                     Assert.Equal(3, reader.GetTableRowCount(TableIndex.ImplMap))
@@ -754,7 +1180,7 @@ End Module
         End Sub
 
         <Fact()>
-        <WorkItem(544176, "DevDiv")>
+        <WorkItem(544176, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/544176")>
         Public Sub TestPseudoAttributes_DllImport_AllTrue()
             Dim source =
 <compilation>
@@ -771,8 +1197,8 @@ End Class
     </file>
 </compilation>
 
-            Dim validator As Action(Of PEAssembly, TestEmitters) =
-                Sub(assembly, _omitted)
+            Dim validator As Action(Of PEAssembly) =
+                Sub(assembly)
                     Dim reader = assembly.GetMetadataReader()
 
                     ' ModuleRef:
@@ -817,19 +1243,19 @@ End Class
                     Assert.Equal(True, info.ThrowOnUnmappableCharacter)
 
                     Assert.Equal(
-                        Cci.PInvokeAttributes.NoMangle Or
-                        Cci.PInvokeAttributes.CharSetUnicode Or
-                        Cci.PInvokeAttributes.SupportsLastError Or
-                        Cci.PInvokeAttributes.CallConvCdecl Or
-                        Cci.PInvokeAttributes.BestFitEnabled Or
-                        Cci.PInvokeAttributes.ThrowOnUnmappableCharEnabled, DirectCast(info, Cci.IPlatformInvokeInformation).Flags)
+                        MethodImportAttributes.ExactSpelling Or
+                        MethodImportAttributes.CharSetUnicode Or
+                        MethodImportAttributes.SetLastError Or
+                        MethodImportAttributes.CallingConventionCDecl Or
+                        MethodImportAttributes.BestFitMappingEnable Or
+                        MethodImportAttributes.ThrowOnUnmappableCharEnable, DirectCast(info, Cci.IPlatformInvokeInformation).Flags)
                 End Sub
 
             CompileAndVerify(source, validator:=validator, symbolValidator:=symValidator)
         End Sub
 
         <Fact>
-        <WorkItem(544601, "DevDiv")>
+        <WorkItem(544601, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/544601")>
         Public Sub GetDllImportData_UnspecifiedProperties()
             Dim source =
 <compilation>
@@ -866,7 +1292,7 @@ End Class
         End Sub
 
         <Fact>
-        <WorkItem(544601, "DevDiv")>
+        <WorkItem(544601, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/544601")>
         Public Sub GetDllImportData_Declare()
             Dim source =
 <compilation>
@@ -875,8 +1301,8 @@ Imports System.Runtime.CompilerServices
 Imports System.Runtime.InteropServices
 
 Class C
-    Declare Unicode Sub M1 Lib "foo"()
-    Declare Unicode Sub M2 Lib "foo" Alias "bar"()
+    Declare Unicode Sub M1 Lib "goo"()
+    Declare Unicode Sub M2 Lib "goo" Alias "bar"()
 End Class
 ]]>
     </file>
@@ -888,7 +1314,7 @@ End Class
                         Dim c = [module].GlobalNamespace.GetMember(Of NamedTypeSymbol)("C")
 
                         Dim info = c.GetMember(Of MethodSymbol)("M1").GetDllImportData()
-                        Assert.Equal("foo", info.ModuleName)
+                        Assert.Equal("goo", info.ModuleName)
                         Assert.Equal(If(isFromSource, Nothing, "M1"), info.EntryPointName)
                         Assert.Equal(CharSet.Unicode, info.CharacterSet)
                         Assert.Equal(CallingConvention.Winapi, info.CallingConvention)
@@ -898,7 +1324,7 @@ End Class
                         Assert.Equal(Nothing, info.ThrowOnUnmappableCharacter)
 
                         info = c.GetMember(Of MethodSymbol)("M2").GetDllImportData()
-                        Assert.Equal("foo", info.ModuleName)
+                        Assert.Equal("goo", info.ModuleName)
                         Assert.Equal("bar", info.EntryPointName)
                         Assert.Equal(CharSet.Unicode, info.CharacterSet)
                         Assert.Equal(CallingConvention.Winapi, info.CallingConvention)
@@ -920,7 +1346,7 @@ Imports System.Runtime.CompilerServices
 Imports System.Runtime.InteropServices
 
 Public Class C
-    <DllImport("foo")>
+    <DllImport("goo")>
     Public Shared Operator +(a As C, b As C) As Integer
     End Operator
 End Class
@@ -929,7 +1355,7 @@ End Class
 </compilation>
 
             CompileAndVerify(source, validator:=
-                Sub(assembly, _omitted)
+                Sub(assembly)
                     Dim reader = assembly.GetMetadataReader()
                     Assert.Equal(1, reader.GetTableRowCount(TableIndex.ModuleRef))
                     Assert.Equal(1, reader.GetTableRowCount(TableIndex.ImplMap))
@@ -940,7 +1366,7 @@ End Class
                     Dim entryPointName As String = reader.GetString(method.Name)
 
                     Assert.Equal("op_Addition", entryPointName)
-                    Assert.Equal("foo", moduleName)
+                    Assert.Equal("goo", moduleName)
                 End Sub)
         End Sub
 
@@ -953,7 +1379,7 @@ Imports System.Runtime.CompilerServices
 Imports System.Runtime.InteropServices
 
 Public Class C
-    <DllImport("foo")>
+    <DllImport("goo")>
     Public Shared Narrowing Operator CType(a As C) As Integer
     End Operator
 End Class
@@ -962,7 +1388,7 @@ End Class
 </compilation>
 
             CompileAndVerify(source, validator:=
-                Sub(assembly, _omitted)
+                Sub(assembly)
                     Dim peFileReader = assembly.GetMetadataReader()
                     Assert.Equal(1, peFileReader.GetTableRowCount(TableIndex.ModuleRef))
                     Assert.Equal(1, peFileReader.GetTableRowCount(TableIndex.ImplMap))
@@ -972,7 +1398,7 @@ End Class
                     Dim entryPointName As String = peFileReader.GetString(method.Name)
 
                     Assert.Equal("op_Explicit", entryPointName)
-                    Assert.Equal("foo", moduleName)
+                    Assert.Equal("goo", moduleName)
                 End Sub)
         End Sub
 
@@ -986,10 +1412,10 @@ Imports System.Runtime.InteropServices
 
 Public Class C
     <DllImport("module name")>
-    Shared Partial Private Sub foo()
+    Shared Partial Private Sub goo()
     End Sub
  
-    Shared Private Sub foo()
+    Shared Private Sub goo()
     End Sub
 End Class
 ]]>
@@ -997,7 +1423,7 @@ End Class
 </compilation>
 
             CompileAndVerify(source, validator:=
-                Sub(assembly, _omitted)
+                Sub(assembly)
                     Dim reader = assembly.GetMetadataReader()
                     Assert.Equal(1, reader.GetTableRowCount(TableIndex.ModuleRef))
                     Assert.Equal(1, reader.GetTableRowCount(TableIndex.ImplMap))
@@ -1007,7 +1433,7 @@ End Class
                     Dim entryPointName As String = reader.GetString(method.Name)
 
                     Assert.Equal("module name", moduleName)
-                    Assert.Equal("foo", entryPointName)
+                    Assert.Equal("goo", entryPointName)
                 End Sub)
         End Sub
 
@@ -1020,17 +1446,17 @@ Imports System.Runtime.InteropServices
 
 Public Class C
     <DllImport("module name")>
-    Partial Private Sub foo()
+    Partial Private Sub goo()
     End Sub
  
-    Private Sub foo()
+    Private Sub goo()
     End Sub
 End Class
 ]]>
     </file>
 </compilation>
 
-            CreateCompilationWithMscorlib(source).VerifyDiagnostics(
+            CreateCompilationWithMscorlib40(source).VerifyDiagnostics(
                 Diagnostic(ERRID.ERR_DllImportOnInstanceMethod, "DllImport"))
         End Sub
 
@@ -1058,7 +1484,7 @@ End Module
 ]]>
     </file>
 </compilation>
-            CreateCompilationWithMscorlibAndVBRuntime(source).VerifyDiagnostics(
+            CreateCompilationWithMscorlib40AndVBRuntime(source).VerifyDiagnostics(
                 Diagnostic(ERRID.ERR_DllImportOnNonEmptySubOrFunction, "System.Runtime.InteropServices.DllImport"))
 
         End Sub
@@ -1085,47 +1511,47 @@ Public Class C
     End Property
 
     Custom Event x As Action(Of Integer)
-        <DllImport("foo")>
+        <DllImport("goo")>
         AddHandler(value As Action(Of Integer))
         End AddHandler
 
-        <DllImport("foo")>
+        <DllImport("goo")>
         RemoveHandler(value As Action(Of Integer))
         End RemoveHandler
 
-        <DllImport("foo")>
+        <DllImport("goo")>
         RaiseEvent(obj As Integer)
         End RaiseEvent
     End Event
 
-    <DllImport("foo")>
+    <DllImport("goo")>
     Sub InstanceMethod
     End Sub
 
-    <DllImport("foo")>
+    <DllImport("goo")>
     Shared Sub NonEmptyBody
        System.Console.WriteLine() 
     End Sub
 
-    <DllImport("foo")>
+    <DllImport("goo")>
     Shared Sub GenericMethod(Of T)()
     End Sub
 End Class
 
 Interface I
-    <DllImport("foo")>
+    <DllImport("goo")>
     Sub InterfaceMethod()
 End Interface
 
 Interface I(Of T)
-    <DllImport("foo")>
+    <DllImport("goo")>
     Sub InterfaceMethod()
 End Interface
 
 Class C(Of T)
-    Interface Foo
+    Interface Goo
         Class D
-            <DllImport("foo")>
+            <DllImport("goo")>
             Shared Sub MethodOnGenericType()
             End Sub
         End Class
@@ -1135,7 +1561,7 @@ End Class
     </file>
 </compilation>
 
-            CreateCompilationWithMscorlib(source).VerifyDiagnostics(
+            CreateCompilationWithMscorlib40(source).VerifyDiagnostics(
                 Diagnostic(ERRID.ERR_DllImportNotLegalOnGetOrSet, "DllImport"),
                 Diagnostic(ERRID.ERR_DllImportNotLegalOnGetOrSet, "DllImport"),
                 Diagnostic(ERRID.ERR_DllImportNotLegalOnEventMethod, "DllImport"),
@@ -1214,7 +1640,7 @@ Public Class C
             Dim code = <compilation><file name="attr.vb"><%= sb.ToString() %></file></compilation>
 
             CompileAndVerify(code, validator:=
-                Sub(assembly, _omitted)
+                Sub(assembly)
                     Dim reader = assembly.GetMetadataReader()
                     Assert.Equal(cases.Length, reader.GetTableRowCount(TableIndex.ImplMap))
                     Dim j = 0
@@ -1313,9 +1739,8 @@ End Class
     </file>
 </compilation>
 
-            Dim validator As Action(Of PEAssembly, TestEmitters) =
-                Sub(assembly, options)
-                    Dim isRefEmit = options = TestEmitters.RefEmit
+            Dim validator As Action(Of PEAssembly) =
+                Sub(assembly)
                     Dim peReader = assembly.GetMetadataReader()
 
                     For Each methodDef In peReader.MethodDefinitions
@@ -1334,12 +1759,10 @@ End Class
                                 expectedFlags = MethodImplAttributes.Synchronized
 
                             Case "InternalCallStatic", "InternalCallInstance", "InternalCallAbstract"
-                                ' workaround for a bug in ref.emit:
-                                expectedFlags = If(isRefEmit, MethodImplAttributes.Runtime Or MethodImplAttributes.InternalCall, MethodImplAttributes.InternalCall)
+                                expectedFlags = MethodImplAttributes.InternalCall
 
                             Case "ForwardRef"
-                                ' workaround for a bug in ref.emit:
-                                expectedFlags = If(isRefEmit, Nothing, MethodImplAttributes.ForwardRef)
+                                expectedFlags = MethodImplAttributes.ForwardRef
 
                             Case ".ctor"
                                 expectedFlags = MethodImplAttributes.IL
@@ -1357,7 +1780,7 @@ End Class
 
         <Fact>
         Public Sub TestMethodImplAttribute_UnverifiableMD()
-            Dim compilation = CreateCompilationWithMscorlib(
+            Dim compilation = CreateCompilationWithMscorlib40(
 <compilation>
     <file name="attr.vb"><![CDATA[
 Imports System.Runtime.CompilerServices
@@ -1457,13 +1880,13 @@ Imports System.Runtime.InteropServices
 
 Public Class C
     <DllImport("Baz")>
-    Declare Ansi Sub Foo Lib "Foo" Alias "bar" ()
+    Declare Ansi Sub Goo Lib "Goo" Alias "bar" ()
 End Class
 ]]>
     </file>
 </compilation>
 
-            CreateCompilationWithMscorlib(source).VerifyDiagnostics(
+            CreateCompilationWithMscorlib40(source).VerifyDiagnostics(
                 Diagnostic(ERRID.ERR_DllImportNotLegalOnDeclare, "DllImport"))
         End Sub
 
@@ -1482,7 +1905,7 @@ Public Module M
     End Sub
 
     <Extension()>
-    <DllImport("foo")>
+    <DllImport("goo")>
     Sub DllImp(a As Integer)
     End Sub
 
@@ -1502,7 +1925,7 @@ End Class
     </file>
 </compilation>
 
-            CreateCompilationWithMscorlibAndVBRuntimeAndReferences(source, {SystemCoreRef}).VerifyDiagnostics()
+            CreateCompilationWithMscorlib40AndVBRuntimeAndReferences(source, {TestMetadata.Net40.SystemCore}).VerifyDiagnostics()
         End Sub
 
         <Fact>
@@ -1523,69 +1946,69 @@ MustInherit Class C
     <MethodImpl(MethodImplOptions.PreserveSig)>
     MustOverride Public Sub f1()
 
-    <DllImport("foo")>
+    <DllImport("goo")>
     Public Shared Sub f2()
     End Sub
 
-    <DllImport("foo", PreserveSig:=True)>
+    <DllImport("goo", PreserveSig:=True)>
     Public Shared Sub f3()
     End Sub
 
-    <DllImport("foo", PreserveSig:=False)>
+    <DllImport("goo", PreserveSig:=False)>
     Public Shared Sub f4()
     End Sub
 
-    <MethodImpl(MethodImplOptions.PreserveSig), DllImport("foo", PreserveSig:=True)>
+    <MethodImpl(MethodImplOptions.PreserveSig), DllImport("goo", PreserveSig:=True)>
     Public Shared Sub f5()
     End Sub
 
-    <MethodImpl(MethodImplOptions.PreserveSig), DllImport("foo", PreserveSig:=False)>
+    <MethodImpl(MethodImplOptions.PreserveSig), DllImport("goo", PreserveSig:=False)>
     Public Shared Sub f6()
     End Sub
 
     <MethodImpl(MethodImplOptions.PreserveSig), PreserveSig>
     MustOverride Public Sub f7()
 
-    <DllImport("foo"), PreserveSig>
+    <DllImport("goo"), PreserveSig>
     Public Shared Sub f8()
     End Sub
 
-    <PreserveSig, DllImport("foo", PreserveSig:=True)>
+    <PreserveSig, DllImport("goo", PreserveSig:=True)>
     Public Shared Sub f9()
     End Sub
 
     ' false
-    <DllImport("foo", PreserveSig:=False), PreserveSig>
+    <DllImport("goo", PreserveSig:=False), PreserveSig>
     Public Shared Sub f10()
     End Sub
 
-    <MethodImpl(MethodImplOptions.PreserveSig), DllImport("foo", PreserveSig:=True), PreserveSig>
+    <MethodImpl(MethodImplOptions.PreserveSig), DllImport("goo", PreserveSig:=True), PreserveSig>
     Public Shared Sub f11()
     End Sub
 
     ' false
-    <DllImport("foo", PreserveSig:=False), PreserveSig, MethodImpl(MethodImplOptions.PreserveSig)>
+    <DllImport("goo", PreserveSig:=False), PreserveSig, MethodImpl(MethodImplOptions.PreserveSig)>
     Public Shared Sub f12()
     End Sub
 
     ' false
-    <DllImport("foo", PreserveSig:=False), MethodImpl(MethodImplOptions.PreserveSig), PreserveSig>
+    <DllImport("goo", PreserveSig:=False), MethodImpl(MethodImplOptions.PreserveSig), PreserveSig>
     Public Shared Sub f13()
     End Sub
 
-    <PreserveSig, DllImport("foo", PreserveSig:=False), MethodImpl(MethodImplOptions.PreserveSig)>
+    <PreserveSig, DllImport("goo", PreserveSig:=False), MethodImpl(MethodImplOptions.PreserveSig)>
     Public Shared Sub f14()
     End Sub
 
-    <PreserveSig, MethodImpl(MethodImplOptions.PreserveSig), DllImport("foo", PreserveSig:=False)>
+    <PreserveSig, MethodImpl(MethodImplOptions.PreserveSig), DllImport("goo", PreserveSig:=False)>
     Public Shared Sub f15()
     End Sub
 
-    <MethodImpl(MethodImplOptions.PreserveSig), PreserveSig, DllImport("foo", PreserveSig:=False)>
+    <MethodImpl(MethodImplOptions.PreserveSig), PreserveSig, DllImport("goo", PreserveSig:=False)>
     Public Shared Sub f16()
     End Sub
 
-    <MethodImpl(MethodImplOptions.PreserveSig), DllImport("foo", PreserveSig:=False), PreserveSig>
+    <MethodImpl(MethodImplOptions.PreserveSig), DllImport("goo", PreserveSig:=False), PreserveSig>
     Public Shared Sub f17()
     End Sub
 
@@ -1593,7 +2016,7 @@ MustInherit Class C
     Public Shared Sub f18()
     End Sub
 
-    <MethodImpl(MethodImplOptions.Synchronized), DllImport("foo", PreserveSig:=False), PreserveSig>
+    <MethodImpl(MethodImplOptions.Synchronized), DllImport("goo", PreserveSig:=False), PreserveSig>
     Public Shared Sub f19()
     End Sub
 
@@ -1605,7 +2028,7 @@ End Class
     </file>
 </compilation>
             CompileAndVerify(source, validator:=
-                Sub(assembly, _omitted)
+                Sub(assembly)
                     Dim peReader = assembly.GetMetadataReader()
                     For Each methodDef In peReader.MethodDefinitions
                         Dim row = peReader.GetMethodDefinition(methodDef)
@@ -1687,7 +2110,7 @@ End Class
     </file>
 </compilation>
 
-            CreateCompilationWithMscorlib(source).AssertTheseDiagnostics(<![CDATA[
+            CreateCompilationWithMscorlib40(source).AssertTheseDiagnostics(<![CDATA[
 BC30127: Attribute 'MethodImplAttribute' is not valid: Incorrect argument value.
     <MethodImpl(CShort(1))>
                 ~~~~~~~~~
@@ -1718,23 +2141,23 @@ BC30127: Attribute 'MethodImplAttribute' is not valid: Incorrect argument value.
             implFlags As MethodImplAttributes()
         )
             Dim m = assembly.Modules(0)
-            Dim dissableOptDef As TypeDefinitionHandle = Nothing
+            Dim disableOptDef As TypeDefinitionHandle = Nothing
             Dim name As String = Nothing
 
             For Each typeDef In m.GetMetadataReader().TypeDefinitions
                 name = m.GetTypeDefNameOrThrow(typeDef)
 
                 If name.Equals("DisableJITOptimization") Then
-                    dissableOptDef = typeDef
+                    disableOptDef = typeDef
                     Exit For
                 End If
             Next
 
-            Assert.NotEqual(Nothing, dissableOptDef)
+            Assert.NotEqual(Nothing, disableOptDef)
 
             Dim map As New Dictionary(Of String, MethodDefinitionHandle)()
 
-            For Each methodDef In m.GetMethodsOfTypeOrThrow(dissableOptDef)
+            For Each methodDef In m.GetMethodsOfTypeOrThrow(disableOptDef)
                 map.Add(m.GetMethodDefNameOrThrow(methodDef), methodDef)
             Next
 
@@ -1763,8 +2186,8 @@ End Module
 ]]>
     </file>
 </compilation>
-            Dim validator As Action(Of PEAssembly, TestEmitters) =
-                Sub(assembly, _omitted)
+            Dim validator As Action(Of PEAssembly) =
+                Sub(assembly)
                     Const implFlags As MethodImplAttributes = MethodImplAttributes.IL Or MethodImplAttributes.Managed Or MethodImplAttributes.NoInlining Or MethodImplAttributes.NoOptimization
                     DisableJITOptimizationTestHelper(assembly, {"Main", "Main2"}, {implFlags, 0})
                 End Sub
@@ -1775,7 +2198,7 @@ End Module
 #End Region
 
 #Region "DefaultCharSetAttribute"
-        <Fact, WorkItem(544518, "DevDiv")>
+        <Fact, WorkItem(544518, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/544518")>
         Public Sub DllImport_DefaultCharSet1()
             Dim source =
 <compilation>
@@ -1786,7 +2209,7 @@ Imports System.Runtime.InteropServices
 <Module:DefaultCharSet(CharSet.Ansi)>
 MustInherit Class C
 
-    <DllImport("foo")>
+    <DllImport("goo")>
     Shared Sub f1()
     End Sub
 End Class
@@ -1794,12 +2217,12 @@ End Class
     </file>
 </compilation>
 
-            CompileAndVerify(source, emitOptions:=TestEmitters.CCI, validator:=
-                Sub(assembly, _omitted)
+            CompileAndVerify(source, validator:=
+                Sub(assembly)
                     Dim reader = assembly.GetMetadataReader()
                     Assert.Equal(1, reader.GetTableRowCount(TableIndex.ModuleRef))
                     Assert.Equal(1, reader.GetTableRowCount(TableIndex.ImplMap))
-                    Assert.False(FindCustomAttribute(reader, "DefaultCharSetAttribute").IsNil)
+                    Assert.False(MetadataValidation.FindCustomAttribute(reader, "DefaultCharSetAttribute").IsNil)
                     Dim import = reader.GetImportedMethods().Single().GetImport()
                     Assert.Equal(MethodImportAttributes.CharSetAnsi, import.Attributes And MethodImportAttributes.CharSetMask)
                 End Sub)
@@ -1817,21 +2240,21 @@ Imports System.Runtime.InteropServices
 
 <StructLayout(LayoutKind.Explicit)>
 MustInherit Class C
-    <DllImport("foo")>
+    <DllImport("goo")>
     Shared Sub f1()
     End Sub
 End Class
 ]]>
     </file>
 </compilation>
-            CompileAndVerify(source, emitOptions:=TestEmitters.CCI, validator:=
-                Sub(assembly, _omitted)
+            CompileAndVerify(source, validator:=
+                Sub(assembly)
                     Dim reader = assembly.GetMetadataReader()
 
                     Assert.Equal(1, reader.GetTableRowCount(TableIndex.ModuleRef))
                     Assert.Equal(1, reader.GetTableRowCount(TableIndex.ImplMap))
 
-                    Assert.False(FindCustomAttribute(reader, "DefaultCharSetAttribute").IsNil)
+                    Assert.False(MetadataValidation.FindCustomAttribute(reader, "DefaultCharSetAttribute").IsNil)
 
                     Dim import = reader.GetImportedMethods().Single().GetImport()
                     Assert.Equal(MethodImportAttributes.None, import.Attributes And MethodImportAttributes.CharSetMask)
@@ -1866,7 +2289,7 @@ Imports System.Runtime.InteropServices
     </file>
 </compilation>
 
-            CreateCompilationWithMscorlib(source).AssertTheseDiagnostics(<![CDATA[
+            CreateCompilationWithMscorlib40(source).AssertTheseDiagnostics(<![CDATA[
 BC30127: Attribute 'DefaultCharSetAttribute' is not valid: Incorrect argument value.
 <Module:DefaultCharSet(DirectCast(Integer.MaxValue, CharSet))>
                        ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -1888,7 +2311,7 @@ Class C
     Class D
         Dim arr As Integer() = {1, 2, 3, 4, 5, 6, 7, 8, 9, 0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 0}
 
-        Sub foo()
+        Sub goo()
             Dim a As Integer = 1
             Dim b As Integer = 2
             Dim q = New With {.f = 1, .g = 2}
@@ -1896,7 +2319,7 @@ Class C
         End Sub
     End Class
 
-    Event Foo(a As Integer, b As String)
+    Event Goo(a As Integer, b As String)
 End Class
 
 <SpecialName>
@@ -1927,8 +2350,8 @@ End Class
 ]]>
     </file>
 </compilation>
-            CompileAndVerify(source, emitOptions:=TestEmitters.CCI, validator:=
-                Sub(assembly, _omitted)
+            CompileAndVerify(source, validator:=
+                Sub(assembly)
                     Dim peFileReader = assembly.GetMetadataReader()
                     For Each typeDef In peFileReader.TypeDefinitions
                         Dim row = peFileReader.GetTypeDefinition(typeDef)
@@ -1949,7 +2372,7 @@ End Class
         ''' <summary>
         ''' DefaultCharSet is not applied on embedded types.
         ''' </summary>
-        <WorkItem(546644, "DevDiv")>
+        <WorkItem(546644, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/546644")>
         <Fact>
         Public Sub DefaultCharSet_EmbeddedTypes()
             Dim source =
@@ -1962,7 +2385,7 @@ Imports Microsoft.VisualBasic
 <Module:DefaultCharSet(CharSet.Unicode)>
 
 Friend Class C
-    Public Sub Foo(x As Integer)    
+    Public Sub Goo(x As Integer)    
       Console.WriteLine(ChrW(x))
     End Sub
 End Class
@@ -1970,11 +2393,11 @@ End Class
     </file>
 </compilation>
 
-            Dim c = CompilationUtils.CreateCompilationWithReferences(source,
+            Dim c = CompilationUtils.CreateEmptyCompilationWithReferences(source,
                                                                      references:={MscorlibRef, SystemRef, SystemCoreRef},
                                                                      options:=TestOptions.ReleaseDll.WithEmbedVbCoreRuntime(True))
             CompileAndVerify(c, validator:=
-                Sub(assembly, _omitted)
+                Sub(assembly)
                     Dim peFileReader = assembly.GetMetadataReader()
                     For Each typeDef In peFileReader.TypeDefinitions
                         Dim row = peFileReader.GetTypeDefinition(typeDef)
@@ -2003,19 +2426,19 @@ Imports System.Runtime.CompilerServices
 Imports System.Runtime.InteropServices
 
 Public Class C
-    Declare Sub Bar Lib "Foo" ()
+    Declare Sub Bar Lib "Goo" ()
 End Class
 ]]>
     </file>
 </compilation>
 
-            Dim validator As Action(Of PEAssembly, TestEmitters) =
-                Sub(assembly, _omitted)
+            Dim validator As Action(Of PEAssembly) =
+                Sub(assembly)
                     Dim reader = assembly.GetMetadataReader()
 
                     ' ModuleRef:
                     Dim moduleRefName = reader.GetModuleReference(reader.GetModuleReferences().Single()).Name
-                    Assert.Equal("Foo", reader.GetString(moduleRefName))
+                    Assert.Equal("Goo", reader.GetString(moduleRefName))
 
                     ' FileRef:
                     ' Although the Metadata spec says there should be a File entry for each ModuleRef entry 
@@ -2061,8 +2484,8 @@ End Class
 </compilation>
             Const declareFlags = MethodImportAttributes.CallingConventionWinApi Or MethodImportAttributes.SetLastError
 
-            Dim validator As Action(Of PEAssembly, TestEmitters) =
-                Sub(assembly, _omitted)
+            Dim validator As Action(Of PEAssembly) =
+                Sub(assembly)
                     Dim peFileReader = assembly.GetMetadataReader()
                     Assert.Equal(4, peFileReader.GetTableRowCount(TableIndex.ModuleRef))
                     Assert.Equal(4, peFileReader.GetTableRowCount(TableIndex.ImplMap))
@@ -2135,7 +2558,7 @@ End Class
     </file>
 </compilation>
 
-            CreateCompilationWithMscorlib(source).VerifyDiagnostics(
+            CreateCompilationWithMscorlib40(source).VerifyDiagnostics(
                 Diagnostic(ERRID.ERR_BadDeclareFlags1, "Shared").WithArguments("Shared"),
                 Diagnostic(ERRID.ERR_BadDeclareFlags1, "Static").WithArguments("Static"),
                 Diagnostic(ERRID.ERR_BadDeclareFlags1, "ReadOnly").WithArguments("ReadOnly"),
@@ -2170,7 +2593,7 @@ End Class
 </compilation>
 
             ' TODO (tomat): Dev10 only reports ERR_InvalidUseOfKeyword 
-            CreateCompilationWithMscorlib(source).VerifyDiagnostics(
+            CreateCompilationWithMscorlib40(source).VerifyDiagnostics(
                 Diagnostic(ERRID.ERR_InvalidUseOfKeyword, "Lib"),
                 Diagnostic(ERRID.ERR_MissingLibInDeclare, "")
             )
@@ -2189,7 +2612,7 @@ End Class
 </compilation>
 
             ' TODO (tomat): Dev10 only reports ERR_IllegalChar 
-            CreateCompilationWithMscorlib(source).VerifyDiagnostics(
+            CreateCompilationWithMscorlib40(source).VerifyDiagnostics(
                 Diagnostic(ERRID.ERR_ExpectedIdentifier, ""),
                 Diagnostic(ERRID.ERR_IllegalChar, "$")
             )
@@ -2222,7 +2645,7 @@ End Class
 </compilation>
 
             CompileAndVerify(source, validator:=
-                Sub(assembly, _omitted)
+                Sub(assembly)
                     Dim reader = assembly.GetMetadataReader()
                     Assert.Equal(12, reader.GetTableRowCount(TableIndex.Param))
 
@@ -2279,7 +2702,7 @@ End Class
 </compilation>
 
             CompileAndVerify(source, validator:=
-                Sub(assembly, _omitted)
+                Sub(assembly)
                     Dim reader = assembly.GetMetadataReader()
 
                     ' property parameters are copied for both getter and setter
@@ -2311,7 +2734,7 @@ End Class
 #End Region
 
 #Region "ParamArrayAttribute"
-        <WorkItem(529684, "DevDiv")>
+        <WorkItem(529684, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/529684")>
         <Fact>
         Public Sub TestParamArrayAttributeForParams2()
             Dim source =
@@ -2335,7 +2758,7 @@ End Module
     </file>
 </compilation>
 
-            Dim compilation = CompilationUtils.CreateCompilationWithMscorlib(source)
+            Dim compilation = CompilationUtils.CreateCompilationWithMscorlib40(source)
             Dim attributeValidator As Action(Of ModuleSymbol) =
                 Sub(m As ModuleSymbol)
                     Dim type = DirectCast(m.GlobalNamespace.GetMember("M1"), NamedTypeSymbol)
@@ -2450,11 +2873,11 @@ End Structure
 </compilation>
 
             CompileAndVerify(source, validator:=
-                Sub(assembly, _omitted)
+                Sub(assembly)
                     Dim peFileReader = assembly.GetMetadataReader()
 
                     For Each ca In peFileReader.CustomAttributes
-                        Dim name = GetAttributeName(peFileReader, ca)
+                        Dim name = MetadataValidation.GetAttributeName(peFileReader, ca)
                         Assert.NotEqual("SpecialNameAttribute", name)
                     Next
 
@@ -2575,11 +2998,11 @@ End Class
 </compilation>
 
             CompileAndVerify(source, validator:=
-                Sub(assembly, _omitted)
+                Sub(assembly)
                     Dim peFileReader = assembly.GetMetadataReader()
 
                     For Each ca In peFileReader.CustomAttributes
-                        Dim name = GetAttributeName(peFileReader, ca)
+                        Dim name = MetadataValidation.GetAttributeName(peFileReader, ca)
                         Assert.NotEqual("SerializableAttribute", name)
                         Assert.NotEqual("NonSerializedAttribute", name)
                     Next
@@ -2615,9 +3038,9 @@ End Class
                 End Sub)
         End Sub
 
-        <WorkItem(545199, "DevDiv")>
+        <WorkItem(545199, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/545199")>
         <Fact>
-        Sub Serializable_NonSerialized_CustomEvents()
+        Public Sub Serializable_NonSerialized_CustomEvents()
             Dim source =
 <compilation>
     <file name="a.vb"><![CDATA[
@@ -2643,7 +3066,7 @@ End Class
     </file>
 </compilation>
 
-            CompilationUtils.AssertTheseDiagnostics(CreateCompilationWithMscorlib(source),
+            CompilationUtils.AssertTheseDiagnostics(CreateCompilationWithMscorlib40(source),
 <expected><![CDATA[
 BC30662: Attribute 'NonSerializedAttribute' cannot be applied to 'e1' because the attribute is not valid on this declaration type.
     <NonSerialized>
@@ -2653,11 +3076,249 @@ BC30662: Attribute 'NonSerializedAttribute' cannot be applied to 'e2' because th
      ~~~~~~~~~~~~~
 ]]></expected>)
         End Sub
+
+        <ConditionalFact(GetType(NoUsedAssembliesValidation))> ' https://github.com/dotnet/roslyn/issues/40682: The test hook is blocked by this issue.
+        <WorkItem(40682, "https://github.com/dotnet/roslyn/issues/40682")>
+        <WorkItem(3898, "https://github.com/dotnet/roslyn/issues/3898")>
+        Public Sub TestIsSerializableProperty()
+            Dim missing =
+<compilation>
+    <file name="missing.vb"><![CDATA[
+Public Class TopLevel
+    Public Class Nested
+    End Class
+End Class
+Public Class TopLevel(Of T)
+    Public Class Nested(Of U)
+    End Class
+End Class
+Public Class Constructed(Of T)
+End Class
+]]></file>
+</compilation>
+
+            Dim source =
+<compilation>
+    <file name="source.vb"><![CDATA[
+Public Class C(Of T)
+    Public Class Nested
+    End Class
+End Class
+
+<System.Serializable>
+Public Class CS(Of T)
+    <System.Serializable>
+    Public Class NestedS
+    End Class
+
+    Public Class Nested(Of U)
+    End Class
+
+    <System.Serializable>
+    Public Class NestedS(Of U)
+    End Class
+End Class
+
+Public Class SubstitutedNested
+    Inherits C(Of Integer).Nested
+End Class
+Public Class SubstitutedNestedS
+    Inherits CS(Of Integer).NestedS
+End Class
+
+Public Class Constructed
+    Inherits C(Of Integer)
+End Class
+Public Class ConstructedS
+    Inherits CS(Of Integer)
+End Class
+Public Class MissingTopLevel
+    Inherits TopLevel
+End Class
+Public Class MissingNested
+    Inherits TopLevel.Nested
+End Class
+Public Class MissingConstructed
+    Inherits Constructed(Of Integer)
+End Class
+
+Public Class MissingSubstitutedNested(Of T, U)
+    Inherits TopLevel(Of T).Nested(Of U)
+End Class
+
+Public Class SpecializedGenericType
+    Inherits CS(Of Integer).Nested(Of Integer)
+End Class
+Public Class SpecializedGenericTypeS
+    Inherits CS(Of Integer).NestedS(Of Integer)
+End Class
+
+Namespace System
+    <System.Serializable>
+    Public Structure ValueTuple(Of T1, T2)
+    End Structure
+
+    Public Class InNamespace
+    End Class
+
+    <System.Serializable>
+    Public Class InNamespaceS
+    End Class
+End Namespace
+
+Public Class ValueTupleS
+    Function M() As (Integer, Integer)
+        Throw New System.Exception()
+    End Function
+End Class
+]]></file>
+</compilation>
+
+            Dim errors =
+<compilation>
+    <file name="errors.vb"><![CDATA[
+Public Class ExtendedError
+    Inherits ExtendedErrorBase
+End Class
+]]></file>
+</compilation>
+            Dim lib1 = CreateCompilationWithMscorlib45AndVBRuntime(missing)
+            lib1.VerifyDiagnostics()
+            Dim comp = CreateCompilationWithMscorlib45AndVBRuntime(source, references:={lib1.EmitToImageReference()})
+            comp.VerifyDiagnostics()
+            Dim comp2 = CreateCompilationWithMscorlib45AndVBRuntime(errors, references:={comp.EmitToImageReference()})
+
+            Dim substitutedNested = comp.GetTypeByMetadataName("SubstitutedNested").BaseType()
+            Assert.IsType(Of SubstitutedNamedType.SpecializedNonGenericType)(substitutedNested)
+            Assert.False(DirectCast(substitutedNested, INamedTypeSymbol).IsSerializable)
+
+            Dim substitutedNestedS = comp.GetTypeByMetadataName("SubstitutedNestedS").BaseType()
+            Assert.IsType(Of SubstitutedNamedType.SpecializedNonGenericType)(substitutedNestedS)
+            Assert.True(DirectCast(substitutedNestedS, INamedTypeSymbol).IsSerializable)
+
+            Dim specialized = comp.GetTypeByMetadataName("SpecializedGenericType").BaseType()
+            Assert.IsType(Of SubstitutedNamedType.ConstructedSpecializedGenericType)(specialized)
+            Assert.False(DirectCast(specialized, INamedTypeSymbol).IsSerializable)
+
+            Dim specializedS = comp.GetTypeByMetadataName("SpecializedGenericTypeS").BaseType()
+            Assert.IsType(Of SubstitutedNamedType.ConstructedSpecializedGenericType)(specializedS)
+            Assert.True(DirectCast(specializedS, INamedTypeSymbol).IsSerializable)
+
+            Dim valueTupleS = DirectCast(comp.GetTypeByMetadataName("ValueTupleS").GetMember("M"), SourceMemberMethodSymbol).ReturnType
+            Assert.IsType(Of TupleTypeSymbol)(valueTupleS)
+            Assert.True(DirectCast(valueTupleS, INamedTypeSymbol).IsSerializable)
+
+            Dim constructed = comp.GetTypeByMetadataName("Constructed").BaseType()
+            Assert.IsType(Of SubstitutedNamedType.ConstructedInstanceType)(constructed)
+            Assert.False(DirectCast(constructed, INamedTypeSymbol).IsSerializable)
+
+            Dim constructedPE = comp2.GetTypeByMetadataName("Constructed").BaseType().ConstructedFrom
+            Assert.IsType(Of PENamedTypeSymbol)(constructedPE)
+            Assert.False(DirectCast(constructedPE, INamedTypeSymbol).IsSerializable)
+
+            Dim constructedFrom = constructed.ConstructedFrom
+            Assert.IsType(Of SourceNamedTypeSymbol)(constructedFrom)
+            Assert.False(DirectCast(constructedFrom, INamedTypeSymbol).IsSerializable)
+
+            Dim constructedS = comp.GetTypeByMetadataName("ConstructedS").BaseType()
+            Assert.IsType(Of SubstitutedNamedType.ConstructedInstanceType)(constructedS)
+            Assert.True(DirectCast(constructedS, INamedTypeSymbol).IsSerializable)
+
+            Dim constructedSPE = comp2.GetTypeByMetadataName("ConstructedS").BaseType().ConstructedFrom
+            Assert.IsType(Of PENamedTypeSymbol)(constructedSPE)
+            Assert.True(DirectCast(constructedSPE, INamedTypeSymbol).IsSerializable)
+
+            Dim constructedFromS = constructedS.ConstructedFrom
+            Assert.IsType(Of SourceNamedTypeSymbol)(constructedFromS)
+            Assert.True(DirectCast(constructedFromS, INamedTypeSymbol).IsSerializable)
+
+            Dim extendedError = comp2.GetTypeByMetadataName("ExtendedError").BaseType()
+            Assert.IsType(Of ExtendedErrorTypeSymbol)(extendedError)
+            Assert.False(DirectCast(extendedError, INamedTypeSymbol).IsSerializable)
+
+            Dim topLevel = comp2.GetTypeByMetadataName("MissingTopLevel").BaseType()
+            Assert.IsType(Of MissingMetadataTypeSymbol.TopLevel)(topLevel)
+            Assert.False(DirectCast(topLevel, INamedTypeSymbol).IsSerializable)
+
+            Dim nested = comp2.GetTypeByMetadataName("MissingNested").BaseType()
+            Assert.IsType(Of MissingMetadataTypeSymbol.Nested)(nested)
+            Assert.False(DirectCast(nested, INamedTypeSymbol).IsSerializable)
+
+            Dim constructedError = comp2.GetTypeByMetadataName("MissingConstructed").BaseType()
+            Assert.IsType(Of SubstitutedErrorType)(constructedError)
+            Assert.False(DirectCast(constructedError, INamedTypeSymbol).IsSerializable)
+
+            Dim nestedSubstitutedError = comp2.GetTypeByMetadataName("MissingSubstitutedNested`2").BaseType().ConstructedFrom
+            Assert.IsType(Of SubstitutedErrorType)(nestedSubstitutedError)
+            Assert.False(DirectCast(nestedSubstitutedError, INamedTypeSymbol).IsSerializable)
+
+            Dim script = CreateCompilationWithMscorlib40("", parseOptions:=TestOptions.Script)
+            Dim scriptClass = script.GetTypeByMetadataName("Script")
+            Assert.IsType(Of ImplicitNamedTypeSymbol)(scriptClass)
+            Assert.False(DirectCast(scriptClass, INamedTypeSymbol).IsSerializable)
+
+            Dim inNamespace = comp2.GetTypeByMetadataName("System.InNamespace")
+            Assert.IsType(Of PENamedTypeSymbolWithEmittedNamespaceName)(inNamespace)
+            Assert.False(DirectCast(inNamespace, INamedTypeSymbol).IsSerializable)
+
+            Dim inNamespaceS = comp2.GetTypeByMetadataName("System.InNamespaceS")
+            Assert.IsType(Of PENamedTypeSymbolWithEmittedNamespaceName)(inNamespaceS)
+            Assert.True(DirectCast(inNamespaceS, INamedTypeSymbol).IsSerializable)
+        End Sub
+
+        <Fact>
+        <WorkItem(3898, "https://github.com/dotnet/roslyn/issues/3898")>
+        Public Sub TestAttributeWithNestedUnboundGeneric()
+            Dim library =
+    <file name="Library.vb"><![CDATA[
+Namespace ClassLibrary1
+    <System.Serializable>
+    Public Class C1(Of T1)
+    End Class
+End Namespace
+]]>
+    </file>
+
+            Dim compilation1 = VisualBasicCompilation.Create("library.dll",
+                                                             {VisualBasicSyntaxTree.ParseText(library.Value)},
+                                                             {MscorlibRef},
+                                                             TestOptions.ReleaseDll)
+
+            Dim classLibrary = MetadataReference.CreateFromImage(compilation1.EmitToArray())
+
+            Dim source =
+        <compilation>
+            <file name="TestAttributeWithNestedUnboundGeneric.vb"><![CDATA[
+Imports System
+
+Class A
+    Inherits Attribute
+
+    Public Sub New(o As Object)
+    End Sub
+End Class
+
+<A(GetType(ClassLibrary1.C1(Of )))>
+Module Module1
+    Sub Main()
+    End Sub
+End Module
+]]>
+            </file>
+        </compilation>
+            Dim compilation2 = CreateCompilationWithMscorlib40AndReferences(source, {SystemRef, MsvbRef, classLibrary})
+            compilation2.VerifyDiagnostics()
+
+            Dim gt = compilation2.GetTypeByMetadataName("Module1").GetAttributes().First().CommonConstructorArguments.First()
+            Dim arg = DirectCast(gt.Value, UnboundGenericType)
+            Assert.True(DirectCast(arg, INamedTypeSymbol).IsSerializable)
+        End Sub
+
 #End Region
 
 #Region "AttributeUsageAttribute"
 
-        <WorkItem(541733, "DevDiv")>
+        <WorkItem(541733, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/541733")>
         <Fact()>
         Public Sub TestSourceOverrideWellKnownAttribute_01()
             Dim source = <compilation>
@@ -2675,13 +3336,13 @@ End Namespace
                              </file>
                          </compilation>
 
-            Dim compilation = CompilationUtils.CreateCompilationWithMscorlib(source)
+            Dim compilation = CompilationUtils.CreateCompilationWithMscorlib40(source)
 
             ' BC30663: Attribute 'AttributeUsageAttribute' cannot be applied multiple times.
             compilation.VerifyDiagnostics(Diagnostic(ERRID.ERR_InvalidMultipleAttributeUsage1, "AttributeUsage(AttributeTargets.Class)").WithArguments("AttributeUsageAttribute"))
         End Sub
 
-        <WorkItem(541733, "DevDiv")>
+        <WorkItem(541733, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/541733")>
         <Fact()>
         Public Sub TestSourceOverrideWellKnownAttribute_02()
             Dim source = <compilation>
@@ -2708,7 +3369,7 @@ End Namespace
                              </file>
                          </compilation>
 
-            Dim compilation = CompilationUtils.CreateCompilationWithMscorlib(source, OutputKind.DynamicallyLinkedLibrary)
+            Dim compilation = CompilationUtils.CreateCompilationWithMscorlib40(source, OutputKind.DynamicallyLinkedLibrary)
 
             Dim attributeValidator As Action(Of ModuleSymbol) = Sub(m As ModuleSymbol)
                                                                     Dim ns = DirectCast(m.GlobalNamespace.GetMember("System"), NamespaceSymbol)
@@ -2775,7 +3436,7 @@ End Namespace
                              </file>
                          </compilation>
 
-            Dim compilation = CompilationUtils.CreateCompilationWithMscorlib(source, OutputKind.DynamicallyLinkedLibrary)
+            Dim compilation = CompilationUtils.CreateCompilationWithMscorlib40(source, OutputKind.DynamicallyLinkedLibrary)
             CompilationUtils.AssertNoErrors(compilation)
         End Sub
 
@@ -2805,7 +3466,7 @@ End Namespace
                              </file>
                          </compilation>
 
-            Dim compilation = CompilationUtils.CreateCompilationWithMscorlib(source, OutputKind.DynamicallyLinkedLibrary)
+            Dim compilation = CompilationUtils.CreateCompilationWithMscorlib40(source, OutputKind.DynamicallyLinkedLibrary)
 
             compilation.VerifyDiagnostics(Diagnostic(ERRID.ERR_InvalidMultipleAttributeUsage1, "AttributeUsage(AttributeTargets.Class, AllowMultiple:= True)").WithArguments("AttributeUsageAttribute"))
         End Sub
@@ -2829,7 +3490,7 @@ End Namespace
                              </file>
                          </compilation>
 
-            Dim compilation = CompilationUtils.CreateCompilationWithMscorlib(source, OutputKind.DynamicallyLinkedLibrary)
+            Dim compilation = CompilationUtils.CreateCompilationWithMscorlib40(source, OutputKind.DynamicallyLinkedLibrary)
             CompilationUtils.AssertNoErrors(compilation)
         End Sub
 
@@ -2857,7 +3518,7 @@ End Namespace
                              </file>
                          </compilation>
 
-            Dim compilation = CompilationUtils.CreateCompilationWithMscorlib(source, OutputKind.DynamicallyLinkedLibrary)
+            Dim compilation = CompilationUtils.CreateCompilationWithMscorlib40(source, OutputKind.DynamicallyLinkedLibrary)
             CompilationUtils.AssertTheseDiagnostics(compilation,
 <expected><![CDATA[
 BC30662: Attribute 'X' cannot be applied to 'Z' because the attribute is not valid on this declaration type.
@@ -2894,7 +3555,7 @@ end structure
                     Assert.NotNull(hostProtectionAttr)
 
                     ' Verify type security attributes
-                    Dim type = DirectCast([module].GlobalNamespace.GetMember("EventDescriptor"), Microsoft.Cci.ITypeDefinition)
+                    Dim type = DirectCast([module].GlobalNamespace.GetMember("EventDescriptor").GetCciAdapter(), Microsoft.Cci.ITypeDefinition)
                     Debug.Assert(type.HasDeclarativeSecurity)
                     Dim typeSecurityAttributes As IEnumerable(Of Microsoft.Cci.SecurityAttribute) = type.SecurityAttributes
 
@@ -2902,14 +3563,14 @@ end structure
 
                     ' Verify <System.Security.Permissions.HostProtection(MayLeakOnAbort := true)>
                     Dim securityAttribute = typeSecurityAttributes.First()
-                    Assert.Equal(Cci.SecurityAction.LinkDemand, securityAttribute.Action)
+                    Assert.Equal(DeclarativeSecurityAction.LinkDemand, securityAttribute.Action)
                     Dim typeAttribute = DirectCast(securityAttribute.Attribute, VisualBasicAttributeData)
                     Assert.Equal(hostProtectionAttr, typeAttribute.AttributeClass)
                     Assert.Equal(0, typeAttribute.CommonConstructorArguments.Length)
                     typeAttribute.VerifyNamedArgumentValue(0, "MayLeakOnAbort", TypedConstantKind.Primitive, True)
                 End Sub
 
-            CompileAndVerify(source, emitOptions:=TestEmitters.RefEmitBug, sourceSymbolValidator:=attributeValidator)
+            CompileAndVerify(source, sourceSymbolValidator:=attributeValidator)
         End Sub
 
         <Fact()>
@@ -3100,7 +3761,7 @@ end class
                              </file>
                          </compilation>
 
-            Dim comp = CompilationUtils.CreateCompilationWithMscorlibAndVBRuntime(source)
+            Dim comp = CompilationUtils.CreateCompilationWithMscorlib40AndVBRuntime(source)
             comp.VerifyDiagnostics(Diagnostic(ERRID.ERR_OmittedArgument2, "FileIOPermission").WithArguments("action", "Public Overloads Sub New(action As System.Security.Permissions.SecurityAction)"),
                                 Diagnostic(ERRID.ERR_SecurityAttributeInvalidActionTypeOrMethod, "DirectCast(0, SecurityAction)").WithArguments("MySecurityAttribute", "DirectCast(0, SecurityAction)"),
                                 Diagnostic(ERRID.ERR_SecurityAttributeInvalidActionTypeOrMethod, "DirectCast(11, SecurityAction)").WithArguments("MySecurityAttribute", "DirectCast(11, SecurityAction)"),
@@ -3149,7 +3810,7 @@ end class
                              </file>
                          </compilation>
 
-            Dim comp = CompilationUtils.CreateCompilationWithMscorlibAndVBRuntimeAndReferences(source)
+            Dim comp = CompilationUtils.CreateCompilationWithMscorlib40AndVBRuntimeAndReferences(source)
             comp.VerifyDiagnostics(
                 Diagnostic(ERRID.ERR_SecurityAttributeMissingAction, "MySecurityAttribute").WithArguments("MySecurityAttribute"),
                 Diagnostic(ERRID.ERR_SecurityAttributeMissingAction, "MySecurityAttribute").WithArguments("MySecurityAttribute"),
@@ -3214,7 +3875,7 @@ end class
                              </file>
                          </compilation>
 
-            Dim compilation = CreateCompilationWithMscorlibAndVBRuntime(source)
+            Dim compilation = CreateCompilationWithMscorlib40AndVBRuntime(source)
             VerifyDiagnostics(compilation,
                 Diagnostic(ERRID.WRN_UseOfObsoleteSymbol2, "SecurityAction.Deny").WithArguments("Deny", "Deny is obsolete and will be removed in a future release of the .NET Framework. See http://go.microsoft.com/fwlink/?LinkID=155570 for more information."),
                 Diagnostic(ERRID.WRN_UseOfObsoleteSymbol2, "SecurityAction.Deny").WithArguments("Deny", "Deny is obsolete and will be removed in a future release of the .NET Framework. See http://go.microsoft.com/fwlink/?LinkID=155570 for more information."),
@@ -3289,7 +3950,7 @@ end class
                              </file>
                          </compilation>
 
-            Dim compilation = CreateCompilationWithMscorlibAndVBRuntime(source)
+            Dim compilation = CreateCompilationWithMscorlib40AndVBRuntime(source)
             VerifyDiagnostics(compilation,
                 Diagnostic(ERRID.WRN_UseOfObsoleteSymbol2, "SecurityAction.RequestMinimum").WithArguments("RequestMinimum", "Assembly level declarative security is obsolete and is no longer enforced by the CLR by default. See http://go.microsoft.com/fwlink/?LinkID=155570 for more information."),
                 Diagnostic(ERRID.WRN_UseOfObsoleteSymbol2, "SecurityAction.RequestOptional").WithArguments("RequestOptional", "Assembly level declarative security is obsolete and is no longer enforced by the CLR by default. See http://go.microsoft.com/fwlink/?LinkID=155570 for more information."),
@@ -3317,7 +3978,7 @@ end class
                 Diagnostic(ERRID.ERR_SecurityAttributeInvalidActionTypeOrMethod, "SecurityAction.RequestRefuse").WithArguments("SecurityAction.RequestRefuse"))
         End Sub
 
-        <WorkItem(546623, "DevDiv")>
+        <WorkItem(546623, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/546623")>
         <Fact>
         Public Sub TestSecurityAttributeInvalidTarget()
             Dim source = <compilation>
@@ -3347,12 +4008,12 @@ End Class
                              </file>
                          </compilation>
 
-            Dim compilation = CreateCompilationWithMscorlibAndVBRuntime(source)
+            Dim compilation = CreateCompilationWithMscorlib40AndVBRuntime(source)
             VerifyDiagnostics(compilation,
                 Diagnostic(ERRID.ERR_SecurityAttributeInvalidTarget, "MyPermission").WithArguments("MyPermissionAttribute"))
         End Sub
 
-        <WorkItem(544929, "DevDiv")>
+        <WorkItem(544929, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/544929")>
         <Fact>
         Public Sub PrincipalPermissionAttribute()
             Dim source = <compilation>
@@ -3376,12 +4037,12 @@ End Class
                              </file>
                          </compilation>
 
-            CreateCompilationWithMscorlib(source).VerifyDiagnostics(Diagnostic(ERRID.WRN_UseOfObsoleteSymbol2, "SecurityAction.Deny").WithArguments("Deny", "Deny is obsolete and will be removed in a future release of the .NET Framework. See http://go.microsoft.com/fwlink/?LinkID=155570 for more information."),
+            CreateCompilationWithMscorlib40(source).VerifyDiagnostics(Diagnostic(ERRID.WRN_UseOfObsoleteSymbol2, "SecurityAction.Deny").WithArguments("Deny", "Deny is obsolete and will be removed in a future release of the .NET Framework. See http://go.microsoft.com/fwlink/?LinkID=155570 for more information."),
                                                                     Diagnostic(ERRID.ERR_PrincipalPermissionInvalidAction, "SecurityAction.InheritanceDemand").WithArguments("SecurityAction.InheritanceDemand"),
                                                                     Diagnostic(ERRID.ERR_PrincipalPermissionInvalidAction, "SecurityAction.LinkDemand").WithArguments("SecurityAction.LinkDemand"))
         End Sub
 
-        <WorkItem(544956, "DevDiv")>
+        <WorkItem(544956, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/544956")>
         <Fact>
         Public Sub SuppressUnmanagedCodeSecurityAttribute()
             Dim source = <compilation>
@@ -3460,7 +4121,7 @@ End Class
     </file>
 </compilation>
             CompileAndVerify(source, validator:=
-                Sub(m, _omitted)
+                Sub(m)
                     Dim reader = m.GetMetadataReader()
                     For Each methodDef In reader.MethodDefinitions
                         Dim row = reader.GetMethodDefinition(methodDef)
@@ -3581,7 +4242,7 @@ End Interface
                              </file>
                          </compilation>
 
-            Dim comp = CreateCompilationWithMscorlib(source)
+            Dim comp = CreateCompilationWithMscorlib40(source)
             CompilationUtils.AssertTheseDiagnostics(comp,
 <expected><![CDATA[
 BC30127: Attribute 'ClassInterfaceAttribute' is not valid: Incorrect argument value.
@@ -3683,7 +4344,7 @@ End Class
                              </file>
                          </compilation>
 
-            Dim comp = CreateCompilationWithMscorlib(source)
+            Dim comp = CreateCompilationWithMscorlib40(source)
             CompilationUtils.AssertTheseDiagnostics(comp,
 <expected><![CDATA[
 BC30127: Attribute 'InterfaceTypeAttribute' is not valid: Incorrect argument value.
@@ -3709,10 +4370,10 @@ BC30662: Attribute 'InterfaceTypeAttribute' cannot be applied to 'InvalidTarget'
 ]]></expected>)
         End Sub
 
-        <WorkItem(546664, "DevDiv")>
+        <WorkItem(546664, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/546664")>
         <Fact()>
         Public Sub TestIsExtensibleInterface()
-            Dim compilation = CreateCompilationWithMscorlibAndVBRuntime(
+            Dim compilation = CreateCompilationWithMscorlib40AndVBRuntime(
 <compilation>
     <file name="a.vb">
         <![CDATA[
@@ -3789,10 +4450,10 @@ End Interface
             CompileAndVerify(compilation, sourceSymbolValidator:=validator, symbolValidator:=validator)
         End Sub
 
-        <WorkItem(546664, "DevDiv")>
+        <WorkItem(546664, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/546664")>
         <Fact()>
         Public Sub TestIsExtensibleInterface_LateBinding()
-            Dim compilation = CreateCompilationWithMscorlibAndVBRuntime(
+            Dim compilation = CreateCompilationWithMscorlib40AndVBRuntime(
 <compilation>
     <file name="a.vb">
         <![CDATA[
@@ -3862,7 +4523,7 @@ Public Class C
     Dim fNotExtensible2 As NotExtensibleInterface2
     Dim fNotExtensible3 As NotExtensibleInterface3
 
-    Public Sub Foo()
+    Public Sub Goo()
         fExtensible1.LateBound()
         fExtensible2.LateBound()
         fExtensible3.LateBound()
@@ -3895,10 +4556,10 @@ BC30456: 'LateBound' is not a member of 'NotExtensibleInterface3'.
             CompilationUtils.AssertTheseDiagnostics(compilation, expectedErrors)
         End Sub
 
-        <WorkItem(546664, "DevDiv")>
+        <WorkItem(546664, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/546664")>
         <Fact()>
         Public Sub Bug16489_StackOverflow()
-            Dim compilation = CreateCompilationWithMscorlibAndVBRuntime(
+            Dim compilation = CreateCompilationWithMscorlib40AndVBRuntime(
 <compilation>
     <file name="a.vb">
         <![CDATA[
@@ -3986,7 +4647,7 @@ End Class
                              </file>
                          </compilation>
 
-            CreateCompilationWithMscorlib(source).VerifyDiagnostics()
+            CreateCompilationWithMscorlib40(source).VerifyDiagnostics()
         End Sub
 
         <Fact>
@@ -4003,7 +4664,7 @@ End Class
                              </file>
                          </compilation>
 
-            CreateCompilationWithMscorlibAndVBRuntime(source).VerifyDiagnostics()
+            CreateCompilationWithMscorlib40AndVBRuntime(source).VerifyDiagnostics()
         End Sub
 
         <Fact>
@@ -4018,7 +4679,7 @@ Imports System.Runtime.InteropServices
                              </file>
                          </compilation>
 
-            Dim comp = CreateCompilationWithMscorlib(source)
+            Dim comp = CreateCompilationWithMscorlib40(source)
             CompilationUtils.AssertTheseDiagnostics(comp,
 <expected><![CDATA[
 BC30127: Attribute 'TypeLibVersionAttribute' is not valid: Incorrect argument value.
@@ -4042,7 +4703,7 @@ Imports System.Runtime.InteropServices
                              </file>
                          </compilation>
 
-            Dim comp = CreateCompilationWithMscorlib(source)
+            Dim comp = CreateCompilationWithMscorlib40(source)
             CompilationUtils.AssertTheseDiagnostics(comp,
 <expected><![CDATA[
 BC30934: Conversion from 'String' to 'Integer' cannot occur in a constant expression used as an argument to an attribute.
@@ -4067,7 +4728,7 @@ Imports System.Runtime.InteropServices
                              </file>
                          </compilation>
 
-            Dim comp = CreateCompilationWithMscorlib(source)
+            Dim comp = CreateCompilationWithMscorlib40(source)
             CompilationUtils.AssertNoErrors(comp)
         End Sub
 
@@ -4083,7 +4744,7 @@ Imports System.Runtime.InteropServices
                              </file>
                          </compilation>
 
-            Dim comp = CreateCompilationWithMscorlib(source)
+            Dim comp = CreateCompilationWithMscorlib40(source)
             CompilationUtils.AssertTheseDiagnostics(comp,
 <expected><![CDATA[
 BC30127: Attribute 'ComCompatibleVersionAttribute' is not valid: Incorrect argument value.
@@ -4113,7 +4774,7 @@ Imports System.Runtime.InteropServices
                              </file>
                          </compilation>
 
-            Dim comp = CreateCompilationWithMscorlib(source)
+            Dim comp = CreateCompilationWithMscorlib40(source)
             CompilationUtils.AssertTheseDiagnostics(comp,
 <expected><![CDATA[
 BC30934: Conversion from 'String' to 'Integer' cannot occur in a constant expression used as an argument to an attribute.
@@ -4156,7 +4817,7 @@ End Class
                              </file>
                          </compilation>
 
-            Dim comp = CreateCompilationWithMscorlib(source)
+            Dim comp = CreateCompilationWithMscorlib40(source)
             CompilationUtils.AssertTheseDiagnostics(comp,
 <expected><![CDATA[
 BC32500: 'GuidAttribute' cannot be applied because the format of the GUID '69D3E2A0-BB0F-4FE3-9860-ED714C51075' is not correct.
@@ -4174,7 +4835,7 @@ BC32500: 'GuidAttribute' cannot be applied because the format of the GUID 'Nothi
 ]]></expected>)
         End Sub
 
-        <WorkItem(545490, "DevDiv")>
+        <WorkItem(545490, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/545490")>
         <Fact>
         Public Sub TestInvalidGuidAttribute_02()
             Dim source = <compilation>
@@ -4207,7 +4868,7 @@ End Class
                              </file>
                          </compilation>
 
-            Dim comp = CreateCompilationWithMscorlib(source)
+            Dim comp = CreateCompilationWithMscorlib40(source)
             CompilationUtils.AssertTheseDiagnostics(comp,
 <expected><![CDATA[
 BC32500: 'GuidAttribute' cannot be applied because the format of the GUID '69D3E2A0BB0F4FE39860ED714C510756' is not correct.
@@ -4238,7 +4899,7 @@ Imports System.Runtime.InteropServices
                              </file>
                          </compilation>
 
-            Dim comp = CreateCompilationWithMscorlib(source)
+            Dim comp = CreateCompilationWithMscorlib40(source)
             CompilationUtils.AssertTheseDiagnostics(comp,
 <expected><![CDATA[
 BC32500: 'GuidAttribute' cannot be applied because the format of the GUID '69D3E2A0BB0F--4FE3-9860-ED714C510756' is not correct.
@@ -4251,8 +4912,9 @@ BC32500: 'GuidAttribute' cannot be applied because the format of the GUID '69D3E
 
 #Region "WindowsRuntimeImportAttribute"
 
-        <Fact>
-        <WorkItem(531295, "DevDiv")>
+        <ConditionalFact(GetType(WindowsDesktopOnly))>
+        <WorkItem(6190, "https://github.com/dotnet/roslyn/issues/6190")>
+        <WorkItem(531295, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/531295")>
         Public Sub TestWindowsRuntimeImportAttribute()
             Dim source = <compilation>
                              <file name="a.vb">
@@ -4308,32 +4970,22 @@ End Class
             ' Dev10 Runtime Exception:
             ' Unhandled Exception: System.TypeLoadException: Windows Runtime types can only be declared in Windows Runtime assemblies.
 
-            Dim validator = CompileAndVerify(source, emitOptions:=TestEmitters.CCI, sourceSymbolValidator:=sourceValidator, symbolValidator:=metadataValidator, verify:=False)
+            Dim validator = CompileAndVerifyEx(source, sourceSymbolValidator:=sourceValidator, symbolValidator:=metadataValidator, verify:=Verification.Fails, targetFramework:=TargetFramework.Mscorlib45)
             validator.EmitAndVerify("Type load failed.")
         End Sub
 
 #End Region
 
 #Region "STAThreadAttribute, MTAThreadAttribute"
-        Private Sub VerifySynthesizedSTAThreadAttribute(sourceMethod As SourceMethodSymbol, expected As Boolean)
-            Dim synthesizedAttributes = sourceMethod.GetSynthesizedAttributes()
+        Private Sub VerifySTAThreadAttribute(method As MethodSymbol, expected As Boolean)
+            Dim attributes = method.GetAttributes().Where(Function(attribute) attribute.AttributeClass.MetadataName = "STAThreadAttribute")
+
             If expected Then
-                Assert.Equal(1, synthesizedAttributes.Length)
-                Dim attribute = synthesizedAttributes(0)
-
-                Dim compilation = sourceMethod.DeclaringCompilation
-                Dim sysNS = DirectCast(compilation.GlobalNamespace.GetMember("System"), NamespaceSymbol)
-
-                Dim attributeType As NamedTypeSymbol = sysNS.GetTypeMember("STAThreadAttribute")
-                Dim attributeTypeCtor = DirectCast(compilation.GetWellKnownTypeMember(WellKnownMember.System_STAThreadAttribute__ctor), MethodSymbol)
-
-                Assert.Equal(attributeType, attribute.AttributeClass)
-                Assert.Equal(attributeTypeCtor, attribute.AttributeConstructor)
-
-                Assert.Equal(0, attribute.ConstructorArguments.Count)
-                Assert.Equal(0, attribute.NamedArguments.Count)
+                Dim attribute = attributes.Single()
+                Assert.Empty(attribute.ConstructorArguments)
+                Assert.Empty(attribute.NamedArguments)
             Else
-                Assert.Equal(0, synthesizedAttributes.Length)
+                Assert.Empty(attributes)
             End If
         End Sub
 
@@ -4344,7 +4996,7 @@ End Class
         <file name="a.vb">
             Imports System
             Module Module1
-                Sub foo()
+                Sub goo()
                 End Sub
 
                 Sub Main()
@@ -4353,19 +5005,19 @@ End Class
         </file>
     </compilation>
 
-            Dim compilation = CreateCompilationWithMscorlibAndVBRuntime(source, TestOptions.ReleaseExe)
+            Dim compilation = CreateCompilationWithMscorlib40AndVBRuntime(source, TestOptions.ReleaseExe)
             compilation.AssertNoErrors()
 
-            Dim sourceValidator As Action(Of ModuleSymbol) = Sub(m As ModuleSymbol)
-                                                                 Dim type = DirectCast(m.GlobalNamespace.GetMember("Module1"), SourceNamedTypeSymbol)
-                                                                 Dim fooMethod = DirectCast(type.GetMember("foo"), SourceMethodSymbol)
-                                                                 VerifySynthesizedSTAThreadAttribute(fooMethod, expected:=False)
+            Dim validator As Action(Of ModuleSymbol) = Sub(m As ModuleSymbol)
+                                                           Dim type = m.GlobalNamespace.GetTypeMember("Module1")
+                                                           Dim gooMethod = type.GetMethod("goo")
+                                                           VerifySTAThreadAttribute(gooMethod, expected:=False)
 
-                                                                 Dim mainMethod = DirectCast(type.GetMember("Main"), SourceMethodSymbol)
-                                                                 VerifySynthesizedSTAThreadAttribute(mainMethod, expected:=True)
-                                                             End Sub
+                                                           Dim mainMethod = type.GetMethod("Main")
+                                                           VerifySTAThreadAttribute(mainMethod, expected:=True)
+                                                       End Sub
 
-            CompileAndVerify(compilation, sourceSymbolValidator:=sourceValidator, expectedOutput:="")
+            CompileAndVerify(compilation, symbolValidator:=validator, expectedOutput:="")
         End Sub
 
         <Fact>
@@ -4375,7 +5027,7 @@ End Class
         <file name="a.vb">
             Imports System
             Module Module1
-                Sub foo()
+                Sub goo()
                 End Sub
 
                 Sub Main()
@@ -4384,19 +5036,19 @@ End Class
         </file>
     </compilation>
 
-            Dim compilation = CreateCompilationWithMscorlibAndVBRuntime(source, TestOptions.ReleaseDll)
+            Dim compilation = CreateCompilationWithMscorlib40AndVBRuntime(source, TestOptions.ReleaseDll)
             compilation.AssertNoErrors()
 
-            Dim sourceValidator As Action(Of ModuleSymbol) = Sub(m As ModuleSymbol)
-                                                                 Dim type = DirectCast(m.GlobalNamespace.GetMember("Module1"), SourceNamedTypeSymbol)
-                                                                 Dim fooMethod = DirectCast(type.GetMember("foo"), SourceMethodSymbol)
-                                                                 VerifySynthesizedSTAThreadAttribute(fooMethod, expected:=False)
+            Dim validator As Action(Of ModuleSymbol) = Sub(m As ModuleSymbol)
+                                                           Dim type = m.GlobalNamespace.GetTypeMember("Module1")
+                                                           Dim gooMethod = type.GetMethod("goo")
+                                                           VerifySTAThreadAttribute(gooMethod, expected:=False)
 
-                                                                 Dim mainMethod = DirectCast(type.GetMember("Main"), SourceMethodSymbol)
-                                                                 VerifySynthesizedSTAThreadAttribute(mainMethod, expected:=False)
-                                                             End Sub
+                                                           Dim mainMethod = type.GetMethod("Main")
+                                                           VerifySTAThreadAttribute(mainMethod, expected:=False)
+                                                       End Sub
 
-            CompileAndVerify(compilation, sourceSymbolValidator:=sourceValidator)
+            CompileAndVerify(compilation, symbolValidator:=validator)
         End Sub
 
         <Fact>
@@ -4407,7 +5059,7 @@ End Class
         <![CDATA[ 
             Imports System
                 Module Module1
-            Sub foo()
+            Sub goo()
             End Sub
 
             <STAThread()>
@@ -4418,19 +5070,28 @@ End Class
     </file>
 </compilation>
 
-            Dim compilation = CreateCompilationWithMscorlibAndVBRuntime(source, TestOptions.ReleaseExe)
+            Dim compilation = CreateCompilationWithMscorlib40AndVBRuntime(source, TestOptions.ReleaseExe)
             compilation.AssertNoErrors()
 
             Dim sourceValidator As Action(Of ModuleSymbol) = Sub(m As ModuleSymbol)
-                                                                 Dim type = DirectCast(m.GlobalNamespace.GetMember("Module1"), SourceNamedTypeSymbol)
-                                                                 Dim fooMethod = DirectCast(type.GetMember("foo"), SourceMethodSymbol)
-                                                                 VerifySynthesizedSTAThreadAttribute(fooMethod, expected:=False)
+                                                                 Dim type = m.GlobalNamespace.GetTypeMember("Module1")
+                                                                 Dim gooMethod = type.GetMethod("goo")
+                                                                 VerifySTAThreadAttribute(gooMethod, expected:=False)
 
-                                                                 Dim mainMethod = DirectCast(type.GetMember("Main"), SourceMethodSymbol)
-                                                                 VerifySynthesizedSTAThreadAttribute(mainMethod, expected:=False)
+                                                                 Dim mainMethod = type.GetMethod("Main")
+                                                                 VerifySTAThreadAttribute(mainMethod, expected:=True)
                                                              End Sub
 
-            CompileAndVerify(compilation, sourceSymbolValidator:=sourceValidator)
+            Dim peValidator As Action(Of ModuleSymbol) = Sub(m As ModuleSymbol)
+                                                             Dim type = m.GlobalNamespace.GetTypeMember("Module1")
+                                                             Dim gooMethod = type.GetMethod("goo")
+                                                             VerifySTAThreadAttribute(gooMethod, expected:=False)
+
+                                                             Dim mainMethod = type.GetMethod("Main")
+                                                             VerifySTAThreadAttribute(mainMethod, expected:=True)
+                                                         End Sub
+
+            CompileAndVerify(compilation, sourceSymbolValidator:=sourceValidator, symbolValidator:=peValidator)
         End Sub
 
         <Fact>
@@ -4441,7 +5102,7 @@ End Class
         <![CDATA[ 
             Imports System
                 Module Module1
-            Sub foo()
+            Sub goo()
             End Sub
 
             <MTAThread()>
@@ -4452,25 +5113,503 @@ End Class
     </file>
 </compilation>
 
-            Dim compilation = CreateCompilationWithMscorlibAndVBRuntime(source, TestOptions.ReleaseExe)
+            Dim compilation = CreateCompilationWithMscorlib40AndVBRuntime(source, TestOptions.ReleaseExe)
             compilation.AssertNoErrors()
 
-            Dim sourceValidator As Action(Of ModuleSymbol) = Sub(m As ModuleSymbol)
-                                                                 Dim type = DirectCast(m.GlobalNamespace.GetMember("Module1"), SourceNamedTypeSymbol)
-                                                                 Dim fooMethod = DirectCast(type.GetMember("foo"), SourceMethodSymbol)
-                                                                 VerifySynthesizedSTAThreadAttribute(fooMethod, expected:=False)
+            Dim validator As Action(Of ModuleSymbol) = Sub(m As ModuleSymbol)
+                                                           Dim type = m.GlobalNamespace.GetTypeMember("Module1")
+                                                           Dim gooMethod = type.GetMethod("goo")
+                                                           VerifySTAThreadAttribute(gooMethod, expected:=False)
 
-                                                                 Dim mainMethod = DirectCast(type.GetMember("Main"), SourceMethodSymbol)
-                                                                 VerifySynthesizedSTAThreadAttribute(mainMethod, expected:=False)
-                                                             End Sub
+                                                           Dim mainMethod = type.GetMethod("Main")
+                                                           VerifySTAThreadAttribute(mainMethod, expected:=False)
+                                                       End Sub
 
-            CompileAndVerify(compilation, sourceSymbolValidator:=sourceValidator)
+            CompileAndVerify(compilation, symbolValidator:=validator)
         End Sub
+#End Region
+
+#Region "SkipLocalsInitAttribute"
+
+        <Fact>
+        Public Sub SkipLocalsInitAttributeOnMethod()
+            Dim source = <compilation>
+                             <file name="a.vb">
+                                 <![CDATA[
+Namespace System.Runtime.CompilerServices
+    Class SkipLocalsInitAttribute
+        Inherits System.Attribute
+    End Class
+End Namespace
+
+Class C
+    <System.Runtime.CompilerServices.SkipLocalsInitAttribute>
+    Sub S()
+    End Sub
+
+    <System.Runtime.CompilerServices.SkipLocalsInitAttribute>
+    Function F() As Integer
+        Return 1
+    End Function
+End Class
+]]>
+
+                             </file>
+                         </compilation>
+
+            Dim comp = CreateCompilationWithMscorlib40(source)
+
+            CompilationUtils.AssertTheseDiagnostics(comp,
+<expected><![CDATA[
+BC42381: 'System.Runtime.CompilerServices.SkipLocalsInitAttribute' is not supported in VB.
+    <System.Runtime.CompilerServices.SkipLocalsInitAttribute>
+     ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+BC42381: 'System.Runtime.CompilerServices.SkipLocalsInitAttribute' is not supported in VB.
+    <System.Runtime.CompilerServices.SkipLocalsInitAttribute>
+     ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+]]></expected>)
+        End Sub
+
+        <Fact>
+        Public Sub SkipLocalsInitAttributeOnClass()
+            Dim source = <compilation>
+                             <file name="a.vb">
+                                 <![CDATA[
+Namespace System.Runtime.CompilerServices
+    Class SkipLocalsInitAttribute
+        Inherits System.Attribute
+    End Class
+End Namespace
+
+<System.Runtime.CompilerServices.SkipLocalsInitAttribute>
+Class C
+End Class
+]]>
+
+                             </file>
+                         </compilation>
+
+            Dim comp = CreateCompilationWithMscorlib40(source)
+
+            CompilationUtils.AssertTheseDiagnostics(comp,
+<expected><![CDATA[
+BC42381: 'System.Runtime.CompilerServices.SkipLocalsInitAttribute' is not supported in VB.
+<System.Runtime.CompilerServices.SkipLocalsInitAttribute>
+ ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+]]></expected>)
+        End Sub
+
+        <Fact>
+        Public Sub SkipLocalsInitAttributeOnProperty()
+            Dim source = <compilation>
+                             <file name="a.vb">
+                                 <![CDATA[
+Namespace System.Runtime.CompilerServices
+    Class SkipLocalsInitAttribute
+        Inherits System.Attribute
+    End Class
+End Namespace
+
+Class C
+    <System.Runtime.CompilerServices.SkipLocalsInitAttribute>
+    Property P As Integer
+        Get
+            Return 1
+        End Get
+
+        Set
+        End Set
+    End Property
+End Class
+]]>
+
+                             </file>
+                         </compilation>
+
+            Dim comp = CreateCompilationWithMscorlib40(source)
+
+            CompilationUtils.AssertTheseDiagnostics(comp,
+<expected><![CDATA[
+BC42381: 'System.Runtime.CompilerServices.SkipLocalsInitAttribute' is not supported in VB.
+    <System.Runtime.CompilerServices.SkipLocalsInitAttribute>
+     ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+]]></expected>)
+        End Sub
+
+        <Fact>
+        Public Sub SkipLocalsInitAttributeOnAccessors()
+            Dim source = <compilation>
+                             <file name="a.vb">
+                                 <![CDATA[
+Namespace System.Runtime.CompilerServices
+    Class SkipLocalsInitAttribute
+        Inherits System.Attribute
+    End Class
+End Namespace
+
+Class C
+    Property P As Integer
+        <System.Runtime.CompilerServices.SkipLocalsInitAttribute>
+        Get
+            Return 1
+        End Get
+
+        <System.Runtime.CompilerServices.SkipLocalsInitAttribute>
+        Set
+        End Set
+    End Property
+End Class
+]]>
+
+                             </file>
+                         </compilation>
+
+            Dim comp = CreateCompilationWithMscorlib40(source)
+
+            CompilationUtils.AssertTheseDiagnostics(comp,
+<expected><![CDATA[
+BC42381: 'System.Runtime.CompilerServices.SkipLocalsInitAttribute' is not supported in VB.
+        <System.Runtime.CompilerServices.SkipLocalsInitAttribute>
+         ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+BC42381: 'System.Runtime.CompilerServices.SkipLocalsInitAttribute' is not supported in VB.
+        <System.Runtime.CompilerServices.SkipLocalsInitAttribute>
+         ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+]]></expected>)
+        End Sub
+
+        <Fact>
+        Public Sub SkipLocalsInitAttributeOnModule()
+            Dim source = <compilation>
+                             <file name="a.vb">
+                                 <![CDATA[
+<Module: System.Runtime.CompilerServices.SkipLocalsInitAttribute>
+
+Namespace System.Runtime.CompilerServices
+    Class SkipLocalsInitAttribute
+        Inherits System.Attribute
+    End Class
+End Namespace
+]]>
+
+                             </file>
+                         </compilation>
+
+            Dim comp = CreateCompilationWithMscorlib40(source)
+
+            CompilationUtils.AssertTheseDiagnostics(comp,
+<expected><![CDATA[
+BC42381: 'System.Runtime.CompilerServices.SkipLocalsInitAttribute' is not supported in VB.
+<Module: System.Runtime.CompilerServices.SkipLocalsInitAttribute>
+ ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+]]></expected>)
+        End Sub
+
+        <Fact>
+        Public Sub SkipLocalsInitAttributeOnAssembly()
+            Dim source = <compilation>
+                             <file name="a.vb">
+                                 <![CDATA[
+<Assembly: System.Runtime.CompilerServices.SkipLocalsInitAttribute>
+
+Namespace System.Runtime.CompilerServices
+    Class SkipLocalsInitAttribute
+        Inherits System.Attribute
+    End Class
+End Namespace
+]]>
+
+                             </file>
+                         </compilation>
+
+            Dim comp = CreateCompilationWithMscorlib40(source)
+
+            CompilationUtils.AssertTheseDiagnostics(comp,
+<expected><![CDATA[
+BC42381: 'System.Runtime.CompilerServices.SkipLocalsInitAttribute' is not supported in VB.
+<Assembly: System.Runtime.CompilerServices.SkipLocalsInitAttribute>
+ ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+]]></expected>)
+        End Sub
+
+        <Fact>
+        Public Sub SkipLocalsInitAttributeOnEnum()
+            Dim source = <compilation>
+                             <file name="a.vb">
+                                 <![CDATA[
+Namespace System.Runtime.CompilerServices
+    Class SkipLocalsInitAttribute
+        Inherits System.Attribute
+    End Class
+End Namespace
+
+<System.Runtime.CompilerServices.SkipLocalsInitAttribute>
+Enum E
+    Member
+End Enum
+]]>
+
+                             </file>
+                         </compilation>
+
+            Dim comp = CreateCompilationWithMscorlib40(source)
+
+            CompilationUtils.AssertTheseDiagnostics(comp,
+<expected><![CDATA[
+BC42381: 'System.Runtime.CompilerServices.SkipLocalsInitAttribute' is not supported in VB.
+<System.Runtime.CompilerServices.SkipLocalsInitAttribute>
+ ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+]]></expected>)
+        End Sub
+
+        <Fact>
+        Public Sub SkipLocalsInitAttributeOnEnumMember()
+            Dim source = <compilation>
+                             <file name="a.vb">
+                                 <![CDATA[
+Namespace System.Runtime.CompilerServices
+    Class SkipLocalsInitAttribute
+        Inherits System.Attribute
+    End Class
+End Namespace
+
+Enum E
+    <System.Runtime.CompilerServices.SkipLocalsInitAttribute>
+    Member1
+    <System.Runtime.CompilerServices.SkipLocalsInitAttribute>
+    Member2
+End Enum
+]]>
+
+                             </file>
+                         </compilation>
+
+            Dim comp = CreateCompilationWithMscorlib40(source)
+
+            CompilationUtils.AssertTheseDiagnostics(comp,
+<expected><![CDATA[
+BC42381: 'System.Runtime.CompilerServices.SkipLocalsInitAttribute' is not supported in VB.
+    <System.Runtime.CompilerServices.SkipLocalsInitAttribute>
+     ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+BC42381: 'System.Runtime.CompilerServices.SkipLocalsInitAttribute' is not supported in VB.
+    <System.Runtime.CompilerServices.SkipLocalsInitAttribute>
+     ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+]]></expected>)
+        End Sub
+
+        <Fact>
+        Public Sub SkipLocalsInitAttributeOnEvent()
+            Dim source = <compilation>
+                             <file name="a.vb">
+                                 <![CDATA[
+Namespace System.Runtime.CompilerServices
+    Class SkipLocalsInitAttribute
+        Inherits System.Attribute
+    End Class
+End Namespace
+
+Class C
+    <System.Runtime.CompilerServices.SkipLocalsInitAttribute>
+    Event E(ByVal i As Integer)
+End Class
+]]>
+
+                             </file>
+                         </compilation>
+
+            Dim comp = CreateCompilationWithMscorlib40(source)
+
+            CompilationUtils.AssertTheseDiagnostics(comp,
+<expected><![CDATA[
+BC42381: 'System.Runtime.CompilerServices.SkipLocalsInitAttribute' is not supported in VB.
+    <System.Runtime.CompilerServices.SkipLocalsInitAttribute>
+     ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+]]></expected>)
+        End Sub
+
+        <Fact>
+        Public Sub SkipLocalsInitAttributeOnDelegate()
+            Dim source = <compilation>
+                             <file name="a.vb">
+                                 <![CDATA[
+Namespace System.Runtime.CompilerServices
+    Class SkipLocalsInitAttribute
+        Inherits System.Attribute
+    End Class
+End Namespace
+
+Class C
+    <System.Runtime.CompilerServices.SkipLocalsInitAttribute>
+    Delegate Sub D()
+End Class
+]]>
+
+                             </file>
+                         </compilation>
+
+            Dim comp = CreateCompilationWithMscorlib40(source)
+
+            CompilationUtils.AssertTheseDiagnostics(comp,
+<expected><![CDATA[
+BC42381: 'System.Runtime.CompilerServices.SkipLocalsInitAttribute' is not supported in VB.
+    <System.Runtime.CompilerServices.SkipLocalsInitAttribute>
+     ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+]]></expected>)
+        End Sub
+
+        <Fact>
+        Public Sub SkipLocalsInitAttributeOnInterface()
+            Dim source = <compilation>
+                             <file name="a.vb">
+                                 <![CDATA[
+Namespace System.Runtime.CompilerServices
+    Class SkipLocalsInitAttribute
+        Inherits System.Attribute
+    End Class
+End Namespace
+
+<System.Runtime.CompilerServices.SkipLocalsInitAttribute>
+Interface I
+End Interface
+]]>
+
+                             </file>
+                         </compilation>
+
+            Dim comp = CreateCompilationWithMscorlib40(source)
+
+            CompilationUtils.AssertTheseDiagnostics(comp,
+<expected><![CDATA[
+BC42381: 'System.Runtime.CompilerServices.SkipLocalsInitAttribute' is not supported in VB.
+<System.Runtime.CompilerServices.SkipLocalsInitAttribute>
+ ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+]]></expected>)
+        End Sub
+
+        <Fact>
+        Public Sub SkipLocalsInitAttributeOnStructure()
+            Dim source = <compilation>
+                             <file name="a.vb">
+                                 <![CDATA[
+Namespace System.Runtime.CompilerServices
+    Class SkipLocalsInitAttribute
+        Inherits System.Attribute
+    End Class
+End Namespace
+
+<System.Runtime.CompilerServices.SkipLocalsInitAttribute>
+Structure S
+End Structure
+]]>
+
+                             </file>
+                         </compilation>
+
+            Dim comp = CreateCompilationWithMscorlib40(source)
+
+            CompilationUtils.AssertTheseDiagnostics(comp,
+<expected><![CDATA[
+BC42381: 'System.Runtime.CompilerServices.SkipLocalsInitAttribute' is not supported in VB.
+<System.Runtime.CompilerServices.SkipLocalsInitAttribute>
+ ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+]]></expected>)
+        End Sub
+
+        <Fact>
+        Public Sub SkipLocalsInitAttributeOnReturnValue()
+            Dim source = <compilation>
+                             <file name="a.vb">
+                                 <![CDATA[
+Namespace System.Runtime.CompilerServices
+    Class SkipLocalsInitAttribute
+        Inherits System.Attribute
+    End Class
+End Namespace
+
+Class C
+    Function F() As <System.Runtime.CompilerServices.SkipLocalsInitAttribute> Integer
+        Return 1
+    End Function
+End Class
+]]>
+
+                             </file>
+                         </compilation>
+
+            Dim comp = CreateCompilationWithMscorlib40(source)
+
+            CompilationUtils.AssertTheseDiagnostics(comp,
+<expected><![CDATA[
+BC42381: 'System.Runtime.CompilerServices.SkipLocalsInitAttribute' is not supported in VB.
+    Function F() As <System.Runtime.CompilerServices.SkipLocalsInitAttribute> Integer
+                     ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+]]></expected>)
+        End Sub
+
+        <Fact>
+        Public Sub SkipLocalsInitAttributeOnParameter()
+            Dim source = <compilation>
+                             <file name="a.vb">
+                                 <![CDATA[
+Namespace System.Runtime.CompilerServices
+    Class SkipLocalsInitAttribute
+        Inherits System.Attribute
+    End Class
+End Namespace
+
+Class C
+    Sub M(<System.Runtime.CompilerServices.SkipLocalsInitAttribute> ByVal i As Integer)
+    End Sub
+End Class
+]]>
+
+                             </file>
+                         </compilation>
+
+            Dim comp = CreateCompilationWithMscorlib40(source)
+
+            CompilationUtils.AssertTheseDiagnostics(comp,
+<expected><![CDATA[
+BC42381: 'System.Runtime.CompilerServices.SkipLocalsInitAttribute' is not supported in VB.
+    Sub M(<System.Runtime.CompilerServices.SkipLocalsInitAttribute> ByVal i As Integer)
+           ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+]]></expected>)
+        End Sub
+
+        <Fact>
+        Public Sub SkipLocalsInitAttributeOnField()
+            Dim source = <compilation>
+                             <file name="a.vb">
+                                 <![CDATA[
+Namespace System.Runtime.CompilerServices
+    Class SkipLocalsInitAttribute
+        Inherits System.Attribute
+    End Class
+End Namespace
+
+Class C
+    <System.Runtime.CompilerServices.SkipLocalsInitAttribute>
+    Dim i As Integer
+End Class
+]]>
+
+                             </file>
+                         </compilation>
+
+            Dim comp = CreateCompilationWithMscorlib40(source)
+
+            CompilationUtils.AssertTheseDiagnostics(comp,
+<expected><![CDATA[
+BC42381: 'System.Runtime.CompilerServices.SkipLocalsInitAttribute' is not supported in VB.
+    <System.Runtime.CompilerServices.SkipLocalsInitAttribute>
+     ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+]]></expected>)
+        End Sub
+
 #End Region
 
 #Region "RequiredAttributeAttribute"
 
-        <Fact, WorkItem(81)>
+        <Fact, WorkItem(81, "https://github.com/dotnet/roslyn/issues/81")>
         Public Sub DisallowRequiredAttributeInSource()
             Dim source = <compilation>
                              <file name="a.vb">
@@ -4503,7 +5642,7 @@ End Namespace
                              </file>
                          </compilation>
 
-            Dim comp = CreateCompilationWithMscorlib(source)
+            Dim comp = CreateCompilationWithMscorlib40(source)
             CompilationUtils.AssertTheseDiagnostics(comp,
 <expected><![CDATA[
 BC37235: The RequiredAttribute attribute is not permitted on Visual Basic types.
@@ -4515,7 +5654,7 @@ BC37235: The RequiredAttribute attribute is not permitted on Visual Basic types.
 ]]></expected>)
         End Sub
 
-        <Fact, WorkItem(81)>
+        <Fact, WorkItem(81, "https://github.com/dotnet/roslyn/issues/81")>
         Public Sub DisallowRequiredAttributeFromMetadata01()
             Dim ilSource = <![CDATA[
 .class public auto ansi beforefieldinit RequiredAttrClass
@@ -4556,7 +5695,7 @@ End Module
 
             Dim ilReference = CompileIL(ilSource.Value)
 
-            Dim comp = CreateCompilationWithMscorlibAndReferences(source, references:={MsvbRef, ilReference})
+            Dim comp = CreateCompilationWithMscorlib40AndReferences(source, references:={MsvbRef, ilReference})
             CompilationUtils.AssertTheseDiagnostics(comp,
 <expected><![CDATA[
 BC30649: 'RequiredAttrClass' is an unsupported type.
@@ -4565,7 +5704,7 @@ BC30649: 'RequiredAttrClass' is an unsupported type.
 ]]></expected>)
         End Sub
 
-        <Fact, WorkItem(81)>
+        <Fact, WorkItem(81, "https://github.com/dotnet/roslyn/issues/81")>
         Public Sub DisallowRequiredAttributeFromMetadata02()
             Dim ilSource = <![CDATA[
 .class public auto ansi beforefieldinit RequiredAttr.Scenario1
@@ -4659,7 +5798,7 @@ End Class
 
             Dim ilReference = CompileIL(ilSource.Value)
 
-            Dim comp = CreateCompilationWithMscorlib(source, references:={ilReference})
+            Dim comp = CreateCompilationWithMscorlib40(source, references:={ilReference})
             CompilationUtils.AssertTheseDiagnostics(comp,
 <expected><![CDATA[
 BC30656: Field 'sc1_field' is of an unsupported type.
@@ -4676,5 +5815,783 @@ BC30657: 'sc1_method' has a return type that is not supported or parameter types
 
 #End Region
 
+#Region "ModuleInitializerAttribute"
+        <Fact>
+        Public Sub ModuleInitializerAttributeOnMethod()
+            Dim source =
+            <compilation>
+                <file name="attr.vb"><![CDATA[
+Namespace System.Runtime.CompilerServices
+    Public Class ModuleInitializerAttribute
+        Inherits Attribute
+    End Class
+End Namespace
+
+Class Program
+    <System.Runtime.CompilerServices.ModuleInitializerAttribute>
+    Sub S()
+    End Sub
+
+    <System.Runtime.CompilerServices.ModuleInitializerAttribute>
+    Function F() As Integer
+        Return 1
+    End Function
+End Class
+]]>
+                </file>
+            </compilation>
+
+            Dim compilation = CreateCompilationWithMscorlib40(source)
+            CompilationUtils.AssertTheseDiagnostics(compilation,
+<expected><![CDATA[
+BC42381: 'System.Runtime.CompilerServices.ModuleInitializerAttribute' is not supported in VB.
+    <System.Runtime.CompilerServices.ModuleInitializerAttribute>
+     ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+BC42381: 'System.Runtime.CompilerServices.ModuleInitializerAttribute' is not supported in VB.
+    <System.Runtime.CompilerServices.ModuleInitializerAttribute>
+     ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+]]></expected>)
+        End Sub
+
+        <Fact>
+        Public Sub ModuleInitializerAttributeOnClass()
+            Dim source = <compilation>
+                             <file name="a.vb">
+                                 <![CDATA[
+Namespace System.Runtime.CompilerServices
+    Class ModuleInitializerAttribute
+        Inherits System.Attribute
+    End Class
+End Namespace
+
+<System.Runtime.CompilerServices.ModuleInitializerAttribute>
+Class C
+End Class
+]]>
+
+                             </file>
+                         </compilation>
+
+            Dim comp = CreateCompilationWithMscorlib40(source)
+
+            CompilationUtils.AssertNoDiagnostics(comp)
+        End Sub
+
+        <Fact>
+        Public Sub ModuleInitializerAttributeOnProperty()
+            Dim source = <compilation>
+                             <file name="a.vb">
+                                 <![CDATA[
+Namespace System.Runtime.CompilerServices
+    Class ModuleInitializerAttribute
+        Inherits System.Attribute
+    End Class
+End Namespace
+
+Class C
+    <System.Runtime.CompilerServices.ModuleInitializerAttribute>
+    Property P As Integer
+        Get
+            Return 1
+        End Get
+
+        Set
+        End Set
+    End Property
+End Class
+]]>
+
+                             </file>
+                         </compilation>
+
+            Dim comp = CreateCompilationWithMscorlib40(source)
+
+            CompilationUtils.AssertNoDiagnostics(comp)
+        End Sub
+
+        <Fact>
+        Public Sub ModuleInitializerAttributeOnAccessors()
+            Dim source = <compilation>
+                             <file name="a.vb">
+                                 <![CDATA[
+Namespace System.Runtime.CompilerServices
+    Class ModuleInitializerAttribute
+        Inherits System.Attribute
+    End Class
+End Namespace
+
+Class C
+    Property P As Integer
+        <System.Runtime.CompilerServices.ModuleInitializerAttribute>
+        Get
+            Return 1
+        End Get
+
+        <System.Runtime.CompilerServices.ModuleInitializerAttribute>
+        Set
+        End Set
+    End Property
+End Class
+]]>
+
+                             </file>
+                         </compilation>
+
+            Dim comp = CreateCompilationWithMscorlib40(source)
+
+            CompilationUtils.AssertTheseDiagnostics(comp,
+<expected><![CDATA[
+BC42381: 'System.Runtime.CompilerServices.ModuleInitializerAttribute' is not supported in VB.
+        <System.Runtime.CompilerServices.ModuleInitializerAttribute>
+         ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+BC42381: 'System.Runtime.CompilerServices.ModuleInitializerAttribute' is not supported in VB.
+        <System.Runtime.CompilerServices.ModuleInitializerAttribute>
+         ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+]]></expected>)
+        End Sub
+
+        <Fact>
+        Public Sub ModuleInitializerAttributeOnModule()
+            Dim source = <compilation>
+                             <file name="a.vb">
+                                 <![CDATA[
+<Module: System.Runtime.CompilerServices.ModuleInitializerAttribute>
+
+Namespace System.Runtime.CompilerServices
+    Class ModuleInitializerAttribute
+        Inherits System.Attribute
+    End Class
+End Namespace
+]]>
+
+                             </file>
+                         </compilation>
+
+            Dim comp = CreateCompilationWithMscorlib40(source)
+
+            CompilationUtils.AssertNoDiagnostics(comp)
+        End Sub
+
+        <Fact>
+        Public Sub ModuleInitializerAttributeOnAssembly()
+            Dim source = <compilation>
+                             <file name="a.vb">
+                                 <![CDATA[
+<Assembly: System.Runtime.CompilerServices.ModuleInitializerAttribute>
+
+Namespace System.Runtime.CompilerServices
+    Class ModuleInitializerAttribute
+        Inherits System.Attribute
+    End Class
+End Namespace
+]]>
+
+                             </file>
+                         </compilation>
+
+            Dim comp = CreateCompilationWithMscorlib40(source)
+
+            CompilationUtils.AssertNoDiagnostics(comp)
+        End Sub
+
+        <Fact>
+        Public Sub ModuleInitializerAttributeOnEnum()
+            Dim source = <compilation>
+                             <file name="a.vb">
+                                 <![CDATA[
+Namespace System.Runtime.CompilerServices
+    Class ModuleInitializerAttribute
+        Inherits System.Attribute
+    End Class
+End Namespace
+
+<System.Runtime.CompilerServices.ModuleInitializerAttribute>
+Enum E
+    Member
+End Enum
+]]>
+
+                             </file>
+                         </compilation>
+
+            Dim comp = CreateCompilationWithMscorlib40(source)
+
+            CompilationUtils.AssertNoDiagnostics(comp)
+        End Sub
+
+        <Fact>
+        Public Sub ModuleInitializerAttributeOnEnumMember()
+            Dim source = <compilation>
+                             <file name="a.vb">
+                                 <![CDATA[
+Namespace System.Runtime.CompilerServices
+    Class ModuleInitializerAttribute
+        Inherits System.Attribute
+    End Class
+End Namespace
+
+Enum E
+    <System.Runtime.CompilerServices.ModuleInitializerAttribute>
+    Member1
+    <System.Runtime.CompilerServices.ModuleInitializerAttribute>
+    Member2
+End Enum
+]]>
+
+                             </file>
+                         </compilation>
+
+            Dim comp = CreateCompilationWithMscorlib40(source)
+
+            CompilationUtils.AssertNoDiagnostics(comp)
+        End Sub
+
+        <Fact>
+        Public Sub ModuleInitializerAttributeOnEvent()
+            Dim source = <compilation>
+                             <file name="a.vb">
+                                 <![CDATA[
+Namespace System.Runtime.CompilerServices
+    Class ModuleInitializerAttribute
+        Inherits System.Attribute
+    End Class
+End Namespace
+
+Class C
+    <System.Runtime.CompilerServices.ModuleInitializerAttribute>
+    Event E(ByVal i As Integer)
+End Class
+]]>
+
+                             </file>
+                         </compilation>
+
+            Dim comp = CreateCompilationWithMscorlib40(source)
+
+            CompilationUtils.AssertNoDiagnostics(comp)
+        End Sub
+
+        <Fact>
+        Public Sub ModuleInitializerAttributeOnDelegate()
+            Dim source = <compilation>
+                             <file name="a.vb">
+                                 <![CDATA[
+Namespace System.Runtime.CompilerServices
+    Class ModuleInitializerAttribute
+        Inherits System.Attribute
+    End Class
+End Namespace
+
+Class C
+    <System.Runtime.CompilerServices.ModuleInitializerAttribute>
+    Delegate Sub D()
+End Class
+]]>
+
+                             </file>
+                         </compilation>
+
+            Dim comp = CreateCompilationWithMscorlib40(source)
+
+            CompilationUtils.AssertNoDiagnostics(comp)
+        End Sub
+
+        <Fact>
+        Public Sub ModuleInitializerAttributeOnInterface()
+            Dim source = <compilation>
+                             <file name="a.vb">
+                                 <![CDATA[
+Namespace System.Runtime.CompilerServices
+    Class ModuleInitializerAttribute
+        Inherits System.Attribute
+    End Class
+End Namespace
+
+<System.Runtime.CompilerServices.ModuleInitializerAttribute>
+Interface I
+End Interface
+]]>
+
+                             </file>
+                         </compilation>
+
+            Dim comp = CreateCompilationWithMscorlib40(source)
+
+            CompilationUtils.AssertNoDiagnostics(comp)
+        End Sub
+
+        <Fact>
+        Public Sub ModuleInitializerAttributeOnStructure()
+            Dim source = <compilation>
+                             <file name="a.vb">
+                                 <![CDATA[
+Namespace System.Runtime.CompilerServices
+    Class ModuleInitializerAttribute
+        Inherits System.Attribute
+    End Class
+End Namespace
+
+<System.Runtime.CompilerServices.ModuleInitializerAttribute>
+Structure S
+End Structure
+]]>
+
+                             </file>
+                         </compilation>
+
+            Dim comp = CreateCompilationWithMscorlib40(source)
+
+            CompilationUtils.AssertNoDiagnostics(comp)
+        End Sub
+
+        <Fact>
+        Public Sub ModuleInitializerAttributeOnReturnValue()
+            Dim source = <compilation>
+                             <file name="a.vb">
+                                 <![CDATA[
+Namespace System.Runtime.CompilerServices
+    Class ModuleInitializerAttribute
+        Inherits System.Attribute
+    End Class
+End Namespace
+
+Class C
+    Function F() As <System.Runtime.CompilerServices.ModuleInitializerAttribute> Integer
+        Return 1
+    End Function
+End Class
+]]>
+
+                             </file>
+                         </compilation>
+
+            Dim comp = CreateCompilationWithMscorlib40(source)
+
+            CompilationUtils.AssertNoDiagnostics(comp)
+        End Sub
+
+        <Fact>
+        Public Sub ModuleInitializerAttributeOnParameter()
+            Dim source = <compilation>
+                             <file name="a.vb">
+                                 <![CDATA[
+Namespace System.Runtime.CompilerServices
+    Class ModuleInitializerAttribute
+        Inherits System.Attribute
+    End Class
+End Namespace
+
+Class C
+    Sub M(<System.Runtime.CompilerServices.ModuleInitializerAttribute> ByVal i As Integer)
+    End Sub
+End Class
+]]>
+
+                             </file>
+                         </compilation>
+
+            Dim comp = CreateCompilationWithMscorlib40(source)
+
+            CompilationUtils.AssertNoDiagnostics(comp)
+        End Sub
+
+        <Fact>
+        Public Sub ModuleInitializerAttributeOnField()
+            Dim source = <compilation>
+                             <file name="a.vb">
+                                 <![CDATA[
+Namespace System.Runtime.CompilerServices
+    Class ModuleInitializerAttribute
+        Inherits System.Attribute
+    End Class
+End Namespace
+
+Class C
+    <System.Runtime.CompilerServices.ModuleInitializerAttribute>
+    Dim i As Integer
+End Class
+]]>
+
+                             </file>
+                         </compilation>
+
+            Dim comp = CreateCompilationWithMscorlib40(source)
+
+            CompilationUtils.AssertNoDiagnostics(comp)
+        End Sub
+
+#End Region
+
+        <Fact, WorkItem(807, "https://github.com/dotnet/roslyn/issues/807")>
+        Public Sub TestAttributePropagationForAsyncAndIterators_01()
+            Dim source =
+            <compilation>
+                <file name="attr.vb"><![CDATA[
+Imports System
+Imports System.Collections.Generic
+Imports System.Threading.Tasks
+
+Class Program
+
+    Shared Sub Main()
+    End Sub
+
+    <MyAttribute>
+    <System.Diagnostics.DebuggerNonUserCodeAttribute>
+    <System.Diagnostics.DebuggerHiddenAttribute>
+    <System.Diagnostics.DebuggerStepperBoundaryAttribute>
+    <System.Diagnostics.DebuggerStepThroughAttribute>
+    Public Async Function test1() As Task(Of Integer)
+        Return Await DoNothing()
+    End Function
+
+    Public Async Function test2() As Task(Of Integer)
+        Return Await DoNothing()
+    End Function
+
+    Private Async Function DoNothing() As Task(Of Integer)
+        Return 1
+    End Function
+
+    <MyAttribute>
+    <System.Diagnostics.DebuggerNonUserCodeAttribute>
+    <System.Diagnostics.DebuggerHiddenAttribute>
+    <System.Diagnostics.DebuggerStepperBoundaryAttribute>
+    <System.Diagnostics.DebuggerStepThroughAttribute>
+    Public Iterator Function Test3() As IEnumerable(Of Integer)
+        Yield 1
+        Yield 2
+    End Function
+
+    Public Iterator Function Test4() As IEnumerable(Of Integer)
+        Yield 1
+        Yield 2
+    End Function
+End Class
+
+Class MyAttribute
+    Inherits System.Attribute
+End Class
+            ]]>
+                </file>
+            </compilation>
+
+            Dim attributeValidator As Action(Of ModuleSymbol) =
+            Sub(m As ModuleSymbol)
+                Dim program = m.GlobalNamespace.GetTypeMember("Program")
+
+                Assert.Equal("", CheckAttributePropagation(DirectCast(program.GetMember(Of MethodSymbol)("test1").
+                                                           GetAttributes("System.Runtime.CompilerServices", "AsyncStateMachineAttribute").Single().
+                                                           ConstructorArguments.Single().Value, NamedTypeSymbol).
+                                                           GetMember(Of MethodSymbol)("MoveNext")))
+
+                Assert.Equal("System.Runtime.CompilerServices.CompilerGeneratedAttribute", DirectCast(program.GetMember(Of MethodSymbol)("test2").
+                                GetAttributes("System.Runtime.CompilerServices", "AsyncStateMachineAttribute").Single().
+                                ConstructorArguments.Single().Value, NamedTypeSymbol).
+                                GetMember(Of MethodSymbol)("MoveNext").GetAttributes().Single().AttributeClass.ToTestDisplayString())
+
+                Assert.Equal("", CheckAttributePropagation(DirectCast(program.GetMember(Of MethodSymbol)("Test3").
+                                                           GetAttributes("System.Runtime.CompilerServices", "IteratorStateMachineAttribute").Single().
+                                                           ConstructorArguments.Single().Value, NamedTypeSymbol).
+                                                           GetMember(Of MethodSymbol)("MoveNext")))
+
+                Assert.Equal("System.Runtime.CompilerServices.CompilerGeneratedAttribute", DirectCast(program.GetMember(Of MethodSymbol)("Test4").
+                                GetAttributes("System.Runtime.CompilerServices", "IteratorStateMachineAttribute").Single().
+                                ConstructorArguments.Single().Value, NamedTypeSymbol).
+                                GetMember(Of MethodSymbol)("MoveNext").GetAttributes().Single().AttributeClass.ToTestDisplayString())
+            End Sub
+
+            CompileAndVerify(CreateCompilationWithMscorlib45AndVBRuntime(source), symbolValidator:=attributeValidator)
+        End Sub
+
+        Private Shared Function CheckAttributePropagation(symbol As Symbol) As String
+            Dim result = ""
+
+            If symbol.GetAttributes("", "MyAttribute").Any() Then
+                result += "MyAttribute is present" & vbCr
+            End If
+
+            If Not symbol.GetAttributes("System.Diagnostics", "DebuggerNonUserCodeAttribute").Any() Then
+                result += "DebuggerNonUserCodeAttribute is missing" & vbCr
+            End If
+
+            If Not symbol.GetAttributes("System.Diagnostics", "DebuggerHiddenAttribute").Any() Then
+                result += "DebuggerHiddenAttribute is missing" & vbCr
+            End If
+
+            If Not symbol.GetAttributes("System.Diagnostics", "DebuggerStepperBoundaryAttribute").Any() Then
+                result += "DebuggerStepperBoundaryAttribute is missing" & vbCr
+            End If
+
+            If Not symbol.GetAttributes("System.Diagnostics", "DebuggerStepThroughAttribute").Any() Then
+                result += "DebuggerStepThroughAttribute is missing" & vbCr
+            End If
+
+            If Not symbol.GetAttributes("System.Runtime.CompilerServices", "CompilerGeneratedAttribute").Any() Then
+                result += "CompilerGeneratedAttribute is missing" & vbCr
+            End If
+
+            Return result
+        End Function
+
+        <Fact, WorkItem(4521, "https://github.com/dotnet/roslyn/issues/4521")>
+        Public Sub TestAttributePropagationForAsyncAndIterators_02()
+            Dim source =
+            <compilation>
+                <file name="attr.vb"><![CDATA[
+Imports System
+Imports System.Collections.Generic
+Imports System.Threading.Tasks
+
+<MyAttribute>
+<System.Diagnostics.DebuggerNonUserCodeAttribute>
+<System.Diagnostics.DebuggerStepThroughAttribute>
+Class Program1
+
+    Shared Sub Main()
+    End Sub
+
+    Public Async Function test1() As Task(Of Integer)
+        Return Await DoNothing()
+    End Function
+
+    Private Async Function DoNothing() As Task(Of Integer)
+        Return 1
+    End Function
+
+    Public Iterator Function Test3() As IEnumerable(Of Integer)
+        Yield 1
+        Yield 2
+    End Function
+End Class
+
+Class Program2
+
+    Shared Sub Main()
+    End Sub
+
+    Public Async Function test2() As Task(Of Integer)
+        Return Await DoNothing()
+    End Function
+
+    Private Async Function DoNothing() As Task(Of Integer)
+        Return 1
+    End Function
+
+    Public Iterator Function Test4() As IEnumerable(Of Integer)
+        Yield 1
+        Yield 2
+    End Function
+End Class
+
+Class MyAttribute
+    Inherits System.Attribute
+End Class
+            ]]>
+                </file>
+            </compilation>
+
+            Dim attributeValidator As Action(Of ModuleSymbol) =
+            Sub(m As ModuleSymbol)
+                Dim program1 = m.GlobalNamespace.GetTypeMember("Program1")
+                Dim program2 = m.GlobalNamespace.GetTypeMember("Program2")
+
+                Assert.Equal("DebuggerHiddenAttribute is missing" & vbCr & "DebuggerStepperBoundaryAttribute is missing" & vbCr,
+                             CheckAttributePropagation(DirectCast(program1.GetMember(Of MethodSymbol)("test1").
+                                                           GetAttributes("System.Runtime.CompilerServices", "AsyncStateMachineAttribute").Single().
+                                                           ConstructorArguments.Single().Value, NamedTypeSymbol)))
+
+                Assert.Equal("DebuggerNonUserCodeAttribute is missing" & vbCr & "DebuggerHiddenAttribute is missing" & vbCr & "DebuggerStepperBoundaryAttribute is missing" & vbCr & "DebuggerStepThroughAttribute is missing" & vbCr,
+                             CheckAttributePropagation(DirectCast(program2.GetMember(Of MethodSymbol)("test2").
+                                                           GetAttributes("System.Runtime.CompilerServices", "AsyncStateMachineAttribute").Single().
+                                                           ConstructorArguments.Single().Value, NamedTypeSymbol)))
+
+                Assert.Equal("DebuggerHiddenAttribute is missing" & vbCr & "DebuggerStepperBoundaryAttribute is missing" & vbCr,
+                             CheckAttributePropagation(DirectCast(program1.GetMember(Of MethodSymbol)("Test3").
+                                                           GetAttributes("System.Runtime.CompilerServices", "IteratorStateMachineAttribute").Single().
+                                                           ConstructorArguments.Single().Value, NamedTypeSymbol)))
+
+                Assert.Equal("DebuggerNonUserCodeAttribute is missing" & vbCr & "DebuggerHiddenAttribute is missing" & vbCr & "DebuggerStepperBoundaryAttribute is missing" & vbCr & "DebuggerStepThroughAttribute is missing" & vbCr,
+                             CheckAttributePropagation(DirectCast(program2.GetMember(Of MethodSymbol)("Test4").
+                                                           GetAttributes("System.Runtime.CompilerServices", "IteratorStateMachineAttribute").Single().
+                                                           ConstructorArguments.Single().Value, NamedTypeSymbol)))
+            End Sub
+
+            CompileAndVerify(CreateCompilationWithMscorlib45AndVBRuntime(source), symbolValidator:=attributeValidator)
+        End Sub
+
+        <Fact, WorkItem(10639, "https://github.com/dotnet/roslyn/issues/10639")>
+        Public Sub UsingStaticDirectiveDoesNotIgnoreObsoleteAttribute_DifferentSeverity()
+            Dim source = <compilation>
+                             <file name="a.vb">
+                                 <![CDATA[
+Imports System
+Imports TestAssembly.TestError
+Imports TestAssembly.TestWarning
+
+<Obsolete("Broken Error Class", True)>
+Public Class TestError
+    Public Shared Sub TestErrorFunc()
+    End Sub
+End Class
+
+<Obsolete("Broken Warning Class", False)>
+Public Class TestWarning
+    Public Shared Sub TestWarningFunc()
+    End Sub
+End Class
+
+Public Module Test
+    Public Sub Main()
+        TestErrorFunc()
+        TestWarningFunc()
+    End Sub
+End Module
+]]>
+                             </file>
+                         </compilation>
+
+            Dim options = New VisualBasicCompilationOptions(OutputKind.ConsoleApplication, rootNamespace:="TestAssembly")
+            Dim compilation = CreateCompilationWithMscorlib40AndVBRuntime(source, options)
+
+            compilation.AssertTheseDiagnostics(<expected><![CDATA[
+BC30668: 'TestError' is obsolete: 'Broken Error Class'.
+Imports TestAssembly.TestError
+        ~~~~~~~~~~~~~~~~~~~~~~
+BC40000: 'TestWarning' is obsolete: 'Broken Warning Class'.
+Imports TestAssembly.TestWarning
+        ~~~~~~~~~~~~~~~~~~~~~~~~
+]]></expected>)
+        End Sub
+
+        <Fact, WorkItem(10639, "https://github.com/dotnet/roslyn/issues/10639")>
+        Public Sub UsingStaticDirectiveDoesNotIgnoreObsoleteAttribute_NestedClasses()
+            Dim source = <compilation>
+                             <file name="a.vb">
+                                 <![CDATA[
+Imports System
+Imports TestAssembly.ActiveParent.ObsoleteChild
+Imports TestAssembly.ObsoleteParent.ActiveChild
+Imports TestAssembly.BothObsoleteParent.BothObsoleteChild
+
+Public Class ActiveParent
+    <Obsolete>
+    Public Class ObsoleteChild
+        Public Shared Sub ObsoleteChildFunc()
+        End Sub
+    End Class
+End Class
+
+<Obsolete>
+Public Class ObsoleteParent
+    Public Class ActiveChild
+        Public Shared Sub ActiveChildFunc()
+        End Sub
+    End Class
+End Class
+
+<Obsolete>
+Public Class BothObsoleteParent
+    <Obsolete>
+    Public Class BothObsoleteChild
+        Public Shared Sub BothObsoleteFunc()
+        End Sub
+    End Class
+End Class
+
+Public Module Test
+    Public Sub Main()
+        ObsoleteChildFunc()
+        ActiveChildFunc()
+        BothObsoleteFunc()
+    End Sub
+End Module
+]]>
+                             </file>
+                         </compilation>
+
+            Dim options = New VisualBasicCompilationOptions(OutputKind.ConsoleApplication, rootNamespace:="TestAssembly")
+            Dim compilation = CreateCompilationWithMscorlib40AndVBRuntime(source, options)
+
+            compilation.AssertTheseDiagnostics(<expected><![CDATA[
+BC40008: 'ActiveParent.ObsoleteChild' is obsolete.
+Imports TestAssembly.ActiveParent.ObsoleteChild
+        ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+BC40008: 'ObsoleteParent' is obsolete.
+Imports TestAssembly.ObsoleteParent.ActiveChild
+        ~~~~~~~~~~~~~~~~~~~~~~~~~~~
+BC40008: 'BothObsoleteParent' is obsolete.
+Imports TestAssembly.BothObsoleteParent.BothObsoleteChild
+        ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+BC40008: 'BothObsoleteParent.BothObsoleteChild' is obsolete.
+Imports TestAssembly.BothObsoleteParent.BothObsoleteChild
+        ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+]]></expected>)
+        End Sub
+
+        <Fact>
+        <WorkItem(19394, "https://github.com/dotnet/roslyn/issues/19394")>
+        Public Sub WellKnownTypeAsStruct_DefaultConstructor_ParamArrayAttribute()
+            Dim code = <compilation><file name="a.vb"><![CDATA[
+Namespace System
+	public Structure ParamArrayAttribute
+	End Structure
+End Namespace
+Public Class C
+    Public Sub Test(ByVal ParamArray args() As Double)
+    End Sub
+End Class
+]]></file></compilation>
+
+            CreateCompilationWithMscorlib40AndVBRuntime(code).VerifyDiagnostics().AssertTheseEmitDiagnostics(<expected><![CDATA[
+BC31503: 'ParamArrayAttribute' cannot be used as an attribute because it is not a class.
+]]></expected>)
+        End Sub
+
+        <Fact>
+        <WorkItem(19394, "https://github.com/dotnet/roslyn/issues/19394")>
+        Public Sub WellKnownTypeAsStruct_NonDefaultConstructor_TupleElementNamesAttribute()
+            Dim compilation = CreateCompilationWithMscorlib45AndVBRuntime(
+<compilation>
+    <file name="errors.vb"><![CDATA[
+Imports System
+
+Namespace System.Runtime.CompilerServices
+    Public Structure TupleElementNamesAttribute
+        Public Sub New(transformNames As String())
+        End Sub
+    End Structure
+End Namespace
+
+Module Program
+    Public Sub Main(args As String())
+        Test(("first", "second"))
+    End Sub
+
+    Public Sub Test(tuple As (a As String, b As String))
+        Console.WriteLine(tuple.a)
+        Console.WriteLine(tuple.b)
+    End Sub
+End Module
+]]></file>
+</compilation>,
+                references:={ValueTupleRef, SystemRuntimeFacadeRef},
+                options:=TestOptions.ReleaseExe)
+
+            CompileAndVerify(
+                compilation,
+                expectedOutput:="
+first
+second",
+                symbolValidator:=
+                    Sub([module] As ModuleSymbol)
+                        Dim attribute = [module].ContainingAssembly.GetTypeByMetadataName("Program").GetMethod("Test").Parameters.Single().GetAttributes().Single()
+
+                        Assert.Equal("System.Runtime.CompilerServices.TupleElementNamesAttribute", attribute.AttributeClass.ToTestDisplayString())
+                        Assert.True(attribute.AttributeClass.IsStructureType())
+                        Assert.Equal([module].ContainingAssembly, attribute.AttributeClass.ContainingAssembly)
+                        Assert.Equal("transformNames", attribute.AttributeConstructor.Parameters.Single().Name)
+                    End Sub)
+        End Sub
     End Class
 End Namespace

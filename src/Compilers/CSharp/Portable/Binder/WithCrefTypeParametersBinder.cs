@@ -1,4 +1,8 @@
-﻿// Copyright (c) Microsoft.  All Rights Reserved.  Licensed under the Apache License, Version 2.0.  See License.txt in the project root for license information.
+﻿// Licensed to the .NET Foundation under one or more agreements.
+// The .NET Foundation licenses this file to you under the MIT license.
+// See the LICENSE file in the project root for more information.
+
+#nullable disable
 
 using System.Diagnostics;
 using System.Threading;
@@ -65,8 +69,7 @@ namespace Microsoft.CodeAnalysis.CSharp
                     }
                 default:
                     {
-                        Debug.Assert(false, "Unexpected cref syntax kind " + _crefSyntax.Kind());
-                        break;
+                        throw ExceptionUtilities.UnexpectedValue(_crefSyntax.Kind());
                     }
             }
             return map;
@@ -93,8 +96,7 @@ namespace Microsoft.CodeAnalysis.CSharp
                 case SyntaxKind.PredefinedType:
                     break;
                 default:
-                    Debug.Assert(false, "Unexpected type syntax kind " + typeSyntax.Kind());
-                    break;
+                    throw ExceptionUtilities.UnexpectedValue(typeSyntax.Kind());
             }
         }
 
@@ -143,7 +145,7 @@ namespace Microsoft.CodeAnalysis.CSharp
                     foreach (TypeParameterSymbol typeParameter in kvp.Value)
                     {
                         // In any context where this binder applies, the type parameters are always viable/speakable.
-                        Debug.Assert(originalBinder.CanAddLookupSymbolInfo(typeParameter, options, null));
+                        Debug.Assert(!result.CanBeAdded(typeParameter.Name) || originalBinder.CanAddLookupSymbolInfo(typeParameter, options, result, null));
 
                         result.AddSymbol(typeParameter, kvp.Key, 0);
                     }

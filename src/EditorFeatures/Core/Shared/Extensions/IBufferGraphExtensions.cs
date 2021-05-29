@@ -1,4 +1,6 @@
-// Copyright (c) Microsoft.  All Rights Reserved.  Licensed under the Apache License, Version 2.0.  See License.txt in the project root for license information.
+﻿// Licensed to the .NET Foundation under one or more agreements.
+// The .NET Foundation licenses this file to you under the MIT license.
+// See the LICENSE file in the project root for more information.
 
 using System;
 using System.Linq;
@@ -63,7 +65,18 @@ namespace Microsoft.CodeAnalysis.Editor.Shared.Extensions
 
                 case BufferMapDirection.Down:
                     {
-                        return bufferGraph.MapDownToBuffer(point, PointTrackingMode.Positive, targetBuffer, PositionAffinity.Predecessor);
+                        // TODO (https://github.com/dotnet/roslyn/issues/5281): Remove try-catch.
+                        try
+                        {
+                            return bufferGraph.MapDownToInsertionPoint(point, PointTrackingMode.Positive, s => s == targetBuffer.CurrentSnapshot);
+                        }
+                        catch (ArgumentOutOfRangeException) when (bufferGraph.TopBuffer.ContentType.TypeName == "Interactive Content")
+                        {
+                            // Suppress this to work around DevDiv #144964.
+                            // Note: Other callers might be affected, but this is the narrowest workaround for the observed problems.
+                            // A fix is already being reviewed, so a broader change is not required.
+                            return null;
+                        }
                     }
 
                 case BufferMapDirection.Up:
@@ -84,14 +97,12 @@ namespace Microsoft.CodeAnalysis.Editor.Shared.Extensions
             }
 
             // Are we trying to map down or up?
-            var startProjBuffer = startBuffer as IProjectionBufferBase;
-            if (startProjBuffer != null && IsSourceBuffer(startProjBuffer, destinationBuffer))
+            if (startBuffer is IProjectionBufferBase startProjBuffer && IsSourceBuffer(startProjBuffer, destinationBuffer))
             {
                 return BufferMapDirection.Down;
             }
 
-            var destProjBuffer = destinationBuffer as IProjectionBufferBase;
-            if (destProjBuffer != null && IsSourceBuffer(destProjBuffer, startBuffer))
+            if (destinationBuffer is IProjectionBufferBase destProjBuffer && IsSourceBuffer(destProjBuffer, startBuffer))
             {
                 return BufferMapDirection.Up;
             }

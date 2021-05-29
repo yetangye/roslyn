@@ -1,11 +1,13 @@
-﻿' Copyright (c) Microsoft.  All Rights Reserved.  Licensed under the Apache License, Version 2.0.  See License.txt in the project root for license information.
+﻿' Licensed to the .NET Foundation under one or more agreements.
+' The .NET Foundation licenses this file to you under the MIT license.
+' See the LICENSE file in the project root for more information.
 
 Imports System.Collections.Immutable
 Imports System.Collections.ObjectModel
 Imports System.ComponentModel
 Imports System.Reflection
 Imports System.Threading
-Imports Microsoft.CodeAnalysis.Instrumentation
+Imports Microsoft.CodeAnalysis.PooledObjects
 Imports Microsoft.CodeAnalysis.Text
 Imports Microsoft.CodeAnalysis.VisualBasic.Symbols
 Imports Microsoft.CodeAnalysis.VisualBasic.Syntax
@@ -32,29 +34,12 @@ Namespace Microsoft.CodeAnalysis.VisualBasic
             _syntaxTree = syntaxTree
         End Sub
 
-        Friend Overrides ReadOnly Property Navigator As AbstractSyntaxNavigator
-            Get
-                Return SyntaxNavigator.Instance
-            End Get
-        End Property
-
         'TODO: may be eventually not needed
         Friend ReadOnly Property VbGreen As InternalSyntax.VisualBasicSyntaxNode
             Get
                 Return DirectCast(Me.Green, InternalSyntax.VisualBasicSyntaxNode)
             End Get
         End Property
-
-        ''' <summary>
-        ''' Creates a clone of a red node that can be used as a root of given syntaxTree.
-        ''' New node has no parents, position == 0, and syntaxTree as specified.
-        ''' </summary>
-        Friend Shared Function CloneNodeAsRoot(Of T As VisualBasicSyntaxNode)(node As T, syntaxTree As SyntaxTree) As T
-            Dim clone = DirectCast(node.Green.CreateRed(Nothing, 0), T)
-            clone._syntaxTree = syntaxTree
-
-            Return clone
-        End Function
 
         ''' <summary>
         ''' Returns a non-null SyntaxTree that owns this node.
@@ -114,12 +99,6 @@ Namespace Microsoft.CodeAnalysis.VisualBasic
             Return CType(Me.Green.RawKind, SyntaxKind)
         End Function
 
-        Protected Overrides ReadOnly Property KindText As String
-            Get
-                Return Me.Kind.ToString()
-            End Get
-        End Property
-
         ''' <summary>
         ''' The language name this node is syntax of.
         ''' </summary>
@@ -139,109 +118,29 @@ Namespace Microsoft.CodeAnalysis.VisualBasic
             End Get
         End Property
 
-        ''' <summary>
-        ''' Returns the string representation of this node, not including its leading and trailing trivia.
-        ''' </summary>
-        ''' <returns>The string representation of this node, not including its leading and trailing trivia.</returns>
-        ''' <remarks>The length of the returned string is always the same as Span.Length</remarks>
-        Public NotOverridable Overrides Function ToString() As String
-            Return Me.Green.ToString()
-        End Function
-
-        ''' <summary>
-        ''' Returns full string representation of this node including its leading and trailing trivia.
-        ''' </summary>
-        ''' <returns>The full string representation of this node including its leading and trailing trivia.</returns>
-        ''' <remarks>The length of the returned string is always the same as FullSpan.Length</remarks>
-        Public NotOverridable Overrides Function ToFullString() As String
-            Return Me.Green.ToFullString()
-        End Function
-
-        ''' <summary>
-        ''' Writes the full text of this node to the specified TextWriter
-        ''' </summary>
-        Public Overrides Sub WriteTo(writer As IO.TextWriter)
-            Me.Green.WriteTo(writer)
-        End Sub
-
 #Region "Serialization"
-
-        Private Shared _binder As RecordingObjectBinder = New ConcurrentRecordingObjectBinder()
-        ''' <summary>
-        ''' Serialize this node to a byte stream.
-        ''' </summary>
-        Public Overrides Sub SerializeTo(stream As IO.Stream, Optional cancellationToken As CancellationToken = Nothing)
-            Using Logger.LogBlock(FunctionId.VisualBasic_SyntaxNode_SerializeTo, cancellationToken:=cancellationToken)
-                Using writer = New ObjectWriter(stream, GetDefaultObjectWriterData(), binder:=_binder, cancellationToken:=cancellationToken)
-                    writer.WriteValue(Me.Green)
-                End Using
-            End Using
-        End Sub
 
         ''' <summary>
         ''' Deserialize a syntax node from a byte stream.
         ''' </summary>
         Public Shared Function DeserializeFrom(stream As IO.Stream, Optional cancellationToken As CancellationToken = Nothing) As SyntaxNode
-            Using Logger.LogBlock(FunctionId.VisualBasic_SyntaxNode_DeserializeFrom, cancellationToken:=cancellationToken)
-                Using reader = New ObjectReader(stream, defaultData:=GetDefaultObjectReaderData(), binder:=_binder)
-                    Return DirectCast(reader.ReadValue(), InternalSyntax.VisualBasicSyntaxNode).CreateRed(Nothing, 0)
-                End Using
+            If stream Is Nothing Then
+                Throw New ArgumentNullException(NameOf(stream))
+            End If
+
+            If Not stream.CanRead Then
+                Throw New InvalidOperationException(CodeAnalysisResources.TheStreamCannotBeReadFrom)
+            End If
+
+            Using reader = ObjectReader.TryGetReader(stream, leaveOpen:=True, cancellationToken:=cancellationToken)
+                If reader Is Nothing Then
+                    Throw New ArgumentException(CodeAnalysisResources.Stream_contains_invalid_data, NameOf(stream))
+                End If
+
+                Return DirectCast(reader.ReadValue(), InternalSyntax.VisualBasicSyntaxNode).CreateRed(Nothing, 0)
             End Using
         End Function
 
-        Private Shared _defaultObjectReaderData As ObjectReaderData
-        Private Shared Function GetDefaultObjectReaderData() As ObjectReaderData
-            If _defaultObjectReaderData Is Nothing Then
-                Interlocked.CompareExchange(_defaultObjectReaderData, New ObjectReaderData(GetSerializationData()), Nothing)
-            End If
-            Return _defaultObjectReaderData
-        End Function
-
-        Private Shared _defaultObjectWriterData As ObjectWriterData
-        Private Shared Function GetDefaultObjectWriterData() As ObjectWriterData
-            If _defaultObjectWriterData Is Nothing Then
-                Interlocked.CompareExchange(_defaultObjectWriterData, New ObjectWriterData(GetSerializationData()), Nothing)
-            End If
-            Return _defaultObjectWriterData
-        End Function
-
-        Private Shared ReadOnly _serializationData As IEnumerable(Of Object)
-        Private Shared Function GetSerializationData() As IEnumerable(Of Object)
-            If _serializationData Is Nothing Then
-                Dim data = New Object() {
-                    GetType(Object).GetTypeInfo().Assembly.FullName,
-                    GetType(Microsoft.CodeAnalysis.DiagnosticInfo).GetTypeInfo().Assembly.FullName,
-                    GetType(Microsoft.CodeAnalysis.VisualBasic.VisualBasicSyntaxNode).GetTypeInfo().Assembly.FullName,
-                    GetType(Microsoft.CodeAnalysis.VisualBasic.Syntax.InternalSyntax.SyntaxToken.TriviaInfo),
-                    GetType(Microsoft.CodeAnalysis.VisualBasic.Syntax.InternalSyntax.SimpleIdentifierSyntax),
-                    GetType(Microsoft.CodeAnalysis.VisualBasic.Syntax.InternalSyntax.ComplexIdentifierSyntax),
-                    GetType(Microsoft.CodeAnalysis.VisualBasic.Syntax.InternalSyntax.SyntaxList),
-                    GetType(Microsoft.CodeAnalysis.VisualBasic.Syntax.InternalSyntax.SyntaxList.WithTwoChildren),
-                    GetType(Microsoft.CodeAnalysis.VisualBasic.Syntax.InternalSyntax.SyntaxList.WithThreeChildren),
-                    GetType(Microsoft.CodeAnalysis.VisualBasic.Syntax.InternalSyntax.SyntaxList.WithManyChildren),
-                    GetType(Microsoft.CodeAnalysis.VisualBasic.Syntax.InternalSyntax.SyntaxList.WithLotsOfChildren),
-                    GetType(Microsoft.CodeAnalysis.VisualBasic.Syntax.InternalSyntax.IntegerLiteralTokenSyntax(Of Int32)),
-                    GetType(Microsoft.CodeAnalysis.VisualBasic.Syntax.InternalSyntax.IntegerLiteralTokenSyntax(Of Int16)),
-                    GetType(Microsoft.CodeAnalysis.VisualBasic.Syntax.InternalSyntax.IntegerLiteralTokenSyntax(Of Int64)),
-                    GetType(Microsoft.CodeAnalysis.VisualBasic.Syntax.InternalSyntax.IntegerLiteralTokenSyntax(Of UInt32)),
-                    GetType(Microsoft.CodeAnalysis.VisualBasic.Syntax.InternalSyntax.IntegerLiteralTokenSyntax(Of UInt16)),
-                    GetType(Microsoft.CodeAnalysis.VisualBasic.Syntax.InternalSyntax.IntegerLiteralTokenSyntax(Of UInt64)),
-                    GetType(Microsoft.CodeAnalysis.VisualBasic.Syntax.InternalSyntax.IntegerLiteralTokenSyntax(Of Byte)),
-                    GetType(Microsoft.CodeAnalysis.VisualBasic.Syntax.InternalSyntax.IntegerLiteralTokenSyntax(Of SByte)),
-                    GetType(Microsoft.CodeAnalysis.VisualBasic.Syntax.InternalSyntax.FloatingLiteralTokenSyntax(Of Single)),
-                    GetType(Microsoft.CodeAnalysis.VisualBasic.Syntax.InternalSyntax.FloatingLiteralTokenSyntax(Of Double)),
-                    GetType(Microsoft.CodeAnalysis.DiagnosticInfo),
-                    GetType(Microsoft.CodeAnalysis.SyntaxAnnotation)
-                } _
-                .Concat(InternalSyntax.SyntaxFactory.GetNodeTypes()) _
-                .Concat(InternalSyntax.SyntaxFactory.GetWellKnownTrivia()) _
-                .ToImmutableArray()
-
-                Interlocked.CompareExchange(_serializationData, data, Nothing)
-            End If
-
-            Return _serializationData
-        End Function
 #End Region
 
         ''' <summary>
@@ -289,15 +188,8 @@ Namespace Microsoft.CodeAnalysis.VisualBasic
             Return GetLastToken(includeZeroWidth:=True).TrailingTrivia
         End Function
 
-        Friend ReadOnly Property HasErrors As Boolean
-            Get
-                ' TODO (tomat): share impl with C#
-                Return Me.ContainsDiagnostics AndAlso Me.GetSyntaxErrors(Me.SyntaxTree).Any(Function(i) i.Severity = DiagnosticSeverity.Error)
-            End Get
-        End Property
-
         ' an empty collection of syntax errors.
-        Friend Shared EmptyErrorCollection As New ReadOnlyCollection(Of Diagnostic)(New VBDiagnostic() {})
+        Friend Shared EmptyErrorCollection As New ReadOnlyCollection(Of Diagnostic)(Array.Empty(Of Diagnostic))
 
         ''' <summary>
         ''' Get all syntax errors associated with this node, or any child nodes, grand-child nodes, etc. The errors
@@ -324,7 +216,7 @@ Namespace Microsoft.CodeAnalysis.VisualBasic
                     If node.ContainsDiagnostics Then
                         Dim errors = DirectCast(node, Syntax.InternalSyntax.VisualBasicSyntaxNode).GetDiagnostics
                         If errors IsNot Nothing Then
-                            For i = 0 To errors.Count - 1
+                            For i = 0 To errors.Length - 1
                                 Dim greenError = errors(i)
                                 Debug.Assert(greenError IsNot Nothing)
                                 errorList.Add(CreateSyntaxError(tree, nodeOrToken, greenError))
@@ -398,21 +290,6 @@ Namespace Microsoft.CodeAnalysis.VisualBasic
 
             ' Translate the green error offset/width relative to my location.
             Return New VBDiagnostic(errorInfo, If(tree Is Nothing, New SourceLocation(tree, nodeOrToken.Span), tree.GetLocation(nodeOrToken.Span)))
-        End Function
-
-        ''' <summary>
-        ''' Compares to tree for structural equivalence.
-        ''' </summary>
-        Friend Shadows Function IsEquivalentTo(other As VisualBasicSyntaxNode) As Boolean
-            If other Is Nothing Then
-                Return False
-            End If
-
-            If Me Is other Then
-                Return True
-            End If
-
-            Return Me.Green.IsEquivalentTo(other.Green)
         End Function
 
         ''' <summary>
@@ -515,87 +392,7 @@ Namespace Microsoft.CodeAnalysis.VisualBasic
             Return Nothing
         End Function
 
-        Friend Shared Function FindTriviaByOffset(node As SyntaxNode, textOffset As Integer, Optional stepInto As Func(Of SyntaxTrivia, Boolean) = Nothing) As SyntaxTrivia
-            If textOffset >= 0 Then
-                For Each element In node.ChildNodesAndTokens()
-                    Dim fullWidth = element.FullWidth
-                    If textOffset < fullWidth Then
-                        If element.IsNode Then
-                            Return FindTriviaByOffset(element.AsNode(), textOffset, stepInto)
-                        ElseIf element.IsToken Then
-                            Dim token = element.AsToken()
-                            Dim leading = token.LeadingWidth
-                            If textOffset < token.LeadingWidth Then
-                                For Each trivia In token.LeadingTrivia
-                                    If textOffset < trivia.FullWidth Then
-                                        If trivia.HasStructure AndAlso stepInto IsNot Nothing AndAlso stepInto(trivia) Then
-                                            Return FindTriviaByOffset(DirectCast(trivia.GetStructure(), VisualBasicSyntaxNode), textOffset, stepInto)
-                                        End If
-
-                                        Return trivia
-                                    End If
-
-                                    textOffset -= trivia.FullWidth
-                                Next
-                            ElseIf textOffset >= leading + token.Width Then
-                                textOffset -= leading + token.Width
-                                For Each trivia In token.TrailingTrivia
-                                    If textOffset < trivia.FullWidth Then
-                                        If trivia.HasStructure AndAlso stepInto IsNot Nothing AndAlso stepInto(trivia) Then
-                                            Return FindTriviaByOffset(DirectCast(trivia.GetStructure(), VisualBasicSyntaxNode), textOffset, stepInto)
-                                        End If
-
-                                        Return trivia
-                                    End If
-
-                                    textOffset -= trivia.FullWidth
-                                Next
-                            End If
-
-                            Return Nothing
-                        End If
-                    End If
-
-                    textOffset -= fullWidth
-                Next
-            End If
-
-            Return Nothing
-        End Function
-
-#Region "Node Lookup"
-        ''' <summary>
-        ''' Returns child node or token that contains given position.
-        ''' </summary>
-        Public Overrides Function ChildThatContainsPosition(position As Integer) As SyntaxNodeOrToken
-            'PERF: it is very important to keep this method fast.
-
-            If Not FullSpan.Contains(position) Then
-                Throw New ArgumentOutOfRangeException("position")
-            End If
-
-            Dim childNodeOrToken = ChildSyntaxList.ChildThatContainsPosition(Me, position)
-            Debug.Assert(childNodeOrToken.FullSpan.Contains(position), "ChildThatContainsPosition's return value does not contain the requested position.")
-            Return childNodeOrToken
-        End Function
-#End Region
-
 #Region "Core Overloads"
-        Protected NotOverridable Overrides Function EquivalentToCore(other As SyntaxNode) As Boolean
-            Return Me.IsEquivalentTo(TryCast(other, VisualBasicSyntaxNode))
-        End Function
-
-        Protected NotOverridable Overrides Function FindTokenCore(position As Integer, findInsideTrivia As Boolean) As SyntaxToken
-            Return FindToken(position, findInsideTrivia)
-        End Function
-
-        Protected Overrides Function FindTokenCore(position As Integer, stepInto As Func(Of SyntaxTrivia, Boolean)) As SyntaxToken
-            Return FindToken(position, stepInto.ToLanguageSpecific())
-        End Function
-
-        Protected NotOverridable Overrides Function FindTriviaCore(position As Integer, findInsideTrivia As Boolean) As SyntaxTrivia
-            Return FindTrivia(position, findInsideTrivia)
-        End Function
 
         Protected Overrides ReadOnly Property SyntaxTreeCore As SyntaxTree
             Get
@@ -610,39 +407,40 @@ Namespace Microsoft.CodeAnalysis.VisualBasic
             Optional computeReplacementToken As Func(Of SyntaxToken, SyntaxToken, SyntaxToken) = Nothing,
             Optional trivia As IEnumerable(Of SyntaxTrivia) = Nothing,
             Optional computeReplacementTrivia As Func(Of SyntaxTrivia, SyntaxTrivia, SyntaxTrivia) = Nothing) As SyntaxNode
-            Return SyntaxReplacer.Replace(Me, nodes, computeReplacementNode, tokens, computeReplacementToken, trivia, computeReplacementTrivia)
+
+            Return SyntaxReplacer.Replace(Me, nodes, computeReplacementNode, tokens, computeReplacementToken, trivia, computeReplacementTrivia).AsRootOfNewTreeWithOptionsFrom(Me.SyntaxTree)
         End Function
 
         Protected Overrides Function RemoveNodesCore(nodes As IEnumerable(Of SyntaxNode), options As SyntaxRemoveOptions) As SyntaxNode
-            Return SyntaxNodeRemover.RemoveNodes(Me, nodes, options)
+            Return SyntaxNodeRemover.RemoveNodes(Me, nodes, options).AsRootOfNewTreeWithOptionsFrom(Me.SyntaxTree)
         End Function
 
         Protected Overrides Function ReplaceNodeInListCore(originalNode As SyntaxNode, replacementNodes As IEnumerable(Of SyntaxNode)) As SyntaxNode
-            Return SyntaxReplacer.ReplaceNodeInList(Me, originalNode, replacementNodes)
+            Return SyntaxReplacer.ReplaceNodeInList(Me, originalNode, replacementNodes).AsRootOfNewTreeWithOptionsFrom(Me.SyntaxTree)
         End Function
 
         Protected Overrides Function InsertNodesInListCore(nodeInList As SyntaxNode, nodesToInsert As IEnumerable(Of SyntaxNode), insertBefore As Boolean) As SyntaxNode
-            Return SyntaxReplacer.InsertNodeInList(Me, nodeInList, nodesToInsert, insertBefore)
+            Return SyntaxReplacer.InsertNodeInList(Me, nodeInList, nodesToInsert, insertBefore).AsRootOfNewTreeWithOptionsFrom(Me.SyntaxTree)
         End Function
 
         Protected Overrides Function ReplaceTokenInListCore(originalToken As SyntaxToken, newTokens As IEnumerable(Of SyntaxToken)) As SyntaxNode
-            Return SyntaxReplacer.ReplaceTokenInList(Me, originalToken, newTokens)
+            Return SyntaxReplacer.ReplaceTokenInList(Me, originalToken, newTokens).AsRootOfNewTreeWithOptionsFrom(Me.SyntaxTree)
         End Function
 
         Protected Overrides Function InsertTokensInListCore(originalToken As SyntaxToken, newTokens As IEnumerable(Of SyntaxToken), insertBefore As Boolean) As SyntaxNode
-            Return SyntaxReplacer.InsertTokenInList(Me, originalToken, newTokens, insertBefore)
+            Return SyntaxReplacer.InsertTokenInList(Me, originalToken, newTokens, insertBefore).AsRootOfNewTreeWithOptionsFrom(Me.SyntaxTree)
         End Function
 
         Protected Overrides Function ReplaceTriviaInListCore(originalTrivia As SyntaxTrivia, newTrivia As IEnumerable(Of SyntaxTrivia)) As SyntaxNode
-            Return SyntaxReplacer.ReplaceTriviaInList(Me, originalTrivia, newTrivia)
+            Return SyntaxReplacer.ReplaceTriviaInList(Me, originalTrivia, newTrivia).AsRootOfNewTreeWithOptionsFrom(Me.SyntaxTree)
         End Function
 
         Protected Overrides Function InsertTriviaInListCore(originalTrivia As SyntaxTrivia, newTrivia As IEnumerable(Of SyntaxTrivia), insertBefore As Boolean) As SyntaxNode
-            Return SyntaxReplacer.InsertTriviaInList(Me, originalTrivia, newTrivia, insertBefore)
+            Return SyntaxReplacer.InsertTriviaInList(Me, originalTrivia, newTrivia, insertBefore).AsRootOfNewTreeWithOptionsFrom(Me.SyntaxTree)
         End Function
 
-        Protected Overrides Function NormalizeWhitespaceCore(indentation As String, elasticTrivia As Boolean) As SyntaxNode
-            Return SyntaxFormatter.Format(Me, indentation, elasticTrivia, useDefaultCasing:=False)
+        Protected Overrides Function NormalizeWhitespaceCore(indentation As String, eol As String, elasticTrivia As Boolean) As SyntaxNode
+            Return SyntaxNormalizer.Normalize(Me, indentation, eol, elasticTrivia, useDefaultCasing:=False).AsRootOfNewTreeWithOptionsFrom(Me.SyntaxTree)
         End Function
 #End Region
 
@@ -682,9 +480,8 @@ Namespace Microsoft.CodeAnalysis.VisualBasic
             Return SyntaxFactory.AreEquivalent(Me, DirectCast(node, VisualBasicSyntaxNode), topLevel)
         End Function
 
-        Friend Overrides Function GetCorrespondingLambdaBody(body As SyntaxNode) As SyntaxNode
-            Return SyntaxUtilities.GetCorrespondingLambdaBody(body, Me)
+        Friend Overrides Function ShouldCreateWeakList() As Boolean
+            Return TypeOf Me Is MethodBlockBaseSyntax
         End Function
-
     End Class
 End Namespace

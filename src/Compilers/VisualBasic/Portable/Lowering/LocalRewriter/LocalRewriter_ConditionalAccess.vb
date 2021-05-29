@@ -1,4 +1,6 @@
-﻿' Copyright (c) Microsoft.  All Rights Reserved.  Licensed under the Apache License, Version 2.0.  See License.txt in the project root for license information.
+﻿' Licensed to the .NET Foundation under one or more agreements.
+' The .NET Foundation licenses this file to you under the MIT license.
+' See the LICENSE file in the project root for more information.
 
 Imports System.Collections.Immutable
 Imports System.Diagnostics
@@ -11,7 +13,7 @@ Imports TypeKind = Microsoft.CodeAnalysis.TypeKind
 Namespace Microsoft.CodeAnalysis.VisualBasic
     Partial Friend NotInheritable Class LocalRewriter
 
-        Private Function ShouldCaptureConditionalAccessReceiver(receiver As BoundExpression) As Boolean
+        Private Shared Function ShouldCaptureConditionalAccessReceiver(receiver As BoundExpression) As Boolean
             Select Case receiver.Kind
                 Case BoundKind.MeReference
                     Return False
@@ -23,7 +25,7 @@ Namespace Microsoft.CodeAnalysis.VisualBasic
                     Return DirectCast(receiver, BoundLocal).LocalSymbol.IsByRef
 
                 Case Else
-                    Return True
+                    Return Not receiver.IsDefaultValue()
             End Select
         End Function
 
@@ -43,7 +45,7 @@ Namespace Microsoft.CodeAnalysis.VisualBasic
             Dim needWhenNotNullPart As Boolean = True
             Dim needWhenNullPart As Boolean = True
 
-            Dim factory = New SyntheticBoundNodeFactory(topMethod, currentMethodOrLambda, node.Syntax, compilationState, diagnostics)
+            Dim factory = New SyntheticBoundNodeFactory(_topMethod, _currentMethodOrLambda, node.Syntax, _compilationState, _diagnostics)
 
             If receiverType.IsNullableType() Then
                 ' if( receiver.HasValue, receiver.GetValueOrDefault(). ... -> to Nullable, Nothing) 
@@ -61,7 +63,7 @@ Namespace Microsoft.CodeAnalysis.VisualBasic
                     Dim first As BoundExpression
 
                     If ShouldCaptureConditionalAccessReceiver(rewrittenReceiver) Then
-                        temp = New SynthesizedLocal(Me.currentMethodOrLambda, receiverType, SynthesizedLocalKind.LoweringTemp)
+                        temp = New SynthesizedLocal(Me._currentMethodOrLambda, receiverType, SynthesizedLocalKind.LoweringTemp)
 
                         assignment = factory.AssignmentExpression(factory.Local(temp, isLValue:=True), rewrittenReceiver.MakeRValue())
                         first = factory.Local(temp, isLValue:=True)
@@ -97,8 +99,8 @@ Namespace Microsoft.CodeAnalysis.VisualBasic
                     ' if( receiver IsNot Nothing, receiver. ... -> to Nullable, Nothing) 
                     receiverOrCondition = rewrittenReceiver
                     captureReceiver = ShouldCaptureConditionalAccessReceiver(rewrittenReceiver)
-                    Me.conditionalAccessReceiverPlaceholderId += 1
-                    newPlaceholderId = Me.conditionalAccessReceiverPlaceholderId
+                    Me._conditionalAccessReceiverPlaceholderId += 1
+                    newPlaceholderId = Me._conditionalAccessReceiverPlaceholderId
                     Debug.Assert(newPlaceholderId <> 0)
                     newPlaceHolder = New BoundConditionalAccessReceiverPlaceholder(node.Placeholder.Syntax, newPlaceholderId, node.Placeholder.Type)
                     placeholderReplacement = newPlaceHolder
@@ -162,6 +164,57 @@ Namespace Microsoft.CodeAnalysis.VisualBasic
             End If
 
             Return result
+        End Function
+
+        Private Shared Function IsConditionalAccess(operand As BoundExpression, <Out> ByRef whenNotNull As BoundExpression, <Out> ByRef whenNull As BoundExpression) As Boolean
+            If operand.Kind = BoundKind.Sequence Then
+                Dim sequence = DirectCast(operand, BoundSequence)
+
+                If sequence.ValueOpt Is Nothing Then
+                    whenNotNull = Nothing
+                    whenNull = Nothing
+                    Return False
+                End If
+
+                operand = sequence.ValueOpt
+            End If
+
+            If operand.Kind = BoundKind.LoweredConditionalAccess Then
+                Dim conditional = DirectCast(operand, BoundLoweredConditionalAccess)
+                whenNotNull = conditional.WhenNotNull
+                whenNull = conditional.WhenNullOpt
+                Return True
+            End If
+
+            whenNotNull = Nothing
+            whenNull = Nothing
+            Return False
+        End Function
+
+        Private Shared Function UpdateConditionalAccess(operand As BoundExpression, whenNotNull As BoundExpression, whenNull As BoundExpression) As BoundExpression
+            Dim sequence As BoundSequence
+
+            If operand.Kind = BoundKind.Sequence Then
+                sequence = DirectCast(operand, BoundSequence)
+                operand = sequence.ValueOpt
+            Else
+                sequence = Nothing
+            End If
+
+            Dim conditional = DirectCast(operand, BoundLoweredConditionalAccess)
+
+            operand = conditional.Update(conditional.ReceiverOrCondition,
+                                         conditional.CaptureReceiver,
+                                         conditional.PlaceholderId,
+                                         whenNotNull,
+                                         whenNull,
+                                         whenNotNull.Type)
+
+            If sequence Is Nothing Then
+                Return operand
+            End If
+
+            Return sequence.Update(sequence.Locals, sequence.SideEffects, operand, operand.Type)
         End Function
 
     End Class

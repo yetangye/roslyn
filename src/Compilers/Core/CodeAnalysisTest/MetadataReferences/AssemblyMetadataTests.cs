@@ -1,4 +1,8 @@
-﻿// Copyright (c) Microsoft.  All Rights Reserved.  Licensed under the Apache License, Version 2.0.  See License.txt in the project root for license information.
+﻿// Licensed to the .NET Foundation under one or more agreements.
+// The .NET Foundation licenses this file to you under the MIT license.
+// See the LICENSE file in the project root for more information.
+
+#nullable disable
 
 using System;
 using System.Collections.Immutable;
@@ -14,13 +18,18 @@ namespace Microsoft.CodeAnalysis.UnitTests
         public void Ctor_Errors()
         {
             Assert.Throws<ArgumentNullException>(() => AssemblyMetadata.CreateFromImage(default(ImmutableArray<byte>)));
-            Assert.Throws<ArgumentNullException>(() => AssemblyMetadata.CreateFromImage(default(IEnumerable<byte>)));
-            Assert.Throws<ArgumentNullException>(() => AssemblyMetadata.CreateFromImage(default(byte[])));
+
+            IEnumerable<byte> enumerableImage = null;
+            Assert.Throws<ArgumentNullException>(() => AssemblyMetadata.CreateFromImage(enumerableImage));
+
+            byte[] arrayImage = null;
+            Assert.Throws<ArgumentNullException>(() => AssemblyMetadata.CreateFromImage(arrayImage));
+
             Assert.Throws<ArgumentNullException>(() => AssemblyMetadata.Create((ModuleMetadata)null));
             Assert.Throws<ArgumentException>(() => AssemblyMetadata.Create(default(ImmutableArray<ModuleMetadata>)));
             Assert.Throws<ArgumentException>(() => AssemblyMetadata.Create(ImmutableArray.Create<ModuleMetadata>()));
 
-            var m1 = ModuleMetadata.CreateFromImage(TestResources.SymbolsTests.MultiModule.MultiModule);
+            var m1 = ModuleMetadata.CreateFromImage(TestResources.SymbolsTests.MultiModule.MultiModuleDll);
             var m2 = ModuleMetadata.CreateFromImage(TestResources.SymbolsTests.MultiModule.mod2);
             var m3 = ModuleMetadata.CreateFromImage(TestResources.SymbolsTests.MultiModule.mod3);
 
@@ -35,7 +44,7 @@ namespace Microsoft.CodeAnalysis.UnitTests
         [Fact]
         public void CreateFromBytes()
         {
-            using (var a = AssemblyMetadata.CreateFromImage(TestResources.SymbolsTests.MultiModule.MultiModule))
+            using (var a = AssemblyMetadata.CreateFromImage(TestResources.SymbolsTests.MultiModule.MultiModuleDll))
             {
                 // even though the image refers to other modules only the manifest module is loaded:
                 Assert.Equal(1, a.GetModules().Length);
@@ -47,7 +56,7 @@ namespace Microsoft.CodeAnalysis.UnitTests
         public void CreateFromFile()
         {
             var dir = Temp.CreateDirectory();
-            var mm = dir.CreateFile("MultiModule.dll").WriteAllBytes(TestResources.SymbolsTests.MultiModule.MultiModule).Path;
+            var mm = dir.CreateFile("MultiModule.dll").WriteAllBytes(TestResources.SymbolsTests.MultiModule.MultiModuleDll).Path;
             dir.CreateFile("mod2.netmodule").WriteAllBytes(TestResources.SymbolsTests.MultiModule.mod2);
             dir.CreateFile("mod3.netmodule").WriteAllBytes(TestResources.SymbolsTests.MultiModule.mod3);
 
@@ -65,7 +74,7 @@ namespace Microsoft.CodeAnalysis.UnitTests
         {
             ModuleMetadata m1, m2, m3;
             var md = AssemblyMetadata.Create(
-                m1 = ModuleMetadata.CreateFromImage(TestResources.SymbolsTests.MultiModule.MultiModule),
+                m1 = ModuleMetadata.CreateFromImage(TestResources.SymbolsTests.MultiModule.MultiModuleDll),
                 m2 = ModuleMetadata.CreateFromImage(TestResources.SymbolsTests.MultiModule.mod2),
                 m3 = ModuleMetadata.CreateFromImage(TestResources.SymbolsTests.MultiModule.mod3));
 
@@ -81,7 +90,7 @@ namespace Microsoft.CodeAnalysis.UnitTests
         {
             ModuleMetadata m1, m2, m3;
             var a = AssemblyMetadata.Create(
-                m1 = ModuleMetadata.CreateFromImage(TestResources.SymbolsTests.MultiModule.MultiModule),
+                m1 = ModuleMetadata.CreateFromImage(TestResources.SymbolsTests.MultiModule.MultiModuleDll),
                 m2 = ModuleMetadata.CreateFromImage(TestResources.SymbolsTests.MultiModule.mod2),
                 m3 = ModuleMetadata.CreateFromImage(TestResources.SymbolsTests.MultiModule.mod3));
 
@@ -134,7 +143,7 @@ namespace Microsoft.CodeAnalysis.UnitTests
             Assert.Throws<BadImageFormatException>(() => metadata.GetModules());
         }
 
-        [Fact, WorkItem(547015, "DevDiv")]
+        [Fact, WorkItem(547015, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/547015")]
         public void IncorrectCustomAssemblyTableSize_TooManyMethodSpecs()
         {
             var metadata = AssemblyMetadata.CreateFromImage(TestResources.MetadataTests.Invalid.IncorrectCustomAssemblyTableSize_TooManyMethodSpecs);

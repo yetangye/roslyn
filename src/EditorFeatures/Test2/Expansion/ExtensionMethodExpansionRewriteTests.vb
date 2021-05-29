@@ -1,8 +1,8 @@
-' Copyright (c) Microsoft.  All Rights Reserved.  Licensed under the Apache License, Version 2.0.  See License.txt in the project root for license information.
+﻿' Licensed to the .NET Foundation under one or more agreements.
+' The .NET Foundation licenses this file to you under the MIT license.
+' See the LICENSE file in the project root for more information.
 
-Imports Microsoft.CodeAnalysis
-Imports Microsoft.CodeAnalysis.Editor.UnitTests.Workspaces
-Imports Microsoft.CodeAnalysis.Text
+Imports System.Threading.Tasks
 
 Namespace Microsoft.CodeAnalysis.Editor.UnitTests.Expansion
     Public Class ExtensionMethodExpansionRewriteTests
@@ -10,7 +10,7 @@ Namespace Microsoft.CodeAnalysis.Editor.UnitTests.Expansion
 
 #Region "Visual Basic ExtensionMethodRewrite Expansion tests"
         <Fact, Trait(Traits.Feature, Traits.Features.Expansion)>
-        Public Sub VisualBasic_ExpandSingleExtensionMethod()
+        Public Async Function TestVisualBasic_ExpandSingleExtensionMethod() As Task
             Dim input =
 <Workspace>
     <Project Language="Visual Basic" CommonReferences="true">
@@ -20,13 +20,13 @@ Imports System.Runtime.CompilerServices
 Public Class Program
     Public Sub Main(args As String())
         Dim p As Program = Nothing
-        Dim ss = {|Expand:p.foo()|}
+        Dim ss = {|Expand:p.goo()|}
     End Sub
 End Class
 
 Module ProgramExtensions
     &lt;Extension()&gt;
-    Public Function foo(ByVal Prog As Program) As Program
+    Public Function goo(ByVal Prog As Program) As Program
         Return Prog
     End Function
 End Module
@@ -41,23 +41,23 @@ Imports System.Runtime.CompilerServices
 Public Class Program
     Public Sub Main(args As String())
         Dim p As Program = Nothing
-        Dim ss = Global.ProgramExtensions.foo((CType((p), Global.Program)))
+        Dim ss = Global.ProgramExtensions.goo((CType((p), Global.Program)))
     End Sub
 End Class
 
 Module ProgramExtensions
     &lt;Extension()&gt;
-    Public Function foo(ByVal Prog As Program) As Program
+    Public Function goo(ByVal Prog As Program) As Program
         Return Prog
     End Function
 End Module
 </code>
 
-            Test(input, expected)
-        End Sub
+            Await TestAsync(input, expected)
+        End Function
 
         <Fact, Trait(Traits.Feature, Traits.Features.Expansion)>
-        Public Sub VisualBasic_ExpandSingleExtensionMethodWithArgument()
+        Public Async Function TestVisualBasic_ExpandSingleExtensionMethodWithArgument() As Task
             Dim input =
 <Workspace>
     <Project Language="Visual Basic" CommonReferences="true">
@@ -67,13 +67,13 @@ Imports System.Runtime.CompilerServices
 Public Class Program
     Public Sub Main(args As String())
         Dim p As Program = Nothing
-        Dim ss = {|Expand:p.foo("")|}
+        Dim ss = {|Expand:p.goo("")|}
     End Sub
 End Class
 
 Module ProgramExtensions
     &lt;Extension()&gt;
-    Public Function foo(ByVal Prog As Program, str as string) As Program
+    Public Function goo(ByVal Prog As Program, str as string) As Program
         Return Prog
     End Function
 End Module
@@ -88,23 +88,23 @@ Imports System.Runtime.CompilerServices
 Public Class Program
     Public Sub Main(args As String())
         Dim p As Program = Nothing
-        Dim ss = Global.ProgramExtensions.foo((CType((p), Global.Program)), (CType((""), System.String)))
+        Dim ss = Global.ProgramExtensions.goo((CType((p), Global.Program)), (CStr((""))))
     End Sub
 End Class
 
 Module ProgramExtensions
     &lt;Extension()&gt;
-    Public Function foo(ByVal Prog As Program, str as string) As Program
+    Public Function goo(ByVal Prog As Program, str as string) As Program
         Return Prog
     End Function
 End Module
 </code>
 
-            Test(input, expected)
-        End Sub
+            Await TestAsync(input, expected)
+        End Function
 
         <Fact, Trait(Traits.Feature, Traits.Features.Expansion)>
-        Public Sub VisualBasic_ExpandMultiExtensionMethod()
+        Public Async Function TestVisualBasic_ExpandMultiExtensionMethod() As Task
             Dim input =
 <Workspace>
     <Project Language="Visual Basic" CommonReferences="true">
@@ -114,13 +114,13 @@ Imports System.Runtime.CompilerServices
 Public Class Program
     Public Sub Main(args As String())
         Dim p As Program = Nothing
-        Dim ss = {|Expand:p.foo().foo()|}
+        Dim ss = {|Expand:p.goo().goo()|}
     End Sub
 End Class
 
 Module ProgramExtensions
     &lt;Extension()&gt;
-    Public Function foo(ByVal Prog As Program) As Program
+    Public Function goo(ByVal Prog As Program) As Program
         Return Prog
     End Function
 End Module
@@ -135,23 +135,23 @@ Imports System.Runtime.CompilerServices
 Public Class Program
     Public Sub Main(args As String())
         Dim p As Program = Nothing
-        Dim ss = Global.ProgramExtensions.foo((CType((Global.ProgramExtensions.foo((CType((p), Global.Program)))), Global.Program)))
+        Dim ss = Global.ProgramExtensions.goo((CType((Global.ProgramExtensions.goo((CType((p), Global.Program)))), Global.Program)))
     End Sub
 End Class
 
 Module ProgramExtensions
     &lt;Extension()&gt;
-    Public Function foo(ByVal Prog As Program) As Program
+    Public Function goo(ByVal Prog As Program) As Program
         Return Prog
     End Function
 End Module
 </code>
 
-            Test(input, expected)
-        End Sub
+            Await TestAsync(input, expected)
+        End Function
 
         <Fact, Trait(Traits.Feature, Traits.Features.Expansion)>
-        Public Sub VisualBasic_ExpandMultiExtensionMethodWithArgument()
+        Public Async Function TestVisualBasic_ExpandMultiExtensionMethodWithArgument() As Task
             Dim input =
 <Workspace>
     <Project Language="Visual Basic" CommonReferences="true">
@@ -161,13 +161,13 @@ Imports System.Runtime.CompilerServices
 Public Class Program
     Public Sub Main(args As String())
         Dim p As Program = Nothing
-        Dim ss = {|Expand:p.foo("").foo("")|}
+        Dim ss = {|Expand:p.goo("").goo("")|}
     End Sub
 End Class
 
 Module ProgramExtensions
     &lt;Extension()&gt;
-    Public Function foo(ByVal Prog As Program, str as string) As Program
+    Public Function goo(ByVal Prog As Program, str as string) As Program
         Return Prog
     End Function
 End Module
@@ -182,23 +182,23 @@ Imports System.Runtime.CompilerServices
 Public Class Program
     Public Sub Main(args As String())
         Dim p As Program = Nothing
-        Dim ss = Global.ProgramExtensions.foo((CType((Global.ProgramExtensions.foo((CType((p), Global.Program)), (CType((""), System.String)))), Global.Program)), (CType((""), System.String)))
+        Dim ss = Global.ProgramExtensions.goo((CType((Global.ProgramExtensions.goo((CType((p), Global.Program)), (CStr((""))))), Global.Program)), (CStr((""))))
     End Sub
 End Class
 
 Module ProgramExtensions
     &lt;Extension()&gt;
-    Public Function foo(ByVal Prog As Program, str as string) As Program
+    Public Function goo(ByVal Prog As Program, str as string) As Program
         Return Prog
     End Function
 End Module
 </code>
 
-            Test(input, expected)
-        End Sub
+            Await TestAsync(input, expected)
+        End Function
 
         <Fact, Trait(Traits.Feature, Traits.Features.Expansion)>
-        Public Sub VisualBasic_ExpandMultiExtensionMethodWithMoreArgument()
+        Public Async Function TestVisualBasic_ExpandMultiExtensionMethodWithMoreArgument() As Task
             Dim input =
 <Workspace>
     <Project Language="Visual Basic" CommonReferences="true">
@@ -208,13 +208,13 @@ Imports System.Runtime.CompilerServices
 Public Class Program
     Public Sub Main(args As String())
         Dim p As Program = Nothing
-        Dim ss = {|Expand:p.foo("","","").foo("","","")|}
+        Dim ss = {|Expand:p.goo("","","").goo("","","")|}
     End Sub
 End Class
 
 Module ProgramExtensions
     &lt;Extension()&gt;
-    Public Function foo(ByVal Prog As Program, str as string, str1 as string, str2 as string) As Program
+    Public Function goo(ByVal Prog As Program, str as string, str1 as string, str2 as string) As Program
         Return Prog
     End Function
 End Module
@@ -229,23 +229,23 @@ Imports System.Runtime.CompilerServices
 Public Class Program
     Public Sub Main(args As String())
         Dim p As Program = Nothing
-        Dim ss = Global.ProgramExtensions.foo((CType((Global.ProgramExtensions.foo((CType((p), Global.Program)), (CType((""), System.String)), (CType((""), System.String)), (CType((""), System.String)))), Global.Program)), (CType((""), System.String)), (CType((""), System.String)), (CType((""), System.String)))
+        Dim ss = Global.ProgramExtensions.goo((CType((Global.ProgramExtensions.goo((CType((p), Global.Program)), (CStr((""))), (CStr((""))), (CStr((""))))), Global.Program)), (CStr((""))), (CStr((""))), (CStr((""))))
     End Sub
 End Class
 
 Module ProgramExtensions
     &lt;Extension()&gt;
-    Public Function foo(ByVal Prog As Program, str as string, str1 as string, str2 as string) As Program
+    Public Function goo(ByVal Prog As Program, str as string, str1 as string, str2 as string) As Program
         Return Prog
     End Function
 End Module
 </code>
 
-            Test(input, expected)
-        End Sub
+            Await TestAsync(input, expected)
+        End Function
 
         <Fact, Trait(Traits.Feature, Traits.Features.Expansion)>
-        Public Sub VisualBasic_ExpandSimplifySingleExtensionMethod()
+        Public Async Function TestVisualBasic_ExpandSimplifySingleExtensionMethod() As Task
             Dim input =
 <Workspace>
     <Project Language="Visual Basic" CommonReferences="true">
@@ -255,13 +255,13 @@ Imports System.Runtime.CompilerServices
 Public Class Program
     Public Sub Main(args As String())
         Dim p As Program = Nothing
-        Dim ss = {|ExpandAndSimplify:p.foo()|}
+        Dim ss = {|ExpandAndSimplify:p.goo()|}
     End Sub
 End Class
 
 Module ProgramExtensions
     &lt;Extension()&gt;
-    Public Function foo(ByVal Prog As Program) As Program
+    Public Function goo(ByVal Prog As Program) As Program
         Return Prog
     End Function
 End Module
@@ -276,23 +276,23 @@ Imports System.Runtime.CompilerServices
 Public Class Program
     Public Sub Main(args As String())
         Dim p As Program = Nothing
-        Dim ss = p.foo()
+        Dim ss = p.goo()
     End Sub
 End Class
 
 Module ProgramExtensions
     &lt;Extension()&gt;
-    Public Function foo(ByVal Prog As Program) As Program
+    Public Function goo(ByVal Prog As Program) As Program
         Return Prog
     End Function
 End Module
 </code>
 
-            Test(input, expected)
-        End Sub
+            Await TestAsync(input, expected)
+        End Function
 
         <Fact, Trait(Traits.Feature, Traits.Features.Expansion)>
-        Public Sub VisualBasic_ExpandSimplifyChainedExtensionMethodMoreArguments()
+        Public Async Function TestVisualBasic_ExpandSimplifyChainedExtensionMethodMoreArguments() As Task
             Dim input =
 <Workspace>
     <Project Language="Visual Basic" CommonReferences="true">
@@ -302,13 +302,13 @@ Imports System.Runtime.CompilerServices
 Public Class Program
     Public Sub Main(args As String())
         Dim p As Program = Nothing
-        Dim ss = {|ExpandAndSimplify:p.foo("","","").foo("","","")|}
+        Dim ss = {|ExpandAndSimplify:p.goo("","","").goo("","","")|}
     End Sub
 End Class
 
 Module ProgramExtensions
     &lt;Extension()&gt;
-    Public Function foo(ByVal Prog As Program, str as string, str1 as string, str2 as string) As Program
+    Public Function goo(ByVal Prog As Program, str as string, str1 as string, str2 as string) As Program
         Return Prog
     End Function
 End Module
@@ -323,23 +323,23 @@ Imports System.Runtime.CompilerServices
 Public Class Program
     Public Sub Main(args As String())
         Dim p As Program = Nothing
-        Dim ss = p.foo("", "", "").foo("", "", "")
+        Dim ss = p.goo("", "", "").goo("", "", "")
     End Sub
 End Class
 
 Module ProgramExtensions
     &lt;Extension()&gt;
-    Public Function foo(ByVal Prog As Program, str as string, str1 as string, str2 as string) As Program
+    Public Function goo(ByVal Prog As Program, str as string, str1 as string, str2 as string) As Program
         Return Prog
     End Function
 End Module
 </code>
 
-            Test(input, expected)
-        End Sub
+            Await TestAsync(input, expected)
+        End Function
 
         <Fact, Trait(Traits.Feature, Traits.Features.Expansion)>
-        Public Sub VisualBasic_ExpandSimplifyChainedExtensionMethodMoreArgumentsWithStatic()
+        Public Async Function TestVisualBasic_ExpandSimplifyChainedExtensionMethodMoreArgumentsWithStatic() As Task
             Dim input =
 <Workspace>
     <Project Language="Visual Basic" CommonReferences="true">
@@ -348,7 +348,7 @@ Imports System.Runtime.CompilerServices
 
 Public Class Program
     Public Sub Main(args As String())
-        Dim ss = {|ExpandAndSimplify:staticer.statP.foo("", "", "").foo("", "", "")|}
+        Dim ss = {|ExpandAndSimplify:staticer.statP.goo("", "", "").goo("", "", "")|}
     End Sub
 End Class
 
@@ -358,7 +358,7 @@ End Class
 
 Module ProgramExtensions
     &lt;Extension()&gt;
-    Public Function foo(ByVal Prog As Program, str As String, str1 As String, str2 As String) As Program
+    Public Function goo(ByVal Prog As Program, str As String, str1 As String, str2 As String) As Program
         Return Prog
     End Function
 End Module
@@ -372,7 +372,7 @@ Imports System.Runtime.CompilerServices
 
 Public Class Program
     Public Sub Main(args As String())
-        Dim ss = staticer.statP.foo("", "", "").foo("", "", "")
+        Dim ss = staticer.statP.goo("", "", "").goo("", "", "")
     End Sub
 End Class
 
@@ -382,18 +382,18 @@ End Class
 
 Module ProgramExtensions
     &lt;Extension()&gt;
-    Public Function foo(ByVal Prog As Program, str As String, str1 As String, str2 As String) As Program
+    Public Function goo(ByVal Prog As Program, str As String, str1 As String, str2 As String) As Program
         Return Prog
     End Function
 End Module
 </code>
 
-            Test(input, expected)
-        End Sub
+            Await TestAsync(input, expected)
+        End Function
 
-        <WorkItem(654403)>
+        <WorkItem(654403, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/654403")>
         <Fact, Trait(Traits.Feature, Traits.Features.Expansion)>
-        Public Sub VB_ExtensionMethodRewriteRoundTripsTrivia()
+        Public Async Function TestVB_ExtensionMethodRewriteRoundTripsTrivia() As Task
             Dim input =
 <Workspace>
     <Project Language="Visual Basic" CommonReferences="true">
@@ -456,14 +456,253 @@ Module ProgramExtensions
 End Module
 </code>
 
-            Test(input, expected)
-        End Sub
+            Await TestAsync(input, expected)
+        End Function
 
+        <Fact, Trait(Traits.Feature, Traits.Features.Expansion)>
+        <WorkItem(2593, "https://github.com/dotnet/roslyn/issues/2593")>
+        <WorkItem(3260, "https://github.com/dotnet/roslyn/issues/3260")>
+        Public Async Function TestVisualBasic_ExpandExtensionMethodInMemberAccessExpression() As Task
+            Dim input =
+<Workspace>
+    <Project Language="Visual Basic" CommonReferences="true">
+        <Document><![CDATA[
+Imports System.Collections.Generic
+Imports System.Linq
+Imports System.Runtime.CompilerServices
+
+Module M
+    <Extension()>
+    Public Function Something(cust As C) As IEnumerable(Of String)
+        Throw New NotImplementedException()
+    End Function
+End Module
+
+Class C
+    Private Function GetAssemblyIdentity(types As IEnumerable(Of C)) As Object
+        For Each t In types
+            Dim x = {|Expand:t.Something().First()|}
+        Next
+        Return Nothing
+    End Function
+End Class]]>
+        </Document>
+    </Project>
+</Workspace>
+
+            Dim expected =
+<code><![CDATA[
+Imports System.Collections.Generic
+Imports System.Linq
+Imports System.Runtime.CompilerServices
+
+Module M
+    <Extension()>
+    Public Function Something(cust As C) As IEnumerable(Of String)
+        Throw New NotImplementedException()
+    End Function
+End Module
+
+Class C
+    Private Function GetAssemblyIdentity(types As IEnumerable(Of C)) As Object
+        For Each t In types
+            Dim x = Global.System.Linq.Enumerable.First((CType((Global.M.Something((CType((t), Global.C)))), Global.System.Collections.Generic.IEnumerable(Of System.String))))
+        Next
+        Return Nothing
+    End Function
+End Class]]>
+</code>
+
+            Await TestAsync(input, expected)
+        End Function
+
+        <WpfFact(Skip:="3260"), Trait(Traits.Feature, Traits.Features.Expansion)>
+        <WorkItem(2593, "https://github.com/dotnet/roslyn/issues/2593")>
+        <WorkItem(3260, "https://github.com/dotnet/roslyn/issues/3260")>
+        Public Async Function TestVisualBasic_ExpandExtensionMethodInConditionalAccessExpression() As Task
+            Dim input =
+<Workspace>
+    <Project Language="Visual Basic" CommonReferences="true">
+        <Document><![CDATA[
+Imports System.Collections.Generic
+Imports System.Linq
+Imports System.Runtime.CompilerServices
+
+Module M
+    <Extension()>
+    Public Function Something(cust As C) As IEnumerable(Of String)
+        Throw New NotImplementedException()
+    End Function
+End Module
+
+Class C
+    Private Function GetAssemblyIdentity(types As IEnumerable(Of C)) As Object
+        For Each t In types
+            Dim x = {|Expand:t?.Something().First()|}
+        Next
+        Return Nothing
+    End Function
+End Class]]>
+        </Document>
+    </Project>
+</Workspace>
+
+            Dim expected =
+<code><![CDATA[
+Imports System.Collections.Generic
+Imports System.Linq
+Imports System.Runtime.CompilerServices
+
+Module M
+    <Extension()>
+    Public Function Something(cust As C) As IEnumerable(Of String)
+        Throw New NotImplementedException()
+    End Function
+End Module
+
+Class C
+    Private Function GetAssemblyIdentity(types As IEnumerable(Of C)) As Object
+        For Each t In types
+            Dim x = Global.System.Linq.Enumerable.First((CType(((CType((t), Global.C))?.Something()), Global.System.Collections.Generic.IEnumerable(Of System.String))))
+        Next
+        Return Nothing
+    End Function
+End Class]]>
+</code>
+
+            Await TestAsync(input, expected)
+        End Function
+
+        <Fact, Trait(Traits.Feature, Traits.Features.Expansion)>
+        <WorkItem(2593, "https://github.com/dotnet/roslyn/issues/2593")>
+        <WorkItem(3260, "https://github.com/dotnet/roslyn/issues/3260")>
+        Public Async Function TestVisualBasic_ExpandExtensionMethodInMemberAccessExpression_2() As Task
+            Dim input =
+<Workspace>
+    <Project Language="Visual Basic" CommonReferences="true">
+        <Document><![CDATA[
+Imports System.Runtime.CompilerServices
+
+Module M
+    <Extension()>
+    Public Function Something(cust As C) As IEnumerable(Of String)
+        Throw New NotImplementedException()
+    End Function
+
+    <Extension()>
+    Public Function Something2(cust As C) As Func(Of C)
+        Throw New NotImplementedException()
+    End Function
+End Module
+
+Class C
+    Private Function GetAssemblyIdentity(types As IEnumerable(Of C)) As Object
+        For Each t In types
+            Dim x = {|Expand:t.Something2()().Something().First()|}
+        Next
+        Return Nothing
+    End Function
+End Class]]>
+        </Document>
+    </Project>
+</Workspace>
+
+            Dim expected =
+<code><![CDATA[
+Imports System.Runtime.CompilerServices
+
+Module M
+    <Extension()>
+    Public Function Something(cust As C) As IEnumerable(Of String)
+        Throw New NotImplementedException()
+    End Function
+
+    <Extension()>
+    Public Function Something2(cust As C) As Func(Of C)
+        Throw New NotImplementedException()
+    End Function
+End Module
+
+Class C
+    Private Function GetAssemblyIdentity(types As IEnumerable(Of C)) As Object
+        For Each t In types
+            Dim x = Global.System.Linq.Enumerable.First((CType((Global.M.Something((CType((Global.M.Something2((CType((t), Global.C)))()), Global.C)))), Global.System.Collections.Generic.IEnumerable(Of System.String))))
+        Next
+        Return Nothing
+    End Function
+End Class]]>
+</code>
+
+            Await TestAsync(input, expected)
+        End Function
+
+        <WpfFact(Skip:="3260"), Trait(Traits.Feature, Traits.Features.Expansion)>
+        <WorkItem(2593, "https://github.com/dotnet/roslyn/issues/2593")>
+        <WorkItem(3260, "https://github.com/dotnet/roslyn/issues/3260")>
+        Public Async Function TestVisualBasic_ExpandExtensionMethodInConditionalAccessExpression_2() As Task
+            Dim input =
+<Workspace>
+    <Project Language="Visual Basic" CommonReferences="true">
+        <Document><![CDATA[
+Imports System.Runtime.CompilerServices
+
+Module M
+    <Extension()>
+    Public Function Something(cust As C) As IEnumerable(Of String)
+        Throw New NotImplementedException()
+    End Function
+
+    <Extension()>
+    Public Function Something2(cust As C) As Func(Of C)
+        Throw New NotImplementedException()
+    End Function
+End Module
+
+Class C
+    Private Function GetAssemblyIdentity(types As IEnumerable(Of C)) As Object
+        For Each t In types
+            Dim x = {|Expand:t?.Something2()?()?.Something().First()|}
+        Next
+        Return Nothing
+    End Function
+End Class]]>
+        </Document>
+    </Project>
+</Workspace>
+
+            Dim expected =
+<code><![CDATA[
+Imports System.Runtime.CompilerServices
+
+Module M
+    <Extension()>
+    Public Function Something(cust As C) As IEnumerable(Of String)
+        Throw New NotImplementedException()
+    End Function
+
+    <Extension()>
+    Public Function Something2(cust As C) As Func(Of C)
+        Throw New NotImplementedException()
+    End Function
+End Module
+
+Class C
+    Private Function GetAssemblyIdentity(types As IEnumerable(Of C)) As Object
+        For Each t In types
+            Dim x = Global.System.Linq.Enumerable.First((CType(((CType(((CType((t), Global.C))?.Something2()?()), Global.C)?.Something())), Global.System.Collections.Generic.IEnumerable(Of System.String))))
+        Next
+        Return Nothing
+    End Function
+End Class]]>
+</code>
+
+            Await TestAsync(input, expected)
+        End Function
 #End Region
 
 #Region "CSharp ExtensionMethodRewrite Expansion tests"
         <Fact, Trait(Traits.Feature, Traits.Features.Expansion)>
-        Public Sub CSharp_ExpandSingleExtensionMethod()
+        Public Async Function TestCSharp_ExpandSingleExtensionMethod() As Task
             Dim input =
 <Workspace>
     <Project Language="C#" CommonReferences="true">
@@ -473,13 +712,13 @@ public class Program
     static void Main(string[] args)
     {
         Program ss = null;
-        Program s = {|Expand:ss.foo()|};
+        Program s = {|Expand:ss.goo()|};
     }
 }
 
 public static class ProgramExtensions
 {
-    public static Program foo(this Program p)
+    public static Program goo(this Program p)
     {
         return p;
     }
@@ -495,24 +734,24 @@ public class Program
     static void Main(string[] args)
     {
         Program ss = null;
-        Program s = global::ProgramExtensions.foo(ss);
+        Program s = global::ProgramExtensions.goo(ss);
     }
 }
 
 public static class ProgramExtensions
 {
-    public static Program foo(this Program p)
+    public static Program goo(this Program p)
     {
         return p;
     }
 }
 </code>
 
-            Test(input, expected)
-        End Sub
+            Await TestAsync(input, expected)
+        End Function
 
         <Fact, Trait(Traits.Feature, Traits.Features.Expansion)>
-        Public Sub CSharp_ExpandSingleExtensionMethodWithArgument()
+        Public Async Function TestCSharp_ExpandSingleExtensionMethodWithArgument() As Task
             Dim input =
 <Workspace>
     <Project Language="C#" CommonReferences="true">
@@ -523,121 +762,13 @@ public class Program
     {
         Program ss = null;
         Second sec = null;
-        Program s = {|Expand:ss.foo(sec)|};
+        Program s = {|Expand:ss.goo(sec)|};
     }
 }
 
 public static class ProgramExtensions
 {
-    public static Program foo(this Program p, Second s)
-    {
-        return p;
-    }
-}
-
-public class Second
-{
-}
-        </Document>
-    </Project>
-</Workspace>
-
-            Dim expected =
-<code>
-public class Program
-{
-    static void Main(string[] args)
-    {
-        Program ss = null;
-        Second sec = null;
-        Program s = global::ProgramExtensions.foo(ss, (global::Second)(sec));
-    }
-}
-
-public static class ProgramExtensions
-{
-    public static Program foo(this Program p, Second s)
-    {
-        return p;
-    }
-}
-
-public class Second
-{
-}
-</code>
-
-            Test(input, expected)
-        End Sub
-
-        <Fact, Trait(Traits.Feature, Traits.Features.Expansion)>
-        Public Sub CSharp_ExpandMultiExtensionMethod()
-            Dim input =
-<Workspace>
-    <Project Language="C#" CommonReferences="true">
-        <Document>
-public class Program
-{
-    static void Main(string[] args)
-    {
-        Program ss = null;
-        Program sss = {|Expand:ss.foo().foo()|};
-    }
-}
-
-public static class ProgramExtensions
-{
-    public static Program foo(this Program p)
-    {
-        return p;
-    }
-}
-        </Document>
-    </Project>
-</Workspace>
-
-            Dim expected =
-<code>
-public class Program
-{
-    static void Main(string[] args)
-    {
-        Program ss = null;
-        Program sss = global::ProgramExtensions.foo(global::ProgramExtensions.foo(ss));
-    }
-}
-
-public static class ProgramExtensions
-{
-    public static Program foo(this Program p)
-    {
-        return p;
-    }
-}
-</code>
-
-            Test(input, expected)
-        End Sub
-
-        <Fact, Trait(Traits.Feature, Traits.Features.Expansion)>
-        Public Sub CSharp_ExpandMultiExtensionMethodWithArgument()
-            Dim input =
-<Workspace>
-    <Project Language="C#" CommonReferences="true">
-        <Document>
-public class Program
-{
-    static void Main(string[] args)
-    {
-        Program ss = null;
-        Second sec = null;
-        Program s = {|Expand:ss.foo(sec).foo(sec)|};
-    }
-}
-
-public static class ProgramExtensions
-{
-    public static Program foo(this Program p, Second s)
+    public static Program goo(this Program p, Second s)
     {
         return p;
     }
@@ -658,13 +789,13 @@ public class Program
     {
         Program ss = null;
         Second sec = null;
-        Program s = global::ProgramExtensions.foo(global::ProgramExtensions.foo(ss, (global::Second)(sec)), (global::Second)(sec));
+        Program s = global::ProgramExtensions.goo(ss, (global::Second)(sec));
     }
 }
 
 public static class ProgramExtensions
 {
-    public static Program foo(this Program p, Second s)
+    public static Program goo(this Program p, Second s)
     {
         return p;
     }
@@ -675,11 +806,60 @@ public class Second
 }
 </code>
 
-            Test(input, expected)
-        End Sub
+            Await TestAsync(input, expected)
+        End Function
 
         <Fact, Trait(Traits.Feature, Traits.Features.Expansion)>
-        Public Sub CSharp_ExpandMultiExtensionMethodWithMoreArgument()
+        Public Async Function TestCSharp_ExpandMultiExtensionMethod() As Task
+            Dim input =
+<Workspace>
+    <Project Language="C#" CommonReferences="true">
+        <Document>
+public class Program
+{
+    static void Main(string[] args)
+    {
+        Program ss = null;
+        Program sss = {|Expand:ss.goo().goo()|};
+    }
+}
+
+public static class ProgramExtensions
+{
+    public static Program goo(this Program p)
+    {
+        return p;
+    }
+}
+        </Document>
+    </Project>
+</Workspace>
+
+            Dim expected =
+<code>
+public class Program
+{
+    static void Main(string[] args)
+    {
+        Program ss = null;
+        Program sss = global::ProgramExtensions.goo(global::ProgramExtensions.goo(ss));
+    }
+}
+
+public static class ProgramExtensions
+{
+    public static Program goo(this Program p)
+    {
+        return p;
+    }
+}
+</code>
+
+            Await TestAsync(input, expected)
+        End Function
+
+        <Fact, Trait(Traits.Feature, Traits.Features.Expansion)>
+        Public Async Function TestCSharp_ExpandMultiExtensionMethodWithArgument() As Task
             Dim input =
 <Workspace>
     <Project Language="C#" CommonReferences="true">
@@ -690,13 +870,13 @@ public class Program
     {
         Program ss = null;
         Second sec = null;
-        Program s = {|Expand:ss.foo(sec, sec, sec).foo(sec, sec, sec)|};
+        Program s = {|Expand:ss.goo(sec).goo(sec)|};
     }
 }
 
 public static class ProgramExtensions
 {
-    public static Program foo(this Program p, Second s, Second ss, Second sss)
+    public static Program goo(this Program p, Second s)
     {
         return p;
     }
@@ -717,13 +897,13 @@ public class Program
     {
         Program ss = null;
         Second sec = null;
-        Program s = global::ProgramExtensions.foo(global::ProgramExtensions.foo(ss, (global::Second)(sec), (global::Second)(sec), (global::Second)(sec)), (global::Second)(sec), (global::Second)(sec), (global::Second)(sec));
+        Program s = global::ProgramExtensions.goo(global::ProgramExtensions.goo(ss, (global::Second)(sec)), (global::Second)(sec));
     }
 }
 
 public static class ProgramExtensions
 {
-    public static Program foo(this Program p, Second s, Second ss, Second sss)
+    public static Program goo(this Program p, Second s)
     {
         return p;
     }
@@ -734,60 +914,11 @@ public class Second
 }
 </code>
 
-            Test(input, expected)
-        End Sub
+            Await TestAsync(input, expected)
+        End Function
 
         <Fact, Trait(Traits.Feature, Traits.Features.Expansion)>
-        Public Sub CSharp_ExpandSimplifySingleExtensionMethod()
-            Dim input =
-<Workspace>
-    <Project Language="C#" CommonReferences="true">
-        <Document>
-public class Program
-{
-    static void Main(string[] args)
-    {
-        Program ss = null;
-        Program s = {|ExpandAndSimplify:ss.foo()|};
-    }
-}
-
-public static class ProgramExtensions
-{
-    public static Program foo(this Program p)
-    {
-        return p;
-    }
-}
-        </Document>
-    </Project>
-</Workspace>
-
-            Dim expected =
-<code>
-public class Program
-{
-    static void Main(string[] args)
-    {
-        Program ss = null;
-        Program s = ss.foo();
-    }
-}
-
-public static class ProgramExtensions
-{
-    public static Program foo(this Program p)
-    {
-        return p;
-    }
-}
-</code>
-
-            Test(input, expected)
-        End Sub
-
-        <Fact, Trait(Traits.Feature, Traits.Features.Expansion)>
-        Public Sub CSharp_ExpandSimplifyChainedExtensionMethodWithMoreArgument()
+        Public Async Function TestCSharp_ExpandMultiExtensionMethodWithMoreArgument() As Task
             Dim input =
 <Workspace>
     <Project Language="C#" CommonReferences="true">
@@ -798,13 +929,13 @@ public class Program
     {
         Program ss = null;
         Second sec = null;
-        Program s = {|ExpandAndSimplify:ss.foo(sec, sec, sec).foo(sec, sec, sec)|};
+        Program s = {|Expand:ss.goo(sec, sec, sec).goo(sec, sec, sec)|};
     }
 }
 
 public static class ProgramExtensions
 {
-    public static Program foo(this Program p, Second s, Second ss, Second sss)
+    public static Program goo(this Program p, Second s, Second ss, Second sss)
     {
         return p;
     }
@@ -825,13 +956,13 @@ public class Program
     {
         Program ss = null;
         Second sec = null;
-        Program s = ss.foo(sec, sec, sec).foo(sec, sec, sec);
+        Program s = global::ProgramExtensions.goo(global::ProgramExtensions.goo(ss, (global::Second)(sec), (global::Second)(sec), (global::Second)(sec)), (global::Second)(sec), (global::Second)(sec), (global::Second)(sec));
     }
 }
 
 public static class ProgramExtensions
 {
-    public static Program foo(this Program p, Second s, Second ss, Second sss)
+    public static Program goo(this Program p, Second s, Second ss, Second sss)
     {
         return p;
     }
@@ -842,11 +973,11 @@ public class Second
 }
 </code>
 
-            Test(input, expected)
-        End Sub
+            Await TestAsync(input, expected)
+        End Function
 
         <Fact, Trait(Traits.Feature, Traits.Features.Expansion)>
-        Public Sub CSharp_ExpandSimplifyWithStaticFieldExtensionMethod()
+        Public Async Function TestCSharp_ExpandSimplifySingleExtensionMethod() As Task
             Dim input =
 <Workspace>
     <Project Language="C#" CommonReferences="true">
@@ -855,7 +986,115 @@ public class Program
 {
     static void Main(string[] args)
     {
-        Program s = {|ExpandAndSimplify:starter.staticP.foo()|};
+        Program ss = null;
+        Program s = {|ExpandAndSimplify:ss.goo()|};
+    }
+}
+
+public static class ProgramExtensions
+{
+    public static Program goo(this Program p)
+    {
+        return p;
+    }
+}
+        </Document>
+    </Project>
+</Workspace>
+
+            Dim expected =
+<code>
+public class Program
+{
+    static void Main(string[] args)
+    {
+        Program ss = null;
+        Program s = ss.goo();
+    }
+}
+
+public static class ProgramExtensions
+{
+    public static Program goo(this Program p)
+    {
+        return p;
+    }
+}
+</code>
+
+            Await TestAsync(input, expected)
+        End Function
+
+        <Fact, Trait(Traits.Feature, Traits.Features.Expansion)>
+        Public Async Function TestCSharp_ExpandSimplifyChainedExtensionMethodWithMoreArgument() As Task
+            Dim input =
+<Workspace>
+    <Project Language="C#" CommonReferences="true">
+        <Document>
+public class Program
+{
+    static void Main(string[] args)
+    {
+        Program ss = null;
+        Second sec = null;
+        Program s = {|ExpandAndSimplify:ss.goo(sec, sec, sec).goo(sec, sec, sec)|};
+    }
+}
+
+public static class ProgramExtensions
+{
+    public static Program goo(this Program p, Second s, Second ss, Second sss)
+    {
+        return p;
+    }
+}
+
+public class Second
+{
+}
+        </Document>
+    </Project>
+</Workspace>
+
+            Dim expected =
+<code>
+public class Program
+{
+    static void Main(string[] args)
+    {
+        Program ss = null;
+        Second sec = null;
+        Program s = ss.goo(sec, sec, sec).goo(sec, sec, sec);
+    }
+}
+
+public static class ProgramExtensions
+{
+    public static Program goo(this Program p, Second s, Second ss, Second sss)
+    {
+        return p;
+    }
+}
+
+public class Second
+{
+}
+</code>
+
+            Await TestAsync(input, expected)
+        End Function
+
+        <Fact, Trait(Traits.Feature, Traits.Features.Expansion)>
+        Public Async Function TestCSharp_ExpandSimplifyWithStaticFieldExtensionMethod() As Task
+            Dim input =
+<Workspace>
+    <Project Language="C#" CommonReferences="true">
+        <Document>
+public class Program
+{
+    static void Main(string[] args)
+    {
+        Program s = {|ExpandAndSimplify:starter.staticP.goo()|};
     }
 }
 
@@ -866,7 +1105,7 @@ public class starter
 
 public static class ProgramExtensions
 {
-    public static Program foo(this Program p)
+    public static Program goo(this Program p)
     {
         return p;
     }
@@ -881,7 +1120,7 @@ public class Program
 {
     static void Main(string[] args)
     {
-        Program s = starter.staticP.foo();
+        Program s = starter.staticP.goo();
     }
 }
 
@@ -892,19 +1131,19 @@ public class starter
 
 public static class ProgramExtensions
 {
-    public static Program foo(this Program p)
+    public static Program goo(this Program p)
     {
         return p;
     }
 }
 </code>
 
-            Test(input, expected)
-        End Sub
+            Await TestAsync(input, expected)
+        End Function
 
-        <WorkItem(654403)>
+        <WorkItem(654403, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/654403")>
         <Fact, Trait(Traits.Feature, Traits.Features.Expansion)>
-        Public Sub CSharp_ExtensionMethodRewriteRoundTripsTrivia()
+        Public Async Function TestCSharp_ExtensionMethodRewriteRoundTripsTrivia() As Task
             Dim input =
 <Workspace>
     <Project Language="C#" CommonReferences="true">
@@ -918,7 +1157,7 @@ public class Program
     }
 }
 
-public static class FooExtension
+public static class GooExtension
 {
     public static object DoStuff(this Program p, int i, int j, int k)
     {
@@ -940,7 +1179,7 @@ public class Program
     }
 }
 
-public static class FooExtension
+public static class GooExtension
 {
     public static object DoStuff(this Program p, int i, int j, int k)
     {
@@ -949,9 +1188,288 @@ public static class FooExtension
 }
 </code>
 
-            Test(input, expected)
-        End Sub
+            Await TestAsync(input, expected)
+        End Function
 
+        <Fact, Trait(Traits.Feature, Traits.Features.Expansion)>
+        <WorkItem(2593, "https://github.com/dotnet/roslyn/issues/2593")>
+        <WorkItem(3260, "https://github.com/dotnet/roslyn/issues/3260")>
+        Public Async Function TestCSharp_ExpandExtensionMethodInMemberAccessExpression() As Task
+            Dim input =
+<Workspace>
+    <Project Language="C#" CommonReferences="true">
+        <Document><![CDATA[
+using System;
+using System.Collections.Generic;
+using System.Linq;
+
+static class M
+{
+    public static IEnumerable<string> Something(this C cust)
+    {
+        throw new NotImplementedException();
+    }
+}
+
+class C
+{
+    private object GetAssemblyIdentity(IEnumerable<C> types)
+    {
+        foreach (var t in types)
+        {
+            var x = {|Expand:t.Something().First()|};
+        }
+        return null;
+    }
+}]]>
+        </Document>
+    </Project>
+</Workspace>
+
+            Dim expected =
+<code><![CDATA[
+using System;
+using System.Collections.Generic;
+using System.Linq;
+
+static class M
+{
+    public static IEnumerable<string> Something(this C cust)
+    {
+        throw new NotImplementedException();
+    }
+}
+
+class C
+{
+    private object GetAssemblyIdentity(IEnumerable<C> types)
+    {
+        foreach (var t in types)
+        {
+            var x = global::System.Linq.Enumerable.First<global::System.String>(global::M.Something(t));
+        }
+        return null;
+    }
+}]]>
+</code>
+
+            Await TestAsync(input, expected)
+        End Function
+
+        <WpfFact(Skip:="3260"), Trait(Traits.Feature, Traits.Features.Expansion)>
+        <WorkItem(2593, "https://github.com/dotnet/roslyn/issues/2593")>
+        <WorkItem(3260, "https://github.com/dotnet/roslyn/issues/3260")>
+        Public Async Function TestCSharp_ExpandExtensionMethodInConditionalAccessExpression() As Task
+            Dim input =
+<Workspace>
+    <Project Language="C#" CommonReferences="true">
+        <Document><![CDATA[
+using System;
+using System.Collections.Generic;
+using System.Linq;
+
+static class M
+{
+    public static IEnumerable<string> Something(this C cust)
+    {
+        throw new NotImplementedException();
+    }
+}
+
+class C
+{
+    private object GetAssemblyIdentity(IEnumerable<C> types)
+    {
+        foreach (var t in types)
+        {
+            var x = {|Expand:t?.Something().First()|};
+        }
+        return null;
+    }
+}]]>
+        </Document>
+    </Project>
+</Workspace>
+
+            Dim expected =
+<code><![CDATA[
+using System;
+using System.Collections.Generic;
+using System.Linq;
+
+static class M
+{
+    public static IEnumerable<string> Something(this C cust)
+    {
+        throw new NotImplementedException();
+    }
+}
+
+class C
+{
+    private object GetAssemblyIdentity(IEnumerable<C> types)
+    {
+        foreach (var t in types)
+        {
+            var x = global::System.Linq.Enumerable.First<global::System.String>(t?.Something());
+        }
+        return null;
+    }
+}]]>
+</code>
+
+            Await TestAsync(input, expected)
+        End Function
+
+        <Fact, Trait(Traits.Feature, Traits.Features.Expansion)>
+        <WorkItem(2593, "https://github.com/dotnet/roslyn/issues/2593")>
+        <WorkItem(3260, "https://github.com/dotnet/roslyn/issues/3260")>
+        Public Async Function TestCSharp_ExpandExtensionMethodInMemberAccessExpression_2() As Task
+            Dim input =
+<Workspace>
+    <Project Language="C#" CommonReferences="true">
+        <Document><![CDATA[
+using System;
+using System.Collections.Generic;
+using System.Linq;
+
+static class M
+{
+    public static IEnumerable<string> Something(this C cust)
+    {
+        throw new NotImplementedException();
+    }
+
+    public static Func<C> Something2(this C cust)
+    {
+        throw new NotImplementedException();
+    }
+}
+
+class C
+{
+    private object GetAssemblyIdentity(IEnumerable<C> types)
+    {
+        foreach (var t in types)
+        {
+            var x = {|Expand:(t.Something2())().Something().First()|};
+        }
+        return null;
+    }
+}]]>
+        </Document>
+    </Project>
+</Workspace>
+
+            Dim expected =
+<code><![CDATA[
+using System;
+using System.Collections.Generic;
+using System.Linq;
+
+static class M
+{
+    public static IEnumerable<string> Something(this C cust)
+    {
+        throw new NotImplementedException();
+    }
+
+    public static Func<C> Something2(this C cust)
+    {
+        throw new NotImplementedException();
+    }
+}
+
+class C
+{
+    private object GetAssemblyIdentity(IEnumerable<C> types)
+    {
+        foreach (var t in types)
+        {
+            var x = global::System.Linq.Enumerable.First<global::System.String>(global::M.Something((global::M.Something2(t))()));
+        }
+        return null;
+    }
+}]]>
+</code>
+
+            Await TestAsync(input, expected)
+        End Function
+
+        <WpfFact(Skip:="3260"), Trait(Traits.Feature, Traits.Features.Expansion)>
+        <WorkItem(2593, "https://github.com/dotnet/roslyn/issues/2593")>
+        <WorkItem(3260, "https://github.com/dotnet/roslyn/issues/3260")>
+        Public Async Function TestCSharp_ExpandExtensionMethodInConditionalAccessExpression_2() As Task
+            Dim input =
+<Workspace>
+    <Project Language="C#" CommonReferences="true">
+        <Document><![CDATA[
+using System;
+using System.Collections.Generic;
+using System.Linq;
+
+static class M
+{
+    public static IEnumerable<string> Something(this C cust)
+    {
+        throw new NotImplementedException();
+    }
+
+    public static Func<C> Something2(this C cust)
+    {
+        throw new NotImplementedException();
+    }
+}
+
+class C
+{
+    private object GetAssemblyIdentity(IEnumerable<C> types)
+    {
+        foreach (var t in types)
+        {
+            var x = {|Expand:(t?.Something2())()?.Something().First()|};
+        }
+        return null;
+    }
+}]]>
+        </Document>
+    </Project>
+</Workspace>
+
+            Dim expected =
+<code><![CDATA[
+using System;
+using System.Collections.Generic;
+using System.Linq;
+
+static class M
+{
+    public static IEnumerable<string> Something(this C cust)
+    {
+        throw new NotImplementedException();
+    }
+
+    public static Func<C> Something2(this C cust)
+    {
+        throw new NotImplementedException();
+    }
+}
+
+class C
+{
+    private object GetAssemblyIdentity(IEnumerable<C> types)
+    {
+        foreach (var t in types)
+        {
+            var x = global::System.Linq.Enumerable.First<global::System.String>((t?.Something2())()?.Something());
+        }
+        return null;
+    }
+}]]>
+</code>
+
+            Await TestAsync(input, expected)
+        End Function
 #End Region
 
     End Class

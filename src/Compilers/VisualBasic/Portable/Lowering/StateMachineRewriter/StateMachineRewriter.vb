@@ -1,9 +1,12 @@
-﻿' Copyright (c) Microsoft.  All Rights Reserved.  Licensed under the Apache License, Version 2.0.  See License.txt in the project root for license information.
+﻿' Licensed to the .NET Foundation under one or more agreements.
+' The .NET Foundation licenses this file to you under the MIT license.
+' See the LICENSE file in the project root for more information.
 
 Imports System.Collections.Immutable
 Imports System.Runtime.InteropServices
 Imports Microsoft.CodeAnalysis.CodeGen
 Imports Microsoft.CodeAnalysis.Collections
+Imports Microsoft.CodeAnalysis.PooledObjects
 Imports Microsoft.CodeAnalysis.VisualBasic.Symbols
 
 Namespace Microsoft.CodeAnalysis.VisualBasic
@@ -20,7 +23,7 @@ Namespace Microsoft.CodeAnalysis.VisualBasic
 
         Protected ReadOnly Body As BoundStatement
         Protected ReadOnly Method As MethodSymbol
-        Protected ReadOnly Diagnostics As DiagnosticBag
+        Protected ReadOnly Diagnostics As BindingDiagnosticBag
         Protected ReadOnly F As SyntheticBoundNodeFactory
         Protected ReadOnly StateMachineType As SynthesizedContainer
         Protected ReadOnly SlotAllocatorOpt As VariableSlotAllocator
@@ -37,12 +40,13 @@ Namespace Microsoft.CodeAnalysis.VisualBasic
                           stateMachineType As StateMachineTypeSymbol,
                           slotAllocatorOpt As VariableSlotAllocator,
                           compilationState As TypeCompilationState,
-                          diagnostics As DiagnosticBag)
+                          diagnostics As BindingDiagnosticBag)
 
             Debug.Assert(body IsNot Nothing)
             Debug.Assert(method IsNot Nothing)
             Debug.Assert(compilationState IsNot Nothing)
             Debug.Assert(diagnostics IsNot Nothing)
+            Debug.Assert(diagnostics.AccumulatesDiagnostics)
             Debug.Assert(stateMachineType IsNot Nothing)
 
             Me.Body = body
@@ -100,7 +104,7 @@ Namespace Microsoft.CodeAnalysis.VisualBasic
             End If
 
             ' add fields for the captured variables of the method
-            Dim variablesToHoist = IteratorAndAsyncCaptureWalker.Analyze(New FlowAnalysisInfo(F.CompilationState.Compilation, Me.Method, Me.Body), Me.Diagnostics)
+            Dim variablesToHoist = IteratorAndAsyncCaptureWalker.Analyze(New FlowAnalysisInfo(F.CompilationState.Compilation, Me.Method, Me.Body), Me.Diagnostics.DiagnosticBag)
 
             CreateNonReusableLocalProxies(variablesToHoist, Me.nextFreeHoistedLocalSlot)
 
@@ -115,7 +119,7 @@ Namespace Microsoft.CodeAnalysis.VisualBasic
         Private Function GenerateKickoffMethodBody() As BoundBlock
             Me.F.CurrentMethod = Me.Method
             Dim bodyBuilder = ArrayBuilder(Of BoundStatement).GetInstance()
-            bodyBuilder.Add(Me.F.HiddenSequencePoint())
+            bodyBuilder.Add(SyntheticBoundNodeFactory.HiddenSequencePoint())
 
             Dim frameType As NamedTypeSymbol = If(Me.Method.IsGenericMethod, Me.StateMachineType.Construct(Method.TypeArguments), Me.StateMachineType)
             Dim stateMachineVariable As LocalSymbol = F.SynthesizedLocal(frameType)
@@ -167,10 +171,13 @@ Namespace Microsoft.CodeAnalysis.VisualBasic
                 Select Case variable.Kind
                     Case SymbolKind.Local
                         Dim local = DirectCast(variable, LocalSymbol)
-                        Dim synthesizedKind = local.SynthesizedKind
 
                         ' No need to hoist constants
                         If local.IsConst Then
+                            Continue For
+                        End If
+
+                        If local.SynthesizedKind = SynthesizedLocalKind.ConditionalBranchDiscriminator Then
                             Continue For
                         End If
 
@@ -194,7 +201,7 @@ Namespace Microsoft.CodeAnalysis.VisualBasic
 
             If parameter.IsMe Then
                 Dim typeName As String = parameter.ContainingSymbol.ContainingType.Name
-                Dim isMeOfClosureType As Boolean = typeName.StartsWith(StringConstants.DisplayClassPrefix)
+                Dim isMeOfClosureType As Boolean = typeName.StartsWith(StringConstants.DisplayClassPrefix, StringComparison.Ordinal)
 
                 ' NOTE: even though 'Me' is 'ByRef' in structures, Dev11 does capture it by value
                 ' NOTE: without generation of any errors/warnings. Roslyn has to match this behavior
@@ -225,7 +232,7 @@ Namespace Microsoft.CodeAnalysis.VisualBasic
                 End If
 
             Else
-                Dim paramType As TypeSymbol = parameter.Type.InternalSubstituteTypeParameters(typeMap)
+                Dim paramType As TypeSymbol = parameter.Type.InternalSubstituteTypeParameters(typeMap).Type
 
                 Debug.Assert(Not parameter.IsByRef)
                 proxy = CreateParameterCapture(
@@ -275,7 +282,7 @@ Namespace Microsoft.CodeAnalysis.VisualBasic
             End If
 
             ' Variable needs to be hoisted.
-            Dim fieldType = local.Type.InternalSubstituteTypeParameters(typeMap)
+            Dim fieldType = local.Type.InternalSubstituteTypeParameters(typeMap).Type
 
             Dim id As LocalDebugId = LocalDebugId.None
             Dim slotIndex As Integer = -1
@@ -292,7 +299,12 @@ Namespace Microsoft.CodeAnalysis.VisualBasic
                 id = New LocalDebugId(syntaxOffset, ordinal)
 
                 Dim previousSlotIndex = -1
-                If SlotAllocatorOpt IsNot Nothing AndAlso SlotAllocatorOpt.TryGetPreviousHoistedLocalSlotIndex(declaratorSyntax, DirectCast(fieldType, Cci.ITypeReference), local.SynthesizedKind, id, previousSlotIndex) Then
+                If SlotAllocatorOpt IsNot Nothing AndAlso SlotAllocatorOpt.TryGetPreviousHoistedLocalSlotIndex(declaratorSyntax,
+                                                                                                               F.CompilationState.ModuleBuilderOpt.Translate(fieldType, declaratorSyntax, Diagnostics.DiagnosticBag),
+                                                                                                               local.SynthesizedKind,
+                                                                                                               id,
+                                                                                                               Diagnostics.DiagnosticBag,
+                                                                                                               previousSlotIndex) Then
                     slotIndex = previousSlotIndex
                 End If
             End If
@@ -360,98 +372,100 @@ Namespace Microsoft.CodeAnalysis.VisualBasic
             Return False
         End Function
 
-        Friend Sub EnsureSpecialType(type As SpecialType, <[In], Out> ByRef hasErrors As Boolean)
-            Dim sType = Me.F.SpecialType(type)
-            If sType.GetUseSiteErrorInfo IsNot Nothing Then
-                hasErrors = True
+        Friend Function EnsureSpecialType(type As SpecialType, bag As BindingDiagnosticBag) As Symbol
+            Return Binder.GetSpecialType(F.Compilation, type, Me.Body.Syntax, bag)
+        End Function
+
+        Friend Function EnsureWellKnownType(type As WellKnownType, bag As BindingDiagnosticBag) As Symbol
+            Return Binder.GetWellKnownType(F.Compilation, type, Me.Body.Syntax, bag)
+        End Function
+
+        Friend Function EnsureSpecialMember(member As SpecialMember, bag As BindingDiagnosticBag) As Symbol
+            Return Binder.GetSpecialTypeMember(F.Compilation.Assembly, member, Me.Body.Syntax, bag)
+        End Function
+
+        Friend Function EnsureWellKnownMember(member As WellKnownMember, bag As BindingDiagnosticBag) As Symbol
+            Return Binder.GetWellKnownTypeMember(F.Compilation, member, Me.Body.Syntax, bag)
+        End Function
+
+        ''' <summary>
+        ''' Check that the property and its getter exist and collect any use-site errors.
+        ''' </summary>
+        Friend Sub EnsureSpecialPropertyGetter(member As SpecialMember, bag As BindingDiagnosticBag)
+            Dim symbol = DirectCast(EnsureSpecialMember(member, bag), PropertySymbol)
+
+            If symbol IsNot Nothing Then
+                Dim getter = symbol.GetMethod
+
+                If getter Is Nothing Then
+                    Binder.ReportDiagnostic(bag, Body.Syntax, ERRID.ERR_NoGetProperty1, CustomSymbolDisplayFormatter.QualifiedName(symbol))
+                    Return
+                End If
+
+                Dim useSiteInfo = getter.GetUseSiteInfo()
+                Binder.ReportUseSite(bag, Body.Syntax, useSiteInfo)
             End If
         End Sub
 
-        Friend Sub EnsureWellKnownType(type As WellKnownType, <[In], Out> ByRef hasErrors As Boolean)
-            Dim wkType = Me.F.WellKnownType(type)
-            If wkType.GetUseSiteErrorInfo IsNot Nothing Then
-                hasErrors = True
-            End If
-        End Sub
-
-        Friend Sub EnsureWellKnownMember(Of T As Symbol)(member As WellKnownMember, <[In], Out> ByRef hasErrors As Boolean)
-            Dim wkMember = Me.F.WellKnownMember(Of T)(member)
-            If wkMember Is Nothing OrElse wkMember.GetUseSiteErrorInfo IsNot Nothing Then
-                hasErrors = True
-            End If
-        End Sub
-
-        Friend Function OpenMethodImplementation(interfaceMethod As WellKnownMember, name As String, dbgAttrs As DebugAttributes, accessibility As Accessibility, generateDebugInfo As Boolean, Optional hasMethodBodyDependency As Boolean = False, Optional associatedProperty As PropertySymbol = Nothing) As SynthesizedStateMachineMethod
+        Friend Function OpenMethodImplementation(interfaceMethod As WellKnownMember, name As String, accessibility As Accessibility, Optional hasMethodBodyDependency As Boolean = False, Optional associatedProperty As PropertySymbol = Nothing) As SynthesizedMethod
             Dim methodToImplement As MethodSymbol = Me.F.WellKnownMember(Of MethodSymbol)(interfaceMethod)
 
-            Return OpenMethodImplementation(methodToImplement, name, dbgAttrs, accessibility, generateDebugInfo, hasMethodBodyDependency, associatedProperty)
+            Return OpenMethodImplementation(methodToImplement, name, accessibility, hasMethodBodyDependency, associatedProperty)
         End Function
 
-        Friend Function OpenMethodImplementation(interfaceMethod As SpecialMember, name As String, dbgAttrs As DebugAttributes, accessibility As Accessibility, generateDebugInfo As Boolean, Optional hasMethodBodyDependency As Boolean = False, Optional associatedProperty As PropertySymbol = Nothing) As SynthesizedStateMachineMethod
+        Friend Function OpenMethodImplementation(interfaceMethod As SpecialMember, name As String, accessibility As Accessibility, Optional hasMethodBodyDependency As Boolean = False, Optional associatedProperty As PropertySymbol = Nothing) As SynthesizedMethod
             Dim methodToImplement As MethodSymbol = DirectCast(Me.F.SpecialMember(interfaceMethod), MethodSymbol)
 
-            Return OpenMethodImplementation(methodToImplement, name, dbgAttrs, accessibility, generateDebugInfo, hasMethodBodyDependency, associatedProperty)
+            Return OpenMethodImplementation(methodToImplement, name, accessibility, hasMethodBodyDependency, associatedProperty)
         End Function
 
-        Friend Function OpenMethodImplementation(interfaceType As NamedTypeSymbol, interfaceMethod As SpecialMember, name As String, dbgAttrs As DebugAttributes, accessibility As Accessibility, generateDebugInfo As Boolean, Optional hasMethodBodyDependency As Boolean = False, Optional associatedProperty As PropertySymbol = Nothing) As SynthesizedStateMachineMethod
+        Friend Function OpenMethodImplementation(interfaceType As NamedTypeSymbol, interfaceMethod As SpecialMember, name As String, accessibility As Accessibility, Optional hasMethodBodyDependency As Boolean = False, Optional associatedProperty As PropertySymbol = Nothing) As SynthesizedMethod
             Dim methodToImplement As MethodSymbol = DirectCast(Me.F.SpecialMember(interfaceMethod), MethodSymbol).AsMember(interfaceType)
 
-            Return OpenMethodImplementation(methodToImplement, name, dbgAttrs, accessibility, generateDebugInfo, hasMethodBodyDependency, associatedProperty)
+            Return OpenMethodImplementation(methodToImplement, name, accessibility, hasMethodBodyDependency, associatedProperty)
         End Function
 
         Private Function OpenMethodImplementation(methodToImplement As MethodSymbol,
                                                   methodName As String,
-                                                  debugAttributes As DebugAttributes,
                                                   accessibility As Accessibility,
-                                                  generateDebugInfo As Boolean,
                                                   Optional hasMethodBodyDependency As Boolean = False,
-                                                  Optional associatedProperty As PropertySymbol = Nothing) As SynthesizedStateMachineMethod
+                                                  Optional associatedProperty As PropertySymbol = Nothing) As SynthesizedMethod
 
-            ' Errors must be reported before and if any thispoint should not be reachable
-            Debug.Assert(methodToImplement IsNot Nothing AndAlso methodToImplement.GetUseSiteErrorInfo Is Nothing)
+            ' Errors must be reported before and if any this point should not be reachable
+            Debug.Assert(methodToImplement IsNot Nothing AndAlso methodToImplement.GetUseSiteInfo().DiagnosticInfo Is Nothing)
 
-            Dim result As New SynthesizedStateMachineMethod(DirectCast(Me.F.CurrentType, StateMachineTypeSymbol),
-                                                            methodName,
-                                                            methodToImplement,
-                                                            Me.F.Syntax,
-                                                            debugAttributes,
-                                                            accessibility,
-                                                            generateDebugInfo,
-                                                            hasMethodBodyDependency,
-                                                            associatedProperty)
+            Dim result As New SynthesizedStateMachineDebuggerNonUserCodeMethod(DirectCast(Me.F.CurrentType, StateMachineTypeSymbol),
+                                                                               methodName,
+                                                                               methodToImplement,
+                                                                               Me.F.Syntax,
+                                                                               accessibility,
+                                                                               hasMethodBodyDependency,
+                                                                               associatedProperty)
 
             Me.F.AddMethod(Me.F.CurrentType, result)
             Me.F.CurrentMethod = result
             Return result
         End Function
 
-        Friend Function OpenPropertyImplementation(interfaceProperty As SpecialMember, name As String, dbgAttrs As DebugAttributes, accessibility As Accessibility, generateDebugInfo As Boolean) As MethodSymbol
+        Friend Function OpenPropertyImplementation(interfaceProperty As SpecialMember, name As String, accessibility As Accessibility) As MethodSymbol
             Dim methodToImplement As MethodSymbol = DirectCast(Me.F.SpecialMember(interfaceProperty), PropertySymbol).GetMethod
 
-            Return OpenPropertyImplementation(methodToImplement, name, dbgAttrs, accessibility, generateDebugInfo)
+            Return OpenPropertyImplementation(methodToImplement, name, accessibility)
         End Function
 
-        Friend Function OpenPropertyImplementation(interfaceType As NamedTypeSymbol, interfaceMethod As SpecialMember, name As String, dbgAttrs As DebugAttributes, accessibility As Accessibility, generateDebugInfo As Boolean) As MethodSymbol
+        Friend Function OpenPropertyImplementation(interfaceType As NamedTypeSymbol, interfaceMethod As SpecialMember, name As String, accessibility As Accessibility) As MethodSymbol
             Dim methodToImplement As MethodSymbol = DirectCast(Me.F.SpecialMember(interfaceMethod), PropertySymbol).GetMethod.AsMember(interfaceType)
 
-            Return OpenPropertyImplementation(methodToImplement, name, dbgAttrs, accessibility, generateDebugInfo)
+            Return OpenPropertyImplementation(methodToImplement, name, accessibility)
         End Function
 
-        Private Function OpenPropertyImplementation(getterToImplement As MethodSymbol,
-                                                    name As String,
-                                                    debugAttributes As DebugAttributes,
-                                                    accessibility As Accessibility,
-                                                    generateDebugInfo As Boolean,
-                                                    Optional hasMethodBodyDependency As Boolean = False) As MethodSymbol
+        Private Function OpenPropertyImplementation(getterToImplement As MethodSymbol, name As String, accessibility As Accessibility) As MethodSymbol
 
             Dim prop As New SynthesizedStateMachineProperty(DirectCast(Me.F.CurrentType, StateMachineTypeSymbol),
                                                             name,
                                                             getterToImplement,
                                                             Me.F.Syntax,
-                                                            debugAttributes,
-                                                            accessibility,
-                                                            generateDebugInfo,
-                                                            hasMethodBodyDependency)
+                                                            accessibility)
 
             Me.F.AddProperty(Me.F.CurrentType, prop)
 
@@ -470,13 +484,31 @@ Namespace Microsoft.CodeAnalysis.VisualBasic
             Return body
         End Function
 
-        Protected Function IsDebuggerHidden(method As MethodSymbol) As Boolean
-            Dim debuggerHiddenAttribute = F.CompilationState.Compilation.GetWellKnownType(WellKnownType.System_Diagnostics_DebuggerHiddenAttribute)
-            For Each a In Me.Method.GetAttributes()
-                If a.AttributeClass = debuggerHiddenAttribute Then Return True
-            Next
+        Friend Function OpenMoveNextMethodImplementation(interfaceMethod As WellKnownMember, accessibility As Accessibility) As SynthesizedMethod
+            Dim methodToImplement As MethodSymbol = Me.F.WellKnownMember(Of MethodSymbol)(interfaceMethod)
 
-            Return False
+            Return OpenMoveNextMethodImplementation(methodToImplement, accessibility)
+        End Function
+
+        Friend Function OpenMoveNextMethodImplementation(interfaceMethod As SpecialMember, accessibility As Accessibility) As SynthesizedMethod
+            Dim methodToImplement As MethodSymbol = DirectCast(Me.F.SpecialMember(interfaceMethod), MethodSymbol)
+
+            Return OpenMoveNextMethodImplementation(methodToImplement, accessibility)
+        End Function
+
+        Private Function OpenMoveNextMethodImplementation(methodToImplement As MethodSymbol, accessibility As Accessibility) As SynthesizedMethod
+
+            ' Errors must be reported before and if any this point should not be reachable
+            Debug.Assert(methodToImplement IsNot Nothing AndAlso methodToImplement.GetUseSiteInfo().DiagnosticInfo Is Nothing)
+
+            Dim result As New SynthesizedStateMachineMoveNextMethod(DirectCast(Me.F.CurrentType, StateMachineTypeSymbol),
+                                                                    methodToImplement,
+                                                                    Me.F.Syntax,
+                                                                    accessibility)
+
+            Me.F.AddMethod(Me.F.CurrentType, result)
+            Me.F.CurrentMethod = result
+            Return result
         End Function
     End Class
 

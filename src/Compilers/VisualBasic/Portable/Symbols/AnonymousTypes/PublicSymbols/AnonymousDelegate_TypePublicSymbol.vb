@@ -1,10 +1,13 @@
-﻿' Copyright (c) Microsoft.  All Rights Reserved.  Licensed under the Apache License, Version 2.0.  See License.txt in the project root for license information.
+﻿' Licensed to the .NET Foundation under one or more agreements.
+' The .NET Foundation licenses this file to you under the MIT license.
+' See the LICENSE file in the project root for more information.
 
 Imports System.Collections.Generic
 Imports System.Collections.Immutable
 Imports System.Threading
 Imports Microsoft.CodeAnalysis
 Imports Microsoft.CodeAnalysis.Collections
+Imports Microsoft.CodeAnalysis.PooledObjects
 Imports Microsoft.CodeAnalysis.Text
 Imports Microsoft.CodeAnalysis.VisualBasic.Symbols
 Imports Microsoft.CodeAnalysis.VisualBasic.Syntax
@@ -15,7 +18,7 @@ Namespace Microsoft.CodeAnalysis.VisualBasic.Symbols
         Friend NotInheritable Class AnonymousDelegatePublicSymbol
             Inherits AnonymousTypeOrDelegatePublicSymbol
 
-            Private ReadOnly m_Members As ImmutableArray(Of SynthesizedDelegateMethodSymbol)
+            Private ReadOnly _members As ImmutableArray(Of SynthesizedDelegateMethodSymbol)
 
             Public Sub New(manager As AnonymousTypeManager, typeDescr As AnonymousTypeDescriptor)
                 MyBase.New(manager, typeDescr)
@@ -67,7 +70,7 @@ Namespace Microsoft.CodeAnalysis.VisualBasic.Symbols
 
                     parameters.Free()
 
-                    m_Members = ImmutableArray.Create(delegateCtor, delegateInvoke)
+                    _members = ImmutableArray.Create(delegateCtor, delegateInvoke)
                 Else
                     ' (3) BeginInvoke
                     delegateBeginInvoke = New SynthesizedDelegateMethodSymbol(
@@ -105,11 +108,11 @@ Namespace Microsoft.CodeAnalysis.VisualBasic.Symbols
                                                                   False, StringConstants.DelegateMethodResultParameterName))
                     delegateEndInvoke.SetParameters(parameters.ToImmutableAndFree())
 
-                    m_Members = ImmutableArray.Create(delegateCtor, delegateBeginInvoke, delegateEndInvoke, delegateInvoke)
+                    _members = ImmutableArray.Create(delegateCtor, delegateBeginInvoke, delegateEndInvoke, delegateInvoke)
                 End If
 
 #If DEBUG Then
-                For Each m In m_Members
+                For Each m In _members
                     Debug.Assert(m IsNot Nothing)
                 Next
 #End If
@@ -132,47 +135,36 @@ Namespace Microsoft.CodeAnalysis.VisualBasic.Symbols
             End Function
 
             Public Overrides Function GetMembers() As ImmutableArray(Of Symbol)
-                Return StaticCast(Of Symbol).From(m_Members)
+                Return StaticCast(Of Symbol).From(_members)
             End Function
 
-            Friend Overrides Function InternalSubstituteTypeParameters(substitution As TypeSubstitution) As TypeSymbol
+            Friend Overrides Function InternalSubstituteTypeParameters(substitution As TypeSubstitution) As TypeWithModifiers
                 Dim newDescriptor As New AnonymousTypeDescriptor
                 If Not Me.TypeDescriptor.SubstituteTypeParametersIfNeeded(substitution, newDescriptor) Then
-                    Return Me
+                    Return New TypeWithModifiers(Me)
                 End If
-                Return Me.Manager.ConstructAnonymousDelegateSymbol(newDescriptor)
+
+                Return New TypeWithModifiers(Me.Manager.ConstructAnonymousDelegateSymbol(newDescriptor))
             End Function
 
             Public Overrides Function MapToImplementationSymbol() As NamedTypeSymbol
                 Return Me.Manager.ConstructAnonymousDelegateImplementationSymbol(Me)
             End Function
 
-            Friend Overrides Function MakeAcyclicBaseType(diagnostics As DiagnosticBag) As NamedTypeSymbol
+            Friend Overrides Function MakeAcyclicBaseType(diagnostics As BindingDiagnosticBag) As NamedTypeSymbol
                 Return Manager.System_MulticastDelegate
             End Function
 
-            Friend Overrides Function MakeAcyclicInterfaces(diagnostics As DiagnosticBag) As ImmutableArray(Of NamedTypeSymbol)
+            Friend Overrides Function MakeAcyclicInterfaces(diagnostics As BindingDiagnosticBag) As ImmutableArray(Of NamedTypeSymbol)
                 Return ImmutableArray(Of NamedTypeSymbol).Empty
             End Function
 
             Public Overrides ReadOnly Property DelegateInvokeMethod As MethodSymbol
                 Get
                     ' In both regular and winmd, the last member is invoke
-                    Return m_Members(m_Members.Length - 1)
+                    Return _members(_members.Length - 1)
                 End Get
             End Property
-
-            Public Overrides Function Equals(obj As Object) As Boolean
-                If Me Is obj Then
-                    Return True
-                End If
-                Dim other = TryCast(obj, AnonymousDelegatePublicSymbol)
-                Return other IsNot Nothing AndAlso Me.TypeDescriptor.Equals(other.TypeDescriptor)
-            End Function
-
-            Public Overrides Function GetHashCode() As Integer
-                Return Me.TypeDescriptor.GetHashCode()
-            End Function
 
         End Class
 

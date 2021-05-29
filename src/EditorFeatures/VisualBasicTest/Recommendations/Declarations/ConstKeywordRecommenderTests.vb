@@ -1,18 +1,17 @@
-' Copyright (c) Microsoft.  All Rights Reserved.  Licensed under the Apache License, Version 2.0.  See License.txt in the project root for license information.
-
-Imports Microsoft.CodeAnalysis.Text
-Imports Roslyn.Test.Utilities
+﻿' Licensed to the .NET Foundation under one or more agreements.
+' The .NET Foundation licenses this file to you under the MIT license.
+' See the LICENSE file in the project root for more information.
 
 Namespace Microsoft.CodeAnalysis.Editor.VisualBasic.UnitTests.Recommendations.Declarations
     Public Class ConstKeywordRecommenderTests
 
         <Fact, Trait(Traits.Feature, Traits.Features.KeywordRecommending)>
-        Public Sub ConstInMethodBody()
+        Public Sub ConstInMethodBodyTest()
             VerifyRecommendationsContain(<MethodBody>|</MethodBody>, "Const")
         End Sub
 
         <Fact, Trait(Traits.Feature, Traits.Features.KeywordRecommending)>
-        Public Sub ConstInLambda()
+        Public Sub ConstInLambdaTest()
             VerifyRecommendationsContain(<MethodBody>
 Dim x = Sub()
 |
@@ -20,40 +19,40 @@ Dim x = Sub()
         End Sub
 
         <Fact, Trait(Traits.Feature, Traits.Features.KeywordRecommending)>
-        Public Sub ConstAfterStatement()
+        Public Sub ConstAfterStatementTest()
             VerifyRecommendationsContain(<MethodBody>
 Dim x
 |</MethodBody>, "Const")
         End Sub
 
         <Fact, Trait(Traits.Feature, Traits.Features.KeywordRecommending)>
-        Public Sub ConstNotInsideSingleLineLambda()
+        Public Sub ConstNotInsideSingleLineLambdaTest()
             VerifyRecommendationsMissing(<MethodBody>
 Dim x = Sub() |
 </MethodBody>, "Const")
         End Sub
 
-        <WorkItem(544912)>
+        <WorkItem(544912, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/544912")>
         <Fact, Trait(Traits.Feature, Traits.Features.KeywordRecommending)>
-        Public Sub ConstAfterDimInClass()
+        Public Sub ConstAfterDimInClassTest()
             VerifyRecommendationsContain(<ClassDeclaration>Dim |</ClassDeclaration>, "Const")
         End Sub
 
-        <WorkItem(644881)>
+        <WorkItem(644881, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/644881")>
         <Fact, Trait(Traits.Feature, Traits.Features.KeywordRecommending)>
-        Public Sub ConstAfterFriendInClass()
+        Public Sub ConstAfterFriendInClassTest()
             VerifyRecommendationsContain(<ClassDeclaration>Friend |</ClassDeclaration>, "Const")
         End Sub
 
-        <WorkItem(644881)>
+        <WorkItem(644881, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/644881")>
         <Fact, Trait(Traits.Feature, Traits.Features.KeywordRecommending)>
-        Public Sub ConstAfterFriendInModule()
+        Public Sub ConstAfterFriendInModuleTest()
             VerifyRecommendationsContain(<ModuleDeclaration>Friend |</ModuleDeclaration>, "Const")
         End Sub
 
-        <WorkItem(674791)>
+        <WorkItem(674791, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/674791")>
         <Fact, Trait(Traits.Feature, Traits.Features.KeywordRecommending)>
-        Public Sub NotAfterHash()
+        Public Sub NotAfterHashTest()
             VerifyRecommendationsMissing(<File>
 Imports System
 
@@ -65,6 +64,5 @@ End Module
 
 </File>, "Const")
         End Sub
-
     End Class
 End Namespace

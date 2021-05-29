@@ -1,4 +1,6 @@
-﻿' Copyright (c) Microsoft.  All Rights Reserved.  Licensed under the Apache License, Version 2.0.  See License.txt in the project root for license information.
+﻿' Licensed to the .NET Foundation under one or more agreements.
+' The .NET Foundation licenses this file to you under the MIT license.
+' See the LICENSE file in the project root for more information.
 
 Imports System.Collections.Concurrent
 Imports System.Collections.Generic
@@ -23,16 +25,25 @@ Namespace Microsoft.CodeAnalysis.VisualBasic
         Inherits Binder
 
         ' The syntax tree this binder is associated with
-        Private ReadOnly m_tree As SyntaxTree
+        Private ReadOnly _tree As SyntaxTree
 
         Public Sub New(containingBinder As Binder, tree As SyntaxTree)
             MyBase.New(containingBinder)
-            m_tree = tree
+            _tree = tree
         End Sub
 
         Public Overrides Function GetSyntaxReference(node As VisualBasicSyntaxNode) As SyntaxReference
-            Return m_tree.GetReference(node)
+            Return _tree.GetReference(node)
         End Function
+
+        Friend Overrides ReadOnly Property SuppressObsoleteDiagnostics As Boolean
+            Get
+                ' Obsolete diagnostics is not reported for project level imports. This is VS2013 behavior.
+                ' This also ensures that we don't get into circularity while binding imports because we are 
+                ' remapping diagnostics in SourceModuleSymbol.BindImports
+                Return True
+            End Get
+        End Property
     End Class
 
 End Namespace

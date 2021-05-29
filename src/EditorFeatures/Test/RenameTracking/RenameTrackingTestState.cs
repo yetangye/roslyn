@@ -1,24 +1,32 @@
-// Copyright (c) Microsoft.  All Rights Reserved.  Licensed under the Apache License, Version 2.0.  See License.txt in the project root for license information.
+﻿// Licensed to the .NET Foundation under one or more agreements.
+// The .NET Foundation licenses this file to you under the MIT license.
+// See the LICENSE file in the project root for more information.
+
+#nullable disable
 
 using System;
 using System.Collections.Generic;
+using System.Collections.Immutable;
 using System.Linq;
 using System.Threading;
+using System.Threading.Tasks;
 using Microsoft.CodeAnalysis.CodeActions;
-using Microsoft.CodeAnalysis.CodeFixes;
-using Microsoft.CodeAnalysis.Editor.Commands;
-using Microsoft.CodeAnalysis.Editor.CSharp.RenameTracking;
+using Microsoft.CodeAnalysis.CodeRefactorings;
+using Microsoft.CodeAnalysis.Diagnostics;
 using Microsoft.CodeAnalysis.Editor.Implementation.RenameTracking;
 using Microsoft.CodeAnalysis.Editor.Shared.Extensions;
+using Microsoft.CodeAnalysis.Editor.Shared.Utilities;
+using Microsoft.CodeAnalysis.Editor.UnitTests.Utilities;
 using Microsoft.CodeAnalysis.Editor.UnitTests.Workspaces;
-using Microsoft.CodeAnalysis.Editor.VisualBasic.RenameTracking;
 using Microsoft.CodeAnalysis.Notification;
-using Microsoft.CodeAnalysis.Options;
 using Microsoft.CodeAnalysis.Shared.TestHooks;
-using Microsoft.CodeAnalysis.UnitTests.Diagnostics;
+using Microsoft.CodeAnalysis.Shared.Utilities;
+using Microsoft.CodeAnalysis.Text;
+using Microsoft.CodeAnalysis.Text.Shared.Extensions;
 using Microsoft.VisualStudio.Composition;
 using Microsoft.VisualStudio.Text;
 using Microsoft.VisualStudio.Text.Editor;
+using Microsoft.VisualStudio.Text.Editor.Commanding.Commands;
 using Microsoft.VisualStudio.Text.Operations;
 using Microsoft.VisualStudio.Text.Tagging;
 using Roslyn.Test.Utilities;
@@ -44,16 +52,36 @@ namespace Microsoft.CodeAnalysis.Editor.UnitTests.RenameTracking
         private readonly MockRefactorNotifyService _mockRefactorNotifyService;
         public MockRefactorNotifyService RefactorNotifyService { get { return _mockRefactorNotifyService; } }
 
-        private readonly CodeFixProvider _codeFixProvider;
+        private readonly RenameTrackingCodeRefactoringProvider _codeRefactoringProvider;
         private readonly RenameTrackingCancellationCommandHandler _commandHandler = new RenameTrackingCancellationCommandHandler();
 
-        public RenameTrackingTestState(
+        public static RenameTrackingTestState Create(
             string markup,
             string languageName,
             bool onBeforeGlobalSymbolRenamedReturnValue = true,
             bool onAfterGlobalSymbolRenamedReturnValue = true)
         {
-            this.Workspace = CreateTestWorkspace(markup, languageName, TestExportProvider.CreateExportProviderWithCSharpAndVisualBasic());
+            var workspace = CreateTestWorkspace(markup, languageName);
+            return new RenameTrackingTestState(workspace, languageName, onBeforeGlobalSymbolRenamedReturnValue, onAfterGlobalSymbolRenamedReturnValue);
+        }
+
+        public static RenameTrackingTestState CreateFromWorkspaceXml(
+            string workspaceXml,
+            string languageName,
+            bool onBeforeGlobalSymbolRenamedReturnValue = true,
+            bool onAfterGlobalSymbolRenamedReturnValue = true)
+        {
+            var workspace = CreateTestWorkspace(workspaceXml);
+            return new RenameTrackingTestState(workspace, languageName, onBeforeGlobalSymbolRenamedReturnValue, onAfterGlobalSymbolRenamedReturnValue);
+        }
+
+        public RenameTrackingTestState(
+            TestWorkspace workspace,
+            string languageName,
+            bool onBeforeGlobalSymbolRenamedReturnValue = true,
+            bool onAfterGlobalSymbolRenamedReturnValue = true)
+        {
+            this.Workspace = workspace;
 
             _hostDocument = Workspace.Documents.First();
             _view = _hostDocument.GetTextView();
@@ -66,58 +94,49 @@ namespace Microsoft.CodeAnalysis.Editor.UnitTests.RenameTracking
                 OnAfterSymbolRenamedReturnValue = onAfterGlobalSymbolRenamedReturnValue
             };
 
-            var optionService = this.Workspace.Services.GetService<IOptionService>();
-
             // Mock the action taken by the workspace INotificationService
-            var notificationService = Workspace.Services.GetService<INotificationService>() as INotificationServiceCallback;
+            var notificationService = (INotificationServiceCallback)Workspace.Services.GetRequiredService<INotificationService>();
             var callback = new Action<string, string, NotificationSeverity>((message, title, severity) => _notificationMessage = message);
             notificationService.NotificationCallback = callback;
 
             var tracker = new RenameTrackingTaggerProvider(
-                _historyRegistry,
-                Workspace.ExportProvider.GetExport<Host.IWaitIndicator>().Value,
+                Workspace.ExportProvider.GetExportedValue<IThreadingContext>(),
                 Workspace.ExportProvider.GetExport<IInlineRenameService>().Value,
-                SpecializedCollections.SingletonEnumerable(_mockRefactorNotifyService),
-                Workspace.ExportProvider.GetExports<IAsynchronousOperationListener, FeatureMetadata>());
+                Workspace.ExportProvider.GetExport<IDiagnosticAnalyzerService>().Value,
+                Workspace.ExportProvider.GetExportedValue<IAsynchronousOperationListenerProvider>());
 
             _tagger = tracker.CreateTagger<RenameTrackingTag>(_hostDocument.GetTextBuffer());
 
-            if (languageName == LanguageNames.CSharp)
+            if (languageName == LanguageNames.CSharp ||
+                languageName == LanguageNames.VisualBasic)
             {
-                _codeFixProvider = new CSharpRenameTrackingCodeFixProvider(
-                    Workspace.ExportProvider.GetExport<Host.IWaitIndicator>().Value,
-                    _historyRegistry,
-                    SpecializedCollections.SingletonEnumerable(_mockRefactorNotifyService));
-            }
-            else if (languageName == LanguageNames.VisualBasic)
-            {
-                _codeFixProvider = new VisualBasicRenameTrackingCodeFixProvider(
-                    Workspace.ExportProvider.GetExport<Host.IWaitIndicator>().Value,
+                _codeRefactoringProvider = new RenameTrackingCodeRefactoringProvider(
                     _historyRegistry,
                     SpecializedCollections.SingletonEnumerable(_mockRefactorNotifyService));
             }
             else
             {
-                throw new ArgumentException("Invalid langauge name: " + languageName, "languageName");
+                throw new ArgumentException("Invalid language name: " + languageName, nameof(languageName));
             }
         }
 
-        private static TestWorkspace CreateTestWorkspace(string code, string languageName, ExportProvider exportProvider = null)
+        private static TestWorkspace CreateTestWorkspace(string code, string languageName)
         {
-            var xml = string.Format(@"
+            return CreateTestWorkspace(string.Format(@"
 <Workspace>
     <Project Language=""{0}"" CommonReferences=""true"">
         <Document>{1}</Document>
     </Project>
-</Workspace>", languageName, code);
+</Workspace>", languageName, code));
+        }
 
-            return TestWorkspaceFactory.CreateWorkspace(xml, exportProvider: exportProvider);
+        private static TestWorkspace CreateTestWorkspace(string xml)
+        {
+            return TestWorkspace.Create(xml, composition: EditorTestCompositions.EditorFeaturesWpf);
         }
 
         public void SendEscape()
-        {
-            _commandHandler.ExecuteCommand(new EscapeKeyCommandArgs(_view, _view.TextBuffer), () => { });
-        }
+            => _commandHandler.ExecuteCommand(new EscapeKeyCommandArgs(_view, _view.TextBuffer), TestCommandExecutionContext.Create());
 
         public void MoveCaret(int delta)
         {
@@ -137,78 +156,72 @@ namespace Microsoft.CodeAnalysis.Editor.UnitTests.RenameTracking
             history.Redo(count);
         }
 
-        public void AssertNoTag()
+        public async Task AssertNoTag()
         {
-            WaitForAsyncOperations();
+            await WaitForAsyncOperationsAsync();
 
-            var tags = _tagger.GetTags(new NormalizedSnapshotSpanCollection(new SnapshotSpan(_view.TextBuffer.CurrentSnapshot, new Span(0, _view.TextBuffer.CurrentSnapshot.Length))));
+            var tags = _tagger.GetTags(_view.TextBuffer.CurrentSnapshot.GetSnapshotSpanCollection());
 
             Assert.Equal(0, tags.Count());
         }
 
-        public void AssertTag(string expectedFromName, string expectedToName, bool invokeAction = false, int actionIndex = 0)
+        /// <param name="textSpan">If <see langword="null"/> the current caret position will be used.</param>
+        public async Task<CodeAction> TryGetCodeActionAsync(TextSpan? textSpan = null)
         {
-            WaitForAsyncOperations();
+            var span = textSpan ?? new TextSpan(_view.Caret.Position.BufferPosition, 0);
 
-            var tags = _tagger.GetTags(new NormalizedSnapshotSpanCollection(new SnapshotSpan(_view.TextBuffer.CurrentSnapshot, new Span(0, _view.TextBuffer.CurrentSnapshot.Length))));
+            var document = this.Workspace.CurrentSolution.GetDocument(_hostDocument.Id);
+
+            var actions = new List<CodeAction>();
+            var context = new CodeRefactoringContext(
+                document, span, actions.Add, CancellationToken.None);
+            await _codeRefactoringProvider.ComputeRefactoringsAsync(context);
+            return actions.SingleOrDefault();
+        }
+
+        public async Task AssertTag(string expectedFromName, string expectedToName, bool invokeAction = false)
+        {
+            await WaitForAsyncOperationsAsync();
+
+            var tags = _tagger.GetTags(_view.TextBuffer.CurrentSnapshot.GetSnapshotSpanCollection());
 
             // There should only ever be one tag
             Assert.Equal(1, tags.Count());
 
             var tag = tags.Single();
 
-            var document = this.Workspace.CurrentSolution.GetDocument(_hostDocument.Id);
-
-            var analyzer = new RenameTrackingDiagnosticAnalyzer();
-            var diagnostics = DiagnosticProviderTestUtilities.GetDocumentDiagnostics(analyzer, document, tag.Span.Span.ToTextSpan()).ToList();
-
-            // There should be a single rename tracking diagnostic
-            Assert.Equal(1, diagnostics.Count);
-            Assert.Equal(RenameTrackingDiagnosticAnalyzer.DiagnosticId, diagnostics[0].Id);
-
-            var actions = new List<CodeAction>();
-            var context = new CodeFixContext(document, diagnostics[0], (a, d) => actions.Add(a), CancellationToken.None);
-            _codeFixProvider.RegisterCodeFixesAsync(context).Wait();
-
-            // There should be two actions
-            Assert.Equal(2, actions.Count);
-
-            Assert.Equal(string.Format("Rename '{0}' to '{1}'", expectedFromName, expectedToName), actions[0].Title);
-            Assert.Equal(string.Format("Rename '{0}' to '{1}' with preview...", expectedFromName, expectedToName), actions[1].Title);
+            // There should only be one code action for the tag
+            var codeAction = await TryGetCodeActionAsync(tag.Span.Span.ToTextSpan());
+            Assert.NotNull(codeAction);
+            Assert.Equal(string.Format(EditorFeaturesResources.Rename_0_to_1, expectedFromName, expectedToName), codeAction.Title);
 
             if (invokeAction)
             {
-                var operations = actions[actionIndex]
-                    .GetOperationsAsync(CancellationToken.None)
-                    .WaitAndGetResult(CancellationToken.None)
-                    .ToArray();
-
+                var operations = (await codeAction.GetOperationsAsync(CancellationToken.None)).ToArray();
                 Assert.Equal(1, operations.Length);
 
-                operations[0].Apply(this.Workspace, CancellationToken.None);
+                operations[0].TryApply(this.Workspace, new ProgressTracker(), CancellationToken.None);
             }
         }
 
         public void AssertNoNotificationMessage()
-        {
-            Assert.Null(_notificationMessage);
-        }
+            => Assert.Null(_notificationMessage);
 
         public void AssertNotificationMessage()
-        {
-            Assert.NotNull(_notificationMessage);
-        }
+            => Assert.NotNull(_notificationMessage);
 
-        private void WaitForAsyncOperations()
+        private async Task WaitForAsyncOperationsAsync()
         {
-            var waiters = Workspace.ExportProvider.GetExportedValues<IAsynchronousOperationWaiter>();
-            var tasks = waiters.Select(w => w.CreateWaitTask()).ToList();
-            tasks.PumpingWaitAll();
+            var provider = Workspace.ExportProvider.GetExportedValue<AsynchronousOperationListenerProvider>();
+            await provider.WaitAllDispatcherOperationAndTasksAsync(
+                Workspace,
+                FeatureAttribute.RenameTracking,
+                FeatureAttribute.SolutionCrawler,
+                FeatureAttribute.Workspace,
+                FeatureAttribute.EventHookup);
         }
 
         public void Dispose()
-        {
-            Workspace.Dispose();
-        }
+            => Workspace.Dispose();
     }
 }

@@ -1,10 +1,15 @@
-// Copyright (c) Microsoft.  All Rights Reserved.  Licensed under the Apache License, Version 2.0.  See License.txt in the project root for license information.
+﻿// Licensed to the .NET Foundation under one or more agreements.
+// The .NET Foundation licenses this file to you under the MIT license.
+// See the LICENSE file in the project root for more information.
+
+#nullable disable
 
 using System;
 using System.Linq;
 using Microsoft.CodeAnalysis.CSharp.Formatting;
 using Microsoft.CodeAnalysis.Editor.UnitTests.Workspaces;
 using Microsoft.CodeAnalysis.Options;
+using Microsoft.CodeAnalysis.Test.Utilities;
 using Microsoft.VisualStudio.Composition;
 using Microsoft.VisualStudio.LanguageServices.CSharp.Options.Formatting;
 using Microsoft.VisualStudio.LanguageServices.Implementation.Options;
@@ -14,6 +19,7 @@ using Xunit;
 
 namespace Roslyn.VisualStudio.CSharp.UnitTests.Options
 {
+    [UseExportProvider]
     public class OptionViewModelTests
     {
         private class MockServiceProvider : IServiceProvider
@@ -36,93 +42,61 @@ namespace Roslyn.VisualStudio.CSharp.UnitTests.Options
             return viewModel.TextViewHost.TextView.TextBuffer.CurrentSnapshot.GetText().ToString();
         }
 
-        [Fact, Trait(Traits.Feature, Traits.Features.Options)]
+        public OptionViewModelTests()
+        {
+            WpfTestRunner.RequireWpfFact("Tests create WPF ViewModels and updates previews with them");
+        }
+
+        [WpfFact, Trait(Traits.Feature, Traits.Features.Options)]
         public void TestCheckBox()
         {
-            using (var workspace = CSharpWorkspaceFactory.CreateWorkspaceFromFile(""))
-            {
-                var serviceProvider = new MockServiceProvider(workspace.ExportProvider);
-                using (var viewModel = new SpacingViewModel(workspace.Options, serviceProvider))
-                {
-                    // Use the first item's preview.
-                    var checkbox = viewModel.Items.OfType<CheckBoxOptionViewModel>().First();
-                    viewModel.SetOptionAndUpdatePreview(checkbox.IsChecked, checkbox.Option, checkbox.GetPreview());
+            using var workspace = TestWorkspace.CreateCSharp("");
+            var serviceProvider = new MockServiceProvider(workspace.ExportProvider);
+            var optionStore = new OptionStore(workspace.Options, Enumerable.Empty<IOption>());
+            using var viewModel = new SpacingViewModel(optionStore, serviceProvider);
+            // Use the first item's preview.
+            var checkbox = viewModel.Items.OfType<CheckBoxOptionViewModel>().First();
+            viewModel.SetOptionAndUpdatePreview(checkbox.IsChecked, checkbox.Option, checkbox.GetPreview());
 
-                    // Get a checkbox and toggle it
-                    var originalPreview = GetText(viewModel);
+            // Get a checkbox and toggle it
+            var originalPreview = GetText(viewModel);
 
-                    checkbox.IsChecked = !checkbox.IsChecked;
-                    var modifiedPreview = GetText(viewModel);
-                    Assert.NotEqual(modifiedPreview, originalPreview);
+            checkbox.IsChecked = !checkbox.IsChecked;
+            var modifiedPreview = GetText(viewModel);
+            Assert.NotEqual(modifiedPreview, originalPreview);
 
-                    // Switch it back
-                    checkbox.IsChecked = !checkbox.IsChecked;
-                    Assert.Equal(originalPreview, viewModel.TextViewHost.TextView.TextBuffer.CurrentSnapshot.GetText().ToString());
-                }
-            }
+            // Switch it back
+            checkbox.IsChecked = !checkbox.IsChecked;
+            Assert.Equal(originalPreview, viewModel.TextViewHost.TextView.TextBuffer.CurrentSnapshot.GetText().ToString());
         }
 
-        [Fact, Trait(Traits.Feature, Traits.Features.Options)]
+        [WpfFact, Trait(Traits.Feature, Traits.Features.Options)]
         public void TestOptionLoading()
         {
-            using (var workspace = CSharpWorkspaceFactory.CreateWorkspaceFromFile(""))
-            {
-                var optionService = workspace.GetService<IOptionService>();
-                var optionSet = optionService.GetOptions();
-                optionSet = optionSet.WithChangedOption(CSharpFormattingOptions.SpacingAfterMethodDeclarationName, true);
+            using var workspace = TestWorkspace.CreateCSharp("");
+            var optionSet = workspace.Options.WithChangedOption(CSharpFormattingOptions.SpacingAfterMethodDeclarationName, true);
+            var optionStore = new OptionStore(optionSet, Enumerable.Empty<IOption>());
 
-                var serviceProvider = new MockServiceProvider(workspace.ExportProvider);
-                using (var viewModel = new SpacingViewModel(optionSet, serviceProvider))
-                {
-                    // Use the first item's preview.
-                    var checkbox = viewModel.Items.OfType<CheckBoxOptionViewModel>().Where(c => c.Option == CSharpFormattingOptions.SpacingAfterMethodDeclarationName).First();
-                    Assert.True(checkbox.IsChecked);
-                }
-            }
+            var serviceProvider = new MockServiceProvider(workspace.ExportProvider);
+            using var viewModel = new SpacingViewModel(optionStore, serviceProvider);
+            // Use the first item's preview.
+            var checkbox = viewModel.Items.OfType<CheckBoxOptionViewModel>().Where(c => c.Option == CSharpFormattingOptions.SpacingAfterMethodDeclarationName).First();
+            Assert.True(checkbox.IsChecked);
         }
 
-        [Fact, Trait(Traits.Feature, Traits.Features.Options)]
+        [WpfFact, Trait(Traits.Feature, Traits.Features.Options)]
         public void TestOptionSaving()
         {
-            using (var workspace = CSharpWorkspaceFactory.CreateWorkspaceFromFile(""))
-            {
-                var serviceProvider = new MockServiceProvider(workspace.ExportProvider);
-                using (var viewModel = new SpacingViewModel(workspace.Options, serviceProvider))
-                {
-                    // Use the first item's preview.
-                    var checkbox = viewModel.Items.OfType<CheckBoxOptionViewModel>().Where(c => c.Option == CSharpFormattingOptions.SpacingAfterMethodDeclarationName).First();
-                    var initial = checkbox.IsChecked;
-                    checkbox.IsChecked = !checkbox.IsChecked;
+            using var workspace = TestWorkspace.CreateCSharp("");
+            var serviceProvider = new MockServiceProvider(workspace.ExportProvider);
+            var optionStore = new OptionStore(workspace.Options, Enumerable.Empty<IOption>());
+            using var viewModel = new SpacingViewModel(optionStore, serviceProvider);
+            // Use the first item's preview.
+            var checkbox = viewModel.Items.OfType<CheckBoxOptionViewModel>().Where(c => c.Option == CSharpFormattingOptions.SpacingAfterMethodDeclarationName).First();
+            var initial = checkbox.IsChecked;
+            checkbox.IsChecked = !checkbox.IsChecked;
 
-                    var optionService = workspace.GetService<IOptionService>();
-                    var optionSet = optionService.GetOptions();
-
-                    var changedOptions = viewModel.ApplyChangedOptions(optionSet);
-                    Assert.NotEqual(changedOptions.GetOption(CSharpFormattingOptions.SpacingAfterMethodDeclarationName), initial);
-                }
-            }
-        }
-
-        [Fact, Trait(Traits.Feature, Traits.Features.Options)]
-        public void TestFeatureBasedSaving()
-        {
-            using (var workspace = CSharpWorkspaceFactory.CreateWorkspaceFromFile(""))
-            {
-                // Set an option for an unrelated feature
-                var optionService = workspace.GetService<IOptionService>();
-                var optionSet = optionService.GetOptions();
-                var expectedValue = !CSharpFormattingOptions.NewLineForCatch.DefaultValue;
-                optionSet = optionSet.WithChangedOption(CSharpFormattingOptions.NewLineForCatch, expectedValue);
-                optionService.SetOptions(optionSet);
-
-                // Save the options
-                var serviceProvider = new MockServiceProvider(workspace.ExportProvider);
-                using (var viewModel = new SpacingViewModel(workspace.Options, serviceProvider))
-                {
-                    var changedOptions = optionService.GetOptions();
-                    Assert.Equal(changedOptions.GetOption(CSharpFormattingOptions.NewLineForCatch), expectedValue);
-                }
-            }
+            Assert.NotEqual(optionStore.GetOption(CSharpFormattingOptions.SpacingAfterMethodDeclarationName), initial);
         }
     }
 }

@@ -1,22 +1,17 @@
-' Copyright (c) Microsoft.  All Rights Reserved.  Licensed under the Apache License, Version 2.0.  See License.txt in the project root for license information.
-
-Imports Microsoft.CodeAnalysis.Text
-Imports Microsoft.CodeAnalysis.VisualBasic
-Imports Microsoft.CodeAnalysis.VisualBasic.Symbols
-Imports Microsoft.CodeAnalysis.VisualBasic.Syntax
-Imports Roslyn.Test.Utilities
-Imports Xunit
+﻿' Licensed to the .NET Foundation under one or more agreements.
+' The .NET Foundation licenses this file to you under the MIT license.
+' See the LICENSE file in the project root for more information.
 
 Namespace Microsoft.CodeAnalysis.Editor.VisualBasic.UnitTests.Recommendations.Statements
     Public Class DoKeywordRecommenderTests
 
         <Fact, Trait(Traits.Feature, Traits.Features.KeywordRecommending)>
-        Public Sub DoInMethodBody()
+        Public Sub DoInMethodBodyTest()
             VerifyRecommendationsContain(<MethodBody>|</MethodBody>, {"Do", "Do Until", "Do While"})
         End Sub
 
         <Fact, Trait(Traits.Feature, Traits.Features.KeywordRecommending)>
-        Public Sub DoInLambda()
+        Public Sub DoInLambdaTest()
             VerifyRecommendationsContain(<MethodBody>
 Dim x = Sub()
 |
@@ -24,14 +19,14 @@ Dim x = Sub()
         End Sub
 
         <Fact, Trait(Traits.Feature, Traits.Features.KeywordRecommending)>
-        Public Sub DoAfterStatement()
+        Public Sub DoAfterStatementTest()
             VerifyRecommendationsContain(<MethodBody>
 Dim x
 |</MethodBody>, "Do")
         End Sub
 
         <Fact, Trait(Traits.Feature, Traits.Features.KeywordRecommending)>
-        Public Sub DoAfterExitKeyword()
+        Public Sub DoAfterExitKeywordTest()
             VerifyRecommendationsContain(<MethodBody>
 Do
 Exit |
@@ -39,7 +34,7 @@ Loop</MethodBody>, "Do")
         End Sub
 
         <Fact, Trait(Traits.Feature, Traits.Features.KeywordRecommending)>
-        Public Sub DoAfterContinueKeyword()
+        Public Sub DoAfterContinueKeywordTest()
             VerifyRecommendationsContain(<MethodBody>
 Do
 Continue |
@@ -48,21 +43,21 @@ Loop</MethodBody>, "Do")
 
         <Fact>
         <Trait(Traits.Feature, Traits.Features.KeywordRecommending)>
-        Public Sub DoNotAfterContinueKeywordOutsideLoop()
+        Public Sub DoNotAfterContinueKeywordOutsideLoopTest()
             VerifyRecommendationsMissing(<MethodBody>
 Continue |
 </MethodBody>, "Do")
         End Sub
 
         <Fact, Trait(Traits.Feature, Traits.Features.KeywordRecommending)>
-        Public Sub DoNotAfterExitKeywordOutsideLoop()
+        Public Sub DoNotAfterExitKeywordOutsideLoopTest()
             VerifyRecommendationsMissing(<MethodBody>
 Exit |
 </MethodBody>, "Do")
         End Sub
 
         <Fact, Trait(Traits.Feature, Traits.Features.KeywordRecommending)>
-        Public Sub NoDoAfterExitInsideLambdaInsideDoLoop()
+        Public Sub NoDoAfterExitInsideLambdaInsideDoLoopTest()
             VerifyRecommendationsMissing(<MethodBody>
 Do
 Dim x = Sub()
@@ -73,7 +68,7 @@ Loop
         End Sub
 
         <Fact, Trait(Traits.Feature, Traits.Features.KeywordRecommending)>
-        Public Sub DoAfterExitInsideDoLoopInsideLambda()
+        Public Sub DoAfterExitInsideDoLoopInsideLambdaTest()
             VerifyRecommendationsContain(<MethodBody>
 Dim x = Sub()
             Do
@@ -84,14 +79,14 @@ Dim x = Sub()
         End Sub
 
         <Fact, Trait(Traits.Feature, Traits.Features.KeywordRecommending)>
-        Public Sub DoNotInsideSingleLineLambda()
+        Public Sub DoNotInsideSingleLineLambdaTest()
             VerifyRecommendationsMissing(<MethodBody>
 Dim x = Sub() |
 </MethodBody>, "Do")
         End Sub
 
         <Fact, Trait(Traits.Feature, Traits.Features.KeywordRecommending)>
-        Public Sub NotAfterExitInFinallyBlock()
+        Public Sub NotAfterExitInFinallyBlockTest()
             Dim code =
 <MethodBody>
 Do
@@ -102,6 +97,5 @@ Do
 
             VerifyRecommendationsMissing(code, "Do")
         End Sub
-
     End Class
 End Namespace

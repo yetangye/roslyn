@@ -1,4 +1,6 @@
-﻿' Copyright (c) Microsoft.  All Rights Reserved.  Licensed under the Apache License, Version 2.0.  See License.txt in the project root for license information.
+﻿' Licensed to the .NET Foundation under one or more agreements.
+' The .NET Foundation licenses this file to you under the MIT license.
+' See the LICENSE file in the project root for more information.
 
 Imports System.IO
 Imports System.Linq
@@ -9,6 +11,7 @@ Imports Microsoft.CodeAnalysis.Emit
 Imports Microsoft.CodeAnalysis.Test.Utilities
 Imports Microsoft.CodeAnalysis.Text
 Imports Microsoft.CodeAnalysis.VisualBasic.Symbols
+Imports Microsoft.CodeAnalysis.VisualBasic.Symbols.Metadata.PE
 Imports Microsoft.CodeAnalysis.VisualBasic.Syntax
 Imports Roslyn.Test.Utilities
 Imports Xunit
@@ -17,7 +20,7 @@ Namespace Microsoft.CodeAnalysis.VisualBasic.UnitTests.Emit
     Public Class OptionalArgumentsTests
         Inherits BasicTestBase
 
-        Dim librarySource As XElement =
+        Private ReadOnly _librarySource As XElement =
             <compilation>
                 <file name="library.vb">
                     <![CDATA[
@@ -154,9 +157,9 @@ End Module
 ]]></file>
             </compilation>
 
-        Dim classLibrary As MetadataReference = CreateHelperLibrary(librarySource.Value)
+        Private ReadOnly _classLibrary As MetadataReference = CreateHelperLibrary(_librarySource.Value)
 
-        Function CreateHelperLibrary(source As String) As MetadataReference
+        Public Function CreateHelperLibrary(source As String) As MetadataReference
             Dim libraryCompilation = VisualBasicCompilation.Create("library",
                                                         {VisualBasicSyntaxTree.ParseText(source)},
                                                         {MsvbRef, MscorlibRef, SystemCoreRef},
@@ -165,7 +168,7 @@ End Module
             Return MetadataReference.CreateFromImage(libraryCompilation.EmitToArray())
         End Function
 
-        <Fact()>
+        <ConditionalFact(GetType(WindowsDesktopOnly), Reason:="https://github.com/dotnet/roslyn/issues/28046")>
         Public Sub TestOptionalInteger()
             Dim source =
 <compilation>
@@ -192,7 +195,7 @@ End Module
 ]]></file>
 </compilation>
             CompileAndVerify(source,
-                             additionalRefs:={classLibrary},
+                             references:={_classLibrary},
                              expectedOutput:=<![CDATA[
 i = 1
 Member: OptionalArg
@@ -200,7 +203,7 @@ Parameter: Type=System.Int32, Name=i, Optional=True, DefaultValue=1
 ]]>)
         End Sub
 
-        <Fact()>
+        <ConditionalFact(GetType(WindowsDesktopOnly), Reason:="https://github.com/dotnet/roslyn/issues/28046")>
         Public Sub TestIntegerOptionalAttribute()
             Dim source =
 <compilation>
@@ -228,14 +231,14 @@ End Module
 </compilation>
 
             CompileAndVerify(source,
-                             additionalRefs:={classLibrary},
+                             references:={_classLibrary},
                              expectedOutput:=<![CDATA[
 Member: OptionalArg
 Parameter: Type=System.Int32, Name=i, Optional=True, DefaultValue=System.Reflection.Missing
 ]]>)
         End Sub
 
-        <Fact()>
+        <ConditionalFact(GetType(WindowsDesktopOnly), Reason:="https://github.com/dotnet/roslyn/issues/28046")>
         Public Sub TestOptionalString()
             Dim source =
 <compilation>
@@ -265,7 +268,7 @@ End Module
 </compilation>
 
             CompileAndVerify(source,
-                             additionalRefs:={classLibrary},
+                             references:={_classLibrary},
                              expectedOutput:=<![CDATA[
 i = hello world
 Member: OptionalArg
@@ -273,7 +276,7 @@ Parameter: Type=System.String, Name=i, Optional=True, DefaultValue=hello world
 ]]>)
         End Sub
 
-        <Fact()>
+        <ConditionalFact(GetType(WindowsDesktopOnly), Reason:="https://github.com/dotnet/roslyn/issues/28046")>
         Public Sub TestOptionalDateTime()
             Dim source =
 <compilation>
@@ -303,7 +306,7 @@ End Module
 </compilation>
 
             CompileAndVerify(source,
-                             additionalRefs:={classLibrary},
+                             references:={_classLibrary},
                              expectedOutput:=<![CDATA[
 i = 1/26/2012 12:00:00 AM
 Member: OptionalArg
@@ -312,7 +315,7 @@ Attribute: System.Runtime.CompilerServices.DateTimeConstantAttribute(1/26/2012 1
 ]]>)
         End Sub
 
-        <Fact()>
+        <ConditionalFact(GetType(WindowsDesktopOnly), Reason:="https://github.com/dotnet/roslyn/issues/28046")>
         Public Sub TestOptionalDecimal()
             Dim source =
 <compilation>
@@ -342,7 +345,7 @@ End Module
 </compilation>
 
             CompileAndVerify(source,
-                             additionalRefs:={classLibrary},
+                             references:={_classLibrary},
                              expectedOutput:=<![CDATA[
 i = 999.99
 Member: OptionalArg
@@ -351,7 +354,7 @@ Attribute: System.Runtime.CompilerServices.DecimalConstantAttribute(999.99)
 ]]>)
         End Sub
 
-        <WorkItem(543530, "DevDiv")>
+        <WorkItem(543530, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/543530")>
         <Fact()>
         Public Sub OptionalForConstructorofAttribute()
             Dim source =
@@ -387,11 +390,11 @@ End Class
 </compilation>
 
             CompileAndVerify(source,
-                             additionalRefs:={classLibrary},
+                             references:={_classLibrary},
                              expectedOutput:="Nothing;Nothing;C1;")
         End Sub
 
-        <Fact()>
+        <ConditionalFact(GetType(WindowsDesktopOnly), Reason:="https://github.com/dotnet/roslyn/issues/28046")>
         Public Sub TestDateTimeConstantAttribute()
             Dim source =
 <compilation>
@@ -421,7 +424,7 @@ End Module
 </compilation>
 
             CompileAndVerify(source,
-                             additionalRefs:={classLibrary},
+                             references:={_classLibrary},
                              expectedOutput:=<![CDATA[
 Member: OptionalArg
 Parameter: Type=System.DateTime, Name=i, Optional=False, DefaultValue=1/26/2012 12:00:00 AM
@@ -429,7 +432,7 @@ Attribute: System.Runtime.CompilerServices.DateTimeConstantAttribute(1/26/2012 1
 ]]>)
         End Sub
 
-        <Fact()>
+        <ConditionalFact(GetType(WindowsDesktopOnly), Reason:="https://github.com/dotnet/roslyn/issues/28046")>
         Public Sub TestDateTimeOptionalAttributeConstantAttribute()
             Dim source =
 <compilation>
@@ -458,7 +461,7 @@ End Module
 </compilation>
 
             CompileAndVerify(source,
-                             additionalRefs:={classLibrary},
+                             references:={_classLibrary},
                              expectedOutput:=<![CDATA[
 Member: OptionalArg
 Parameter: Type=System.DateTime, Name=i, Optional=True, DefaultValue=1/26/2012 12:00:00 AM
@@ -481,7 +484,7 @@ End Module
     </file>
 </compilation>
 
-            Dim comp = CompilationUtils.CreateCompilationWithMscorlibAndVBRuntimeAndReferences(source, additionalRefs:={classLibrary})
+            Dim comp = CompilationUtils.CreateCompilationWithMscorlib40AndVBRuntimeAndReferences(source, references:={_classLibrary})
             comp.VerifyDiagnostics(Diagnostic(ERRID.ERR_OmittedArgument2, "DateTimeUsingConstantAttribute").WithArguments("i", "Public Sub DateTimeUsingConstantAttribute(i As Date)"))
         End Sub
 
@@ -507,7 +510,7 @@ End Module
 </compilation>
 
             CompileAndVerify(source,
-                             additionalRefs:={classLibrary},
+                             references:={_classLibrary},
                              expectedOutput:=<![CDATA[
    1/26/2012 12:00:00 AM
 ]]>)
@@ -538,7 +541,7 @@ End Module
 </compilation>
 
             CompileAndVerify(source,
-                             additionalRefs:={classLibrary},
+                             references:={_classLibrary},
                              expectedOutput:=<![CDATA[
    999.99
 ]]>)
@@ -566,13 +569,13 @@ End Module
 </compilation>
 
             CompileAndVerify(source,
-                             additionalRefs:={classLibrary},
+                             references:={_classLibrary},
                              expectedOutput:=<![CDATA[
 1/1/0001 12:00:00 AM
 ]]>)
         End Sub
 
-        <Fact()>
+        <ConditionalFact(GetType(WindowsDesktopOnly), Reason:="https://github.com/dotnet/roslyn/issues/28046")>
         Public Sub TestOptionalWithNothing()
             Dim source =
 <compilation>
@@ -651,7 +654,7 @@ End Module
 </compilation>
 
             CompileAndVerify(source,
-                             additionalRefs:={classLibrary},
+                             references:={_classLibrary},
                              expectedOutput:=<![CDATA[
 True
 True
@@ -684,13 +687,13 @@ End Module
     </file>
 </compilation>
 
-            Dim comp = CompilationUtils.CreateCompilationWithMscorlibAndVBRuntimeAndReferences(source, additionalRefs:={classLibrary})
+            Dim comp = CompilationUtils.CreateCompilationWithMscorlib40AndVBRuntimeAndReferences(source, references:={_classLibrary})
             comp.VerifyDiagnostics(Diagnostic(ERRID.ERR_NameNotDeclared1, "p").WithArguments("p"))
         End Sub
 
         <Fact()>
         Public Sub ParamArrayAndAttribute()
-            Dim comp = CreateCompilationWithMscorlibAndVBRuntime(
+            Dim comp = CreateCompilationWithMscorlib40AndVBRuntime(
 <compilation>
     <file name="a.vb"><![CDATA[
 Imports System
@@ -706,29 +709,30 @@ End Interface
     </file>
 </compilation>)
             comp.AssertTheseDiagnostics(<errors/>)
-            CompileAndVerify(comp, sourceSymbolValidator:=Sub([module])
-                                                              Dim type = [module].GlobalNamespace.GetMember(Of NamedTypeSymbol)("I")
-                                                              Assert.Equal(1, CountParamArrayAttributes(type.GetMember(Of MethodSymbol)("M1").Parameters(0)))
-                                                              Assert.Equal(1, CountParamArrayAttributes(type.GetMember(Of MethodSymbol)("M2").Parameters(0)))
-                                                              Assert.Equal(1, CountParamArrayAttributes(type.GetMember(Of MethodSymbol)("M3").Parameters(0)))
-                                                              Assert.Equal(1, CountParamArrayAttributes(type.GetMember(Of PropertySymbol)("P1").Parameters(0)))
-                                                              Assert.Equal(1, CountParamArrayAttributes(type.GetMember(Of MethodSymbol)("get_P1").Parameters(0)))
-                                                              Assert.Equal(1, CountParamArrayAttributes(type.GetMember(Of MethodSymbol)("set_P1").Parameters(0)))
-                                                              Assert.Equal(1, CountParamArrayAttributes(type.GetMember(Of PropertySymbol)("P2").Parameters(0)))
-                                                              Assert.Equal(1, CountParamArrayAttributes(type.GetMember(Of MethodSymbol)("get_P2").Parameters(0)))
-                                                              Assert.Equal(1, CountParamArrayAttributes(type.GetMember(Of MethodSymbol)("set_P2").Parameters(0)))
-                                                              Assert.Equal(1, CountParamArrayAttributes(type.GetMember(Of PropertySymbol)("P3").Parameters(0)))
-                                                              Assert.Equal(1, CountParamArrayAttributes(type.GetMember(Of MethodSymbol)("get_P3").Parameters(0)))
-                                                              Assert.Equal(1, CountParamArrayAttributes(type.GetMember(Of MethodSymbol)("set_P3").Parameters(0)))
-                                                          End Sub)
+            CompileAndVerify(comp, symbolValidator:=Sub([module])
+                                                        Dim type = [module].GlobalNamespace.GetMember(Of NamedTypeSymbol)("I")
+                                                        Assert.Equal(1, CountParamArrayAttributes(type.GetMember(Of MethodSymbol)("M1").Parameters(0)))
+                                                        Assert.Equal(1, CountParamArrayAttributes(type.GetMember(Of MethodSymbol)("M2").Parameters(0)))
+                                                        Assert.Equal(1, CountParamArrayAttributes(type.GetMember(Of MethodSymbol)("M3").Parameters(0)))
+                                                        Assert.Equal(1, CountParamArrayAttributes(type.GetMember(Of PropertySymbol)("P1").Parameters(0)))
+                                                        Assert.Equal(1, CountParamArrayAttributes(type.GetMember(Of MethodSymbol)("get_P1").Parameters(0)))
+                                                        Assert.Equal(1, CountParamArrayAttributes(type.GetMember(Of MethodSymbol)("set_P1").Parameters(0)))
+                                                        Assert.Equal(1, CountParamArrayAttributes(type.GetMember(Of PropertySymbol)("P2").Parameters(0)))
+                                                        Assert.Equal(1, CountParamArrayAttributes(type.GetMember(Of MethodSymbol)("get_P2").Parameters(0)))
+                                                        Assert.Equal(1, CountParamArrayAttributes(type.GetMember(Of MethodSymbol)("set_P2").Parameters(0)))
+                                                        Assert.Equal(1, CountParamArrayAttributes(type.GetMember(Of PropertySymbol)("P3").Parameters(0)))
+                                                        Assert.Equal(1, CountParamArrayAttributes(type.GetMember(Of MethodSymbol)("get_P3").Parameters(0)))
+                                                        Assert.Equal(1, CountParamArrayAttributes(type.GetMember(Of MethodSymbol)("set_P3").Parameters(0)))
+                                                    End Sub)
         End Sub
 
         Private Shared Function CountParamArrayAttributes(parameter As ParameterSymbol) As Integer
-            Dim attributes = parameter.GetCustomAttributesToEmit(New ModuleCompilationState)
+            Dim [module] = DirectCast(parameter.ContainingModule, PEModuleSymbol)
+            Dim attributes = [module].GetCustomAttributesForToken(DirectCast(parameter, PEParameterSymbol).Handle)
             Return attributes.Where(Function(a) a.AttributeClass.Name = "ParamArrayAttribute").Count()
         End Function
 
-        <WorkItem(529684, "DevDiv")>
+        <WorkItem(529684, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/529684")>
         <Fact()>
         Public Sub TestDuplicateConstantAttributesMetadata()
             Dim ilSource = <![CDATA[
@@ -812,7 +816,8 @@ Class P
         Report(C.F6())
     End Sub
     Shared Sub Report(o As Object)
-        System.Console.WriteLine("{0}: {1}", o.GetType(), o)
+        Dim value As Object = If (TypeOf o is Date, DirectCast(o, Date).ToString("yyyy-MM-dd HH:mm:ss"), o)
+        System.Console.WriteLine("{0}: {1}", o.GetType(), value)
     End Sub
 End Class
 ]]>
@@ -822,16 +827,16 @@ End Class
             comp.AssertTheseDiagnostics(<errors/>)
             CompileAndVerify(comp, expectedOutput:=<![CDATA[
 System.Reflection.Missing: System.Reflection.Missing
-System.DateTime: 01/01/0001 00:00:00
-System.DateTime: 01/01/0001 00:00:00
-System.DateTime: 01/01/0001 00:00:00
+System.DateTime: 0001-01-01 00:00:00
+System.DateTime: 0001-01-01 00:00:00
+System.DateTime: 0001-01-01 00:00:00
 System.Int32: 0
 System.Int64: 3
 System.Decimal: 3
 ]]>)
         End Sub
 
-        <WorkItem(529684, "DevDiv")>
+        <WorkItem(529684, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/529684")>
         <Fact()>
         Public Sub TestDuplicateConstantAttributesSameValues()
             Dim source1 =
@@ -879,23 +884,23 @@ End Class
 ]]>
     </file>
 </compilation>
-            Dim comp1 = CreateCompilationWithMscorlibAndVBRuntime(source1)
+            Dim comp1 = CreateCompilationWithMscorlib40AndVBRuntime(source1)
             comp1.AssertTheseDiagnostics(<errors/>)
-            CompileAndVerify(comp1, sourceSymbolValidator:=Sub([module])
-                                                               Dim type = [module].GlobalNamespace.GetMember(Of NamedTypeSymbol)("C")
-                                                               VerifyDefaultValueAttribute(type.GetMember(Of MethodSymbol)("F1").Parameters(0), Nothing, 1, True)
-                                                               VerifyDefaultValueAttribute(type.GetMember(Of MethodSymbol)("F2").Parameters(0), "DefaultParameterValueAttribute", 2, False)
-                                                               VerifyDefaultValueAttribute(type.GetMember(Of MethodSymbol)("F3").Parameters(0), "DefaultParameterValueAttribute", 3, True)
-                                                               VerifyDefaultValueAttribute(type.GetMember(Of MethodSymbol)("F4").Parameters(0), "DecimalConstantAttribute", 4UI, False)
-                                                               VerifyDefaultValueAttribute(type.GetMember(Of MethodSymbol)("F5").Parameters(0), "DecimalConstantAttribute", 5, False)
-                                                               VerifyDefaultValueAttribute(type.GetMember(Of MethodSymbol)("F6").Parameters(0), "DecimalConstantAttribute", 6, False)
-                                                               VerifyDefaultValueAttribute(type.GetMember(Of MethodSymbol)("F7").Parameters(0), "DateTimeConstantAttribute", 635102208000000000L, False)
-                                                               VerifyDefaultValueAttribute(type.GetMember(Of MethodSymbol)("F8").Parameters(0), "DateTimeConstantAttribute", 635102208000000000L, False)
-                                                               VerifyDefaultValueAttribute(type.GetMember(Of MethodSymbol)("F9").Parameters(0), "DateTimeConstantAttribute", 635102208000000000L, False)
-                                                               VerifyDefaultValueAttribute(type.GetMember(Of PropertySymbol)("P").Parameters(0), "DecimalConstantAttribute", 10, False)
-                                                               VerifyDefaultValueAttribute(type.GetMember(Of MethodSymbol)("get_P").Parameters(0), "DecimalConstantAttribute", 10, False)
-                                                               VerifyDefaultValueAttribute(type.GetMember(Of MethodSymbol)("set_P").Parameters(0), "DecimalConstantAttribute", 10, False)
-                                                           End Sub)
+            CompileAndVerify(comp1, symbolValidator:=Sub([module])
+                                                         Dim type = [module].GlobalNamespace.GetMember(Of NamedTypeSymbol)("C")
+                                                         VerifyDefaultValueAttribute(type.GetMember(Of MethodSymbol)("F1").Parameters(0), Nothing, 1, True)
+                                                         VerifyDefaultValueAttribute(type.GetMember(Of MethodSymbol)("F2").Parameters(0), "DefaultParameterValueAttribute", 2, False)
+                                                         VerifyDefaultValueAttribute(type.GetMember(Of MethodSymbol)("F3").Parameters(0), "DefaultParameterValueAttribute", 3, True)
+                                                         VerifyDefaultValueAttribute(type.GetMember(Of MethodSymbol)("F4").Parameters(0), "DecimalConstantAttribute", 4UI, False)
+                                                         VerifyDefaultValueAttribute(type.GetMember(Of MethodSymbol)("F5").Parameters(0), "DecimalConstantAttribute", 5, False)
+                                                         VerifyDefaultValueAttribute(type.GetMember(Of MethodSymbol)("F6").Parameters(0), "DecimalConstantAttribute", 6, False)
+                                                         VerifyDefaultValueAttribute(type.GetMember(Of MethodSymbol)("F7").Parameters(0), "DateTimeConstantAttribute", 635102208000000000L, False)
+                                                         VerifyDefaultValueAttribute(type.GetMember(Of MethodSymbol)("F8").Parameters(0), "DateTimeConstantAttribute", 635102208000000000L, False)
+                                                         VerifyDefaultValueAttribute(type.GetMember(Of MethodSymbol)("F9").Parameters(0), "DateTimeConstantAttribute", 635102208000000000L, False)
+                                                         VerifyDefaultValueAttribute(type.GetMember(Of PropertySymbol)("P").Parameters(0), "DecimalConstantAttribute", 10, False)
+                                                         VerifyDefaultValueAttribute(type.GetMember(Of MethodSymbol)("get_P").Parameters(0), "DecimalConstantAttribute", 10, False)
+                                                         VerifyDefaultValueAttribute(type.GetMember(Of MethodSymbol)("set_P").Parameters(0), "DecimalConstantAttribute", 10, False)
+                                                     End Sub)
             Dim source2 =
 <compilation>
     <file name="a.vb"><![CDATA[
@@ -919,7 +924,7 @@ End Class
 ]]>
     </file>
 </compilation>
-            Dim comp2a = CreateCompilationWithMscorlibAndVBRuntime(
+            Dim comp2a = CreateCompilationWithMscorlib40AndVBRuntime(
                 source2,
                 additionalRefs:={New VisualBasicCompilationReference(comp1)},
                 options:=TestOptions.DebugExe)
@@ -935,7 +940,7 @@ BC30455: Argument not specified for parameter 'o' of 'Public Shared Function F8(
         Report(C.F8().Ticks)
                  ~~
 </errors>)
-            Dim comp2b = CreateCompilationWithMscorlibAndVBRuntime(
+            Dim comp2b = CreateCompilationWithMscorlib40AndVBRuntime(
                 source2,
                 additionalRefs:={MetadataReference.CreateFromImage(comp1.EmitToArray())},
                 options:=TestOptions.DebugExe)
@@ -955,10 +960,10 @@ BC30455: Argument not specified for parameter 'o' of 'Public Shared Function F8(
 ]]>)
         End Sub
 
-        <WorkItem(529684, "DevDiv")>
+        <WorkItem(529684, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/529684")>
         <Fact()>
         Public Sub TestDuplicateConstantAttributesSameValues_PartialMethods()
-            Dim comp = CreateCompilationWithMscorlibAndVBRuntime(
+            Dim comp = CreateCompilationWithMscorlib40AndVBRuntime(
 <compilation>
     <file name="a.vb"><![CDATA[
 Imports System
@@ -982,37 +987,40 @@ Partial Class C
 End Class
 ]]>
     </file>
-</compilation>)
-            comp.AssertTheseDiagnostics(<errors/>)
-            CompileAndVerify(comp, sourceSymbolValidator:=Sub([module])
-                                                              Dim type = [module].GlobalNamespace.GetMember(Of NamedTypeSymbol)("C")
-                                                              VerifyDefaultValueAttribute(type.GetMember(Of MethodSymbol)("F1").Parameters(0), "DefaultParameterValueAttribute", 1, True)
-                                                              VerifyDefaultValueAttribute(type.GetMember(Of MethodSymbol)("F2").Parameters(0), "DecimalConstantAttribute", 2, False)
-                                                              VerifyDefaultValueAttribute(type.GetMember(Of MethodSymbol)("F3").Parameters(0), "DateTimeConstantAttribute", 635102208000000000L, False)
-                                                          End Sub)
+</compilation>,
+                options:=TestOptions.ReleaseDll.WithMetadataImportOptions(MetadataImportOptions.All))
+
+            CompileAndVerify(comp, symbolValidator:=Sub([module])
+                                                        Dim type = [module].GlobalNamespace.GetMember(Of NamedTypeSymbol)("C")
+                                                        VerifyDefaultValueAttribute(type.GetMember(Of MethodSymbol)("F1").Parameters(0), "DefaultParameterValueAttribute", 1, True)
+                                                        VerifyDefaultValueAttribute(type.GetMember(Of MethodSymbol)("F2").Parameters(0), "DecimalConstantAttribute", 2, False)
+                                                        VerifyDefaultValueAttribute(type.GetMember(Of MethodSymbol)("F3").Parameters(0), "DateTimeConstantAttribute", 635102208000000000L, False)
+                                                    End Sub)
         End Sub
 
         Private Shared Sub VerifyDefaultValueAttribute(parameter As ParameterSymbol, expectedAttributeName As String, expectedDefault As Object, hasDefault As Boolean)
-            Dim attributes = parameter.GetCustomAttributesToEmit(New ModuleCompilationState).ToArray()
+            Dim attributes = DirectCast(parameter.ContainingModule, PEModuleSymbol).
+                GetCustomAttributesForToken(DirectCast(parameter, PEParameterSymbol).Handle).
+                Where(Function(attr) attr.AttributeClass.Name = expectedAttributeName).
+                ToArray()
+
             If expectedAttributeName Is Nothing Then
                 Assert.Equal(attributes.Length, 0)
             Else
                 Assert.Equal(attributes.Length, 1)
                 Dim attribute = DirectCast(attributes(0), VisualBasicAttributeData)
                 Dim argument = attribute.ConstructorArguments.Last()
-                Assert.Equal(expectedAttributeName, attribute.AttributeClass.Name)
                 Assert.Equal(expectedDefault, argument.Value)
-                Assert.Equal(hasDefault, DirectCast(parameter, Cci.IParameterDefinition).HasDefaultValue)
             End If
             If hasDefault Then
                 Assert.Equal(expectedDefault, parameter.ExplicitDefaultValue)
             End If
         End Sub
 
-        <WorkItem(529684, "DevDiv")>
+        <WorkItem(529684, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/529684")>
         <Fact()>
         Public Sub TestDuplicateConstantAttributesDifferentValues()
-            Dim comp = CreateCompilationWithMscorlibAndVBRuntime(
+            Dim comp = CreateCompilationWithMscorlib40AndVBRuntime(
 <compilation>
     <file name="a.vb"><![CDATA[
 Imports System
@@ -1097,10 +1105,10 @@ Delegate Sub D(<DateTimeConstant(1), DefaultParameterValue(2)> o As DateTime)
 ]]></errors>)
         End Sub
 
-        <WorkItem(529684, "DevDiv")>
+        <WorkItem(529684, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/529684")>
         <Fact()>
         Public Sub TestDuplicateConstantAttributesDifferentValues_PartialMethods()
-            Dim comp = CreateCompilationWithMscorlibAndVBRuntime(
+            Dim comp = CreateCompilationWithMscorlib40AndVBRuntime(
 <compilation>
     <file name="a.vb"><![CDATA[
 Imports System
@@ -1140,10 +1148,10 @@ BC37226: The parameter has multiple distinct default values.
         ''' <summary>
         ''' Should not report differences if either value is bad.
         ''' </summary>
-        <WorkItem(529684, "DevDiv")>
+        <WorkItem(529684, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/529684")>
         <Fact()>
         Public Sub TestDuplicateConstantAttributesDifferentValues_BadValue()
-            Dim comp = CreateCompilationWithMscorlibAndVBRuntime(
+            Dim comp = CreateCompilationWithMscorlib40AndVBRuntime(
 <compilation>
     <file name="a.vb"><![CDATA[
 Imports System
@@ -1152,6 +1160,7 @@ Imports System.Runtime.InteropServices
 Interface I
     Sub M1(<DefaultParameterValue(GetType(C)), DecimalConstant(0, 0, 0, 0, 0)> o As Decimal)
     Sub M2(<DefaultParameterValue(0), DecimalConstant(0, 0, 0, 0, GetType(C))> o As Decimal)
+    Sub M3(<DefaultParameterValue(0), DecimalConstant(0, 0, 0, 0, 0)> o As Decimal)
 End Interface
 ]]>
     </file>
@@ -1160,9 +1169,15 @@ End Interface
 BC30002: Type 'C' is not defined.
     Sub M1(<DefaultParameterValue(GetType(C)), DecimalConstant(0, 0, 0, 0, 0)> o As Decimal)
                                           ~
+BC37226: The parameter has multiple distinct default values.
+    Sub M1(<DefaultParameterValue(GetType(C)), DecimalConstant(0, 0, 0, 0, 0)> o As Decimal)
+                                               ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 BC30002: Type 'C' is not defined.
     Sub M2(<DefaultParameterValue(0), DecimalConstant(0, 0, 0, 0, GetType(C))> o As Decimal)
                                                                           ~
+BC37226: The parameter has multiple distinct default values.
+    Sub M3(<DefaultParameterValue(0), DecimalConstant(0, 0, 0, 0, 0)> o As Decimal)
+                                      ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 ]]></errors>)
         End Sub
 
@@ -1186,17 +1201,17 @@ End Module
 ]]>
     </file>
 </compilation>
-            Dim comp = CompilationUtils.CreateCompilationWithMscorlibAndVBRuntimeAndReferences(source, additionalRefs:={classLibrary})
+            Dim comp = CompilationUtils.CreateCompilationWithMscorlib40AndVBRuntimeAndReferences(source, references:={_classLibrary})
             CompileAndVerify(source,
-                 additionalRefs:={classLibrary},
+                 references:={_classLibrary},
                  expectedOutput:=<![CDATA[
    0
 False
 ]]>)
         End Sub
 
-        <WorkItem(543076, "DevDiv")>
-        <Fact()>
+        <WorkItem(543076, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/543076")>
+        <ConditionalFact(GetType(WindowsDesktopOnly), Reason:="https://github.com/dotnet/roslyn/issues/28046")>
         Public Sub TestPropertyIntegerOptionalDouble()
             Dim source =
 <compilation>
@@ -1215,7 +1230,7 @@ End Module
 ]]></file>
 </compilation>
             CompileAndVerify(source,
-                             additionalRefs:={classLibrary},
+                             references:={_classLibrary},
                              expectedOutput:=<![CDATA[
 Member: get_PropertyIntegerOptionalDouble
 Parameter: Type=System.Int32, Name=i, Optional=False, DefaultValue=
@@ -1223,7 +1238,7 @@ Parameter: Type=System.Double, Name=j, Optional=True, DefaultValue=100
 ]]>)
         End Sub
 
-        <WorkItem(543093, "DevDiv")>
+        <WorkItem(543093, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/543093")>
         <Fact()>
         Public Sub TestIntegerWithDateTimeOptionalValue()
             Dim source =
@@ -1239,12 +1254,12 @@ End Module
     </file>
 </compilation>
 
-            Dim comp = CompilationUtils.CreateCompilationWithMscorlibAndVBRuntimeAndReferences(source, additionalRefs:={classLibrary})
+            Dim comp = CompilationUtils.CreateCompilationWithMscorlib40AndVBRuntimeAndReferences(source, references:={_classLibrary})
             comp.VerifyDiagnostics(Diagnostic(ERRID.ERR_TypeMismatch2, "IntegerWithDateTimeOptionalValue()").WithArguments("Date", "Integer"))
         End Sub
 
-        <WorkItem(543093, "DevDiv")>
-        <Fact()>
+        <WorkItem(543093, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/543093")>
+        <ConditionalFact(GetType(NoIOperationValidation))> ' Disabling for IOperation run due to https://github.com/dotnet/roslyn/issues/26895
         Public Sub TestStringWithOptionalDateTimeValue()
             ' Error when option strict is on
             ' No error when option strict is off
@@ -1267,7 +1282,7 @@ End Module
                         </file>
                     </compilation>
 
-                Dim comp = CompilationUtils.CreateCompilationWithMscorlibAndVBRuntimeAndReferences(source, additionalRefs:={classLibrary})
+                Dim comp = CompilationUtils.CreateCompilationWithMscorlib40AndVBRuntimeAndReferences(source, references:={_classLibrary})
                 Dim diag = expectedDiagnostics(i)
                 If diag IsNot Nothing Then
                     comp.VerifyDiagnostics(diag)
@@ -1278,7 +1293,7 @@ End Module
             Next
         End Sub
 
-        <WorkItem(543139, "DevDiv")>
+        <WorkItem(543139, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/543139")>
         <Fact()>
         Public Sub TestOverrideOptionalArgumentFromMetadata()
             Dim source =
@@ -1298,17 +1313,17 @@ End Module
 ]]>
     </file>
 </compilation>
-            Dim comp = CompilationUtils.CreateCompilationWithMscorlibAndVBRuntimeAndReferences(source, additionalRefs:={classLibrary})
+            Dim comp = CompilationUtils.CreateCompilationWithMscorlib40AndVBRuntimeAndReferences(source, references:={_classLibrary})
             comp.VerifyDiagnostics()
             CompileAndVerify(source,
-                 additionalRefs:={classLibrary},
+                 references:={_classLibrary},
                  expectedOutput:=<![CDATA[
 ]]>)
         End Sub
 
-        <WorkItem(543227, "DevDiv")>
-        <Fact()>
-        Public Sub TestMultpleEnumDefaultValuesFromMetadata()
+        <WorkItem(543227, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/543227")>
+        <ConditionalFact(GetType(WindowsDesktopOnly), Reason:="https://github.com/dotnet/roslyn/issues/28046")>
+        Public Sub TestMultipleEnumDefaultValuesFromMetadata()
             Dim source =
 <compilation>
     <file name="a.vb">
@@ -1322,10 +1337,10 @@ End Module
 ]]>
     </file>
 </compilation>
-            Dim comp = CompilationUtils.CreateCompilationWithMscorlibAndVBRuntimeAndReferences(source, additionalRefs:={classLibrary})
+            Dim comp = CompilationUtils.CreateCompilationWithMscorlib40AndVBRuntimeAndReferences(source, references:={_classLibrary})
             comp.VerifyDiagnostics()
             CompileAndVerify(source,
-                 additionalRefs:={classLibrary},
+                 references:={_classLibrary},
                  expectedOutput:=<![CDATA[
 Member: TestWithMultipleOptionalEnumValues
 Parameter: Type=Library+Animal, Name=e1, Optional=True, DefaultValue=Dog
@@ -1337,8 +1352,8 @@ Parameter: Type=Library+Animal, Name=e2, Optional=True, DefaultValue=Cat
         ' Test without omitted argument syntax and an error
 
         <Fact()>
-        Public Sub TestExplicitConstantAttributesOnFields()
-            Dim comp = CreateCompilationWithMscorlibAndVBRuntime(
+        Public Sub TestExplicitConstantAttributesOnFields_Error()
+            Dim comp = CreateCompilationWithMscorlib40AndVBRuntime(
 <compilation>
     <file name="a.vb"><![CDATA[
 Imports System
@@ -1375,10 +1390,6 @@ Class C
     <DecimalConstant(0, 0, 0, 0, 0)> Public Const F13 As DateTime = #1/1/2013#
 
     <DecimalConstant(0, 0, 0, 0, 0)> Public Const F14 As Decimal = 1
-
-    <DecimalConstantAttribute(0, 128, 0, 0, 7)> Public Const F15 as Decimal = -7
-
-    <DateTimeConstantAttribute(634925952000000000)> Public Const F16 as Date = #1/1/2013#
 End Class
 ]]>
     </file>
@@ -1424,11 +1435,36 @@ BC37228: The field has multiple distinct constant values.
     <DecimalConstant(0, 0, 0, 0, 0)> Public Const F14 As Decimal = 1
      ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 ]]></errors>)
+        End Sub
 
-            Dim c = comp.GetTypeByMetadataName("C")
-            Dim context = New ModuleCompilationState()
-            Assert.Equal(1, c.GetMember("F15").GetCustomAttributesToEmit(context).Count())
-            Assert.Equal(1, c.GetMember("F16").GetCustomAttributesToEmit(context).Count())
+        <Fact()>
+        Public Sub TestExplicitConstantAttributesOnFields_Valid()
+            Dim comp = CreateCompilationWithMscorlib40AndVBRuntime(
+<compilation>
+    <file name="a.vb"><![CDATA[
+Imports System
+Imports System.Runtime.CompilerServices
+Imports System.Runtime.InteropServices
+
+Class C
+    <DecimalConstantAttribute(0, 128, 0, 0, 7)> Public Const F1 as Decimal = -7
+
+    <DateTimeConstantAttribute(634925952000000000)> Public Const F2 as Date = #1/1/2013#
+End Class
+]]>
+    </file>
+</compilation>)
+
+            CompileAndVerify(comp, symbolValidator:=Sub([module] As ModuleSymbol)
+                                                        Dim peModule = DirectCast([module], PEModuleSymbol)
+                                                        Dim type = peModule.GlobalNamespace.GetTypeMember("C")
+
+                                                        Dim f1 = DirectCast(type.GetMember("F1"), PEFieldSymbol)
+                                                        Assert.Equal(1, peModule.GetCustomAttributesForToken(f1.Handle).Length)
+
+                                                        Dim f2 = DirectCast(type.GetMember("F2"), PEFieldSymbol)
+                                                        Assert.Equal(1, peModule.GetCustomAttributesForToken(f2.Handle).Length)
+                                                    End Sub)
         End Sub
 
     End Class

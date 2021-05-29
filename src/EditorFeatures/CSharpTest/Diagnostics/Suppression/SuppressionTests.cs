@@ -1,40 +1,44 @@
-﻿// Copyright (c) Microsoft.  All Rights Reserved.  Licensed under the Apache License, Version 2.0.  See License.txt in the project root for license information.
+﻿// Licensed to the .NET Foundation under one or more agreements.
+// The .NET Foundation licenses this file to you under the MIT license.
+// See the LICENSE file in the project root for more information.
+
+#nullable disable
 
 using System;
 using System.Collections.Immutable;
-using Microsoft.CodeAnalysis.CodeFixes.Suppression;
+using System.Linq;
+using System.Text.RegularExpressions;
+using System.Threading;
+using System.Threading.Tasks;
+using Microsoft.CodeAnalysis.CodeActions;
+using Microsoft.CodeAnalysis.CodeFixes;
 using Microsoft.CodeAnalysis.CSharp;
 using Microsoft.CodeAnalysis.CSharp.CodeFixes.Suppression;
 using Microsoft.CodeAnalysis.CSharp.Diagnostics.SimplifyTypeNames;
 using Microsoft.CodeAnalysis.CSharp.Syntax;
 using Microsoft.CodeAnalysis.Diagnostics;
+using Microsoft.CodeAnalysis.Diagnostics.CSharp;
 using Microsoft.CodeAnalysis.Editor.UnitTests.Diagnostics;
 using Microsoft.CodeAnalysis.Editor.UnitTests.Workspaces;
+using Microsoft.CodeAnalysis.ErrorLogger;
+using Microsoft.CodeAnalysis.Formatting;
+using Microsoft.CodeAnalysis.Host.Mef;
+using Microsoft.CodeAnalysis.Test.Utilities;
 using Roslyn.Test.Utilities;
+using Roslyn.Utilities;
 using Xunit;
 
 namespace Microsoft.CodeAnalysis.Editor.CSharp.UnitTests.Diagnostics.Suppression
 {
-    public abstract class CSharpSuppressionTests : AbstractSuppressionDiagnosticTest
+    public abstract partial class CSharpSuppressionTests : AbstractSuppressionDiagnosticTest
     {
-        protected override ParseOptions GetScriptOptions()
-        {
-            return Options.Script;
-        }
+        protected override ParseOptions GetScriptOptions() => Options.Script;
 
-        protected override TestWorkspace CreateWorkspaceFromFile(string definition, ParseOptions parseOptions, CompilationOptions compilationOptions)
-        {
-            return CSharpWorkspaceFactory.CreateWorkspaceFromFile(definition, (CSharpParseOptions)parseOptions, (CSharpCompilationOptions)compilationOptions);
-        }
-
-        protected override string GetLanguage()
-        {
-            return LanguageNames.CSharp;
-        }
+        protected internal override string GetLanguage() => LanguageNames.CSharp;
 
         #region "Pragma disable tests"
 
-        public abstract class CSharpPragmaWarningDisableSuppressionTests : CSharpSuppressionTests
+        public abstract partial class CSharpPragmaWarningDisableSuppressionTests : CSharpSuppressionTests
         {
             protected sealed override int CodeActionIndex
             {
@@ -43,15 +47,13 @@ namespace Microsoft.CodeAnalysis.Editor.CSharp.UnitTests.Diagnostics.Suppression
 
             public class CompilerDiagnosticSuppressionTests : CSharpPragmaWarningDisableSuppressionTests
             {
-                internal override Tuple<DiagnosticAnalyzer, ISuppressionFixProvider> CreateDiagnosticProviderAndFixer(Workspace workspace)
-                {
-                    return Tuple.Create<DiagnosticAnalyzer, ISuppressionFixProvider>(null, new CSharpSuppressionCodeFixProvider());
-                }
+                internal override Tuple<DiagnosticAnalyzer, IConfigurationFixProvider> CreateDiagnosticProviderAndFixer(Workspace workspace)
+                    => Tuple.Create<DiagnosticAnalyzer, IConfigurationFixProvider>(null, new CSharpSuppressionCodeFixProvider());
 
                 [Fact, Trait(Traits.Feature, Traits.Features.CodeActionsSuppression)]
-                public void TestPragmaWarningDirective()
+                public async Task TestPragmaWarningDirective()
                 {
-                    Test(
+                    await TestAsync(
         @"
 class Class
 {
@@ -60,22 +62,49 @@ class Class
         [|int x = 0;|]
     }
 }",
+        $@"
+class Class
+{{
+    void Method()
+    {{
+#pragma warning disable CS0219 // {CSharpResources.WRN_UnreferencedVarAssg_Title}
+        int x = 0;
+#pragma warning restore CS0219 // {CSharpResources.WRN_UnreferencedVarAssg_Title}
+    }}
+}}");
+                }
+
+                [WorkItem(26015, "https://github.com/dotnet/roslyn/issues/26015")]
+                [Fact, Trait(Traits.Feature, Traits.Features.CodeActionsSuppression)]
+                public async Task TestPragmaWarningDirectiveAroundMultiLineStatement()
+                {
+                    await TestAsync(
         @"
 class Class
 {
     void Method()
     {
-#pragma warning disable CS0219 // Variable is assigned but its value is never used
-        int x = 0;
-#pragma warning restore CS0219 // Variable is assigned but its value is never used
+        [|string x = @""multi
+line"";|]
     }
-}");
+}",
+        $@"
+class Class
+{{
+    void Method()
+    {{
+#pragma warning disable CS0219 // {CSharpResources.WRN_UnreferencedVarAssg_Title}
+        string x = @""multi
+line"";
+#pragma warning restore CS0219 // {CSharpResources.WRN_UnreferencedVarAssg_Title}
+    }}
+}}");
                 }
 
                 [Fact, Trait(Traits.Feature, Traits.Features.CodeActionsSuppression)]
-                public void TestMultilineStatementPragmaWarningDirective()
+                public async Task TestMultilineStatementPragmaWarningDirective()
                 {
-                    Test(
+                    await TestAsync(
         @"
 class Class
 {
@@ -85,23 +114,23 @@ class Class
               + 1;|]
     }
 }",
-        @"
+        $@"
 class Class
-{
+{{
     void Method()
-    {
-#pragma warning disable CS0219 // Variable is assigned but its value is never used
+    {{
+#pragma warning disable CS0219 // {CSharpResources.WRN_UnreferencedVarAssg_Title}
         int x = 0
-#pragma warning restore CS0219 // Variable is assigned but its value is never used
+#pragma warning restore CS0219 // {CSharpResources.WRN_UnreferencedVarAssg_Title}
               + 1;
-    }
-}");
+    }}
+}}");
                 }
 
                 [Fact, Trait(Traits.Feature, Traits.Features.CodeActionsSuppression)]
-                public void TestPragmaWarningDirectiveWithExistingTrivia()
+                public async Task TestPragmaWarningDirectiveWithExistingTrivia()
                 {
-                    Test(
+                    await TestAsync(
         @"
 class Class
 {
@@ -112,25 +141,82 @@ class Class
         /* End comment next line */
     }
 }",
-        @"
+        $@"
 class Class
-{
+{{
     void Method()
-    {
-#pragma warning disable CS0219 // Variable is assigned but its value is never used
-                              // Start comment previous line
-                              /* Start comment same line */
+    {{
+        // Start comment previous line
+#pragma warning disable CS0219 // {CSharpResources.WRN_UnreferencedVarAssg_Title}
+        /* Start comment same line */
         int x = 0; // End comment same line
-#pragma warning restore CS0219 // Variable is assigned but its value is never used
-                              /* End comment next line */
-    }
-}");
+#pragma warning restore CS0219 // {CSharpResources.WRN_UnreferencedVarAssg_Title}
+        /* End comment next line */
+    }}
+}}");
                 }
 
                 [Fact, Trait(Traits.Feature, Traits.Features.CodeActionsSuppression)]
-                public void TestMultipleInstancesOfPragmaWarningDirective()
+                [WorkItem(16681, "https://github.com/dotnet/roslyn/issues/16681")]
+                public async Task TestPragmaWarningDirectiveWithDocumentationComment1()
                 {
-                    Test(
+                    await TestAsync(
+        @"
+sealed class Class
+{
+    /// <summary>Text</summary>
+    [|protected void Method()|]
+    {
+    }
+}",
+        $@"
+sealed class Class
+{{
+    /// <summary>Text</summary>
+#pragma warning disable CS0628 // {CSharpResources.WRN_ProtectedInSealed_Title}
+    protected void Method()
+#pragma warning restore CS0628 // {CSharpResources.WRN_ProtectedInSealed_Title}
+    {{
+    }}
+}}");
+                }
+
+                [Fact, Trait(Traits.Feature, Traits.Features.CodeActionsSuppression)]
+                [WorkItem(16681, "https://github.com/dotnet/roslyn/issues/16681")]
+                public async Task TestPragmaWarningDirectiveWithDocumentationComment2()
+                {
+                    await TestAsync(
+        @"
+sealed class Class
+{
+    /// <summary>Text</summary>
+    /// <remarks>
+    /// <see cref=""[|Class2|]""/>
+    /// </remarks>
+    void Method()
+    {
+    }
+}",
+        $@"
+sealed class Class
+{{
+
+#pragma warning disable CS1574 // {CSharpResources.WRN_BadXMLRef_Title}
+    /// <summary>Text</summary>
+    /// <remarks>
+    /// <see cref=""Class2""/>
+    /// </remarks>
+    void Method()
+#pragma warning restore CS1574 // {CSharpResources.WRN_BadXMLRef_Title}
+    {{
+    }}
+}}", new CSharpParseOptions(documentationMode: DocumentationMode.Diagnose));
+                }
+
+                [Fact, Trait(Traits.Feature, Traits.Features.CodeActionsSuppression)]
+                public async Task TestMultipleInstancesOfPragmaWarningDirective()
+                {
+                    await TestAsync(
         @"
 class Class
 {
@@ -139,22 +225,74 @@ class Class
         [|int x = 0, y = 0;|]
     }
 }",
-        @"
+        $@"
+class Class
+{{
+    void Method()
+    {{
+#pragma warning disable CS0219 // {CSharpResources.WRN_UnreferencedVarAssg_Title}
+        int x = 0, y = 0;
+#pragma warning restore CS0219 // {CSharpResources.WRN_UnreferencedVarAssg_Title}
+    }}
+}}");
+                }
+
+                [Fact, Trait(Traits.Feature, Traits.Features.CodeActionsSuppression)]
+                [WorkItem(3311, "https://github.com/dotnet/roslyn/issues/3311")]
+                public async Task TestNoDuplicateSuppressionCodeFixes()
+                {
+                    var source = @"
 class Class
 {
     void Method()
     {
-#pragma warning disable CS0219 // Variable is assigned but its value is never used
-        int x = 0, y = 0;
-#pragma warning restore CS0219 // Variable is assigned but its value is never used
+        [|int x = 0, y = 0; string s;|]
     }
-}");
+}";
+                    var parameters = new TestParameters();
+                    using var workspace = CreateWorkspaceFromOptions(source, parameters);
+
+                    var analyzerReference = new AnalyzerImageReference(ImmutableArray.Create<DiagnosticAnalyzer>(new CSharpCompilerDiagnosticAnalyzer()));
+                    workspace.TryApplyChanges(workspace.CurrentSolution.WithAnalyzerReferences(new[] { analyzerReference }));
+
+                    Assert.IsType<MockDiagnosticUpdateSourceRegistrationService>(workspace.ExportProvider.GetExportedValue<IDiagnosticUpdateSourceRegistrationService>());
+                    var diagnosticService = Assert.IsType<DiagnosticAnalyzerService>(workspace.ExportProvider.GetExportedValue<IDiagnosticAnalyzerService>());
+                    var incrementalAnalyzer = diagnosticService.CreateIncrementalAnalyzer(workspace);
+                    var suppressionProvider = CreateDiagnosticProviderAndFixer(workspace).Item2;
+                    var suppressionProviderFactory = new Lazy<IConfigurationFixProvider, CodeChangeProviderMetadata>(() => suppressionProvider,
+                        new CodeChangeProviderMetadata("SuppressionProvider", languages: new[] { LanguageNames.CSharp }));
+                    var fixService = new CodeFixService(
+                        diagnosticService,
+                        SpecializedCollections.EmptyEnumerable<Lazy<IErrorLoggerService>>(),
+                        SpecializedCollections.EmptyEnumerable<Lazy<CodeFixProvider, CodeChangeProviderMetadata>>(),
+                        SpecializedCollections.SingletonEnumerable(suppressionProviderFactory));
+                    var document = GetDocumentAndSelectSpan(workspace, out var span);
+                    var diagnostics = await diagnosticService.GetDiagnosticsForSpanAsync(document, span);
+                    Assert.Equal(2, diagnostics.Where(d => d.Id == "CS0219").Count());
+
+                    var allFixes = (await fixService.GetFixesAsync(document, span, includeConfigurationFixes: true, cancellationToken: CancellationToken.None))
+                        .SelectMany(fixCollection => fixCollection.Fixes);
+
+                    var cs0219Fixes = allFixes.Where(fix => fix.PrimaryDiagnostic.Id == "CS0219").ToArray();
+
+                    // Ensure that there are no duplicate suppression fixes.
+                    Assert.Equal(1, cs0219Fixes.Length);
+                    var cs0219EquivalenceKey = cs0219Fixes[0].Action.EquivalenceKey;
+                    Assert.NotNull(cs0219EquivalenceKey);
+
+                    // Ensure that there *is* a fix for the other warning and that it has a *different*
+                    // equivalence key so that it *doesn't* get de-duplicated
+                    Assert.Equal(1, diagnostics.Where(d => d.Id == "CS0168").Count());
+                    var cs0168Fixes = allFixes.Where(fix => fix.PrimaryDiagnostic.Id == "CS0168");
+                    var cs0168EquivalenceKey = cs0168Fixes.Single().Action.EquivalenceKey;
+                    Assert.NotNull(cs0168EquivalenceKey);
+                    Assert.NotEqual(cs0219EquivalenceKey, cs0168EquivalenceKey);
                 }
 
                 [Fact, Trait(Traits.Feature, Traits.Features.CodeActionsSuppression)]
-                public void TestErrorAndWarningScenario()
+                public async Task TestErrorAndWarningScenario()
                 {
-                    Test(
+                    await TestAsync(
         @"
 class Class
 {
@@ -164,35 +302,35 @@ class Class
         [|int x = ""0"";|]
     }
 }",
-        @"
+        $@"
 class Class
-{
+{{
     void Method()
-    {
+    {{
         return 0;
-#pragma warning disable CS0162 // Unreachable code detected
+#pragma warning disable CS0162 // {CSharpResources.WRN_UnreachableCode_Title}
         int x = ""0"";
-#pragma warning restore CS0162 // Unreachable code detected
-    }
-}");
+#pragma warning restore CS0162 // {CSharpResources.WRN_UnreachableCode_Title}
+    }}
+}}");
                 }
 
-                [WorkItem(956453)]
+                [WorkItem(956453, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/956453")]
                 [Fact, Trait(Traits.Feature, Traits.Features.CodeActionsSuppression)]
-                public void TestWholeFilePragmaWarningDirective()
+                public async Task TestWholeFilePragmaWarningDirective()
                 {
-                    Test(
+                    await TestAsync(
         @"class Class { void Method() { [|int x = 0;|] } }",
-        @"#pragma warning disable CS0219 // Variable is assigned but its value is never used
-class Class { void Method() { int x = 0; } }
-#pragma warning restore CS0219 // Variable is assigned but its value is never used");
+        $@"#pragma warning disable CS0219 // {CSharpResources.WRN_UnreferencedVarAssg_Title}
+class Class {{ void Method() {{ int x = 0; }} }}
+#pragma warning restore CS0219 // {CSharpResources.WRN_UnreferencedVarAssg_Title}");
                 }
 
-                [WorkItem(970129)]
+                [WorkItem(970129, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/970129")]
                 [Fact, Trait(Traits.Feature, Traits.Features.CodeActionsSuppression)]
-                public void TestSuppressionAroundSingleToken()
+                public async Task TestSuppressionAroundSingleToken()
                 {
-                    Test(
+                    await TestAsync(
         @"
 using System;
 [Obsolete]
@@ -204,26 +342,26 @@ class Program
       [|Session|]
     }
 }",
-        @"
+        $@"
 using System;
 [Obsolete]
-class Session { }
+class Session {{ }}
 class Program
-{
+{{
     static void Main()
-    {
-#pragma warning disable CS0612 // Type or member is obsolete
+    {{
+#pragma warning disable CS0612 // {CSharpResources.WRN_DeprecatedSymbol_Title}
         Session
-#pragma warning restore CS0612 // Type or member is obsolete
-    }
-}");
+#pragma warning restore CS0612 // {CSharpResources.WRN_DeprecatedSymbol_Title}
+    }}
+}}");
                 }
 
-                [WorkItem(1066576)]
+                [WorkItem(1066576, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/1066576")]
                 [Fact, Trait(Traits.Feature, Traits.Features.CodeActionsSuppression)]
-                public void TestPragmaWarningDirectiveAroundTrivia1()
+                public async Task TestPragmaWarningDirectiveAroundTrivia1()
                 {
-                    Test(
+                    await TestAsync(
         @"
 class Class
 {
@@ -239,118 +377,118 @@ class Class
 
 
 }",
-        @"
+        $@"
 class Class
-{
+{{
     void Method()
-    {
+    {{
 
-#pragma warning disable CS1633 // Unrecognized #pragma directive
-                              // Comment
-                              // Comment
+        // Comment
+        // Comment
+#pragma warning disable CS1633 // {CSharpResources.WRN_IllegalPragma_Title}
 #pragma abcde
 
-    }    // Comment   
-#pragma warning restore CS1633 // Unrecognized #pragma directive
+    }}    // Comment   
+#pragma warning restore CS1633 // {CSharpResources.WRN_IllegalPragma_Title}
 
 
 
-}");
+}}");
                 }
 
-                [WorkItem(1066576)]
+                [WorkItem(1066576, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/1066576")]
                 [Fact, Trait(Traits.Feature, Traits.Features.CodeActionsSuppression)]
-                public void TestPragmaWarningDirectiveAroundTrivia2()
+                public async Task TestPragmaWarningDirectiveAroundTrivia2()
                 {
-                    Test(
+                    await TestAsync(
         @"[|#pragma abcde|]",
-        @"#pragma warning disable CS1633 // Unrecognized #pragma directive
+        $@"#pragma warning disable CS1633 // {CSharpResources.WRN_IllegalPragma_Title}
 #pragma abcde
-#pragma warning restore CS1633 // Unrecognized #pragma directive");
+#pragma warning restore CS1633 // {CSharpResources.WRN_IllegalPragma_Title}");
                 }
 
-                [WorkItem(1066576)]
+                [WorkItem(1066576, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/1066576")]
                 [Fact, Trait(Traits.Feature, Traits.Features.CodeActionsSuppression)]
-                public void TestPragmaWarningDirectiveAroundTrivia3()
+                public async Task TestPragmaWarningDirectiveAroundTrivia3()
                 {
-                    Test(
-        @"  [|#pragma abcde|]  ",
-        @"#pragma warning disable CS1633 // Unrecognized #pragma directive
+                    await TestAsync(
+        @"[|#pragma abcde|]  ",
+        $@"#pragma warning disable CS1633 // {CSharpResources.WRN_IllegalPragma_Title}
 #pragma abcde  
-#pragma warning restore CS1633 // Unrecognized #pragma directive");
+#pragma warning restore CS1633 // {CSharpResources.WRN_IllegalPragma_Title}");
                 }
 
-                [WorkItem(1066576)]
+                [WorkItem(1066576, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/1066576")]
                 [Fact, Trait(Traits.Feature, Traits.Features.CodeActionsSuppression)]
-                public void TestPragmaWarningDirectiveAroundTrivia4()
+                public async Task TestPragmaWarningDirectiveAroundTrivia4()
                 {
-                    Test(
+                    await TestAsync(
         @"
 
 [|#pragma abc|]
 class C { }
 
 ",
-        @"
+        $@"
 
-#pragma warning disable CS1633 // Unrecognized #pragma directive
+#pragma warning disable CS1633 // {CSharpResources.WRN_IllegalPragma_Title}
 #pragma abc
-class C { }
-#pragma warning restore CS1633 // Unrecognized #pragma directive
+class C {{ }}
+#pragma warning restore CS1633 // {CSharpResources.WRN_IllegalPragma_Title}
 
 ");
                 }
 
-                [WorkItem(1066576)]
+                [WorkItem(1066576, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/1066576")]
                 [Fact, Trait(Traits.Feature, Traits.Features.CodeActionsSuppression)]
-                public void TestPragmaWarningDirectiveAroundTrivia5()
+                public async Task TestPragmaWarningDirectiveAroundTrivia5()
                 {
-                    Test(
+                    await TestAsync(
         @"class C1 { }
 [|#pragma abc|]
 class C2 { }
 class C3 { }",
-        @"class C1 { }
-#pragma warning disable CS1633 // Unrecognized #pragma directive
+        $@"class C1 {{ }}
+#pragma warning disable CS1633 // {CSharpResources.WRN_IllegalPragma_Title}
 #pragma abc
-class C2 { }
-#pragma warning restore CS1633 // Unrecognized #pragma directive
-class C3 { }");
+class C2 {{ }}
+#pragma warning restore CS1633 // {CSharpResources.WRN_IllegalPragma_Title}
+class C3 {{ }}");
                 }
 
-                [WorkItem(1066576)]
+                [WorkItem(1066576, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/1066576")]
                 [Fact, Trait(Traits.Feature, Traits.Features.CodeActionsSuppression)]
-                public void TestPragmaWarningDirectiveAroundTrivia6()
+                public async Task TestPragmaWarningDirectiveAroundTrivia6()
                 {
-                    Test(
+                    await TestAsync(
         @"class C1 { }
 class C2 { } /// <summary><see [|cref=""abc""|]/></summary>
 class C3 { } // comment
   // comment
 // comment",
-        @"class C1 { }
-class C2 { }
-#pragma warning disable CS1574
-/// <summary><see cref=""abc""/></summary>
-class C3 { } // comment
-#pragma warning enable CS1574
-// comment
+$@"class C1 {{ }}
+#pragma warning disable CS1574 // {CSharpResources.WRN_BadXMLRef_Title}
+class C2 {{ }} /// <summary><see cref=""abc""/></summary>
+class
+#pragma warning restore CS1574 // {CSharpResources.WRN_BadXMLRef_Title}
+C3 {{ }} // comment
+  // comment
 // comment", CSharpParseOptions.Default.WithDocumentationMode(DocumentationMode.Diagnose));
                 }
             }
 
             public class UserHiddenDiagnosticSuppressionTests : CSharpPragmaWarningDisableSuppressionTests
             {
-                internal override Tuple<DiagnosticAnalyzer, ISuppressionFixProvider> CreateDiagnosticProviderAndFixer(Workspace workspace)
+                internal override Tuple<DiagnosticAnalyzer, IConfigurationFixProvider> CreateDiagnosticProviderAndFixer(Workspace workspace)
                 {
-                    return new Tuple<DiagnosticAnalyzer, ISuppressionFixProvider>(
+                    return new Tuple<DiagnosticAnalyzer, IConfigurationFixProvider>(
                         new CSharpSimplifyTypeNamesDiagnosticAnalyzer(), new CSharpSuppressionCodeFixProvider());
                 }
 
                 [Fact, Trait(Traits.Feature, Traits.Features.CodeActionsSuppression)]
-                public void TestHiddenDiagnosticCannotBeSuppressed()
+                public async Task TestHiddenDiagnosticCannotBeSuppressed()
                 {
-                    TestMissing(
+                    await TestMissingAsync(
         @"
 using System;
 
@@ -365,43 +503,41 @@ int Method()
                 }
             }
 
-            public class UserInfoDiagnosticSuppressionTests : CSharpPragmaWarningDisableSuppressionTests
+            public partial class UserInfoDiagnosticSuppressionTests : CSharpPragmaWarningDisableSuppressionTests
             {
                 private class UserDiagnosticAnalyzer : DiagnosticAnalyzer
                 {
-                    private DiagnosticDescriptor _descriptor =
+                    public static readonly DiagnosticDescriptor Decsciptor =
                         new DiagnosticDescriptor("InfoDiagnostic", "InfoDiagnostic Title", "InfoDiagnostic", "InfoDiagnostic", DiagnosticSeverity.Info, isEnabledByDefault: true);
 
                     public override ImmutableArray<DiagnosticDescriptor> SupportedDiagnostics
                     {
                         get
                         {
-                            return ImmutableArray.Create(_descriptor);
+                            return ImmutableArray.Create(Decsciptor);
                         }
                     }
 
                     public override void Initialize(AnalysisContext context)
-                    {
-                        context.RegisterSyntaxNodeAction(AnalyzeNode, SyntaxKind.ClassDeclaration);
-                    }
+                        => context.RegisterSyntaxNodeAction(AnalyzeNode, SyntaxKind.ClassDeclaration);
 
                     public void AnalyzeNode(SyntaxNodeAnalysisContext context)
                     {
                         var classDecl = (ClassDeclarationSyntax)context.Node;
-                        context.ReportDiagnostic(Diagnostic.Create(_descriptor, classDecl.Identifier.GetLocation()));
+                        context.ReportDiagnostic(Diagnostic.Create(Decsciptor, classDecl.Identifier.GetLocation()));
                     }
                 }
 
-                internal override Tuple<DiagnosticAnalyzer, ISuppressionFixProvider> CreateDiagnosticProviderAndFixer(Workspace workspace)
+                internal override Tuple<DiagnosticAnalyzer, IConfigurationFixProvider> CreateDiagnosticProviderAndFixer(Workspace workspace)
                 {
-                    return new Tuple<DiagnosticAnalyzer, ISuppressionFixProvider>(
+                    return new Tuple<DiagnosticAnalyzer, IConfigurationFixProvider>(
                         new UserDiagnosticAnalyzer(), new CSharpSuppressionCodeFixProvider());
                 }
 
                 [Fact, Trait(Traits.Feature, Traits.Features.CodeActionsSuppression)]
-                public void TestInfoDiagnosticSuppressed()
+                public async Task TestInfoDiagnosticSuppressed()
                 {
-                    Test(
+                    await TestAsync(
             @"
 using System;
 
@@ -427,11 +563,61 @@ class Class
                 }
             }
 
+            public partial class FormattingDiagnosticSuppressionTests : CSharpPragmaWarningDisableSuppressionTests
+            {
+                internal override Tuple<DiagnosticAnalyzer, IConfigurationFixProvider> CreateDiagnosticProviderAndFixer(Workspace workspace)
+                {
+                    return new Tuple<DiagnosticAnalyzer, IConfigurationFixProvider>(
+                        new FormattingDiagnosticAnalyzer(), new CSharpSuppressionCodeFixProvider());
+                }
+
+                protected override Task<(ImmutableArray<CodeAction>, CodeAction actionToInvoke)> GetCodeActionsAsync(TestWorkspace workspace, TestParameters parameters)
+                {
+                    var solution = workspace.CurrentSolution;
+                    var compilationOptions = solution.Projects.Single().CompilationOptions;
+                    var specificDiagnosticOptions = new[] { KeyValuePairUtil.Create(IDEDiagnosticIds.FormattingDiagnosticId, ReportDiagnostic.Warn) };
+                    compilationOptions = compilationOptions.WithSpecificDiagnosticOptions(specificDiagnosticOptions);
+                    var updatedSolution = solution.WithProjectCompilationOptions(solution.ProjectIds.Single(), compilationOptions);
+                    workspace.ChangeSolution(updatedSolution);
+
+                    return base.GetCodeActionsAsync(workspace, parameters);
+                }
+
+                [Fact, Trait(Traits.Feature, Traits.Features.CodeActionsSuppression)]
+                [WorkItem(38587, "https://github.com/dotnet/roslyn/issues/38587")]
+                public async Task TestFormattingDiagnosticSuppressed()
+                {
+                    await TestAsync(
+            @"
+using System;
+
+class Class
+{
+    int Method()
+    {
+        [|int x = 0 ;|]
+    }
+}",
+            @"
+using System;
+
+class Class
+{
+    int Method()
+    {
+#pragma warning disable format
+        int x = 0 ;
+#pragma warning restore format
+    }
+}");
+                }
+            }
+
             public class UserErrorDiagnosticSuppressionTests : CSharpPragmaWarningDisableSuppressionTests
             {
                 private class UserDiagnosticAnalyzer : DiagnosticAnalyzer
                 {
-                    private DiagnosticDescriptor _descriptor =
+                    private readonly DiagnosticDescriptor _descriptor =
                         new DiagnosticDescriptor("ErrorDiagnostic", "ErrorDiagnostic", "ErrorDiagnostic", "ErrorDiagnostic", DiagnosticSeverity.Error, isEnabledByDefault: true);
 
                     public override ImmutableArray<DiagnosticDescriptor> SupportedDiagnostics
@@ -443,9 +629,7 @@ class Class
                     }
 
                     public override void Initialize(AnalysisContext context)
-                    {
-                        context.RegisterSyntaxNodeAction(AnalyzeNode, SyntaxKind.ClassDeclaration);
-                    }
+                        => context.RegisterSyntaxNodeAction(AnalyzeNode, SyntaxKind.ClassDeclaration);
 
                     public void AnalyzeNode(SyntaxNodeAnalysisContext context)
                     {
@@ -454,20 +638,32 @@ class Class
                     }
                 }
 
-                internal override Tuple<DiagnosticAnalyzer, ISuppressionFixProvider> CreateDiagnosticProviderAndFixer(Workspace workspace)
+                internal override Tuple<DiagnosticAnalyzer, IConfigurationFixProvider> CreateDiagnosticProviderAndFixer(Workspace workspace)
                 {
-                    return new Tuple<DiagnosticAnalyzer, ISuppressionFixProvider>(
+                    return new Tuple<DiagnosticAnalyzer, IConfigurationFixProvider>(
                         new UserDiagnosticAnalyzer(), new CSharpSuppressionCodeFixProvider());
                 }
 
                 [Fact, Trait(Traits.Feature, Traits.Features.CodeActionsSuppression)]
-                public void TestErrorDiagnosticCannotBeSuppressed()
+                public async Task TestErrorDiagnosticCanBeSuppressed()
                 {
-                    TestMissing(
+                    await TestAsync(
             @"
 using System;
 
 [|class Class|]
+{
+    int Method()
+    {
+        int x = 0;
+    }
+}",
+            @"
+using System;
+
+#pragma warning disable ErrorDiagnostic // ErrorDiagnostic
+class Class
+#pragma warning restore ErrorDiagnostic // ErrorDiagnostic
 {
     int Method()
     {
@@ -479,9 +675,12 @@ using System;
 
             public class DiagnosticWithBadIdSuppressionTests : CSharpPragmaWarningDisableSuppressionTests
             {
+                // Analyzer driver generates a no-location analyzer exception diagnostic, which we don't intend to test here.
+                protected override bool IncludeNoLocationDiagnostics => false;
+
                 private class UserDiagnosticAnalyzer : DiagnosticAnalyzer
                 {
-                    private DiagnosticDescriptor _descriptor =
+                    private readonly DiagnosticDescriptor _descriptor =
                         new DiagnosticDescriptor("@~DiagnosticWithBadId", "DiagnosticWithBadId", "DiagnosticWithBadId", "DiagnosticWithBadId", DiagnosticSeverity.Info, isEnabledByDefault: true);
 
                     public override ImmutableArray<DiagnosticDescriptor> SupportedDiagnostics
@@ -493,9 +692,7 @@ using System;
                     }
 
                     public override void Initialize(AnalysisContext context)
-                    {
-                        context.RegisterSyntaxNodeAction(AnalyzeNode, SyntaxKind.ClassDeclaration);
-                    }
+                        => context.RegisterSyntaxNodeAction(AnalyzeNode, SyntaxKind.ClassDeclaration);
 
                     public void AnalyzeNode(SyntaxNodeAnalysisContext context)
                     {
@@ -504,61 +701,21 @@ using System;
                     }
                 }
 
-                internal override Tuple<DiagnosticAnalyzer, ISuppressionFixProvider> CreateDiagnosticProviderAndFixer(Workspace workspace)
+                internal override Tuple<DiagnosticAnalyzer, IConfigurationFixProvider> CreateDiagnosticProviderAndFixer(Workspace workspace)
                 {
-                    return new Tuple<DiagnosticAnalyzer, ISuppressionFixProvider>(
+                    return new Tuple<DiagnosticAnalyzer, IConfigurationFixProvider>(
                         new UserDiagnosticAnalyzer(), new CSharpSuppressionCodeFixProvider());
                 }
 
                 [Fact, Trait(Traits.Feature, Traits.Features.CodeActionsSuppression)]
-                public void TestDiagnosticWithBadIdSuppressed()
+                public async Task TestDiagnosticWithBadIdSuppressed()
                 {
-                    Test(
+                    // Diagnostics with bad/invalid ID are not reported.
+                    await TestMissingAsync(
             @"
 using System;
 
 [|class Class|]
-{
-    int Method()
-    {
-        int x = 0;
-    }
-}",
-            @"
-using System;
-
-#pragma warning disable @~DiagnosticWithBadId // DiagnosticWithBadId
-class Class
-#pragma warning restore @~DiagnosticWithBadId // DiagnosticWithBadId
-{
-    int Method()
-    {
-        int x = 0;
-    }
-}");
-
-                    // Verify that the original suppression doesn't really work and that the diagnostic can be suppressed again.
-                    Test(
-            @"
-using System;
-
-#pragma warning disable @~DiagnosticWithBadId // DiagnosticWithBadId
-[|class Class|]
-#pragma warning restore @~DiagnosticWithBadId // DiagnosticWithBadId
-{
-    int Method()
-    {
-        int x = 0;
-    }
-}",
-            @"
-using System;
-
-#pragma warning disable @~DiagnosticWithBadId // DiagnosticWithBadId
-#pragma warning disable @~DiagnosticWithBadId // DiagnosticWithBadId
-class Class
-#pragma warning restore @~DiagnosticWithBadId // DiagnosticWithBadId
-#pragma warning restore @~DiagnosticWithBadId // DiagnosticWithBadId
 {
     int Method()
     {
@@ -569,29 +726,77 @@ class Class
             }
         }
 
+        public partial class MultilineDiagnosticSuppressionTests : CSharpPragmaWarningDisableSuppressionTests
+        {
+            private class UserDiagnosticAnalyzer : DiagnosticAnalyzer
+            {
+                public static readonly DiagnosticDescriptor Decsciptor =
+                    new DiagnosticDescriptor("InfoDiagnostic", "InfoDiagnostic Title", "InfoDiagnostic", "InfoDiagnostic", DiagnosticSeverity.Info, isEnabledByDefault: true);
+
+                public override ImmutableArray<DiagnosticDescriptor> SupportedDiagnostics
+                {
+                    get
+                    {
+                        return ImmutableArray.Create(Decsciptor);
+                    }
+                }
+
+                public override void Initialize(AnalysisContext context)
+                    => context.RegisterSyntaxNodeAction(AnalyzeNode, SyntaxKind.ClassDeclaration);
+
+                public void AnalyzeNode(SyntaxNodeAnalysisContext context)
+                {
+                    var classDecl = (ClassDeclarationSyntax)context.Node;
+                    context.ReportDiagnostic(Diagnostic.Create(Decsciptor, classDecl.GetLocation()));
+                }
+            }
+
+            internal override Tuple<DiagnosticAnalyzer, IConfigurationFixProvider> CreateDiagnosticProviderAndFixer(Workspace workspace)
+            {
+                return new Tuple<DiagnosticAnalyzer, IConfigurationFixProvider>(
+                    new UserDiagnosticAnalyzer(), new CSharpSuppressionCodeFixProvider());
+            }
+
+            [WorkItem(2764, "https://github.com/dotnet/roslyn/issues/2764")]
+            [Fact, Trait(Traits.Feature, Traits.Features.CodeActionsSuppression)]
+            public async Task TestPragmaWarningDirectiveAroundMultilineDiagnostic()
+            {
+                await TestAsync(
+    @"
+[|class Class
+{
+}|]
+",
+    $@"
+#pragma warning disable {UserDiagnosticAnalyzer.Decsciptor.Id} // {UserDiagnosticAnalyzer.Decsciptor.Title}
+class Class
+{{
+}}
+#pragma warning restore {UserDiagnosticAnalyzer.Decsciptor.Id} // {UserDiagnosticAnalyzer.Decsciptor.Title}
+");
+            }
+        }
         #endregion
 
         #region "SuppressMessageAttribute tests"
 
-        public abstract class CSharpGlobalSuppressMessageSuppressionTests : CSharpSuppressionTests
+        public abstract partial class CSharpGlobalSuppressMessageSuppressionTests : CSharpSuppressionTests
         {
             protected sealed override int CodeActionIndex
             {
-                get { return 2; }
+                get { return 1; }
             }
 
             public class CompilerDiagnosticSuppressionTests : CSharpGlobalSuppressMessageSuppressionTests
             {
-                internal override Tuple<DiagnosticAnalyzer, ISuppressionFixProvider> CreateDiagnosticProviderAndFixer(Workspace workspace)
-                {
-                    return Tuple.Create<DiagnosticAnalyzer, ISuppressionFixProvider>(null, new CSharpSuppressionCodeFixProvider());
-                }
+                internal override Tuple<DiagnosticAnalyzer, IConfigurationFixProvider> CreateDiagnosticProviderAndFixer(Workspace workspace)
+                    => Tuple.Create<DiagnosticAnalyzer, IConfigurationFixProvider>(null, new CSharpSuppressionCodeFixProvider());
 
                 [Fact, Trait(Traits.Feature, Traits.Features.CodeActionsSuppression)]
-                public void TestCompilerDiagnosticsCannotBeSuppressed()
+                public async Task TestCompilerDiagnosticsCannotBeSuppressed()
                 {
                     // Another test verifies we have a pragma warning action for this source, this verifies there are no other suppression actions.
-                    TestActionCount(
+                    await TestActionCountAsync(
         @"
 class Class
 {
@@ -603,18 +808,55 @@ class Class
                 }
             }
 
+            public class FormattingDiagnosticSuppressionTests : CSharpGlobalSuppressMessageSuppressionTests
+            {
+                internal override Tuple<DiagnosticAnalyzer, IConfigurationFixProvider> CreateDiagnosticProviderAndFixer(Workspace workspace)
+                {
+                    return Tuple.Create<DiagnosticAnalyzer, IConfigurationFixProvider>(
+                        new FormattingDiagnosticAnalyzer(), new CSharpSuppressionCodeFixProvider());
+                }
+
+                protected override Task<(ImmutableArray<CodeAction>, CodeAction actionToInvoke)> GetCodeActionsAsync(TestWorkspace workspace, TestParameters parameters)
+                {
+                    var solution = workspace.CurrentSolution;
+                    var compilationOptions = solution.Projects.Single().CompilationOptions;
+                    var specificDiagnosticOptions = new[] { KeyValuePairUtil.Create(IDEDiagnosticIds.FormattingDiagnosticId, ReportDiagnostic.Warn) };
+                    compilationOptions = compilationOptions.WithSpecificDiagnosticOptions(specificDiagnosticOptions);
+                    var updatedSolution = solution.WithProjectCompilationOptions(solution.ProjectIds.Single(), compilationOptions);
+                    workspace.ChangeSolution(updatedSolution);
+
+                    return base.GetCodeActionsAsync(workspace, parameters);
+                }
+
+                [Fact, Trait(Traits.Feature, Traits.Features.CodeActionsSuppression)]
+                [WorkItem(38587, "https://github.com/dotnet/roslyn/issues/38587")]
+                public async Task TestCompilerDiagnosticsCannotBeSuppressed()
+                {
+                    // Another test verifies we have a pragma warning action for this source, this verifies there are no other suppression actions.
+                    await TestActionCountAsync(
+        @"
+class Class
+{
+    void Method()
+    {
+        [|int x = 0 ;|]
+    }
+}", 1);
+                }
+            }
+
             public class UserHiddenDiagnosticSuppressionTests : CSharpGlobalSuppressMessageSuppressionTests
             {
-                internal override Tuple<DiagnosticAnalyzer, ISuppressionFixProvider> CreateDiagnosticProviderAndFixer(Workspace workspace)
+                internal override Tuple<DiagnosticAnalyzer, IConfigurationFixProvider> CreateDiagnosticProviderAndFixer(Workspace workspace)
                 {
-                    return new Tuple<DiagnosticAnalyzer, ISuppressionFixProvider>(
+                    return new Tuple<DiagnosticAnalyzer, IConfigurationFixProvider>(
                         new CSharpSimplifyTypeNamesDiagnosticAnalyzer(), new CSharpSuppressionCodeFixProvider());
                 }
 
                 [Fact, Trait(Traits.Feature, Traits.Features.CodeActionsSuppression)]
-                public void TestHiddenDiagnosticsCannotBeSuppressed()
+                public async Task TestHiddenDiagnosticsCannotBeSuppressed()
                 {
-                    TestMissing(
+                    await TestMissingAsync(
         @"
 using System;
 class Class
@@ -627,25 +869,23 @@ class Class
                 }
             }
 
-            public class UserInfoDiagnosticSuppressionTests : CSharpGlobalSuppressMessageSuppressionTests
+            public partial class UserInfoDiagnosticSuppressionTests : CSharpGlobalSuppressMessageSuppressionTests
             {
                 private class UserDiagnosticAnalyzer : DiagnosticAnalyzer
                 {
-                    private DiagnosticDescriptor _descriptor =
+                    public static readonly DiagnosticDescriptor Descriptor =
                         new DiagnosticDescriptor("InfoDiagnostic", "InfoDiagnostic", "InfoDiagnostic", "InfoDiagnostic", DiagnosticSeverity.Info, isEnabledByDefault: true);
 
                     public override ImmutableArray<DiagnosticDescriptor> SupportedDiagnostics
                     {
                         get
                         {
-                            return ImmutableArray.Create(_descriptor);
+                            return ImmutableArray.Create(Descriptor);
                         }
                     }
 
                     public override void Initialize(AnalysisContext context)
-                    {
-                        context.RegisterSyntaxNodeAction(AnalyzeNode, SyntaxKind.ClassDeclaration, SyntaxKind.NamespaceDeclaration, SyntaxKind.MethodDeclaration, SyntaxKind.PropertyDeclaration, SyntaxKind.FieldDeclaration, SyntaxKind.EventDeclaration);
-                    }
+                        => context.RegisterSyntaxNodeAction(AnalyzeNode, SyntaxKind.ClassDeclaration, SyntaxKind.EnumDeclaration, SyntaxKind.NamespaceDeclaration, SyntaxKind.MethodDeclaration, SyntaxKind.PropertyDeclaration, SyntaxKind.FieldDeclaration, SyntaxKind.EventDeclaration);
 
                     public void AnalyzeNode(SyntaxNodeAnalysisContext context)
                     {
@@ -653,47 +893,150 @@ class Class
                         {
                             case SyntaxKind.ClassDeclaration:
                                 var classDecl = (ClassDeclarationSyntax)context.Node;
-                                context.ReportDiagnostic(Diagnostic.Create(_descriptor, classDecl.Identifier.GetLocation()));
+                                context.ReportDiagnostic(Diagnostic.Create(Descriptor, classDecl.Identifier.GetLocation()));
                                 break;
 
                             case SyntaxKind.NamespaceDeclaration:
                                 var ns = (NamespaceDeclarationSyntax)context.Node;
-                                context.ReportDiagnostic(Diagnostic.Create(_descriptor, ns.Name.GetLocation()));
+                                context.ReportDiagnostic(Diagnostic.Create(Descriptor, ns.Name.GetLocation()));
                                 break;
 
                             case SyntaxKind.MethodDeclaration:
                                 var method = (MethodDeclarationSyntax)context.Node;
-                                context.ReportDiagnostic(Diagnostic.Create(_descriptor, method.Identifier.GetLocation()));
+                                context.ReportDiagnostic(Diagnostic.Create(Descriptor, method.Identifier.GetLocation()));
                                 break;
 
                             case SyntaxKind.PropertyDeclaration:
                                 var property = (PropertyDeclarationSyntax)context.Node;
-                                context.ReportDiagnostic(Diagnostic.Create(_descriptor, property.Identifier.GetLocation()));
+                                context.ReportDiagnostic(Diagnostic.Create(Descriptor, property.Identifier.GetLocation()));
                                 break;
 
                             case SyntaxKind.FieldDeclaration:
                                 var field = (FieldDeclarationSyntax)context.Node;
-                                context.ReportDiagnostic(Diagnostic.Create(_descriptor, field.Declaration.Variables.First().Identifier.GetLocation()));
+                                context.ReportDiagnostic(Diagnostic.Create(Descriptor, field.Declaration.Variables.First().Identifier.GetLocation()));
                                 break;
 
                             case SyntaxKind.EventDeclaration:
                                 var e = (EventDeclarationSyntax)context.Node;
-                                context.ReportDiagnostic(Diagnostic.Create(_descriptor, e.Identifier.GetLocation()));
+                                context.ReportDiagnostic(Diagnostic.Create(Descriptor, e.Identifier.GetLocation()));
+                                break;
+
+                            case SyntaxKind.EnumDeclaration:
+                                // Report diagnostic on each descendant comment trivia
+                                foreach (var trivia in context.Node.DescendantTrivia().Where(t => t.Kind() == SyntaxKind.SingleLineCommentTrivia || t.Kind() == SyntaxKind.MultiLineCommentTrivia))
+                                {
+                                    context.ReportDiagnostic(Diagnostic.Create(Descriptor, trivia.GetLocation()));
+                                }
                                 break;
                         }
                     }
                 }
 
-                internal override Tuple<DiagnosticAnalyzer, ISuppressionFixProvider> CreateDiagnosticProviderAndFixer(Workspace workspace)
+                internal override Tuple<DiagnosticAnalyzer, IConfigurationFixProvider> CreateDiagnosticProviderAndFixer(Workspace workspace)
                 {
-                    return new Tuple<DiagnosticAnalyzer, ISuppressionFixProvider>(
+                    return new Tuple<DiagnosticAnalyzer, IConfigurationFixProvider>(
                         new UserDiagnosticAnalyzer(), new CSharpSuppressionCodeFixProvider());
                 }
 
                 [Fact, Trait(Traits.Feature, Traits.Features.CodeActionsSuppression)]
-                public void TestSuppressionOnSimpleType()
+                [WorkItem(37529, "https://github.com/dotnet/roslyn/issues/37529")]
+                public async Task GeneratedCodeShouldNotHaveTrailingWhitespace()
                 {
-                    Test(
+                    var expected =
+$@"// This file is used by Code Analysis to maintain SuppressMessage
+// attributes that are applied to this project.
+// Project-level suppressions either have no target or are given
+// a specific target and scoped to a namespace, type, member, etc.
+
+using System.Diagnostics.CodeAnalysis;
+
+[assembly: SuppressMessage(""InfoDiagnostic"", ""InfoDiagnostic:InfoDiagnostic"", Justification = ""{FeaturesResources.Pending}"", Scope = ""type"", Target = ""~T:Class"")]
+";
+
+                    Assert.All(Regex.Split(expected, "\r?\n"), line => Assert.False(HasTrailingWhitespace(line)));
+
+                    await TestAsync(
+            @"
+using System;
+
+[|class Class|]
+{
+    int Method()
+    {
+        int x = 0;
+    }
+}", expected);
+                }
+
+                private static bool HasTrailingWhitespace(string line)
+                    => line.LastOrNull() is char last && char.IsWhiteSpace(last);
+
+                [Fact, Trait(Traits.Feature, Traits.Features.CodeActionsSuppression)]
+                [WorkItem(37529, "https://github.com/dotnet/roslyn/issues/37529")]
+                public async Task GeneratedCodeShouldNotHaveLeadingBlankLines()
+                {
+                    var expected =
+$@"// This file is used by Code Analysis to maintain SuppressMessage
+// attributes that are applied to this project.
+// Project-level suppressions either have no target or are given
+// a specific target and scoped to a namespace, type, member, etc.
+
+using System.Diagnostics.CodeAnalysis;
+
+[assembly: SuppressMessage(""InfoDiagnostic"", ""InfoDiagnostic:InfoDiagnostic"", Justification = ""{FeaturesResources.Pending}"", Scope = ""type"", Target = ""~T:Class"")]
+";
+
+                    var lines = Regex.Split(expected, "\r?\n");
+                    Assert.False(string.IsNullOrWhiteSpace(lines.First()));
+
+                    await TestAsync(
+            @"
+using System;
+
+[|class Class|]
+{
+    int Method()
+    {
+        int x = 0;
+    }
+}", expected);
+                }
+
+                [Fact, Trait(Traits.Feature, Traits.Features.CodeActionsSuppression)]
+                [WorkItem(37529, "https://github.com/dotnet/roslyn/issues/37529")]
+                public async Task GeneratedCodeShouldNotHaveMoreThanOneTrailingBlankLine()
+                {
+                    var expected =
+$@"// This file is used by Code Analysis to maintain SuppressMessage
+// attributes that are applied to this project.
+// Project-level suppressions either have no target or are given
+// a specific target and scoped to a namespace, type, member, etc.
+
+using System.Diagnostics.CodeAnalysis;
+
+[assembly: SuppressMessage(""InfoDiagnostic"", ""InfoDiagnostic:InfoDiagnostic"", Justification = ""{FeaturesResources.Pending}"", Scope = ""type"", Target = ""~T:Class"")]
+";
+
+                    var lines = Regex.Split(expected, "\r?\n");
+                    Assert.False(string.IsNullOrWhiteSpace(lines[lines.Length - 2]));
+
+                    await TestAsync(
+            @"
+using System;
+
+[|class Class|]
+{
+    int Method()
+    {
+        int x = 0;
+    }
+}", expected);
+                }
+
+                [Fact, Trait(Traits.Feature, Traits.Features.CodeActionsSuppression)]
+                public async Task TestSuppressionOnSimpleType()
+                {
+                    await TestAsync(
             @"
 using System;
 
@@ -704,22 +1047,24 @@ using System;
         int x = 0;
     }
 }",
-            @"
-// This file is used by Code Analysis to maintain SuppressMessage 
+$@"// This file is used by Code Analysis to maintain SuppressMessage
 // attributes that are applied to this project.
-// Project-level suppressions either have no target or are given 
+// Project-level suppressions either have no target or are given
 // a specific target and scoped to a namespace, type, member, etc.
 
-[assembly: System.Diagnostics.CodeAnalysis.SuppressMessage(""InfoDiagnostic"", ""InfoDiagnostic:InfoDiagnostic"", Justification = ""<Pending>"", Scope = ""type"", Target = ""~T:Class"")]
+using System.Diagnostics.CodeAnalysis;
 
-", isAddedDocument: true);
+[assembly: SuppressMessage(""InfoDiagnostic"", ""InfoDiagnostic:InfoDiagnostic"", Justification = ""{FeaturesResources.Pending}"", Scope = ""type"", Target = ""~T:Class"")]
+");
 
                     // Also verify that the added attribute does indeed suppress the diagnostic.
-                    TestMissing(
+                    await TestMissingAsync(
             @"
 using System;
 
-[assembly: System.Diagnostics.CodeAnalysis.SuppressMessage(""InfoDiagnostic"", ""InfoDiagnostic:InfoDiagnostic"", Justification = ""<Pending>"", Scope = ""type"", Target = ""~T:Class"")]
+using System.Diagnostics.CodeAnalysis;
+
+[assembly: SuppressMessage(""InfoDiagnostic"", ""InfoDiagnostic:InfoDiagnostic"", Justification = ""<Pending>"", Scope = ""type"", Target = ""~T:Class"")]
 
 [|class Class|]
 {
@@ -731,9 +1076,9 @@ using System;
                 }
 
                 [Fact, Trait(Traits.Feature, Traits.Features.CodeActionsSuppression)]
-                public void TestSuppressionOnNamespace()
+                public async Task TestSuppressionOnNamespace()
                 {
-                    Test(
+                    await TestInRegularAndScriptAsync(
             @"
 using System;
 
@@ -747,22 +1092,24 @@ using System;
         }
     }
 }",
-            @"
-// This file is used by Code Analysis to maintain SuppressMessage 
+$@"// This file is used by Code Analysis to maintain SuppressMessage
 // attributes that are applied to this project.
-// Project-level suppressions either have no target or are given 
+// Project-level suppressions either have no target or are given
 // a specific target and scoped to a namespace, type, member, etc.
 
-[assembly: System.Diagnostics.CodeAnalysis.SuppressMessage(""InfoDiagnostic"", ""InfoDiagnostic:InfoDiagnostic"", Justification = ""<Pending>"", Scope = ""namespace"", Target = ""~N:N"")]
+using System.Diagnostics.CodeAnalysis;
 
-", index: 1, isAddedDocument: true);
+[assembly: SuppressMessage(""InfoDiagnostic"", ""InfoDiagnostic:InfoDiagnostic"", Justification = ""{FeaturesResources.Pending}"", Scope = ""namespace"", Target = ""~N:N"")]
+", index: 1);
 
                     // Also verify that the added attribute does indeed suppress the diagnostic.
-                    TestMissing(
+                    await TestMissingAsync(
             @"
 using System;
 
-[assembly: System.Diagnostics.CodeAnalysis.SuppressMessage(""InfoDiagnostic"", ""InfoDiagnostic:InfoDiagnostic"", Justification = ""<Pending>"", Scope = ""namespace"", Target = ""~N:N"")]
+using System.Diagnostics.CodeAnalysis;
+
+[assembly: SuppressMessage(""InfoDiagnostic"", ""InfoDiagnostic:InfoDiagnostic"", Justification = ""<Pending>"", Scope = ""namespace"", Target = ""~N:N"")]
 
 [|namespace N|]
 {
@@ -777,9 +1124,9 @@ using System;
                 }
 
                 [Fact, Trait(Traits.Feature, Traits.Features.CodeActionsSuppression)]
-                public void TestSuppressionOnTypeInsideNamespace()
+                public async Task TestSuppressionOnTypeInsideNamespace()
                 {
-                    Test(
+                    await TestAsync(
             @"
 using System;
 
@@ -796,22 +1143,24 @@ namespace N1
         }
     }
 }",
-            @"
-// This file is used by Code Analysis to maintain SuppressMessage 
+$@"// This file is used by Code Analysis to maintain SuppressMessage
 // attributes that are applied to this project.
-// Project-level suppressions either have no target or are given 
+// Project-level suppressions either have no target or are given
 // a specific target and scoped to a namespace, type, member, etc.
 
-[assembly: System.Diagnostics.CodeAnalysis.SuppressMessage(""InfoDiagnostic"", ""InfoDiagnostic:InfoDiagnostic"", Justification = ""<Pending>"", Scope = ""type"", Target = ""~T:N1.N2.Class"")]
+using System.Diagnostics.CodeAnalysis;
 
-", isAddedDocument: true);
+[assembly: SuppressMessage(""InfoDiagnostic"", ""InfoDiagnostic:InfoDiagnostic"", Justification = ""{FeaturesResources.Pending}"", Scope = ""type"", Target = ""~T:N1.N2.Class"")]
+");
 
                     // Also verify that the added attribute does indeed suppress the diagnostic.
-                    TestMissing(
+                    await TestMissingAsync(
             @"
 using System;
 
-[assembly: System.Diagnostics.CodeAnalysis.SuppressMessage(""InfoDiagnostic"", ""InfoDiagnostic:InfoDiagnostic"", Justification = ""<Pending>"", Scope = ""type"", Target = ""~T:N1.N2.Class"")]
+using System.Diagnostics.CodeAnalysis;
+
+[assembly: SuppressMessage(""InfoDiagnostic"", ""InfoDiagnostic:InfoDiagnostic"", Justification = ""<Pending>"", Scope = ""type"", Target = ""~T:N1.N2.Class"")]
 
 namespace N1
 {
@@ -829,9 +1178,9 @@ namespace N1
                 }
 
                 [Fact, Trait(Traits.Feature, Traits.Features.CodeActionsSuppression)]
-                public void TestSuppressionOnNestedType()
+                public async Task TestSuppressionOnNestedType()
                 {
-                    Test(
+                    await TestAsync(
             @"
 using System;
 
@@ -848,22 +1197,24 @@ namespace N
         }
     }
 }",
-            @"
-// This file is used by Code Analysis to maintain SuppressMessage 
+$@"// This file is used by Code Analysis to maintain SuppressMessage
 // attributes that are applied to this project.
-// Project-level suppressions either have no target or are given 
+// Project-level suppressions either have no target or are given
 // a specific target and scoped to a namespace, type, member, etc.
 
-[assembly: System.Diagnostics.CodeAnalysis.SuppressMessage(""InfoDiagnostic"", ""InfoDiagnostic:InfoDiagnostic"", Justification = ""<Pending>"", Scope = ""type"", Target = ""~T:N.Generic`1.Class"")]
+using System.Diagnostics.CodeAnalysis;
 
-", isAddedDocument: true);
+[assembly: SuppressMessage(""InfoDiagnostic"", ""InfoDiagnostic:InfoDiagnostic"", Justification = ""{FeaturesResources.Pending}"", Scope = ""type"", Target = ""~T:N.Generic`1.Class"")]
+");
 
                     // Also verify that the added attribute does indeed suppress the diagnostic.
-                    TestMissing(
+                    await TestMissingAsync(
             @"
 using System;
 
-[assembly: System.Diagnostics.CodeAnalysis.SuppressMessage(""InfoDiagnostic"", ""InfoDiagnostic:InfoDiagnostic"", Justification = ""<Pending>"", Scope = ""type"", Target = ""~T:N.Generic`1.Class"")]
+using System.Diagnostics.CodeAnalysis;
+
+[assembly: SuppressMessage(""InfoDiagnostic"", ""InfoDiagnostic:InfoDiagnostic"", Justification = ""<Pending>"", Scope = ""type"", Target = ""~T:N.Generic`1.Class"")]
 
 namespace N
 {
@@ -881,9 +1232,9 @@ namespace N
                 }
 
                 [Fact, Trait(Traits.Feature, Traits.Features.CodeActionsSuppression)]
-                public void TestSuppressionOnMethod()
+                public async Task TestSuppressionOnMethod()
                 {
-                    Test(
+                    await TestAsync(
             @"
 using System;
 
@@ -900,22 +1251,24 @@ namespace N
         }
     }
 }",
-            @"
-// This file is used by Code Analysis to maintain SuppressMessage 
+$@"// This file is used by Code Analysis to maintain SuppressMessage
 // attributes that are applied to this project.
-// Project-level suppressions either have no target or are given 
+// Project-level suppressions either have no target or are given
 // a specific target and scoped to a namespace, type, member, etc.
 
-[assembly: System.Diagnostics.CodeAnalysis.SuppressMessage(""InfoDiagnostic"", ""InfoDiagnostic:InfoDiagnostic"", Justification = ""<Pending>"", Scope = ""member"", Target = ""~M:N.Generic`1.Class.Method~System.Int32"")]
+using System.Diagnostics.CodeAnalysis;
 
-", isAddedDocument: true);
+[assembly: SuppressMessage(""InfoDiagnostic"", ""InfoDiagnostic:InfoDiagnostic"", Justification = ""{FeaturesResources.Pending}"", Scope = ""member"", Target = ""~M:N.Generic`1.Class.Method~System.Int32"")]
+");
 
                     // Also verify that the added attribute does indeed suppress the diagnostic.
-                    TestMissing(
+                    await TestMissingAsync(
             @"
 using System;
 
-[assembly: System.Diagnostics.CodeAnalysis.SuppressMessage(""InfoDiagnostic"", ""InfoDiagnostic:InfoDiagnostic"", Justification = ""<Pending>"", Scope = ""member"", Target = ""~M:N.Generic`1.Class.Method~System.Int32"")]
+using System.Diagnostics.CodeAnalysis;
+
+[assembly: SuppressMessage(""InfoDiagnostic"", ""InfoDiagnostic:InfoDiagnostic"", Justification = ""<Pending>"", Scope = ""member"", Target = ""~M:N.Generic`1.Class.Method~System.Int32"")]
 
 namespace N
 {
@@ -933,9 +1286,9 @@ namespace N
                 }
 
                 [Fact, Trait(Traits.Feature, Traits.Features.CodeActionsSuppression)]
-                public void TestSuppressionOnOverloadedMethod()
+                public async Task TestSuppressionOnOverloadedMethod()
                 {
-                    Test(
+                    await TestAsync(
             @"
 using System;
 
@@ -957,22 +1310,24 @@ namespace N
         }
     }
 }",
-            @"
-// This file is used by Code Analysis to maintain SuppressMessage 
+$@"// This file is used by Code Analysis to maintain SuppressMessage
 // attributes that are applied to this project.
-// Project-level suppressions either have no target or are given 
+// Project-level suppressions either have no target or are given
 // a specific target and scoped to a namespace, type, member, etc.
 
-[assembly: System.Diagnostics.CodeAnalysis.SuppressMessage(""InfoDiagnostic"", ""InfoDiagnostic:InfoDiagnostic"", Justification = ""<Pending>"", Scope = ""member"", Target = ""~M:N.Generic`1.Class.Method(System.Int32,System.Char@)~System.Int32"")]
+using System.Diagnostics.CodeAnalysis;
 
-", isAddedDocument: true);
+[assembly: SuppressMessage(""InfoDiagnostic"", ""InfoDiagnostic:InfoDiagnostic"", Justification = ""{FeaturesResources.Pending}"", Scope = ""member"", Target = ""~M:N.Generic`1.Class.Method(System.Int32,System.Char@)~System.Int32"")]
+");
 
                     // Also verify that the added attribute does indeed suppress the diagnostic.
-                    TestMissing(
+                    await TestMissingAsync(
             @"
 using System;
 
-[assembly: System.Diagnostics.CodeAnalysis.SuppressMessage(""InfoDiagnostic"", ""InfoDiagnostic:InfoDiagnostic"", Justification = ""<Pending>"", Scope = ""member"", Target = ""~M:N.Generic`1.Class.Method(System.Int32,System.Char@)~System.Int32"")]
+using System.Diagnostics.CodeAnalysis;
+
+[assembly: SuppressMessage(""InfoDiagnostic"", ""InfoDiagnostic:InfoDiagnostic"", Justification = ""<Pending>"", Scope = ""member"", Target = ""~M:N.Generic`1.Class.Method(System.Int32,System.Char@)~System.Int32"")]
 
 namespace N
 {
@@ -993,11 +1348,13 @@ namespace N
     }
 }");
 
-                    Test(
+                    await TestAsync(
         @"
 using System;
 
-[assembly: System.Diagnostics.CodeAnalysis.SuppressMessage(""InfoDiagnostic"", ""InfoDiagnostic:InfoDiagnostic"", Justification = ""<Pending>"", Scope = ""member"", Target = ""~M:N.Generic`1.Class.Method(System.Int32,System.Char@)~System.Int32"")]
+using System.Diagnostics.CodeAnalysis;
+
+[assembly: SuppressMessage(""InfoDiagnostic"", ""InfoDiagnostic:InfoDiagnostic"", Justification = ""<Pending>"", Scope = ""member"", Target = ""~M:N.Generic`1.Class.Method(System.Int32,System.Char@)~System.Int32"")]
 
 namespace N
 {
@@ -1017,21 +1374,21 @@ namespace N
         }
     }
 }",
-            @"
-// This file is used by Code Analysis to maintain SuppressMessage 
+$@"// This file is used by Code Analysis to maintain SuppressMessage
 // attributes that are applied to this project.
-// Project-level suppressions either have no target or are given 
+// Project-level suppressions either have no target or are given
 // a specific target and scoped to a namespace, type, member, etc.
 
-[assembly: System.Diagnostics.CodeAnalysis.SuppressMessage(""InfoDiagnostic"", ""InfoDiagnostic:InfoDiagnostic"", Justification = ""<Pending>"", Scope = ""member"", Target = ""~M:N.Generic`1.Class.Method~System.Int32"")]
+using System.Diagnostics.CodeAnalysis;
 
-", isAddedDocument: true);
+[assembly: SuppressMessage(""InfoDiagnostic"", ""InfoDiagnostic:InfoDiagnostic"", Justification = ""{FeaturesResources.Pending}"", Scope = ""member"", Target = ""~M:N.Generic`1.Class.Method~System.Int32"")]
+");
                 }
 
                 [Fact, Trait(Traits.Feature, Traits.Features.CodeActionsSuppression)]
-                public void TestSuppressionOnGenericMethod()
+                public async Task TestSuppressionOnGenericMethod()
                 {
-                    Test(
+                    await TestAsync(
             @"
 using System;
 
@@ -1048,22 +1405,24 @@ namespace N
         }
     }
 }",
-            @"
-// This file is used by Code Analysis to maintain SuppressMessage 
+$@"// This file is used by Code Analysis to maintain SuppressMessage
 // attributes that are applied to this project.
-// Project-level suppressions either have no target or are given 
+// Project-level suppressions either have no target or are given
 // a specific target and scoped to a namespace, type, member, etc.
 
-[assembly: System.Diagnostics.CodeAnalysis.SuppressMessage(""InfoDiagnostic"", ""InfoDiagnostic:InfoDiagnostic"", Justification = ""<Pending>"", Scope = ""member"", Target = ""~M:N.Generic`1.Class.Method``1(``0)~System.Int32"")]
+using System.Diagnostics.CodeAnalysis;
 
-", isAddedDocument: true);
+[assembly: SuppressMessage(""InfoDiagnostic"", ""InfoDiagnostic:InfoDiagnostic"", Justification = ""{FeaturesResources.Pending}"", Scope = ""member"", Target = ""~M:N.Generic`1.Class.Method``1(``0)~System.Int32"")]
+");
 
                     // Also verify that the added attribute does indeed suppress the diagnostic.
-                    TestMissing(
+                    await TestMissingAsync(
             @"
 using System;
 
-[assembly: System.Diagnostics.CodeAnalysis.SuppressMessage(""InfoDiagnostic"", ""InfoDiagnostic:InfoDiagnostic"", Justification = ""<Pending>"", Scope = ""member"", Target = ""~M:N.Generic`1.Class.Method``1(``0)~System.Int32"")]
+using System.Diagnostics.CodeAnalysis;
+
+[assembly: SuppressMessage(""InfoDiagnostic"", ""InfoDiagnostic:InfoDiagnostic"", Justification = ""<Pending>"", Scope = ""member"", Target = ""~M:N.Generic`1.Class.Method``1(``0)~System.Int32"")]
 
 namespace N
 {
@@ -1081,9 +1440,9 @@ namespace N
                 }
 
                 [Fact, Trait(Traits.Feature, Traits.Features.CodeActionsSuppression)]
-                public void TestSuppressionOnProperty()
+                public async Task TestSuppressionOnProperty()
                 {
-                    Test(
+                    await TestAsync(
             @"
 using System;
 
@@ -1100,22 +1459,24 @@ namespace N
         }
     }
 }",
-            @"
-// This file is used by Code Analysis to maintain SuppressMessage 
+$@"// This file is used by Code Analysis to maintain SuppressMessage
 // attributes that are applied to this project.
-// Project-level suppressions either have no target or are given 
+// Project-level suppressions either have no target or are given
 // a specific target and scoped to a namespace, type, member, etc.
 
-[assembly: System.Diagnostics.CodeAnalysis.SuppressMessage(""InfoDiagnostic"", ""InfoDiagnostic:InfoDiagnostic"", Justification = ""<Pending>"", Scope = ""member"", Target = ""~P:N.Generic.Class.Property"")]
+using System.Diagnostics.CodeAnalysis;
 
-", isAddedDocument: true);
+[assembly: SuppressMessage(""InfoDiagnostic"", ""InfoDiagnostic:InfoDiagnostic"", Justification = ""{FeaturesResources.Pending}"", Scope = ""member"", Target = ""~P:N.Generic.Class.Property"")]
+");
 
                     // Also verify that the added attribute does indeed suppress the diagnostic.
-                    TestMissing(
+                    await TestMissingAsync(
             @"
 using System;
 
-[assembly: System.Diagnostics.CodeAnalysis.SuppressMessage(""InfoDiagnostic"", ""InfoDiagnostic:InfoDiagnostic"", Justification = ""<Pending>"", Scope = ""member"", Target = ""~P:N.Generic.Class.Property"")]
+using System.Diagnostics.CodeAnalysis;
+
+[assembly: SuppressMessage(""InfoDiagnostic"", ""InfoDiagnostic:InfoDiagnostic"", Justification = ""<Pending>"", Scope = ""member"", Target = ""~P:N.Generic.Class.Property"")]
 
 namespace N
 {
@@ -1133,9 +1494,9 @@ namespace N
                 }
 
                 [Fact, Trait(Traits.Feature, Traits.Features.CodeActionsSuppression)]
-                public void TestSuppressionOnField()
+                public async Task TestSuppressionOnField()
                 {
-                    Test(
+                    await TestAsync(
             @"
 using System;
 
@@ -1143,22 +1504,24 @@ class Class
 {
     [|int field = 0;|]
 }",
-            @"
-// This file is used by Code Analysis to maintain SuppressMessage 
+$@"// This file is used by Code Analysis to maintain SuppressMessage
 // attributes that are applied to this project.
-// Project-level suppressions either have no target or are given 
+// Project-level suppressions either have no target or are given
 // a specific target and scoped to a namespace, type, member, etc.
 
-[assembly: System.Diagnostics.CodeAnalysis.SuppressMessage(""InfoDiagnostic"", ""InfoDiagnostic:InfoDiagnostic"", Justification = ""<Pending>"", Scope = ""member"", Target = ""~F:Class.field"")]
+using System.Diagnostics.CodeAnalysis;
 
-", isAddedDocument: true);
+[assembly: SuppressMessage(""InfoDiagnostic"", ""InfoDiagnostic:InfoDiagnostic"", Justification = ""{FeaturesResources.Pending}"", Scope = ""member"", Target = ""~F:Class.field"")]
+");
 
                     // Also verify that the added attribute does indeed suppress the diagnostic.
-                    TestMissing(
+                    await TestMissingAsync(
             @"
 using System;
 
-[assembly: System.Diagnostics.CodeAnalysis.SuppressMessage(""InfoDiagnostic"", ""InfoDiagnostic:InfoDiagnostic"", Justification = ""<Pending>"", Scope = ""member"", Target = ""~F:Class.field"")]
+using System.Diagnostics.CodeAnalysis;
+
+[assembly: SuppressMessage(""InfoDiagnostic"", ""InfoDiagnostic:InfoDiagnostic"", Justification = ""<Pending>"", Scope = ""member"", Target = ""~F:Class.field"")]
 
 class Class
 {
@@ -1167,9 +1530,60 @@ class Class
                 }
 
                 [Fact, Trait(Traits.Feature, Traits.Features.CodeActionsSuppression)]
-                public void TestSuppressionOnField2()
+                [WorkItem(6379, "https://github.com/dotnet/roslyn/issues/6379")]
+                public async Task TestSuppressionOnTriviaBetweenFields()
                 {
-                    Test(
+                    await TestAsync(
+            @"
+using System;
+
+// suppressions on field are not relevant.
+using System.Diagnostics.CodeAnalysis;
+
+[assembly: SuppressMessage(""InfoDiagnostic"", ""InfoDiagnostic:InfoDiagnostic"", Justification = ""{FeaturesResources.Pending}"", Scope = ""member"", Target = ""~F:E.Field1"")]
+using System.Diagnostics.CodeAnalysis;
+
+[assembly: SuppressMessage(""InfoDiagnostic"", ""InfoDiagnostic:InfoDiagnostic"", Justification = ""{FeaturesResources.Pending}"", Scope = ""member"", Target = ""~F:E.Field2"")]
+
+enum E
+{
+    [|
+    Field1, // trailing trivia for comma token which doesn't belong to span of any of the fields
+    Field2
+    |]
+}",
+$@"// This file is used by Code Analysis to maintain SuppressMessage
+// attributes that are applied to this project.
+// Project-level suppressions either have no target or are given
+// a specific target and scoped to a namespace, type, member, etc.
+
+using System.Diagnostics.CodeAnalysis;
+
+[assembly: SuppressMessage(""InfoDiagnostic"", ""InfoDiagnostic:InfoDiagnostic"", Justification = ""{FeaturesResources.Pending}"", Scope = ""type"", Target = ""~T:E"")]
+");
+
+                    // Also verify that the added attribute does indeed suppress the diagnostic.
+                    await TestMissingAsync(
+            @"
+using System;
+
+using System.Diagnostics.CodeAnalysis;
+
+[assembly: SuppressMessage(""InfoDiagnostic"", ""InfoDiagnostic:InfoDiagnostic"", Justification = ""{FeaturesResources.Pending}"", Scope = ""type"", Target = ""~T:E"")]
+
+enum E
+{
+    [|
+    Field1, // trailing trivia for comma token which doesn't belong to span of any of the fields
+    Field2
+    |]
+}");
+                }
+
+                [Fact, Trait(Traits.Feature, Traits.Features.CodeActionsSuppression)]
+                public async Task TestSuppressionOnField2()
+                {
+                    await TestAsync(
             @"
 using System;
 
@@ -1177,22 +1591,24 @@ class Class
 {
     int [|field = 0|], field2 = 1;
 }",
-            @"
-// This file is used by Code Analysis to maintain SuppressMessage 
+$@"// This file is used by Code Analysis to maintain SuppressMessage
 // attributes that are applied to this project.
-// Project-level suppressions either have no target or are given 
+// Project-level suppressions either have no target or are given
 // a specific target and scoped to a namespace, type, member, etc.
 
-[assembly: System.Diagnostics.CodeAnalysis.SuppressMessage(""InfoDiagnostic"", ""InfoDiagnostic:InfoDiagnostic"", Justification = ""<Pending>"", Scope = ""member"", Target = ""~F:Class.field"")]
+using System.Diagnostics.CodeAnalysis;
 
-", isAddedDocument: true);
+[assembly: SuppressMessage(""InfoDiagnostic"", ""InfoDiagnostic:InfoDiagnostic"", Justification = ""{FeaturesResources.Pending}"", Scope = ""member"", Target = ""~F:Class.field"")]
+");
 
                     // Also verify that the added attribute does indeed suppress the diagnostic.
-                    TestMissing(
+                    await TestMissingAsync(
             @"
 using System;
 
-[assembly: System.Diagnostics.CodeAnalysis.SuppressMessage(""InfoDiagnostic"", ""InfoDiagnostic:InfoDiagnostic"", Justification = ""<Pending>"", Scope = ""member"", Target = ""~F:Class.field"")]
+using System.Diagnostics.CodeAnalysis;
+
+[assembly: SuppressMessage(""InfoDiagnostic"", ""InfoDiagnostic:InfoDiagnostic"", Justification = ""<Pending>"", Scope = ""member"", Target = ""~F:Class.field"")]
 
 class Class
 {
@@ -1201,9 +1617,9 @@ class Class
                 }
 
                 [Fact, Trait(Traits.Feature, Traits.Features.CodeActionsSuppression)]
-                public void TestSuppressionOnEvent()
+                public async Task TestSuppressionOnEvent()
                 {
-                    Test(
+                    await TestAsync(
             @"
 using System;
 
@@ -1225,22 +1641,24 @@ class Class
         remove { }
     }|]
 }",
-            @"
-// This file is used by Code Analysis to maintain SuppressMessage 
+$@"// This file is used by Code Analysis to maintain SuppressMessage
 // attributes that are applied to this project.
-// Project-level suppressions either have no target or are given 
+// Project-level suppressions either have no target or are given
 // a specific target and scoped to a namespace, type, member, etc.
 
-[assembly: System.Diagnostics.CodeAnalysis.SuppressMessage(""InfoDiagnostic"", ""InfoDiagnostic:InfoDiagnostic"", Justification = ""<Pending>"", Scope = ""member"", Target = ""~E:Class.SampleEvent"")]
+using System.Diagnostics.CodeAnalysis;
 
-", isAddedDocument: true);
+[assembly: SuppressMessage(""InfoDiagnostic"", ""InfoDiagnostic:InfoDiagnostic"", Justification = ""{FeaturesResources.Pending}"", Scope = ""member"", Target = ""~E:Class.SampleEvent"")]
+");
 
                     // Also verify that the added attribute does indeed suppress the diagnostic.
-                    TestMissing(
+                    await TestMissingAsync(
             @"
 using System;
 
-[assembly: System.Diagnostics.CodeAnalysis.SuppressMessage(""InfoDiagnostic"", ""InfoDiagnostic:InfoDiagnostic"", Justification = ""<Pending>"", Scope = ""member"", Target = ""~E:Class.SampleEvent"")]
+using System.Diagnostics.CodeAnalysis;
+
+[assembly: SuppressMessage(""InfoDiagnostic"", ""InfoDiagnostic:InfoDiagnostic"", Justification = ""<Pending>"", Scope = ""member"", Target = ""~E:Class.SampleEvent"")]
 
 public class SampleEventArgs
 {
@@ -1250,10 +1668,10 @@ public class SampleEventArgs
 
 class Class
 {
-    // Declare the delegate (if using non-generic pattern). 
+    // Declare the delegate (if using non-generic pattern).
     public delegate void SampleEventHandler(object sender, SampleEventArgs e);
 
-    // Declare the event. 
+    // Declare the event.
     [|public event SampleEventHandler SampleEvent|]
     {
         add { }
@@ -1263,7 +1681,7 @@ class Class
                 }
 
                 [Fact, Trait(Traits.Feature, Traits.Features.CodeActionsSuppression)]
-                public void TestSuppressionWithExistingGlobalSuppressionsDocument()
+                public async Task TestSuppressionWithExistingGlobalSuppressionsDocument()
                 {
                     var initialMarkup = @"<Workspace>
     <Project Language=""C#"" CommonReferences=""true"" AssemblyName=""Proj1"">
@@ -1275,34 +1693,35 @@ class Class { }
 [|class Class2|] { }
 ]]>
         </Document>
-        <Document FilePath=""GlobalSuppressions.cs""><![CDATA[
-// This file is used by Code Analysis to maintain SuppressMessage 
+        <Document FilePath=""GlobalSuppressions.cs""><![CDATA[// This file is used by Code Analysis to maintain SuppressMessage
 // attributes that are applied to this project.
-// Project-level suppressions either have no target or are given 
+// Project-level suppressions either have no target or are given
 // a specific target and scoped to a namespace, type, member, etc.
 
-[assembly: System.Diagnostics.CodeAnalysis.SuppressMessage(""InfoDiagnostic"", ""InfoDiagnostic:InfoDiagnostic"", Justification = ""<Pending>"", Scope = ""type"", Target = ""Class"")]
+using System.Diagnostics.CodeAnalysis;
+
+[assembly: SuppressMessage(""InfoDiagnostic"", ""InfoDiagnostic:InfoDiagnostic"", Justification = ""<Pending>"", Scope = ""type"", Target = ""Class"")]
 ]]>
         </Document>
     </Project>
 </Workspace>";
                     var expectedText =
-                        @"
-// This file is used by Code Analysis to maintain SuppressMessage 
+$@"// This file is used by Code Analysis to maintain SuppressMessage
 // attributes that are applied to this project.
-// Project-level suppressions either have no target or are given 
+// Project-level suppressions either have no target or are given
 // a specific target and scoped to a namespace, type, member, etc.
 
-[assembly: System.Diagnostics.CodeAnalysis.SuppressMessage(""InfoDiagnostic"", ""InfoDiagnostic:InfoDiagnostic"", Justification = ""<Pending>"", Scope = ""type"", Target = ""Class"")]
-[assembly: System.Diagnostics.CodeAnalysis.SuppressMessage(""InfoDiagnostic"", ""InfoDiagnostic:InfoDiagnostic"", Justification = ""<Pending>"", Scope = ""type"", Target = ""~T:Class2"")]
+using System.Diagnostics.CodeAnalysis;
 
+[assembly: SuppressMessage(""InfoDiagnostic"", ""InfoDiagnostic:InfoDiagnostic"", Justification = ""<Pending>"", Scope = ""type"", Target = ""Class"")]
+[assembly: SuppressMessage(""InfoDiagnostic"", ""InfoDiagnostic:InfoDiagnostic"", Justification = ""{FeaturesResources.Pending}"", Scope = ""type"", Target = ""~T:Class2"")]
 ";
 
-                    Test(initialMarkup, expectedText, isLine: false);
+                    await TestAsync(initialMarkup, expectedText);
                 }
 
                 [Fact, Trait(Traits.Feature, Traits.Features.CodeActionsSuppression)]
-                public void TestSuppressionWithExistingGlobalSuppressionsDocument2()
+                public async Task TestSuppressionWithExistingGlobalSuppressionsDocument2()
                 {
                     // Own custom file named GlobalSuppressions.cs
                     var initialMarkup = @"<Workspace>
@@ -1324,21 +1743,21 @@ class Class { }
     </Project>
 </Workspace>";
                     var expectedText =
-                        @"
-// This file is used by Code Analysis to maintain SuppressMessage 
+$@"// This file is used by Code Analysis to maintain SuppressMessage
 // attributes that are applied to this project.
-// Project-level suppressions either have no target or are given 
+// Project-level suppressions either have no target or are given
 // a specific target and scoped to a namespace, type, member, etc.
 
-[assembly: System.Diagnostics.CodeAnalysis.SuppressMessage(""InfoDiagnostic"", ""InfoDiagnostic:InfoDiagnostic"", Justification = ""<Pending>"", Scope = ""type"", Target = ""~T:Class2"")]
+using System.Diagnostics.CodeAnalysis;
 
+[assembly: SuppressMessage(""InfoDiagnostic"", ""InfoDiagnostic:InfoDiagnostic"", Justification = ""{FeaturesResources.Pending}"", Scope = ""type"", Target = ""~T:Class2"")]
 ";
 
-                    Test(initialMarkup, expectedText, isLine: false, isAddedDocument: true);
+                    await TestAsync(initialMarkup, expectedText);
                 }
 
                 [Fact, Trait(Traits.Feature, Traits.Features.CodeActionsSuppression)]
-                public void TestSuppressionWithExistingGlobalSuppressionsDocument3()
+                public async Task TestSuppressionWithExistingGlobalSuppressionsDocument3()
                 {
                     // Own custom file named GlobalSuppressions.cs + existing GlobalSuppressions2.cs with global suppressions
                     var initialMarkup = @"<Workspace>
@@ -1357,30 +1776,93 @@ using System;
 class Class { }
 ]]>
         </Document>
-         <Document FilePath=""GlobalSuppressions2.cs""><![CDATA[
-// This file is used by Code Analysis to maintain SuppressMessage 
+         <Document FilePath=""GlobalSuppressions2.cs""><![CDATA[// This file is used by Code Analysis to maintain SuppressMessage
 // attributes that are applied to this project.
-// Project-level suppressions either have no target or are given 
+// Project-level suppressions either have no target or are given
 // a specific target and scoped to a namespace, type, member, etc.
 
+using System.Diagnostics.CodeAnalysis;
+
+[assembly: SuppressMessage(""InfoDiagnostic"", ""InfoDiagnostic:InfoDiagnostic"", Justification = ""<Pending>"", Scope = ""type"", Target = ""Class"")]
+]]>
+        </Document>
+    </Project>
+</Workspace>";
+                    var expectedText =
+$@"// This file is used by Code Analysis to maintain SuppressMessage
+// attributes that are applied to this project.
+// Project-level suppressions either have no target or are given
+// a specific target and scoped to a namespace, type, member, etc.
+
+using System.Diagnostics.CodeAnalysis;
+
+[assembly: SuppressMessage(""InfoDiagnostic"", ""InfoDiagnostic:InfoDiagnostic"", Justification = ""<Pending>"", Scope = ""type"", Target = ""Class"")]
+[assembly: SuppressMessage(""InfoDiagnostic"", ""InfoDiagnostic:InfoDiagnostic"", Justification = ""{FeaturesResources.Pending}"", Scope = ""type"", Target = ""~T:Class2"")]
+";
+
+                    await TestAsync(initialMarkup, expectedText);
+                }
+
+                [Fact, Trait(Traits.Feature, Traits.Features.CodeActionsSuppression)]
+                public async Task TestSuppressionWithUsingDirectiveInExistingGlobalSuppressionsDocument()
+                {
+                    var initialMarkup = @"<Workspace>
+    <Project Language=""C#"" CommonReferences=""true"" AssemblyName=""Proj1"">
+        <Document FilePath=""CurrentDocument.cs""><![CDATA[
+using System;
+
+class Class { }
+
+[|class Class2|] { }
+]]>
+        </Document>
+        <Document FilePath=""GlobalSuppressions.cs""><![CDATA[
+using System.Diagnostics.CodeAnalysis;
+
+[assembly: SuppressMessage(""InfoDiagnostic"", ""InfoDiagnostic:InfoDiagnostic"", Justification = ""<Pending>"", Scope = ""type"", Target = ""Class"")]
+]]>
+        </Document>
+    </Project>
+</Workspace>";
+                    var expectedText =
+                        $@"
+using System.Diagnostics.CodeAnalysis;
+
+[assembly: SuppressMessage(""InfoDiagnostic"", ""InfoDiagnostic:InfoDiagnostic"", Justification = ""<Pending>"", Scope = ""type"", Target = ""Class"")]
+[assembly: SuppressMessage(""InfoDiagnostic"", ""InfoDiagnostic:InfoDiagnostic"", Justification = ""{FeaturesResources.Pending}"", Scope = ""type"", Target = ""~T:Class2"")]
+";
+
+                    await TestAsync(initialMarkup, expectedText);
+                }
+
+                [Fact, Trait(Traits.Feature, Traits.Features.CodeActionsSuppression)]
+                public async Task TestSuppressionWithoutUsingDirectiveInExistingGlobalSuppressionsDocument()
+                {
+                    var initialMarkup = @"<Workspace>
+    <Project Language=""C#"" CommonReferences=""true"" AssemblyName=""Proj1"">
+        <Document FilePath=""CurrentDocument.cs""><![CDATA[
+using System;
+
+class Class { }
+
+[|class Class2|] { }
+]]>
+        </Document>
+        <Document FilePath=""GlobalSuppressions.cs""><![CDATA[
 [assembly: System.Diagnostics.CodeAnalysis.SuppressMessage(""InfoDiagnostic"", ""InfoDiagnostic:InfoDiagnostic"", Justification = ""<Pending>"", Scope = ""type"", Target = ""Class"")]
 ]]>
         </Document>
     </Project>
 </Workspace>";
                     var expectedText =
-                        @"
-// This file is used by Code Analysis to maintain SuppressMessage 
-// attributes that are applied to this project.
-// Project-level suppressions either have no target or are given 
-// a specific target and scoped to a namespace, type, member, etc.
+$@"
+using System.Diagnostics.CodeAnalysis;
 
 [assembly: System.Diagnostics.CodeAnalysis.SuppressMessage(""InfoDiagnostic"", ""InfoDiagnostic:InfoDiagnostic"", Justification = ""<Pending>"", Scope = ""type"", Target = ""Class"")]
-[assembly: System.Diagnostics.CodeAnalysis.SuppressMessage(""InfoDiagnostic"", ""InfoDiagnostic:InfoDiagnostic"", Justification = ""<Pending>"", Scope = ""type"", Target = ""~T:Class2"")]
-
+[assembly: SuppressMessage(""InfoDiagnostic"", ""InfoDiagnostic:InfoDiagnostic"", Justification = ""{FeaturesResources.Pending}"", Scope = ""type"", Target = ""~T:Class2"")]
 ";
 
-                    Test(initialMarkup, expectedText, isLine: false, isAddedDocument: false);
+                    await TestAsync(initialMarkup, expectedText);
                 }
             }
         }
@@ -1389,14 +1871,14 @@ class Class { }
         {
             protected sealed override int CodeActionIndex
             {
-                get { return 1; }
+                get { return 2; }
             }
 
             public class UserInfoDiagnosticSuppressionTests : CSharpLocalSuppressMessageSuppressionTests
             {
                 private class UserDiagnosticAnalyzer : DiagnosticAnalyzer
                 {
-                    private DiagnosticDescriptor _descriptor =
+                    private readonly DiagnosticDescriptor _descriptor =
                         new DiagnosticDescriptor("InfoDiagnostic", "InfoDiagnostic", "InfoDiagnostic", "InfoDiagnostic", DiagnosticSeverity.Info, isEnabledByDefault: true);
 
                     public override ImmutableArray<DiagnosticDescriptor> SupportedDiagnostics
@@ -1408,9 +1890,7 @@ class Class { }
                     }
 
                     public override void Initialize(AnalysisContext context)
-                    {
-                        context.RegisterSyntaxNodeAction(AnalyzeNode, SyntaxKind.ClassDeclaration, SyntaxKind.NamespaceDeclaration, SyntaxKind.MethodDeclaration);
-                    }
+                        => context.RegisterSyntaxNodeAction(AnalyzeNode, SyntaxKind.ClassDeclaration, SyntaxKind.NamespaceDeclaration, SyntaxKind.MethodDeclaration);
 
                     public void AnalyzeNode(SyntaxNodeAnalysisContext context)
                     {
@@ -1434,14 +1914,14 @@ class Class { }
                     }
                 }
 
-                internal override Tuple<DiagnosticAnalyzer, ISuppressionFixProvider> CreateDiagnosticProviderAndFixer(Workspace workspace)
+                internal override Tuple<DiagnosticAnalyzer, IConfigurationFixProvider> CreateDiagnosticProviderAndFixer(Workspace workspace)
                 {
-                    return new Tuple<DiagnosticAnalyzer, ISuppressionFixProvider>(
+                    return new Tuple<DiagnosticAnalyzer, IConfigurationFixProvider>(
                         new UserDiagnosticAnalyzer(), new CSharpSuppressionCodeFixProvider());
                 }
 
                 [Fact, Trait(Traits.Feature, Traits.Features.CodeActionsSuppression)]
-                public void TestSuppressionOnSimpleType()
+                public async Task TestSuppressionOnSimpleType()
                 {
                     var initial = @"
 using System;
@@ -1454,28 +1934,28 @@ using System;
         int x = 0;
     }
 }";
-                    var expected = @"
+                    var expected = $@"
 using System;
 
 // Some trivia
 /* More Trivia */
-[System.Diagnostics.CodeAnalysis.SuppressMessage(""InfoDiagnostic"", ""InfoDiagnostic:InfoDiagnostic"", Justification = ""<Pending>"")]
+[System.Diagnostics.CodeAnalysis.SuppressMessage(""InfoDiagnostic"", ""InfoDiagnostic:InfoDiagnostic"", Justification = ""{FeaturesResources.Pending}"")]
 class Class
-{
+{{
     int Method()
-    {
+    {{
         int x = 0;
-    }
-}";
-                    Test(initial, expected);
+    }}
+}}";
+                    await TestAsync(initial, expected);
 
                     // Also verify that the added attribute does indeed suppress the diagnostic.
                     expected = expected.Replace("class Class", "[|class Class|]");
-                    TestMissing(expected);
+                    await TestMissingAsync(expected);
                 }
 
                 [Fact, Trait(Traits.Feature, Traits.Features.CodeActionsSuppression)]
-                public void TestSuppressionOnSimpleType2()
+                public async Task TestSuppressionOnSimpleType2()
                 {
                     // Type already has attributes.
                     var initial = @"
@@ -1491,29 +1971,29 @@ using System;
         int x = 0;
     }
 }";
-                    var expected = @"
+                    var expected = $@"
 using System;
 
 // Some trivia
 /* More Trivia */
 [System.Diagnostics.CodeAnalysis.SuppressMessage(""SomeOtherDiagnostic"", ""SomeOtherDiagnostic:Title"", Justification = ""<Pending>"")]
-[System.Diagnostics.CodeAnalysis.SuppressMessage(""InfoDiagnostic"", ""InfoDiagnostic:InfoDiagnostic"", Justification = ""<Pending>"")]
+[System.Diagnostics.CodeAnalysis.SuppressMessage(""InfoDiagnostic"", ""InfoDiagnostic:InfoDiagnostic"", Justification = ""{FeaturesResources.Pending}"")]
 class Class
-{
+{{
     int Method()
-    {
+    {{
         int x = 0;
-    }
-}";
-                    Test(initial, expected);
+    }}
+}}";
+                    await TestAsync(initial, expected);
 
                     // Also verify that the added attribute does indeed suppress the diagnostic.
                     expected = expected.Replace("class Class", "[|class Class|]");
-                    TestMissing(expected);
+                    await TestMissingAsync(expected);
                 }
 
                 [Fact, Trait(Traits.Feature, Traits.Features.CodeActionsSuppression)]
-                public void TestSuppressionOnSimpleType3()
+                public async Task TestSuppressionOnSimpleType3()
                 {
                     // Type already has attributes with trailing trivia.
                     var initial = @"
@@ -1530,30 +2010,30 @@ using System;
         int x = 0;
     }
 }";
-                    var expected = @"
+                    var expected = $@"
 using System;
 
 // Some trivia
 /* More Trivia */
 [System.Diagnostics.CodeAnalysis.SuppressMessage(""SomeOtherDiagnostic"", ""SomeOtherDiagnostic:Title"", Justification = ""<Pending>"")]
-[System.Diagnostics.CodeAnalysis.SuppressMessage(""InfoDiagnostic"", ""InfoDiagnostic:InfoDiagnostic"", Justification = ""<Pending>"")]
+[System.Diagnostics.CodeAnalysis.SuppressMessage(""InfoDiagnostic"", ""InfoDiagnostic:InfoDiagnostic"", Justification = ""{FeaturesResources.Pending}"")]
 /* Some More Trivia */
 class Class
-{
+{{
     int Method()
-    {
+    {{
         int x = 0;
-    }
-}";
-                    Test(initial, expected);
+    }}
+}}";
+                    await TestAsync(initial, expected);
 
                     // Also verify that the added attribute does indeed suppress the diagnostic.
                     expected = expected.Replace("class Class", "[|class Class|]");
-                    TestMissing(expected);
+                    await TestMissingAsync(expected);
                 }
 
                 [Fact, Trait(Traits.Feature, Traits.Features.CodeActionsSuppression)]
-                public void TestSuppressionOnTypeInsideNamespace()
+                public async Task TestSuppressionOnTypeInsideNamespace()
                 {
                     var initial = @"
 using System;
@@ -1571,32 +2051,32 @@ namespace N1
         }
     }
 }";
-                    var expected = @"
+                    var expected = $@"
 using System;
 
 namespace N1
-{
+{{
     namespace N2
-    {
-        [System.Diagnostics.CodeAnalysis.SuppressMessage(""InfoDiagnostic"", ""InfoDiagnostic:InfoDiagnostic"", Justification = ""<Pending>"")]
+    {{
+        [System.Diagnostics.CodeAnalysis.SuppressMessage(""InfoDiagnostic"", ""InfoDiagnostic:InfoDiagnostic"", Justification = ""{FeaturesResources.Pending}"")]
         class Class
-        {
+        {{
             int Method()
-            {
+            {{
                 int x = 0;
-            }
-        }
-    }
-}";
-                    Test(initial, expected);
+            }}
+        }}
+    }}
+}}";
+                    await TestAsync(initial, expected);
 
                     // Also verify that the added attribute does indeed suppress the diagnostic.
                     expected = expected.Replace("class Class", "[|class Class|]");
-                    TestMissing(expected);
+                    await TestMissingAsync(expected);
                 }
 
                 [Fact, Trait(Traits.Feature, Traits.Features.CodeActionsSuppression)]
-                public void TestSuppressionOnNestedType()
+                public async Task TestSuppressionOnNestedType()
                 {
                     var initial = @"
 using System;
@@ -1614,32 +2094,32 @@ namespace N
         }
     }
 }";
-                    var expected = @"
+                    var expected = $@"
 using System;
 
 namespace N
-{
+{{
     class Generic<T>
-    {
-        [System.Diagnostics.CodeAnalysis.SuppressMessage(""InfoDiagnostic"", ""InfoDiagnostic:InfoDiagnostic"", Justification = ""<Pending>"")]
+    {{
+        [System.Diagnostics.CodeAnalysis.SuppressMessage(""InfoDiagnostic"", ""InfoDiagnostic:InfoDiagnostic"", Justification = ""{FeaturesResources.Pending}"")]
         class Class
-        {
+        {{
             int Method()
-            {
+            {{
                 int x = 0;
-            }
-        }
-    }
-}";
-                    Test(initial, expected);
+            }}
+        }}
+    }}
+}}";
+                    await TestAsync(initial, expected);
 
                     // Also verify that the added attribute does indeed suppress the diagnostic.
                     expected = expected.Replace("class Class", "[|class Class|]");
-                    TestMissing(expected);
+                    await TestMissingAsync(expected);
                 }
 
                 [Fact, Trait(Traits.Feature, Traits.Features.CodeActionsSuppression)]
-                public void TestSuppressionOnMethod()
+                public async Task TestSuppressionOnMethod()
                 {
                     var initial = @"
 using System;
@@ -1657,28 +2137,28 @@ namespace N
         }
     }
 }";
-                    var expected = @"
+                    var expected = $@"
 using System;
 
 namespace N
-{
+{{
     class Generic<T>
-    {
+    {{
         class Class
-        {
-            [System.Diagnostics.CodeAnalysis.SuppressMessage(""InfoDiagnostic"", ""InfoDiagnostic:InfoDiagnostic"", Justification = ""<Pending>"")]
+        {{
+            [System.Diagnostics.CodeAnalysis.SuppressMessage(""InfoDiagnostic"", ""InfoDiagnostic:InfoDiagnostic"", Justification = ""{FeaturesResources.Pending}"")]
             int Method()
-            {
+            {{
                 int x = 0;
-            }
-        }
-    }
-}";
-                    Test(initial, expected);
+            }}
+        }}
+    }}
+}}";
+                    await TestAsync(initial, expected);
 
                     // Also verify that the added attribute does indeed suppress the diagnostic.
                     expected = expected.Replace("int Method()", "[|int Method()|]");
-                    TestMissing(expected);
+                    await TestMissingAsync(expected);
                 }
             }
         }
@@ -1687,35 +2167,31 @@ namespace N
 
         #region NoLocation Diagnostics tests
 
-        public class CSharpDiagnosticWithoutLocationSuppressionTests : CSharpSuppressionTests
+        public partial class CSharpDiagnosticWithoutLocationSuppressionTests : CSharpSuppressionTests
         {
             private class UserDiagnosticAnalyzer : DiagnosticAnalyzer
             {
-                private DiagnosticDescriptor _descriptor =
+                public static readonly DiagnosticDescriptor Descriptor =
                     new DiagnosticDescriptor("NoLocationDiagnostic", "NoLocationDiagnostic", "NoLocationDiagnostic", "NoLocationDiagnostic", DiagnosticSeverity.Info, isEnabledByDefault: true);
 
                 public override ImmutableArray<DiagnosticDescriptor> SupportedDiagnostics
                 {
                     get
                     {
-                        return ImmutableArray.Create(_descriptor);
+                        return ImmutableArray.Create(Descriptor);
                     }
                 }
 
                 public override void Initialize(AnalysisContext context)
-                {
-                    context.RegisterSyntaxNodeAction(AnalyzeNode, SyntaxKind.ClassDeclaration);
-                }
+                    => context.RegisterSyntaxNodeAction(AnalyzeNode, SyntaxKind.ClassDeclaration);
 
                 public void AnalyzeNode(SyntaxNodeAnalysisContext context)
-                {
-                    context.ReportDiagnostic(Diagnostic.Create(_descriptor, Location.None));
-                }
+                    => context.ReportDiagnostic(Diagnostic.Create(Descriptor, Location.None));
             }
 
-            internal override Tuple<DiagnosticAnalyzer, ISuppressionFixProvider> CreateDiagnosticProviderAndFixer(Workspace workspace)
+            internal override Tuple<DiagnosticAnalyzer, IConfigurationFixProvider> CreateDiagnosticProviderAndFixer(Workspace workspace)
             {
-                return new Tuple<DiagnosticAnalyzer, ISuppressionFixProvider>(
+                return new Tuple<DiagnosticAnalyzer, IConfigurationFixProvider>(
                     new UserDiagnosticAnalyzer(), new CSharpSuppressionCodeFixProvider());
             }
 
@@ -1728,22 +2204,32 @@ namespace N
             }
 
             [Fact, Trait(Traits.Feature, Traits.Features.CodeActionsSuppression)]
-            [WorkItem(1073825)]
-            public void TestDiagnosticWithoutLocationCannotBeSuppressed()
+            [WorkItem(1073825, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/1073825")]
+            public async Task TestDiagnosticWithoutLocationCanBeSuppressed()
             {
-                TestMissing(
-        @"
+                await TestAsync(
+        @"[||]
 using System;
 
-[|class Class|]
+class Class
 {
     int Method()
     {
         int x = 0;
     }
-}");
+}",
+$@"// This file is used by Code Analysis to maintain SuppressMessage
+// attributes that are applied to this project.
+// Project-level suppressions either have no target or are given
+// a specific target and scoped to a namespace, type, member, etc.
+
+using System.Diagnostics.CodeAnalysis;
+
+[assembly: SuppressMessage(""NoLocationDiagnostic"", ""NoLocationDiagnostic:NoLocationDiagnostic"", Justification = ""{FeaturesResources.Pending}"")]
+");
             }
         }
+
         #endregion
     }
 }

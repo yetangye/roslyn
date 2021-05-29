@@ -1,9 +1,14 @@
-﻿Imports System.Collections.Immutable
+﻿' Licensed to the .NET Foundation under one or more agreements.
+' The .NET Foundation licenses this file to you under the MIT license.
+' See the LICENSE file in the project root for more information.
+
+Imports System.Collections.Immutable
+Imports System.Collections.ObjectModel
 Imports System.Reflection.Metadata
 Imports System.Reflection.Metadata.Ecma335
 Imports System.Runtime.CompilerServices
-Imports System.Runtime.InteropServices
 Imports Microsoft.CodeAnalysis.ExpressionEvaluator
+Imports Microsoft.CodeAnalysis.PooledObjects
 Imports Microsoft.CodeAnalysis.VisualBasic.Symbols
 Imports Microsoft.CodeAnalysis.VisualBasic.Symbols.Metadata.PE
 
@@ -16,18 +21,12 @@ Namespace Microsoft.CodeAnalysis.VisualBasic.ExpressionEvaluator
         End Function
 
         <Extension>
-        Friend Function [GetType](compilation As VisualBasicCompilation, moduleVersionId As Guid, typeToken As Integer, <Out> ByRef metadataDecoder As MetadataDecoder) As PENamedTypeSymbol
-            Dim [module] = compilation.GetModule(moduleVersionId)
-            Dim reader = [module].Module.MetadataReader
-            Dim typeHandle = CType(MetadataTokens.Handle(typeToken), TypeDefinitionHandle)
-            Dim type = [GetType]([module], typeHandle)
-            metadataDecoder = New MetadataDecoder([module], type)
-            Return type
+        Friend Function [GetType](compilation As VisualBasicCompilation, moduleVersionId As Guid, typeToken As Integer) As PENamedTypeSymbol
+            Return [GetType](compilation.GetModule(moduleVersionId), CType(MetadataTokens.Handle(typeToken), TypeDefinitionHandle))
         End Function
 
         <Extension>
-        Friend Function GetSourceMethod(compilation As VisualBasicCompilation, moduleVersionId As Guid, methodToken As Integer) As PEMethodSymbol
-            Dim methodHandle = CType(MetadataTokens.Handle(methodToken), MethodDefinitionHandle)
+        Friend Function GetSourceMethod(compilation As VisualBasicCompilation, moduleVersionId As Guid, methodHandle As MethodDefinitionHandle) As PEMethodSymbol
             Dim method = GetMethod(compilation, moduleVersionId, methodHandle)
             Dim metadataDecoder = New MetadataDecoder(DirectCast(method.ContainingModule, PEModuleSymbol))
             Dim containingType = method.ContainingType
@@ -75,24 +74,57 @@ Namespace Microsoft.CodeAnalysis.VisualBasic.ExpressionEvaluator
                 Next
             Next
 
-            Return Nothing
+            Throw New ArgumentException($"No module found with MVID '{moduleVersionId}'", NameOf(moduleVersionId))
         End Function
 
         <Extension>
         Friend Function ToCompilation(metadataBlocks As ImmutableArray(Of MetadataBlock)) As VisualBasicCompilation
-            Return VisualBasicCompilation.Create(
-                assemblyName:=ExpressionCompilerUtilities.GenerateUniqueName(),
-                references:=metadataBlocks.MakeAssemblyReferences(),
-                options:=CompilationOptions)
+            Return ToCompilation(metadataBlocks, moduleVersionId:=Nothing, MakeAssemblyReferencesKind.AllAssemblies)
         End Function
 
+        <Extension>
+        Friend Function ToCompilationReferencedModulesOnly(metadataBlocks As ImmutableArray(Of MetadataBlock), moduleVersionId As Guid) As VisualBasicCompilation
+            Return ToCompilation(metadataBlocks, moduleVersionId, MakeAssemblyReferencesKind.DirectReferencesOnly)
+        End Function
+
+        <Extension>
+        Friend Function ToCompilation(metadataBlocks As ImmutableArray(Of MetadataBlock), moduleVersionId As Guid, kind As MakeAssemblyReferencesKind) As VisualBasicCompilation
+            Dim referencesBySimpleName As IReadOnlyDictionary(Of String, ImmutableArray(Of (AssemblyIdentity, MetadataReference))) = Nothing
+            Dim references = metadataBlocks.MakeAssemblyReferences(moduleVersionId, IdentityComparer, kind, referencesBySimpleName)
+            Dim options = s_compilationOptions
+            If referencesBySimpleName IsNot Nothing Then
+                Debug.Assert(kind = MakeAssemblyReferencesKind.AllReferences)
+                Dim resolver = New EEMetadataReferenceResolver(IdentityComparer, referencesBySimpleName)
+                options = options.WithMetadataReferenceResolver(resolver)
+            End If
+            Return VisualBasicCompilation.Create(
+                assemblyName:=ExpressionCompilerUtilities.GenerateUniqueName(),
+                references:=references,
+                options:=options)
+        End Function
+
+        <Extension>
+        Friend Function GetCustomTypeInfoPayload(compilation As VisualBasicCompilation, type As TypeSymbol) As ReadOnlyCollection(Of Byte)
+            Dim builder = ArrayBuilder(Of String).GetInstance()
+            Dim names = If(VisualBasicCompilation.TupleNamesEncoder.TryGetNames(type, builder) AndAlso compilation.HasTupleNamesAttributes,
+                New ReadOnlyCollection(Of String)(builder.ToArray()),
+                Nothing)
+            builder.Free()
+            Return CustomTypeInfo.Encode(Nothing, names)
+        End Function
+
+        Friend ReadOnly IdentityComparer As AssemblyIdentityComparer = DesktopAssemblyIdentityComparer.Default
+
         ' XML file references, #r directives not supported:
-        Private ReadOnly CompilationOptions As VisualBasicCompilationOptions = New VisualBasicCompilationOptions(
+        Private ReadOnly s_compilationOptions As VisualBasicCompilationOptions = New VisualBasicCompilationOptions(
             outputKind:=OutputKind.DynamicallyLinkedLibrary,
             platform:=Platform.AnyCpu, ' Platform should match PEModule.Machine, in this case I386.
             optimizationLevel:=OptimizationLevel.Release,
-            assemblyIdentityComparer:=DesktopAssemblyIdentityComparer.Default).
-            WithMetadataImportOptions(MetadataImportOptions.All)
+            assemblyIdentityComparer:=IdentityComparer).
+            WithMetadataImportOptions(MetadataImportOptions.All).
+            WithReferencesSupersedeLowerVersions(True).
+            WithSuppressEmbeddedDeclarations(True).
+            WithIgnoreCorLibraryDuplicatedTypes(True)
 
     End Module
 

@@ -1,106 +1,104 @@
-' Copyright (c) Microsoft.  All Rights Reserved.  Licensed under the Apache License, Version 2.0.  See License.txt in the project root for license information.
-
-Imports System.Threading
-Imports System.Xml.Linq
-Imports Microsoft.CodeAnalysis.Editor.VisualBasic.Completion
-Imports Microsoft.CodeAnalysis.Text
-Imports Roslyn.Test.Utilities
+﻿' Licensed to the .NET Foundation under one or more agreements.
+' The .NET Foundation licenses this file to you under the MIT license.
+' See the LICENSE file in the project root for more information.
 
 Namespace Microsoft.CodeAnalysis.Editor.UnitTests.IntelliSense
+    <[UseExportProvider]>
     Public Class CSharpIntelliSenseCommandHandlerTests
-        <Fact>
-        Public Sub TestOpenParenDismissesCompletionAndBringsUpSignatureHelp1()
-            Using state = TestState.CreateCSharpTestState(
+
+        <WpfTheory, CombinatorialData, Trait(Traits.Feature, Traits.Features.Completion)>
+        Public Async Function TestOpenParenDismissesCompletionAndBringsUpSignatureHelp1(showCompletionInArgumentLists As Boolean) As Task
+            Using state = TestStateFactory.CreateCSharpTestState(
                               <Document>
 class C
 {
-    void Foo()
+    void Goo()
     {
         $$
     }
 }
-                              </Document>)
+                              </Document>, showCompletionInArgumentLists:=showCompletionInArgumentLists)
 
-                state.SendTypeChars("Fo")
-                state.AssertCompletionSession()
-                state.AssertNoSignatureHelpSession()
+                state.SendTypeChars("Go")
+                Await state.AssertCompletionSession()
+                Await state.AssertNoSignatureHelpSession()
                 state.SendTypeChars("(")
-                state.AssertNoCompletionSession()
-                state.AssertSignatureHelpSession()
-                state.AssertSelectedSignatureHelpItem(displayText:="void C.Foo()")
-                Assert.Contains("Foo(", state.GetLineTextFromCaretPosition())
+                ' Await state.AssertNoCompletionSession() TODO: Split into 2 tests
+                Await state.AssertSignatureHelpSession()
+                Await state.AssertSelectedSignatureHelpItem(displayText:="void C.Goo()")
+                Assert.Contains("Goo(", state.GetLineTextFromCaretPosition(), StringComparison.Ordinal)
             End Using
-        End Sub
+        End Function
 
-        <WorkItem(543913)>
-        <Fact>
-        Public Sub TestEscapeDismissesCompletionFirst()
-            Using state = TestState.CreateCSharpTestState(
+        <WorkItem(543913, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/543913")>
+        <WpfTheory, CombinatorialData, Trait(Traits.Feature, Traits.Features.Completion)>
+        Public Async Function TestEscapeDismissesCompletionFirst(showCompletionInArgumentLists As Boolean) As Task
+            Using state = TestStateFactory.CreateCSharpTestState(
                               <Document>
 class C
 {
-    void Foo()
+    void Goo()
     {
         $$
     }
 }
-                              </Document>)
+                              </Document>, showCompletionInArgumentLists:=showCompletionInArgumentLists)
 
-                state.SendTypeChars("Foo(a")
-                state.AssertCompletionSession()
-                state.AssertSignatureHelpSession()
-                state.SendEscape(block:=True)
-                state.AssertNoCompletionSession()
-                state.AssertSignatureHelpSession()
-                state.SendEscape(block:=True)
-                state.AssertNoCompletionSession()
-                state.AssertNoSignatureHelpSession()
+                state.SendTypeChars("Goo(a")
+                Await state.AssertCompletionSession()
+                Await state.AssertSignatureHelpSession()
+                state.SendEscape()
+                Await state.AssertNoCompletionSession()
+                Await state.AssertSignatureHelpSession()
+                state.SendEscape()
+                Await state.AssertNoCompletionSession()
+                Await state.AssertNoSignatureHelpSession()
             End Using
-        End Sub
+        End Function
 
-        <WorkItem(531149)>
-        <Fact>
-        Public Sub TestCutDismissesCompletion()
-            Using state = TestState.CreateCSharpTestState(
+        <WorkItem(531149, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/531149")>
+        <WpfTheory, CombinatorialData, Trait(Traits.Feature, Traits.Features.Completion)>
+        Public Async Function TestCutDismissesCompletion(showCompletionInArgumentLists As Boolean) As Task
+            Using state = TestStateFactory.CreateCSharpTestState(
                               <Document>
 class C
 {
-    void Foo()
+    void Goo()
     {
         $$
     }
 }
-                              </Document>)
-                state.SendTypeChars("Foo(a")
-                state.AssertCompletionSession()
-                state.AssertSignatureHelpSession()
-                state.SendCut(block:=True)
-                state.AssertNoCompletionSession()
-                state.AssertSignatureHelpSession()
+                              </Document>, showCompletionInArgumentLists:=showCompletionInArgumentLists)
+                state.SendTypeChars("Goo(a")
+                Await state.AssertCompletionSession()
+                Await state.AssertSignatureHelpSession()
+                state.SendCut()
+                Await state.AssertNoCompletionSession()
+                Await state.AssertSignatureHelpSession()
             End Using
-        End Sub
+        End Function
 
-        <WorkItem(531149)>
-        <Fact>
-        Public Sub TestPasteDismissesCompletion()
-            Using state = TestState.CreateCSharpTestState(
+        <WorkItem(531149, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/531149")>
+        <WpfTheory, CombinatorialData, Trait(Traits.Feature, Traits.Features.Completion)>
+        Public Async Function TestPasteDismissesCompletion(showCompletionInArgumentLists As Boolean) As Task
+            Using state = TestStateFactory.CreateCSharpTestState(
                               <Document>
 class C
 {
-    void Foo()
+    void Goo()
     {
         $$
     }
 }
-                              </Document>)
+                              </Document>, showCompletionInArgumentLists:=showCompletionInArgumentLists)
 
-                state.SendTypeChars("Foo(a")
-                state.AssertCompletionSession()
-                state.AssertSignatureHelpSession()
-                state.SendPaste(block:=True)
-                state.AssertNoCompletionSession()
-                state.AssertSignatureHelpSession()
+                state.SendTypeChars("Goo(a")
+                Await state.AssertCompletionSession()
+                Await state.AssertSignatureHelpSession()
+                state.SendPaste()
+                Await state.AssertNoCompletionSession()
+                Await state.AssertSignatureHelpSession()
             End Using
-        End Sub
+        End Function
     End Class
 End Namespace

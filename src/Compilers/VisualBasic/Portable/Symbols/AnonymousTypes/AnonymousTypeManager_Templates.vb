@@ -1,10 +1,14 @@
-﻿' Copyright (c) Microsoft.  All Rights Reserved.  Licensed under the Apache License, Version 2.0.  See License.txt in the project root for license information.
+﻿' Licensed to the .NET Foundation under one or more agreements.
+' The .NET Foundation licenses this file to you under the MIT license.
+' See the LICENSE file in the project root for more information.
 
 Imports System.Collections.Concurrent
 Imports System.Collections.Generic
 Imports System.Collections.Immutable
 Imports System.Diagnostics
 Imports System.Threading
+Imports Microsoft.CodeAnalysis
+Imports Microsoft.CodeAnalysis.PooledObjects
 
 Namespace Microsoft.CodeAnalysis.VisualBasic.Symbols
 
@@ -20,7 +24,7 @@ Namespace Microsoft.CodeAnalysis.VisualBasic.Symbols
         ''' <summary>
         ''' Holds a collection of all the locations of anonymous types and delegates from source
         ''' </summary>
-        Private _sourceLocationsSeen As New ConcurrentDictionary(Of Location, Boolean)
+        Private ReadOnly _sourceLocationsSeen As New ConcurrentDictionary(Of Location, Boolean)
 #End If
 
         <Conditional("DEBUG")>
@@ -158,7 +162,7 @@ Namespace Microsoft.CodeAnalysis.VisualBasic.Symbols
         End Sub
 
         Private Shared Function CreatePlaceholderTypeDescriptor(key As Microsoft.CodeAnalysis.Emit.AnonymousTypeKey) As AnonymousTypeDescriptor
-            Dim names = key.Names.SelectAsArray(Function(n) New AnonymousTypeField(n, Location.None))
+            Dim names = key.Fields.SelectAsArray(Function(f) New AnonymousTypeField(f.Name, Location.None, f.IsKey))
             Return New AnonymousTypeDescriptor(names, Location.None, True)
         End Function
 
@@ -166,12 +170,12 @@ Namespace Microsoft.CodeAnalysis.VisualBasic.Symbols
         ''' Resets numbering in anonymous type names and compiles the
         ''' anonymous type methods. Also seals the collection of templates.
         ''' </summary>
-        Public Sub AssignTemplatesNamesAndCompile(compiler As MethodCompiler, moduleBeingBuilt As Emit.PEModuleBuilder, diagnostics As DiagnosticBag)
+        Public Sub AssignTemplatesNamesAndCompile(compiler As MethodCompiler, moduleBeingBuilt As Emit.PEModuleBuilder, diagnostics As BindingDiagnosticBag)
 
             ' Ensure all previous anonymous type templates are included so the
             ' types are available for subsequent edit and continue generations.
             For Each key In moduleBeingBuilt.GetPreviousAnonymousTypes()
-                Dim templateKey = AnonymousTypeDescriptor.ComputeKey(key.Names, Function(f) f, Function(f) False)
+                Dim templateKey = AnonymousTypeDescriptor.ComputeKey(key.Fields, Function(f) f.Name, Function(f) f.IsKey)
                 If key.IsDelegate Then
                     AnonymousDelegateTemplates.GetOrAdd(templateKey, Function(k) AnonymousDelegateTemplateSymbol.Create(Me, CreatePlaceholderTypeDescriptor(key)))
                 Else
@@ -187,9 +191,6 @@ Namespace Microsoft.CodeAnalysis.VisualBasic.Symbols
             ' to the created anonymous type and delegate templates
             If Not Me.AreTemplatesSealed Then
 
-                ' Sort types and delegates using smallest location
-                builder.Sort(New AnonymousTypeComparer(Me.Compilation))
-
                 ' If we are emitting .NET module, include module's name into type's name to ensure
                 ' uniqueness across added modules.
                 Dim moduleId As String
@@ -202,7 +203,7 @@ Namespace Microsoft.CodeAnalysis.VisualBasic.Symbols
                         moduleId = moduleId.Substring(0, moduleId.Length - extension.Length)
                     End If
 
-                    moduleId = "<" & moduleId.Replace("."c, "_"c) & ">"
+                    moduleId = "<" & MetadataHelpers.MangleForTypeNameIfNeeded(moduleId) & ">"
                 Else
                     moduleId = String.Empty
                 End If
@@ -238,17 +239,13 @@ Namespace Microsoft.CodeAnalysis.VisualBasic.Symbols
             If builder.Count > 0 AndAlso Not Me.CheckAndReportMissingSymbols(builder, diagnostics) Then
 
                 ' Process all the templates
-                For newIndex = 0 To builder.Count - 1
-                    builder(newIndex).Accept(compiler)
+                For Each template In builder
+                    template.Accept(compiler)
                 Next
             End If
 
             builder.Free()
         End Sub
-
-        Friend Shared Function GetAnonymousTypeKey(type As NamedTypeSymbol) As Microsoft.CodeAnalysis.Emit.AnonymousTypeKey
-            Return DirectCast(type, AnonymousTypeOrDelegateTemplateSymbol).GetAnonymousTypeKey()
-        End Function
 
         Friend Function GetAnonymousTypeMap() As IReadOnlyDictionary(Of Microsoft.CodeAnalysis.Emit.AnonymousTypeKey, Microsoft.CodeAnalysis.Emit.AnonymousTypeValue)
             Dim result = New Dictionary(Of Microsoft.CodeAnalysis.Emit.AnonymousTypeKey, Microsoft.CodeAnalysis.Emit.AnonymousTypeValue)
@@ -257,15 +254,11 @@ Namespace Microsoft.CodeAnalysis.VisualBasic.Symbols
             For Each template In builder
                 Dim nameAndIndex = template.NameAndIndex
                 Dim key = template.GetAnonymousTypeKey()
-                Dim value = New Microsoft.CodeAnalysis.Emit.AnonymousTypeValue(nameAndIndex.Name, nameAndIndex.Index, template)
+                Dim value = New Microsoft.CodeAnalysis.Emit.AnonymousTypeValue(nameAndIndex.Name, nameAndIndex.Index, template.GetCciAdapter())
                 result.Add(key, value)
             Next
             builder.Free()
             Return result
-        End Function
-
-        Friend Shared Function IsAnonymousTypeTemplate(type As NamedTypeSymbol) As Boolean
-            Return TypeOf type Is AnonymousTypeOrDelegateTemplateSymbol
         End Function
 
         ''' <summary>
@@ -301,8 +294,15 @@ Namespace Microsoft.CodeAnalysis.VisualBasic.Symbols
         End Property
 
         Private Sub GetAllCreatedTemplates(builder As ArrayBuilder(Of AnonymousTypeOrDelegateTemplateSymbol))
+            Debug.Assert(Not builder.Any())
+
             AddFromCache(builder, Me._concurrentTypesCache)
             AddFromCache(builder, Me._concurrentDelegatesCache)
+
+            If builder.Any() Then
+                ' Sort types and delegates using smallest location
+                builder.Sort(New AnonymousTypeComparer(Me.Compilation))
+            End If
         End Sub
 
         Private NotInheritable Class AnonymousTypeComparer

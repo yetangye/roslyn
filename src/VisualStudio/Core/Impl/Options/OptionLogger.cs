@@ -1,4 +1,8 @@
-// Copyright (c) Microsoft.  All Rights Reserved.  Licensed under the Apache License, Version 2.0.  See License.txt in the project root for license information.
+﻿// Licensed to the .NET Foundation under one or more agreements.
+// The .NET Foundation licenses this file to you under the MIT license.
+// See the LICENSE file in the project root for more information.
+
+#nullable disable
 
 using Microsoft.CodeAnalysis.Internal.Log;
 using Microsoft.CodeAnalysis.Options;
@@ -7,10 +11,10 @@ namespace Microsoft.VisualStudio.LanguageServices.Implementation.Options
 {
     internal static class OptionLogger
     {
-        private const string Name = "Name";
-        private const string Language = "Language";
-        private const string Change = "Change";
-        private const string All = "All";
+        private const string Name = nameof(Name);
+        private const string Language = nameof(Language);
+        private const string Change = nameof(Change);
+        private const string All = nameof(All);
 
         public static void Log(OptionSet oldOptions, OptionSet newOptions)
         {
@@ -42,8 +46,6 @@ namespace Microsoft.VisualStudio.LanguageServices.Implementation.Options
         }
 
         private static string GetOptionValue(object oldValue)
-        {
-            return oldValue == null ? "[null]" : oldValue.ToString();
-        }
+            => oldValue == null ? "[null]" : oldValue.ToString();
     }
 }

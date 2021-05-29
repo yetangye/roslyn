@@ -1,4 +1,6 @@
-﻿' Copyright (c) Microsoft.  All Rights Reserved.  Licensed under the Apache License, Version 2.0.  See License.txt in the project root for license information.
+﻿' Licensed to the .NET Foundation under one or more agreements.
+' The .NET Foundation licenses this file to you under the MIT license.
+' See the LICENSE file in the project root for more information.
 
 '-----------------------------------------------------------------------------------------------------------
 ' Defines the in-memory format of the parse tree description. Many of the structures also 
@@ -48,19 +50,19 @@ Public Class ParseTree
     Public RootToken, RootTrivia As ParseNodeStructure
 
     ' Remember nodes with errors so we only report one error per node.
-    Private ElementsWithErrors As New Dictionary(Of XNode, Boolean)
+    Private ReadOnly _elementsWithErrors As New Dictionary(Of XNode, Boolean)
 
     ' Report an error.
     Public Sub ReportError(referencingNode As XNode, message As String, ParamArray args As Object())
         Dim fullMessage As String = FileName
 
         If referencingNode IsNot Nothing Then
-            If ElementsWithErrors.ContainsKey(referencingNode) Then
+            If _elementsWithErrors.ContainsKey(referencingNode) Then
                 ' We already reported an error on this node.
                 Exit Sub
             End If
 
-            ElementsWithErrors(referencingNode) = True      ' remember this so we only report errors on this node once.
+            _elementsWithErrors(referencingNode) = True      ' remember this so we only report errors on this node once.
             Dim lineInfo = CType(referencingNode, IXmlLineInfo)
             fullMessage += String.Format("({0})", lineInfo.LineNumber)
         End If
@@ -105,7 +107,7 @@ Public Class ParseTree
 
             IsAbstract(struct) = True
 
-            ' Determine "tokens" and trivia by walking the heirarchy
+            ' Determine "tokens" and trivia by walking the hierarchy
             SetIsTokenAndIsTrivia(struct)
         Next
 
@@ -117,7 +119,7 @@ Public Class ParseTree
 
     ' Set the IsToken and IsTrivia flags on a struct
     Private Sub SetIsTokenAndIsTrivia(struct As ParseNodeStructure)
-        ' Walk the heirarchy.
+        ' Walk the hierarchy.
         Dim parent = struct
 
         While parent IsNot Nothing
@@ -138,10 +140,9 @@ Public Class ParseTree
             Return Enumerations(enumString)
         End If
 
-        ReportError(referencingElement, "{0} is not a valid field type", enumString)
+        ReportError(referencingElement, "{0} is not a valid field type. You should add a node-kind entry in the syntax.xml.", enumString)
         Return Nothing
     End Function
-
 
     Public Function ParseOneNodeKind(typeString As String, referencingNode As XNode) As ParseNodeKind
         If (NodeKinds.ContainsKey(typeString)) Then
@@ -193,7 +194,7 @@ Public Class ParseTree
             Return typeList
         End If
 
-        If typeString.StartsWith("@") Then
+        If typeString.StartsWith("@", StringComparison.Ordinal) Then
             Dim nodeTypeString = typeString.Substring(1)
             If Not NodeStructures.ContainsKey(nodeTypeString) Then
                 ReportError(referencingNode, "Unknown structure '@{0}'", nodeTypeString)
@@ -481,7 +482,6 @@ Public Class ParseNodeField
         End Get
     End Property
 
-
 End Class
 
 ' Defines a child node with a node structure. A child can be a single child
@@ -495,13 +495,15 @@ Public Class ParseNodeChild
 
     Public ReadOnly IsOptional As Boolean
 
+    Public ReadOnly MinCount As Integer
+
     Public ReadOnly IsList As Boolean
 
     Public ReadOnly IsSeparated As Boolean
 
     Public ReadOnly SeparatorsName As String
 
-    Private _childKindNames As New Dictionary(Of String, List(Of String))
+    Private ReadOnly _childKindNames As New Dictionary(Of String, List(Of String))
     Private _childKind As Object
 
     Public ReadOnly SeparatorsTypeId As String
@@ -532,6 +534,7 @@ Public Class ParseNodeChild
         IsList = If(CType(el.Attribute("list"), Boolean?), False)
         IsSeparated = el.@<separator-kind> <> ""
         IsOptional = If(CType(el.Attribute("optional"), Boolean?), False)
+        MinCount = If(CType(el.Attribute("min-count"), Integer?), 0)
         Description = el.<description>.Value
         NotInFactory = If(CType(el.Attribute("not-in-factory"), Boolean?), False)
         GenerateWith = If(CType(el.Attribute("generate-with"), Boolean?), False)
@@ -602,7 +605,6 @@ Public Class ParseNodeChild
         End Get
     End Property
 
-
     ' Gets the child type. Could return a NodeKind, List(NodeKind) containing the allowable node kinds of the child.
     Public ReadOnly Property ChildKind() As Object
         Get
@@ -614,6 +616,12 @@ Public Class ParseNodeChild
             Return _childKind
         End Get
     End Property
+
+    Public Function WithChildKind(childKind As Object) As ParseNodeChild
+        Dim copy = New ParseNodeChild(Me.Element, Me.ContainingStructure)
+        copy._childKind = childKind
+        Return copy
+    End Function
 
     Public ReadOnly Property DefaultChildKind() As ParseNodeKind
         Get
@@ -680,7 +688,6 @@ Public Class ParseEnumerator
             Return Convert.ToInt64(ValueString, 16)
         End Get
     End Property
-
 
 End Class
 

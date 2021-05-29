@@ -1,4 +1,6 @@
-﻿' Copyright (c) Microsoft.  All Rights Reserved.  Licensed under the Apache License, Version 2.0.  See License.txt in the project root for license information.
+﻿' Licensed to the .NET Foundation under one or more agreements.
+' The .NET Foundation licenses this file to you under the MIT license.
+' See the LICENSE file in the project root for more information.
 
 Imports System.Collections.Immutable
 Imports System.Runtime.InteropServices
@@ -7,7 +9,9 @@ Imports Microsoft.CodeAnalysis
 Imports Microsoft.CodeAnalysis.CodeGeneration
 Imports Microsoft.CodeAnalysis.Host
 Imports Microsoft.CodeAnalysis.LanguageServices
+Imports Microsoft.CodeAnalysis.PooledObjects
 Imports Microsoft.CodeAnalysis.Text
+Imports Microsoft.CodeAnalysis.VisualBasic.LanguageServices
 Imports Microsoft.CodeAnalysis.VisualBasic.Syntax
 
 Namespace Microsoft.CodeAnalysis.VisualBasic.CodeGeneration
@@ -15,15 +19,16 @@ Namespace Microsoft.CodeAnalysis.VisualBasic.CodeGeneration
         Inherits AbstractCodeGenerationService
 
         Public Sub New(provider As HostLanguageServices)
-            MyBase.New(provider.GetService(Of ISymbolDeclarationService)())
+            MyBase.New(provider.GetService(Of ISymbolDeclarationService)(),
+                       provider.WorkspaceServices.Workspace)
         End Sub
 
         Public Overloads Overrides Function GetDestination(containerNode As SyntaxNode) As CodeGenerationDestination
             Return VisualBasicCodeGenerationHelpers.GetDestination(containerNode)
         End Function
 
-        Protected Overrides Function CreateImportsAdder(document As Document) As AbstractImportsAdder
-            Return New ImportsStatementsAdder(document)
+        Protected Overrides Function GetMemberComparer() As IComparer(Of SyntaxNode)
+            Return VisualBasicDeclarationComparer.WithoutNamesInstance
         End Function
 
         Protected Overrides Function GetAvailableInsertionIndices(destination As SyntaxNode, cancellationToken As CancellationToken) As IList(Of Boolean)
@@ -43,7 +48,7 @@ Namespace Microsoft.CodeAnalysis.VisualBasic.CodeGeneration
             Return Nothing
         End Function
 
-        Private Overloads Function GetAvailableInsertionIndices(destination As CompilationUnitSyntax, cancellationToken As CancellationToken) As IList(Of Boolean)
+        Private Overloads Shared Function GetAvailableInsertionIndices(destination As CompilationUnitSyntax, cancellationToken As CancellationToken) As IList(Of Boolean)
             Dim members = destination.Members
 
             Dim indices = New List(Of Boolean)
@@ -75,7 +80,7 @@ Namespace Microsoft.CodeAnalysis.VisualBasic.CodeGeneration
                 options As CodeGenerationOptions,
                 availableIndices As IList(Of Boolean)) As TDeclarationNode
             CheckDeclarationNode(Of TypeBlockSyntax)(destinationType)
-            Return Cast(Of TDeclarationNode)(EventGenerator.AddEventTo(Cast(Of TypeBlockSyntax)(destinationType), [event], options, availableIndices))
+            Return Cast(Of TDeclarationNode)(AddEventTo(Cast(Of TypeBlockSyntax)(destinationType), [event], options, availableIndices))
         End Function
 
         Protected Overrides Function AddField(Of TDeclarationNode As SyntaxNode)(
@@ -154,15 +159,16 @@ Namespace Microsoft.CodeAnalysis.VisualBasic.CodeGeneration
                 destination As TDeclarationNode,
                 namedType As INamedTypeSymbol,
                 options As CodeGenerationOptions,
-                availableIndices As IList(Of Boolean)) As TDeclarationNode
+                availableIndices As IList(Of Boolean),
+                cancellationToken As CancellationToken) As TDeclarationNode
             CheckDeclarationNode(Of TypeBlockSyntax, NamespaceBlockSyntax, CompilationUnitSyntax)(destination)
             options = If(options, CodeGenerationOptions.Default)
             If TypeOf destination Is TypeBlockSyntax Then
-                Return Cast(Of TDeclarationNode)(NamedTypeGenerator.AddNamedTypeTo(Me, Cast(Of TypeBlockSyntax)(destination), namedType, options, availableIndices))
+                Return Cast(Of TDeclarationNode)(NamedTypeGenerator.AddNamedTypeTo(Me, Cast(Of TypeBlockSyntax)(destination), namedType, options, availableIndices, cancellationToken))
             ElseIf TypeOf destination Is NamespaceBlockSyntax Then
-                Return Cast(Of TDeclarationNode)(NamedTypeGenerator.AddNamedTypeTo(Me, Cast(Of NamespaceBlockSyntax)(destination), namedType, options, availableIndices))
+                Return Cast(Of TDeclarationNode)(NamedTypeGenerator.AddNamedTypeTo(Me, Cast(Of NamespaceBlockSyntax)(destination), namedType, options, availableIndices, cancellationToken))
             Else
-                Return Cast(Of TDeclarationNode)(NamedTypeGenerator.AddNamedTypeTo(Me, Cast(Of CompilationUnitSyntax)(destination), namedType, options, availableIndices))
+                Return Cast(Of TDeclarationNode)(NamedTypeGenerator.AddNamedTypeTo(Me, Cast(Of CompilationUnitSyntax)(destination), namedType, options, availableIndices, cancellationToken))
             End If
         End Function
 
@@ -170,13 +176,14 @@ Namespace Microsoft.CodeAnalysis.VisualBasic.CodeGeneration
                 destination As TDeclarationNode,
                 [namespace] As INamespaceSymbol,
                 options As CodeGenerationOptions,
-                availableIndices As IList(Of Boolean)) As TDeclarationNode
+                availableIndices As IList(Of Boolean),
+                cancellationToken As CancellationToken) As TDeclarationNode
             CheckDeclarationNode(Of CompilationUnitSyntax, NamespaceBlockSyntax)(destination)
 
             If TypeOf destination Is CompilationUnitSyntax Then
-                Return Cast(Of TDeclarationNode)(NamespaceGenerator.AddNamespaceTo(Me, Cast(Of CompilationUnitSyntax)(destination), [namespace], options, availableIndices))
+                Return Cast(Of TDeclarationNode)(NamespaceGenerator.AddNamespaceTo(Me, Cast(Of CompilationUnitSyntax)(destination), [namespace], options, availableIndices, cancellationToken))
             Else
-                Return Cast(Of TDeclarationNode)(NamespaceGenerator.AddNamespaceTo(Me, Cast(Of NamespaceBlockSyntax)(destination), [namespace], options, availableIndices))
+                Return Cast(Of TDeclarationNode)(NamespaceGenerator.AddNamespaceTo(Me, Cast(Of NamespaceBlockSyntax)(destination), [namespace], options, availableIndices, cancellationToken))
             End If
         End Function
 
@@ -298,7 +305,7 @@ Namespace Microsoft.CodeAnalysis.VisualBasic.CodeGeneration
                     cancellationToken As CancellationToken) As TDeclarationNode
 
             If target.HasValue AndAlso Not target.Value.IsValidAttributeTarget() Then
-                Throw New ArgumentException("target")
+                Throw New ArgumentException(NameOf(target))
             End If
 
             Dim attributeSyntaxList = AttributeGenerator.GenerateAttributeBlocks(attributes.ToImmutableArray(), options, target)
@@ -326,7 +333,7 @@ Namespace Microsoft.CodeAnalysis.VisualBasic.CodeGeneration
 
         Public Overrides Function RemoveAttribute(Of TDeclarationNode As SyntaxNode)(destination As TDeclarationNode, attributeToRemove As AttributeData, options As CodeGenerationOptions, cancellationToken As CancellationToken) As TDeclarationNode
             If attributeToRemove.ApplicationSyntaxReference Is Nothing Then
-                Throw New ArgumentException("attributeToRemove")
+                Throw New ArgumentException(NameOf(attributeToRemove))
             End If
 
             Dim attributeSyntaxToRemove = attributeToRemove.ApplicationSyntaxReference.GetSyntax(cancellationToken)
@@ -335,7 +342,7 @@ Namespace Microsoft.CodeAnalysis.VisualBasic.CodeGeneration
 
         Public Overrides Function RemoveAttribute(Of TDeclarationNode As SyntaxNode)(destination As TDeclarationNode, attributeToRemove As SyntaxNode, options As CodeGenerationOptions, cancellationToken As CancellationToken) As TDeclarationNode
             If attributeToRemove Is Nothing Then
-                Throw New ArgumentException("attributeToRemove")
+                Throw New ArgumentException(NameOf(attributeToRemove))
             End If
 
             ' Removed node could be AttributeSyntax or AttributeListSyntax.
@@ -346,7 +353,7 @@ Namespace Microsoft.CodeAnalysis.VisualBasic.CodeGeneration
             ' Handle most cases
             Dim member = TryCast(destination, StatementSyntax)
             If member IsNot Nothing Then
-                Dim newAttributeLists = RemoveAttributeFromAttributeLists(member.GetAttributes(), attributeToRemove, options, attributeRemoved, positionOfRemovedNode, triviaOfRemovedNode)
+                Dim newAttributeLists = RemoveAttributeFromAttributeLists(member.GetAttributes(), attributeToRemove, attributeRemoved, positionOfRemovedNode, triviaOfRemovedNode)
                 VerifyAttributeRemoved(attributeRemoved)
                 Dim newMember = member.WithAttributeLists(newAttributeLists)
                 Return Cast(Of TDeclarationNode)(AppendTriviaAtPosition(newMember, positionOfRemovedNode - destination.FullSpan.Start, triviaOfRemovedNode))
@@ -356,7 +363,7 @@ Namespace Microsoft.CodeAnalysis.VisualBasic.CodeGeneration
             Dim compilationUnit = TryCast(destination, CompilationUnitSyntax)
             If compilationUnit IsNot Nothing Then
                 Dim attributeStatements = compilationUnit.Attributes
-                Dim newAttributeStatements = RemoveAttributeFromAttributeStatements(attributeStatements, attributeToRemove, options, attributeRemoved, positionOfRemovedNode, triviaOfRemovedNode)
+                Dim newAttributeStatements = RemoveAttributeFromAttributeStatements(attributeStatements, attributeToRemove, attributeRemoved, positionOfRemovedNode, triviaOfRemovedNode)
                 VerifyAttributeRemoved(attributeRemoved)
                 Dim newCompilationUnit = compilationUnit.WithAttributes(newAttributeStatements)
                 Return Cast(Of TDeclarationNode)(AppendTriviaAtPosition(newCompilationUnit, positionOfRemovedNode - destination.FullSpan.Start, triviaOfRemovedNode))
@@ -365,7 +372,7 @@ Namespace Microsoft.CodeAnalysis.VisualBasic.CodeGeneration
             ' Handle parameters
             Dim parameter = TryCast(destination, ParameterSyntax)
             If parameter IsNot Nothing Then
-                Dim newAttributeLists = RemoveAttributeFromAttributeLists(parameter.AttributeLists, attributeToRemove, options, attributeRemoved, positionOfRemovedNode, triviaOfRemovedNode)
+                Dim newAttributeLists = RemoveAttributeFromAttributeLists(parameter.AttributeLists, attributeToRemove, attributeRemoved, positionOfRemovedNode, triviaOfRemovedNode)
                 VerifyAttributeRemoved(attributeRemoved)
                 Dim newParameter = parameter.WithAttributeLists(newAttributeLists)
                 Return Cast(Of TDeclarationNode)(AppendTriviaAtPosition(newParameter, positionOfRemovedNode - destination.FullSpan.Start, triviaOfRemovedNode))
@@ -374,7 +381,7 @@ Namespace Microsoft.CodeAnalysis.VisualBasic.CodeGeneration
             Return destination
         End Function
 
-        Private Shared Function RemoveAttributeFromAttributeLists(attributeLists As SyntaxList(Of AttributeListSyntax), attributeToRemove As SyntaxNode, options As CodeGenerationOptions,
+        Private Shared Function RemoveAttributeFromAttributeLists(attributeLists As SyntaxList(Of AttributeListSyntax), attributeToRemove As SyntaxNode,
                                                                   <Out> ByRef attributeRemoved As Boolean, <Out> ByRef positionOfRemovedNode As Integer, <Out> ByRef triviaOfRemovedNode As SyntaxTriviaList) As SyntaxList(Of AttributeListSyntax)
             For Each attributeList In attributeLists
                 Dim attributes = attributeList.Attributes
@@ -403,11 +410,11 @@ Namespace Microsoft.CodeAnalysis.VisualBasic.CodeGeneration
             Return attributeLists
         End Function
 
-        Private Shared Function RemoveAttributeFromAttributeStatements(attributeStatements As SyntaxList(Of AttributesStatementSyntax), attributeToRemove As SyntaxNode, options As CodeGenerationOptions,
+        Private Shared Function RemoveAttributeFromAttributeStatements(attributeStatements As SyntaxList(Of AttributesStatementSyntax), attributeToRemove As SyntaxNode,
                                                                        <Out> ByRef attributeRemoved As Boolean, <Out> ByRef positionOfRemovedNode As Integer, <Out> ByRef triviaOfRemovedNode As SyntaxTriviaList) As SyntaxList(Of AttributesStatementSyntax)
             For Each attributeStatement In attributeStatements
                 Dim attributeLists = attributeStatement.AttributeLists
-                Dim newAttributeLists = RemoveAttributeFromAttributeLists(attributeLists, attributeToRemove, options, attributeRemoved, positionOfRemovedNode, triviaOfRemovedNode)
+                Dim newAttributeLists = RemoveAttributeFromAttributeLists(attributeLists, attributeToRemove, attributeRemoved, positionOfRemovedNode, triviaOfRemovedNode)
                 If attributeRemoved Then
                     Dim newAttributeStatement = attributeStatement.WithAttributeLists(newAttributeLists)
                     Return SyntaxFactory.List(attributeStatements.Select(Function(attrStatement) If(attrStatement Is attributeStatement, newAttributeStatement, attrStatement)))
@@ -457,7 +464,7 @@ Namespace Microsoft.CodeAnalysis.VisualBasic.CodeGeneration
             End If
         End Function
 
-        Private Function AddStatementsWorker(Of TDeclarationNode As SyntaxNode)(
+        Private Shared Function AddStatementsWorker(Of TDeclarationNode As SyntaxNode)(
                 destinationMember As TDeclarationNode,
                 statements As IEnumerable(Of SyntaxNode),
                 options As CodeGenerationOptions,
@@ -476,8 +483,9 @@ Namespace Microsoft.CodeAnalysis.VisualBasic.CodeGeneration
             Dim statementArray = statements.OfType(Of StatementSyntax).ToArray()
             Dim newBlock As SyntaxNode
             If options.BeforeThisLocation IsNot Nothing Then
-                Dim strippedTrivia As IEnumerable(Of SyntaxTrivia) = Nothing
-                Dim newStatement = oldStatement.GetNodeWithoutLeadingBannerAndPreprocessorDirectives(strippedTrivia)
+                Dim strippedTrivia As ImmutableArray(Of SyntaxTrivia) = Nothing
+                Dim newStatement = VisualBasicSyntaxFacts.Instance.GetNodeWithoutLeadingBannerAndPreprocessorDirectives(
+                    oldStatement, strippedTrivia)
 
                 statementArray(0) = statementArray(0).WithLeadingTrivia(strippedTrivia)
 
@@ -493,8 +501,18 @@ Namespace Microsoft.CodeAnalysis.VisualBasic.CodeGeneration
         Public Overrides Function CreateMethodDeclaration(method As IMethodSymbol,
                                                           destination As CodeGenerationDestination,
                                                           options As CodeGenerationOptions) As SyntaxNode
+            ' Synthesized methods for properties/events are not things we actually generate 
+            ' declarations for.
+            If method.AssociatedSymbol IsNot Nothing Then
+                Return Nothing
+            End If
+
             If method.IsConstructor() Then
                 Return ConstructorGenerator.GenerateConstructorDeclaration(method, destination, options)
+            ElseIf method.IsUserDefinedOperator() Then
+                Return OperatorGenerator.GenerateOperatorDeclaration(method, options)
+            ElseIf method.IsConversion() Then
+                Return ConversionGenerator.GenerateConversionDeclaration(method, options)
             Else
                 Return MethodGenerator.GenerateMethodDeclaration(method, destination, options)
             End If
@@ -524,17 +542,19 @@ Namespace Microsoft.CodeAnalysis.VisualBasic.CodeGeneration
 
         Public Overrides Function CreateNamedTypeDeclaration(namedType As INamedTypeSymbol,
                                                              destination As CodeGenerationDestination,
-                                                             options As CodeGenerationOptions) As SyntaxNode
-            Return NamedTypeGenerator.GenerateNamedTypeDeclaration(Me, namedType, options)
+                                                             options As CodeGenerationOptions,
+                                                             cancellationToken As CancellationToken) As SyntaxNode
+            Return NamedTypeGenerator.GenerateNamedTypeDeclaration(Me, namedType, options, cancellationToken)
         End Function
 
         Public Overrides Function CreateNamespaceDeclaration([namespace] As INamespaceSymbol,
                                                              destination As CodeGenerationDestination,
-                                                             options As CodeGenerationOptions) As SyntaxNode
-            Return NamespaceGenerator.GenerateNamespaceDeclaration(Me, [namespace], options)
+                                                             options As CodeGenerationOptions,
+                                                             cancellationToken As CancellationToken) As SyntaxNode
+            Return NamespaceGenerator.GenerateNamespaceDeclaration(Me, [namespace], options, cancellationToken)
         End Function
 
-        Private Overloads Shared Function UpdateDeclarationModifiers(Of TDeclarationNode As SyntaxNode)(declaration As TDeclarationNode, computeNewModifiersList As Func(Of SyntaxTokenList, SyntaxTokenList), options As CodeGenerationOptions, cancellationToken As CancellationToken) As TDeclarationNode
+        Private Overloads Shared Function UpdateDeclarationModifiers(Of TDeclarationNode As SyntaxNode)(declaration As TDeclarationNode, computeNewModifiersList As Func(Of SyntaxTokenList, SyntaxTokenList)) As TDeclarationNode
             ' Handle type declarations
             Dim typeStatementSyntax = TryCast(declaration, TypeStatementSyntax)
             If typeStatementSyntax IsNot Nothing Then
@@ -584,27 +604,31 @@ Namespace Microsoft.CodeAnalysis.VisualBasic.CodeGeneration
             Dim computeNewModifiersList As Func(Of SyntaxTokenList, SyntaxTokenList) = Function(modifiersList As SyntaxTokenList)
                                                                                            Return SyntaxFactory.TokenList(newModifiers)
                                                                                        End Function
-            Return UpdateDeclarationModifiers(declaration, computeNewModifiersList, options, cancellationToken)
+            Return UpdateDeclarationModifiers(declaration, computeNewModifiersList)
         End Function
 
-        Public Overrides Function UpdateDeclarationAccessibility(Of TDeclarationNode As SyntaxNode)(declaration As TDeclarationNode, newAccesibility As Accessibility, options As CodeGenerationOptions, cancellationToken As CancellationToken) As TDeclarationNode
+        Public Overrides Function UpdateDeclarationAccessibility(Of TDeclarationNode As SyntaxNode)(declaration As TDeclarationNode, newAccessibility As Accessibility, options As CodeGenerationOptions, cancellationToken As CancellationToken) As TDeclarationNode
             Dim computeNewModifiersList As Func(Of SyntaxTokenList, SyntaxTokenList) = Function(modifiersList As SyntaxTokenList)
-                                                                                           Return UpdateDeclarationAccessibility(modifiersList, newAccesibility, options)
+                                                                                           Return UpdateDeclarationAccessibility(modifiersList, newAccessibility, options)
                                                                                        End Function
-            Return UpdateDeclarationModifiers(declaration, computeNewModifiersList, options, cancellationToken)
+            Return UpdateDeclarationModifiers(declaration, computeNewModifiersList)
         End Function
 
-        Private Overloads Shared Function UpdateDeclarationAccessibility(modifiersList As SyntaxTokenList, newAccesibility As Accessibility, options As CodeGenerationOptions) As SyntaxTokenList
-            Dim newModifierTokens = New List(Of SyntaxToken)()
-            VisualBasicCodeGenerationHelpers.AddAccessibilityModifiers(newAccesibility, newModifierTokens, CodeGenerationDestination.Unspecified, options, Accessibility.NotApplicable)
-            If newModifierTokens.Count = 0 Then
-                Return modifiersList
-            End If
+        Private Overloads Shared Function UpdateDeclarationAccessibility(modifiersList As SyntaxTokenList, newAccessibility As Accessibility, options As CodeGenerationOptions) As SyntaxTokenList
+            Dim newModifierTokens As ArrayBuilder(Of SyntaxToken) = Nothing
+            Using x = ArrayBuilder(Of SyntaxToken).GetInstance(newModifierTokens)
+                AddAccessibilityModifiers(newAccessibility, newModifierTokens, CodeGenerationDestination.Unspecified, options, Accessibility.NotApplicable)
+                If newModifierTokens.Count = 0 Then
+                    Return modifiersList
+                End If
 
-            Return SyntaxFactory.TokenList(GetUpdatedDeclarationAccessibilityModifiers(newModifierTokens, modifiersList, Function(modifier As SyntaxToken) SyntaxFacts.IsAccessibilityModifier(modifier.Kind())))
+                Return GetUpdatedDeclarationAccessibilityModifiers(
+                    newModifierTokens, modifiersList,
+                    Function(modifier) SyntaxFacts.IsAccessibilityModifier(modifier.Kind()))
+            End Using
         End Function
 
-        Private Function UpdateSimpleAsClause(asClause As SimpleAsClauseSyntax, newType As ITypeSymbol) As SimpleAsClauseSyntax
+        Private Shared Function UpdateSimpleAsClause(asClause As SimpleAsClauseSyntax, newType As ITypeSymbol) As SimpleAsClauseSyntax
             Dim newTypeSyntax = newType.GenerateTypeSyntax().
                 WithLeadingTrivia(asClause.GetLeadingTrivia()).
                 WithTrailingTrivia(asClause.GetTrailingTrivia())
@@ -612,7 +636,7 @@ Namespace Microsoft.CodeAnalysis.VisualBasic.CodeGeneration
             Return DirectCast(asClause, SimpleAsClauseSyntax).WithType(newTypeSyntax)
         End Function
 
-        Private Function UpdateAsClause(asClause As AsClauseSyntax, newType As ITypeSymbol) As AsClauseSyntax
+        Private Shared Function UpdateAsClause(asClause As AsClauseSyntax, newType As ITypeSymbol) As AsClauseSyntax
             Dim newTypeSyntax = newType.GenerateTypeSyntax().
                 WithLeadingTrivia(asClause.GetLeadingTrivia()).
                 WithTrailingTrivia(asClause.GetTrailingTrivia())

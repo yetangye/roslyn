@@ -1,9 +1,8 @@
-﻿// Copyright (c) Microsoft.  All Rights Reserved.  Licensed under the Apache License, Version 2.0.  See License.txt in the project root for license information.
+﻿// Licensed to the .NET Foundation under one or more agreements.
+// The .NET Foundation licenses this file to you under the MIT license.
+// See the LICENSE file in the project root for more information.
 
-using System;
-using System.Collections.Generic;
 using System.Collections.Immutable;
-using System.Diagnostics;
 
 namespace Microsoft.CodeAnalysis.Diagnostics
 {
@@ -31,20 +30,22 @@ namespace Microsoft.CodeAnalysis.Diagnostics
                     builder.Add(descriptor);
                 }
 
+                builder.Add(AnalyzerExecutor.GetAnalyzerExceptionDiagnosticDescriptor());
                 return builder.ToImmutable();
             }
         }
 
         public sealed override void Initialize(AnalysisContext context)
         {
+            context.EnableConcurrentExecution();
+            context.ConfigureGeneratedCodeAnalysis(GeneratedCodeAnalysisFlags.Analyze | GeneratedCodeAnalysisFlags.ReportDiagnostics);
+
             context.RegisterCompilationStartAction(c =>
             {
                 var analyzer = new CompilationAnalyzer(c.Compilation);
                 c.RegisterSyntaxTreeAction(analyzer.AnalyzeSyntaxTree);
-                c.RegisterSemanticModelAction(analyzer.AnalyzeSemanticModel);
+                c.RegisterSemanticModelAction(CompilationAnalyzer.AnalyzeSemanticModel);
             });
-
-            context.RegisterCompilationEndAction(CompilationAnalyzer.AnalyzeCompilation);
         }
     }
 }

@@ -1,17 +1,27 @@
-' Copyright (c) Microsoft.  All Rights Reserved.  Licensed under the Apache License, Version 2.0.  See License.txt in the project root for license information.
+﻿' Licensed to the .NET Foundation under one or more agreements.
+' The .NET Foundation licenses this file to you under the MIT license.
+' See the LICENSE file in the project root for more information.
 
 Imports System.Collections.Immutable
+Imports System.Collections.ObjectModel
 Imports System.Runtime.CompilerServices
+Imports System.Runtime.InteropServices
+Imports Microsoft.CodeAnalysis.PooledObjects
 Imports Microsoft.CodeAnalysis.VisualBasic.Symbols
 
 Namespace Microsoft.CodeAnalysis.VisualBasic.ExpressionEvaluator
     Friend Module SymbolExtensions
         <Extension>
-        Public Function IsContainingSymbolOfAllTypeParameters(containingSymbol As Symbol, type As TypeSymbol) As Boolean
-            Return type.VisitType(HasInvalidTypeParameterFunc, containingSymbol) Is Nothing
+        Friend Function GetCustomTypeInfoPayload(method As MethodSymbol) As ReadOnlyCollection(Of Byte)
+            Return method.DeclaringCompilation.GetCustomTypeInfoPayload(method.ReturnType)
         End Function
 
-        Private ReadOnly HasInvalidTypeParameterFunc As Func(Of TypeSymbol, Symbol, Boolean) = AddressOf HasInvalidTypeParameter
+        <Extension>
+        Public Function IsContainingSymbolOfAllTypeParameters(containingSymbol As Symbol, type As TypeSymbol) As Boolean
+            Return type.VisitType(s_hasInvalidTypeParameterFunc, containingSymbol) Is Nothing
+        End Function
+
+        Private ReadOnly s_hasInvalidTypeParameterFunc As Func(Of TypeSymbol, Symbol, Boolean) = AddressOf HasInvalidTypeParameter
 
         Private Function HasInvalidTypeParameter(type As TypeSymbol, containingSymbol As Symbol) As Boolean
             If type.TypeKind = TypeKind.TypeParameter Then
@@ -69,6 +79,21 @@ Namespace Microsoft.CodeAnalysis.VisualBasic.ExpressionEvaluator
             method.ContainingType.GetAllTypeParameters(builder)
             builder.AddRange(method.TypeParameters)
             Return builder.ToImmutableAndFree()
+        End Function
+
+        <Extension>
+        Friend Function IsAnonymousTypeField(field As FieldSymbol, <Out> ByRef unmangledName As String) As Boolean
+            If GeneratedNames.GetKind(field.ContainingType.Name) <> GeneratedNameKind.AnonymousType Then
+                unmangledName = Nothing
+                Return False
+            End If
+
+            unmangledName = field.Name
+            If unmangledName(0) = "$"c Then
+                unmangledName = unmangledName.Substring(1)
+            End If
+
+            Return True
         End Function
     End Module
 End Namespace

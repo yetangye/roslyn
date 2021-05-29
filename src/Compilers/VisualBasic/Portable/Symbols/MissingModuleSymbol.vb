@@ -1,4 +1,6 @@
-﻿' Copyright (c) Microsoft.  All Rights Reserved.  Licensed under the Apache License, Version 2.0.  See License.txt in the project root for license information.
+﻿' Licensed to the .NET Foundation under one or more agreements.
+' The .NET Foundation licenses this file to you under the MIT license.
+' See the LICENSE file in the project root for more information.
 
 Imports System
 Imports System.Collections.Immutable
@@ -165,29 +167,33 @@ Namespace Microsoft.CodeAnalysis.VisualBasic.Symbols
                 Return Nothing
             End Get
         End Property
+
+        Public Overrides Function GetMetadata() As ModuleMetadata
+            Return Nothing
+        End Function
     End Class
 
     Friend Class MissingModuleSymbolWithName
         Inherits MissingModuleSymbol
 
-        Private ReadOnly m_Name As String
+        Private ReadOnly _name As String
 
         Public Sub New(assembly As AssemblySymbol, name As String)
             MyBase.New(assembly, -1)
 
             Debug.Assert(name IsNot Nothing)
 
-            m_Name = name
+            _name = name
         End Sub
 
         Public Overrides ReadOnly Property Name As String
             Get
-                Return m_Name
+                Return _name
             End Get
         End Property
 
         Public Overrides Function GetHashCode() As Integer
-            Return Hash.Combine(m_Assembly.GetHashCode(), StringComparer.OrdinalIgnoreCase.GetHashCode(m_Name))
+            Return Hash.Combine(m_Assembly.GetHashCode(), StringComparer.OrdinalIgnoreCase.GetHashCode(_name))
         End Function
 
         Public Overrides Function Equals(obj As Object) As Boolean
@@ -197,8 +203,7 @@ Namespace Microsoft.CodeAnalysis.VisualBasic.Symbols
 
             Dim other = TryCast(obj, MissingModuleSymbolWithName)
 
-            Return other IsNot Nothing AndAlso m_Assembly.Equals(other.m_Assembly) AndAlso String.Equals(m_Name, other.m_Name, StringComparison.OrdinalIgnoreCase)
+            Return other IsNot Nothing AndAlso m_Assembly.Equals(other.m_Assembly) AndAlso String.Equals(_name, other._name, StringComparison.OrdinalIgnoreCase)
         End Function
     End Class
-
 End Namespace

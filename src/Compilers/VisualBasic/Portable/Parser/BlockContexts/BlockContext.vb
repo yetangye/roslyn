@@ -1,8 +1,11 @@
-﻿' Copyright (c) Microsoft.  All Rights Reserved.  Licensed under the Apache License, Version 2.0.  See License.txt in the project root for license information.
+﻿' Licensed to the .NET Foundation under one or more agreements.
+' The .NET Foundation licenses this file to you under the MIT license.
+' See the LICENSE file in the project root for more information.
 
 '-----------------------------------------------------------------------------
 ' Contains the definition of the BlockContext
 '-----------------------------------------------------------------------------
+Imports Microsoft.CodeAnalysis.Syntax.InternalSyntax
 Imports Microsoft.CodeAnalysis.Text
 Imports Microsoft.CodeAnalysis.VisualBasic.Syntax
 Imports InternalSyntaxFactory = Microsoft.CodeAnalysis.VisualBasic.Syntax.InternalSyntax.SyntaxFactory
@@ -204,7 +207,7 @@ Namespace Microsoft.CodeAnalysis.VisualBasic.Syntax.InternalSyntax
             _parser._pool.Free(_statements)
         End Sub
 
-        Friend Function Body() As SyntaxList(Of StatementSyntax)
+        Friend Function Body() As CodeAnalysis.Syntax.InternalSyntax.SyntaxList(Of StatementSyntax)
             Dim result = _statements.ToList()
 
             _statements.Clear()
@@ -224,7 +227,7 @@ Namespace Microsoft.CodeAnalysis.VisualBasic.Syntax.InternalSyntax
         ''' Return an empty body if the body is a single, zero-width EmptyStatement,
         ''' otherwise returns the entire body.
         ''' </summary>
-        Friend Function OptionalBody() As SyntaxList(Of StatementSyntax)
+        Friend Function OptionalBody() As CodeAnalysis.Syntax.InternalSyntax.SyntaxList(Of StatementSyntax)
             Dim statement = SingleStatementOrDefault()
 
             If statement IsNot Nothing AndAlso
@@ -236,7 +239,7 @@ Namespace Microsoft.CodeAnalysis.VisualBasic.Syntax.InternalSyntax
             Return Body()
         End Function
 
-        Friend Function Body(Of T As StatementSyntax)() As SyntaxList(Of T)
+        Friend Function Body(Of T As StatementSyntax)() As CodeAnalysis.Syntax.InternalSyntax.SyntaxList(Of T)
             Dim result = _statements.ToList(Of T)()
 
             _statements.Clear()
@@ -245,10 +248,10 @@ Namespace Microsoft.CodeAnalysis.VisualBasic.Syntax.InternalSyntax
         End Function
 
         ' Same as Body(), but use a SyntaxListWithManyChildren if the
-        ' body is large enough, so we get red node with with weak children.
-        Friend Function BodyWithWeakChildren() As SyntaxList(Of StatementSyntax)
+        ' body is large enough, so we get red node with weak children.
+        Friend Function BodyWithWeakChildren() As CodeAnalysis.Syntax.InternalSyntax.SyntaxList(Of StatementSyntax)
             If IsLargeEnoughNonEmptyStatementList(_statements) Then
-                Dim result = New SyntaxList(Of StatementSyntax)(SyntaxList.List(CType(_statements, SyntaxListBuilder).ToArray))
+                Dim result = New CodeAnalysis.Syntax.InternalSyntax.SyntaxList(Of StatementSyntax)(SyntaxList.List(CType(_statements, SyntaxListBuilder).ToArray))
 
                 _statements.Clear()
 
@@ -265,7 +268,7 @@ Namespace Microsoft.CodeAnalysis.VisualBasic.Syntax.InternalSyntax
             ElseIf statements.Count <= 2 Then
                 ' If we have a single statement (Count include separators), it might be small, like "return null", or large,
                 ' like a loop or if or switch with many statements inside. Use the width as a proxy for
-                ' how big it is. If it's small, its better to forgoe a many children list anyway, since the
+                ' how big it is. If it's small, its better to forgo a many children list anyway, since the
                 ' weak reference would consume as much memory as is saved.
                 Return statements(0).Width > 60
             Else
@@ -274,7 +277,7 @@ Namespace Microsoft.CodeAnalysis.VisualBasic.Syntax.InternalSyntax
             End If
         End Function
 
-        Friend Function BaseDeclarations(Of T As InheritsOrImplementsStatementSyntax)() As SyntaxList(Of T)
+        Friend Function BaseDeclarations(Of T As InheritsOrImplementsStatementSyntax)() As CodeAnalysis.Syntax.InternalSyntax.SyntaxList(Of T)
 
             Dim result = _statements.ToList(Of T)()
 
@@ -300,17 +303,6 @@ Namespace Microsoft.CodeAnalysis.VisualBasic.Syntax.InternalSyntax
 
         Friend MustOverride Function ProcessStatementTerminator(lambdaContext As BlockContext) As BlockContext
 
-        Friend Overridable Function ProcessElseAsStatementTerminator() As BlockContext
-            ' Nothing to do. The Else should be processed as a
-            ' statement associated with this context.
-            Return Me
-        End Function
-
-        Friend Overridable Function ProcessOtherAsStatementTerminator() As BlockContext
-            ' Nothing to do.
-            Return Me
-        End Function
-
         Friend MustOverride ReadOnly Property IsSingleLine As Boolean
 
         Friend Overridable ReadOnly Property IsLambda As Boolean
@@ -319,7 +311,7 @@ Namespace Microsoft.CodeAnalysis.VisualBasic.Syntax.InternalSyntax
             End Get
         End Property
 
-        Private Sub HandleAnyUnexpectedTokens(currentStmt As StatementSyntax, unexpected As SyntaxList(Of SyntaxToken))
+        Private Sub HandleAnyUnexpectedTokens(currentStmt As StatementSyntax, unexpected As CodeAnalysis.Syntax.InternalSyntax.SyntaxList(Of SyntaxToken))
             If unexpected.Node Is Nothing Then
                 Return
             End If
@@ -410,7 +402,7 @@ Namespace Microsoft.CodeAnalysis.VisualBasic.Syntax.InternalSyntax
             ' get off the current node as we are definitely using it and LinkStatement may need to look at next token
             Parser.GetNextSyntaxNode()
 
-            ' TODO: this will add an error to the statement. Perhaps duplicationg it
+            ' TODO: this will add an error to the statement. Perhaps duplicating it
             ' context-sensitive errors should be filtered out before re-using nodes.
             ' or better we should put contextual errors on the actual block not on the offending node (if possible).
             newContext = LinkSyntax(node)

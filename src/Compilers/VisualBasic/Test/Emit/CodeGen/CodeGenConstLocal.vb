@@ -1,4 +1,6 @@
-﻿' Copyright (c) Microsoft.  All Rights Reserved.  Licensed under the Apache License, Version 2.0.  See License.txt in the project root for license information.
+﻿' Licensed to the .NET Foundation under one or more agreements.
+' The .NET Foundation licenses this file to you under the MIT license.
+' See the LICENSE file in the project root for more information.
 
 Imports Microsoft.CodeAnalysis
 Imports Microsoft.CodeAnalysis.Test.Utilities
@@ -180,6 +182,7 @@ End Module
         End Sub
 
         <Fact()>
+        <WorkItem(33564, "https://github.com/dotnet/roslyn/issues/33564")>
         Public Sub TestDoubleConstLocal()
             Dim verifier = CompileAndVerify(
 <compilation>
@@ -199,8 +202,8 @@ Dim cul As System.Globalization.CultureInfo = System.Globalization.CultureInfo.I
         console.WriteLine(pi.ToString(cul))
         console.WriteLine(r)
         console.WriteLine((pi*(r^2)).ToString(cul))
-        console.WriteLine(m.ToString(cul))
-        console.WriteLine(double.maxValue.ToString(cul))
+        console.WriteLine(m.ToString("G15", cul))
+        console.WriteLine(double.maxValue.ToString("G15", cul))
 
         SByRef(pi)
         console.writeline(pi.ToString(cul))
@@ -218,8 +221,8 @@ End Module
 
             verifier.VerifyIL("C.Main", <![CDATA[
 {
-  // Code size      167 (0xa7)
-  .maxstack  2
+  // Code size      177 (0xb1)
+  .maxstack  3
   .locals init (Double V_0)
   IL_0000:  ldc.r8     3.1415926
   IL_0009:  stloc.0
@@ -238,26 +241,28 @@ End Module
   IL_0044:  ldc.r8     1.79769313486232E+308
   IL_004d:  stloc.0
   IL_004e:  ldloca.s   V_0
-  IL_0050:  ldsfld     "C.cul As System.Globalization.CultureInfo"
-  IL_0055:  call       "Function Double.ToString(System.IFormatProvider) As String"
-  IL_005a:  call       "Sub System.Console.WriteLine(String)"
-  IL_005f:  ldc.r8     1.79769313486232E+308
-  IL_0068:  stloc.0
-  IL_0069:  ldloca.s   V_0
-  IL_006b:  ldsfld     "C.cul As System.Globalization.CultureInfo"
-  IL_0070:  call       "Function Double.ToString(System.IFormatProvider) As String"
-  IL_0075:  call       "Sub System.Console.WriteLine(String)"
-  IL_007a:  ldc.r8     3.1415926
-  IL_0083:  stloc.0
-  IL_0084:  ldloca.s   V_0
-  IL_0086:  call       "Sub C.SByRef(ByRef Double)"
-  IL_008b:  ldc.r8     3.1415926
-  IL_0094:  stloc.0
-  IL_0095:  ldloca.s   V_0
-  IL_0097:  ldsfld     "C.cul As System.Globalization.CultureInfo"
-  IL_009c:  call       "Function Double.ToString(System.IFormatProvider) As String"
-  IL_00a1:  call       "Sub System.Console.WriteLine(String)"
-  IL_00a6:  ret
+  IL_0050:  ldstr      "G15"
+  IL_0055:  ldsfld     "C.cul As System.Globalization.CultureInfo"
+  IL_005a:  call       "Function Double.ToString(String, System.IFormatProvider) As String"
+  IL_005f:  call       "Sub System.Console.WriteLine(String)"
+  IL_0064:  ldc.r8     1.79769313486232E+308
+  IL_006d:  stloc.0
+  IL_006e:  ldloca.s   V_0
+  IL_0070:  ldstr      "G15"
+  IL_0075:  ldsfld     "C.cul As System.Globalization.CultureInfo"
+  IL_007a:  call       "Function Double.ToString(String, System.IFormatProvider) As String"
+  IL_007f:  call       "Sub System.Console.WriteLine(String)"
+  IL_0084:  ldc.r8     3.1415926
+  IL_008d:  stloc.0
+  IL_008e:  ldloca.s   V_0
+  IL_0090:  call       "Sub C.SByRef(ByRef Double)"
+  IL_0095:  ldc.r8     3.1415926
+  IL_009e:  stloc.0
+  IL_009f:  ldloca.s   V_0
+  IL_00a1:  ldsfld     "C.cul As System.Globalization.CultureInfo"
+  IL_00a6:  call       "Function Double.ToString(System.IFormatProvider) As String"
+  IL_00ab:  call       "Sub System.Console.WriteLine(String)"
+  IL_00b0:  ret
 }
 ]]>)
         End Sub
@@ -501,21 +506,21 @@ End Module
 {
   // Code size       42 (0x2a)
   .maxstack  2
-  IL_0000:  ldsfld     "C._Closure$__.$I0-1 As <generated method>"
+  IL_0000:  ldsfld     "C._Closure$__.$I0-0 As <generated method>"
   IL_0005:  brfalse.s  IL_000e
-  IL_0007:  ldsfld     "C._Closure$__.$I0-1 As <generated method>"
+  IL_0007:  ldsfld     "C._Closure$__.$I0-0 As <generated method>"
   IL_000c:  br.s       IL_0024
   IL_000e:  ldsfld     "C._Closure$__.$I As C._Closure$__"
-  IL_0013:  ldftn      "Sub C._Closure$__._Lambda$__0-1()"
+  IL_0013:  ldftn      "Sub C._Closure$__._Lambda$__0-0()"
   IL_0019:  newobj     "Sub VB$AnonymousDelegate_0..ctor(Object, System.IntPtr)"
   IL_001e:  dup
-  IL_001f:  stsfld     "C._Closure$__.$I0-1 As <generated method>"
+  IL_001f:  stsfld     "C._Closure$__.$I0-0 As <generated method>"
   IL_0024:  callvirt   "Sub VB$AnonymousDelegate_0.Invoke()"
   IL_0029:  ret
 }
 ]]>)
 
-            verifier.VerifyIL("C._Closure$__._Lambda$__0-1", <![CDATA[
+            verifier.VerifyIL("C._Closure$__._Lambda$__0-0", <![CDATA[
 {
   // Code size        8 (0x8)
   .maxstack  1
@@ -554,21 +559,21 @@ End Module
 {
   // Code size       42 (0x2a)
   .maxstack  2
-  IL_0000:  ldsfld     "C._Closure$__.$I0-1 As <generated method>"
+  IL_0000:  ldsfld     "C._Closure$__.$I0-0 As <generated method>"
   IL_0005:  brfalse.s  IL_000e
-  IL_0007:  ldsfld     "C._Closure$__.$I0-1 As <generated method>"
+  IL_0007:  ldsfld     "C._Closure$__.$I0-0 As <generated method>"
   IL_000c:  br.s       IL_0024
   IL_000e:  ldsfld     "C._Closure$__.$I As C._Closure$__"
-  IL_0013:  ldftn      "Sub C._Closure$__._Lambda$__0-1()"
+  IL_0013:  ldftn      "Sub C._Closure$__._Lambda$__0-0()"
   IL_0019:  newobj     "Sub VB$AnonymousDelegate_0..ctor(Object, System.IntPtr)"
   IL_001e:  dup
-  IL_001f:  stsfld     "C._Closure$__.$I0-1 As <generated method>"
+  IL_001f:  stsfld     "C._Closure$__.$I0-0 As <generated method>"
   IL_0024:  callvirt   "Sub VB$AnonymousDelegate_0.Invoke()"
   IL_0029:  ret
 }
 ]]>)
 
-            verifier.VerifyIL("C._Closure$__._Lambda$__0-1", <![CDATA[
+            verifier.VerifyIL("C._Closure$__._Lambda$__0-0", <![CDATA[
 {
   // Code size       33 (0x21)
   .maxstack  5
@@ -590,7 +595,7 @@ End Module
 
         End Sub
 
-        <WorkItem(543469, "DevDiv")>
+        <WorkItem(543469, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/543469")>
         <Fact()>
         Public Sub TestLiftedIntegerConstLocalInLambda()
 
@@ -619,21 +624,21 @@ End Module
 {
   // Code size       42 (0x2a)
   .maxstack  2
-  IL_0000:  ldsfld     "C._Closure$__.$I0-1 As <generated method>"
+  IL_0000:  ldsfld     "C._Closure$__.$I0-0 As <generated method>"
   IL_0005:  brfalse.s  IL_000e
-  IL_0007:  ldsfld     "C._Closure$__.$I0-1 As <generated method>"
+  IL_0007:  ldsfld     "C._Closure$__.$I0-0 As <generated method>"
   IL_000c:  br.s       IL_0024
   IL_000e:  ldsfld     "C._Closure$__.$I As C._Closure$__"
-  IL_0013:  ldftn      "Sub C._Closure$__._Lambda$__0-1()"
+  IL_0013:  ldftn      "Sub C._Closure$__._Lambda$__0-0()"
   IL_0019:  newobj     "Sub VB$AnonymousDelegate_0..ctor(Object, System.IntPtr)"
   IL_001e:  dup
-  IL_001f:  stsfld     "C._Closure$__.$I0-1 As <generated method>"
+  IL_001f:  stsfld     "C._Closure$__.$I0-0 As <generated method>"
   IL_0024:  callvirt   "Sub VB$AnonymousDelegate_0.Invoke()"
   IL_0029:  ret
 }
 ]]>)
 
-            verifier.VerifyIL("C._Closure$__._Lambda$__0-1", <![CDATA[
+            verifier.VerifyIL("C._Closure$__._Lambda$__0-0", <![CDATA[
 {
   // Code size        8 (0x8)
   .maxstack  1
@@ -645,7 +650,7 @@ End Module
 
         End Sub
 
-        <WorkItem(543469, "DevDiv")>
+        <WorkItem(543469, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/543469")>
         <Fact()>
         Public Sub TestLiftedDecimalConstLocalInLambda()
 
@@ -675,21 +680,21 @@ End Module
 {
   // Code size       42 (0x2a)
   .maxstack  2
-  IL_0000:  ldsfld     "C._Closure$__.$I0-1 As <generated method>"
+  IL_0000:  ldsfld     "C._Closure$__.$I0-0 As <generated method>"
   IL_0005:  brfalse.s  IL_000e
-  IL_0007:  ldsfld     "C._Closure$__.$I0-1 As <generated method>"
+  IL_0007:  ldsfld     "C._Closure$__.$I0-0 As <generated method>"
   IL_000c:  br.s       IL_0024
   IL_000e:  ldsfld     "C._Closure$__.$I As C._Closure$__"
-  IL_0013:  ldftn      "Sub C._Closure$__._Lambda$__0-1()"
+  IL_0013:  ldftn      "Sub C._Closure$__._Lambda$__0-0()"
   IL_0019:  newobj     "Sub VB$AnonymousDelegate_0..ctor(Object, System.IntPtr)"
   IL_001e:  dup
-  IL_001f:  stsfld     "C._Closure$__.$I0-1 As <generated method>"
+  IL_001f:  stsfld     "C._Closure$__.$I0-0 As <generated method>"
   IL_0024:  callvirt   "Sub VB$AnonymousDelegate_0.Invoke()"
   IL_0029:  ret
 }
 ]]>)
 
-            verifier.VerifyIL("C._Closure$__._Lambda$__0-1", <![CDATA[
+            verifier.VerifyIL("C._Closure$__._Lambda$__0-0", <![CDATA[
 {
   // Code size       65 (0x41)
   .maxstack  7
@@ -722,11 +727,11 @@ End Module
 
         End Sub
 
-        <WorkItem(543475, "DevDiv")>
+        <WorkItem(543475, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/543475")>
         <Fact()>
         Public Sub TestLocalConstCycleDetection()
 
-            Dim verifier = CompilationUtils.CreateCompilationWithMscorlibAndVBRuntime(
+            Dim verifier = CompilationUtils.CreateCompilationWithMscorlib40AndVBRuntime(
 <compilation>
     <file name="a.vb">
 Imports System
@@ -746,7 +751,7 @@ End Module
                                        Diagnostic(ERRID.ERR_CircularEvaluation1, "j").WithArguments("j"))
         End Sub
 
-        <WorkItem(542910, "DevDiv")>
+        <WorkItem(542910, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/542910")>
         <Fact()>
         Public Sub TestSByteLocalConst()
 
@@ -781,6 +786,140 @@ End Module
 }
 ]]>)
 
+        End Sub
+
+        <ConditionalFact(GetType(WindowsDesktopOnly), Reason:="https://github.com/dotnet/roslyn/issues/28044")>
+        Public Sub TruncatePrecisionFloat()
+
+            Dim verifier = CompileAndVerify(
+<compilation>
+    <file name="a.vb">
+Imports System
+Module C
+    Sub Main()
+        const temp1 as single = 23334800f / 5.5f
+        console.WriteLine(Microsoft.VisualBasic.Int(temp1))
+        console.WriteLine(Microsoft.VisualBasic.Int(23334800f / 5.5f))
+        console.WriteLine(temp1 * 5.5)
+
+        const temp2 as double = 23334800.0 / 5.5
+        console.WriteLine(Microsoft.VisualBasic.Int(temp2))
+        console.WriteLine(Microsoft.VisualBasic.Int(23334800.0 / 5.5))
+        console.WriteLine(temp2 * 5.5)
+    End Sub
+End Module
+    </file>
+</compilation>, expectedOutput:=<![CDATA[
+4242691
+4242691
+23334800.5
+4242690
+4242690
+23334800
+            ]]>)
+        End Sub
+
+        <Fact()>
+        <WorkItem(49902, "https://github.com/dotnet/roslyn/issues/49902")>
+        Public Sub BadConstantValue_1()
+            Dim compilation = CreateCompilation(
+<compilation>
+    <file name="c.vb">
+Class Test
+
+    Shared Sub Main()
+        Dim z As Integer = 2
+        Const w As Integer = 2 ^ z
+    End Sub
+
+End Class
+    </file>
+</compilation>)
+
+            compilation.AssertTheseEmitDiagnostics(
+<expected>
+BC30059: Constant expression is required.
+        Const w As Integer = 2 ^ z
+                                 ~
+</expected>)
+        End Sub
+
+        <Fact()>
+        <WorkItem(49902, "https://github.com/dotnet/roslyn/issues/49902")>
+        Public Sub BadConstantValue_2()
+            Dim compilation = CreateCompilation(
+<compilation>
+    <file name="c.vb">
+Class Test
+
+    Shared Sub Main()
+        Dim z As Integer = 2
+        Const w As Integer = z
+    End Sub
+
+End Class
+    </file>
+</compilation>)
+
+            compilation.AssertTheseEmitDiagnostics(
+<expected>
+BC30059: Constant expression is required.
+        Const w As Integer = z
+                             ~
+</expected>)
+        End Sub
+
+        <Fact()>
+        <WorkItem(49902, "https://github.com/dotnet/roslyn/issues/49902")>
+        Public Sub BadConstantValue_3()
+            Dim compilation = CreateCompilation(
+<compilation>
+    <file name="c.vb">
+Class Test
+
+    Shared Sub Main()
+        Dim z As Integer = 2
+        Const w As Integer = z ^ 2
+    End Sub
+
+End Class
+    </file>
+</compilation>)
+
+            compilation.AssertTheseEmitDiagnostics(
+<expected>
+BC30059: Constant expression is required.
+        Const w As Integer = z ^ 2
+                             ~
+</expected>)
+        End Sub
+
+        <Fact()>
+        <WorkItem(49902, "https://github.com/dotnet/roslyn/issues/49902")>
+        Public Sub BadConstantValue_4()
+            Dim compilation = CreateCompilation(
+<compilation>
+    <file name="c.vb">
+Class Test
+
+    Shared Sub Main()
+        Dim z As Integer = 2
+        Const w As Integer = z ^ z
+    End Sub
+
+End Class
+    </file>
+</compilation>)
+
+            compilation.AssertTheseEmitDiagnostics(
+<expected>
+BC30059: Constant expression is required.
+        Const w As Integer = z ^ z
+                             ~
+BC30059: Constant expression is required.
+        Const w As Integer = z ^ z
+                                 ~
+</expected>)
         End Sub
     End Class
 

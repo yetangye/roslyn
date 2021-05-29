@@ -1,10 +1,15 @@
-' Copyright (c) Microsoft.  All Rights Reserved.  Licensed under the Apache License, Version 2.0.  See License.txt in the project root for license information.
+﻿' Licensed to the .NET Foundation under one or more agreements.
+' The .NET Foundation licenses this file to you under the MIT license.
+' See the LICENSE file in the project root for more information.
+
+Imports System.Threading.Tasks
+Imports Microsoft.CodeAnalysis.Remote.Testing
 
 Namespace Microsoft.CodeAnalysis.Editor.UnitTests.FindReferences
     Partial Public Class FindReferencesTests
-        <WorkItem(538886)>
-        <Fact, Trait(Traits.Feature, Traits.Features.FindReferences)>
-        Public Sub CSharp_Property1()
+        <WorkItem(538886, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/538886")>
+        <WpfTheory, CombinatorialData, Trait(Traits.Feature, Traits.Features.FindReferences)>
+        Public Async Function TestCSharp_Property1(kind As TestKind, host As TestHost) As Task
             Dim input =
 <Workspace>
     <Project Language="C#" CommonReferences="true">
@@ -14,7 +19,7 @@ namespace ConsoleApplication22
 {
     class Program
     {
-        static public int {|Definition:F$$oo|}
+        static public int {|Definition:G$$oo|}
         {
             get
             {
@@ -23,19 +28,19 @@ namespace ConsoleApplication22
         } 
         static void Main(string[] args)
         {
-            int temp = Program.[|Foo|];
+            int temp = Program.[|Goo|];
         }
     }
 }
         </Document>
     </Project>
 </Workspace>
-            Test(input)
-        End Sub
+            Await TestAPIAndFeature(input, kind, host)
+        End Function
 
-        <WorkItem(538886)>
-        <Fact, Trait(Traits.Feature, Traits.Features.FindReferences)>
-        Public Sub CSharp_Property2()
+        <WorkItem(538886, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/538886")>
+        <WpfTheory, CombinatorialData, Trait(Traits.Feature, Traits.Features.FindReferences)>
+        Public Async Function TestCSharp_Property2(kind As TestKind, host As TestHost) As Task
             Dim input =
 <Workspace>
     <Project Language="C#" CommonReferences="true">
@@ -45,7 +50,7 @@ namespace ConsoleApplication22
 {
     class Program
     {
-        static public int {|Definition:Foo|}
+        static public int {|Definition:Goo|}
         {
             get
             {
@@ -54,19 +59,19 @@ namespace ConsoleApplication22
         } 
         static void Main(string[] args)
         {
-            int temp = Program.[|Fo$$o|];
+            int temp = Program.[|Go$$o|];
         }
     }
 }
         </Document>
     </Project>
 </Workspace>
-            Test(input)
-        End Sub
+            Await TestAPIAndFeature(input, kind, host)
+        End Function
 
-        <WorkItem(539022)>
-        <Fact, Trait(Traits.Feature, Traits.Features.FindReferences)>
-        Public Sub CSharp_PropertyCascadeThroughInterface1()
+        <WorkItem(539022, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/539022")>
+        <WpfTheory, CombinatorialData, Trait(Traits.Feature, Traits.Features.FindReferences)>
+        Public Async Function TestCSharp_PropertyCascadeThroughInterface1(kind As TestKind, host As TestHost) As Task
             Dim input =
 <Workspace>
     <Project Language="C#" CommonReferences="true">
@@ -83,12 +88,12 @@ namespace ConsoleApplication22
         </Document>
     </Project>
 </Workspace>
-            Test(input)
-        End Sub
+            Await TestAPIAndFeature(input, kind, host)
+        End Function
 
-        <WorkItem(539022)>
-        <Fact, Trait(Traits.Feature, Traits.Features.FindReferences)>
-        Public Sub CSharp_PropertyCascadeThroughInterface2()
+        <WorkItem(539022, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/539022")>
+        <WpfTheory, CombinatorialData, Trait(Traits.Feature, Traits.Features.FindReferences)>
+        Public Async Function TestCSharp_PropertyCascadeThroughInterface2(kind As TestKind, host As TestHost) As Task
             Dim input =
 <Workspace>
     <Project Language="C#" CommonReferences="true">
@@ -105,12 +110,12 @@ namespace ConsoleApplication22
         </Document>
     </Project>
 </Workspace>
-            Test(input)
-        End Sub
+            Await TestAPIAndFeature(input, kind, host)
+        End Function
 
-        <WorkItem(539047)>
-        <Fact, Trait(Traits.Feature, Traits.Features.FindReferences)>
-        Public Sub CSharp_PropertyThroughBase1()
+        <WorkItem(539047, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/539047")>
+        <WpfTheory, CombinatorialData, Trait(Traits.Feature, Traits.Features.FindReferences)>
+        Public Async Function TestCSharp_PropertyThroughBase1(kind As TestKind, host As TestHost) As Task
             Dim input =
 <Workspace>
     <Project Language="C#" CommonReferences="true">
@@ -138,12 +143,12 @@ class C2 : C1
         </Document>
     </Project>
 </Workspace>
-            Test(input)
-        End Sub
+            Await TestAPIAndFeature(input, kind, host)
+        End Function
 
-        <WorkItem(539047)>
-        <Fact, Trait(Traits.Feature, Traits.Features.FindReferences)>
-        Public Sub CSharp_PropertyThroughBase2()
+        <WorkItem(539047, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/539047")>
+        <WpfTheory, CombinatorialData, Trait(Traits.Feature, Traits.Features.FindReferences)>
+        Public Async Function TestCSharp_PropertyThroughBase2(kind As TestKind, host As TestHost) As Task
             Dim input =
 <Workspace>
     <Project Language="C#" CommonReferences="true">
@@ -171,12 +176,12 @@ class C2 : C1
         </Document>
     </Project>
 </Workspace>
-            Test(input)
-        End Sub
+            Await TestAPIAndFeature(input, kind, host)
+        End Function
 
-        <WorkItem(539047)>
-        <Fact, Trait(Traits.Feature, Traits.Features.FindReferences)>
-        Public Sub CSharp_PropertyThroughBase3()
+        <WorkItem(539047, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/539047")>
+        <WpfTheory, CombinatorialData, Trait(Traits.Feature, Traits.Features.FindReferences)>
+        Public Async Function TestCSharp_PropertyThroughBase3(kind As TestKind, host As TestHost) As Task
             Dim input =
 <Workspace>
     <Project Language="C#" CommonReferences="true">
@@ -204,12 +209,12 @@ class C2 : C1
         </Document>
     </Project>
 </Workspace>
-            Test(input)
-        End Sub
+            Await TestAPIAndFeature(input, kind, host)
+        End Function
 
-        <WorkItem(539047)>
-        <Fact, Trait(Traits.Feature, Traits.Features.FindReferences)>
-        Public Sub CSharp_PropertyThroughBase4()
+        <WorkItem(539047, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/539047")>
+        <WpfTheory, CombinatorialData, Trait(Traits.Feature, Traits.Features.FindReferences)>
+        Public Async Function TestCSharp_PropertyThroughBase4(kind As TestKind, host As TestHost) As Task
             Dim input =
 <Workspace>
     <Project Language="C#" CommonReferences="true">
@@ -237,12 +242,12 @@ class C2 : C1
         </Document>
     </Project>
 </Workspace>
-            Test(input)
-        End Sub
+            Await TestAPIAndFeature(input, kind, host)
+        End Function
 
-        <WorkItem(539523)>
-        <Fact, Trait(Traits.Feature, Traits.Features.FindReferences)>
-        Public Sub CSharp_ExplicitProperty1()
+        <WorkItem(539523, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/539523")>
+        <WpfTheory, CombinatorialData, Trait(Traits.Feature, Traits.Features.FindReferences)>
+        Public Async Function TestCSharp_ExplicitProperty1(kind As TestKind, host As TestHost) As Task
             Dim input =
 <Workspace>
     <Project Language="C#" CommonReferences="true">
@@ -262,12 +267,12 @@ public class A : DD
         </Document>
     </Project>
 </Workspace>
-            Test(input)
-        End Sub
+            Await TestAPIAndFeature(input, kind, host)
+        End Function
 
-        <WorkItem(539523)>
-        <Fact, Trait(Traits.Feature, Traits.Features.FindReferences)>
-        Public Sub CSharp_ExplicitProperty2()
+        <WorkItem(539523, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/539523")>
+        <WpfTheory, CombinatorialData, Trait(Traits.Feature, Traits.Features.FindReferences)>
+        Public Async Function TestCSharp_ExplicitProperty2(kind As TestKind, host As TestHost) As Task
             Dim input =
 <Workspace>
     <Project Language="C#" CommonReferences="true">
@@ -287,12 +292,12 @@ public class A : DD
         </Document>
     </Project>
 </Workspace>
-            Test(input)
-        End Sub
+            Await TestAPIAndFeature(input, kind, host)
+        End Function
 
-        <WorkItem(539885)>
-        <Fact, Trait(Traits.Feature, Traits.Features.FindReferences)>
-        Public Sub CSharp_PropertyFromGenericInterface1()
+        <WorkItem(539885, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/539885")>
+        <WpfTheory, CombinatorialData, Trait(Traits.Feature, Traits.Features.FindReferences)>
+        Public Async Function TestCSharp_PropertyFromGenericInterface1(kind As TestKind, host As TestHost) As Task
             Dim input =
 <Workspace>
     <Project Language="C#" CommonReferences="true">
@@ -324,12 +329,12 @@ public class M<T> : I1<T>, I3<T>
         </Document>
     </Project>
 </Workspace>
-            Test(input)
-        End Sub
+            Await TestAPIAndFeature(input, kind, host)
+        End Function
 
-        <WorkItem(539885)>
-        <Fact, Trait(Traits.Feature, Traits.Features.FindReferences)>
-        Public Sub CSharp_PropertyFromGenericInterface2()
+        <WorkItem(539885, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/539885")>
+        <WpfTheory, CombinatorialData, Trait(Traits.Feature, Traits.Features.FindReferences)>
+        Public Async Function TestCSharp_PropertyFromGenericInterface2(kind As TestKind, host As TestHost) As Task
             Dim input =
 <Workspace>
     <Project Language="C#" CommonReferences="true">
@@ -361,12 +366,12 @@ public class M<T> : I1<T>, I3<T>
         </Document>
     </Project>
 </Workspace>
-            Test(input)
-        End Sub
+            Await TestAPIAndFeature(input, kind, host)
+        End Function
 
-        <WorkItem(539885)>
-        <Fact, Trait(Traits.Feature, Traits.Features.FindReferences)>
-        Public Sub CSharp_PropertyFromGenericInterface3()
+        <WorkItem(539885, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/539885")>
+        <WpfTheory, CombinatorialData, Trait(Traits.Feature, Traits.Features.FindReferences)>
+        Public Async Function TestCSharp_PropertyFromGenericInterface3(kind As TestKind, host As TestHost) As Task
             Dim input =
 <Workspace>
     <Project Language="C#" CommonReferences="true">
@@ -398,12 +403,12 @@ public class M<T> : I1<T>, I3<T>
         </Document>
     </Project>
 </Workspace>
-            Test(input)
-        End Sub
+            Await TestAPIAndFeature(input, kind, host)
+        End Function
 
-        <WorkItem(539885)>
-        <Fact, Trait(Traits.Feature, Traits.Features.FindReferences)>
-        Public Sub CSharp_PropertyFromGenericInterface4()
+        <WorkItem(539885, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/539885")>
+        <WpfTheory, CombinatorialData, Trait(Traits.Feature, Traits.Features.FindReferences)>
+        Public Async Function TestCSharp_PropertyFromGenericInterface4(kind As TestKind, host As TestHost) As Task
             Dim input =
 <Workspace>
     <Project Language="C#" CommonReferences="true">
@@ -435,12 +440,12 @@ public class M<T> : I1<T>, I3<T>
         </Document>
     </Project>
 </Workspace>
-            Test(input)
-        End Sub
+            Await TestAPIAndFeature(input, kind, host)
+        End Function
 
-        <WorkItem(539885)>
-        <Fact, Trait(Traits.Feature, Traits.Features.FindReferences)>
-        Public Sub CSharp_PropertyFromGenericInterface5()
+        <WorkItem(539885, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/539885")>
+        <WpfTheory, CombinatorialData, Trait(Traits.Feature, Traits.Features.FindReferences)>
+        Public Async Function TestCSharp_PropertyFromGenericInterface5(kind As TestKind, host As TestHost) As Task
             Dim input =
 <Workspace>
     <Project Language="C#" CommonReferences="true">
@@ -472,12 +477,12 @@ public class M<T> : I1<T>, I3<T>
         </Document>
     </Project>
 </Workspace>
-            Test(input)
-        End Sub
+            Await TestAPIAndFeature(input, kind, host)
+        End Function
 
-        <WorkItem(540440)>
-        <Fact, Trait(Traits.Feature, Traits.Features.FindReferences)>
-        Public Sub Basic_PropertyFunctionValue1()
+        <WorkItem(540440, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/540440")>
+        <WpfTheory, CombinatorialData, Trait(Traits.Feature, Traits.Features.FindReferences)>
+        Public Async Function TestBasic_PropertyFunctionValue1(kind As TestKind, host As TestHost) As Task
             Dim input =
 <Workspace>
     <Project Language="Visual Basic" CommonReferences="true">
@@ -493,12 +498,12 @@ End Module]]>
         </Document>
     </Project>
 </Workspace>
-            Test(input)
-        End Sub
+            Await TestAPIAndFeature(input, kind, host)
+        End Function
 
-        <WorkItem(540440)>
-        <Fact, Trait(Traits.Feature, Traits.Features.FindReferences)>
-        Public Sub Basic_PropertyFunctionValue2()
+        <WorkItem(540440, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/540440")>
+        <WpfTheory, CombinatorialData, Trait(Traits.Feature, Traits.Features.FindReferences)>
+        Public Async Function TestBasic_PropertyFunctionValue2(kind As TestKind, host As TestHost) As Task
             Dim input =
 <Workspace>
     <Project Language="Visual Basic" CommonReferences="true">
@@ -514,12 +519,12 @@ End Module]]>
         </Document>
     </Project>
 </Workspace>
-            Test(input)
-        End Sub
+            Await TestAPIAndFeature(input, kind, host)
+        End Function
 
-        <WorkItem(543125)>
-        <Fact, Trait(Traits.Feature, Traits.Features.FindReferences)>
-        Public Sub CSharp_AnonymousTypeProperties1()
+        <WorkItem(543125, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/543125")>
+        <WpfTheory, CombinatorialData, Trait(Traits.Feature, Traits.Features.FindReferences)>
+        Public Async Function TestCSharp_AnonymousTypeProperties1(kind As TestKind, host As TestHost) As Task
             Dim input =
 <Workspace>
     <Project Language="C#" CommonReferences="true">
@@ -537,12 +542,12 @@ class C
         </Document>
     </Project>
 </Workspace>
-            Test(input)
-        End Sub
+            Await TestAPIAndFeature(input, kind, host)
+        End Function
 
-        <WorkItem(543125)>
-        <Fact, Trait(Traits.Feature, Traits.Features.FindReferences)>
-        Public Sub CSharp_AnonymousTypeProperties2()
+        <WorkItem(543125, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/543125")>
+        <WpfTheory, CombinatorialData, Trait(Traits.Feature, Traits.Features.FindReferences)>
+        Public Async Function TestCSharp_AnonymousTypeProperties2(kind As TestKind, host As TestHost) As Task
             Dim input =
 <Workspace>
     <Project Language="C#" CommonReferences="true">
@@ -560,12 +565,12 @@ class C
         </Document>
     </Project>
 </Workspace>
-            Test(input)
-        End Sub
+            Await TestAPIAndFeature(input, kind, host)
+        End Function
 
-        <WorkItem(543125)>
-        <Fact, Trait(Traits.Feature, Traits.Features.FindReferences)>
-        Public Sub CSharp_AnonymousTypeProperties3()
+        <WorkItem(543125, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/543125")>
+        <WpfTheory, CombinatorialData, Trait(Traits.Feature, Traits.Features.FindReferences)>
+        Public Async Function TestCSharp_AnonymousTypeProperties3(kind As TestKind, host As TestHost) As Task
             Dim input =
 <Workspace>
     <Project Language="C#" CommonReferences="true">
@@ -583,12 +588,12 @@ class C
         </Document>
     </Project>
 </Workspace>
-            Test(input)
-        End Sub
+            Await TestAPIAndFeature(input, kind, host)
+        End Function
 
-        <WorkItem(543125)>
-        <Fact, Trait(Traits.Feature, Traits.Features.FindReferences)>
-        Public Sub CSharp_AnonymousTypeProperties4()
+        <WorkItem(543125, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/543125")>
+        <WpfTheory, CombinatorialData, Trait(Traits.Feature, Traits.Features.FindReferences)>
+        Public Async Function TestCSharp_AnonymousTypeProperties4(kind As TestKind, host As TestHost) As Task
             Dim input =
 <Workspace>
     <Project Language="C#" CommonReferences="true">
@@ -606,12 +611,12 @@ class C
         </Document>
     </Project>
 </Workspace>
-            Test(input)
-        End Sub
+            Await TestAPIAndFeature(input, kind, host)
+        End Function
 
-        <WorkItem(542881)>
-        <Fact, Trait(Traits.Feature, Traits.Features.FindReferences)>
-        Public Sub Basic_AnonymousTypeProperties1()
+        <WorkItem(542881, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/542881")>
+        <WpfTheory, CombinatorialData, Trait(Traits.Feature, Traits.Features.FindReferences)>
+        Public Async Function TestBasic_AnonymousTypeProperties1(kind As TestKind, host As TestHost) As Task
             Dim input =
 <Workspace>
     <Project Language="Visual Basic" CommonReferences="true">
@@ -630,12 +635,12 @@ End Module
         </Document>
     </Project>
 </Workspace>
-            Test(input)
-        End Sub
+            Await TestAPIAndFeature(input, kind, host)
+        End Function
 
-        <WorkItem(542881)>
-        <Fact, Trait(Traits.Feature, Traits.Features.FindReferences)>
-        Public Sub Basic_AnonymousTypeProperties2()
+        <WorkItem(542881, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/542881")>
+        <WpfTheory, CombinatorialData, Trait(Traits.Feature, Traits.Features.FindReferences)>
+        Public Async Function TestBasic_AnonymousTypeProperties2(kind As TestKind, host As TestHost) As Task
             Dim input =
 <Workspace>
     <Project Language="Visual Basic" CommonReferences="true">
@@ -654,12 +659,12 @@ End Module
         </Document>
     </Project>
 </Workspace>
-            Test(input)
-        End Sub
+            Await TestAPIAndFeature(input, kind, host)
+        End Function
 
-        <WorkItem(542881)>
-        <Fact, Trait(Traits.Feature, Traits.Features.FindReferences)>
-        Public Sub Basic_AnonymousTypeProperties3()
+        <WorkItem(542881, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/542881")>
+        <WpfTheory, CombinatorialData, Trait(Traits.Feature, Traits.Features.FindReferences)>
+        Public Async Function TestBasic_AnonymousTypeProperties3(kind As TestKind, host As TestHost) As Task
             Dim input =
 <Workspace>
     <Project Language="Visual Basic" CommonReferences="true">
@@ -678,12 +683,12 @@ End Module
         </Document>
     </Project>
 </Workspace>
-            Test(input)
-        End Sub
+            Await TestAPIAndFeature(input, kind, host)
+        End Function
 
-        <WorkItem(545576)>
-        <Fact, Trait(Traits.Feature, Traits.Features.FindReferences)>
-        Public Sub Basic_CascadeBetweenPropertyAndField1()
+        <WorkItem(545576, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/545576")>
+        <WpfTheory, CombinatorialData, Trait(Traits.Feature, Traits.Features.FindReferences)>
+        Public Async Function TestBasic_CascadeBetweenPropertyAndField1(kind As TestKind, host As TestHost) As Task
             Dim input =
 <Workspace>
     <Project Language="Visual Basic" CommonReferences="true">
@@ -691,19 +696,19 @@ End Module
 Class C
     Property {|Definition:$$X|}()
 
-    Sub Foo()
+    Sub Goo()
         Console.WriteLine([|_X|])
     End Sub
 End Class
         </Document>
     </Project>
 </Workspace>
-            Test(input)
-        End Sub
+            Await TestAPIAndFeature(input, kind, host)
+        End Function
 
-        <WorkItem(545576)>
-        <Fact, Trait(Traits.Feature, Traits.Features.FindReferences)>
-        Public Sub Basic_CascadeBetweenPropertyAndField2()
+        <WorkItem(545576, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/545576")>
+        <WpfTheory, CombinatorialData, Trait(Traits.Feature, Traits.Features.FindReferences)>
+        Public Async Function TestBasic_CascadeBetweenPropertyAndField2(kind As TestKind, host As TestHost) As Task
             Dim input =
 <Workspace>
     <Project Language="Visual Basic" CommonReferences="true">
@@ -711,19 +716,19 @@ End Class
 Class C
     Property {|Definition:X|}()
 
-    Sub Foo()
+    Sub Goo()
         Console.WriteLine([|$$_X|])
     End Sub
 End Class
         </Document>
     </Project>
 </Workspace>
-            Test(input)
-        End Sub
+            Await TestAPIAndFeature(input, kind, host)
+        End Function
 
-        <WorkItem(529765)>
-        <Fact, Trait(Traits.Feature, Traits.Features.FindReferences)>
-        Public Sub Basic_CascadeBetweenParameterizedVBPropertyAndCSharpMethod1()
+        <WorkItem(529765, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/529765")>
+        <WpfTheory, CombinatorialData, Trait(Traits.Feature, Traits.Features.FindReferences)>
+        Public Async Function TestBasic_CascadeBetweenParameterizedVBPropertyAndCSharpMethod1(kind As TestKind, host As TestHost) As Task
             Dim input =
 <Workspace>
     <Project Language="Visual Basic" AssemblyName="VBAssembly" CommonReferences="true">
@@ -751,12 +756,12 @@ class B : A
     </Project>
 </Workspace>
 
-            Test(input)
-        End Sub
+            Await TestAPIAndFeature(input, kind, host)
+        End Function
 
-        <WorkItem(529765)>
-        <Fact, Trait(Traits.Feature, Traits.Features.FindReferences)>
-        Public Sub Basic_CascadeBetweenParameterizedVBPropertyAndCSharpMethod2()
+        <WorkItem(529765, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/529765")>
+        <WpfTheory, CombinatorialData, Trait(Traits.Feature, Traits.Features.FindReferences)>
+        Public Async Function TestBasic_CascadeBetweenParameterizedVBPropertyAndCSharpMethod2(kind As TestKind, host As TestHost) As Task
             Dim input =
 <Workspace>
     <Project Language="Visual Basic" AssemblyName="VBAssembly" CommonReferences="true">
@@ -784,12 +789,12 @@ class B : A
     </Project>
 </Workspace>
 
-            Test(input)
-        End Sub
+            Await TestAPIAndFeature(input, kind, host)
+        End Function
 
-        <WorkItem(529765)>
-        <Fact, Trait(Traits.Feature, Traits.Features.FindReferences)>
-        Public Sub Basic_CascadeBetweenParameterizedVBPropertyAndCSharpMethod3()
+        <WorkItem(529765, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/529765")>
+        <WpfTheory, CombinatorialData, Trait(Traits.Feature, Traits.Features.FindReferences)>
+        Public Async Function TestBasic_CascadeBetweenParameterizedVBPropertyAndCSharpMethod3(kind As TestKind, host As TestHost) As Task
             Dim input =
 <Workspace>
     <Project Language="Visual Basic" AssemblyName="VBAssembly" CommonReferences="true">
@@ -817,23 +822,23 @@ class B : A
     </Project>
 </Workspace>
 
-            Test(input)
-        End Sub
+            Await TestAPIAndFeature(input, kind, host)
+        End Function
 
-        <WorkItem(665876)>
-        <Fact, Trait(Traits.Feature, Traits.Features.FindReferences)>
-        Public Sub Basic_DefaultProperties()
+        <WorkItem(665876, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/665876")>
+        <WpfTheory, CombinatorialData, Trait(Traits.Feature, Traits.Features.FindReferences)>
+        Public Async Function TestBasic_DefaultProperties(kind As TestKind, host As TestHost) As Task
             Dim input =
 <Workspace>
     <Project Language="Visual Basic" CommonReferences="true">
         <Document>
 Option Strict On
 Public Interface IA
-    Default Property Foo(ByVal x As Integer) As Integer
+    Default Property Goo(ByVal x As Integer) As Integer
 End Interface
 Public Interface IC
     Inherits IA
-    Default Overloads Property {|Definition:$$Foo|}(ByVal x As Long) As String ' Rename Foo to Bar
+    Default Overloads Property {|Definition:$$Goo|}(ByVal x As Long) As String ' Rename Goo to Bar
 End Interface
 
 Class M
@@ -853,23 +858,23 @@ End Class
         </Document>
     </Project>
 </Workspace>
-            Test(input)
-        End Sub
+            Await TestAPIAndFeature(input, kind, host)
+        End Function
 
-        <WorkItem(665876)>
-        <Fact, Trait(Traits.Feature, Traits.Features.FindReferences)>
-        Public Sub Basic_DefaultProperties2()
+        <WorkItem(665876, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/665876")>
+        <WpfTheory, CombinatorialData, Trait(Traits.Feature, Traits.Features.FindReferences)>
+        Public Async Function TestBasic_DefaultProperties2(kind As TestKind, host As TestHost) As Task
             Dim input =
 <Workspace>
     <Project Language="Visual Basic" CommonReferences="true">
         <Document>
 Option Strict On
 Public Interface IA
-    Default Property {|Definition:$$Foo|}(ByVal x As Integer) As Integer
+    Default Property {|Definition:$$Goo|}(ByVal x As Integer) As Integer
 End Interface
 Public Interface IC
     Inherits IA
-    Default Overloads Property Foo(ByVal x As Long) As String ' Rename Foo to Bar
+    Default Overloads Property Goo(ByVal x As Long) As String ' Rename Goo to Bar
 End Interface
 
 Class M
@@ -889,7 +894,121 @@ End Class
         </Document>
     </Project>
 </Workspace>
-            Test(input)
-        End Sub
+            Await TestAPIAndFeature(input, kind, host)
+        End Function
+
+        <WpfTheory, CombinatorialData, Trait(Traits.Feature, Traits.Features.FindReferences)>
+        Public Async Function TestCSharpProperty_Cref(host As TestHost) As Task
+            Dim input =
+<Workspace>
+    <Project Language="C#" CommonReferences="true">
+        <Document>
+interface IC
+{
+    /// &lt;see cref="[|Prop|]"/&gt;
+    int {|Definition:$$Prop|} { get; set; }
+}
+        </Document>
+    </Project>
+</Workspace>
+            Await TestStreamingFeature(input, host)
+        End Function
+
+        <WorkItem(538886, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/538886")>
+        <WpfTheory, CombinatorialData, Trait(Traits.Feature, Traits.Features.FindReferences)>
+        Public Async Function TestProperty_ValueUsageInfo(kind As TestKind, host As TestHost) As Task
+            Dim input =
+<Workspace>
+    <Project Language="C#" CommonReferences="true">
+        <Document>
+using System;
+namespace ConsoleApplication22
+{
+    class Program
+    {
+        static public int {|Definition:G$$oo|}
+        {
+            get
+            {
+                return 1;
+            }
+            set
+            {
+            }
+        }
+        static void Main(string[] args)
+        {
+            Console.WriteLine(Program.{|ValueUsageInfo.Read:[|Goo|]|});
+            Program.{|ValueUsageInfo.Write:[|Goo|]|} = 0;
+            Program.{|ValueUsageInfo.ReadWrite:[|Goo|]|} += 1;
+        }
+    }
+}
+        </Document>
+    </Project>
+</Workspace>
+            Await TestAPIAndFeature(input, kind, host)
+        End Function
+
+        <WorkItem(44288, "https://github.com/dotnet/roslyn/issues/44288")>
+        <WpfTheory, CombinatorialData, Trait(Traits.Feature, Traits.Features.FindReferences)>
+        Public Async Function TestPropertyReferenceInGlobalSuppression(kind As TestKind, host As TestHost) As Task
+            Dim input =
+<Workspace>
+    <Project Language="C#" CommonReferences="true">
+        <Document>
+
+[assembly: System.Diagnostics.CodeAnalysis.SuppressMessage("Category", "RuleId", Scope = "member", Target = "~P:N.C.[|P|]")]
+
+namespace N
+{
+    class C
+    {
+        public int {|Definition:$$P|} { get; set; }
+}
+        </Document>
+    </Project>
+</Workspace>
+            Await TestAPIAndFeature(input, kind, host)
+        End Function
+
+        <WpfTheory, CombinatorialData, Trait(Traits.Feature, Traits.Features.FindReferences)>
+        Public Async Function TestCSharp_PropertyUseInSourceGeneratedDocument(kind As TestKind) As Task
+            Dim input =
+<Workspace>
+    <Project Language="C#" CommonReferences="true">
+        <Document>
+namespace ConsoleApplication22
+{
+    class C
+    {
+        static public int {|Definition:G$$oo|}
+        {
+            get
+            {
+                return 1;
+            }
+        } 
+    }
+}
+        </Document>
+        <DocumentFromSourceGenerator>
+
+using System;
+namespace ConsoleApplication22
+{
+    class Program
+    {
+        static void Main(string[] args)
+        {
+            int temp = C.[|Goo|];
+        }
+    }
+}
+        </DocumentFromSourceGenerator>
+    </Project>
+</Workspace>
+            Await TestAPIAndFeature(input, kind, TestHost.InProcess) ' TODO: support out of proc in tests: https://github.com/dotnet/roslyn/issues/50494
+        End Function
     End Class
 End Namespace

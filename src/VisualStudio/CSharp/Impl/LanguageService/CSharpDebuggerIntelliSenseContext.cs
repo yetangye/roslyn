@@ -1,4 +1,8 @@
-// Copyright (c) Microsoft.  All Rights Reserved.  Licensed under the Apache License, Version 2.0.  See License.txt in the project root for license information.
+﻿// Licensed to the .NET Foundation under one or more agreements.
+// The .NET Foundation licenses this file to you under the MIT license.
+// See the LICENSE file in the project root for more information.
+
+#nullable disable
 
 using System;
 using System.Threading;
@@ -7,6 +11,7 @@ using Microsoft.CodeAnalysis.CSharp;
 using Microsoft.CodeAnalysis.CSharp.Extensions;
 using Microsoft.CodeAnalysis.CSharp.Syntax;
 using Microsoft.CodeAnalysis.Editor;
+using Microsoft.CodeAnalysis.Shared.Extensions;
 using Microsoft.VisualStudio.ComponentModelHost;
 using Microsoft.VisualStudio.LanguageServices.Implementation.DebuggerIntelliSense;
 using Microsoft.VisualStudio.Text;
@@ -59,8 +64,8 @@ namespace Microsoft.VisualStudio.LanguageServices.CSharp.LanguageService
         protected override int GetAdjustedContextPoint(int contextPoint, Document document)
         {
             // Determine the position in the buffer at which to end the tracking span representing
-            // the part of the imagininary buffer before the text in the view. 
-            var tree = document.GetCSharpSyntaxTreeAsync(CancellationToken.None).WaitAndGetResult(CancellationToken.None);
+            // the part of the imaginary buffer before the text in the view. 
+            var tree = document.GetSyntaxTreeSynchronously(CancellationToken.None);
             var token = tree.FindTokenOnLeftOfPosition(contextPoint, CancellationToken.None);
 
             // Special case to handle class designer because it asks for debugger IntelliSense using

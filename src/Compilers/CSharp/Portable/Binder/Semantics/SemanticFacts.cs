@@ -1,4 +1,8 @@
-﻿// Copyright (c) Microsoft.  All Rights Reserved.  Licensed under the Apache License, Version 2.0.  See License.txt in the project root for license information.
+﻿// Licensed to the .NET Foundation under one or more agreements.
+// The .NET Foundation licenses this file to you under the MIT license.
+// See the LICENSE file in the project root for more information.
+
+#nullable disable
 
 using System;
 using System.Collections.Generic;
@@ -8,6 +12,7 @@ using Microsoft.CodeAnalysis.Text;
 
 namespace Microsoft.CodeAnalysis.CSharp
 {
+
     internal partial class Symbol
     {
         /// <summary>
@@ -22,19 +27,19 @@ namespace Microsoft.CodeAnalysis.CSharp
         {
             if ((object)symbol == null)
             {
-                throw new ArgumentNullException("symbol");
+                throw new ArgumentNullException(nameof(symbol));
             }
 
             if ((object)within == null)
             {
-                throw new ArgumentNullException("within");
+                throw new ArgumentNullException(nameof(within));
             }
 
-            HashSet<DiagnosticInfo> useSiteDiagnostics = null;
+            var discardedUseSiteInfo = CompoundUseSiteInfo<AssemblySymbol>.Discarded;
             return AccessCheck.IsSymbolAccessible(
                 symbol,
                 within,
-                ref useSiteDiagnostics,
+                ref discardedUseSiteInfo,
                 throughTypeOpt);
         }
 
@@ -47,52 +52,16 @@ namespace Microsoft.CodeAnalysis.CSharp
         {
             if ((object)symbol == null)
             {
-                throw new ArgumentNullException("symbol");
+                throw new ArgumentNullException(nameof(symbol));
             }
 
             if ((object)within == null)
             {
-                throw new ArgumentNullException("within");
+                throw new ArgumentNullException(nameof(within));
             }
 
-            HashSet<DiagnosticInfo> useSiteDiagnostics = null;
-            return AccessCheck.IsSymbolAccessible(symbol, within, ref useSiteDiagnostics);
-        }
-
-        private static readonly HashSet<string> s_supportedOperators =
-            new HashSet<string>(StringComparer.Ordinal)
-            {
-                WellKnownMemberNames.AdditionOperatorName,
-                WellKnownMemberNames.BitwiseAndOperatorName,
-                WellKnownMemberNames.BitwiseOrOperatorName,
-                WellKnownMemberNames.DecrementOperatorName,
-                WellKnownMemberNames.DivisionOperatorName,
-                WellKnownMemberNames.EqualityOperatorName,
-                WellKnownMemberNames.ExclusiveOrOperatorName,
-                WellKnownMemberNames.ExplicitConversionName,
-                WellKnownMemberNames.FalseOperatorName,
-                WellKnownMemberNames.GreaterThanOperatorName,
-                WellKnownMemberNames.GreaterThanOrEqualOperatorName,
-                WellKnownMemberNames.ImplicitConversionName,
-                WellKnownMemberNames.IncrementOperatorName,
-                WellKnownMemberNames.InequalityOperatorName,
-                WellKnownMemberNames.LeftShiftOperatorName,
-                WellKnownMemberNames.LessThanOperatorName,
-                WellKnownMemberNames.LessThanOrEqualOperatorName,
-                WellKnownMemberNames.LogicalNotOperatorName,
-                WellKnownMemberNames.ModulusOperatorName,
-                WellKnownMemberNames.MultiplyOperatorName,
-                WellKnownMemberNames.OnesComplementOperatorName,
-                WellKnownMemberNames.RightShiftOperatorName,
-                WellKnownMemberNames.SubtractionOperatorName,
-                WellKnownMemberNames.TrueOperatorName,
-                WellKnownMemberNames.UnaryNegationOperatorName,
-                WellKnownMemberNames.UnaryPlusOperatorName
-            };
-
-        public static bool IsSupportedOperatorName(string name)
-        {
-            return s_supportedOperators.Contains(name);
+            var discardedUseSiteInfo = CompoundUseSiteInfo<AssemblySymbol>.Discarded;
+            return AccessCheck.IsSymbolAccessible(symbol, within, ref discardedUseSiteInfo);
         }
     }
 }

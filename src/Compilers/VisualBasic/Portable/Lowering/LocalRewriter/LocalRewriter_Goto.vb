@@ -1,4 +1,6 @@
-﻿' Copyright (c) Microsoft.  All Rights Reserved.  Licensed under the Apache License, Version 2.0.  See License.txt in the project root for license information.
+﻿' Licensed to the .NET Foundation under one or more agreements.
+' The .NET Foundation licenses this file to you under the MIT license.
+' See the LICENSE file in the project root for more information.
 
 Imports System.Diagnostics
 Imports System.Runtime.InteropServices
@@ -13,7 +15,7 @@ Namespace Microsoft.CodeAnalysis.VisualBasic
 
             If node.LabelExpressionOpt IsNot Nothing Then
                 ' we are removing the bound label expression from the bound goto because this expression is no longer needed
-                ' for the emit phase. It is even doing harm to e.g. the stack depth calculation because because this expression
+                ' for the emit phase. It is even doing harm to e.g. the stack depth calculation because this expression
                 ' would not need to be pushed to the stack.
                 node = node.Update(node.Label, labelExpressionOpt:=Nothing)
             End If
@@ -24,7 +26,11 @@ Namespace Microsoft.CodeAnalysis.VisualBasic
                 rewritten = Concat(RegisterUnstructuredExceptionHandlingNonThrowingResumeTarget(node.Syntax), rewritten)
             End If
 
-            Return MarkStatementWithSequencePoint(rewritten)
+            If Instrument(node, rewritten) Then
+                rewritten = _instrumenterOpt.InstrumentGotoStatement(node, rewritten)
+            End If
+
+            Return rewritten
         End Function
     End Class
 End Namespace

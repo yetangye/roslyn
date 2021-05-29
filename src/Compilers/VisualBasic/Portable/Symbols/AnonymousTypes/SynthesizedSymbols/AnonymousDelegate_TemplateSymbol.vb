@@ -1,9 +1,12 @@
-﻿' Copyright (c) Microsoft.  All Rights Reserved.  Licensed under the Apache License, Version 2.0.  See License.txt in the project root for license information.
+﻿' Licensed to the .NET Foundation under one or more agreements.
+' The .NET Foundation licenses this file to you under the MIT license.
+' See the LICENSE file in the project root for more information.
 
 Imports System.Collections.Generic
 Imports System.Collections.Immutable
-Imports System.Threading
 Imports Microsoft.CodeAnalysis
+Imports Microsoft.CodeAnalysis.Emit
+Imports Microsoft.CodeAnalysis.PooledObjects
 
 Namespace Microsoft.CodeAnalysis.VisualBasic.Symbols
     Partial Friend NotInheritable Class AnonymousTypeManager
@@ -11,13 +14,13 @@ Namespace Microsoft.CodeAnalysis.VisualBasic.Symbols
         Private Class AnonymousDelegateTemplateSymbol
             Inherits AnonymousTypeOrDelegateTemplateSymbol
 
-            Private Const ctorIndex As Integer = 0
-            Private Const beginInvokeIndex As Integer = 1
-            Private Const endInvokeIndex As Integer = 2
-            Private Const invokeIndex As Integer = 3
+            Private Const s_ctorIndex As Integer = 0
+            Private Const s_beginInvokeIndex As Integer = 1
+            Private Const s_endInvokeIndex As Integer = 2
+            Private Const s_invokeIndex As Integer = 3
 
             Protected ReadOnly TypeDescr As AnonymousTypeDescriptor
-            Private ReadOnly m_Members As ImmutableArray(Of SynthesizedDelegateMethodSymbol)
+            Private ReadOnly _members As ImmutableArray(Of SynthesizedDelegateMethodSymbol)
 
             Friend Shared Function Create(manager As AnonymousTypeManager, typeDescr As AnonymousTypeDescriptor) As AnonymousDelegateTemplateSymbol
                 Dim parameters = typeDescr.Parameters
@@ -49,12 +52,12 @@ Namespace Microsoft.CodeAnalysis.VisualBasic.Symbols
                                                                          returnType)
 
                 For i = 0 To parameterDescriptors.Length - 2
-                    parameters.Add(New AnonymousDelegateParameterSymbol(delegateInvoke,
-                                                                        Me.TypeParameters(i),
-                                                                        i,
-                                                                        parameterDescriptors(i).IsByRef,
-                                                                        parameterDescriptors(i).Name,
-                                                                        i))
+                    parameters.Add(New AnonymousTypeOrDelegateParameterSymbol(delegateInvoke,
+                                                                              Me.TypeParameters(i),
+                                                                              i,
+                                                                              parameterDescriptors(i).IsByRef,
+                                                                              parameterDescriptors(i).Name,
+                                                                              i))
                 Next
 
                 delegateInvoke.SetParameters(parameters.ToImmutable())
@@ -68,8 +71,8 @@ Namespace Microsoft.CodeAnalysis.VisualBasic.Symbols
 
                 delegateCtor.SetParameters(
                     ImmutableArray.Create(Of ParameterSymbol)(
-                           New AnonymousDelegateParameterSymbol(delegateCtor, manager.System_Object, 0, False, StringConstants.DelegateConstructorInstanceParameterName),
-                           New AnonymousDelegateParameterSymbol(delegateCtor, manager.System_IntPtr, 1, False, StringConstants.DelegateConstructorMethodParameterName)
+                           New AnonymousTypeOrDelegateParameterSymbol(delegateCtor, manager.System_Object, 0, False, StringConstants.DelegateConstructorInstanceParameterName),
+                           New AnonymousTypeOrDelegateParameterSymbol(delegateCtor, manager.System_IntPtr, 1, False, StringConstants.DelegateConstructorMethodParameterName)
                            ))
 
                 Dim delegateBeginInvoke As SynthesizedDelegateMethodSymbol
@@ -80,7 +83,7 @@ Namespace Microsoft.CodeAnalysis.VisualBasic.Symbols
                 If Me.IsCompilationOutputWinMdObj() Then
                     delegateBeginInvoke = Nothing
                     delegateEndInvoke = Nothing
-                    m_Members = ImmutableArray.Create(delegateCtor, delegateInvoke)
+                    _members = ImmutableArray.Create(delegateCtor, delegateInvoke)
                 Else
                     ' (3) BeginInvoke
                     delegateBeginInvoke = New SynthesizedDelegateMethodSymbol(WellKnownMemberNames.DelegateBeginInvokeName,
@@ -90,12 +93,12 @@ Namespace Microsoft.CodeAnalysis.VisualBasic.Symbols
 
                     For i = 0 To delegateInvoke.ParameterCount - 1
                         Dim parameter As ParameterSymbol = delegateInvoke.Parameters(i)
-                        parameters.Add(New AnonymousDelegateParameterSymbol(delegateBeginInvoke, parameter.Type, i, parameter.IsByRef(), parameter.Name, i))
+                        parameters.Add(New AnonymousTypeOrDelegateParameterSymbol(delegateBeginInvoke, parameter.Type, i, parameter.IsByRef(), parameter.Name, i))
                     Next
 
-                    parameters.Add(New AnonymousDelegateParameterSymbol(delegateBeginInvoke, manager.System_AsyncCallback, i, False, StringConstants.DelegateMethodCallbackParameterName))
+                    parameters.Add(New AnonymousTypeOrDelegateParameterSymbol(delegateBeginInvoke, manager.System_AsyncCallback, i, False, StringConstants.DelegateMethodCallbackParameterName))
                     i += 1
-                    parameters.Add(New AnonymousDelegateParameterSymbol(delegateBeginInvoke, manager.System_Object, i, False, StringConstants.DelegateMethodInstanceParameterName))
+                    parameters.Add(New AnonymousTypeOrDelegateParameterSymbol(delegateBeginInvoke, manager.System_Object, i, False, StringConstants.DelegateMethodInstanceParameterName))
                     delegateBeginInvoke.SetParameters(parameters.ToImmutable())
                     parameters.Clear()
 
@@ -109,28 +112,28 @@ Namespace Microsoft.CodeAnalysis.VisualBasic.Symbols
                         Dim parameter As ParameterSymbol = delegateInvoke.Parameters(i)
 
                         If parameter.IsByRef Then
-                            parameters.Add(New AnonymousDelegateParameterSymbol(delegateEndInvoke, parameter.Type, ordinal, parameter.IsByRef(), parameter.Name, i))
+                            parameters.Add(New AnonymousTypeOrDelegateParameterSymbol(delegateEndInvoke, parameter.Type, ordinal, parameter.IsByRef(), parameter.Name, i))
                             ordinal += 1
                         End If
                     Next
 
-                    parameters.Add(New AnonymousDelegateParameterSymbol(delegateEndInvoke, manager.System_IAsyncResult, ordinal, False, StringConstants.DelegateMethodResultParameterName))
+                    parameters.Add(New AnonymousTypeOrDelegateParameterSymbol(delegateEndInvoke, manager.System_IAsyncResult, ordinal, False, StringConstants.DelegateMethodResultParameterName))
                     delegateEndInvoke.SetParameters(parameters.ToImmutable())
 
-                    m_Members = ImmutableArray.Create(delegateCtor, delegateBeginInvoke, delegateEndInvoke, delegateInvoke)
+                    _members = ImmutableArray.Create(delegateCtor, delegateBeginInvoke, delegateEndInvoke, delegateInvoke)
                 End If
 
-                Debug.Assert(m_Members.All(Function(m) m IsNot Nothing))
+                Debug.Assert(_members.All(Function(m) m IsNot Nothing))
                 parameters.Free()
             End Sub
 
-            Friend Overrides Function GetAnonymousTypeKey() As Microsoft.CodeAnalysis.Emit.AnonymousTypeKey
-                Dim names = TypeDescr.Parameters.SelectAsArray(Function(p) p.Name)
-                Return New Microsoft.CodeAnalysis.Emit.AnonymousTypeKey(names, isDelegate:=True)
+            Friend Overrides Function GetAnonymousTypeKey() As AnonymousTypeKey
+                Dim parameters = TypeDescr.Parameters.SelectAsArray(Function(p) New AnonymousTypeKeyField(p.Name, isKey:=p.IsByRef, ignoreCase:=True))
+                Return New AnonymousTypeKey(parameters, isDelegate:=True)
             End Function
 
             Public Overrides Function GetMembers() As ImmutableArray(Of Symbol)
-                Return StaticCast(Of Symbol).From(m_Members)
+                Return StaticCast(Of Symbol).From(_members)
             End Function
 
             Friend NotOverridable Overrides Function GetFieldsToEmit() As IEnumerable(Of FieldSymbol)
@@ -143,18 +146,18 @@ Namespace Microsoft.CodeAnalysis.VisualBasic.Symbols
                 End Get
             End Property
 
-            Friend Overrides Function MakeAcyclicBaseType(diagnostics As DiagnosticBag) As NamedTypeSymbol
+            Friend Overrides Function MakeAcyclicBaseType(diagnostics As BindingDiagnosticBag) As NamedTypeSymbol
                 Return Manager.System_MulticastDelegate
             End Function
 
-            Friend Overrides Function MakeAcyclicInterfaces(diagnostics As DiagnosticBag) As ImmutableArray(Of NamedTypeSymbol)
+            Friend Overrides Function MakeAcyclicInterfaces(diagnostics As BindingDiagnosticBag) As ImmutableArray(Of NamedTypeSymbol)
                 Return ImmutableArray(Of NamedTypeSymbol).Empty
             End Function
 
             Public Overrides ReadOnly Property DelegateInvokeMethod As MethodSymbol
                 Get
                     ' The invoke method is always the last method, in regular or winmd scenarios
-                    Return m_Members(m_Members.Length - 1)
+                    Return _members(_members.Length - 1)
                 End Get
             End Property
 
@@ -170,7 +173,7 @@ Namespace Microsoft.CodeAnalysis.VisualBasic.Symbols
                 End Get
             End Property
 
-            Friend Overrides Sub AddSynthesizedAttributes(compilationState as ModuleCompilationState, ByRef attributes As ArrayBuilder(Of SynthesizedAttributeData))
+            Friend Overrides Sub AddSynthesizedAttributes(compilationState As ModuleCompilationState, ByRef attributes As ArrayBuilder(Of SynthesizedAttributeData))
                 MyBase.AddSynthesizedAttributes(compilationState, attributes)
 
                 ' Attribute: System.Runtime.CompilerServices.CompilerGeneratedAttribute()
@@ -218,7 +221,7 @@ Namespace Microsoft.CodeAnalysis.VisualBasic.Symbols
                 Return Manager.GetHashCode()
             End Function
 
-            Public Overrides Function Equals(obj As Object) As Boolean
+            Public Overrides Function Equals(obj As TypeSymbol, comparison As TypeCompareKind) As Boolean
                 If obj Is Me Then
                     Return True
                 End If

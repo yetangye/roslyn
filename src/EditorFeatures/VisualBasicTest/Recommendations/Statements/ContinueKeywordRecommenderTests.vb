@@ -1,23 +1,18 @@
-' Copyright (c) Microsoft.  All Rights Reserved.  Licensed under the Apache License, Version 2.0.  See License.txt in the project root for license information.
-
-Imports Microsoft.CodeAnalysis.Text
-Imports Microsoft.CodeAnalysis.VisualBasic
-Imports Microsoft.CodeAnalysis.VisualBasic.Symbols
-Imports Microsoft.CodeAnalysis.VisualBasic.Syntax
-Imports Roslyn.Test.Utilities
-Imports Xunit
+﻿' Licensed to the .NET Foundation under one or more agreements.
+' The .NET Foundation licenses this file to you under the MIT license.
+' See the LICENSE file in the project root for more information.
 
 Namespace Microsoft.CodeAnalysis.Editor.VisualBasic.UnitTests.Recommendations.Statements
     Public Class ContinueKeywordRecommenderTests
         <Fact>
         <Trait(Traits.Feature, Traits.Features.KeywordRecommending)>
-        Public Sub ContinueNotInMethodBody()
+        Public Sub ContinueNotInMethodBodyTest()
             VerifyRecommendationsMissing(<MethodBody>|</MethodBody>, "Continue")
         End Sub
 
         <Fact>
         <Trait(Traits.Feature, Traits.Features.KeywordRecommending)>
-        Public Sub ContinueInForLoop()
+        Public Sub ContinueInForLoopTest()
             VerifyRecommendationsContain(<MethodBody>
 For i = 1 To 10
 |
@@ -26,7 +21,7 @@ Next</MethodBody>, "Continue")
 
         <Fact>
         <Trait(Traits.Feature, Traits.Features.KeywordRecommending)>
-        Public Sub ContinueInForEachLoop()
+        Public Sub ContinueInForEachLoopTest()
             VerifyRecommendationsContain(<MethodBody>
 For Each i In j
 |
@@ -35,7 +30,7 @@ Next</MethodBody>, "Continue")
 
         <Fact>
         <Trait(Traits.Feature, Traits.Features.KeywordRecommending)>
-        Public Sub ContinueInWhileLoop()
+        Public Sub ContinueInWhileLoopTest()
             VerifyRecommendationsContain(<MethodBody>
 While True
 |
@@ -44,7 +39,7 @@ End While</MethodBody>, "Continue")
 
         <Fact>
         <Trait(Traits.Feature, Traits.Features.KeywordRecommending)>
-        Public Sub ContinueInDoWhileLoop()
+        Public Sub ContinueInDoWhileLoopTest()
             VerifyRecommendationsContain(<MethodBody>
 Do While True
 |
@@ -53,7 +48,7 @@ Loop</MethodBody>, "Continue")
 
         <Fact>
         <Trait(Traits.Feature, Traits.Features.KeywordRecommending)>
-        Public Sub ContinueInLoopWhileLoop()
+        Public Sub ContinueInLoopWhileLoopTest()
             VerifyRecommendationsContain(<MethodBody>
 Do
 |
@@ -62,7 +57,7 @@ Loop While True</MethodBody>, "Continue")
 
         <Fact>
         <Trait(Traits.Feature, Traits.Features.KeywordRecommending)>
-        Public Sub ContinueInInfiniteDoWhileLoop()
+        Public Sub ContinueInInfiniteDoWhileLoopTest()
             VerifyRecommendationsContain(<MethodBody>
 Do
 |
@@ -71,7 +66,7 @@ Loop</MethodBody>, "Continue")
 
         <Fact>
         <Trait(Traits.Feature, Traits.Features.KeywordRecommending)>
-        Public Sub ContinueNotInLambda()
+        Public Sub ContinueNotInLambdaTest()
             VerifyRecommendationsMissing(<MethodBody>
 Do
 Dim x = Function()
@@ -82,7 +77,7 @@ Loop</MethodBody>, "Continue")
 
         <Fact>
         <Trait(Traits.Feature, Traits.Features.KeywordRecommending)>
-        Public Sub ContinueInClassDeclarationLambda()
+        Public Sub ContinueInClassDeclarationLambdaTest()
             VerifyRecommendationsContain(<ClassDeclaration>
 Dim _x = Function()
              Do
@@ -94,7 +89,7 @@ Dim _x = Function()
 
         <Fact>
         <Trait(Traits.Feature, Traits.Features.KeywordRecommending)>
-        Public Sub ContinueNotInSingleLineLambdaInMethodBody()
+        Public Sub ContinueNotInSingleLineLambdaInMethodBodyTest()
             VerifyRecommendationsMissing(<MethodBody>
 Dim x = Sub() |
 </MethodBody>, "Continue")

@@ -1,30 +1,33 @@
-' Copyright (c) Microsoft.  All Rights Reserved.  Licensed under the Apache License, Version 2.0.  See License.txt in the project root for license information.
+﻿' Licensed to the .NET Foundation under one or more agreements.
+' The .NET Foundation licenses this file to you under the MIT license.
+' See the LICENSE file in the project root for more information.
 
 Imports Microsoft.CodeAnalysis
+Imports Microsoft.CodeAnalysis.Editor.Shared.Utilities
 Imports Microsoft.CodeAnalysis.Editor.UnitTests
 Imports Microsoft.CodeAnalysis.Editor.UnitTests.Workspaces
+Imports Microsoft.CodeAnalysis.Test.Utilities
 Imports Microsoft.CodeAnalysis.Text
-Imports Microsoft.VisualStudio.Composition
 Imports Microsoft.VisualStudio.LanguageServices.Implementation.Preview
 Imports Microsoft.VisualStudio.Text.Editor
 Imports Roslyn.Test.Utilities
 
 Namespace Microsoft.VisualStudio.LanguageServices.UnitTests.Preview
+    <[UseExportProvider]>
     Public Class PreviewChangesTests
 
-        Dim exportProvider As ExportProvider = MinimalTestExportProvider.CreateExportProvider(
-            TestExportProvider.MinimumCatalogWithCSharpAndVisualBasic.WithPart(GetType(StubVsEditorAdaptersFactoryService)))
+        Private Shared ReadOnly s_composition As TestComposition = VisualStudioTestCompositions.LanguageServices
 
-        <Fact>
+        <WpfFact>
         Public Sub TestListStructure()
-            Using workspace = CSharpWorkspaceFactory.CreateWorkspaceFromFile(<text>
+            Using workspace = TestWorkspace.CreateCSharp(<text>
 Class C
 {
-    void Foo()
+    void Goo()
     {
         $$
     }
-}</text>.Value, exportProvider:=exportProvider)
+}</text>.Value, composition:=s_composition)
                 Dim expectedItems = New List(Of Tuple(Of String, Integer)) From
                     {
                     Tuple.Create("topLevelItemName", 0),
@@ -42,7 +45,8 @@ Class C
                 Dim componentModel = New MockComponentModel(workspace.ExportProvider)
 
                 Dim previewEngine = New PreviewEngine(
-                    "Title", "helpString", "description", "topLevelItemName", CodeAnalysis.Glyph.Assembly,
+                    workspace.ExportProvider.GetExportedValue(Of IThreadingContext),
+                    "Title", "helpString", "description", "topLevelItemName", Glyph.Assembly,
                     forkedDocument.Project.Solution,
                     workspace.CurrentSolution,
                     componentModel)
@@ -55,7 +59,7 @@ Class C
             End Using
         End Sub
 
-        <Fact, WorkItem(1036455)>
+        <WpfFact, WorkItem(1036455, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/1036455")>
         Public Sub TestListStructure_AddedDeletedDocuments()
             Dim workspaceXml =
                 <Workspace>
@@ -63,7 +67,7 @@ Class C
                         <Document FilePath="test1.cs">
 Class C
 {
-    void Foo()
+    void Goo()
     {
         $$
     }
@@ -73,15 +77,15 @@ Class C
                     </Project>
                 </Workspace>
 
-            Using workspace = TestWorkspaceFactory.CreateWorkspace(workspaceXml, exportProvider:=exportProvider)
+            Using workspace = TestWorkspace.Create(workspaceXml, composition:=s_composition)
                 Dim expectedItems = New List(Of Tuple(Of String, Integer)) From
                     {
                     Tuple.Create("topLevelItemName", 0),
                     Tuple.Create("test1.cs", 1),
                     Tuple.Create("insertion!", 2),
-                    Tuple.Create(ServicesVSResources.PreviewChangesAddedPrefix + "test3.cs", 1),
+                    Tuple.Create(ServicesVSResources.bracket_plus_bracket + "test3.cs", 1),
                     Tuple.Create("// This file will be added!", 2),
-                    Tuple.Create(ServicesVSResources.PreviewChangesDeletedPrefix + "test2.cs", 1),
+                    Tuple.Create(ServicesVSResources.bracket_bracket + "test2.cs", 1),
                     Tuple.Create("// This file will be deleted!", 2)
                     }
 
@@ -102,7 +106,8 @@ Class C
                 Dim componentModel = New MockComponentModel(workspace.ExportProvider)
 
                 Dim previewEngine = New PreviewEngine(
-                    "Title", "helpString", "description", "topLevelItemName", CodeAnalysis.Glyph.Assembly,
+                    workspace.ExportProvider.GetExportedValue(Of IThreadingContext),
+                    "Title", "helpString", "description", "topLevelItemName", Glyph.Assembly,
                     newSolution,
                     workspace.CurrentSolution,
                     componentModel)
@@ -115,16 +120,16 @@ Class C
             End Using
         End Sub
 
-        <Fact>
+        <WpfFact>
         Public Sub TestCheckedItems()
-            Using workspace = CSharpWorkspaceFactory.CreateWorkspaceFromFile(<text>
+            Using workspace = TestWorkspace.CreateCSharp(<text>
 Class C
 {
-    void Foo()
+    void Goo()
     {
         $$
     }
-}</text>.Value, exportProvider:=exportProvider)
+}</text>.Value, composition:=s_composition)
                 Dim expectedItems = New List(Of String) From {"topLevelItemName", "*test1.cs", "**insertion!"}
 
                 Dim documentId = workspace.Documents.First().Id
@@ -137,28 +142,31 @@ Class C
                 Dim componentModel = New MockComponentModel(workspace.ExportProvider)
 
                 Dim previewEngine = New PreviewEngine(
-                    "Title", "helpString", "description", "topLevelItemName", CodeAnalysis.Glyph.Assembly,
+                    workspace.ExportProvider.GetExportedValue(Of IThreadingContext),
+                    "Title", "helpString", "description", "topLevelItemName", Glyph.Assembly,
                     forkedDocument.Project.Solution,
                     workspace.CurrentSolution,
                     componentModel)
 
+                WpfTestRunner.RequireWpfFact($"Test explicitly creates an {NameOf(IWpfTextView)}")
                 Dim textEditorFactory = componentModel.GetService(Of ITextEditorFactoryService)
-                Dim textView = textEditorFactory.CreateTextView()
+                Using disposableView As DisposableTextView = textEditorFactory.CreateDisposableTextView()
+                    previewEngine.SetTextView(disposableView.TextView)
 
-                previewEngine.SetTextView(textView)
+                    Dim outChangeList As Object = Nothing
+                    previewEngine.GetRootChangesList(outChangeList)
+                    Dim topLevelList = DirectCast(outChangeList, ChangeList)
 
-                Dim outChangeList As Object = Nothing
-                previewEngine.GetRootChangesList(outChangeList)
-                Dim topLevelList = DirectCast(outChangeList, ChangeList)
+                    SetCheckedChildren(New List(Of String)(), topLevelList)
+                    previewEngine.ApplyChanges()
+                    Dim finalText = previewEngine.FinalSolution.GetDocument(documentId).GetTextAsync().Result.ToString()
+                    Assert.Equal(document.GetTextAsync().Result.ToString(), finalText)
+                End Using
 
-                SetCheckedChildren(New List(Of String)(), topLevelList)
-                previewEngine.ApplyChanges()
-                Dim finalText = previewEngine.FinalSolution.GetDocument(documentId).GetTextAsync().Result.ToString()
-                Assert.Equal(document.GetTextAsync().Result.ToString(), finalText)
             End Using
         End Sub
 
-        <Fact, WorkItem(1036455)>
+        <WpfFact, WorkItem(1036455, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/1036455")>
         Public Sub TestCheckedItems_AddedDeletedDocuments()
             Dim workspaceXml =
                 <Workspace>
@@ -166,7 +174,7 @@ Class C
                         <Document FilePath="test1.cs">
 Class C
 {
-    void Foo()
+    void Goo()
     {
         $$
     }
@@ -177,7 +185,7 @@ Class C
                     </Project>
                 </Workspace>
 
-            Using workspace = TestWorkspaceFactory.CreateWorkspace(workspaceXml, exportProvider:=exportProvider)
+            Using workspace = TestWorkspace.Create(workspaceXml, composition:=s_composition)
                 Dim docId = workspace.Documents.First().Id
                 Dim document = workspace.CurrentSolution.GetDocument(docId)
 
@@ -197,48 +205,50 @@ Class C
                 Dim addedDocumentId2 = DocumentId.CreateNewId(docId.ProjectId)
                 Dim addedDocumentText = "// This file will be added!"
                 newSolution = newSolution.AddDocument(addedDocumentId1, "test4.cs", addedDocumentText)
-                newSolution = newSolution.AddDocument(addedDocumentId2, "test5.cs", "// This file will be be unchecked and not added!")
+                newSolution = newSolution.AddDocument(addedDocumentId2, "test5.cs", "// This file will be unchecked and not added!")
 
                 Dim previewEngine = New PreviewEngine(
-                    "Title", "helpString", "description", "topLevelItemName", CodeAnalysis.Glyph.Assembly,
+                    workspace.ExportProvider.GetExportedValue(Of IThreadingContext),
+                    "Title", "helpString", "description", "topLevelItemName", Glyph.Assembly,
                     newSolution,
                     workspace.CurrentSolution,
                     componentModel)
 
+                WpfTestRunner.RequireWpfFact($"Test explicitly creates an {NameOf(IWpfTextView)}")
                 Dim textEditorFactory = componentModel.GetService(Of ITextEditorFactoryService)
-                Dim textView = textEditorFactory.CreateTextView()
+                Using disposableView As DisposableTextView = textEditorFactory.CreateDisposableTextView()
+                    previewEngine.SetTextView(disposableView.TextView)
 
-                previewEngine.SetTextView(textView)
+                    Dim outChangeList As Object = Nothing
+                    previewEngine.GetRootChangesList(outChangeList)
+                    Dim topLevelList = DirectCast(outChangeList, ChangeList)
 
-                Dim outChangeList As Object = Nothing
-                previewEngine.GetRootChangesList(outChangeList)
-                Dim topLevelList = DirectCast(outChangeList, ChangeList)
+                    Dim checkedItems = New List(Of String) From
+                    {
+                        "test1.cs",
+                        ServicesVSResources.bracket_plus_bracket + "test4.cs",
+                        ServicesVSResources.bracket_bracket + "test2.cs"
+                    }
 
-                Dim checkedItems = New List(Of String) From
-                {
-                    "test1.cs",
-                    ServicesVSResources.PreviewChangesAddedPrefix + "test4.cs",
-                    ServicesVSResources.PreviewChangesDeletedPrefix + "test2.cs"
-                }
+                    SetCheckedChildren(checkedItems, topLevelList)
+                    previewEngine.ApplyChanges()
+                    Dim finalSolution = previewEngine.FinalSolution
+                    Dim finalDocuments = finalSolution.Projects.First().Documents
+                    Assert.Equal(3, finalDocuments.Count)
 
-                SetCheckedChildren(checkedItems, topLevelList)
-                previewEngine.ApplyChanges()
-                Dim finalSolution = previewEngine.FinalSolution
-                Dim finalDocuments = finalSolution.Projects.First().Documents
-                Assert.Equal(3, finalDocuments.Count)
+                    Dim changedDocText = finalSolution.GetDocument(docId).GetTextAsync().Result.ToString()
+                    Assert.Equal(forkedDocument.GetTextAsync().Result.ToString(), changedDocText)
 
-                Dim changedDocText = finalSolution.GetDocument(docId).GetTextAsync().Result.ToString()
-                Assert.Equal(forkedDocument.GetTextAsync().Result.ToString(), changedDocText)
+                    Dim finalAddedDocText = finalSolution.GetDocument(addedDocumentId1).GetTextAsync().Result.ToString()
+                    Assert.Equal(addedDocumentText, finalAddedDocText)
 
-                Dim finalAddedDocText = finalSolution.GetDocument(addedDocumentId1).GetTextAsync().Result.ToString()
-                Assert.Equal(addedDocumentText, finalAddedDocText)
-
-                Dim finalNotRemovedDocText = finalSolution.GetDocument(removedDocumentId2).GetTextAsync().Result.ToString()
-                Assert.Equal("// This file will just escape deletion!", finalNotRemovedDocText)
+                    Dim finalNotRemovedDocText = finalSolution.GetDocument(removedDocumentId2).GetTextAsync().Result.ToString()
+                    Assert.Equal("// This file will just escape deletion!", finalNotRemovedDocText)
+                End Using
             End Using
         End Sub
 
-        <Fact>
+        <WpfFact>
         Public Sub TestLinkedFileChangesMergedAndDeduplicated()
 
             Dim workspaceXml = <Workspace>
@@ -259,7 +269,7 @@ End Class
                                    </Project>
                                </Workspace>
 
-            Using workspace = TestWorkspaceFactory.CreateWorkspace(workspaceXml, , exportProvider:=exportProvider)
+            Using workspace = TestWorkspace.Create(workspaceXml, composition:=s_composition)
                 Dim documentId1 = workspace.Documents.Where(Function(d) d.Project.Name = "VBProj1").Single().Id
                 Dim document1 = workspace.CurrentSolution.GetDocument(documentId1)
 
@@ -279,7 +289,8 @@ End Class
                 Dim componentModel = New MockComponentModel(workspace.ExportProvider)
 
                 Dim previewEngine = New PreviewEngine(
-                    "Title", "helpString", "description", "topLevelItemName", CodeAnalysis.Glyph.Assembly,
+                    workspace.ExportProvider.GetExportedValue(Of IThreadingContext),
+                    "Title", "helpString", "description", "topLevelItemName", Glyph.Assembly,
                     updatedSolution,
                     workspace.CurrentSolution,
                     componentModel)
@@ -301,10 +312,6 @@ End Class
         End Sub
 
         Private Sub AssertTreeStructure(expectedItems As List(Of Tuple(Of String, Integer)), topLevelList As ChangeList)
-            Dim outChangeList As Object = Nothing
-            Dim outCanRecurse As Integer = Nothing
-            Dim outTreeList As Shell.Interop.IVsLiteTreeList = Nothing
-
             Dim flatteningResult = New List(Of Tuple(Of String, Integer))()
             FlattenTree(topLevelList, flatteningResult, 0)
 

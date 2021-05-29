@@ -1,13 +1,18 @@
-// Copyright (c) Microsoft.  All Rights Reserved.  Licensed under the Apache License, Version 2.0.  See License.txt in the project root for license information.
+﻿// Licensed to the .NET Foundation under one or more agreements.
+// The .NET Foundation licenses this file to you under the MIT license.
+// See the LICENSE file in the project root for more information.
+
+#nullable disable
 
 using System;
 using System.Collections.Generic;
+using System.Linq;
 using Microsoft.CodeAnalysis.CSharp;
-using Microsoft.CodeAnalysis.EditAndContinue;
 using Microsoft.CodeAnalysis.Text;
+using Roslyn.Test.Utilities;
 using Xunit;
 
-namespace Microsoft.CodeAnalysis.Editor.UnitTests.EditAndContinue
+namespace Microsoft.CodeAnalysis.EditAndContinue.UnitTests
 {
     public class RudeEditDiagnosticTests
     {
@@ -22,25 +27,16 @@ namespace Microsoft.CodeAnalysis.Editor.UnitTests.EditAndContinue
             var arg0 = new HashSet<RudeEditKind>()
             {
                 RudeEditKind.ActiveStatementUpdate,
-                RudeEditKind.STMT_MID_DELETE,
-                RudeEditKind.STMT_NON_LEAF_DELETE,
-                RudeEditKind.STMT_CTOR_CALL,
-                RudeEditKind.STMT_FIELD_INIT,
-                RudeEditKind.STMT_DELETE,
-                RudeEditKind.STMT_DELETE_REMAP,
-                RudeEditKind.STMT_READONLY,
-                RudeEditKind.RUDE_NO_ACTIVE_STMT,
-                RudeEditKind.RUDE_ACTIVE_STMT_DELETED,
-                RudeEditKind.EXC_HANDLER_ERROR,
-                RudeEditKind.EXC_FINALLY_ERROR,
-                RudeEditKind.EXC_CATCH_ERROR,
+                RudeEditKind.PartiallyExecutedActiveStatementUpdate,
+                RudeEditKind.UpdateExceptionHandlerOfActiveTry,
+                RudeEditKind.UpdateTryOrCatchWithActiveFinally,
+                RudeEditKind.UpdateCatchHandlerAroundActiveStatement,
                 RudeEditKind.FieldKindUpdate,
                 RudeEditKind.TypeKindUpdate,
                 RudeEditKind.AccessorKindUpdate,
                 RudeEditKind.MethodKindUpdate,
                 RudeEditKind.DeclareLibraryUpdate,
                 RudeEditKind.DeclareAliasUpdate,
-                RudeEditKind.ChangingConstructorVisibility,
                 RudeEditKind.InsertDllImport,
                 RudeEditKind.MethodBodyAdd,
                 RudeEditKind.MethodBodyDelete,
@@ -48,23 +44,11 @@ namespace Microsoft.CodeAnalysis.Editor.UnitTests.EditAndContinue
                 RudeEditKind.GenericTypeUpdate,
                 RudeEditKind.ExperimentalFeaturesEnabled,
                 RudeEditKind.AwaitStatementUpdate,
-                RudeEditKind.RUDE_EDIT_MODIFY_ANON_METHOD,
-                RudeEditKind.RUDE_EDIT_ADD_ANON_METHOD,
-                RudeEditKind.RUDE_EDIT_DELETE_ANON_METHOD,
-                RudeEditKind.RUDE_EDIT_MOVE_ANON_METHOD,
-                RudeEditKind.RUDE_EDIT_MODIFY_LAMBDA_EXPRESSION,
-                RudeEditKind.RUDE_EDIT_ADD_LAMBDA_EXPRESSION,
-                RudeEditKind.RUDE_EDIT_DELETE_LAMBDA_EXPRESSION,
-                RudeEditKind.RUDE_EDIT_MOVE_LAMBDA_EXPRESSION,
-                RudeEditKind.RUDE_EDIT_MODIFY_QUERY_EXPRESSION,
-                RudeEditKind.RUDE_EDIT_ADD_QUERY_EXPRESSION,
-                RudeEditKind.RUDE_EDIT_DELETE_QUERY_EXPRESSION,
-                RudeEditKind.RUDE_EDIT_MOVE_QUERY_EXPRESSION,
-                RudeEditKind.RUDE_EDIT_MODIFY_ANONYMOUS_TYPE,
-                RudeEditKind.RUDE_EDIT_ADD_ANONYMOUS_TYPE,
-                RudeEditKind.RUDE_EDIT_DELETE_ANONYMOUS_TYPE,
-                RudeEditKind.RUDE_EDIT_MOVE_ANONYMOUS_TYPE,
-                RudeEditKind.RUDE_EDIT_ADD_NEW_FILE,
+                RudeEditKind.InsertFile,
+                RudeEditKind.InsertConstructorToTypeWithInitializersWithLambdas,
+                RudeEditKind.UpdatingStateMachineMethodAroundActiveStatement,
+                RudeEditKind.SwitchBetweenLambdaAndLocalFunction,
+                RudeEditKind.InsertMethodWithExplicitInterfaceSpecifier,
             };
 
             var arg2 = new HashSet<RudeEditKind>()
@@ -73,38 +57,64 @@ namespace Microsoft.CodeAnalysis.Editor.UnitTests.EditAndContinue
                 RudeEditKind.InsertIntoStruct,
                 RudeEditKind.ConstraintKindUpdate,
                 RudeEditKind.InsertIntoStruct,
+                RudeEditKind.ChangingCapturedVariableType,
+                RudeEditKind.AccessingCapturedVariableInLambda,
+                RudeEditKind.NotAccessingCapturedVariableInLambda,
+                RudeEditKind.RenamingCapturedVariable,
+                RudeEditKind.ChangingStateMachineShape,
+                RudeEditKind.InternalError,
+                RudeEditKind.MemberBodyInternalError,
             };
 
-            List<RudeEditKind> errors = new List<RudeEditKind>();
-            foreach (RudeEditKind value in Enum.GetValues(typeof(RudeEditKind)))
+            var arg3 = new HashSet<RudeEditKind>()
             {
-                if (value == RudeEditKind.None)
+                RudeEditKind.InsertLambdaWithMultiScopeCapture,
+                RudeEditKind.DeleteLambdaWithMultiScopeCapture,
+            };
+
+            var allKinds = Enum.GetValues(typeof(RudeEditKind)).Cast<RudeEditKind>();
+
+            foreach (var kind in allKinds)
+            {
+                if (kind == RudeEditKind.None)
                 {
                     continue;
                 }
 
-                if (arg0.Contains(value))
+                if (arg0.Contains(kind))
                 {
-                    var re = new RudeEditDiagnostic(value, TextSpan.FromBounds(1, 2));
+                    var re = new RudeEditDiagnostic(kind, TextSpan.FromBounds(1, 2));
                     var d = re.ToDiagnostic(tree);
-                    Assert.False(d.GetMessage().Contains("{"), value.ToString());
+                    Assert.False(d.GetMessage().Contains("{"), kind.ToString());
                 }
-                else if (arg2.Contains(value))
+                else if (arg2.Contains(kind))
                 {
-                    var re = new RudeEditDiagnostic(value, TextSpan.FromBounds(1, 2), syntaxNode, new[] { "<1>", "<2>" });
+                    var re = new RudeEditDiagnostic(kind, TextSpan.FromBounds(1, 2), syntaxNode, new[] { "<1>", "<2>" });
                     var d = re.ToDiagnostic(tree);
-                    Assert.True(d.GetMessage().Contains("<1>"), value.ToString());
-                    Assert.True(d.GetMessage().Contains("<2>"), value.ToString());
-                    Assert.False(d.GetMessage().Contains("{"), value.ToString());
+                    Assert.True(d.GetMessage().Contains("<1>"), kind.ToString());
+                    Assert.True(d.GetMessage().Contains("<2>"), kind.ToString());
+                    Assert.False(d.GetMessage().Contains("{"), kind.ToString());
+                }
+                else if (arg3.Contains(kind))
+                {
+                    var re = new RudeEditDiagnostic(kind, TextSpan.FromBounds(1, 2), syntaxNode, new[] { "<1>", "<2>", "<3>" });
+                    var d = re.ToDiagnostic(tree);
+                    Assert.True(d.GetMessage().Contains("<1>"), kind.ToString());
+                    Assert.True(d.GetMessage().Contains("<2>"), kind.ToString());
+                    Assert.True(d.GetMessage().Contains("<3>"), kind.ToString());
+                    Assert.False(d.GetMessage().Contains("{"), kind.ToString());
                 }
                 else
                 {
-                    var re = new RudeEditDiagnostic(value, TextSpan.FromBounds(1, 2), syntaxNode, new[] { "<1>" });
+                    var re = new RudeEditDiagnostic(kind, TextSpan.FromBounds(1, 2), syntaxNode, new[] { "<1>" });
                     var d = re.ToDiagnostic(tree);
-                    Assert.True(d.GetMessage().Contains("<1>"), value.ToString());
-                    Assert.False(d.GetMessage().Contains("{"), value.ToString());
+                    Assert.True(d.GetMessage().Contains("<1>"), kind.ToString());
+                    Assert.False(d.GetMessage().Contains("{"), kind.ToString());
                 }
             }
+
+            // check that all values are unique:
+            AssertEx.Equal(allKinds, allKinds.Distinct());
         }
     }
 }

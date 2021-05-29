@@ -1,18 +1,25 @@
-﻿Imports System.Collections.Immutable
+﻿' Licensed to the .NET Foundation under one or more agreements.
+' The .NET Foundation licenses this file to you under the MIT license.
+' See the LICENSE file in the project root for more information.
+
+Imports System.Collections.Immutable
 Imports System.IO
-Imports System.Reflection.Metadata
 Imports System.Threading
+Imports Microsoft.CodeAnalysis.Debugging
 Imports Microsoft.CodeAnalysis.ExpressionEvaluator
-Imports Microsoft.CodeAnalysis.VisualBasic.ExpressionEvaluator
+Imports Microsoft.CodeAnalysis.ExpressionEvaluator.UnitTests
+Imports Microsoft.CodeAnalysis.Test.Utilities
 Imports Microsoft.CodeAnalysis.VisualBasic.Symbols
+Imports Microsoft.CodeAnalysis.VisualBasic.UnitTests
+Imports Roslyn.Test.PdbUtilities
 Imports Roslyn.Test.Utilities
 Imports Xunit
 
-Namespace Microsoft.CodeAnalysis.VisualBasic.UnitTests
+Namespace Microsoft.CodeAnalysis.VisualBasic.ExpressionEvaluator.UnitTests
     Public Class DteeTests
         Inherits ExpressionCompilerTestBase
 
-        Private Const DteeEntryPointSource = "
+        Private Const s_dteeEntryPointSource = "
 Imports System.Collections
 
 Class HostProc
@@ -20,7 +27,7 @@ Class HostProc
     End Sub
 End Class
 "
-        Private Const DteeEntryPointName = "HostProc.BreakForDebugger"
+        Private Const s_dteeEntryPointName = "HostProc.BreakForDebugger"
 
         <Fact>
         Public Sub IsDteeEntryPoint()
@@ -35,7 +42,7 @@ Class AppDomain
     End Sub
 End Class
 "
-            Dim comp = CreateCompilationWithMscorlib({source})
+            Dim comp = CreateCompilationWithMscorlib40({source})
             Dim [global] = comp.GlobalNamespace
             Dim m1 = [global].GetMember(Of NamedTypeSymbol)("HostProc").GetMember(Of MethodSymbol)("BreakForDebugger")
             Dim m2 = [global].GetMember(Of NamedTypeSymbol)("AppDomain").GetMember(Of MethodSymbol)("ExecuteAssembly")
@@ -58,7 +65,7 @@ Namespace N
     End Class
 End Namespace
 "
-            Dim comp = CreateCompilationWithMscorlib({source})
+            Dim comp = CreateCompilationWithMscorlib40({source})
             Dim [namespace] = comp.GlobalNamespace.GetMember(Of NamespaceSymbol)("N")
             Dim m1 = [namespace].GetMember(Of NamedTypeSymbol)("HostProc").GetMember(Of MethodSymbol)("BreakForDebugger")
             Dim m2 = [namespace].GetMember(Of NamedTypeSymbol)("AppDomain").GetMember(Of MethodSymbol)("ExecuteAssembly")
@@ -93,7 +100,7 @@ Namespace N2
     End Class
 End Namespace
 "
-            Dim comp = CreateCompilationWithMscorlib({source})
+            Dim comp = CreateCompilationWithMscorlib40({source})
             Dim [global] = comp.GlobalNamespace
 
             Dim [namespace] = [global].GetMember(Of NamespaceSymbol)("N1")
@@ -111,28 +118,28 @@ End Namespace
 
         <Fact>
         Public Sub DteeEntryPointImportsIgnored()
-            Dim comp = CreateCompilationWithMscorlib({DteeEntryPointSource}, compOptions:=TestOptions.DebugDll, assemblyName:=GetUniqueName())
-            Dim compModuleInstance = GetModuleInstance(comp)
-            Dim corlibModuleReference = MscorlibRef.ToModuleInstance(Nothing, Nothing)
+            Dim comp = CreateCompilationWithMscorlib40({s_dteeEntryPointSource}, options:=TestOptions.DebugDll, assemblyName:=GetUniqueName())
 
-            Dim runtimeInstance = CreateRuntimeInstance(ImmutableArray.Create(compModuleInstance, corlibModuleReference))
-            Dim lazyAssemblyReaders = MakeLazyAssemblyReaders(runtimeInstance)
+            WithRuntimeInstance(comp, {MscorlibRef},
+                Sub(runtime)
+                    Dim lazyAssemblyReaders = MakeLazyAssemblyReaders(runtime)
 
-            Dim evalContext = CreateMethodContext(runtimeInstance, DteeEntryPointName, lazyAssemblyReaders:=lazyAssemblyReaders)
-            Dim compContext = evalContext.CreateCompilationContext(MakeDummySyntax())
+                    Dim evalContext = CreateMethodContext(runtime, s_dteeEntryPointName, lazyAssemblyReaders:=lazyAssemblyReaders)
+                    Dim compContext = evalContext.CreateCompilationContext(withSyntax:=True)
 
-            Dim rootNamespace As NamespaceSymbol = Nothing
-            Dim currentNamespace As NamespaceSymbol = Nothing
-            Dim typesAndNamespaces As ImmutableArray(Of NamespaceOrTypeAndImportsClausePosition) = Nothing
-            Dim aliases As Dictionary(Of String, AliasAndImportsClausePosition) = Nothing
-            Dim xmlNamespaces As Dictionary(Of String, XmlNamespaceAndImportsClausePosition) = Nothing
-            ImportsDebugInfoTests.GetImports(compContext, rootNamespace, currentNamespace, typesAndNamespaces, aliases, xmlNamespaces)
+                    Dim rootNamespace As NamespaceSymbol = Nothing
+                    Dim currentNamespace As NamespaceSymbol = Nothing
+                    Dim typesAndNamespaces As ImmutableArray(Of NamespaceOrTypeAndImportsClausePosition) = Nothing
+                    Dim aliases As Dictionary(Of String, AliasAndImportsClausePosition) = Nothing
+                    Dim xmlNamespaces As Dictionary(Of String, XmlNamespaceAndImportsClausePosition) = Nothing
+                    ImportsDebugInfoTests.GetImports(compContext, rootNamespace, currentNamespace, typesAndNamespaces, aliases, xmlNamespaces)
 
-            Assert.Equal("", rootNamespace.Name)
-            Assert.Equal("", currentNamespace.Name)
-            Assert.True(typesAndNamespaces.IsDefault)
-            Assert.Null(aliases)
-            Assert.Null(xmlNamespaces)
+                    Assert.Equal("", rootNamespace.Name)
+                    Assert.Equal("", currentNamespace.Name)
+                    Assert.True(typesAndNamespaces.IsDefault)
+                    Assert.Null(aliases)
+                    Assert.Null(xmlNamespaces)
+                End Sub)
         End Sub
 
         <Fact>
@@ -150,19 +157,13 @@ Class C2
     End Sub
 End Class
 "
-            Dim comp1 = CreateCompilationWithMscorlib({source1}, compOptions:=TestOptions.DebugDll.WithRootNamespace("root1"), assemblyName:=GetUniqueName())
-            Dim compModuleInstance1 = GetModuleInstance(comp1)
+            Dim module1 = CreateCompilationWithMscorlib40({source1}, options:=TestOptions.DebugDll.WithRootNamespace("root1")).ToModuleInstance()
+            Dim module2 = CreateCompilationWithMscorlib40({source2}, options:=TestOptions.DebugDll.WithRootNamespace("root2")).ToModuleInstance()
 
-            Dim comp2 = CreateCompilationWithMscorlib({source2}, compOptions:=TestOptions.DebugDll.WithRootNamespace("root2"), assemblyName:=GetUniqueName())
-            Dim compModuleInstance2 = GetModuleInstance(comp2)
+            Dim runtimeInstance = CreateRuntimeInstance({module1, module2, MscorlibRef.ToModuleInstance()})
 
-            Dim runtimeInstance = CreateRuntimeInstance(ImmutableArray.Create(
-                compModuleInstance1,
-                compModuleInstance2,
-                MscorlibRef.ToModuleInstance(Nothing, Nothing)))
-
-            Dim [imports] = EvaluationContext.SynthesizeImportStringsForDtee(MakeAssemblyReaders(runtimeInstance))
-            AssertEx.SetEqual([imports], "@P:root1", "@P:root2", "*")
+            Dim methodDebugInfo = EvaluationContext.SynthesizeMethodDebugInfoForDtee(MakeAssemblyReaders(runtimeInstance))
+            CheckDteeMethodDebugInfo(methodDebugInfo, "root1", "root2")
         End Sub
 
         <Fact>
@@ -204,36 +205,25 @@ Namespace N7
     End Class
 End Namespace
 "
-            Dim comp1 = CreateCompilationWithMscorlib({source1}, {MsvbRef}, compOptions:=TestOptions.DebugDll, assemblyName:=GetUniqueName())
-            Dim compModuleInstance1 = GetModuleInstance(comp1)
+            Dim module1 = CreateCompilationWithMscorlib40({source1}, {MsvbRef}, options:=TestOptions.DebugDll).ToModuleInstance()
+            Dim module2 = CreateCompilationWithMscorlib40({source2}, {MsvbRef}, options:=TestOptions.DebugDll).ToModuleInstance()
 
-            Dim comp2 = CreateCompilationWithMscorlib({source2}, {MsvbRef}, compOptions:=TestOptions.DebugDll, assemblyName:=GetUniqueName())
-            Dim compModuleInstance2 = GetModuleInstance(comp2)
+            Dim runtimeInstance = CreateRuntimeInstance({module1, module2, MscorlibRef.ToModuleInstance(), MsvbRef.ToModuleInstance()})
 
-            Dim runtimeInstance = CreateRuntimeInstance(ImmutableArray.Create(
-                compModuleInstance1,
-                compModuleInstance2,
-                MscorlibRef.ToModuleInstance(Nothing, Nothing),
-                MsvbRef.ToModuleInstance(Nothing, Nothing)))
-
-            Dim [imports] = EvaluationContext.SynthesizeImportStringsForDtee(MakeAssemblyReaders(runtimeInstance))
-            AssertEx.SetEqual([imports], "@P:N1", "@P:N2.N3", "@P:N5.N6", "*")
+            Dim methodDebugInfo = EvaluationContext.SynthesizeMethodDebugInfoForDtee(MakeAssemblyReaders(runtimeInstance))
+            CheckDteeMethodDebugInfo(methodDebugInfo, "N1", "N2.N3", "N5.N6")
         End Sub
 
         <Fact>
         Public Sub ImportStrings_NoMethods()
-            Dim comp = CreateCompilationWithMscorlib({""}, {MsvbRef}, compOptions:=TestOptions.DebugDll.WithRootNamespace("root"), assemblyName:=GetUniqueName())
-            Dim compModuleInstance = GetModuleInstance(comp)
-
-            Dim runtimeInstance = CreateRuntimeInstance(ImmutableArray.Create(
-                compModuleInstance,
-                MscorlibRef.ToModuleInstance(Nothing, Nothing),
-                MsvbRef.ToModuleInstance(Nothing, Nothing)))
-
-            ' Since there are no methods in the assembly, there is no import custom debug info, so we
-            ' have no way to find the root namespace.
-            Dim [imports] = EvaluationContext.SynthesizeImportStringsForDtee(MakeAssemblyReaders(runtimeInstance))
-            AssertEx.SetEqual([imports], "*")
+            Dim comp = CreateCompilationWithMscorlib40({""}, {MsvbRef}, options:=TestOptions.DebugDll.WithRootNamespace("root"), assemblyName:=GetUniqueName())
+            WithRuntimeInstance(comp, {MscorlibRef, MsvbRef},
+                Sub(runtime)
+                    ' Since there are no methods in the assembly, there is no import custom debug info, so we
+                    ' have no way to find the root namespace.
+                    Dim methodDebugInfo = EvaluationContext.SynthesizeMethodDebugInfoForDtee(MakeAssemblyReaders(runtime))
+                    CheckDteeMethodDebugInfo(methodDebugInfo)
+                End Sub)
         End Sub
 
         <Fact>
@@ -251,34 +241,26 @@ Namespace N2
     End Module
 End Namespace
 "
-            Dim comp1 = CreateCompilationWithMscorlib({source1}, {MsvbRef}, compOptions:=TestOptions.ReleaseDll, assemblyName:=GetUniqueName())
-            Dim compModuleInstance1 = GetModuleInstance(comp1)
+            Dim comp1 = CreateCompilationWithMscorlib40({source1}, {MsvbRef}, options:=TestOptions.ReleaseDll)
+            Dim module1 = comp1.ToModuleInstance(debugFormat:=Nothing)
 
-            Dim comp2 = CreateCompilationWithMscorlib({source2}, {MsvbRef}, compOptions:=TestOptions.DebugDll, assemblyName:=GetUniqueName())
-            Dim compModuleInstance2 = GetModuleInstance(comp2)
+            Dim comp2 = CreateCompilationWithMscorlib40({source2}, {MsvbRef}, options:=TestOptions.DebugDll)
+            Dim module2 = comp2.ToModuleInstance()
 
-            Dim runtimeInstance = CreateRuntimeInstance(ImmutableArray.Create(
-                compModuleInstance1,
-                compModuleInstance2,
-                MscorlibRef.ToModuleInstance(Nothing, Nothing),
-                MsvbRef.ToModuleInstance(Nothing, Nothing)))
+            Dim runtimeInstance = CreateRuntimeInstance({
+                module1,
+                module2,
+                MscorlibRef.ToModuleInstance(),
+                MsvbRef.ToModuleInstance()})
 
-            Dim [imports] = EvaluationContext.SynthesizeImportStringsForDtee(MakeAssemblyReaders(runtimeInstance))
-            AssertEx.SetEqual([imports], "@P:N2", "*")
+            Dim methodDebugInfo = EvaluationContext.SynthesizeMethodDebugInfoForDtee(MakeAssemblyReaders(runtimeInstance))
+            CheckDteeMethodDebugInfo(methodDebugInfo, "N2")
         End Sub
 
         <Fact>
         Public Sub FalseModule_Nested()
             ' NOTE: VB only allows top-level module types.
             Dim ilSource = "
-.assembly 'IL' {} 
-
-.assembly extern mscorlib 
-{
-  .publickeytoken = (B7 7A 5C 56 19 34 E0 89)
-  .ver 4:0:0:0
-} 
-
 .assembly extern Microsoft.VisualBasic { } 
 
 .class public auto ansi N1.Outer
@@ -308,29 +290,17 @@ End Namespace
   }
 } // end of class N1.Outer
 "
-            Dim ilModuleInstance = GetModuleInstanceForIL(ilSource)
+            Dim ilModule = ExpressionCompilerTestHelpers.GetModuleInstanceForIL(ilSource)
+            Dim runtime = CreateRuntimeInstance(ilModule, {MscorlibRef, MsvbRef})
 
-            Dim runtimeInstance = CreateRuntimeInstance(ImmutableArray.Create(
-                ilModuleInstance,
-                MscorlibRef.ToModuleInstance(Nothing, Nothing),
-                MsvbRef.ToModuleInstance(Nothing, Nothing)))
-
-            Dim [imports] = EvaluationContext.SynthesizeImportStringsForDtee(MakeAssemblyReaders(runtimeInstance))
-            AssertEx.SetEqual([imports], "*")
+            Dim methodDebugInfo = EvaluationContext.SynthesizeMethodDebugInfoForDtee(MakeAssemblyReaders(runtime))
+            CheckDteeMethodDebugInfo(methodDebugInfo)
         End Sub
 
         <Fact>
         Public Sub FalseModule_Generic()
             ' NOTE: VB only allows non-generic module types.
             Dim ilSource = "
-.assembly 'IL' {} 
-
-.assembly extern mscorlib 
-{
-  .publickeytoken = (B7 7A 5C 56 19 34 E0 89)
-  .ver 4:0:0:0
-} 
-
 .assembly extern Microsoft.VisualBasic { } 
 
 .class public auto ansi sealed N1.M`1<T>
@@ -341,29 +311,17 @@ End Namespace
 
 } // end of class M
 "
-            Dim ilModuleInstance = GetModuleInstanceForIL(ilSource)
+            Dim ilModule = ExpressionCompilerTestHelpers.GetModuleInstanceForIL(ilSource)
+            Dim runtime = CreateRuntimeInstance(ilModule, {MscorlibRef, MsvbRef})
 
-            Dim runtimeInstance = CreateRuntimeInstance(ImmutableArray.Create(
-                ilModuleInstance,
-                MscorlibRef.ToModuleInstance(Nothing, Nothing),
-                MsvbRef.ToModuleInstance(Nothing, Nothing)))
-
-            Dim [imports] = EvaluationContext.SynthesizeImportStringsForDtee(MakeAssemblyReaders(runtimeInstance))
-            AssertEx.SetEqual([imports], "*")
+            Dim methodDebugInfo = EvaluationContext.SynthesizeMethodDebugInfoForDtee(MakeAssemblyReaders(runtime))
+            CheckDteeMethodDebugInfo(methodDebugInfo)
         End Sub
 
         <Fact>
         Public Sub FalseModule_Interface()
             ' NOTE: VB only allows non-interface module types.
             Dim ilSource = "
-.assembly 'IL' {} 
-
-.assembly extern mscorlib 
-{
-  .publickeytoken = (B7 7A 5C 56 19 34 E0 89)
-  .ver 4:0:0:0
-} 
-
 .assembly extern Microsoft.VisualBasic { } 
 
 .class interface private abstract auto ansi I
@@ -373,15 +331,11 @@ End Namespace
 
 } // end of class I
 "
-            Dim ilModuleInstance = GetModuleInstanceForIL(ilSource)
+            Dim ilModule = ExpressionCompilerTestHelpers.GetModuleInstanceForIL(ilSource)
+            Dim runtime = CreateRuntimeInstance(ilModule, {MscorlibRef, MsvbRef})
 
-            Dim runtimeInstance = CreateRuntimeInstance(ImmutableArray.Create(
-                ilModuleInstance,
-                MscorlibRef.ToModuleInstance(Nothing, Nothing),
-                MsvbRef.ToModuleInstance(Nothing, Nothing)))
-
-            Dim [imports] = EvaluationContext.SynthesizeImportStringsForDtee(MakeAssemblyReaders(runtimeInstance))
-            AssertEx.SetEqual([imports], "*")
+            Dim methodDebugInfo = EvaluationContext.SynthesizeMethodDebugInfoForDtee(MakeAssemblyReaders(runtime))
+            CheckDteeMethodDebugInfo(methodDebugInfo)
         End Sub
 
         <Fact>
@@ -414,25 +368,25 @@ Namespace N3
 End Namespace
 "
 
-            Dim dteeComp = CreateCompilationWithMscorlib({DteeEntryPointSource}, compOptions:=TestOptions.DebugDll, assemblyName:=GetUniqueName())
-            Dim dteeModuleInstance = GetModuleInstance(dteeComp)
+            Dim dteeComp = CreateCompilationWithMscorlib40({s_dteeEntryPointSource}, options:=TestOptions.DebugDll, assemblyName:=GetUniqueName())
+            Dim dteeModuleInstance = dteeComp.ToModuleInstance()
 
-            Dim comp1 = CreateCompilationWithMscorlib({source1}, {MsvbRef}, compOptions:=TestOptions.DebugDll.WithRootNamespace("root"), assemblyName:=GetUniqueName())
-            Dim compModuleInstance1 = GetModuleInstance(comp1)
+            Dim comp1 = CreateCompilationWithMscorlib40({source1}, {MsvbRef}, options:=TestOptions.DebugDll.WithRootNamespace("root"), assemblyName:=GetUniqueName())
+            Dim compModuleInstance1 = comp1.ToModuleInstance()
 
-            Dim comp2 = CreateCompilationWithMscorlib({source2}, {MsvbRef}, compOptions:=TestOptions.DebugDll.WithRootNamespace("root"), assemblyName:=GetUniqueName())
-            Dim compModuleInstance2 = GetModuleInstance(comp2)
+            Dim comp2 = CreateCompilationWithMscorlib40({source2}, {MsvbRef}, options:=TestOptions.DebugDll.WithRootNamespace("root"), assemblyName:=GetUniqueName())
+            Dim compModuleInstance2 = comp2.ToModuleInstance()
 
-            Dim runtimeInstance = CreateRuntimeInstance(ImmutableArray.Create(
+            Dim runtimeInstance = CreateRuntimeInstance({
                 dteeModuleInstance,
                 compModuleInstance1,
                 compModuleInstance2,
-                MscorlibRef.ToModuleInstance(Nothing, Nothing),
-                MsvbRef.ToModuleInstance(Nothing, Nothing)))
+                MscorlibRef.ToModuleInstance(),
+                MsvbRef.ToModuleInstance()})
             Dim lazyAssemblyReaders = MakeLazyAssemblyReaders(runtimeInstance)
 
-            Dim evalContext = CreateMethodContext(runtimeInstance, DteeEntryPointName, lazyAssemblyReaders:=lazyAssemblyReaders)
-            Dim compContext = evalContext.CreateCompilationContext(MakeDummySyntax())
+            Dim evalContext = CreateMethodContext(runtimeInstance, s_dteeEntryPointName, lazyAssemblyReaders:=lazyAssemblyReaders)
+            Dim compContext = evalContext.CreateCompilationContext(withSyntax:=True)
 
             Dim rootNamespace As NamespaceSymbol = Nothing
             Dim currentNamespace As NamespaceSymbol = Nothing
@@ -448,10 +402,6 @@ End Namespace
             AssertEx.SetEqual(typesAndNamespaces.Select(Function(tn) tn.NamespaceOrType.ToTestDisplayString()), "root", "root.N1", "root.N2", "root.N3")
         End Sub
 
-        Private Shared Function MakeDummySyntax() As Syntax.ExecutableStatementSyntax
-            Return VisualBasicSyntaxTree.ParseText("?Nothing").GetRoot().DescendantNodes().OfType(Of Syntax.ExecutableStatementSyntax)().Single()
-        End Function
-
         Private Shared Function MakeLazyAssemblyReaders(runtimeInstance As RuntimeInstance) As Lazy(Of ImmutableArray(Of AssemblyReaders))
             Return New Lazy(Of ImmutableArray(Of AssemblyReaders))(
                             Function() MakeAssemblyReaders(runtimeInstance),
@@ -461,35 +411,23 @@ End Namespace
         Private Shared Function MakeAssemblyReaders(runtimeInstance As RuntimeInstance) As ImmutableArray(Of AssemblyReaders)
             Return ImmutableArray.CreateRange(runtimeInstance.Modules.
                 Where(Function(instance) instance.SymReader IsNot Nothing).
-                Select(Function(instance) New AssemblyReaders(instance.MetadataReader, instance.SymReader)))
+                Select(Function(instance) New AssemblyReaders(instance.GetMetadataReader(), instance.SymReader)))
         End Function
 
-        Private Shared Function GetModuleInstance(comp As VisualBasicCompilation) As ModuleInstance
-            Dim makePdb = comp.Options.OptimizationLevel = OptimizationLevel.Debug
+        Private Shared Sub CheckDteeMethodDebugInfo(methodDebugInfo As MethodDebugInfo(Of TypeSymbol, LocalSymbol), ParamArray namespaceNames As String())
+            Assert.Equal("", methodDebugInfo.DefaultNamespaceName)
 
-            Dim peBytes As Byte()
-            Dim pdbBytes As Byte()
-            Using pdbStream = If(makePdb, New MemoryStream(), Nothing)
-                Using peStream As New MemoryStream()
-                    Dim emitResult = comp.Emit(peStream, pdbStream)
-                    AssertNoErrors(emitResult.Diagnostics)
-                    Assert.True(emitResult.Success)
+            Dim importRecordGroups = methodDebugInfo.ImportRecordGroups
+            Assert.Equal(2, importRecordGroups.Length)
+            Dim fileLevelImportRecords As ImmutableArray(Of ImportRecord) = importRecordGroups(0)
+            Dim projectLevelImportRecords As ImmutableArray(Of ImportRecord) = importRecordGroups(1)
 
-                    peBytes = peStream.ToArray()
-                    pdbBytes = pdbStream?.ToArray()
-                End Using
-            End Using
-            Assert.Equal(makePdb, pdbBytes IsNot Nothing)
-            Dim compRef = AssemblyMetadata.CreateFromImage(peBytes).GetReference()
-            Return compRef.ToModuleInstance(peBytes, If(makePdb, New SymReader(pdbBytes), Nothing))
-        End Function
+            Assert.Empty(fileLevelImportRecords)
 
-        Private Shared Function GetModuleInstanceForIL(ilSource As String) As ModuleInstance
-            Dim peBytes As ImmutableArray(Of Byte) = Nothing
-            Dim pdbBytes As ImmutableArray(Of Byte) = Nothing
-            EmitILToArray(ilSource, appendDefaultHeader:=False, includePdb:=True, assemblyBytes:=peBytes, pdbBytes:=pdbBytes)
-            Dim compRef = AssemblyMetadata.CreateFromImage(peBytes).GetReference()
-            Return compRef.ToModuleInstance(peBytes.ToArray(), New SymReader(pdbBytes.ToArray()))
-        End Function
+            AssertEx.All(projectLevelImportRecords, Function(record) record.TargetAssemblyAlias Is Nothing)
+            AssertEx.All(projectLevelImportRecords, Function(record) record.TargetKind = ImportTargetKind.Namespace)
+            AssertEx.All(projectLevelImportRecords, Function(record) record.Alias Is Nothing)
+            AssertEx.SetEqual(projectLevelImportRecords.Select(Function(record) record.TargetString), namespaceNames)
+        End Sub
     End Class
 End Namespace

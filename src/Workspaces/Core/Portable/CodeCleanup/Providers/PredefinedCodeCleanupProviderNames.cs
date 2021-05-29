@@ -1,10 +1,6 @@
-﻿// Copyright (c) Microsoft.  All Rights Reserved.  Licensed under the Apache License, Version 2.0.  See License.txt in the project root for license information.
-
-using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Text;
-using Microsoft.CodeAnalysis.Text;
+﻿// Licensed to the .NET Foundation under one or more agreements.
+// The .NET Foundation licenses this file to you under the MIT license.
+// See the LICENSE file in the project root for more information.
 
 namespace Microsoft.CodeAnalysis.CodeCleanup.Providers
 {
@@ -14,7 +10,7 @@ namespace Microsoft.CodeAnalysis.CodeCleanup.Providers
         public const string CaseCorrection = "CaseCorrectionCodeCleanupProvider";
         public const string AddMissingTokens = "AddMissingTokensCodeCleanupProvider";
         public const string NormalizeModifiersOrOperators = "NormalizeModifiersOrOperatorsCodeCleanupProvider";
-        public const string RemoveUnnecessaryLineContinuation = "RemoveUnnecessaryLineContinuation";
+        public const string RemoveUnnecessaryLineContinuation = nameof(RemoveUnnecessaryLineContinuation);
         public const string Format = "FormatCodeCleanupProvider";
         public const string FixIncorrectTokens = "FixIncorrectTokensCodeCleanupProvider";
         public const string ReduceTokens = "ReduceTokensCodeCleanupProvider";

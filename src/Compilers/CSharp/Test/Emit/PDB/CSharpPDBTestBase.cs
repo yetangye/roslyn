@@ -1,8 +1,14 @@
-﻿// Copyright (c) Microsoft.  All Rights Reserved.  Licensed under the Apache License, Version 2.0.  See License.txt in the project root for license information.
+﻿// Licensed to the .NET Foundation under one or more agreements.
+// The .NET Foundation licenses this file to you under the MIT license.
+// See the LICENSE file in the project root for more information.
 
+#nullable disable
+
+using System.IO;
 using System.Linq;
 using System.Xml;
 using Microsoft.CodeAnalysis.CSharp.Test.Utilities;
+using Microsoft.CodeAnalysis.Test.Utilities;
 using Microsoft.CodeAnalysis.Text;
 using Roslyn.Test.Utilities;
 using Xunit;
@@ -18,10 +24,10 @@ namespace Microsoft.CodeAnalysis.CSharp.UnitTests.PDB
             string source;
             MarkupTestFile.GetPositionAndSpan(markup, out source, out position, out expectedSpan);
 
-            var compilation = CreateCompilationWithMscorlibAndSystemCore(source, options: compilationOptions, parseOptions: parseOptions);
+            var compilation = CreateCompilationWithMscorlib40AndSystemCore(source, options: compilationOptions, parseOptions: parseOptions);
             compilation.GetDiagnostics().Where(d => d.Severity == DiagnosticSeverity.Error).Verify();
 
-            var pdb = GetPdbXml(compilation, methodName);
+            var pdb = PdbValidation.GetPdbXml(compilation, qualifiedMethodName: methodName);
             bool hasBreakpoint = CheckIfSpanWithinSequencePoints(expectedSpan.GetValueOrDefault(), source, pdb);
 
             Assert.True(hasBreakpoint);
@@ -39,8 +45,11 @@ namespace Microsoft.CodeAnalysis.CSharp.UnitTests.PDB
             var endRow = endLine.LineNumber + 1;
             var endColumn = span.End - endLine.Start + 1;
 
-            var doc = new XmlDocument();
-            doc.LoadXml(pdb);
+            var doc = new XmlDocument() { XmlResolver = null };
+            using (var reader = new XmlTextReader(new StringReader(pdb)) { DtdProcessing = DtdProcessing.Prohibit })
+            {
+                doc.Load(reader);
+            }
 
             foreach (XmlNode entry in doc.GetElementsByTagName("sequencePoints"))
             {

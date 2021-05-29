@@ -1,4 +1,6 @@
-' Copyright (c) Microsoft.  All Rights Reserved.  Licensed under the Apache License, Version 2.0.  See License.txt in the project root for license information.
+﻿' Licensed to the .NET Foundation under one or more agreements.
+' The .NET Foundation licenses this file to you under the MIT license.
+' See the LICENSE file in the project root for more information.
 
 Imports Microsoft.CodeAnalysis
 Imports Microsoft.VisualStudio.LanguageServices.Implementation.ProjectSystem
@@ -7,14 +9,14 @@ Namespace Microsoft.VisualStudio.LanguageServices.VisualBasic.ProjectSystemShim
     Friend Class EntryPointFinder
         Inherits AbstractEntryPointFinder
 
-        Private ReadOnly findFormsOnly As Boolean
+        Private ReadOnly _findFormsOnly As Boolean
 
         Public Sub New(findFormsOnly As Boolean)
-            Me.findFormsOnly = findFormsOnly
+            Me._findFormsOnly = findFormsOnly
         End Sub
 
         Protected Overrides Function MatchesMainMethodName(name As String) As Boolean
-            If findFormsOnly Then
+            If _findFormsOnly Then
                 Return False
             End If
 

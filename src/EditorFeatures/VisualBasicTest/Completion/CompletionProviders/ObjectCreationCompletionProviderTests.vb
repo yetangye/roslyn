@@ -1,19 +1,20 @@
-' Copyright (c) Microsoft.  All Rights Reserved.  Licensed under the Apache License, Version 2.0.  See License.txt in the project root for license information.
+﻿' Licensed to the .NET Foundation under one or more agreements.
+' The .NET Foundation licenses this file to you under the MIT license.
+' See the LICENSE file in the project root for more information.
 
-Imports Microsoft.CodeAnalysis.Completion.Providers
 Imports Microsoft.CodeAnalysis.VisualBasic.Completion.Providers
 
 Namespace Microsoft.CodeAnalysis.Editor.VisualBasic.UnitTests.Completion.CompletionProviders
     Public Class ObjectCreationCompletionProviderTests
         Inherits AbstractVisualBasicCompletionProviderTests
 
-        Friend Overrides Function CreateCompletionProvider() As ICompletionProvider
-            Return New ObjectCreationCompletionProvider()
+        Friend Overrides Function GetCompletionProviderType() As Type
+            Return GetType(ObjectCreationCompletionProvider)
         End Function
 
         <Fact, Trait(Traits.Feature, Traits.Features.Completion)>
-        <WorkItem(827897)>
-        Public Sub InYieldReturn()
+        <WorkItem(827897, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/827897")>
+        Public Async Function TestInYieldReturn() As Task
             Dim markup = <Text><![CDATA[
 Imports System
 Imports System.Collections.Generic
@@ -25,12 +26,12 @@ Class C
 End Class
 ]]></Text>.Value
 
-            VerifyItemExists(markup, "EntryPointNotFoundException")
-        End Sub
+            Await VerifyItemExistsAsync(markup, "EntryPointNotFoundException")
+        End Function
 
         <Fact, Trait(Traits.Feature, Traits.Features.Completion)>
-        <WorkItem(827897)>
-        Public Sub InAsyncMethodReturnStatement()
+        <WorkItem(827897, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/827897")>
+        Public Async Function TestInAsyncMethodReturnStatement() As Task
             Dim markup = <Text><![CDATA[
 Imports System
 Imports System.Threading.Tasks
@@ -43,12 +44,12 @@ Class C
 End Class
 ]]></Text>.Value
 
-            VerifyItemExists(markup, "EntryPointNotFoundException")
-        End Sub
+            Await VerifyItemExistsAsync(markup, "EntryPointNotFoundException")
+        End Function
 
         <Fact, Trait(Traits.Feature, Traits.Features.Completion)>
-        <WorkItem(892209)>
-        Public Sub UnwrapNullable()
+        <WorkItem(892209, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/892209")>
+        Public Async Function TestUnwrapNullable() As Task
             Dim markup = <Text><![CDATA[
 Public Class C
   Sub M1(arg As N.S?)
@@ -68,11 +69,11 @@ End Namespace
 
 ]]></Text>.Value
 
-            VerifyItemExists(markup, "N.S")
-        End Sub
+            Await VerifyItemExistsAsync(markup, "N.S")
+        End Function
 
         <Fact, Trait(Traits.Feature, Traits.Features.Completion)>
-        Public Sub NotInTrivia()
+        Public Async Function TestNotInTrivia() As Task
             Dim markup = <Text><![CDATA[
 Public Class C
   Sub M1(arg As N.S?)
@@ -92,7 +93,100 @@ End Namespace
 
 ]]></Text>.Value
 
-            VerifyItemExists(markup, "N.S")
+            Await VerifyItemExistsAsync(markup, "N.S")
+        End Function
+
+        <Fact, Trait(Traits.Feature, Traits.Features.Completion)>
+        <WorkItem(2644, "https://github.com/dotnet/roslyn/issues/2644")>
+        Public Async Function InPropertyWithSameNameAsGenericTypeArgument1() As Task
+            Dim markup = <Text><![CDATA[
+Imports System.Collections.Generic
+Namespace Namespace1
+    Module Program
+        Public Bar As List(Of Bar)
+
+        Sub Main()
+            Bar = New $$
         End Sub
+    End Module
+
+    Class Bar
+    End Class
+End Namespace
+]]></Text>.Value
+
+            Await VerifyItemExistsAsync(markup, "List(Of Bar)")
+        End Function
+
+        <Fact, Trait(Traits.Feature, Traits.Features.Completion)>
+        <WorkItem(2644, "https://github.com/dotnet/roslyn/issues/2644")>
+        Public Async Function InPropertyWithSameNameAsGenericTypeArgument2() As Task
+            Dim markup = <Text><![CDATA[
+Imports System.Collections.Generic
+Namespace Namespace1
+    Module Program
+        Public Bar As List(Of Bar) = New $$
+    End Module
+
+    Class Bar
+    End Class
+End Namespace
+]]></Text>.Value
+
+            Await VerifyItemExistsAsync(markup, "List(Of Bar)")
+        End Function
+
+        <Fact, Trait(Traits.Feature, Traits.Features.Completion)>
+        <WorkItem(2644, "https://github.com/dotnet/roslyn/issues/2644")>
+        Public Async Function InPropertyWithSameNameAsGenericTypeArgument3() As Task
+            Dim markup = <Text><![CDATA[
+Namespace Namespace1
+    Module Program
+        Public A As C(Of B)
+        Public B As C(Of A)
+
+        Sub M()
+            A = New $$
+        End Sub
+    End Module
+
+    Class A
+    End Class
+
+    Class B
+    End Class
+
+    Class C(Of T)
+    End Class
+End Namespace
+]]></Text>.Value
+
+            Await VerifyItemExistsAsync(markup, "C(Of B)")
+        End Function
+
+        <Fact, Trait(Traits.Feature, Traits.Features.Completion)>
+        <WorkItem(21674, "https://github.com/dotnet/roslyn/issues/21674")>
+        Public Async Function PropertyWithSameNameAsOtherType() As Task
+            Dim markup = <Text><![CDATA[
+Namespace Namespace1
+    Module Program
+        Public Property A() As B
+        Public Property B() As A
+
+        Sub M()
+            B = New $$
+        End Sub
+    End Module
+
+    Class A
+    End Class
+
+    Class B
+    End Class
+End Namespace
+]]></Text>.Value
+
+            Await VerifyItemExistsAsync(markup, "A")
+        End Function
     End Class
 End Namespace

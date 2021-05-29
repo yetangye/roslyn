@@ -1,7 +1,8 @@
-﻿' Copyright (c) Microsoft.  All Rights Reserved.  Licensed under the Apache License, Version 2.0.  See License.txt in the project root for license information.
+﻿' Licensed to the .NET Foundation under one or more agreements.
+' The .NET Foundation licenses this file to you under the MIT license.
+' See the LICENSE file in the project root for more information.
 
 Imports System.Threading
-Imports Microsoft.CodeAnalysis
 Imports Microsoft.CodeAnalysis.CodeGeneration
 Imports Microsoft.CodeAnalysis.CodeGeneration.CodeGenerationHelpers
 Imports Microsoft.CodeAnalysis.VisualBasic.Syntax
@@ -14,10 +15,11 @@ Namespace Microsoft.CodeAnalysis.VisualBasic.CodeGeneration
                                     destination As CompilationUnitSyntax,
                                     [namespace] As INamespaceSymbol,
                                     options As CodeGenerationOptions,
-                                    availableIndices As IList(Of Boolean)) As CompilationUnitSyntax
-            Dim declaration = GenerateNamespaceDeclaration(service, [namespace], options)
+                                    availableIndices As IList(Of Boolean),
+                                    cancellationToken As CancellationToken) As CompilationUnitSyntax
+            Dim declaration = GenerateNamespaceDeclaration(service, [namespace], options, cancellationToken)
             If Not TypeOf declaration Is NamespaceBlockSyntax Then
-                Throw New ArgumentException(VBWorkspaceResources.NamespaceCannotBeAdded)
+                Throw New ArgumentException(VBWorkspaceResources.Namespace_can_not_be_added_in_this_destination)
             End If
 
             Dim members = Insert(destination.Members, DirectCast(declaration, StatementSyntax), options, availableIndices)
@@ -28,17 +30,18 @@ Namespace Microsoft.CodeAnalysis.VisualBasic.CodeGeneration
                                     destination As NamespaceBlockSyntax,
                                     [namespace] As INamespaceSymbol,
                                     options As CodeGenerationOptions,
-                                    availableIndices As IList(Of Boolean)) As NamespaceBlockSyntax
-            Dim declaration = GenerateNamespaceDeclaration(service, [namespace], options)
+                                    availableIndices As IList(Of Boolean),
+                                    cancellationToken As CancellationToken) As NamespaceBlockSyntax
+            Dim declaration = GenerateNamespaceDeclaration(service, [namespace], options, cancellationToken)
             If Not TypeOf declaration Is NamespaceBlockSyntax Then
-                Throw New ArgumentException(VBWorkspaceResources.NamespaceCannotBeAdded)
+                Throw New ArgumentException(VBWorkspaceResources.Namespace_can_not_be_added_in_this_destination)
             End If
 
             Dim members = Insert(destination.Members, DirectCast(declaration, StatementSyntax), options, availableIndices)
             Return destination.WithMembers(members)
         End Function
 
-        Public Function GenerateNamespaceDeclaration(service As ICodeGenerationService, [namespace] As INamespaceSymbol, options As CodeGenerationOptions) As SyntaxNode
+        Public Function GenerateNamespaceDeclaration(service As ICodeGenerationService, [namespace] As INamespaceSymbol, options As CodeGenerationOptions, cancellationToken As CancellationToken) As SyntaxNode
             Dim name As String = Nothing
             Dim innermostNamespace As INamespaceSymbol = Nothing
             options = If(options, CodeGenerationOptions.Default)
@@ -47,10 +50,10 @@ Namespace Microsoft.CodeAnalysis.VisualBasic.CodeGeneration
             Dim declaration = GetDeclarationSyntaxWithoutMembers([namespace], innermostNamespace, name, options)
 
             declaration = If(options.GenerateMembers,
-                service.AddMembers(declaration, innermostNamespace.GetMembers().AsEnumerable(), options),
+                service.AddMembers(declaration, innermostNamespace.GetMembers().AsEnumerable(), options, cancellationToken),
                 declaration)
 
-            Return AddCleanupAnnotationsTo(declaration)
+            Return AddFormatterAndCodeGeneratorAnnotationsTo(declaration)
         End Function
 
         Public Function UpdateCompilationUnitOrNamespaceDeclaration(service As ICodeGenerationService,
@@ -60,7 +63,7 @@ Namespace Microsoft.CodeAnalysis.VisualBasic.CodeGeneration
                                                                            cancellationToken As CancellationToken) As SyntaxNode
             declaration = RemoveAllMembers(declaration)
             declaration = service.AddMembers(declaration, newMembers, options, cancellationToken)
-            Return AddCleanupAnnotationsTo(declaration)
+            Return AddFormatterAndCodeGeneratorAnnotationsTo(declaration)
         End Function
 
         Private Function GetDeclarationSyntaxWithoutMembers([namespace] As INamespaceSymbol, innermostNamespace As INamespaceSymbol, name As String, options As CodeGenerationOptions) As SyntaxNode

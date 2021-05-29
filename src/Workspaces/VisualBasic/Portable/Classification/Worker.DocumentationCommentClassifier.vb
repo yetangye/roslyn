@@ -1,4 +1,6 @@
-﻿' Copyright (c) Microsoft.  All Rights Reserved.  Licensed under the Apache License, Version 2.0.  See License.txt in the project root for license information.
+﻿' Licensed to the .NET Foundation under one or more agreements.
+' The .NET Foundation licenses this file to you under the MIT license.
+' See the LICENSE file in the project root for more information.
 
 Imports Microsoft.CodeAnalysis.Classification
 Imports Microsoft.CodeAnalysis.Text
@@ -7,9 +9,9 @@ Imports Microsoft.CodeAnalysis.VisualBasic.Syntax
 Namespace Microsoft.CodeAnalysis.VisualBasic.Classification
     Partial Friend Class Worker
         Private Class DocumentationCommentClassifier
-            Private _worker As Worker
+            Private ReadOnly _worker As Worker
 
-            Sub New(worker As Worker)
+            Public Sub New(worker As Worker)
                 _worker = worker
             End Sub
 

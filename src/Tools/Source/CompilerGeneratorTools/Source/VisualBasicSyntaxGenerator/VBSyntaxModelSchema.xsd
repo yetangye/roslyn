@@ -1,5 +1,5 @@
 ﻿<?xml version="1.0" encoding="utf-8"?>
-<!-- Copyright (c)  Microsoft.  All Rights Reserved.  Licensed under the Apache License, Version 2.0.  See License.txt in the project root for license information. -->
+<!-- Licensed to the .NET Foundation under one or more agreements. The .NET Foundation licenses this file to you under the MIT license. See the LICENSE file in the project root for more information. -->
 
 <!-- XML Schema for Parse Tree definition files. This file defines the allowable schema for 
 the definition of VB parse tree nodes. -->
@@ -81,7 +81,7 @@ the definition of VB parse tree nodes. -->
                       <!-- A spec-section element defines the cross-reference to the language spec. -->
                       <xs:element minOccurs="0" maxOccurs="unbounded" name="spec-section" type="xs:string" />
 
-                      <!-- A grammar element defins the grammar non-terminal -->
+                      <!-- A grammar element defines the grammar non-terminal -->
                       <xs:element minOccurs="0" maxOccurs="unbounded" name="grammar" type="xs:string" />
 
                       <!-- A node-kind defines an element of the NodeKind enumeration that refers to this node.
@@ -242,7 +242,7 @@ the definition of VB parse tree nodes. -->
                       <xs:element name="enumerators">
                         <xs:complexType>
                           <xs:sequence>
-                            <!-- enumerator defins one enumeration in an enumeration
+                            <!-- enumerator defines one enumeration in an enumeration
                             Attributes:
                               name - name of the enumerator [required]
                               hexvalue - hex value of the enumerator [optional]

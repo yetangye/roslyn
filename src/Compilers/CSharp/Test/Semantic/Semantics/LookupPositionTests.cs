@@ -1,12 +1,16 @@
-﻿// Copyright (c) Microsoft.  All Rights Reserved.  Licensed under the Apache License, Version 2.0.  See License.txt in the project root for license information.
+﻿// Licensed to the .NET Foundation under one or more agreements.
+// The .NET Foundation licenses this file to you under the MIT license.
+// See the LICENSE file in the project root for more information.
+
+#nullable disable
 
 using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Text;
-using Microsoft.CodeAnalysis.CSharp.Symbols;
-using Microsoft.CodeAnalysis.CSharp.Syntax;
-using Microsoft.CodeAnalysis.Text;
+using Microsoft.CodeAnalysis.CSharp.Test.Utilities;
+using Microsoft.CodeAnalysis.PooledObjects;
+using Microsoft.CodeAnalysis.Test.Utilities;
 using Roslyn.Test.Utilities;
 using Xunit;
 
@@ -19,6 +23,121 @@ namespace Microsoft.CodeAnalysis.CSharp.UnitTests
     public class LookupPositionTests : CompilingTestBase
     {
         private const char KeyPositionMarker = '`';
+
+        [Fact]
+        public void PositionalRecord1()
+        {
+            var text = @"
+record C(int x, int y)
+`{
+`}";
+            var expectedNames = MakeExpectedSymbols(
+                Add( // Global
+                    "System",
+                    "Microsoft",
+                    "C"),
+                Add( // Members
+                    "System.Boolean C.Equals(C? other)",
+                    "System.Boolean C.Equals(System.Object? obj)",
+                    "System.Boolean C." + WellKnownMemberNames.PrintMembersMethodName + "(System.Text.StringBuilder builder)",
+                    "System.Boolean System.Object.Equals(System.Object obj)",
+                    "System.Boolean System.Object.Equals(System.Object objA, System.Object objB)",
+                    "System.Boolean System.Object.ReferenceEquals(System.Object objA, System.Object objB)",
+                    "System.Int32 C.GetHashCode()",
+                    "System.Int32 C.x { get; init; }",
+                    "System.Int32 C.y { get; init; }",
+                    "System.Int32 System.Object.GetHashCode()",
+                    "System.Object System.Object.MemberwiseClone()",
+                    "System.String C.ToString()",
+                    "System.String System.Object.ToString()",
+                    "System.Type C.EqualityContract { get; }",
+                    "System.Type System.Object.GetType()",
+                    "void C.Deconstruct(out System.Int32 x, out System.Int32 y)",
+                    "void System.Object.Finalize()"),
+                s_pop
+            );
+
+            TestLookupNames(text, expectedNames);
+        }
+
+        [Fact]
+        public void PositionalRecord2()
+        {
+            var text = @"
+`record C`<T`>(int x, T t = default(T));";
+            var expectedNames = MakeExpectedSymbols(
+                Add( // Global
+                    "System",
+                    "Microsoft",
+                    "C<T>"),
+                Add( // C Type parameters
+                    "T"),
+                Add( // Members
+                    "System.Int32 C<T>.x { get; init; }",
+                    "T C<T>.t { get; init; }",
+                    "System.Boolean C<T>.Equals(C<T>? other)",
+                    "System.Boolean C<T>.Equals(System.Object? obj)",
+                    "System.Boolean C<T>." + WellKnownMemberNames.PrintMembersMethodName + "(System.Text.StringBuilder builder)",
+                    "System.Boolean System.Object.Equals(System.Object obj)",
+                    "System.Boolean System.Object.Equals(System.Object objA, System.Object objB)",
+                    "System.Boolean System.Object.ReferenceEquals(System.Object objA, System.Object objB)",
+                    "System.Int32 C<T>.GetHashCode()",
+                    "System.Int32 System.Object.GetHashCode()",
+                    "System.Object System.Object.MemberwiseClone()",
+                    "void C<T>.Deconstruct(out System.Int32 x, out T t)",
+                    "void System.Object.Finalize()",
+                    "System.String C<T>.ToString()",
+                    "System.String System.Object.ToString()",
+                    "System.Type C<T>.EqualityContract { get; }",
+                    "System.Type System.Object.GetType()"),
+                s_pop
+                );
+
+            TestLookupNames(text, expectedNames);
+        }
+
+        [Fact]
+        public void NominalRecord()
+        {
+            var text = @"
+`record C`<T`>
+`{
+    int x { get; }
+    T t { get; }
+`}";
+            var members = new[] {
+                "System.Int32 C<T>.x { get; }",
+                "T C<T>.t { get; }",
+                "System.Boolean C<T>.Equals(C<T>? other)",
+                "System.Boolean C<T>.Equals(System.Object? obj)",
+                "System.Boolean C<T>." + WellKnownMemberNames.PrintMembersMethodName + "(System.Text.StringBuilder builder)",
+                "System.Boolean System.Object.Equals(System.Object obj)",
+                "System.Boolean System.Object.Equals(System.Object objA, System.Object objB)",
+                "System.Boolean System.Object.ReferenceEquals(System.Object objA, System.Object objB)",
+                "System.Int32 C<T>.GetHashCode()",
+                "System.Int32 System.Object.GetHashCode()",
+                "System.Object System.Object.MemberwiseClone()",
+                "System.String C<T>.ToString()",
+                "void System.Object.Finalize()",
+                "System.String System.Object.ToString()",
+                "System.Type C<T>.EqualityContract { get; }",
+                "System.Type System.Object.GetType()",
+            };
+            var expectedNames = MakeExpectedSymbols(
+                Add( // Global
+                    "System",
+                    "Microsoft",
+                    "C<T>"),
+                Add( // C decl
+                    "T"),
+                Add(members), // members are visible in type parameter list
+                s_pop,
+                Add(members), // body
+                Combine(s_pop, s_pop) // remove members and type parameters
+                );
+
+            TestLookupNames(text, expectedNames);
+        }
 
         [Fact]
         public void ExpressionBodiedProp()
@@ -47,7 +166,7 @@ class C
                     "System.Type System.Object.GetType()"),
                 s_pop);
 
-            TestLookupNames(text, expectedNames, experimental: true);
+            TestLookupNames(text, expectedNames);
         }
 
         [Fact]
@@ -331,7 +450,7 @@ class C
                 "System.TypeCode System.Enum.GetTypeCode()",
             };
 
-        [Fact, WorkItem(545556, "DevDiv")]
+        [Fact, WorkItem(545556, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/545556")]
         public void TestAssortedMembers()
         {
             var text = @"
@@ -439,8 +558,6 @@ public abstract `class C`<T`> : NS.I
                     "System.Boolean System.Object.Equals(System.Object objA, System.Object objB)",
                     "System.Boolean System.Object.ReferenceEquals(System.Object objA, System.Object objB)",
                     "System.Int32 System.Object.GetHashCode()",
-                    "System.Object System.Object.MemberwiseClone()",
-                    "void System.Object.Finalize()",
                     "System.String System.Object.ToString()",
                     "System.Type System.Object.GetType()"),
                 s_pop, //NS.I
@@ -700,13 +817,13 @@ class C
             var text = @"
 class C
 `{
-    System.Func<int, int> f1 = `x => x`;
-    System.Func<int, int> f2 = `x => `{ int y; return x; `};
+    System.Func<int, int> f1 = x `=> x`;
+    System.Func<int, int> f2 = x `=> `{ int y; return x; `};
 
     void M()
     `{
-        System.Func<int, int> g1 = `x => x`;
-        System.Func<int, int> g2 = `x => `{ int y; return x; `};
+        System.Func<int, int> g1 = x `=> x`;
+        System.Func<int, int> g2 = x `=> `{ int y; return x; `};
     `}
 `}
 ";
@@ -750,13 +867,13 @@ class C
             var text = @"
 class C
 `{
-    System.Func<int, System.Func<int, int>> f1 = `x => `y => x + y`;
-    System.Func<int, System.Func<int, int>> f2 = `x => `{ int y; `{int z; return `a => x`; `} `};
+    System.Func<int, System.Func<int, int>> f1 = x `=> y `=> x + y`;
+    System.Func<int, System.Func<int, int>> f2 = x `=> `{ int y; `{int z; return a `=> x`; `} `};
 
     void M()
     `{
-        System.Func<int, System.Func<int, int>> g1 = `x => `y => x + y`;
-        System.Func<int, System.Func<int, int>> g2 = `x => `{ int y; `{int z; return `a => x`; `} `};
+        System.Func<int, System.Func<int, int>> g1 = x `=> y `=> x + y`;
+        System.Func<int, System.Func<int, int>> g2 = x `=> `{ int y; `{int z; return a `=> x`; `} `};
     `}
 `}
 ";
@@ -806,7 +923,7 @@ class C
             TestLookupNames(text, expectedNames);
         }
 
-        [WorkItem(540633, "DevDiv")]
+        [WorkItem(540633, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/540633")]
         [Fact]
         public void TestConstructorInitializers()
         {
@@ -857,7 +974,7 @@ class D : C
             TestLookupNames(text, expectedNames);
         }
 
-        [WorkItem(540888, "DevDiv")]
+        [WorkItem(540888, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/540888")]
         [Fact]
         public void TestLambdaInConstructorInitializer()
         {
@@ -865,9 +982,9 @@ class D : C
 class C
 `{
     public C(System.Func<int, int> x) `{ `}
-    public C() : this(`a => a`) 
+    public C() : this(a `=> a`) 
     {
-        M(`b => b`); 
+        M(b `=> b`); 
     }
 
     private void M(System.Func<int, int> f) `{ `}
@@ -899,7 +1016,7 @@ class C
             TestLookupNames(text, expectedNames);
         }
 
-        [WorkItem(540890, "DevDiv")]
+        [WorkItem(540890, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/540890")]
         [Fact]
         public void TestLambdaAtEof()
         {
@@ -909,7 +1026,7 @@ class C
     private void M(System.Func<int, int> f) `{ `}
     public C()
     {
-        M(`b =>
+        M(b `=>
 ";
 
             var expectedNames = MakeExpectedSymbols(
@@ -934,7 +1051,7 @@ class C
             TestLookupNames(text, expectedNames);
         }
 
-        [WorkItem(540890, "DevDiv")]
+        [WorkItem(540890, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/540890")]
         [Fact]
         public void TestLambdaWithMissingBody()
         {
@@ -944,7 +1061,7 @@ class C
     private void M(System.Func<int, int> f) `{ `}
     public C()
     {
-        M(`b => `);
+        M(b `=> `);
     }
 `}
 ";
@@ -972,7 +1089,7 @@ class C
             TestLookupNames(text, expectedNames);
         }
 
-        [WorkItem(540890, "DevDiv")]
+        [WorkItem(540890, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/540890")]
         [Fact]
         public void TestIncompleteConstructorParameters1()
         {
@@ -1001,7 +1118,7 @@ class C
             TestLookupNames(text, expectedNames);
         }
 
-        [WorkItem(540890, "DevDiv")]
+        [WorkItem(540890, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/540890")]
         [Fact]
         public void TestIncompleteConstructorParameters2()
         {
@@ -1031,7 +1148,7 @@ class C
             TestLookupNames(text, expectedNames);
         }
 
-        [WorkItem(540890, "DevDiv")]
+        [WorkItem(540890, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/540890")]
         [Fact]
         public void TestIncompleteConstructorParameters3()
         {
@@ -1061,7 +1178,7 @@ class C
             TestLookupNames(text, expectedNames);
         }
 
-        [WorkItem(540890, "DevDiv")]
+        [WorkItem(540890, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/540890")]
         [Fact]
         public void TestIncompleteConstructorParameters4()
         {
@@ -1091,7 +1208,7 @@ class C
             TestLookupNames(text, expectedNames);
         }
 
-        [WorkItem(542360, "DevDiv")]
+        [WorkItem(542360, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/542360")]
         [Fact]
         public void TestMethodParameterAndTypeParameterScope()
         {
@@ -1128,7 +1245,49 @@ class C
             TestLookupNames(text, expectedNames);
         }
 
-        [WorkItem(529406, "DevDiv")]
+        [Fact]
+        [WorkItem(16801, "https://github.com/dotnet/roslyn/issues/16801")]
+        public void TestLocalFunctionParameterAndTypeParameterScope()
+        {
+            var text = @"
+class C
+`{
+    void Test()
+    `{
+        `void `M`<T>(int x) `{ `}
+    `}
+`}
+";
+
+            var expectedNames = MakeExpectedSymbols(
+                Add( //Global
+                    "C",
+                    "System",
+                    "Microsoft"),
+                Add( //C
+                    "void C.Test()",
+                    "System.Boolean System.Object.Equals(System.Object obj)",
+                    "System.Boolean System.Object.Equals(System.Object objA, System.Object objB)",
+                    "System.Boolean System.Object.ReferenceEquals(System.Object objA, System.Object objB)",
+                    "System.Int32 System.Object.GetHashCode()",
+                    "System.Object System.Object.MemberwiseClone()",
+                    "void System.Object.Finalize()",
+                    "System.String System.Object.ToString()",
+                    "System.Type System.Object.GetType()"),
+                Add("void M<T>(System.Int32 x)"), // Test body
+                Add("T"), //M<T>(int) return type
+                s_pop, //M<T>(int) name
+                Add("T"), //M<T>(int) between name and body
+                Add("System.Int32 x"), //M<T>(int) body
+                Combine(s_pop, s_pop), //M<T>(int) after body
+                s_pop, // Test body
+                s_pop //C
+            );
+
+            TestLookupNames(text, expectedNames);
+        }
+
+        [WorkItem(529406, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/529406")]
         [Fact]
         public void TestLeftToRightDeclarators()
         {
@@ -1188,7 +1347,7 @@ unsafe class C
             TestLookupNames(text, expectedNames);
         }
 
-        [WorkItem(782871, "DevDiv")]
+        [WorkItem(782871, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/782871")]
         [Fact]
         public void NestedForEachLoops()
         {
@@ -1233,7 +1392,7 @@ class C
             TestLookupNames(text, expectedNames);
         }
 
-        [WorkItem(782871, "DevDiv")]
+        [WorkItem(782871, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/782871")]
         [Fact]
         public void NestedForEachLoops_Embedded()
         {
@@ -1273,7 +1432,7 @@ class C
             TestLookupNames(text, expectedNames);
         }
 
-        [WorkItem(782871, "DevDiv")]
+        [WorkItem(782871, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/782871")]
         [Fact]
         public void NestedForLoops_Embedded()
         {
@@ -1314,7 +1473,7 @@ class C
             TestLookupNames(text, expectedNames);
         }
 
-        [WorkItem(782871, "DevDiv")]
+        [WorkItem(782871, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/782871")]
         [Fact]
         public void NestedFixedStatements_Embedded()
         {
@@ -1355,7 +1514,7 @@ unsafe class C
             TestLookupNames(text, expectedNames);
         }
 
-        [WorkItem(782871, "DevDiv")]
+        [WorkItem(782871, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/782871")]
         [Fact]
         public void NestedUsingStatements_Embedded()
         {
@@ -1416,16 +1575,44 @@ label1:
 }
 ";
 
-            var compilation = CreateCompilationWithMscorlib(source, references: new[] { LinqAssemblyRef });
+            var compilation = CreateCompilation(source);
 
             var tree = compilation.SyntaxTrees.Single();
             var model = (Microsoft.CodeAnalysis.SemanticModel)(compilation.GetSemanticModel(tree));
-            var symbols = model.LookupLabels(source.ToString().IndexOf("label1;"));
+            var symbols = model.LookupLabels(source.ToString().IndexOf("label1;", StringComparison.Ordinal));
             Assert.True(symbols.IsEmpty);
         }
 
-        [WorkItem(586815, "DevDiv")]
-        [WorkItem(598371, "DevDiv")]
+        [Fact]
+        public void GotoLabelShouldNotHaveColon()
+        {
+            var source = @"
+class Program
+{
+    static void M(object o)
+    {
+        switch (o)
+        {
+            case int i:
+                goto HERE;
+            default:
+@default:
+label1:
+                break;
+        }
+    }
+}
+";
+
+            var compilation = CreateCompilation(source);
+            var tree = compilation.SyntaxTrees.Single();
+            var model = compilation.GetSemanticModel(tree);
+            var symbols = model.LookupLabels(source.ToString().IndexOf("HERE", StringComparison.Ordinal));
+            AssertEx.SetEqual(new[] { "default", "case int i:", "label1" }, symbols.Select(s => s.ToTestDisplayString()));
+        }
+
+        [WorkItem(586815, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/586815")]
+        [WorkItem(598371, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/598371")]
         [Fact]
         public void Cref()
         {
@@ -1514,6 +1701,519 @@ class Derived : Base<int>
             TestLookupNames(text, expectedNames);
         }
 
+        [Fact]
+        public void RecordBaseArguments_01()
+        {
+            var text = @"
+record C(int X) : Base`(X`)
+`{
+`}
+";
+            var expectedNames = MakeExpectedSymbols(
+                Add( // Global
+                    "System",
+                    "Microsoft",
+                    "C"),
+                Add( // Members + parameters
+                    "System.Boolean C.Equals(Base? other)",
+                    "System.Boolean C.Equals(C? other)",
+                    "System.Boolean C.Equals(System.Object? obj)",
+                    "System.Boolean C." + WellKnownMemberNames.PrintMembersMethodName + "(System.Text.StringBuilder builder)",
+                    "System.Boolean System.Object.Equals(System.Object obj)",
+                    "System.Boolean System.Object.Equals(System.Object objA, System.Object objB)",
+                    "System.Boolean System.Object.ReferenceEquals(System.Object objA, System.Object objB)",
+                    "System.Int32 C.GetHashCode()",
+                    "System.Int32 System.Object.GetHashCode()",
+                    "System.Int32 X",
+                    "System.Object System.Object.MemberwiseClone()",
+                    "System.String C.ToString()",
+                    "System.String System.Object.ToString()",
+                    "System.Type C.EqualityContract { get; }",
+                    "System.Type System.Object.GetType()",
+                    "void C.Deconstruct(out System.Int32 X)",
+                    "void System.Object.Finalize()"),
+                s_pop,
+                Add( // Members
+                    "System.Boolean C.Equals(Base? other)",
+                    "System.Boolean C.Equals(C? other)",
+                    "System.Boolean C.Equals(System.Object? obj)",
+                    "System.Boolean C." + WellKnownMemberNames.PrintMembersMethodName + "(System.Text.StringBuilder builder)",
+                    "System.Boolean System.Object.Equals(System.Object obj)",
+                    "System.Boolean System.Object.Equals(System.Object objA, System.Object objB)",
+                    "System.Boolean System.Object.ReferenceEquals(System.Object objA, System.Object objB)",
+                    "System.Int32 C.GetHashCode()",
+                    "System.Int32 C.X { get; init; }",
+                    "System.Int32 System.Object.GetHashCode()",
+                    "System.Object System.Object.MemberwiseClone()",
+                    "System.String C.ToString()",
+                    "System.String System.Object.ToString()",
+                    "System.Type C.EqualityContract { get; }",
+                    "System.Type System.Object.GetType()",
+                    "void C.Deconstruct(out System.Int32 X)",
+                    "void System.Object.Finalize()"),
+                s_pop
+            );
+
+            TestLookupNames(text, expectedNames);
+        }
+
+        [Fact]
+        public void RecordBaseArguments_02()
+        {
+            var text = @"
+record C : Base(X)
+`{
+`}
+";
+            var expectedNames = MakeExpectedSymbols(
+                Add( // Global
+                    "System",
+                    "Microsoft",
+                    "C"),
+                Add( // Members
+                    "System.Boolean C.Equals(Base? other)",
+                    "System.Boolean C.Equals(C? other)",
+                    "System.Boolean C.Equals(System.Object? obj)",
+                    "System.Boolean C." + WellKnownMemberNames.PrintMembersMethodName + "(System.Text.StringBuilder builder)",
+                    "System.Boolean System.Object.Equals(System.Object obj)",
+                    "System.Boolean System.Object.Equals(System.Object objA, System.Object objB)",
+                    "System.Boolean System.Object.ReferenceEquals(System.Object objA, System.Object objB)",
+                    "System.Int32 C.GetHashCode()",
+                    "System.Int32 System.Object.GetHashCode()",
+                    "System.Object System.Object.MemberwiseClone()",
+                    "System.String C.ToString()",
+                    "System.String System.Object.ToString()",
+                    "System.Type C.EqualityContract { get; }",
+                    "System.Type System.Object.GetType()",
+                    "void System.Object.Finalize()"),
+                s_pop
+            );
+
+            TestLookupNames(text, expectedNames);
+        }
+
+        [Fact]
+        public void RecordBaseArguments_03()
+        {
+            var text = @"
+partial record C(int X)
+`{
+`}
+
+partial record C : Base(X, Y)
+`{
+`}
+";
+            var expectedNames = MakeExpectedSymbols(
+                Add( // Global
+                    "System",
+                    "Microsoft",
+                    "C"),
+                Add( // Members
+                    "System.Boolean C.Equals(Base? other)",
+                    "System.Boolean C.Equals(C? other)",
+                    "System.Boolean C.Equals(System.Object? obj)",
+                    "System.Boolean C." + WellKnownMemberNames.PrintMembersMethodName + "(System.Text.StringBuilder builder)",
+                    "System.Boolean System.Object.Equals(System.Object obj)",
+                    "System.Boolean System.Object.Equals(System.Object objA, System.Object objB)",
+                    "System.Boolean System.Object.ReferenceEquals(System.Object objA, System.Object objB)",
+                    "System.Int32 C.GetHashCode()",
+                    "System.Int32 C.X { get; init; }",
+                    "System.Int32 System.Object.GetHashCode()",
+                    "System.Object System.Object.MemberwiseClone()",
+                    "System.String C.ToString()",
+                    "System.String System.Object.ToString()",
+                    "System.Type C.EqualityContract { get; }",
+                    "System.Type System.Object.GetType()",
+                    "void C.Deconstruct(out System.Int32 X)",
+                    "void System.Object.Finalize()"),
+                s_pop,
+                Add( // Members
+                    "System.Boolean C.Equals(Base? other)",
+                    "System.Boolean C.Equals(C? other)",
+                    "System.Boolean C.Equals(System.Object? obj)",
+                    "System.Boolean C." + WellKnownMemberNames.PrintMembersMethodName + "(System.Text.StringBuilder builder)",
+                    "System.Boolean System.Object.Equals(System.Object obj)",
+                    "System.Boolean System.Object.Equals(System.Object objA, System.Object objB)",
+                    "System.Boolean System.Object.ReferenceEquals(System.Object objA, System.Object objB)",
+                    "System.Int32 C.GetHashCode()",
+                    "System.Int32 C.X { get; init; }",
+                    "System.Int32 System.Object.GetHashCode()",
+                    "System.Object System.Object.MemberwiseClone()",
+                    "System.String C.ToString()",
+                    "System.String System.Object.ToString()",
+                    "System.Type C.EqualityContract { get; }",
+                    "System.Type System.Object.GetType()",
+                    "void C.Deconstruct(out System.Int32 X)",
+                    "void System.Object.Finalize()"),
+                s_pop
+
+            );
+
+            TestLookupNames(text, expectedNames);
+        }
+
+        [Fact]
+        public void RecordBaseArguments_04()
+        {
+            var text = @"
+partial record C(int X) : Base`(X`)
+`{
+`}
+
+partial record C : Base(X)
+`{
+`}
+";
+            var expectedNames = MakeExpectedSymbols(
+                Add( // Global
+                    "System",
+                    "Microsoft",
+                    "C"),
+                Add( // Members + parameters
+                    "System.Boolean C.Equals(Base? other)",
+                    "System.Boolean C.Equals(C? other)",
+                    "System.Boolean C.Equals(System.Object? obj)",
+                    "System.Boolean C." + WellKnownMemberNames.PrintMembersMethodName + "(System.Text.StringBuilder builder)",
+                    "System.Boolean System.Object.Equals(System.Object obj)",
+                    "System.Boolean System.Object.Equals(System.Object objA, System.Object objB)",
+                    "System.Boolean System.Object.ReferenceEquals(System.Object objA, System.Object objB)",
+                    "System.Int32 C.GetHashCode()",
+                    "System.Int32 System.Object.GetHashCode()",
+                    "System.Int32 X",
+                    "System.Object System.Object.MemberwiseClone()",
+                    "System.String C.ToString()",
+                    "System.String System.Object.ToString()",
+                    "System.Type C.EqualityContract { get; }",
+                    "System.Type System.Object.GetType()",
+                    "void C.Deconstruct(out System.Int32 X)",
+                    "void System.Object.Finalize()"),
+                s_pop,
+                Add( // Members
+                    "System.Boolean C.Equals(Base? other)",
+                    "System.Boolean C.Equals(C? other)",
+                    "System.Boolean C.Equals(System.Object? obj)",
+                    "System.Boolean C." + WellKnownMemberNames.PrintMembersMethodName + "(System.Text.StringBuilder builder)",
+                    "System.Boolean System.Object.Equals(System.Object obj)",
+                    "System.Boolean System.Object.Equals(System.Object objA, System.Object objB)",
+                    "System.Boolean System.Object.ReferenceEquals(System.Object objA, System.Object objB)",
+                    "System.Int32 C.GetHashCode()",
+                    "System.Int32 C.X { get; init; }",
+                    "System.Int32 System.Object.GetHashCode()",
+                    "System.Object System.Object.MemberwiseClone()",
+                    "System.String C.ToString()",
+                    "System.String System.Object.ToString()",
+                    "System.Type C.EqualityContract { get; }",
+                    "System.Type System.Object.GetType()",
+                    "void C.Deconstruct(out System.Int32 X)",
+                    "void System.Object.Finalize()"),
+                s_pop,
+                Add( // Members
+                    "System.Boolean C.Equals(Base? other)",
+                    "System.Boolean C.Equals(C? other)",
+                    "System.Boolean C.Equals(System.Object? obj)",
+                    "System.Boolean C." + WellKnownMemberNames.PrintMembersMethodName + "(System.Text.StringBuilder builder)",
+                    "System.Boolean System.Object.Equals(System.Object obj)",
+                    "System.Boolean System.Object.Equals(System.Object objA, System.Object objB)",
+                    "System.Boolean System.Object.ReferenceEquals(System.Object objA, System.Object objB)",
+                    "System.Int32 C.GetHashCode()",
+                    "System.Int32 C.X { get; init; }",
+                    "System.Int32 System.Object.GetHashCode()",
+                    "System.Object System.Object.MemberwiseClone()",
+                    "System.String C.ToString()",
+                    "System.String System.Object.ToString()",
+                    "System.Type C.EqualityContract { get; }",
+                    "System.Type System.Object.GetType()",
+                    "void C.Deconstruct(out System.Int32 X)",
+                    "void System.Object.Finalize()"),
+                s_pop
+            );
+
+            TestLookupNames(text, expectedNames);
+        }
+
+        [Fact]
+        public void RecordBaseArguments_05()
+        {
+            var text = @"
+partial record C : Base(X)
+`{
+`}
+
+partial record C(int X) : Base`(X`)
+`{
+`}
+";
+            var expectedNames = MakeExpectedSymbols(
+                Add( // Global
+                    "System",
+                    "Microsoft",
+                    "C"),
+                Add( // Members
+                    "System.Boolean C.Equals(Base? other)",
+                    "System.Boolean C.Equals(C? other)",
+                    "System.Boolean C.Equals(System.Object? obj)",
+                    "System.Boolean C." + WellKnownMemberNames.PrintMembersMethodName + "(System.Text.StringBuilder builder)",
+                    "System.Boolean System.Object.Equals(System.Object obj)",
+                    "System.Boolean System.Object.Equals(System.Object objA, System.Object objB)",
+                    "System.Boolean System.Object.ReferenceEquals(System.Object objA, System.Object objB)",
+                    "System.Int32 C.GetHashCode()",
+                    "System.Int32 C.X { get; init; }",
+                    "System.Int32 System.Object.GetHashCode()",
+                    "System.Object System.Object.MemberwiseClone()",
+                    "System.String C.ToString()",
+                    "System.String System.Object.ToString()",
+                    "System.Type C.EqualityContract { get; }",
+                    "System.Type System.Object.GetType()",
+                    "void C.Deconstruct(out System.Int32 X)",
+                    "void System.Object.Finalize()"),
+                s_pop,
+                Add( // Members + parameters
+                    "System.Boolean C.Equals(Base? other)",
+                    "System.Boolean C.Equals(C? other)",
+                    "System.Boolean C.Equals(System.Object? obj)",
+                    "System.Boolean C." + WellKnownMemberNames.PrintMembersMethodName + "(System.Text.StringBuilder builder)",
+                    "System.Boolean System.Object.Equals(System.Object obj)",
+                    "System.Boolean System.Object.Equals(System.Object objA, System.Object objB)",
+                    "System.Boolean System.Object.ReferenceEquals(System.Object objA, System.Object objB)",
+                    "System.Int32 C.GetHashCode()",
+                    "System.Int32 System.Object.GetHashCode()",
+                    "System.Int32 X",
+                    "System.Object System.Object.MemberwiseClone()",
+                    "System.String C.ToString()",
+                    "System.String System.Object.ToString()",
+                    "System.Type C.EqualityContract { get; }",
+                    "System.Type System.Object.GetType()",
+                    "void C.Deconstruct(out System.Int32 X)",
+                    "void System.Object.Finalize()"),
+                s_pop,
+                Add( // Members
+                    "System.Boolean C.Equals(Base? other)",
+                    "System.Boolean C.Equals(C? other)",
+                    "System.Boolean C.Equals(System.Object? obj)",
+                    "System.Boolean C." + WellKnownMemberNames.PrintMembersMethodName + "(System.Text.StringBuilder builder)",
+                    "System.Boolean System.Object.Equals(System.Object obj)",
+                    "System.Boolean System.Object.Equals(System.Object objA, System.Object objB)",
+                    "System.Boolean System.Object.ReferenceEquals(System.Object objA, System.Object objB)",
+                    "System.Int32 C.GetHashCode()",
+                    "System.Int32 C.X { get; init; }",
+                    "System.Int32 System.Object.GetHashCode()",
+                    "System.Object System.Object.MemberwiseClone()",
+                    "System.String C.ToString()",
+                    "System.String System.Object.ToString()",
+                    "System.Type C.EqualityContract { get; }",
+                    "System.Type System.Object.GetType()",
+                    "void C.Deconstruct(out System.Int32 X)",
+                    "void System.Object.Finalize()"),
+                s_pop
+            );
+
+            TestLookupNames(text, expectedNames);
+        }
+
+        [Fact]
+        public void RecordBaseArguments_06()
+        {
+            var text = @"
+class C : Base(X)
+`{
+`}
+";
+            var expectedNames = MakeExpectedSymbols(
+                Add( // Global
+                    "System",
+                    "Microsoft",
+                    "C"),
+                Add( // Members
+                    "System.Boolean System.Object.Equals(System.Object obj)",
+                    "System.Boolean System.Object.Equals(System.Object objA, System.Object objB)",
+                    "System.Boolean System.Object.ReferenceEquals(System.Object objA, System.Object objB)",
+                    "System.Int32 System.Object.GetHashCode()",
+                    "System.Object System.Object.MemberwiseClone()",
+                    "System.String System.Object.ToString()",
+                    "System.Type System.Object.GetType()",
+                    "void System.Object.Finalize()"),
+                s_pop
+            );
+
+            TestLookupNames(text, expectedNames);
+        }
+
+        [Fact]
+        public void RecordBaseArguments_07()
+        {
+            var text = @"
+struct C : Base(X)
+`{
+`}
+";
+            var expectedNames = MakeExpectedSymbols(
+                Add( // Global
+                    "System",
+                    "Microsoft",
+                    "C"),
+                Add( // Members
+                    "System.Boolean System.Object.Equals(System.Object obj)",
+                    "System.Boolean System.Object.Equals(System.Object objA, System.Object objB)",
+                    "System.Boolean System.Object.ReferenceEquals(System.Object objA, System.Object objB)",
+                    "System.Boolean System.ValueType.Equals(System.Object obj)",
+                    "System.Int32 System.Object.GetHashCode()",
+                    "System.Int32 System.ValueType.GetHashCode()",
+                    "System.Object System.Object.MemberwiseClone()",
+                    "System.String System.Object.ToString()",
+                    "System.String System.ValueType.ToString()",
+                    "System.Type System.Object.GetType()",
+                    "void System.Object.Finalize()"),
+                s_pop
+            );
+
+            TestLookupNames(text, expectedNames);
+        }
+
+        [Fact]
+        public void RecordBaseArguments_08()
+        {
+            var text = @"
+interface C : Base(X)
+`{
+`}
+";
+            var expectedNames = MakeExpectedSymbols(
+                Add( // Global
+                    "System",
+                    "Microsoft",
+                    "C"),
+                Add( // Members
+                    "System.Boolean System.Object.Equals(System.Object obj)",
+                    "System.Boolean System.Object.Equals(System.Object objA, System.Object objB)",
+                    "System.Boolean System.Object.ReferenceEquals(System.Object objA, System.Object objB)",
+                    "System.Int32 System.Object.GetHashCode()",
+                    "System.String System.Object.ToString()",
+                    "System.Type System.Object.GetType()"),
+                s_pop
+            );
+
+            TestLookupNames(text, expectedNames);
+        }
+
+        [Fact]
+        public void RecordInitializers_01()
+        {
+            var text = @"
+record C(int X)
+`{
+    int Z `= X + 1`;
+`}
+";
+            var expectedNames = MakeExpectedSymbols(
+                Add( // Global
+                    "System",
+                    "Microsoft",
+                    "C"),
+                Add( // Members
+                    "System.Boolean C.Equals(C? other)",
+                    "System.Boolean C.Equals(System.Object? obj)",
+                    "System.Boolean C." + WellKnownMemberNames.PrintMembersMethodName + "(System.Text.StringBuilder builder)",
+                    "System.Boolean System.Object.Equals(System.Object obj)",
+                    "System.Boolean System.Object.Equals(System.Object objA, System.Object objB)",
+                    "System.Boolean System.Object.ReferenceEquals(System.Object objA, System.Object objB)",
+                    "System.Int32 C.GetHashCode()",
+                    "System.Int32 C.X { get; init; }",
+                    "System.Int32 C.Z",
+                    "System.Int32 System.Object.GetHashCode()",
+                    "System.Object System.Object.MemberwiseClone()",
+                    "System.String C.ToString()",
+                    "System.String System.Object.ToString()",
+                    "System.Type C.EqualityContract { get; }",
+                    "System.Type System.Object.GetType()",
+                    "void C.Deconstruct(out System.Int32 X)",
+                    "void System.Object.Finalize()"),
+                Combine(
+                    Remove("System.Int32 C.X { get; init; }"),
+                    Add("System.Int32 X")
+                    ),
+                Combine(s_pop, s_pop),
+                s_pop
+            );
+
+            TestLookupNames(text, expectedNames);
+        }
+
+        [Fact]
+        public void RecordInitializers_02()
+        {
+            var text = @"
+record C(int X)
+`{
+    static int Z = X + 1;
+`}
+";
+            var expectedNames = MakeExpectedSymbols(
+                Add( // Global
+                    "System",
+                    "Microsoft",
+                    "C"),
+                Add( // Members
+                    "System.Boolean C.Equals(C? other)",
+                    "System.Boolean C.Equals(System.Object? obj)",
+                    "System.Boolean C." + WellKnownMemberNames.PrintMembersMethodName + "(System.Text.StringBuilder builder)",
+                    "System.Boolean System.Object.Equals(System.Object obj)",
+                    "System.Boolean System.Object.Equals(System.Object objA, System.Object objB)",
+                    "System.Boolean System.Object.ReferenceEquals(System.Object objA, System.Object objB)",
+                    "System.Int32 C.GetHashCode()",
+                    "System.Int32 C.X { get; init; }",
+                    "System.Int32 C.Z",
+                    "System.Int32 System.Object.GetHashCode()",
+                    "System.Object System.Object.MemberwiseClone()",
+                    "System.String C.ToString()",
+                    "System.String System.Object.ToString()",
+                    "System.Type C.EqualityContract { get; }",
+                    "System.Type System.Object.GetType()",
+                    "void C.Deconstruct(out System.Int32 X)",
+                    "void System.Object.Finalize()"),
+                s_pop
+            );
+
+            TestLookupNames(text, expectedNames);
+        }
+
+        [Fact]
+        public void RecordInitializers_03()
+        {
+            var text = @"
+record C(int X)
+`{
+    const int Z = X + 1;
+`}
+";
+            var expectedNames = MakeExpectedSymbols(
+                Add( // Global
+                    "System",
+                    "Microsoft",
+                    "C"),
+                Add( // Members
+                    "System.Boolean C.Equals(C? other)",
+                    "System.Boolean C.Equals(System.Object? obj)",
+                    "System.Boolean C." + WellKnownMemberNames.PrintMembersMethodName + "(System.Text.StringBuilder builder)",
+                    "System.Boolean System.Object.Equals(System.Object obj)",
+                    "System.Boolean System.Object.Equals(System.Object objA, System.Object objB)",
+                    "System.Boolean System.Object.ReferenceEquals(System.Object objA, System.Object objB)",
+                    "System.Int32 C.GetHashCode()",
+                    "System.Int32 C.X { get; init; }",
+                    "System.Int32 C.Z",
+                    "System.Int32 System.Object.GetHashCode()",
+                    "System.Object System.Object.MemberwiseClone()",
+                    "System.String C.ToString()",
+                    "System.String System.Object.ToString()",
+                    "System.Type C.EqualityContract { get; }",
+                    "System.Type System.Object.GetType()",
+                    "void C.Deconstruct(out System.Int32 X)",
+                    "void System.Object.Finalize()"),
+                s_pop
+            );
+
+            TestLookupNames(text, expectedNames);
+        }
 
         /// <summary>
         /// Given a program, calls LookupNames at each character position and verifies the results.
@@ -1527,10 +2227,10 @@ class Derived : Base<int>
         /// For each region of the program, a list of expected names must be provided.  This method
         /// will assert if any region contains different names than expected.
         /// </summary>
-        private static void TestLookupNames(string text, string[][] expectedNames, bool experimental = false)
+        private static void TestLookupNames(string text, string[][] expectedNames)
         {
             int[] keyPositions;
-            var model = GetModelAndKeyPositions(text, out keyPositions, experimental);
+            var model = GetModelAndKeyPositions(text, out keyPositions);
 
             // There should be one more list of expectedNames than there are backticks.
             // Number of key positions = number of backticks + 2 (start and end)
@@ -1554,7 +2254,7 @@ class Derived : Base<int>
         /// Strip the backticks out of "markedText" and record their positions.
         /// Return a SemanticModel for the compiled text.
         /// </summary>
-        private static SemanticModel GetModelAndKeyPositions(string markedText, out int[] keyPositions, bool experimental = false)
+        private static SemanticModel GetModelAndKeyPositions(string markedText, out int[] keyPositions)
         {
             ArrayBuilder<int> keyPositionBuilder = ArrayBuilder<int>.GetInstance();
             StringBuilder textBuilder = new StringBuilder();
@@ -1580,9 +2280,8 @@ class Derived : Base<int>
             keyPositions = keyPositionBuilder.ToArrayAndFree();
             var text = textBuilder.ToString();
 
-            var compilation = experimental
-                ? CreateExperimentalCompilationWithMscorlib45(text)
-                : CreateCompilationWithMscorlibAndDocumentationComments(text);
+            var parseOptions = TestOptions.Regular9.WithDocumentationMode(DocumentationMode.Diagnose);
+            var compilation = CreateCompilationWithMscorlib40(text, parseOptions: parseOptions);
             var tree = compilation.SyntaxTrees[0];
             return compilation.GetSemanticModel(tree);
         }
@@ -1592,7 +2291,7 @@ class Derived : Base<int>
         /// </summary>
         private static void CheckSymbols(SemanticModel model, int keyPositionNum, int position, IEnumerable<string> expectedSymbols)
         {
-            var actualSymbols = model.LookupSymbols(position).Select(SymbolUtilities.ToTestDisplayString).ToArray();
+            var actualSymbols = model.LookupSymbols(position).Select(SymbolExtensions.ToTestDisplayString).ToArray();
             Array.Sort(actualSymbols);
 
             SyntaxToken token = model.SyntaxTree.GetCompilationUnitRoot().FindToken(position, findInsideTrivia: true);

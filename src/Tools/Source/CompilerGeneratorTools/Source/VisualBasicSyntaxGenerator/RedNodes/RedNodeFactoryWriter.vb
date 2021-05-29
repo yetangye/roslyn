@@ -1,9 +1,11 @@
-﻿' Copyright (c) Microsoft.  All Rights Reserved.  Licensed under the Apache License, Version 2.0.  See License.txt in the project root for license information.
+﻿' Licensed to the .NET Foundation under one or more agreements.
+' The .NET Foundation licenses this file to you under the MIT license.
+' See the LICENSE file in the project root for more information.
 
 Imports System.IO
 
 ' Class to write out the code for the code tree.
-Class RedNodeFactoryWriter
+Friend Class RedNodeFactoryWriter
     Inherits WriteUtils
 
     Private _writer As TextWriter    'output is sent here.
@@ -94,17 +96,17 @@ Class RedNodeFactoryWriter
         ' Generate secondary factory w/o auto-creatable tokens
         Dim allFullFactoryChildren = GetAllFactoryChildrenOfStructure(nodeStructure).ToList()
         Dim allFields = GetAllFieldsOfStructure(nodeStructure)
-        Dim allFactoryChildrenWithoutAutoCreateableTokens = GetAllFactoryChildrenWithoutAutoCreatableTokens(nodeStructure, nodeKind)
+        Dim allFactoryChildrenWithoutAutoCreatableTokens = GetAllFactoryChildrenWithoutAutoCreatableTokens(nodeStructure, nodeKind)
         Dim leastSignature = allFullFactoryChildren
-        If Not Enumerable.SequenceEqual(allFullFactoryChildren, allFactoryChildrenWithoutAutoCreateableTokens) Then
-            GenerateSecondaryFactoryMethod(nodeStructure, nodeKind, allFullFactoryChildren, allFields, allFactoryChildrenWithoutAutoCreateableTokens, AddressOf GetDefaultedFactoryParameterExpression)
-            leastSignature = allFactoryChildrenWithoutAutoCreateableTokens
+        If Not Enumerable.SequenceEqual(allFullFactoryChildren, allFactoryChildrenWithoutAutoCreatableTokens) Then
+            GenerateSecondaryFactoryMethod(nodeStructure, nodeKind, allFullFactoryChildren, allFields, allFactoryChildrenWithoutAutoCreatableTokens, AddressOf GetDefaultedFactoryParameterExpression)
+            leastSignature = allFactoryChildrenWithoutAutoCreatableTokens
         End If
 
         ' Generate secondary factory with only required children 
         ' TODO: (if there is only one child and it is an optional list, then allow it to be optional unless there is already a zero-parameter factory)
         Dim allRequiredFactoryChildren = GetAllRequiredFactoryChildren(nodeStructure, nodeKind)
-        If Not (Enumerable.SequenceEqual(allFullFactoryChildren, allRequiredFactoryChildren) OrElse Enumerable.SequenceEqual(allFactoryChildrenWithoutAutoCreateableTokens, allRequiredFactoryChildren)) Then
+        If Not (Enumerable.SequenceEqual(allFullFactoryChildren, allRequiredFactoryChildren) OrElse Enumerable.SequenceEqual(allFactoryChildrenWithoutAutoCreatableTokens, allRequiredFactoryChildren)) Then
             GenerateSecondaryFactoryMethod(nodeStructure, nodeKind, allFullFactoryChildren, allFields, allRequiredFactoryChildren, AddressOf GetDefaultedFactoryParameterExpression)
             leastSignature = allRequiredFactoryChildren
         End If
@@ -254,7 +256,7 @@ Class RedNodeFactoryWriter
 
         If nodeStructure.IsToken Then
             ' tokens have trivia
-            _writer.Write(", DirectCast(leadingTrivia.Node, InternalSyntax.VisualBasicSyntaxNode), DirectCast(trailingTrivia.Node, InternalSyntax.VisualBasicSyntaxNode)")
+            _writer.Write(", leadingTrivia.Node, trailingTrivia.Node")
         End If
 
         ' Generate parameters for each field and child
@@ -268,7 +270,7 @@ Class RedNodeFactoryWriter
             Else
                 If child.IsList Then
                     If KindTypeStructure(child.ChildKind).IsToken Then
-                        _writer.Write(", DirectCast({0}.Node, Syntax.InternalSyntax.VisualBasicSyntaxNode)", ChildParamName(child, factoryFunctionName))
+                        _writer.Write(", {0}.Node", ChildParamName(child, factoryFunctionName))
                     Else
                         _writer.Write(", {0}.Node", ChildParamName(child, factoryFunctionName))
                     End If
@@ -291,8 +293,6 @@ Class RedNodeFactoryWriter
         '----------------------------
         _writer.WriteLine("        End Function")
         _writer.WriteLine()
-
-
 
         ' For tokens, generate factory method that doesn't take trivia
         If nodeStructure.IsToken Then
@@ -438,7 +438,7 @@ Class RedNodeFactoryWriter
 
     Private Sub CheckParam(name As String)
         _writer.WriteLine("            if {0} Is Nothing Then", name)
-        _writer.WriteLine("                Throw New ArgumentNullException(""{0}"")", name)
+        _writer.WriteLine("                Throw New ArgumentNullException(NameOf({0}))", name)
         _writer.WriteLine("            End If")
     End Sub
 
@@ -463,7 +463,7 @@ Class RedNodeFactoryWriter
             _writer.WriteLine()
             _writer.WriteLine("                Case Else")
             _writer.WriteLine("                    Throw new ArgumentException(""{0}"")", paramName)
-            _writer.WriteLine("             End Select")
+            _writer.WriteLine("            End Select")
 
         ElseIf childNodeKinds IsNot Nothing Then
             If nodeKind Is Nothing AndAlso child.KindForNodeKind IsNot Nothing AndAlso child.KindForNodeKind.Count > 1 Then
@@ -501,7 +501,7 @@ Class RedNodeFactoryWriter
 
                 _writer.WriteLine("                Case Else")
                 _writer.WriteLine("                    Throw new ArgumentException(""{0}"")", paramName)
-                _writer.WriteLine("             End Select")
+                _writer.WriteLine("            End Select")
 
             End If
         End If
@@ -521,14 +521,14 @@ Class RedNodeFactoryWriter
             _writer.Write("                Case SyntaxKind.{0}", childNodeKind.Name)
 
             If child.IsOptional Then
-                _writer.WriteLine(":")
+                _writer.WriteLine(" :")
                 _writer.Write("                Case SyntaxKind.None")
             End If
 
             _writer.WriteLine()
             _writer.WriteLine("                Case Else")
             _writer.WriteLine("                    Throw new ArgumentException(""{0}"")", paramName)
-            _writer.WriteLine("             End Select")
+            _writer.WriteLine("            End Select")
 
         ElseIf childNodeKinds IsNot Nothing Then
 
@@ -554,14 +554,14 @@ Class RedNodeFactoryWriter
                 For Each childNodeKind In childNodeKinds
 
                     If needsComma Then
-                        _writer.WriteLine(":")
+                        _writer.WriteLine(" :")
                     End If
                     _writer.Write("                Case SyntaxKind.{0}", childNodeKind.Name)
                     needsComma = True
                 Next
 
                 If child.IsOptional Then
-                    _writer.WriteLine(":")
+                    _writer.WriteLine(" :")
                     _writer.WriteLine("                Case SyntaxKind.None")
                 End If
 
@@ -569,7 +569,7 @@ Class RedNodeFactoryWriter
 
                 _writer.WriteLine("                Case Else")
                 _writer.WriteLine("                    Throw new ArgumentException(""{0}"")", paramName)
-                _writer.WriteLine("             End Select")
+                _writer.WriteLine("            End Select")
 
             End If
         End If

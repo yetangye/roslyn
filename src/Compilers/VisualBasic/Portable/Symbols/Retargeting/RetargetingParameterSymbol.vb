@@ -1,4 +1,6 @@
-﻿' Copyright (c) Microsoft.  All Rights Reserved.  Licensed under the Apache License, Version 2.0.  See License.txt in the project root for license information.
+﻿' Licensed to the .NET Foundation under one or more agreements.
+' The .NET Foundation licenses this file to you under the MIT license.
+' See the LICENSE file in the project root for more information.
 
 Imports System
 Imports System.Collections.Generic
@@ -22,15 +24,15 @@ Namespace Microsoft.CodeAnalysis.VisualBasic.Symbols.Retargeting
         ''' <summary>
         ''' The underlying ParameterSymbol, cannot be another RetargetingParameterSymbol.
         ''' </summary>
-        Private ReadOnly m_UnderlyingParameter As ParameterSymbol
+        Private ReadOnly _underlyingParameter As ParameterSymbol
 
-        Private m_LazyCustomModifiers As ImmutableArray(Of CustomModifier)
+        Private _lazyCustomModifiers As CustomModifiersTuple
 
         ''' <summary>
         ''' Retargeted custom attributes
         ''' </summary>
         ''' <remarks></remarks>
-        Private m_LazyCustomAttributes As ImmutableArray(Of VisualBasicAttributeData)
+        Private _lazyCustomAttributes As ImmutableArray(Of VisualBasicAttributeData)
 
         Public Shared Function CreateMethodParameter(retargetingMethod As RetargetingMethodSymbol, underlyingParameter As ParameterSymbol) As RetargetingParameterSymbol
             Return New RetargetingMethodParameterSymbol(retargetingMethod, underlyingParameter)
@@ -48,12 +50,12 @@ Namespace Microsoft.CodeAnalysis.VisualBasic.Symbols.Retargeting
                 Throw New ArgumentException()
             End If
 
-            m_UnderlyingParameter = underlyingParameter
+            _underlyingParameter = underlyingParameter
         End Sub
 
         Public ReadOnly Property UnderlyingParameter As ParameterSymbol
             Get
-                Return m_UnderlyingParameter
+                Return _underlyingParameter
             End Get
         End Property
 
@@ -67,73 +69,85 @@ Namespace Microsoft.CodeAnalysis.VisualBasic.Symbols.Retargeting
 
         Public Overrides ReadOnly Property IsImplicitlyDeclared As Boolean
             Get
-                Return m_UnderlyingParameter.IsImplicitlyDeclared
+                Return _underlyingParameter.IsImplicitlyDeclared
             End Get
         End Property
 
         Public Overrides ReadOnly Property Type As TypeSymbol
             Get
-                Return RetargetingTranslator.Retarget(m_UnderlyingParameter.Type, RetargetOptions.RetargetPrimitiveTypesByTypeCode)
+                Return RetargetingTranslator.Retarget(_underlyingParameter.Type, RetargetOptions.RetargetPrimitiveTypesByTypeCode)
             End Get
         End Property
 
         Public Overrides ReadOnly Property CustomModifiers As ImmutableArray(Of CustomModifier)
             Get
-                Return RetargetingTranslator.RetargetModifiers(m_UnderlyingParameter.CustomModifiers, m_LazyCustomModifiers)
+                Return CustomModifiersTuple.TypeCustomModifiers
+            End Get
+        End Property
+
+        Public Overrides ReadOnly Property RefCustomModifiers As ImmutableArray(Of CustomModifier)
+            Get
+                Return CustomModifiersTuple.RefCustomModifiers
+            End Get
+        End Property
+
+        Private ReadOnly Property CustomModifiersTuple As CustomModifiersTuple
+            Get
+                Return RetargetingTranslator.RetargetModifiers(_underlyingParameter.CustomModifiers, _underlyingParameter.RefCustomModifiers, _lazyCustomModifiers)
             End Get
         End Property
 
         Public Overrides ReadOnly Property IsParamArray As Boolean
             Get
-                Return m_UnderlyingParameter.IsParamArray
+                Return _underlyingParameter.IsParamArray
             End Get
         End Property
 
         Public Overrides ReadOnly Property IsByRef As Boolean
             Get
-                Return m_UnderlyingParameter.IsByRef
+                Return _underlyingParameter.IsByRef
             End Get
         End Property
 
         Friend Overrides ReadOnly Property IsExplicitByRef As Boolean
             Get
-                Return m_UnderlyingParameter.IsExplicitByRef
+                Return _underlyingParameter.IsExplicitByRef
             End Get
         End Property
 
         Public Overrides ReadOnly Property Ordinal As Integer
             Get
-                Return m_UnderlyingParameter.Ordinal
+                Return _underlyingParameter.Ordinal
             End Get
         End Property
 
         Public Overrides ReadOnly Property IsOptional As Boolean
             Get
-                Return m_UnderlyingParameter.IsOptional
+                Return _underlyingParameter.IsOptional
             End Get
         End Property
 
         Friend Overrides ReadOnly Property IsMetadataOut As Boolean
             Get
-                Return m_UnderlyingParameter.IsMetadataOut
+                Return _underlyingParameter.IsMetadataOut
             End Get
         End Property
 
         Friend Overrides ReadOnly Property IsMetadataIn As Boolean
             Get
-                Return m_UnderlyingParameter.IsMetadataIn
+                Return _underlyingParameter.IsMetadataIn
             End Get
         End Property
 
         Public Overrides ReadOnly Property HasExplicitDefaultValue As Boolean
             Get
-                Return m_UnderlyingParameter.HasExplicitDefaultValue
+                Return _underlyingParameter.HasExplicitDefaultValue
             End Get
         End Property
 
         Friend Overrides ReadOnly Property ExplicitDefaultConstantValue(inProgress As SymbolsInProgress(Of ParameterSymbol)) As ConstantValue
             Get
-                Return m_UnderlyingParameter.ExplicitDefaultConstantValue(inProgress)
+                Return _underlyingParameter.ExplicitDefaultConstantValue(inProgress)
             End Get
         End Property
 
@@ -145,70 +159,64 @@ Namespace Microsoft.CodeAnalysis.VisualBasic.Symbols.Retargeting
 
         Friend Overrides ReadOnly Property HasOptionCompare As Boolean
             Get
-                Return m_UnderlyingParameter.HasOptionCompare
+                Return _underlyingParameter.HasOptionCompare
             End Get
         End Property
 
         Friend Overrides ReadOnly Property IsIDispatchConstant As Boolean
             Get
-                Return m_UnderlyingParameter.IsIDispatchConstant
+                Return _underlyingParameter.IsIDispatchConstant
             End Get
         End Property
 
         Friend Overrides ReadOnly Property IsIUnknownConstant As Boolean
             Get
-                Return m_UnderlyingParameter.IsIUnknownConstant
+                Return _underlyingParameter.IsIUnknownConstant
             End Get
         End Property
 
         Friend Overrides ReadOnly Property IsCallerLineNumber As Boolean
             Get
-                Return m_UnderlyingParameter.IsCallerLineNumber
+                Return _underlyingParameter.IsCallerLineNumber
             End Get
         End Property
 
         Friend Overrides ReadOnly Property IsCallerMemberName As Boolean
             Get
-                Return m_UnderlyingParameter.IsCallerMemberName
+                Return _underlyingParameter.IsCallerMemberName
             End Get
         End Property
 
         Friend Overrides ReadOnly Property IsCallerFilePath As Boolean
             Get
-                Return m_UnderlyingParameter.IsCallerFilePath
-            End Get
-        End Property
-
-        Friend NotOverridable Overrides ReadOnly Property HasByRefBeforeCustomModifiers As Boolean
-            Get
-                Return m_UnderlyingParameter.HasByRefBeforeCustomModifiers
+                Return _underlyingParameter.IsCallerFilePath
             End Get
         End Property
 
         Public Overrides ReadOnly Property ContainingSymbol As Symbol
             Get
-                Return RetargetingTranslator.Retarget(m_UnderlyingParameter.ContainingSymbol)
+                Return RetargetingTranslator.Retarget(_underlyingParameter.ContainingSymbol)
             End Get
         End Property
 
         Public Overrides ReadOnly Property Locations As ImmutableArray(Of Location)
             Get
-                Return m_UnderlyingParameter.Locations
+                Return _underlyingParameter.Locations
             End Get
         End Property
 
         Public Overrides ReadOnly Property DeclaringSyntaxReferences As ImmutableArray(Of SyntaxReference)
             Get
-                Return m_UnderlyingParameter.DeclaringSyntaxReferences
+                Return _underlyingParameter.DeclaringSyntaxReferences
             End Get
         End Property
 
         Public Overrides Function GetAttributes() As ImmutableArray(Of VisualBasicAttributeData)
-            Return RetargetingTranslator.GetRetargetedAttributes(m_UnderlyingParameter, m_LazyCustomAttributes)
+            Return RetargetingTranslator.GetRetargetedAttributes(_underlyingParameter, _lazyCustomAttributes)
         End Function
 
         Friend Overrides Function GetCustomAttributesToEmit(compilationState As ModuleCompilationState) As IEnumerable(Of VisualBasicAttributeData)
-            Return RetargetingTranslator.RetargetAttributes(m_UnderlyingParameter.GetCustomAttributesToEmit(compilationState))
+            Return RetargetingTranslator.RetargetAttributes(_underlyingParameter.GetCustomAttributesToEmit(compilationState))
         End Function
 
         Public Overrides ReadOnly Property ContainingAssembly As AssemblySymbol
@@ -225,37 +233,37 @@ Namespace Microsoft.CodeAnalysis.VisualBasic.Symbols.Retargeting
 
         Public Overrides ReadOnly Property Name As String
             Get
-                Return m_UnderlyingParameter.Name
+                Return _underlyingParameter.Name
             End Get
         End Property
 
         Public Overrides ReadOnly Property MetadataName As String
             Get
-                Return m_UnderlyingParameter.MetadataName
+                Return _underlyingParameter.MetadataName
             End Get
         End Property
 
         Friend Overrides ReadOnly Property HasMetadataConstantValue As Boolean
             Get
-                Return m_UnderlyingParameter.HasMetadataConstantValue
+                Return _underlyingParameter.HasMetadataConstantValue
             End Get
         End Property
 
         Friend Overrides ReadOnly Property IsMetadataOptional As Boolean
             Get
-                Return m_UnderlyingParameter.IsMetadataOptional
+                Return _underlyingParameter.IsMetadataOptional
             End Get
         End Property
 
         Friend Overrides ReadOnly Property IsMarshalledExplicitly As Boolean
             Get
-                Return m_UnderlyingParameter.IsMarshalledExplicitly
+                Return _underlyingParameter.IsMarshalledExplicitly
             End Get
         End Property
 
         Friend Overrides ReadOnly Property MarshallingDescriptor As ImmutableArray(Of Byte)
             Get
-                Return m_UnderlyingParameter.MarshallingDescriptor
+                Return _underlyingParameter.MarshallingDescriptor
             End Get
         End Property
 
@@ -265,18 +273,18 @@ Namespace Microsoft.CodeAnalysis.VisualBasic.Symbols.Retargeting
             ''' <summary>
             ''' Owning RetargetingMethodSymbol.
             ''' </summary>
-            Private ReadOnly m_RetargetingMethod As RetargetingMethodSymbol
+            Private ReadOnly _retargetingMethod As RetargetingMethodSymbol
 
             Public Sub New(retargetingMethod As RetargetingMethodSymbol, underlyingParameter As ParameterSymbol)
                 MyBase.New(underlyingParameter)
 
                 Debug.Assert(retargetingMethod IsNot Nothing)
-                m_RetargetingMethod = retargetingMethod
+                _retargetingMethod = retargetingMethod
             End Sub
 
             Protected Overrides ReadOnly Property RetargetingModule As RetargetingModuleSymbol
                 Get
-                    Return m_RetargetingMethod.RetargetingModule
+                    Return _retargetingMethod.RetargetingModule
                 End Get
             End Property
         End Class
@@ -287,18 +295,18 @@ Namespace Microsoft.CodeAnalysis.VisualBasic.Symbols.Retargeting
             ''' <summary>
             ''' Owning RetargetingPropertySymbol.
             ''' </summary>
-            Private ReadOnly m_RetargetingProperty As RetargetingPropertySymbol
+            Private ReadOnly _retargetingProperty As RetargetingPropertySymbol
 
             Public Sub New(retargetingProperty As RetargetingPropertySymbol, underlyingParameter As ParameterSymbol)
                 MyBase.New(underlyingParameter)
 
                 Debug.Assert(retargetingProperty IsNot Nothing)
-                m_RetargetingProperty = retargetingProperty
+                _retargetingProperty = retargetingProperty
             End Sub
 
             Protected Overrides ReadOnly Property RetargetingModule As RetargetingModuleSymbol
                 Get
-                    Return m_RetargetingProperty.RetargetingModule
+                    Return _retargetingProperty.RetargetingModule
                 End Get
             End Property
         End Class
@@ -313,7 +321,7 @@ Namespace Microsoft.CodeAnalysis.VisualBasic.Symbols.Retargeting
         End Property
 
         Public Overrides Function GetDocumentationCommentXml(Optional preferredCulture As CultureInfo = Nothing, Optional expandIncludes As Boolean = False, Optional cancellationToken As CancellationToken = Nothing) As String
-            Return m_UnderlyingParameter.GetDocumentationCommentXml(preferredCulture, expandIncludes, cancellationToken)
+            Return _underlyingParameter.GetDocumentationCommentXml(preferredCulture, expandIncludes, cancellationToken)
         End Function
     End Class
 End Namespace

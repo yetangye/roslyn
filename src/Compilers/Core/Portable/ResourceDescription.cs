@@ -1,11 +1,15 @@
-﻿// Copyright (c) Microsoft.  All Rights Reserved.  Licensed under the Apache License, Version 2.0.  See License.txt in the project root for license information.
+﻿// Licensed to the .NET Foundation under one or more agreements.
+// The .NET Foundation licenses this file to you under the MIT license.
+// See the LICENSE file in the project root for more information.
 
 using System;
 using System.IO;
 using Roslyn.Utilities;
+using Microsoft.CodeAnalysis.Emit;
 using System.Reflection;
 using System.Collections.Immutable;
 using System.Diagnostics;
+using System.Security.Cryptography;
 
 namespace Microsoft.CodeAnalysis
 {
@@ -15,7 +19,7 @@ namespace Microsoft.CodeAnalysis
     public sealed class ResourceDescription : Cci.IFileReference
     {
         internal readonly string ResourceName;
-        internal readonly string FileName; // null if embedded
+        internal readonly string? FileName; // null if embedded
         internal readonly bool IsPublic;
         internal readonly Func<Stream> DataProvider;
         private readonly CryptographicHashProvider _hashes;
@@ -32,7 +36,7 @@ namespace Microsoft.CodeAnalysis
         /// Returns a stream of the data to embed.
         /// </remarks> 
         public ResourceDescription(string resourceName, Func<Stream> dataProvider, bool isPublic)
-            : this(resourceName, null, dataProvider, isPublic, isEmbedded: true, checkArgs: true)
+            : this(resourceName, fileName: null, dataProvider, isPublic, isEmbedded: true, checkArgs: true)
         {
         }
 
@@ -46,42 +50,42 @@ namespace Microsoft.CodeAnalysis
         /// </param>
         /// <param name="isPublic">True if the resource is public.</param>
         /// <remarks>
-        /// Function returning a stream of the recource content (used to calculate hash).
+        /// Function returning a stream of the resource content (used to calculate hash).
         /// </remarks>
-        public ResourceDescription(string resourceName, string fileName, Func<Stream> dataProvider, bool isPublic)
+        public ResourceDescription(string resourceName, string? fileName, Func<Stream> dataProvider, bool isPublic)
             : this(resourceName, fileName, dataProvider, isPublic, isEmbedded: false, checkArgs: true)
         {
         }
 
-        internal ResourceDescription(string resourceName, string fileName, Func<Stream> dataProvider, bool isPublic, bool isEmbedded, bool checkArgs)
+        internal ResourceDescription(string resourceName, string? fileName, Func<Stream> dataProvider, bool isPublic, bool isEmbedded, bool checkArgs)
         {
             if (checkArgs)
             {
                 if (dataProvider == null)
                 {
-                    throw new ArgumentNullException("dataProvider");
+                    throw new ArgumentNullException(nameof(dataProvider));
                 }
 
                 if (resourceName == null)
                 {
-                    throw new ArgumentNullException("resourceName");
+                    throw new ArgumentNullException(nameof(resourceName));
                 }
 
                 if (!MetadataHelpers.IsValidMetadataIdentifier(resourceName))
                 {
-                    throw new ArgumentException(CodeAnalysisResources.EmptyOrInvalidResourceName, "resourceName");
+                    throw new ArgumentException(CodeAnalysisResources.EmptyOrInvalidResourceName, nameof(resourceName));
                 }
 
                 if (!isEmbedded)
                 {
                     if (fileName == null)
                     {
-                        throw new ArgumentNullException("fileName");
+                        throw new ArgumentNullException(nameof(fileName));
                     }
 
                     if (!MetadataHelpers.IsValidMetadataFileName(fileName))
                     {
-                        throw new ArgumentException(CodeAnalysisResources.EmptyOrInvalidFileName, "fileName");
+                        throw new ArgumentException(CodeAnalysisResources.EmptyOrInvalidFileName, nameof(fileName));
                     }
                 }
             }
@@ -99,7 +103,7 @@ namespace Microsoft.CodeAnalysis
 
             public ResourceHashProvider(ResourceDescription resource)
             {
-                Debug.Assert(resource != null);
+                RoslynDebug.Assert(resource != null);
                 _resource = resource;
             }
 
@@ -129,7 +133,7 @@ namespace Microsoft.CodeAnalysis
             get { return FileName == null; }
         }
 
-        internal Cci.ManagedResource ToManagedResource(Cci.IModule moduleBeingBuilt)
+        internal Cci.ManagedResource ToManagedResource(CommonPEModuleBuilder moduleBeingBuilt)
         {
             return new Cci.ManagedResource(ResourceName, IsPublic, IsEmbedded ? DataProvider : null, IsEmbedded ? null : this, offset: 0);
         }
@@ -139,7 +143,7 @@ namespace Microsoft.CodeAnalysis
             return _hashes.GetHash(algorithmId);
         }
 
-        string Cci.IFileReference.FileName
+        string? Cci.IFileReference.FileName
         {
             get { return FileName; }
         }

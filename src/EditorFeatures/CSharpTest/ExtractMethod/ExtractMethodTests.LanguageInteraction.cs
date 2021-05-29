@@ -1,6 +1,12 @@
-﻿// Copyright (c) Microsoft.  All Rights Reserved.  Licensed under the Apache License, Version 2.0.  See License.txt in the project root for license information.
+﻿// Licensed to the .NET Foundation under one or more agreements.
+// The .NET Foundation licenses this file to you under the MIT license.
+// See the LICENSE file in the project root for more information.
 
+#nullable disable
+
+using System.Threading.Tasks;
 using Microsoft.CodeAnalysis.CSharp;
+using Microsoft.CodeAnalysis.Test.Utilities;
 using Roslyn.Test.Utilities;
 using Xunit;
 
@@ -8,12 +14,13 @@ namespace Microsoft.CodeAnalysis.Editor.CSharp.UnitTests.ExtractMethod
 {
     public partial class ExtractMethodTests
     {
+        [UseExportProvider]
         public class LanguageInteraction : ExtractMethodBase
         {
             #region Generics
 
             [Fact, Trait(Traits.Feature, Traits.Features.ExtractMethod)]
-            public void SelectTypeParameterWithConstraints()
+            public async Task SelectTypeParameterWithConstraints()
             {
                 var code = @"using System;
 
@@ -41,11 +48,11 @@ class Program
     }
 }";
 
-                TestExtractMethod(code, expected);
+                await TestExtractMethodAsync(code, expected);
             }
 
             [Fact, Trait(Traits.Feature, Traits.Features.ExtractMethod)]
-            public void SelectTypeParameter()
+            public async Task SelectTypeParameter()
             {
                 var code = @"using System;
 
@@ -82,11 +89,11 @@ class Program
     }
 }";
 
-                TestExtractMethod(code, expected, allowMovingDeclaration: false);
+                await TestExtractMethodAsync(code, expected);
             }
 
             [Fact, Trait(Traits.Feature, Traits.Features.ExtractMethod)]
-            public void SelectTypeOfTypeParameter()
+            public async Task SelectTypeOfTypeParameter()
             {
                 var code = @"using System;
 
@@ -112,11 +119,11 @@ class Program
     }
 }";
 
-                TestExtractMethod(code, expected);
+                await TestExtractMethodAsync(code, expected);
             }
 
             [Fact, Trait(Traits.Feature, Traits.Features.ExtractMethod)]
-            public void SelectTypeParameterDataFlowOut()
+            public async Task SelectTypeParameterDataFlowOut()
             {
                 var code = @"using System;
 using System.Collections.Generic;
@@ -165,12 +172,12 @@ class Program
     }
 }";
 
-                TestExtractMethod(code, expected, allowMovingDeclaration: false);
+                await TestExtractMethodAsync(code, expected);
             }
 
-            [WorkItem(528198)]
+            [WorkItem(528198, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/528198")]
             [Fact, Trait(Traits.Feature, Traits.Features.ExtractMethod)]
-            public void BugFix6794()
+            public async Task BugFix6794()
             {
                 var code = @"using System;
 class Program
@@ -196,10 +203,10 @@ class Program
     static void Main(string[] args)
     {
         int i = 2;
-        C<int> c = GetC(i);
+        C<int> c = GetC(ref i);
     }
 
-    private static C<int> GetC(int i)
+    private static C<int> GetC(ref int i)
     {
         return new C<int>(ref i);
     }
@@ -214,12 +221,12 @@ class Program
     }
 }";
 
-                TestExtractMethod(code, expected);
+                await TestExtractMethodAsync(code, expected);
             }
 
-            [WorkItem(528198)]
+            [WorkItem(528198, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/528198")]
             [Fact, Trait(Traits.Feature, Traits.Features.ExtractMethod)]
-            public void BugFix6794_1()
+            public async Task BugFix6794_1()
             {
                 var code = @"using System;
 class Program
@@ -243,12 +250,12 @@ class Program
 {
     static void Main(string[] args)
     {
-        C<int> c = GetC();
+        int i;
+        C<int> c = GetC(out i);
     }
 
-    private static C<int> GetC()
+    private static C<int> GetC(out int i)
     {
-        int i;
         return new C<int>(out i);
     }
 
@@ -261,11 +268,11 @@ class Program
     }
 }";
 
-                TestExtractMethod(code, expected);
+                await TestExtractMethodAsync(code, expected);
             }
 
             [Fact, Trait(Traits.Feature, Traits.Features.ExtractMethod)]
-            public void SelectDefaultOfT()
+            public async Task SelectDefaultOfT()
             {
                 var code = @"using System;
 using System.Collections.Generic;
@@ -297,7 +304,7 @@ class Test11<T>
     }
 }";
 
-                TestExtractMethod(code, expected);
+                await TestExtractMethodAsync(code, expected);
             }
 
             #endregion
@@ -305,7 +312,7 @@ class Test11<T>
             #region Operators
 
             [Fact, Trait(Traits.Feature, Traits.Features.ExtractMethod)]
-            public void SelectPostIncrementOperatorExtractWithRef()
+            public async Task SelectPostIncrementOperatorExtractWithRef()
             {
                 var code = @"class A
 {
@@ -326,11 +333,11 @@ class Test11<T>
         return i++;
     }
 }";
-                TestExtractMethod(code, expected, allowMovingDeclaration: false);
+                await TestExtractMethodAsync(code, expected);
             }
 
             [Fact, Trait(Traits.Feature, Traits.Features.ExtractMethod)]
-            public void SelectPostIncrementOperator()
+            public async Task SelectPostIncrementOperator()
             {
                 var code = @"class A
 {
@@ -343,19 +350,19 @@ class Test11<T>
 {
     int method(int i)
     {
-        return NewMethod(i);
+        return NewMethod(ref i);
     }
 
-    private static int NewMethod(int i)
+    private static int NewMethod(ref int i)
     {
         return i++;
     }
 }";
-                TestExtractMethod(code, expected);
+                await TestExtractMethodAsync(code, expected);
             }
 
             [Fact, Trait(Traits.Feature, Traits.Features.ExtractMethod)]
-            public void SelectPreIncrementOperator()
+            public async Task SelectPreIncrementOperator()
             {
                 var code = @"class A
 {
@@ -368,19 +375,19 @@ class Test11<T>
 {
     int method(int i)
     {
-        return NewMethod(i);
+        return NewMethod(ref i);
     }
 
-    private static int NewMethod(int i)
+    private static int NewMethod(ref int i)
     {
         return ++i;
     }
 }";
-                TestExtractMethod(code, expected);
+                await TestExtractMethodAsync(code, expected);
             }
 
             [Fact, Trait(Traits.Feature, Traits.Features.ExtractMethod)]
-            public void SelectPostDecrementOperator()
+            public async Task SelectPostDecrementOperator()
             {
                 var code = @"class A
 {
@@ -393,19 +400,19 @@ class Test11<T>
 {
     int method(int i)
     {
-        return NewMethod(i);
+        return NewMethod(ref i);
     }
 
-    private static int NewMethod(int i)
+    private static int NewMethod(ref int i)
     {
         return i--;
     }
 }";
-                TestExtractMethod(code, expected);
+                await TestExtractMethodAsync(code, expected);
             }
 
             [Fact, Trait(Traits.Feature, Traits.Features.ExtractMethod)]
-            public void SelectPreDecrementOperator()
+            public async Task SelectPreDecrementOperator()
             {
                 var code = @"class A
 {
@@ -418,22 +425,433 @@ class Test11<T>
 {
     int method(int i)
     {
-        return NewMethod(i);
+        return NewMethod(ref i);
     }
 
-    private static int NewMethod(int i)
+    private static int NewMethod(ref int i)
     {
         return --i;
     }
 }";
-                TestExtractMethod(code, expected);
+                await TestExtractMethodAsync(code, expected);
+            }
+
+            #endregion
+
+            #region ExpressionBodiedMembers
+
+            [WorkItem(528, "https://github.com/dotnet/roslyn/issues/528")]
+            [Fact, Trait(Traits.Feature, Traits.Features.ExtractMethod)]
+            public async Task ExpressionBodiedMethod()
+            {
+                var code = @"using System;
+class T
+{
+    int m;
+    int M1() => [|1|] + 2 + 3 + m;
+}";
+                var expected = @"using System;
+class T
+{
+    int m;
+    int M1() => NewMethod() + 2 + 3 + m;
+
+    private static int NewMethod()
+    {
+        return 1;
+    }
+}";
+                await TestExtractMethodAsync(code, expected);
+            }
+
+            [WorkItem(528, "https://github.com/dotnet/roslyn/issues/528")]
+            [Fact, Trait(Traits.Feature, Traits.Features.ExtractMethod)]
+            public async Task ExpressionBodiedOperator()
+            {
+                var code = @"using System;
+class Complex
+{
+    int real; int imaginary;
+    public static Complex operator +(Complex a, Complex b) => a.Add([|b.real + 1|]);
+
+    private Complex Add(int b)
+    {
+        throw new NotImplementedException();
+    }
+}";
+                var expected = @"using System;
+class Complex
+{
+    int real; int imaginary;
+    public static Complex operator +(Complex a, Complex b) => a.Add(NewMethod(b));
+
+    private static int NewMethod(Complex b)
+    {
+        return b.real + 1;
+    }
+
+    private Complex Add(int b)
+    {
+        throw new NotImplementedException();
+    }
+}";
+                await TestExtractMethodAsync(code, expected);
+            }
+
+            [WorkItem(528, "https://github.com/dotnet/roslyn/issues/528")]
+            [Fact, Trait(Traits.Feature, Traits.Features.ExtractMethod)]
+            public async Task ExpressionBodiedConversionOperator()
+            {
+                var code = @"using System;
+public struct DBBool
+{
+    public static readonly DBBool dbFalse = new DBBool(-1);
+    int value;
+
+    DBBool(int value)
+    {
+        this.value = value;
+    }
+
+    public static implicit operator DBBool(bool x) => x ? new DBBool([|1|]) : dbFalse;
+}";
+                var expected = @"using System;
+public struct DBBool
+{
+    public static readonly DBBool dbFalse = new DBBool(-1);
+    int value;
+
+    DBBool(int value)
+    {
+        this.value = value;
+    }
+
+    public static implicit operator DBBool(bool x) => x ? new DBBool(NewMethod()) : dbFalse;
+
+    private static int NewMethod()
+    {
+        return 1;
+    }
+}";
+                await TestExtractMethodAsync(code, expected);
+            }
+
+            [WorkItem(528, "https://github.com/dotnet/roslyn/issues/528")]
+            [Fact, Trait(Traits.Feature, Traits.Features.ExtractMethod)]
+            public async Task ExpressionBodiedProperty()
+            {
+                var code = @"using System;
+class T
+{
+    int M1 => [|1|] + 2;
+}";
+                var expected = @"using System;
+class T
+{
+    int M1 => NewMethod() + 2;
+
+    private static int NewMethod()
+    {
+        return 1;
+    }
+}";
+                await TestExtractMethodAsync(code, expected);
+            }
+
+            [WorkItem(528, "https://github.com/dotnet/roslyn/issues/528")]
+            [Fact, Trait(Traits.Feature, Traits.Features.ExtractMethod)]
+            public async Task ExpressionBodiedIndexer()
+            {
+                var code = @"using System;
+class SampleCollection<T>
+{
+    private T[] arr = new T[100];
+    public T this[int i] => i > 0 ? arr[[|i + 1|]] : arr[i + 2];
+}";
+                var expected = @"using System;
+class SampleCollection<T>
+{
+    private T[] arr = new T[100];
+    public T this[int i] => i > 0 ? arr[NewMethod(i)] : arr[i + 2];
+
+    private static int NewMethod(int i)
+    {
+        return i + 1;
+    }
+}";
+                await TestExtractMethodAsync(code, expected);
+            }
+
+            [WorkItem(528, "https://github.com/dotnet/roslyn/issues/528")]
+            [Fact, Trait(Traits.Feature, Traits.Features.ExtractMethod)]
+            public async Task ExpressionBodiedIndexer2()
+            {
+                var code = @"using System;
+class SampleCollection<T>
+{
+    private T[] arr = new T[100];
+    public T this[int i] => [|i > 0 ? arr[i + 1]|] : arr[i + 2];
+}";
+                var expected = @"using System;
+class SampleCollection<T>
+{
+    private T[] arr = new T[100];
+    public T this[int i] => NewMethod(i);
+
+    private T NewMethod(int i)
+    {
+        return i > 0 ? arr[i + 1] : arr[i + 2];
+    }
+}";
+                await TestExtractMethodAsync(code, expected);
+            }
+
+            [WorkItem(528, "https://github.com/dotnet/roslyn/issues/528")]
+            [Fact, Trait(Traits.Feature, Traits.Features.ExtractMethod)]
+            public async Task ExpressionBodiedMethodWithBlockBodiedAnonymousMethodExpression()
+            {
+                var code = @"using System;
+class TestClass
+{
+    Func<int, int> Y() => delegate (int x)
+    {
+        return [|9|];
+    };
+}";
+                var expected = @"using System;
+class TestClass
+{
+    Func<int, int> Y() => delegate (int x)
+    {
+        return NewMethod();
+    };
+
+    private static int NewMethod()
+    {
+        return 9;
+    }
+}";
+                await TestExtractMethodAsync(code, expected);
+            }
+
+            [WorkItem(528, "https://github.com/dotnet/roslyn/issues/528")]
+            [Fact, Trait(Traits.Feature, Traits.Features.ExtractMethod)]
+            public async Task ExpressionBodiedMethodWithSingleLineBlockBodiedAnonymousMethodExpression()
+            {
+                var code = @"using System;
+class TestClass
+{
+    Func<int, int> Y() => delegate (int x) { return [|9|]; };
+}";
+                var expected = @"using System;
+class TestClass
+{
+    Func<int, int> Y() => delegate (int x) { return NewMethod(); };
+
+    private static int NewMethod()
+    {
+        return 9;
+    }
+}";
+                await TestExtractMethodAsync(code, expected);
+            }
+
+            [WorkItem(528, "https://github.com/dotnet/roslyn/issues/528")]
+            [Fact, Trait(Traits.Feature, Traits.Features.ExtractMethod)]
+            public async Task ExpressionBodiedMethodWithBlockBodiedSimpleLambdaExpression()
+            {
+                var code = @"using System;
+class TestClass
+{
+    Func<int, int> Y() => f =>
+    {
+        return f * [|9|];
+    };
+}";
+                var expected = @"using System;
+class TestClass
+{
+    Func<int, int> Y() => f =>
+    {
+        return f * NewMethod();
+    };
+
+    private static int NewMethod()
+    {
+        return 9;
+    }
+}";
+                await TestExtractMethodAsync(code, expected);
+            }
+
+            [WorkItem(528, "https://github.com/dotnet/roslyn/issues/528")]
+            [Fact, Trait(Traits.Feature, Traits.Features.ExtractMethod)]
+            public async Task ExpressionBodiedMethodWithExpressionBodiedSimpleLambdaExpression()
+            {
+                var code = @"using System;
+class TestClass
+{
+    Func<int, int> Y() => f => f * [|9|];
+}";
+                var expected = @"using System;
+class TestClass
+{
+    Func<int, int> Y() => f => f * NewMethod();
+
+    private static int NewMethod()
+    {
+        return 9;
+    }
+}";
+                await TestExtractMethodAsync(code, expected);
+            }
+
+            [WorkItem(528, "https://github.com/dotnet/roslyn/issues/528")]
+            [Fact, Trait(Traits.Feature, Traits.Features.ExtractMethod)]
+            public async Task ExpressionBodiedMethodWithBlockBodiedParenthesizedLambdaExpression()
+            {
+                var code = @"using System;
+class TestClass
+{
+    Func<int, int> Y() => (f) =>
+    {
+        return f * [|9|];
+    };
+}";
+                var expected = @"using System;
+class TestClass
+{
+    Func<int, int> Y() => (f) =>
+    {
+        return f * NewMethod();
+    };
+
+    private static int NewMethod()
+    {
+        return 9;
+    }
+}";
+                await TestExtractMethodAsync(code, expected);
+            }
+
+            [WorkItem(528, "https://github.com/dotnet/roslyn/issues/528")]
+            [Fact, Trait(Traits.Feature, Traits.Features.ExtractMethod)]
+            public async Task ExpressionBodiedMethodWithExpressionBodiedParenthesizedLambdaExpression()
+            {
+                var code = @"using System;
+class TestClass
+{
+    Func<int, int> Y() => (f) => f * [|9|];
+}";
+                var expected = @"using System;
+class TestClass
+{
+    Func<int, int> Y() => (f) => f * NewMethod();
+
+    private static int NewMethod()
+    {
+        return 9;
+    }
+}";
+                await TestExtractMethodAsync(code, expected);
+            }
+
+            [WorkItem(528, "https://github.com/dotnet/roslyn/issues/528")]
+            [Fact, Trait(Traits.Feature, Traits.Features.ExtractMethod)]
+            public async Task ExpressionBodiedMethodWithBlockBodiedAnonymousMethodExpressionInMethodArgs()
+            {
+                var code = @"using System;
+class TestClass
+{
+    public int Prop => Method1(delegate()
+    {
+        return [|8|];
+    });
+
+    private int Method1(Func<int> p)
+    {
+        throw new NotImplementedException();
+    }
+}";
+                var expected = @"using System;
+class TestClass
+{
+    public int Prop => Method1(delegate()
+    {
+        return NewMethod();
+    });
+
+    private static int NewMethod()
+    {
+        return 8;
+    }
+
+    private int Method1(Func<int> p)
+    {
+        throw new NotImplementedException();
+    }
+}";
+                await TestExtractMethodAsync(code, expected);
+            }
+
+            [WorkItem(528, "https://github.com/dotnet/roslyn/issues/528")]
+            [Fact, Trait(Traits.Feature, Traits.Features.ExtractMethod)]
+            public async Task LeadingAndTrailingTriviaOnExpressionBodiedMethod()
+            {
+                var code = @"using System;
+class TestClass
+{
+    int M1() => 1 + 2 + /*not moved*/ [|3|] /*not moved*/;
+
+    void Cat() { }
+}";
+                var expected = @"using System;
+class TestClass
+{
+    int M1() => 1 + 2 + /*not moved*/ NewMethod() /*not moved*/;
+
+    private static int NewMethod()
+    {
+        return 3;
+    }
+
+    void Cat() { }
+}";
+                await TestExtractMethodAsync(code, expected);
+            }
+
+            #endregion
+
+            #region Patterns
+
+            [WorkItem(9244, "https://github.com/dotnet/roslyn/issues/9244")]
+            [Fact]
+            public async Task PatternIsDisabled()
+            {
+                var code = @"
+using System;
+class Program
+{
+    static void Main()
+    {
+        object o = null;
+        if (o is Program [|p|])
+        {
+
+        }
+    }
+}
+
+";
+
+                await ExpectExtractMethodToFailAsync(code);
             }
 
             #endregion
 
             [WorkItem(11155, "DevDiv_Projects/Roslyn")]
             [Fact, Trait(Traits.Feature, Traits.Features.ExtractMethod)]
-            public void AnonymousTypeMember1()
+            public async Task AnonymousTypeMember1()
             {
                 var code = @"using System;
  
@@ -446,12 +864,12 @@ class Program
     }
 }
 ";
-                ExpectExtractMethodToFail(code);
+                await ExpectExtractMethodToFailAsync(code);
             }
 
-            [WorkItem(544259)]
+            [WorkItem(544259, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/544259")]
             [Fact, Trait(Traits.Feature, Traits.Features.ExtractMethod)]
-            public void ExtractMethod_ConstructorInitializer()
+            public async Task ExtractMethod_ConstructorInitializer()
             {
                 var code = @"class Program
 {
@@ -473,12 +891,12 @@ class Program
     }
 }";
 
-                TestExtractMethod(code, expected);
+                await TestExtractMethodAsync(code, expected);
             }
 
-            [WorkItem(543984)]
+            [WorkItem(543984, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/543984")]
             [Fact, Trait(Traits.Feature, Traits.Features.ExtractMethod)]
-            public void ExtractMethod_UnsafeAddressTaken()
+            public async Task ExtractMethod_UnsafeAddressTaken()
             {
                 var code = @"class C
 {
@@ -502,12 +920,12 @@ class Program
     }
 }";
 
-                ExpectExtractMethodToFail(code, expected);
+                await ExpectExtractMethodToFailAsync(code, expected);
             }
 
-            [WorkItem(544387)]
+            [WorkItem(544387, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/544387")]
             [Fact, Trait(Traits.Feature, Traits.Features.ExtractMethod)]
-            public void ExtractMethod_PointerType()
+            public async Task ExtractMethod_PointerType()
             {
                 var code = @"class Test
 {
@@ -537,12 +955,12 @@ class Program
     }
 }";
 
-                TestExtractMethod(code, expected);
+                await TestExtractMethodAsync(code, expected);
             }
 
-            [WorkItem(544514)]
+            [WorkItem(544514, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/544514")]
             [Fact, Trait(Traits.Feature, Traits.Features.ExtractMethod)]
-            public void ExtractMethod_AnonymousType()
+            public async Task ExtractMethod_AnonymousType()
             {
                 var code = @"public class Test
 {
@@ -561,21 +979,21 @@ class Program
         var p1 = new { Price = 45 };
         var p2 = new { Price = 50 };
 
-        NewMethod(p2);
+        p1 = NewMethod(p2);
     }
 
-    private static void NewMethod(object p2)
+    private static object NewMethod(object p2)
     {
-        object p1 = p2;
+        return p2;
     }
 }";
 
-                ExpectExtractMethodToFail(code, expected);
+                await ExpectExtractMethodToFailAsync(code, expected);
             }
 
-            [WorkItem(544920)]
+            [WorkItem(544920, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/544920")]
             [Fact, Trait(Traits.Feature, Traits.Features.ExtractMethod)]
-            public void ExtractMethod_StackAllocExpression()
+            public async Task ExtractMethod_StackAllocExpression()
             {
                 var code = @"
 unsafe class C
@@ -601,12 +1019,12 @@ unsafe class C
 }
 ";
 
-                TestExtractMethod(code, expected);
+                await TestExtractMethodAsync(code, expected);
             }
 
-            [WorkItem(539310)]
+            [WorkItem(539310, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/539310")]
             [Fact, Trait(Traits.Feature, Traits.Features.ExtractMethod)]
-            public void Readonly_Field_WrittenTo()
+            public async Task Readonly_Field_WrittenTo()
             {
                 var code = @"class C
 {
@@ -617,12 +1035,12 @@ unsafe class C
         [|i = 1;|]
     }
 }";
-                ExpectExtractMethodToFail(code);
+                await ExpectExtractMethodToFailAsync(code);
             }
 
-            [WorkItem(539310)]
+            [WorkItem(539310, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/539310")]
             [Fact, Trait(Traits.Feature, Traits.Features.ExtractMethod)]
-            public void Readonly_Field()
+            public async Task Readonly_Field()
             {
                 var code = @"class C
 {
@@ -649,12 +1067,12 @@ unsafe class C
         var x = i;
     }
 }";
-                TestExtractMethod(code, expected);
+                await TestExtractMethodAsync(code, expected);
             }
 
-            [WorkItem(545180)]
+            [WorkItem(545180, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/545180")]
             [Fact, Trait(Traits.Feature, Traits.Features.ExtractMethod)]
-            public void NodeHasSyntacticErrors()
+            public async Task NodeHasSyntacticErrors()
             {
                 var code = @"using System;
 using System.Collections.Generic;
@@ -671,12 +1089,12 @@ class Program
     }
 }
 ";
-                ExpectExtractMethodToFail(code);
+                await ExpectExtractMethodToFailAsync(code);
             }
 
-            [WorkItem(545292)]
+            [WorkItem(545292, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/545292")]
             [Fact, Trait(Traits.Feature, Traits.Features.ExtractMethod)]
-            public void LocalConst()
+            public async Task LocalConst()
             {
                 var code = @"class Test
 {
@@ -685,12 +1103,12 @@ class Program
         const int v = [|3|];
     }
 }";
-                ExpectExtractMethodToFail(code);
+                await ExpectExtractMethodToFailAsync(code);
             }
 
-            [WorkItem(545315)]
+            [WorkItem(545315, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/545315")]
             [Fact, Trait(Traits.Feature, Traits.Features.ExtractMethod)]
-            public void Nullable()
+            public async Task Nullable()
             {
                 var code = @"using System;
 class Program
@@ -716,12 +1134,12 @@ class Program
     }
 }";
 
-                TestExtractMethod(code, expected);
+                await TestExtractMethodAsync(code, expected);
             }
 
-            [WorkItem(545263)]
+            [WorkItem(545263, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/545263")]
             [Fact, Trait(Traits.Feature, Traits.Features.ExtractMethod)]
-            public void SyntacticErrorInSelection()
+            public async Task SyntacticErrorInSelection()
             {
                 var code = @"class Program
 {
@@ -738,12 +1156,12 @@ class Program
     }
 }
 ";
-                ExpectExtractMethodToFail(code);
+                await ExpectExtractMethodToFailAsync(code);
             }
 
-            [WorkItem(544497)]
+            [WorkItem(544497, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/544497")]
             [Fact, Trait(Traits.Feature, Traits.Features.ExtractMethod)]
-            public void StackAllocExpression()
+            public async Task StackAllocExpression()
             {
                 var code = @"using System;
 class Test
@@ -766,12 +1184,12 @@ class Test
         void* buffer = stackalloc char[16];
     }
 }";
-                TestExtractMethod(code, expected);
+                await TestExtractMethodAsync(code, expected);
             }
 
-            [WorkItem(545503)]
+            [WorkItem(545503, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/545503")]
             [Fact, Trait(Traits.Feature, Traits.Features.ExtractMethod)]
-            public void MethodBodyInScript()
+            public async Task MethodBodyInScript()
             {
                 var code = @"#r ""System.Management""
 using System;
@@ -822,12 +1240,12 @@ void NewMethod(string query, string[,] labelKeys)
     }
     output.AppendLine();
 }";
-                TestExtractMethod(code, expected, parseOptions: new CSharpParseOptions(kind: SourceCodeKind.Script));
+                await TestExtractMethodAsync(code, expected, parseOptions: new CSharpParseOptions(kind: SourceCodeKind.Script));
             }
 
-            [WorkItem(544920)]
+            [WorkItem(544920, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/544920")]
             [Fact, Trait(Traits.Feature, Traits.Features.ExtractMethod)]
-            public void NoSimplicationForStackAlloc()
+            public async Task NoSimplificationForStackAlloc()
             {
                 var code = @"using System;
  
@@ -855,19 +1273,19 @@ unsafe class C
         return p;
     }
 }";
-                TestExtractMethod(code, expected);
+                await TestExtractMethodAsync(code, expected);
             }
 
-            [WorkItem(545553)]
+            [WorkItem(545553, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/545553")]
             [Fact, Trait(Traits.Feature, Traits.Features.ExtractMethod)]
-            public void CheckStatementContext1()
+            public async Task CheckStatementContext1()
             {
                 var code = @"using System;
 
 class X
 {
-    static void Foo(Func<X, byte> x, string y) { Console.WriteLine(1); }
-    static void Foo(Func<int?, byte> x, object y) { Console.WriteLine(2); }
+    static void Goo(Func<X, byte> x, string y) { Console.WriteLine(1); }
+    static void Goo(Func<int?, byte> x, object y) { Console.WriteLine(2); }
 
     const int Value = 1000;
 
@@ -875,7 +1293,7 @@ class X
     {
         unchecked
         {
-            [|Foo(X => (byte)X.Value, null);|] // Extract method
+            [|Goo(X => (byte)X.Value, null);|] // Extract method
         }
     }
 }";
@@ -883,8 +1301,8 @@ class X
 
 class X
 {
-    static void Foo(Func<X, byte> x, string y) { Console.WriteLine(1); }
-    static void Foo(Func<int?, byte> x, object y) { Console.WriteLine(2); }
+    static void Goo(Func<X, byte> x, string y) { Console.WriteLine(1); }
+    static void Goo(Func<int?, byte> x, object y) { Console.WriteLine(2); }
 
     const int Value = 1000;
 
@@ -900,23 +1318,23 @@ class X
     {
         unchecked
         {
-            Foo(X => (byte)X.Value, null);
+            Goo(X => (byte)X.Value, null);
         }
     }
 }";
-                TestExtractMethod(code, expected);
+                await TestExtractMethodAsync(code, expected);
             }
 
-            [WorkItem(545553)]
+            [WorkItem(545553, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/545553")]
             [Fact, Trait(Traits.Feature, Traits.Features.ExtractMethod)]
-            public void CheckStatementContext2()
+            public async Task CheckStatementContext2()
             {
                 var code = @"using System;
 
 class X
 {
-    static void Foo(Func<X, byte> x, string y) { Console.WriteLine(1); }
-    static void Foo(Func<int?, byte> x, object y) { Console.WriteLine(2); }
+    static void Goo(Func<X, byte> x, string y) { Console.WriteLine(1); }
+    static void Goo(Func<int?, byte> x, object y) { Console.WriteLine(2); }
 
     const int Value = 1000;
 
@@ -924,7 +1342,7 @@ class X
     {
         unchecked
         [|{
-            Foo(X => (byte)X.Value, null); // Extract method
+            Goo(X => (byte)X.Value, null); // Extract method
         }|]
     }
 }";
@@ -932,8 +1350,8 @@ class X
 
 class X
 {
-    static void Foo(Func<X, byte> x, string y) { Console.WriteLine(1); }
-    static void Foo(Func<int?, byte> x, object y) { Console.WriteLine(2); }
+    static void Goo(Func<X, byte> x, string y) { Console.WriteLine(1); }
+    static void Goo(Func<int?, byte> x, object y) { Console.WriteLine(2); }
 
     const int Value = 1000;
 
@@ -946,23 +1364,23 @@ class X
     {
         unchecked
         {
-            Foo(X => (byte)X.Value, null); // Extract method
+            Goo(X => (byte)X.Value, null); // Extract method
         }
     }
 }";
-                TestExtractMethod(code, expected);
+                await TestExtractMethodAsync(code, expected);
             }
 
-            [WorkItem(545553)]
+            [WorkItem(545553, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/545553")]
             [Fact, Trait(Traits.Feature, Traits.Features.ExtractMethod)]
-            public void CheckStatementContext3()
+            public async Task CheckStatementContext3()
             {
                 var code = @"using System;
 
 class X
 {
-    static void Foo(Func<X, byte> x, string y) { Console.WriteLine(1); }
-    static void Foo(Func<int?, byte> x, object y) { Console.WriteLine(2); }
+    static void Goo(Func<X, byte> x, string y) { Console.WriteLine(1); }
+    static void Goo(Func<int?, byte> x, object y) { Console.WriteLine(2); }
 
     const int Value = 1000;
 
@@ -971,7 +1389,7 @@ class X
         unchecked
         {
             [|{
-                Foo(X => (byte)X.Value, null); // Extract method
+                Goo(X => (byte)X.Value, null); // Extract method
             }|]
         }
     }
@@ -980,8 +1398,8 @@ class X
 
 class X
 {
-    static void Foo(Func<X, byte> x, string y) { Console.WriteLine(1); }
-    static void Foo(Func<int?, byte> x, object y) { Console.WriteLine(2); }
+    static void Goo(Func<X, byte> x, string y) { Console.WriteLine(1); }
+    static void Goo(Func<int?, byte> x, object y) { Console.WriteLine(2); }
 
     const int Value = 1000;
 
@@ -997,37 +1415,37 @@ class X
     {
         unchecked
         {
-            Foo(X => (byte)X.Value, null); // Extract method
+            Goo(X => (byte)X.Value, null); // Extract method
         }
     }
 }";
-                TestExtractMethod(code, expected);
+                await TestExtractMethodAsync(code, expected);
             }
 
-            [WorkItem(545553)]
+            [WorkItem(545553, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/545553")]
             [Fact, Trait(Traits.Feature, Traits.Features.ExtractMethod)]
-            public void CheckExpressionContext1()
+            public async Task CheckExpressionContext1()
             {
                 var code = @"using System;
 
 class X
 {
-    static int Foo(Func<X, byte> x, string y) { return 1; } // This Foo is invoked before refactoring
-    static int Foo(Func<int?, byte> x, object y) { return 2; }
+    static int Goo(Func<X, byte> x, string y) { return 1; } // This Goo is invoked before refactoring
+    static int Goo(Func<int?, byte> x, object y) { return 2; }
 
     const int Value = 1000;
 
     static void Main()
     {
-        var s = unchecked(1 + [|Foo(X => (byte)X.Value, null)|]);
+        var s = unchecked(1 + [|Goo(X => (byte)X.Value, null)|]);
     }
 }";
                 var expected = @"using System;
 
 class X
 {
-    static int Foo(Func<X, byte> x, string y) { return 1; } // This Foo is invoked before refactoring
-    static int Foo(Func<int?, byte> x, object y) { return 2; }
+    static int Goo(Func<X, byte> x, string y) { return 1; } // This Goo is invoked before refactoring
+    static int Goo(Func<int?, byte> x, object y) { return 2; }
 
     const int Value = 1000;
 
@@ -1038,14 +1456,14 @@ class X
 
     private static int NewMethod()
     {
-        return unchecked(Foo(X => (byte)X.Value, null));
+        return unchecked(Goo(X => (byte)X.Value, null));
     }
 }";
-                TestExtractMethod(code, expected);
+                await TestExtractMethodAsync(code, expected);
             }
 
             [Fact, Trait(Traits.Feature, Traits.Features.ExtractMethod)]
-            public void AwaitExpression_Normal_SingleStatement()
+            public async Task AwaitExpression_Normal_SingleStatement()
             {
                 var code = @"using System;
 using System.Threading.Tasks;
@@ -1072,11 +1490,11 @@ class X
         await Task.Run(() => { });
     }
 }";
-                TestExtractMethod(code, expected);
+                await TestExtractMethodAsync(code, expected);
             }
 
             [Fact, Trait(Traits.Feature, Traits.Features.ExtractMethod)]
-            public void AwaitExpression_Normal_Expression()
+            public async Task AwaitExpression_Normal_Expression()
             {
                 var code = @"using System;
 using System.Threading.Tasks;
@@ -1103,11 +1521,11 @@ class X
         await Task.Run(() => { });
     }
 }";
-                TestExtractMethod(code, expected);
+                await TestExtractMethodAsync(code, expected);
             }
 
             [Fact, Trait(Traits.Feature, Traits.Features.ExtractMethod)]
-            public void AwaitExpression_Normal_MultipleStatements()
+            public async Task AwaitExpression_Normal_MultipleStatements()
             {
                 var code = @"using System;
 using System.Threading.Tasks;
@@ -1142,11 +1560,11 @@ class X
         return;
     }
 }";
-                TestExtractMethod(code, expected);
+                await TestExtractMethodAsync(code, expected);
             }
 
             [Fact, Trait(Traits.Feature, Traits.Features.ExtractMethod)]
-            public void AwaitExpression_Normal_ExpressionWithReturn()
+            public async Task AwaitExpression_Normal_ExpressionWithReturn()
             {
                 var code = @"using System;
 using System.Threading.Tasks;
@@ -1177,11 +1595,11 @@ class X
         return await Task.Run(() => 1);
     }
 }";
-                TestExtractMethod(code, expected);
+                await TestExtractMethodAsync(code, expected);
             }
 
             [Fact, Trait(Traits.Feature, Traits.Features.ExtractMethod)]
-            public void AwaitExpression_Normal_ExpressionInAwaitExpression()
+            public async Task AwaitExpression_Normal_ExpressionInAwaitExpression()
             {
                 var code = @"using System;
 using System.Threading.Tasks;
@@ -1208,11 +1626,11 @@ class X
         return Task.Run(() => 1);
     }
 }";
-                TestExtractMethod(code, expected);
+                await TestExtractMethodAsync(code, expected);
             }
 
             [Fact, Trait(Traits.Feature, Traits.Features.ExtractMethod)]
-            public void AwaitExpression_Normal_StatementWithAwaitExpressionWithReturn()
+            public async Task AwaitExpression_Normal_StatementWithAwaitExpressionWithReturn()
             {
                 var code = @"using System;
 using System.Threading.Tasks;
@@ -1239,11 +1657,11 @@ class X
         await Task.Run(() => 1);
     }
 }";
-                TestExtractMethod(code, expected);
+                await TestExtractMethodAsync(code, expected);
             }
 
             [Fact, Trait(Traits.Feature, Traits.Features.ExtractMethod)]
-            public void AwaitExpression_Normal_AwaitWithReturnParameter()
+            public async Task AwaitExpression_Normal_AwaitWithReturnParameter()
             {
                 var code = @"using System;
 using System.Threading.Tasks;
@@ -1275,11 +1693,11 @@ class X
         return i;
     }
 }";
-                TestExtractMethod(code, expected);
+                await TestExtractMethodAsync(code, expected);
             }
 
             [Fact, Trait(Traits.Feature, Traits.Features.ExtractMethod)]
-            public void AwaitExpression_Normal_AwaitWithReturnParameter_Error()
+            public async Task AwaitExpression_Normal_AwaitWithReturnParameter_Error()
             {
                 var code = @"using System;
 using System.Threading.Tasks;
@@ -1293,11 +1711,11 @@ class X
         Console.WriteLine(i);
     }
 }";
-                ExpectExtractMethodToFail(code);
+                await ExpectExtractMethodToFailAsync(code);
             }
 
             [Fact, Trait(Traits.Feature, Traits.Features.ExtractMethod)]
-            public void AwaitExpression_AsyncLambda()
+            public async Task AwaitExpression_AsyncLambda()
             {
                 // this is an error case. but currently, I didn't blocked this. but we could if we want to.
                 var code = @"using System;
@@ -1325,11 +1743,11 @@ class X
         return async () => await Task.Run(() => 1);
     }
 }";
-                TestExtractMethod(code, expected);
+                await TestExtractMethodAsync(code, expected);
             }
 
             [Fact, Trait(Traits.Feature, Traits.Features.ExtractMethod)]
-            public void AwaitExpression_AsyncLambda_Body()
+            public async Task AwaitExpression_AsyncLambda_Body()
             {
                 // this is an error case. but currently, I didn't blocked this. but we could if we want to.
                 var code = @"using System;
@@ -1357,11 +1775,11 @@ class X
         return await Task.Run(() => 1);
     }
 }";
-                TestExtractMethod(code, expected);
+                await TestExtractMethodAsync(code, expected);
             }
 
             [Fact, Trait(Traits.Feature, Traits.Features.ExtractMethod)]
-            public void AwaitExpression_AsyncLambda_WholeExpression()
+            public async Task AwaitExpression_AsyncLambda_WholeExpression()
             {
                 // this is an error case. but currently, I didn't blocked this. but we could if we want to.
                 var code = @"using System;
@@ -1389,12 +1807,12 @@ class X
         Test(async () => await Task.Run(() => 1));
     }
 }";
-                TestExtractMethod(code, expected);
+                await TestExtractMethodAsync(code, expected);
             }
 
-            [WorkItem(1064798)]
+            [WorkItem(1064798, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/1064798")]
             [Fact, Trait(Traits.Feature, Traits.Features.ExtractMethod)]
-            public void ExpressionInStringInterpolation()
+            public async Task ExpressionInStringInterpolation()
             {
                 var code = @"using System;
 
@@ -1419,14 +1837,14 @@ class X
         return int.Parse(""12345"");
     }
 }";
-                TestExtractMethod(code, expected);
+                await TestExtractMethodAsync(code, expected);
             }
 
-			[WorkItem(859493)]
-			[Fact, Trait(Traits.Feature, Traits.Features.ExtractMethod)]
-			public void ExpressionInYieldReturnStatement()
-			{
-				var code = @"using System;
+            [WorkItem(859493, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/859493")]
+            [Fact, Trait(Traits.Feature, Traits.Features.ExtractMethod)]
+            public async Task ExpressionInYieldReturnStatement()
+            {
+                var code = @"using System;
 using System.Collections.Generic;
 
 public class Test<T> 
@@ -1448,7 +1866,7 @@ public class Test<T>
         }
     }
 }";
-				var expected = @"using System;
+                var expected = @"using System;
 using System.Collections.Generic;
 
 public class Test<T> 
@@ -1475,9 +1893,122 @@ public class Test<T>
         return _localCurrent._item;
     }
 }";
-				TestExtractMethod(code, expected);
-			}
+                await TestExtractMethodAsync(code, expected);
+            }
+        }
 
-		}
-	}
+        [WorkItem(3147, "https://github.com/dotnet/roslyn/issues/3147")]
+        [Fact, Trait(Traits.Feature, Traits.Features.ExtractMethod)]
+        public async Task HandleFormattableStringTargetTyping1()
+        {
+            const string code = CodeSnippets.FormattableStringType + @"
+namespace N
+{
+    using System;
+
+    class C
+    {
+        public void M()
+        {
+            var f = FormattableString.Invariant([|$""""|]);
+        }
+    }
+}";
+
+            const string expected = CodeSnippets.FormattableStringType + @"
+namespace N
+{
+    using System;
+
+    class C
+    {
+        public void M()
+        {
+            var f = FormattableString.Invariant(NewMethod());
+        }
+
+        private static FormattableString NewMethod()
+        {
+            return $"""";
+        }
+    }
+}";
+
+            await TestExtractMethodAsync(code, expected);
+        }
+
+        [WorkItem(17971, "https://github.com/dotnet/roslyn/issues/17971")]
+        [Fact, Trait(Traits.Feature, Traits.Features.ExtractMethod)]
+        public async Task BrokenForeachLoop()
+        {
+            var code = @"using System;
+namespace ConsoleApp1
+{
+    class Program
+    {
+        static void Main(string[] args)
+        {
+            [|Console.WriteLine(1);
+            foreach ()
+            Console.WriteLine(2);|]
+        }
+    }
+}";
+            var expected = @"using System;
+namespace ConsoleApp1
+{
+    class Program
+    {
+        static void Main(string[] args)
+        {
+            NewMethod();
+        }
+
+        private static void NewMethod()
+        {
+            Console.WriteLine(1);
+            foreach ()
+                Console.WriteLine(2);
+        }
+    }
+}";
+
+            await TestExtractMethodAsync(code, expected);
+        }
+
+        [WorkItem(22150, "https://github.com/dotnet/roslyn/issues/22150")]
+        [Fact, Trait(Traits.Feature, Traits.Features.ExtractMethod)]
+        public async Task ExtractMethod_LocalVariableCrossingLocalFunction()
+        {
+            var code = @"using System;
+
+class C
+{
+    public void Test()
+    {
+        int x = 0;
+        [|void Local() { }
+        Console.WriteLine(x);|]
+    }
+}";
+            var expected = @"using System;
+
+class C
+{
+    public void Test()
+    {
+        int x = 0;
+        NewMethod(x);
+    }
+
+    private static void NewMethod(int x)
+    {
+        void Local() { }
+        Console.WriteLine(x);
+    }
+}";
+
+            await TestExtractMethodAsync(code, expected);
+        }
+    }
 }

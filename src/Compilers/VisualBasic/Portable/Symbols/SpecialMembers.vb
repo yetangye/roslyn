@@ -1,4 +1,6 @@
-﻿' Copyright (c) Microsoft.  All Rights Reserved.  Licensed under the Apache License, Version 2.0.  See License.txt in the project root for license information.
+﻿' Licensed to the .NET Foundation under one or more agreements.
+' The .NET Foundation licenses this file to you under the MIT license.
+' See the LICENSE file in the project root for more information.
 
 Imports System.Collections.Generic
 Imports System.Collections.ObjectModel
@@ -10,7 +12,7 @@ Imports Microsoft.CodeAnalysis.VisualBasic.Syntax
 
 Namespace Microsoft.CodeAnalysis.VisualBasic.Symbols
 
-    Partial Class AssemblySymbol
+    Partial Friend Class AssemblySymbol
 
         ''' <summary>
         ''' Lookup member declaration in predefined CorLib type used by this Assembly.
@@ -31,13 +33,13 @@ Namespace Microsoft.CodeAnalysis.VisualBasic.Symbols
 
     End Class
 
-    Partial Class MetadataOrSourceAssemblySymbol
+    Partial Friend Class MetadataOrSourceAssemblySymbol
 
         ''' <summary>
         ''' Lazy cache of special members.
         ''' Not yet known value is represented by ErrorTypeSymbol.UnknownResultType
         ''' </summary>
-        Private m_LazySpecialTypeMembers() As Symbol
+        Private _lazySpecialTypeMembers() As Symbol
 
         ''' <summary>
         ''' Lookup member declaration in predefined CorLib type in this Assembly. Only valid if this 
@@ -50,15 +52,15 @@ Namespace Microsoft.CodeAnalysis.VisualBasic.Symbols
             Next
 #End If
 
-            If m_LazySpecialTypeMembers Is Nothing OrElse m_LazySpecialTypeMembers(member) Is ErrorTypeSymbol.UnknownResultType Then
-                If (m_LazySpecialTypeMembers Is Nothing) Then
+            If _lazySpecialTypeMembers Is Nothing OrElse _lazySpecialTypeMembers(member) Is ErrorTypeSymbol.UnknownResultType Then
+                If (_lazySpecialTypeMembers Is Nothing) Then
                     Dim specialTypeMembers = New Symbol(SpecialMember.Count - 1) {}
 
                     For i As Integer = 0 To specialTypeMembers.Length - 1
                         specialTypeMembers(i) = ErrorTypeSymbol.UnknownResultType
                     Next
 
-                    Interlocked.CompareExchange(m_LazySpecialTypeMembers, specialTypeMembers, Nothing)
+                    Interlocked.CompareExchange(_lazySpecialTypeMembers, specialTypeMembers, Nothing)
                 End If
 
                 Dim descriptor = SpecialMembers.GetDescriptor(member)
@@ -69,10 +71,10 @@ Namespace Microsoft.CodeAnalysis.VisualBasic.Symbols
                     result = VisualBasicCompilation.GetRuntimeMember(type, descriptor, VisualBasicCompilation.SpecialMembersSignatureComparer.Instance, accessWithinOpt:=Nothing)
                 End If
 
-                Interlocked.CompareExchange(m_LazySpecialTypeMembers(member), result, DirectCast(ErrorTypeSymbol.UnknownResultType, Symbol))
+                Interlocked.CompareExchange(_lazySpecialTypeMembers(member), result, DirectCast(ErrorTypeSymbol.UnknownResultType, Symbol))
             End If
 
-            Return m_LazySpecialTypeMembers(member)
+            Return _lazySpecialTypeMembers(member)
         End Function
 
     End Class

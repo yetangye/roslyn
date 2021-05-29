@@ -1,4 +1,6 @@
-﻿' Copyright (c) Microsoft.  All Rights Reserved.  Licensed under the Apache License, Version 2.0.  See License.txt in the project root for license information.
+﻿' Licensed to the .NET Foundation under one or more agreements.
+' The .NET Foundation licenses this file to you under the MIT license.
+' See the LICENSE file in the project root for more information.
 
 Imports System.IO
 Imports Microsoft.CodeAnalysis
@@ -22,7 +24,7 @@ Namespace Microsoft.CodeAnalysis.VisualBasic.UnitTests
 
         <Fact>
         Public Sub BC30297ERR_SubNewCycle2()
-            Dim comp1 = CompilationUtils.CreateCompilationWithMscorlibAndVBRuntime(
+            Dim comp1 = CompilationUtils.CreateCompilationWithMscorlib40AndVBRuntime(
     <compilation>
         <file name="a.vb">
 Partial Class C1
@@ -56,7 +58,7 @@ BC30298: Constructor 'Public Sub New()' cannot call itself:
 
         <Fact()>
         Public Sub BC31522ERR_DllImportOnNonEmptySubOrFunction()
-            Dim comp1 = CompilationUtils.CreateCompilationWithMscorlibAndReferences(
+            Dim comp1 = CompilationUtils.CreateCompilationWithMscorlib40AndReferences(
     <compilation>
         <file name="a.vb">
 Module MyModule
@@ -75,7 +77,7 @@ End Module
 
         <Fact()>
         Public Sub BC32304ERR_ConflictDefaultPropertyAttribute()
-            Dim comp1 = CompilationUtils.CreateCompilationWithMscorlib(
+            Dim comp1 = CompilationUtils.CreateCompilationWithMscorlib40(
 <compilation>
     <file name="a.vb"><![CDATA[
 Imports System.Reflection
@@ -165,7 +167,7 @@ Interface I
 ]]></errors>)
         End Sub
 
-        <WorkItem(540610, "DevDiv")>
+        <WorkItem(540610, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/540610")>
         <Fact>
         Public Sub OverrideProperty()
             CompileAndVerify(
@@ -200,10 +202,10 @@ End Module
     </compilation>)
         End Sub
 
-        <WorkItem(540577, "DevDiv")>
+        <WorkItem(540577, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/540577")>
         <Fact>
         Public Sub AddErrorCompRef()
-            Dim comp1 = CreateCompilationWithMscorlib(
+            Dim comp1 = CreateCompilationWithMscorlib40(
     <compilation>
         <file name="a.vb">
 Public Class 
@@ -211,7 +213,7 @@ End Class
         </file>
     </compilation>)
 
-            Dim comp2 = CreateCompilationWithMscorlibAndVBRuntime(
+            Dim comp2 = CreateCompilationWithMscorlib40AndVBRuntime(
     <compilation>
         <file name="a.vb">
 Module M1
@@ -224,20 +226,20 @@ End Module
             comp2.VerifyDiagnostics()
         End Sub
 
-        <WorkItem(540643, "DevDiv")>
+        <WorkItem(540643, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/540643")>
         <Fact>
         Public Sub PEVerifyOverrides()
-            Dim comp1 = CompilationUtils.CreateCompilationWithMscorlib(
+            Dim comp1 = CompilationUtils.CreateCompilationWithMscorlib40(
     <compilation>
         <file name="a.vb">
 Imports System
 MustInherit Class cls1
-    MustOverride Sub Foo()
+    MustOverride Sub Goo()
 End Class
 
 Class cls2
     Inherits cls1
-    Overrides Sub foo()
+    Overrides Sub goo()
     End Sub
     Shared Sub Main()
     End Sub
@@ -252,7 +254,7 @@ End Class
         <WorkItem(6983, "DevDiv_Projects/Roslyn")>
         <Fact>
         Public Sub ConstCharWithChrw()
-            Dim comp1 = CompilationUtils.CreateCompilationWithMscorlibAndVBRuntime(
+            Dim comp1 = CompilationUtils.CreateCompilationWithMscorlib40AndVBRuntime(
     <compilation>
         <file name="a.vb">
 Imports System
@@ -281,10 +283,10 @@ End Module
 
         End Sub
 
-        <WorkItem(540536, "DevDiv")>
+        <WorkItem(540536, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/540536")>
         <Fact>
         Public Sub SkipCodeGenIfErrorExist()
-            Dim comp1 = CompilationUtils.CreateCompilationWithMscorlibAndVBRuntime(
+            Dim comp1 = CompilationUtils.CreateCompilationWithMscorlib40AndVBRuntime(
     <compilation>
         <file name="a.vb">
 Option Explicit
@@ -292,9 +294,9 @@ Module M1
     Sub Main()
         Exit Sub
     End Sub
-    Overloads Sub foo(ByVal arg As Byte)
+    Overloads Sub goo(ByVal arg As Byte)
     End Sub
-    Overloads Sub foo(ByVal arg As System.Byte)
+    Overloads Sub goo(ByVal arg As System.Byte)
     End Sub
 End Module
         </file>
@@ -307,7 +309,7 @@ End Module
         <WorkItem(6999, "DevDiv_Projects/Roslyn")>
         <Fact>
         Public Sub LambdaForMultiLine()
-            Dim comp1 = CompilationUtils.CreateCompilationWithMscorlibAndVBRuntime(
+            Dim comp1 = CompilationUtils.CreateCompilationWithMscorlib40AndVBRuntime(
     <compilation>
         <file name="a.vb">
 Module Module1
@@ -329,10 +331,10 @@ True
 ]]>)
         End Sub
 
-        <WorkItem(540659, "DevDiv")>
+        <WorkItem(540659, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/540659")>
         <Fact>
         Public Sub LambdaForSub()
-            Dim comp1 = CompilationUtils.CreateCompilationWithMscorlibAndVBRuntime(
+            Dim comp1 = CompilationUtils.CreateCompilationWithMscorlib40AndVBRuntime(
     <compilation>
         <file name="a.vb">
 Imports System
@@ -353,26 +355,26 @@ Hello Bug 7002
 ]]>)
         End Sub
 
-        <WorkItem(540658, "DevDiv")>
+        <WorkItem(540658, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/540658")>
         <Fact>
         Public Sub LambdaTest1()
-            Dim comp1 = CompilationUtils.CreateCompilationWithMscorlibAndVBRuntime(
+            Dim comp1 = CompilationUtils.CreateCompilationWithMscorlib40AndVBRuntime(
     <compilation>
         <file name="a.vb">
 Imports System
 Module M1
-    Sub Foo(Of T)(ByVal x As T, ByVal y As T)
+    Sub Goo(Of T)(ByVal x As T, ByVal y As T)
     End Sub
     Function Bar(Of T)(ByVal x As T) As T
     End Function
     Event ev(ByVal x As Integer, ByVal y As Integer)
     Sub Main()
-        Dim x = New Func(Of String, String)(AddressOf Foo)
+        Dim x = New Func(Of String, String)(AddressOf Goo)
         Dim x1 = New Func(Of String, String)(AddressOf Bar)
-        Dim x2 = Function() AddressOf Foo
-        Dim x21 = Sub() Call Function() Sub() AddressOf Foo
-        Dim x22 = Sub() Call Function() Sub() AddHandler ev, AddressOf Foo
-        Dim x3 As Func(Of Func(Of String, String)) = Function() AddressOf Foo
+        Dim x2 = Function() AddressOf Goo
+        Dim x21 = Sub() Call Function() Sub() AddressOf Goo
+        Dim x22 = Sub() Call Function() Sub() AddHandler ev, AddressOf Goo
+        Dim x3 As Func(Of Func(Of String, String)) = Function() AddressOf Goo
         Dim x31 As Func(Of Func(Of String, String)) = Function() AddressOf Bar
     End Sub
 End Module
@@ -380,26 +382,26 @@ End Module
     </compilation>)
             AssertTheseDiagnostics(comp1,
 <expected>
-BC31143: Method 'Public Sub Foo(Of T)(x As T, y As T)' does not have a signature compatible with delegate 'Delegate Function Func(Of String, String)(arg As String) As String'.
-        Dim x = New Func(Of String, String)(AddressOf Foo)
+BC31143: Method 'Public Sub Goo(Of T)(x As T, y As T)' does not have a signature compatible with delegate 'Delegate Function Func(Of String, String)(arg As String) As String'.
+        Dim x = New Func(Of String, String)(AddressOf Goo)
                                                       ~~~
 BC30581: 'AddressOf' expression cannot be converted to 'Object' because 'Object' is not a delegate type.
-        Dim x2 = Function() AddressOf Foo
+        Dim x2 = Function() AddressOf Goo
                             ~~~~~~~~~~~~~
 BC30035: Syntax error.
-        Dim x21 = Sub() Call Function() Sub() AddressOf Foo
+        Dim x21 = Sub() Call Function() Sub() AddressOf Goo
                                               ~~~~~~~~~
-BC31143: Method 'Public Sub Foo(Of T)(x As T, y As T)' does not have a signature compatible with delegate 'Delegate Function Func(Of String, String)(arg As String) As String'.
-        Dim x3 As Func(Of Func(Of String, String)) = Function() AddressOf Foo
+BC31143: Method 'Public Sub Goo(Of T)(x As T, y As T)' does not have a signature compatible with delegate 'Delegate Function Func(Of String, String)(arg As String) As String'.
+        Dim x3 As Func(Of Func(Of String, String)) = Function() AddressOf Goo
                                                                           ~~~
 
 </expected>)
         End Sub
 
-        <WorkItem(528232, "DevDiv")>
+        <WorkItem(528232, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/528232")>
         <Fact()>
         Public Sub LambdaTest3()
-            Dim comp1 = CompilationUtils.CreateCompilationWithMscorlibAndVBRuntime(
+            Dim comp1 = CompilationUtils.CreateCompilationWithMscorlib40AndVBRuntime(
     <compilation>
         <file name="a.vb">
 Imports System
@@ -416,10 +418,10 @@ End Module
             CompileAndVerify(comp1)
         End Sub
 
-        <WorkItem(540660, "DevDiv")>
+        <WorkItem(540660, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/540660")>
         <Fact>
         Public Sub LambdaTest4()
-            Dim comp1 = CompilationUtils.CreateCompilationWithMscorlibAndVBRuntime(
+            Dim comp1 = CompilationUtils.CreateCompilationWithMscorlib40AndVBRuntime(
     <compilation>
         <file name="a.vb">
 Imports System
@@ -442,18 +444,18 @@ BC36673: Multiline lambda expression is missing 'End Sub'.
 </expected>)
         End Sub
 
-        <WorkItem(528233, "DevDiv")>
+        <WorkItem(528233, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/528233")>
         <Fact()>
         Public Sub LambdaTest5()
-            Dim comp1 = CompilationUtils.CreateCompilationWithMscorlibAndVBRuntime(
+            Dim comp1 = CompilationUtils.CreateCompilationWithMscorlib40AndVBRuntime(
     <compilation>
         <file name="a.vb">
 Imports System
 Module M1
-    Sub Foo(ByVal x)
+    Sub Goo(ByVal x)
     End Sub
     Class C1
-        Public Shared y As Action(Of Integer) = Sub(c) Call (Sub(b) M1.Foo(b))(c)
+        Public Shared y As Action(Of Integer) = Sub(c) Call (Sub(b) M1.Goo(b))(c)
     End Class
     Sub Main()
     End Sub
@@ -464,10 +466,10 @@ End Module
         End Sub
 
 
-        <WorkItem(541360, "DevDiv")>
+        <WorkItem(541360, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/541360")>
         <Fact>
         Public Sub ERR_30500_CircularEvaluation1()
-            Dim comp1 = CompilationUtils.CreateCompilationWithMscorlibAndVBRuntime(
+            Dim comp1 = CompilationUtils.CreateCompilationWithMscorlib40AndVBRuntime(
         <compilation>
             <file name="a.vb">
         Imports System
@@ -491,14 +493,14 @@ End Module
                 )
         End Sub
 
-        <Fact(), WorkItem(543653, "DevDiv")>
+        <Fact(), WorkItem(543653, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/543653")>
         Public Sub CompareToOnDecimalTypeChar()
-            Dim comp = CompilationUtils.CreateCompilationWithMscorlibAndVBRuntime(
+            Dim comp = CompilationUtils.CreateCompilationWithMscorlib40AndVBRuntime(
     <compilation>
         <file name="a.vb">
 Module M1
     Const Curr1 = 5@
-    Sub FOO()
+    Sub GOO()
         If Curr1 &lt;&gt; 5 Then
         End If
     End Sub
@@ -513,15 +515,15 @@ End Module
 
 #Region "Mixed Error Tests"
 
-        <Fact, WorkItem(530211, "DevDiv")>
+        <Fact, WorkItem(530211, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/530211")>
         Public Sub ModuleNameMismatch()
-            Dim netModule = CreateCompilationWithMscorlib(
+            Dim netModule = CreateCompilationWithMscorlib40(
     <compilation name="ModuleNameMismatch">
         <file name="a.vb">
 Class Test
 End Class
         </file>
-    </compilation>, TestOptions.ReleaseModule)
+    </compilation>, options:=TestOptions.ReleaseModule)
 
             Dim netModuleMetadata = ModuleMetadata.CreateFromImage(netModule.EmitToArray())
 
@@ -536,14 +538,70 @@ End Module
     </compilation>
 
 
-            Dim compilation1 = CreateCompilationWithMscorlibAndVBRuntimeAndReferences(source, {netModuleMetadata.GetReference(filePath:="R:\A\B\ModuleNameMismatch.netmodule")})
+            Dim compilation1 = CreateCompilationWithMscorlib40AndVBRuntimeAndReferences(source, {netModuleMetadata.GetReference(filePath:="R:\A\B\ModuleNameMismatch.netmodule")})
             CompileAndVerify(compilation1)
 
-            Dim compilation2 = CreateCompilationWithMscorlibAndVBRuntimeAndReferences(source, {netModuleMetadata.GetReference(filePath:="R:\A\B\ModuleNameMismatch.mod")})
+            Dim compilation2 = CreateCompilationWithMscorlib40AndVBRuntimeAndReferences(source, {netModuleMetadata.GetReference(filePath:="R:\A\B\ModuleNameMismatch.mod")})
 
             AssertTheseDiagnostics(compilation2,
 <expected>
 BC37205: Module name 'ModuleNameMismatch.netmodule' stored in 'ModuleNameMismatch.mod' must match its filename.
+</expected>)
+        End Sub
+
+        <Fact, WorkItem(2774, "https://github.com/dotnet/roslyn/issues/2774")>
+        Public Sub DoNotCrashOrAssertBecauseOfAMissingHelper()
+            Dim compilation = CreateCompilationWithMscorlib40AndReferences(
+    <compilation>
+        <file name="a.vb"><![CDATA[
+Imports System.Linq
+
+Class C
+    Sub M(args As String())
+        Dim concat =
+            From x In args
+            Let y = x.ToString()
+            Let z = x.GetHashCode()
+            Select x & y & z
+    End Sub
+End Class
+        ]]></file>
+    </compilation>, {SystemCoreRef})
+
+            AssertTheseEmitDiagnostics(compilation,
+<expected><![CDATA[
+BC35000: Requested operation is not available because the runtime library function 'Microsoft.VisualBasic.CompilerServices.Conversions.ToString' is not defined.
+            Select x & y & z
+                           ~
+]]></expected>)
+        End Sub
+
+        <Fact, WorkItem(8287, "https://github.com/dotnet/roslyn/issues/8287")>
+        Public Sub ToManyUserStrings()
+
+            Dim source As New System.Text.StringBuilder()
+            source.Append("
+Module C
+    Sub Main()
+")
+
+            For i As Integer = 1 To 11
+                source.Append(
+"       System.Console.WriteLine(""")
+                source.Append(ChrW(AscW("A"c) + i), 1000000)
+                source.Append(""")
+")
+            Next
+
+            source.Append("
+    End Sub
+End Module")
+
+            Dim compilation = CreateEmptyCompilationWithReferences(VisualBasicSyntaxTree.ParseText(source.ToString()), {MscorlibRef, SystemRef, MsvbRef})
+
+            AssertTheseEmitDiagnostics(compilation,
+<expected>
+BC37255: Combined length of user strings used by the program exceeds allowed limit. Try to decrease use of string or XML literals.
 </expected>)
         End Sub
 

@@ -1,15 +1,15 @@
-' Copyright (c) Microsoft.  All Rights Reserved.  Licensed under the Apache License, Version 2.0.  See License.txt in the project root for license information.
+﻿' Licensed to the .NET Foundation under one or more agreements.
+' The .NET Foundation licenses this file to you under the MIT license.
+' See the LICENSE file in the project root for more information.
 
-Imports Microsoft.CodeAnalysis
-Imports Microsoft.CodeAnalysis.Editor.UnitTests.Workspaces
-Imports Microsoft.CodeAnalysis.Text
+Imports System.Threading.Tasks
 
 Namespace Microsoft.CodeAnalysis.Editor.UnitTests.Expansion
     Public Class ModuleNameExpansionTests
         Inherits AbstractExpansionTest
 
         <Fact, Trait(Traits.Feature, Traits.Features.Expansion)>
-        Public Sub ExpandModuleNameForSimpleName()
+        Public Async Function TestExpandModuleNameForSimpleName() As Task
             Dim input =
 <Workspace>
     <Project Language="Visual Basic" CommonReferences="true">
@@ -18,13 +18,13 @@ Imports N
 
 Module Program
     Sub Main()
-        {|Expand:Foo|}()
+        {|Expand:Goo|}()
     End Sub
 End Module
 
 Namespace N
     Module X
-        Sub Foo()
+        Sub Goo()
         End Sub
     End Module
 End Namespace
@@ -38,23 +38,23 @@ Imports N
 
 Module Program
     Sub Main()
-        Call Global.N.X.Foo()
+        Call Global.N.X.Goo()
     End Sub
 End Module
 
 Namespace N
     Module X
-        Sub Foo()
+        Sub Goo()
         End Sub
     End Module
 End Namespace
 </code>
 
-            Test(input, expected)
-        End Sub
+            Await TestAsync(input, expected)
+        End Function
 
         <Fact, Trait(Traits.Feature, Traits.Features.Expansion)>
-        Public Sub ExpandModuleNameForQualifiedNameWithMissingModuleName()
+        Public Async Function TestExpandModuleNameForQualifiedNameWithMissingModuleName() As Task
             Dim input =
 <Workspace>
     <Project Language="Visual Basic" CommonReferences="true">
@@ -63,13 +63,13 @@ Imports N
 
 Module Program
     Sub Main()
-        Dim bar As {|Expand:N.Foo|}
+        Dim bar As {|Expand:N.Goo|}
     End Sub
 End Module
 
 Namespace N
     Module X
-        Class Foo
+        Class Goo
         End Class
     End Module
 End Namespace
@@ -83,23 +83,23 @@ Imports N
 
 Module Program
     Sub Main()
-        Dim bar As Global.N.X.Foo
+        Dim bar As Global.N.X.Goo
     End Sub
 End Module
 
 Namespace N
     Module X
-        Class Foo
+        Class Goo
         End Class
     End Module
 End Namespace
 </code>
 
-            Test(input, expected)
-        End Sub
+            Await TestAsync(input, expected)
+        End Function
 
         <Fact, Trait(Traits.Feature, Traits.Features.Expansion)>
-        Public Sub ExpandModuleNameForMemberAccessWithMissingModuleName()
+        Public Async Function TestExpandModuleNameForMemberAccessWithMissingModuleName() As Task
             Dim input =
 <Workspace>
     <Project Language="Visual Basic" CommonReferences="true">
@@ -108,13 +108,13 @@ Imports N
 
 Module Program
     Sub Main()
-        {|Expand:N.Foo()|}
+        {|Expand:N.Goo()|}
     End Sub
 End Module
 
 Namespace N
     Module X
-        Sub Foo()
+        Sub Goo()
         End Sub
     End Module
 End Namespace
@@ -128,23 +128,23 @@ Imports N
 
 Module Program
     Sub Main()
-        Global.N.X.Foo()
+        Global.N.X.Goo()
     End Sub
 End Module
 
 Namespace N
     Module X
-        Sub Foo()
+        Sub Goo()
         End Sub
     End Module
 End Namespace
 </code>
 
-            Test(input, expected)
-        End Sub
+            Await TestAsync(input, expected)
+        End Function
 
         <Fact, Trait(Traits.Feature, Traits.Features.Expansion)>
-        Public Sub ExpandAndOmitModuleNameWhenConflicting()
+        Public Async Function TestExpandAndOmitModuleNameWhenConflicting() As Task
             Dim input =
                 <Workspace>
                     <Project Language="Visual Basic" AssemblyName="Project1" CommonReferences="true">
@@ -182,11 +182,11 @@ Namespace X
 End Namespace
                 </code>
 
-            Test(input, expected, useLastProject:=true)
-        End Sub
+            Await TestAsync(input, expected, useLastProject:=True)
+        End Function
 
         <Fact, Trait(Traits.Feature, Traits.Features.Expansion)>
-        Public Sub ExpandModuleNameForSimpleNameRoundtrip()
+        Public Async Function TestExpandModuleNameForSimpleNameRoundtrip() As Task
             Dim input =
 <Workspace>
     <Project Language="Visual Basic" CommonReferences="true">
@@ -195,13 +195,13 @@ Imports N
 
 Module Program
     Sub Main()
-        {|ExpandAndSimplify:Foo|}()
+        {|ExpandAndSimplify:Goo|}()
     End Sub
 End Module
 
 Namespace N
     Module X
-        Sub Foo()
+        Sub Goo()
         End Sub
     End Module
 End Namespace
@@ -215,23 +215,23 @@ Imports N
 
 Module Program
     Sub Main()
-        Foo()
+        Goo()
     End Sub
 End Module
 
 Namespace N
     Module X
-        Sub Foo()
+        Sub Goo()
         End Sub
     End Module
 End Namespace
 </code>
 
-            Test(input, expected)
-        End Sub
+            Await TestAsync(input, expected)
+        End Function
 
         <Fact, Trait(Traits.Feature, Traits.Features.Expansion)>
-        Public Sub ExpandModuleNameForQualifiedNameWithMissingModuleNameRoundtrip()
+        Public Async Function TestExpandModuleNameForQualifiedNameWithMissingModuleNameRoundtrip() As Task
             Dim input =
 <Workspace>
     <Project Language="Visual Basic" CommonReferences="true">
@@ -240,13 +240,13 @@ Imports N
 
 Module Program
     Sub Main()
-        Dim bar As {|ExpandAndSimplify:N.Foo|}
+        Dim bar As {|ExpandAndSimplify:N.Goo|}
     End Sub
 End Module
 
 Namespace N
     Module X
-        Class Foo
+        Class Goo
         End Class
     End Module
 End Namespace
@@ -260,20 +260,20 @@ Imports N
 
 Module Program
     Sub Main()
-        Dim bar As N.Foo
+        Dim bar As N.Goo
     End Sub
 End Module
 
 Namespace N
     Module X
-        Class Foo
+        Class Goo
         End Class
     End Module
 End Namespace
 </code>
 
-            Test(input, expected)
-        End Sub
+            Await TestAsync(input, expected)
+        End Function
 
     End Class
 End Namespace

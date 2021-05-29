@@ -1,4 +1,8 @@
-// Copyright (c) Microsoft.  All Rights Reserved.  Licensed under the Apache License, Version 2.0.  See License.txt in the project root for license information.
+﻿// Licensed to the .NET Foundation under one or more agreements.
+// The .NET Foundation licenses this file to you under the MIT license.
+// See the LICENSE file in the project root for more information.
+
+#nullable disable
 
 using System;
 using System.Runtime.InteropServices;
@@ -21,7 +25,7 @@ namespace Microsoft.VisualStudio.LanguageServices.Implementation.CodeModel.Inter
 
         void ExtractInterface(EnvDTE.CodeType codeType);
         void ImplementInterface(EnvDTE.CodeType implementor, object @interface, bool fExplicit);
-        void ImplementAbstractClass(EnvDTE.CodeType imlpementor, object abstractClass);
+        void ImplementAbstractClass(EnvDTE.CodeType implementor, object abstractClass);
         EnvDTE.CodeElement ImplementOverride(EnvDTE.CodeElement member, EnvDTE.CodeType implementor);
     }
 }

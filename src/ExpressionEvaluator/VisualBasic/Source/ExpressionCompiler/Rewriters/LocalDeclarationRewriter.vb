@@ -1,6 +1,11 @@
-﻿Imports System.Collections.Immutable
+﻿' Licensed to the .NET Foundation under one or more agreements.
+' The .NET Foundation licenses this file to you under the MIT license.
+' See the LICENSE file in the project root for more information.
+
+Imports System.Collections.Immutable
 Imports Microsoft.CodeAnalysis.Collections
 Imports Microsoft.CodeAnalysis.ExpressionEvaluator
+Imports Microsoft.CodeAnalysis.PooledObjects
 Imports Microsoft.CodeAnalysis.VisualBasic.Symbols
 
 Namespace Microsoft.CodeAnalysis.VisualBasic.ExpressionEvaluator
@@ -28,7 +33,7 @@ Namespace Microsoft.CodeAnalysis.VisualBasic.ExpressionEvaluator
 
         ' Find all implicitly declared locals.
         Private NotInheritable Class LocalDeclarationWalker
-            Inherits BoundTreeWalker
+            Inherits BoundTreeWalkerWithStackGuardWithoutRecursionOnTheLeftOfBinaryOperator
 
             Private ReadOnly _locals As HashSet(Of LocalSymbol)
 
@@ -49,32 +54,30 @@ Namespace Microsoft.CodeAnalysis.VisualBasic.ExpressionEvaluator
         Private Shared Function GenerateCreateVariableStatement(
             compilation As VisualBasicCompilation,
             container As EENamedTypeSymbol,
-            syntax As VisualBasicSyntaxNode,
+            syntax As SyntaxNode,
             local As LocalSymbol) As BoundStatement
 
-            Dim voidType = compilation.GetSpecialType(SpecialType.System_Void)
             Dim typeType = compilation.GetWellKnownType(WellKnownType.System_Type)
             Dim stringType = compilation.GetSpecialType(SpecialType.System_String)
+            Dim guidType = compilation.GetWellKnownType(WellKnownType.System_Guid)
+            Dim byteArrayType = ArrayTypeSymbol.CreateVBArray(
+                compilation.GetSpecialType(SpecialType.System_Byte),
+                ImmutableArray(Of CustomModifier).Empty,
+                rank:=1,
+                compilation:=compilation)
 
-            ' <>CreateVariable(type As Type, name As String)
-            Dim method = container.GetOrAddSynthesizedMethod(
-                ExpressionCompilerConstants.CreateVariableMethodName,
-                Function(c, n, s) New PlaceholderMethodSymbol(
-                    c,
-                    s,
-                    n,
-                    voidType,
-                    Function(m) ImmutableArray.Create(Of ParameterSymbol)(
-                        New SynthesizedParameterSymbol(m, typeType, ordinal:=0, isByRef:=False),
-                        New SynthesizedParameterSymbol(m, stringType, ordinal:=1, isByRef:=False))))
+            ' CreateVariable(type As Type, name As String)
+            Dim method = PlaceholderLocalSymbol.GetIntrinsicMethod(compilation, ExpressionCompilerConstants.CreateVariableMethodName)
             Dim type = New BoundGetType(syntax, New BoundTypeExpression(syntax, local.Type), typeType)
             Dim name = New BoundLiteral(syntax, ConstantValue.Create(local.Name), stringType)
+            Dim customTypeInfoPayloadId = New BoundObjectCreationExpression(syntax, Nothing, ImmutableArray(Of BoundExpression).Empty, Nothing, guidType)
+            Dim customTypeInfoPayload = New BoundLiteral(syntax, ConstantValue.Null, byteArrayType)
             Dim expr = New BoundCall(
                 syntax,
                 method,
                 methodGroupOpt:=Nothing,
                 receiverOpt:=Nothing,
-                arguments:=ImmutableArray.Create(Of BoundExpression)(type, name),
+                arguments:=ImmutableArray.Create(Of BoundExpression)(type, name, customTypeInfoPayloadId, customTypeInfoPayload),
                 constantValueOpt:=Nothing,
                 suppressObjectClone:=False,
                 type:=method.ReturnType)

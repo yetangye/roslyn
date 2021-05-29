@@ -1,6 +1,9 @@
-﻿' Copyright (c) Microsoft.  All Rights Reserved.  Licensed under the Apache License, Version 2.0.  See License.txt in the project root for license information.
+﻿' Licensed to the .NET Foundation under one or more agreements.
+' The .NET Foundation licenses this file to you under the MIT license.
+' See the LICENSE file in the project root for more information.
 
 Imports System.Collections.Immutable
+Imports Microsoft.CodeAnalysis.PooledObjects
 
 Namespace Microsoft.CodeAnalysis.VisualBasic.Symbols
 
@@ -9,7 +12,7 @@ Namespace Microsoft.CodeAnalysis.VisualBasic.Symbols
         Partial Private NotInheritable Class AnonymousTypeConstructorSymbol
             Inherits SynthesizedConstructorBase
 
-            Private m_parameters As ImmutableArray(Of ParameterSymbol)
+            Private _parameters As ImmutableArray(Of ParameterSymbol)
 
             Public Sub New(container As AnonymousTypeTemplateSymbol)
                 MyBase.New(VisualBasicSyntaxTree.DummyReference, container, False, Nothing, Nothing)
@@ -19,20 +22,20 @@ Namespace Microsoft.CodeAnalysis.VisualBasic.Symbols
                 Dim paramsArr = New ParameterSymbol(fieldsCount - 1) {}
                 For index = 0 To fieldsCount - 1
                     Dim [property] As PropertySymbol = container.Properties(index)
-                    paramsArr(index) = New SynthesizedParameterSimpleSymbol(Me, [property].Type, index, [property].Name)
+                    paramsArr(index) = New AnonymousTypeOrDelegateParameterSymbol(Me, [property].Type, index, isByRef:=False, [property].Name, correspondingInvokeParameterOrProperty:=index)
                 Next
-                Me.m_parameters = paramsArr.AsImmutableOrNull()
+                Me._parameters = paramsArr.AsImmutableOrNull()
             End Sub
 
             Friend Overrides ReadOnly Property ParameterCount As Integer
                 Get
-                    Return Me.m_parameters.Length
+                    Return Me._parameters.Length
                 End Get
             End Property
 
             Public Overrides ReadOnly Property Parameters As ImmutableArray(Of ParameterSymbol)
                 Get
-                    Return Me.m_parameters
+                    Return Me._parameters
                 End Get
             End Property
 

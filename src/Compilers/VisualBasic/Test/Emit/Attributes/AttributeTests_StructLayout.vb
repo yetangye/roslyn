@@ -1,4 +1,6 @@
-﻿' Copyright (c) Microsoft.  All Rights Reserved.  Licensed under the Apache License, Version 2.0.  See License.txt in the project root for license information.
+﻿' Licensed to the .NET Foundation under one or more agreements.
+' The .NET Foundation licenses this file to you under the MIT license.
+' See the LICENSE file in the project root for more information.
 
 Imports System.Reflection
 Imports System.Reflection.Metadata
@@ -62,7 +64,7 @@ End Class
             Const typeDefMask As TypeAttributes = TypeAttributes.StringFormatMask Or TypeAttributes.LayoutMask
 
             CompileAndVerify(source, validator:=
-                Sub(assembly, _omitted)
+                Sub(assembly)
                     Dim reader = assembly.GetMetadataReader()
                     Assert.Equal(9, reader.GetTableRowCount(TableIndex.ClassLayout))
 
@@ -340,8 +342,8 @@ End Class
     </file>
 </compilation>
 
-            Dim validator As Action(Of PEAssembly, TestEmitters) =
-                Sub(assembly, _omitted)
+            Dim validator As Action(Of PEAssembly) =
+                Sub(assembly)
                     Dim reader = assembly.GetMetadataReader()
                     For Each typeHandle In reader.TypeDefinitions
                         Dim type = reader.GetTypeDefinition(typeHandle)
@@ -387,8 +389,8 @@ End Class
                 End Sub
 
             CompileAndVerify(verifiable, validator:=validator)
-            CompileAndVerify(unverifiable, validator:=validator, verify:=False)
-            CompileAndVerify(unloadable, emitOptions:=TestEmitters.CCI, validator:=validator, verify:=False)
+            CompileAndVerify(unverifiable, validator:=validator, verify:=Verification.Fails)
+            CompileAndVerify(unloadable, validator:=validator, verify:=Verification.Fails)
         End Sub
 
         <Fact>
@@ -430,7 +432,7 @@ End Class
     </file>
 </compilation>
 
-            CreateCompilationWithMscorlib(source).AssertTheseDiagnostics(<![CDATA[
+            CreateCompilationWithMscorlib40(source).AssertTheseDiagnostics(<![CDATA[
 BC30127: Attribute 'StructLayoutAttribute' is not valid: Incorrect argument value.
 <StructLayout(LayoutKind.Sequential, Size:=1, Pack:=-1)>
                                               ~~~~~~~~
@@ -470,7 +472,7 @@ End Class
     </file>
 </compilation>
 
-            CreateCompilationWithMscorlib(source).AssertTheseDiagnostics(<![CDATA[
+            CreateCompilationWithMscorlib40(source).AssertTheseDiagnostics(<![CDATA[
 BC30127: Attribute 'StructLayoutAttribute' is not valid: Incorrect argument value.
 <StructLayout(LayoutKind.Sequential, Size:=-1)>
                                      ~~~~~~~~
@@ -508,7 +510,7 @@ End Class
     </file>
 </compilation>
 
-            CreateCompilationWithMscorlib(source).AssertTheseDiagnostics(<![CDATA[
+            CreateCompilationWithMscorlib40(source).AssertTheseDiagnostics(<![CDATA[
 BC30127: Attribute 'StructLayoutAttribute' is not valid: Incorrect argument value.
 <StructLayout(DirectCast((-1), LayoutKind), CharSet:=CharSet.Ansi)>
               ~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -564,7 +566,7 @@ End Class
     </file>
 </compilation>
             ' type C can't be loaded
-            CompileAndVerify(source, emitOptions:=TestEmitters.CCI, verify:=False)
+            CompileAndVerify(source, verify:=Verification.Fails)
         End Sub
 
         <Fact>
@@ -590,7 +592,7 @@ End Class
 </compilation>
 
             CompileAndVerify(source, validator:=
-                Sub(assembly, _omitted)
+                Sub(assembly)
                     Dim reader = assembly.GetMetadataReader()
                     Assert.Equal(2, reader.GetTableRowCount(TableIndex.FieldLayout))
 
@@ -676,7 +678,7 @@ End Enum
     </file>
 </compilation>
 
-            CreateCompilationWithMscorlib(source).AssertTheseDiagnostics(<![CDATA[
+            CreateCompilationWithMscorlib40(source).AssertTheseDiagnostics(<![CDATA[
 BC30127: Attribute 'FieldOffsetAttribute' is not valid: Incorrect argument value.
     <FieldOffset(-1)>
                  ~~
@@ -699,44 +701,50 @@ BC30127: Attribute 'FieldOffsetAttribute' is not valid: Incorrect argument value
                     Dim name = reader.GetString(type.Name)
 
                     Dim classSize As UInteger = 0, packingSize As UInteger = 0
-                    Dim mdLayout = type.GetLayout()
-                    Dim hasClassLayout = Not mdLayout.IsDefault
 
+                    Dim badLayout = False
+                    Dim mdLayout As System.Reflection.Metadata.TypeLayout
+                    Try
+                        mdLayout = type.GetLayout()
+                    Catch ex As BadImageFormatException
+                        badLayout = True
+                        mdLayout = Nothing
+                    End Try
+
+                    Dim hasClassLayout = Not mdLayout.IsDefault
                     Dim layout As TypeLayout = [module].Module.GetTypeLayout(typeHandle)
 
                     Select Case name
                         Case "<Module>"
                             Assert.False(hasClassLayout)
                             Assert.Equal(Nothing, layout)
+                            Assert.False(badLayout)
 
                         Case "S1"
-                            Assert.True(hasClassLayout)
-                            Assert.Equal(&HAAAAAAAA, mdLayout.Size)
-                            Assert.Equal(&HFFFF, mdLayout.PackingSize)
-                            Assert.Equal(New TypeLayout(LayoutKind.Sequential, 0, 0), layout)
-
                         Case "S2"
-                            Assert.True(hasClassLayout)
-                            Assert.Equal(&HFFFFFFFF, mdLayout.Size)
-                            Assert.Equal(2S, mdLayout.PackingSize)
-                            Assert.Equal(New TypeLayout(LayoutKind.Explicit, 0, 2), layout)
+                            ' invalid size/pack value
+                            Assert.False(hasClassLayout)
+                            Assert.True(badLayout)
 
                         Case "S3"
                             Assert.True(hasClassLayout)
                             Assert.Equal(1, mdLayout.Size)
                             Assert.Equal(2, mdLayout.PackingSize)
                             Assert.Equal(New TypeLayout(LayoutKind.Sequential, size:=1, alignment:=2), layout)
+                            Assert.False(badLayout)
 
                         Case "S4"
                             Assert.True(hasClassLayout)
                             Assert.Equal(&H12345678, mdLayout.Size)
                             Assert.Equal(0, mdLayout.PackingSize)
                             Assert.Equal(New TypeLayout(LayoutKind.Sequential, size:=&H12345678, alignment:=0), layout)
+                            Assert.False(badLayout)
 
                         Case "S5"
                             ' doesn't have layout
                             Assert.False(hasClassLayout)
                             Assert.Equal(New TypeLayout(LayoutKind.Sequential, size:=0, alignment:=0), layout)
+                            Assert.False(badLayout)
 
                         Case Else
                             Throw TestExceptionUtilities.UnexpectedValue(name)
@@ -747,8 +755,8 @@ BC30127: Attribute 'FieldOffsetAttribute' is not valid: Incorrect argument value
         End Sub
 
         Private Sub VerifyStructLayout(source As System.Xml.Linq.XElement, hasInstanceFields As Boolean)
-            CompileAndVerify(source, validator :=
-                Sub(assembly, _omitted)
+            CompileAndVerify(source, validator:=
+                Sub(assembly)
                     Dim reader = assembly.GetMetadataReader()
                     Dim type = reader.TypeDefinitions _
                         .Select(Function(handle) reader.GetTypeDefinition(handle)) _
@@ -758,7 +766,7 @@ BC30127: Attribute 'FieldOffsetAttribute' is not valid: Incorrect argument value
                     Dim layout = type.GetLayout()
                     If Not hasInstanceFields Then
                         Const typeDefMask As TypeAttributes = TypeAttributes.StringFormatMask Or TypeAttributes.LayoutMask
-    
+
                         Assert.False(layout.IsDefault)
                         Assert.Equal(TypeAttributes.SequentialLayout, type.Attributes And typeDefMask)
                         Assert.Equal(0, layout.PackingSize)
@@ -775,19 +783,19 @@ BC30127: Attribute 'FieldOffsetAttribute' is not valid: Incorrect argument value
             VerifyStructLayout(<compilation><file><![CDATA[
 Structure S
 End Structure
-]]></file></compilation>, hasInstanceFields := False)
+]]></file></compilation>, hasInstanceFields:=False)
 
             VerifyStructLayout(<compilation><file><![CDATA[
 Structure S
     Shared f As Integer
 End Structure
-]]></file></compilation>, hasInstanceFields := False)
+]]></file></compilation>, hasInstanceFields:=False)
 
             VerifyStructLayout(<compilation><file><![CDATA[
 Structure S
     Shared Property P As Integer
 End Structure
-]]></file></compilation>, hasInstanceFields := False)
+]]></file></compilation>, hasInstanceFields:=False)
 
             VerifyStructLayout(<compilation><file><![CDATA[
 Structure S
@@ -797,7 +805,7 @@ Structure S
         End Get
     End Property
 End Structure
-]]></file></compilation>, hasInstanceFields := False)
+]]></file></compilation>, hasInstanceFields:=False)
 
             VerifyStructLayout(<compilation><file><![CDATA[
 Structure S
@@ -807,32 +815,32 @@ Structure S
         End Get
     End Property
 End Structure
-]]></file></compilation>, hasInstanceFields := False)
+]]></file></compilation>, hasInstanceFields:=False)
 
             VerifyStructLayout(<compilation><file><![CDATA[
 Structure S
     Shared Event D()
 End Structure
-]]></file></compilation>, hasInstanceFields := False)
+]]></file></compilation>, hasInstanceFields:=False)
 
             ' instance fields
             VerifyStructLayout(<compilation><file><![CDATA[
 Structure S
     Private f As Integer
 End Structure
-]]></file></compilation>, hasInstanceFields := True)
+]]></file></compilation>, hasInstanceFields:=True)
 
             VerifyStructLayout(<compilation><file><![CDATA[
 Structure S
     Property P As Integer
 End Structure
-]]></file></compilation>, hasInstanceFields := True)
+]]></file></compilation>, hasInstanceFields:=True)
 
             VerifyStructLayout(<compilation><file><![CDATA[
 Structure S
     Event D()
 End Structure
-]]></file></compilation>, hasInstanceFields := True)
+]]></file></compilation>, hasInstanceFields:=True)
         End Sub
     End Class
 End Namespace

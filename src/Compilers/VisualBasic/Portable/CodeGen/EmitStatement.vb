@@ -1,14 +1,19 @@
-﻿' Copyright (c) Microsoft.  All Rights Reserved.  Licensed under the Apache License, Version 2.0.  See License.txt in the project root for license information.
+﻿' Licensed to the .NET Foundation under one or more agreements.
+' The .NET Foundation licenses this file to you under the MIT license.
+' See the LICENSE file in the project root for more information.
 
 Imports System.Collections.Immutable
+Imports System.Reflection.Metadata
 Imports System.Runtime.InteropServices
 Imports Microsoft.CodeAnalysis.CodeGen
 Imports Microsoft.CodeAnalysis.Collections
+Imports Microsoft.CodeAnalysis.Emit
+Imports Microsoft.CodeAnalysis.PooledObjects
 Imports Microsoft.CodeAnalysis.VisualBasic.Symbols
 
 Namespace Microsoft.CodeAnalysis.VisualBasic.CodeGen
 
-    Partial Class CodeGenerator
+    Partial Friend Class CodeGenerator
         Private Sub EmitStatement(statement As BoundStatement)
             Select Case statement.Kind
 
@@ -84,29 +89,28 @@ Namespace Microsoft.CodeAnalysis.VisualBasic.CodeGen
         Private Sub EmitNoOpStatement(statement As BoundNoOpStatement)
             Select Case statement.Flavor
                 Case NoOpStatementFlavor.Default
-                    ' Do Nothing.
-                    Return
+                    If _ilEmitStyle = ILEmitStyle.Debug Then
+                        _builder.EmitOpCode(ILOpCode.Nop)
+                    End If
 
                 Case NoOpStatementFlavor.AwaitYieldPoint
-                    Debug.Assert((Me._asyncYieldPoints Is Nothing) = (Me._asyncResumePoints Is Nothing))
-                    If Me._asyncYieldPoints Is Nothing Then
-                        Me._asyncYieldPoints = ArrayBuilder(Of Integer).GetInstance
-                        Me._asyncResumePoints = ArrayBuilder(Of Integer).GetInstance
+                    Debug.Assert((_asyncYieldPoints Is Nothing) = (_asyncResumePoints Is Nothing))
+                    If _asyncYieldPoints Is Nothing Then
+                        _asyncYieldPoints = ArrayBuilder(Of Integer).GetInstance
+                        _asyncResumePoints = ArrayBuilder(Of Integer).GetInstance
                     End If
-                    Debug.Assert(Me._asyncYieldPoints.Count = Me._asyncResumePoints.Count)
-                    Me._asyncYieldPoints.Add(Me._builder.AllocateILMarker())
-                    Return
+                    Debug.Assert(_asyncYieldPoints.Count = _asyncResumePoints.Count)
+                    _asyncYieldPoints.Add(_builder.AllocateILMarker())
 
                 Case NoOpStatementFlavor.AwaitResumePoint
-                    Debug.Assert(Me._asyncYieldPoints IsNot Nothing)
-                    Debug.Assert(Me._asyncResumePoints IsNot Nothing)
-                    Debug.Assert((Me._asyncYieldPoints.Count - 1) = Me._asyncResumePoints.Count)
-                    Me._asyncResumePoints.Add(Me._builder.AllocateILMarker())
-                    Return
+                    Debug.Assert(_asyncYieldPoints IsNot Nothing)
+                    Debug.Assert(_asyncResumePoints IsNot Nothing)
+                    Debug.Assert((_asyncYieldPoints.Count - 1) = _asyncResumePoints.Count)
+                    _asyncResumePoints.Add(_builder.AllocateILMarker())
 
+                Case Else
+                    Throw ExceptionUtilities.UnexpectedValue(statement.Flavor)
             End Select
-
-            Throw ExceptionUtilities.UnexpectedValue(statement.Flavor)
         End Sub
 
         Private Sub EmitTryStatement(statement As BoundTryStatement, Optional emitCatchesOnly As Boolean = False)
@@ -302,7 +306,7 @@ Namespace Microsoft.CodeAnalysis.VisualBasic.CodeGen
 
                     ' here we have our exception on the stack in a form of a reference type (O)
                     ' it means that we have to "unbox" it before storing to the local 
-                    ' if exception's type is a generic type prameter.
+                    ' if exception's type is a generic type parameter.
                     If exceptionSource.Type.IsTypeParameter Then
                         _builder.EmitOpCode(ILOpCode.Unbox_any)
                         EmitSymbolToken(exceptionSource.Type, exceptionSource.Syntax)
@@ -344,6 +348,12 @@ Namespace Microsoft.CodeAnalysis.VisualBasic.CodeGen
                         Case BoundKind.FieldAccess
                             Dim left = DirectCast(exceptionSource, BoundFieldAccess)
                             If Not left.FieldSymbol.IsShared Then
+
+                                Dim stateMachineField = TryCast(left.FieldSymbol, StateMachineFieldSymbol)
+                                If (stateMachineField IsNot Nothing) AndAlso (stateMachineField.SlotIndex >= 0) Then
+                                    DefineUserDefinedStateMachineHoistedLocal(stateMachineField)
+                                End If
+
                                 ' When assigning to a field
                                 ' we need to push param address below the exception
                                 Dim temp = AllocateTemp(exceptionSource.Type, exceptionSource.Syntax)
@@ -418,7 +428,7 @@ Namespace Microsoft.CodeAnalysis.VisualBasic.CodeGen
             Return Not Me._module.SourceModule.ContainingSourceAssembly.IsVbRuntime
         End Function
 
-        Private Sub EmitSetProjectError(syntaxNode As VisualBasicSyntaxNode, errorLineNumberOpt As BoundExpression)
+        Private Sub EmitSetProjectError(syntaxNode As SyntaxNode, errorLineNumberOpt As BoundExpression)
             Dim setProjectErrorMethod As MethodSymbol
 
             If errorLineNumberOpt Is Nothing Then
@@ -435,7 +445,7 @@ Namespace Microsoft.CodeAnalysis.VisualBasic.CodeGen
             Me.EmitSymbolToken(setProjectErrorMethod, syntaxNode)
         End Sub
 
-        Private Sub EmitClearProjectError(syntaxNode As VisualBasicSyntaxNode)
+        Private Sub EmitClearProjectError(syntaxNode As SyntaxNode)
             Const clearProjectError As WellKnownMember = WellKnownMember.Microsoft_VisualBasic_CompilerServices_ProjectData__ClearProjectError
             Dim clearProjectErrorMethod = DirectCast(Me._module.Compilation.GetWellKnownTypeMember(clearProjectError), MethodSymbol)
 
@@ -452,36 +462,9 @@ Namespace Microsoft.CodeAnalysis.VisualBasic.CodeGen
         End Enum
 
         Private Sub EmitConditionalGoto(boundConditionalGoto As BoundConditionalGoto)
-            If _optimizations = OptimizationLevel.Debug Then
-                'TODO: what is the point of this?
-                'native compiler does intentional dead-store here. Does it still help debugging?
-                Dim boolTemp = AllocateTemp(boundConditionalGoto.Condition.Type, boundConditionalGoto.Condition.Syntax)
-
-                Dim crk As ConstResKind = EmitCondExpr(boundConditionalGoto.Condition, boundConditionalGoto.JumpIfTrue)
-                _builder.EmitLocalStore(boolTemp)
-
-                Select Case crk
-                    Case ConstResKind.ConstFalse
-
-                    Case ConstResKind.ConstTrue
-                        _builder.EmitBranch(ILOpCode.Br, boundConditionalGoto.Label)
-
-                    Case ConstResKind.NotAConst
-ConstResKindNotAConst:
-                        _builder.EmitLocalLoad(boolTemp)
-                        _builder.EmitBranch(ILOpCode.Brtrue, boundConditionalGoto.Label)
-
-                    Case Else
-                        Debug.Assert(False)
-                        GoTo ConstResKindNotAConst
-                End Select
-
-                Me.FreeTemp(boolTemp)
-            Else
-                Dim label As Object = boundConditionalGoto.Label
-                Debug.Assert(label IsNot Nothing)
-                EmitCondBranch(boundConditionalGoto.Condition, label, boundConditionalGoto.JumpIfTrue)
-            End If
+            Dim label As Object = boundConditionalGoto.Label
+            Debug.Assert(label IsNot Nothing)
+            EmitCondBranch(boundConditionalGoto.Condition, label, boundConditionalGoto.JumpIfTrue)
         End Sub
 
         ' 3.17 The brfalse instruction transfers control to target if value (of type int32, int64, object reference, managed
@@ -495,17 +478,17 @@ ConstResKindNotAConst:
 
             Dim tc = ts.PrimitiveTypeCode
             Select Case tc
-                Case Microsoft.Cci.PrimitiveTypeCode.Float32, Microsoft.Cci.PrimitiveTypeCode.Float64
+                Case Cci.PrimitiveTypeCode.Float32, Cci.PrimitiveTypeCode.Float64
                     Return False
 
-                Case Microsoft.Cci.PrimitiveTypeCode.NotPrimitive
+                Case Cci.PrimitiveTypeCode.NotPrimitive
                     ' if this is a generic type param, verifier will want us to box
                     ' EmitCondBranch knows that
                     Return ts.IsReferenceType
 
                 Case Else
-                    Debug.Assert(tc <> Microsoft.Cci.PrimitiveTypeCode.Invalid)
-                    Debug.Assert(tc <> Microsoft.Cci.PrimitiveTypeCode.Void)
+                    Debug.Assert(tc <> Cci.PrimitiveTypeCode.Invalid)
+                    Debug.Assert(tc <> Cci.PrimitiveTypeCode.Void)
                     Return True
             End Select
         End Function
@@ -559,7 +542,7 @@ ConstResKindNotAConst:
             Return nonConstOp
         End Function
 
-        Const IL_OP_CODE_ROW_LENGTH = 4
+        Private Const s_IL_OP_CODE_ROW_LENGTH = 4
 
         '    //  <            <=               >                >=
         '    ILOpCode.Blt,    ILOpCode.Ble,    ILOpCode.Bgt,    ILOpCode.Bge,     // Signed
@@ -569,7 +552,7 @@ ConstResKindNotAConst:
         '    ILOpCode.Blt,    ILOpCode.Ble,    ILOpCode.Bgt,    ILOpCode.Bge,     // Float
         '    ILOpCode.Bge_un, ILOpCode.Bgt_un, ILOpCode.Ble_un, ILOpCode.Blt_un,  // Float Invert
 
-        Private Shared ReadOnly CondJumpOpCodes As ILOpCode() = New ILOpCode() {
+        Private Shared ReadOnly s_condJumpOpCodes As ILOpCode() = New ILOpCode() {
             ILOpCode.Blt, ILOpCode.Ble, ILOpCode.Bgt, ILOpCode.Bge,
             ILOpCode.Bge, ILOpCode.Bgt, ILOpCode.Ble, ILOpCode.Blt,
             ILOpCode.Blt_un, ILOpCode.Ble_un, ILOpCode.Bgt_un, ILOpCode.Bge_un,
@@ -632,10 +615,10 @@ ConstResKindNotAConst:
 
             If operandType IsNot Nothing Then
                 If operandType.IsUnsignedIntegralType() Then
-                    opIdx += 2 * IL_OP_CODE_ROW_LENGTH 'unsigned
+                    opIdx += 2 * s_IL_OP_CODE_ROW_LENGTH 'unsigned
                 Else
                     If operandType.IsFloatingType() Then
-                        opIdx += 4 * IL_OP_CODE_ROW_LENGTH 'float
+                        opIdx += 4 * s_IL_OP_CODE_ROW_LENGTH 'float
                     End If
                 End If
             End If
@@ -643,19 +626,47 @@ ConstResKindNotAConst:
             Dim revOpIdx = opIdx
 
             If Not sense Then
-                opIdx += IL_OP_CODE_ROW_LENGTH 'invert op
+                opIdx += s_IL_OP_CODE_ROW_LENGTH 'invert op
             Else
-                revOpIdx += IL_OP_CODE_ROW_LENGTH 'invert orev
+                revOpIdx += s_IL_OP_CODE_ROW_LENGTH 'invert orev
             End If
 
-            revOpCode = CondJumpOpCodes(revOpIdx)
-            Return CondJumpOpCodes(opIdx)
+            revOpCode = s_condJumpOpCodes(revOpIdx)
+            Return s_condJumpOpCodes(opIdx)
         End Function
 
         ' generate a jump to dest if (condition == sense) is true
         ' it is ok if lazyDest is Nothing
         ' if lazyDest is needed it will be initialized to a new object
         Private Sub EmitCondBranch(condition As BoundExpression, ByRef lazyDest As Object, sense As Boolean)
+            _recursionDepth += 1
+
+            If _recursionDepth > 1 Then
+                StackGuard.EnsureSufficientExecutionStack(_recursionDepth)
+
+                EmitCondBranchCore(condition, lazyDest, sense)
+            Else
+                EmitCondBranchCoreWithStackGuard(condition, lazyDest, sense)
+            End If
+
+            _recursionDepth -= 1
+        End Sub
+
+        Private Sub EmitCondBranchCoreWithStackGuard(condition As BoundExpression, ByRef lazyDest As Object, sense As Boolean)
+            Debug.Assert(_recursionDepth = 1)
+
+            Try
+                EmitCondBranchCore(condition, lazyDest, sense)
+                Debug.Assert(_recursionDepth = 1)
+
+            Catch ex As InsufficientExecutionStackException
+                _diagnostics.Add(ERRID.ERR_TooLongOrComplexExpression,
+                                 BoundTreeVisitor.CancelledByStackGuardException.GetTooLongOrComplexExpressionErrorLocation(condition))
+                Throw New EmitCancelledException()
+            End Try
+        End Sub
+
+        Private Sub EmitCondBranchCore(condition As BoundExpression, ByRef lazyDest As Object, sense As Boolean)
 oneMoreTime:
             Dim ilcode As ILOpCode
             Dim constExprValue = condition.ConstantValueOpt
@@ -791,7 +802,7 @@ OtherExpressions:
                     EmitExpression(condition, True)
 
                     Dim conditionType = condition.Type
-                    If conditionType.IsReferenceType AndAlso Not IsVerifierReference(conditionType) Then
+                    If Not conditionType.IsValueType AndAlso Not IsVerifierReference(conditionType) Then
                         EmitBox(conditionType, condition.Syntax)
                     End If
 
@@ -854,16 +865,18 @@ OtherExpressions:
         ''' <summary>
         ''' tells if given node contains a label statement that defines given label symbol
         ''' </summary>
-        Private Class LabelFinder : Inherits BoundTreeWalker
-            Private ReadOnly label As LabelSymbol
-            Private found As Boolean = False
+        Private Class LabelFinder
+            Inherits StatementWalker
+
+            Private ReadOnly _label As LabelSymbol
+            Private _found As Boolean = False
 
             Private Sub New(label As LabelSymbol)
-                Me.label = label
+                Me._label = label
             End Sub
 
             Public Overrides Function Visit(node As BoundNode) As BoundNode
-                If Not found Then
+                If Not _found AndAlso TypeOf node IsNot BoundExpression Then
                     Return MyBase.Visit(node)
                 End If
 
@@ -871,8 +884,8 @@ OtherExpressions:
             End Function
 
             Public Overrides Function VisitLabelStatement(node As BoundLabelStatement) As BoundNode
-                If node.Label Is Me.label Then
-                    found = True
+                If node.Label Is Me._label Then
+                    _found = True
                 End If
 
                 Return MyBase.VisitLabelStatement(node)
@@ -882,7 +895,7 @@ OtherExpressions:
                 Dim finder = New LabelFinder(label)
                 finder.Visit(node)
 
-                Return finder.found
+                Return finder._found
             End Function
         End Class
 
@@ -924,7 +937,7 @@ OtherExpressions:
             Dim caseBlockLabels As ImmutableArray(Of GeneratedLabelSymbol) = CreateCaseBlockLabels(caseBlocks)
 
             ' Create an array of key value pairs (key: case clause constant value, value: case block label)
-            ' for emiting switch table based header.
+            ' for emitting switch table based header.
             ' This function also ensures the correct fallThroughLabel is set, i.e. case else block label if one exists, otherwise exit label.
             Dim caseLabelsForEmit As KeyValuePair(Of ConstantValue, Object)() = GetCaseLabelsForEmitSwitchHeader(caseBlocks, caseBlockLabels, fallThroughLabel)
 
@@ -954,7 +967,7 @@ OtherExpressions:
         End Function
 
         ' Creates an array of key value pairs (key: case clause constant value, value: case block label)
-        ' for emiting switch table based header.
+        ' for emitting switch table based header.
         ' This function also ensures the correct fallThroughLabel is set, i.e. case else block label if one exists, otherwise exit label.
         Private Function GetCaseLabelsForEmitSwitchHeader(
             caseBlocks As ImmutableArray(Of BoundCaseBlock),
@@ -992,10 +1005,10 @@ OtherExpressions:
                                 Dim relationalCaseClause = DirectCast(caseClause, BoundRelationalCaseClause)
 
                                 Debug.Assert(relationalCaseClause.OperatorKind = BinaryOperatorKind.Equals)
-                                Debug.Assert(relationalCaseClause.OperandOpt IsNot Nothing)
+                                Debug.Assert(relationalCaseClause.ValueOpt IsNot Nothing)
                                 Debug.Assert(relationalCaseClause.ConditionOpt Is Nothing)
 
-                                constant = relationalCaseClause.OperandOpt.ConstantValueOpt
+                                constant = relationalCaseClause.ValueOpt.ConstantValueOpt
 
                             Case BoundKind.RangeCaseClause
                                 ' TODO: For now we use IF lists if we encounter
@@ -1073,7 +1086,7 @@ OtherExpressions:
             End If
         End Sub
 
-        Private Sub EmitStringSwitchJumpTable(caseLabels As KeyValuePair(Of ConstantValue, Object)(), fallThroughLabel As LabelSymbol, key As LocalDefinition, syntaxNode As VisualBasicSyntaxNode)
+        Private Sub EmitStringSwitchJumpTable(caseLabels As KeyValuePair(Of ConstantValue, Object)(), fallThroughLabel As LabelSymbol, key As LocalDefinition, syntaxNode As SyntaxNode)
             Dim genHashTableSwitch As Boolean = SwitchStringJumpTableEmitter.ShouldGenerateHashTableSwitch(_module, caseLabels.Length)
             Dim keyHash As LocalDefinition = Nothing
 
@@ -1092,7 +1105,7 @@ OtherExpressions:
                 _builder.EmitOpCode(ILOpCode.[Call], stackAdjustment:=0)
                 _builder.EmitToken(stringHashMethodRef, syntaxNode, _diagnostics)
 
-                Dim UInt32Type = DirectCast(_module.GetSpecialType(SpecialType.System_UInt32, syntaxNode, _diagnostics), TypeSymbol)
+                Dim UInt32Type = DirectCast(_module.GetSpecialType(SpecialType.System_UInt32, syntaxNode, _diagnostics).GetInternalSymbol(), TypeSymbol)
                 keyHash = AllocateTemp(UInt32Type, syntaxNode)
 
                 _builder.EmitLocalStore(keyHash)
@@ -1184,19 +1197,21 @@ OtherExpressions:
                 cur = cur + 1
 
                 ' Emit case statement sequence point
-                If _emitPdbSequencePoints Then
-                    Dim caseStatement = caseBlock.CaseStatement
-                    If Not caseStatement.WasCompilerGenerated Then
-                        Debug.Assert(caseStatement.Syntax IsNot Nothing)
+
+                Dim caseStatement = caseBlock.CaseStatement
+                If Not caseStatement.WasCompilerGenerated Then
+                    Debug.Assert(caseStatement.Syntax IsNot Nothing)
+
+                    If _emitPdbSequencePoints Then
                         EmitSequencePoint(caseStatement.Syntax)
                     End If
-                End If
 
-                If _optimizations = OptimizationLevel.Debug Then
-                    ' Emit nop for the case statement otherwise the above sequence point
-                    ' will get associated with the first statement in subsequent case block.
-                    ' This matches the native compiler codegen.
-                    _builder.EmitOpCode(ILOpCode.Nop)
+                    If _ilEmitStyle = ILEmitStyle.Debug Then
+                        ' Emit nop for the case statement otherwise the above sequence point
+                        ' will get associated with the first statement in subsequent case block.
+                        ' This matches the native compiler codegen.
+                        _builder.EmitOpCode(ILOpCode.Nop)
+                    End If
                 End If
 
                 ' Emit case block body
@@ -1228,8 +1243,11 @@ OtherExpressions:
             End If
         End Sub
 
-        Private Function DefineLocal(local As LocalSymbol, syntaxNode As VisualBasicSyntaxNode) As LocalDefinition
-            Dim specType = local.Type.SpecialType
+        Private Function DefineLocal(local As LocalSymbol, syntaxNode As SyntaxNode) As LocalDefinition
+            Dim dynamicTransformFlags = ImmutableArray(Of Boolean).Empty
+            Dim tupleElementNames = If(Not local.IsCompilerGenerated AndAlso local.Type.ContainsTupleNames(),
+                VisualBasicCompilation.TupleNamesEncoder.Encode(local.Type),
+                ImmutableArray(Of String).Empty)
 
             ' We're treating constants of type Decimal and DateTime as local here to not create a new instance for each time
             ' the value is accessed. This means there will be one local in the scope for this constant.
@@ -1243,7 +1261,12 @@ OtherExpressions:
 
             If local.HasConstantValue Then
                 Dim compileTimeValue As MetadataConstant = _module.CreateConstant(local.Type, local.ConstantValue, syntaxNode, _diagnostics)
-                Dim localConstantDef = New LocalConstantDefinition(local.Name, If(local.Locations.FirstOrDefault(), Location.None), compileTimeValue)
+                Dim localConstantDef = New LocalConstantDefinition(
+                    local.Name,
+                    If(local.Locations.FirstOrDefault(), Location.None),
+                    compileTimeValue,
+                    dynamicTransformFlags:=dynamicTransformFlags,
+                    tupleElementNames:=tupleElementNames)
                 ' Reference in the scope for debugging purpose
                 _builder.AddLocalConstantToScope(localConstantDef)
                 Return Nothing
@@ -1273,9 +1296,9 @@ OtherExpressions:
                 id:=localId,
                 pdbAttributes:=synthesizedKind.PdbAttributes(),
                 constraints:=constraints,
-                isDynamic:=False,
-                dynamicTransformFlags:=Nothing,
-                isSlotReusable:=synthesizedKind.IsSlotReusable(_optimizations))
+                dynamicTransformFlags:=dynamicTransformFlags,
+                tupleElementNames:=tupleElementNames,
+                isSlotReusable:=synthesizedKind.IsSlotReusable(_ilEmitStyle <> ILEmitStyle.Release))
 
             ' If named, add it to the local debug scope.
             If localDef.Name IsNot Nothing Then
@@ -1315,7 +1338,7 @@ OtherExpressions:
                 Return Nothing
             End If
 
-            If _optimizations = OptimizationLevel.Debug Then
+            If _ilEmitStyle = ILEmitStyle.Debug Then
                 Dim syntax = local.GetDeclaratorSyntax()
                 Dim syntaxOffset = _method.CalculateLocalSyntaxOffset(syntax.SpanStart, syntax.SyntaxTree)
 
@@ -1335,7 +1358,7 @@ OtherExpressions:
         End Function
 
         Private Function IsSlotReusable(local As LocalSymbol) As Boolean
-            Return local.SynthesizedKind.IsSlotReusable(_optimizations)
+            Return local.SynthesizedKind.IsSlotReusable(_ilEmitStyle <> ILEmitStyle.Release)
         End Function
 
         Private Sub FreeLocal(local As LocalSymbol)
@@ -1362,7 +1385,7 @@ OtherExpressions:
         ''' <summary>
         ''' Allocates a temp without identity.
         ''' </summary>
-        Private Function AllocateTemp(type As TypeSymbol, syntaxNode As VisualBasicSyntaxNode) As LocalDefinition
+        Private Function AllocateTemp(type As TypeSymbol, syntaxNode As SyntaxNode) As LocalDefinition
             Return _builder.LocalSlotManager.AllocateSlot(
                 Me._module.Translate(type, syntaxNodeOpt:=syntaxNode, diagnostics:=_diagnostics),
                 LocalSlotConstraints.None)
@@ -1400,44 +1423,45 @@ OtherExpressions:
         End Sub
 
         Private Sub EmitStateMachineScope(scope As BoundStateMachineScope)
-            _builder.OpenLocalScope()
-
-            'VB EE uses name mangling to match up original locals and the fields where they are hoisted
-            'The scoping information is passed by recording PDB scopes of "fake" locals named the same 
-            'as the fields. These locals are not emitted to IL.
-
-            '         vb\language\debugger\procedurecontext.cpp
-            '  813                  // Since state machines lift (almost) all locals of a method, the lifted fields should
-            '  814                  // only be shown in the debugger when the original local variable was in scope.  So
-            '  815                  // we first check if there's a local by the given name and attempt to remove it from 
-            '  816                  // m_localVariableMap.  If it was present, we decode the original local's name, otherwise
-            '  817                  // we skip loading this lifted field since it is out of scope.
+            _builder.OpenLocalScope(ScopeType.StateMachineVariable)
 
             For Each field In scope.Fields
-                Dim name As String = Nothing
-                Dim index As Integer = 0
-                Dim parsedOk As Boolean = GeneratedNames.TryParseStateMachineHoistedUserVariableName(field.Name, name, index)
-                Debug.Assert(parsedOk)
-                Debug.Assert(index >= 0)
-                If parsedOk Then
-                    Dim fakePdbOnlyLocal = New LocalDefinition(
-                        symbolOpt:=Nothing,
-                        nameOpt:=field.Name,
-                        type:=Nothing,
-                        slot:=index,
-                        synthesizedKind:=SynthesizedLocalKind.EmitterTemp,
-                        id:=Nothing,
-                        pdbAttributes:=Cci.PdbWriter.DefaultLocalAttributesValue,
-                        constraints:=LocalSlotConstraints.None,
-                        isDynamic:=False,
-                        dynamicTransformFlags:=Nothing)
-                    _builder.AddLocalToScope(fakePdbOnlyLocal)
-                End If
+                DefineUserDefinedStateMachineHoistedLocal(DirectCast(field, StateMachineFieldSymbol))
             Next
 
             EmitStatement(scope.Statement)
-
             _builder.CloseLocalScope()
+        End Sub
+
+        Private Sub DefineUserDefinedStateMachineHoistedLocal(field As StateMachineFieldSymbol)
+            Debug.Assert(field.SlotIndex >= 0)
+
+            If _module.debugInformationFormat = DebugInformationFormat.Pdb Then
+                'Native PDBs: VB EE uses name mangling to match up original locals and the fields where they are hoisted
+                'The scoping information is passed by recording PDB scopes of "fake" locals named the same 
+                'as the fields. These locals are not emitted to IL.
+
+                '         vb\language\debugger\procedurecontext.cpp
+                '  813                  // Since state machines lift (almost) all locals of a method, the lifted fields should
+                '  814                  // only be shown in the debugger when the original local variable was in scope.  So
+                '  815                  // we first check if there's a local by the given name and attempt to remove it from 
+                '  816                  // m_localVariableMap.  If it was present, we decode the original local's name, otherwise
+                '  817                  // we skip loading this lifted field since it is out of scope.
+
+                _builder.AddLocalToScope(New LocalDefinition(
+                    symbolOpt:=Nothing,
+                    nameOpt:=field.Name,
+                    type:=Nothing,
+                    slot:=field.SlotIndex,
+                    synthesizedKind:=SynthesizedLocalKind.EmitterTemp,
+                    id:=Nothing,
+                    pdbAttributes:=LocalVariableAttributes.None,
+                    constraints:=LocalSlotConstraints.None,
+                    dynamicTransformFlags:=Nothing,
+                    tupleElementNames:=Nothing))
+            Else
+                _builder.DefineUserDefinedStateMachineHoistedLocal(field.SlotIndex)
+            End If
         End Sub
 
         Private Sub EmitUnstructuredExceptionResumeSwitch(node As BoundUnstructuredExceptionResumeSwitch)

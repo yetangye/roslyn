@@ -1,15 +1,18 @@
-﻿Imports System.Collections.Immutable
+﻿' Licensed to the .NET Foundation under one or more agreements.
+' The .NET Foundation licenses this file to you under the MIT license.
+' See the LICENSE file in the project root for more information.
+
+Imports System.Collections.Immutable
 Imports System.Runtime.InteropServices
 Imports Microsoft.CodeAnalysis.CodeGen
 Imports Microsoft.CodeAnalysis.ExpressionEvaluator
-Imports Microsoft.CodeAnalysis.Test.Utilities
-Imports Microsoft.CodeAnalysis.VisualBasic.ExpressionEvaluator
+Imports Microsoft.CodeAnalysis.ExpressionEvaluator.UnitTests
+Imports Microsoft.CodeAnalysis.VisualBasic.UnitTests
 Imports Microsoft.VisualStudio.Debugger.Evaluation
-Imports Microsoft.VisualStudio.Debugger.Evaluation.ClrCompilation
 Imports Roslyn.Test.Utilities
 Imports Xunit
 
-Namespace Microsoft.CodeAnalysis.VisualBasic.UnitTests
+Namespace Microsoft.CodeAnalysis.VisualBasic.ExpressionEvaluator.UnitTests
 
     Public Class StatementTests
         Inherits ExpressionCompilerTestBase
@@ -78,7 +81,7 @@ End Module
                 methodName:="Module1.Main",
                 expr:="args(1)",
                 errorMessage:=errorMessage)
-            Assert.Equal("(1) : error BC30454: Expression is not a method.", errorMessage)
+            Assert.Equal("error BC30454: Expression is not a method.", errorMessage)
 
             testData = EvaluateStatement(
                 source,
@@ -351,7 +354,7 @@ End Class
                 methodName:="C.M",
                 expr:="x",
                 errorMessage:=errorMessage)
-            Assert.Equal("(1) : error BC30454: Expression is not a method.", errorMessage)
+            Assert.Equal("error BC30454: Expression is not a method.", errorMessage)
         End Sub
 
         <Fact>
@@ -373,14 +376,14 @@ End Class
                 methodName:="C.M",
                 expr:="  If True Then x = 1",
                 errorMessage:=errorMessage)
-            Assert.Equal("(1) : error BC30035: Syntax error.", errorMessage)
+            Assert.Equal("error BC30035: Syntax error.", errorMessage)
 
             testData = EvaluateStatement(
                 source,
                 methodName:="C.M",
                 expr:="  If True Then x = 1 Else x = 2",
                 errorMessage:=errorMessage)
-            Assert.Equal("(1) : error BC30035: Syntax error.", errorMessage)
+            Assert.Equal("error BC30035: Syntax error.", errorMessage)
         End Sub
 
         <Fact>
@@ -471,7 +474,7 @@ End Class
   .maxstack  2
   .locals init (ULong V_0) //l
   IL_0000:  ldloc.0
-  IL_0001:  dup
+  IL_0001:  ldloc.0
   IL_0002:  mul.ovf.un
   IL_0003:  stloc.0
   IL_0004:  ret
@@ -533,14 +536,14 @@ End Class
                 methodName:="C.M",
                 expr:="? ",
                 errorMessage:=errorMessage)
-            Assert.Equal("(1) : error BC30201: Expression expected.", errorMessage)
+            Assert.Equal("error BC30201: Expression expected.", errorMessage)
 
             testData = EvaluateStatement(
                 source,
                 methodName:="C.M",
                 expr:="??x = 1",
                 errorMessage:=errorMessage)
-            Assert.Equal("(1) : error BC30201: Expression expected.", errorMessage)
+            Assert.Equal("error BC30201: Expression expected.", errorMessage)
 
             testData = EvaluateStatement(
                 source,
@@ -579,7 +582,7 @@ End Class
                 methodName:="C.M",
                 expr:="?AddressOf System.Console.WriteLine",
                 errorMessage:=errorMessage)
-            Assert.Equal("(1) : error BC30491: Expression does not produce a value.", errorMessage)
+            Assert.Equal("error BC30491: Expression does not produce a value.", errorMessage)
 
             testData = EvaluateStatement(
                 source,
@@ -624,7 +627,7 @@ End Class
                 methodName:="C.M",
                 expr:="?ReDim a(2), a(3)",
                 errorMessage:=errorMessage)
-            Assert.Equal("(1) : error BC30201: Expression expected.", errorMessage)
+            Assert.Equal("error BC30201: Expression expected.", errorMessage)
         End Sub
 
         <Fact>
@@ -811,17 +814,17 @@ End Class
                 methodName:="C.M",
                 expr:="  While True :: End While",
                 errorMessage:=errorMessage)
-            Assert.Equal("(1) : error BC30035: Syntax error.", errorMessage) ' not the best error, but not worth modifying parsing to improve...
+            Assert.Equal("error BC30035: Syntax error.", errorMessage) ' not the best error, but not worth modifying parsing to improve...
         End Sub
 
         Private Function EvaluateStatement(source As String, methodName As String, expr As String, <Out> ByRef errorMessage As String, Optional atLineNumber As Integer = -1) As CompilationTestData
             Dim compilationFlags = DkmEvaluationFlags.None
-            If expr IsNot Nothing AndAlso expr.StartsWith("?") Then
+            If expr IsNot Nothing AndAlso expr.StartsWith("?", StringComparison.Ordinal) Then
                 ' This mimics Immediate Window behavior...
                 compilationFlags = DkmEvaluationFlags.TreatAsExpression
                 expr = expr.Substring(1)
             End If
-            Dim compilation0 = CreateCompilationWithReferences(
+            Dim compilation0 = CreateEmptyCompilationWithReferences(
                 {Parse(source)},
                 {MscorlibRef_v4_0_30316_17626, SystemRef, MsvbRef},
                 options:=TestOptions.DebugDll)
@@ -831,10 +834,10 @@ End Class
             Dim resultProperties As ResultProperties = Nothing
             Dim missingAssemblyIdentities As ImmutableArray(Of AssemblyIdentity) = Nothing
             Dim result = context.CompileExpression(
-                    DefaultInspectionContext.Instance,
                     expr,
                     compilationFlags,
-                    VisualBasicDiagnosticFormatter.Instance,
+                    NoAliases,
+                    DebuggerDiagnosticFormatter.Instance,
                     resultProperties,
                     errorMessage,
                     missingAssemblyIdentities,

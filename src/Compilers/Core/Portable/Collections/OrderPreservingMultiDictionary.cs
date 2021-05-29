@@ -1,25 +1,32 @@
-﻿// Copyright (c) Microsoft.  All Rights Reserved.  Licensed under the Apache License, Version 2.0.  See License.txt in the project root for license information.
+﻿// Licensed to the .NET Foundation under one or more agreements.
+// The .NET Foundation licenses this file to you under the MIT license.
+// See the LICENSE file in the project root for more information.
 
+using System;
+using System.Collections;
 using System.Collections.Generic;
 using System.Collections.Immutable;
 using System.Diagnostics;
-using Roslyn.Utilities;
+using System.Diagnostics.CodeAnalysis;
+using Microsoft.CodeAnalysis.PooledObjects;
 
 namespace Microsoft.CodeAnalysis.Collections
 {
     /// <summary>
-    /// A MultiDictionary that allows only adding, and 
-    /// preserves the order of values added to the dictionary.
-    /// Thread-safe for reading, but not for adding.
+    /// A MultiDictionary that allows only adding, and preserves the order of values added to the 
+    /// dictionary. Thread-safe for reading, but not for adding.
     /// </summary>
     /// <remarks>
     /// Always uses the default comparer.
     /// </remarks>
-    internal sealed class OrderPreservingMultiDictionary<K, V>
+    internal sealed class OrderPreservingMultiDictionary<K, V> :
+        IEnumerable<KeyValuePair<K, OrderPreservingMultiDictionary<K, V>.ValueSet>>
+        where K : notnull
+        where V : notnull
     {
         #region Pooling
 
-        private readonly ObjectPool<OrderPreservingMultiDictionary<K, V>> _pool;
+        private readonly ObjectPool<OrderPreservingMultiDictionary<K, V>>? _pool;
 
         private OrderPreservingMultiDictionary(ObjectPool<OrderPreservingMultiDictionary<K, V>> pool)
         {
@@ -30,14 +37,17 @@ namespace Microsoft.CodeAnalysis.Collections
         {
             if (_dictionary != null)
             {
+                // Allow our ValueSets to return their underlying ArrayBuilders to the pool.
+                foreach (var kvp in _dictionary)
+                {
+                    kvp.Value.Free();
+                }
+
                 _dictionary.Free();
                 _dictionary = null;
             }
 
-            if (_pool != null)
-            {
-                _pool.Free(this);
-            }
+            _pool?.Free(this);
         }
 
         // global pool
@@ -46,8 +56,9 @@ namespace Microsoft.CodeAnalysis.Collections
         // if someone needs to create a pool;
         public static ObjectPool<OrderPreservingMultiDictionary<K, V>> CreatePool()
         {
-            ObjectPool<OrderPreservingMultiDictionary<K, V>> pool = null;
-            pool = new ObjectPool<OrderPreservingMultiDictionary<K, V>>(() => new OrderPreservingMultiDictionary<K, V>(pool), 16); // Size is a guess.
+            var pool = new ObjectPool<OrderPreservingMultiDictionary<K, V>>(
+                pool => new OrderPreservingMultiDictionary<K, V>(pool),
+                16); // Size is a guess.
             return pool;
         }
 
@@ -60,123 +71,68 @@ namespace Microsoft.CodeAnalysis.Collections
 
         #endregion Pooling
 
+        // An empty dictionary we keep around to simplify certain operations (like "Keys")
+        // when we don't have an underlying dictionary of our own.
+        private static readonly Dictionary<K, ValueSet> s_emptyDictionary = new();
+
+        // The underlying dictionary we store our data in.  null if we are empty.
+        private PooledDictionary<K, ValueSet>? _dictionary;
+
         public OrderPreservingMultiDictionary()
         {
         }
 
-        // store either a single V or an ArrayBuilder<V>
-        /// <summary>
-        /// Each value is either a single V or an <see cref="ArrayBuilder{V}"/>.
-        /// Null when the dictionary is empty.
-        /// Don't access the field directly.
-        /// </summary>
-        private PooledDictionary<K, object> _dictionary;
-
         private void EnsureDictionary()
         {
-            _dictionary = _dictionary ?? PooledDictionary<K, object>.GetInstance();
+            _dictionary ??= PooledDictionary<K, ValueSet>.GetInstance();
         }
 
-        public bool IsEmpty
-        {
-            get { return _dictionary == null; }
-        }
+        public bool IsEmpty => _dictionary == null;
 
         /// <summary>
         /// Add a value to the dictionary.
         /// </summary>
         public void Add(K k, V v)
         {
-            object item;
-            if (!this.IsEmpty && _dictionary.TryGetValue(k, out item))
+            if (_dictionary is object && _dictionary.TryGetValue(k, out var valueSet))
             {
-                var arrayBuilder = item as ArrayBuilder<V>;
-                if (arrayBuilder == null)
-                {
-                    // Promote from singleton V to ArrayBuilder<V>.
-                    Debug.Assert(item is V, "Item must be either a V or an ArrayBuilder<V>");
-                    arrayBuilder = new ArrayBuilder<V>(2);
-                    arrayBuilder.Add((V)item);
-                    arrayBuilder.Add(v);
-                    _dictionary[k] = arrayBuilder;
-                }
-                else
-                {
-                    arrayBuilder.Add(v);
-                }
+                Debug.Assert(valueSet.Count >= 1);
+                // Have to re-store the ValueSet in case we upgraded the existing ValueSet from 
+                // holding a single item to holding multiple items.
+                _dictionary[k] = valueSet.WithAddedItem(v);
             }
             else
             {
                 this.EnsureDictionary();
-                _dictionary[k] = v;
+                _dictionary![k] = new ValueSet(v);
             }
         }
 
-        /// <summary>
-        /// Add multiple values to the dictionary.
-        /// </summary>
-        public void AddRange(K k, ImmutableArray<V> values)
+        public bool TryGetValue<TArg>(K key, Func<V, TArg, bool> predicate, TArg arg, [MaybeNullWhen(false)] out V value)
         {
-            if (values.IsEmpty)
-                return;
-
-            object item;
-            ArrayBuilder<V> arrayBuilder;
-
-            if (!this.IsEmpty && _dictionary.TryGetValue(k, out item))
+            if (_dictionary is not null && _dictionary.TryGetValue(key, out var valueSet))
             {
-                arrayBuilder = item as ArrayBuilder<V>;
-                if (arrayBuilder == null)
-                {
-                    // Promote from singleton V to ArrayBuilder<V>.
-                    Debug.Assert(item is V, "Item must be either a V or an ArrayBuilder<V>");
-                    arrayBuilder = new ArrayBuilder<V>(1 + values.Length);
-                    arrayBuilder.Add((V)item);
-                    arrayBuilder.AddRange(values);
-                    _dictionary[k] = arrayBuilder;
-                }
-                else
-                {
-                    arrayBuilder.AddRange(values);
-                }
+                Debug.Assert(valueSet.Count >= 1);
+                return valueSet.TryGetValue(predicate, arg, out value);
             }
-            else
-            {
-                this.EnsureDictionary();
 
-                if (values.Length == 1)
-                {
-                    _dictionary[k] = values[0];
-                }
-                else
-                {
-                    arrayBuilder = new ArrayBuilder<V>(values.Length);
-                    arrayBuilder.AddRange(values);
-                    _dictionary[k] = arrayBuilder;
-                }
-            }
+            value = default;
+            return false;
         }
 
-        /// <summary>
-        /// Get the number of values assocaited with a key.
-        /// </summary>
-        public int GetCountForKey(K k)
+        public Dictionary<K, ValueSet>.Enumerator GetEnumerator()
         {
-            object item;
-            if (!this.IsEmpty && _dictionary.TryGetValue(k, out item))
-            {
-                var arrayBuilder = item as ArrayBuilder<V>;
-                return arrayBuilder != null ? arrayBuilder.Count : 1;
-            }
-            return 0;
+            return _dictionary is null ? s_emptyDictionary.GetEnumerator() : _dictionary.GetEnumerator();
         }
 
-        /// <summary>
-        /// Returns true if one or more items with given key have been added.
-        /// </summary>
-        public bool ContainsKey(K k)
+        IEnumerator<KeyValuePair<K, ValueSet>> IEnumerable<KeyValuePair<K, ValueSet>>.GetEnumerator()
         {
-            return !this.IsEmpty && _dictionary.ContainsKey(k);
+            return GetEnumerator();
+        }
+
+        IEnumerator IEnumerable.GetEnumerator()
+        {
+            return GetEnumerator();
         }
 
         /// <summary>
@@ -187,32 +143,214 @@ namespace Microsoft.CodeAnalysis.Collections
         {
             get
             {
-                object item;
-                if (!this.IsEmpty && _dictionary.TryGetValue(k, out item))
+                if (_dictionary is object && _dictionary.TryGetValue(k, out var valueSet))
                 {
-                    var arrayBuilder = item as ArrayBuilder<V>;
-                    if (arrayBuilder == null)
-                    {
-                        // promote singleton to set
-                        Debug.Assert(item is V, "Item must be either a V or an ArrayBuilder<V>");
-                        return ImmutableArray.Create<V>((V)item);
-                    }
-                    else
-                    {
-                        return arrayBuilder.ToImmutable();
-                    }
+                    Debug.Assert(valueSet.Count >= 1);
+                    return valueSet.Items;
                 }
 
                 return ImmutableArray<V>.Empty;
             }
         }
 
+        public bool Contains(K key, V value)
+        {
+            return _dictionary is object &&
+                _dictionary.TryGetValue(key, out var valueSet) &&
+                valueSet.Contains(value);
+        }
+
         /// <summary>
         /// Get a collection of all the keys.
         /// </summary>
-        public ICollection<K> Keys
+        public Dictionary<K, ValueSet>.KeyCollection Keys
         {
-            get { return this.IsEmpty ? SpecializedCollections.EmptyCollection<K>() : _dictionary.Keys; }
+            get { return _dictionary is null ? s_emptyDictionary.Keys : _dictionary.Keys; }
+        }
+
+        public struct ValueSet : IEnumerable<V>
+        {
+            /// <summary>
+            /// Each value is either a single V or an <see cref="ArrayBuilder{V}"/>.
+            /// Never null.
+            /// </summary>
+            private readonly object _value;
+
+            internal ValueSet(V value)
+            {
+                _value = value;
+            }
+
+            internal ValueSet(ArrayBuilder<V> values)
+            {
+                _value = values;
+            }
+
+            internal void Free()
+            {
+                var arrayBuilder = _value as ArrayBuilder<V>;
+                arrayBuilder?.Free();
+            }
+
+            internal V this[int index]
+            {
+                get
+                {
+                    Debug.Assert(this.Count >= 1);
+
+                    var arrayBuilder = _value as ArrayBuilder<V>;
+                    if (arrayBuilder == null)
+                    {
+                        if (index == 0)
+                        {
+                            return (V)_value;
+                        }
+                        else
+                        {
+                            throw new IndexOutOfRangeException();
+                        }
+                    }
+                    else
+                    {
+                        return arrayBuilder[index];
+                    }
+                }
+            }
+
+            public bool TryGetValue<TArg>(Func<V, TArg, bool> predicate, TArg arg, [MaybeNullWhen(false)] out V value)
+            {
+                Debug.Assert(this.Count >= 1);
+                var arrayBuilder = _value as ArrayBuilder<V>;
+                if (arrayBuilder is not null)
+                {
+                    foreach (var v in arrayBuilder)
+                    {
+                        if (predicate(v, arg))
+                        {
+                            value = v;
+                            return true;
+                        }
+                    }
+                }
+                else
+                {
+                    var singleValue = (V)_value;
+                    if (predicate(singleValue, arg))
+                    {
+                        value = singleValue;
+                        return true;
+                    }
+                }
+
+                value = default;
+                return false;
+            }
+
+            internal bool Contains(V item)
+            {
+                Debug.Assert(this.Count >= 1);
+                var arrayBuilder = _value as ArrayBuilder<V>;
+                return arrayBuilder == null
+                    ? EqualityComparer<V>.Default.Equals(item, (V)_value)
+                    : arrayBuilder.Contains(item);
+            }
+
+            internal ImmutableArray<V> Items
+            {
+                get
+                {
+                    Debug.Assert(this.Count >= 1);
+
+                    var arrayBuilder = _value as ArrayBuilder<V>;
+                    if (arrayBuilder == null)
+                    {
+                        // promote singleton to set
+                        Debug.Assert(_value is V, "Item must be a a V");
+                        return ImmutableArray.Create<V>((V)_value);
+                    }
+                    else
+                    {
+                        return arrayBuilder.ToImmutable();
+                    }
+                }
+            }
+
+            internal int Count => (_value as ArrayBuilder<V>)?.Count ?? 1;
+
+            IEnumerator IEnumerable.GetEnumerator()
+            {
+                return GetEnumerator();
+            }
+
+            IEnumerator<V> IEnumerable<V>.GetEnumerator()
+            {
+                return GetEnumerator();
+            }
+
+            public Enumerator GetEnumerator()
+            {
+                return new Enumerator(this);
+            }
+
+            internal ValueSet WithAddedItem(V item)
+            {
+                Debug.Assert(this.Count >= 1);
+
+                var arrayBuilder = _value as ArrayBuilder<V>;
+                if (arrayBuilder == null)
+                {
+                    // Promote from singleton V to ArrayBuilder<V>.
+                    Debug.Assert(_value is V, "_value must be a V");
+
+                    // By default we allocate array builders with a size of two.  That's to store
+                    // the single item already in _value, and to store the item we're adding.  
+                    // In general, we presume that the amount of values per key will be low, so this
+                    // means we have very little overhead when there are multiple keys per value.
+                    arrayBuilder = ArrayBuilder<V>.GetInstance(capacity: 2);
+                    arrayBuilder.Add((V)_value);
+                    arrayBuilder.Add(item);
+                }
+                else
+                {
+                    arrayBuilder.Add(item);
+                }
+
+                return new ValueSet(arrayBuilder);
+            }
+
+            public struct Enumerator : IEnumerator<V>
+            {
+                private readonly ValueSet _valueSet;
+                private readonly int _count;
+                private int _index;
+
+                public Enumerator(ValueSet valueSet)
+                {
+                    _valueSet = valueSet;
+                    _count = _valueSet.Count;
+                    Debug.Assert(_count >= 1);
+                    _index = -1;
+                }
+
+                public V Current => _valueSet[_index];
+
+                object IEnumerator.Current => Current;
+
+                public bool MoveNext()
+                {
+                    _index++;
+                    return _index < _count;
+                }
+
+                public void Reset()
+                {
+                    _index = -1;
+                }
+
+                public void Dispose()
+                {
+                }
+            }
         }
     }
 }

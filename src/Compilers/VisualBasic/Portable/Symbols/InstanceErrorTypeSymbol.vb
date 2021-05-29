@@ -1,4 +1,6 @@
-﻿' Copyright (c) Microsoft.  All Rights Reserved.  Licensed under the Apache License, Version 2.0.  See License.txt in the project root for license information.
+﻿' Licensed to the .NET Foundation under one or more agreements.
+' The .NET Foundation licenses this file to you under the MIT license.
+' See the LICENSE file in the project root for more information.
 
 Imports System.Collections.Immutable
 Imports Microsoft.CodeAnalysis.Text
@@ -8,7 +10,7 @@ Imports Microsoft.CodeAnalysis.VisualBasic.Syntax
 Namespace Microsoft.CodeAnalysis.VisualBasic.Symbols
 
     ''' <summary>
-    ''' The base class for potentially constructable (i.e. with known arity) error type symbols
+    ''' The base class for potentially constructible (i.e. with known arity) error type symbols
     ''' </summary>
     Friend MustInherit Class InstanceErrorTypeSymbol
         Inherits ErrorTypeSymbol
@@ -31,7 +33,7 @@ Namespace Microsoft.CodeAnalysis.VisualBasic.Symbols
             End Get
         End Property
 
-        ' Instance types are always constructable if they have arity >= 1
+        ' Instance types are always constructible if they have arity >= 1
         Friend Overrides ReadOnly Property CanConstruct As Boolean
             Get
                 Return _arity > 0
@@ -62,7 +64,11 @@ Namespace Microsoft.CodeAnalysis.VisualBasic.Symbols
         ''' !!! Only code implementing construction of generic types is allowed to call this method !!!
         ''' !!! All other code should use Construct methods.                                        !!! 
         ''' </summary>
-        Friend NotOverridable Overrides Function InternalSubstituteTypeParameters(substitution As TypeSubstitution) As TypeSymbol
+        Friend NotOverridable Overrides Function InternalSubstituteTypeParameters(substitution As TypeSubstitution) As TypeWithModifiers
+            Return New TypeWithModifiers(InternalSubstituteTypeParametersInInstanceErrorTypeSymbol(substitution))
+        End Function
+
+        Private Overloads Function InternalSubstituteTypeParametersInInstanceErrorTypeSymbol(substitution As TypeSubstitution) As NamedTypeSymbol
             If substitution IsNot Nothing Then
                 ' The substitution might target one of this type's children.
                 substitution = substitution.GetSubstitutionForGenericDefinitionOrContainers(Me)
@@ -79,7 +85,7 @@ Namespace Microsoft.CodeAnalysis.VisualBasic.Symbols
                 Debug.Assert(substitution.TargetGenericDefinition Is Me AndAlso substitution.Parent Is Nothing AndAlso substitution.Pairs.Length > 0)
                 Return New SubstitutedErrorType(container, Me, substitution)
             Else
-                Dim newContainer = DirectCast(containingType.InternalSubstituteTypeParameters(substitution), NamedTypeSymbol)
+                Dim newContainer = DirectCast(containingType.InternalSubstituteTypeParameters(substitution).AsTypeSymbolOnly(), NamedTypeSymbol)
 
                 If substitution.TargetGenericDefinition Is Me Then
                     Debug.Assert(substitution IsNot Nothing)
@@ -118,6 +124,57 @@ Namespace Microsoft.CodeAnalysis.VisualBasic.Symbols
                 Return StaticCast(Of TypeSymbol).From(Me.TypeParameters)
             End Get
         End Property
+
+        Public NotOverridable Overrides Function GetTypeArgumentCustomModifiers(ordinal As Integer) As ImmutableArray(Of CustomModifier)
+            ' This is always the instance type, so the type arguments do not have any modifiers.
+            Return GetEmptyTypeArgumentCustomModifiers(ordinal)
+        End Function
+
+        Friend NotOverridable Overrides ReadOnly Property HasTypeArgumentsCustomModifiers As Boolean
+            Get
+                ' This is always the instance type, so the type arguments do not have any modifiers.
+                Return False
+            End Get
+        End Property
+
+        Public MustOverride Overrides Function GetHashCode() As Integer
+
+        Public NotOverridable Overrides Function Equals(other As TypeSymbol, comparison As TypeCompareKind) As Boolean
+            If other Is Me Then
+                Return True
+            End If
+
+            If other Is Nothing Then
+                Return False
+            End If
+
+            Dim otherInstance = TryCast(other, InstanceErrorTypeSymbol)
+
+            If otherInstance Is Nothing AndAlso (comparison And TypeCompareKind.AllIgnoreOptionsForVB) = 0 Then
+                Return False
+            End If
+
+            Dim otherTuple = TryCast(other, TupleTypeSymbol)
+            If otherTuple IsNot Nothing Then
+                Return otherTuple.Equals(Me, comparison)
+            End If
+
+            If otherInstance IsNot Nothing Then
+                Return SpecializedEquals(otherInstance)
+            End If
+
+            Debug.Assert((comparison And TypeCompareKind.AllIgnoreOptionsForVB) <> 0)
+
+            If Not Me.Equals(other.OriginalDefinition) Then
+                Return False
+            End If
+
+            ' Delegate comparison to the other type to ensure symmetry
+            Debug.Assert(TypeOf other Is SubstitutedErrorType)
+            Return other.Equals(Me, comparison)
+        End Function
+
+        Protected MustOverride Function SpecializedEquals(other As InstanceErrorTypeSymbol) As Boolean
 
         Private NotInheritable Class ErrorTypeParameterSymbol
             Inherits TypeParameterSymbol
@@ -204,7 +261,7 @@ Namespace Microsoft.CodeAnalysis.VisualBasic.Symbols
                 Return Hash.Combine(_container.GetHashCode(), _ordinal)
             End Function
 
-            Public Overrides Function Equals(obj As Object) As Boolean
+            Public Overrides Function Equals(obj As TypeSymbol, comparison As TypeCompareKind) As Boolean
                 If obj Is Nothing Then
                     Return False
                 End If
@@ -215,7 +272,7 @@ Namespace Microsoft.CodeAnalysis.VisualBasic.Symbols
 
                 Dim other = TryCast(obj, ErrorTypeParameterSymbol)
 
-                Return other IsNot Nothing AndAlso other._ordinal = Me._ordinal AndAlso other._container.Equals(Me._container)
+                Return other IsNot Nothing AndAlso other._ordinal = Me._ordinal AndAlso other._container.Equals(Me._container, comparison)
             End Function
 
             Friend Overrides Sub EnsureAllConstraintsAreResolved()

@@ -1,26 +1,19 @@
-﻿Imports System.Collections.Immutable
-Imports Microsoft.CodeAnalysis.ExpressionEvaluator
+﻿' Licensed to the .NET Foundation under one or more agreements.
+' The .NET Foundation licenses this file to you under the MIT license.
+' See the LICENSE file in the project root for more information.
 
 Namespace Microsoft.CodeAnalysis.VisualBasic.ExpressionEvaluator
 
-    Friend NotInheritable Class VisualBasicMetadataContext : Inherits MetadataContext
+    Friend Structure VisualBasicMetadataContext
 
         Friend ReadOnly Compilation As VisualBasicCompilation
         Friend ReadOnly EvaluationContext As EvaluationContext
 
-        Friend Sub New(metadataBlocks As ImmutableArray(Of MetadataBlock))
-            MyBase.New(metadataBlocks)
-
-            Me.Compilation = metadataBlocks.ToCompilation()
-        End Sub
-
-        Friend Sub New(evaluationContext As EvaluationContext)
-            MyBase.New(evaluationContext.MetadataBlocks)
-
-            Me.Compilation = evaluationContext.Compilation
+        Friend Sub New(compilation As VisualBasicCompilation, Optional evaluationContext As EvaluationContext = Nothing)
+            Me.Compilation = compilation
             Me.EvaluationContext = evaluationContext
         End Sub
 
-    End Class
+    End Structure
 
 End Namespace

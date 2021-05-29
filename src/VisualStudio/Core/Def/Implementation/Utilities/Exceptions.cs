@@ -1,4 +1,8 @@
-// Copyright (c) Microsoft.  All Rights Reserved.  Licensed under the Apache License, Version 2.0.  See License.txt in the project root for license information.
+﻿// Licensed to the .NET Foundation under one or more agreements.
+// The .NET Foundation licenses this file to you under the MIT license.
+// See the LICENSE file in the project root for more information.
+
+#nullable disable
 
 using System;
 using System.Runtime.InteropServices;
@@ -10,7 +14,7 @@ namespace Microsoft.VisualStudio.LanguageServices.Implementation.Utilities
     {
         public static Exception ThrowEFail()
         {
-            Marshal.ThrowExceptionForHR(VSConstants.E_FAIL);
+            Marshal.ThrowExceptionForHR(VSConstants.E_FAIL, new IntPtr(-1));
 
             // never reached...
             return null;
@@ -18,7 +22,7 @@ namespace Microsoft.VisualStudio.LanguageServices.Implementation.Utilities
 
         public static Exception ThrowEInvalidArg()
         {
-            Marshal.ThrowExceptionForHR(VSConstants.E_INVALIDARG);
+            Marshal.ThrowExceptionForHR(VSConstants.E_INVALIDARG, new IntPtr(-1));
 
             // never reached...
             return null;
@@ -26,7 +30,7 @@ namespace Microsoft.VisualStudio.LanguageServices.Implementation.Utilities
 
         public static Exception ThrowENotImpl()
         {
-            Marshal.ThrowExceptionForHR(VSConstants.E_NOTIMPL);
+            Marshal.ThrowExceptionForHR(VSConstants.E_NOTIMPL, new IntPtr(-1));
 
             // never reached...
             return null;
@@ -34,7 +38,7 @@ namespace Microsoft.VisualStudio.LanguageServices.Implementation.Utilities
 
         public static Exception ThrowEUnexpected()
         {
-            Marshal.ThrowExceptionForHR(VSConstants.E_UNEXPECTED);
+            Marshal.ThrowExceptionForHR(VSConstants.E_UNEXPECTED, new IntPtr(-1));
 
             // never reached...
             return null;

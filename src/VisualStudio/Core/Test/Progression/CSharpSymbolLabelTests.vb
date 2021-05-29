@@ -1,13 +1,18 @@
-' Copyright (c) Microsoft.  All Rights Reserved.  Licensed under the Apache License, Version 2.0.  See License.txt in the project root for license information.
+﻿' Licensed to the .NET Foundation under one or more agreements.
+' The .NET Foundation licenses this file to you under the MIT license.
+' See the LICENSE file in the project root for more information.
 
+Imports System.Threading.Tasks
+Imports Microsoft.CodeAnalysis.Test.Utilities
 Imports Microsoft.VisualStudio.GraphModel
 Imports Roslyn.Test.Utilities
 
 Namespace Microsoft.VisualStudio.LanguageServices.UnitTests.Progression
+    <UseExportProvider, Trait(Traits.Feature, Traits.Features.Progression)>
     Public Class CSharpSymbolLabelTests
-        <Fact, Trait(Traits.Feature, Traits.Features.Progression)>
-        Sub NamedType()
-            Using testState = New ProgressionTestState(
+        <WpfFact>
+        Public Async Function TestNamedType() As Task
+            Using testState = ProgressionTestState.Create(
                     <Workspace>
                         <Project Language="C#" CommonReferences="true" FilePath="Z:\Project.csproj">
                             <Document FilePath="Z:\Project.cs">
@@ -16,13 +21,13 @@ Namespace Microsoft.VisualStudio.LanguageServices.UnitTests.Progression
                         </Project>
                     </Workspace>)
 
-                testState.AssertMarkedSymbolLabelIs(GraphCommandDefinition.Contains.Id, "C", "C")
+                Await testState.AssertMarkedSymbolLabelIsAsync(GraphCommandDefinition.Contains.Id, "C", "C")
             End Using
-        End Sub
+        End Function
 
-        <Fact, Trait(Traits.Feature, Traits.Features.Progression)>
-        Sub GenericNamedType()
-            Using testState = New ProgressionTestState(
+        <WpfFact>
+        Public Async Function TestGenericNamedType() As Task
+            Using testState = ProgressionTestState.Create(
                     <Workspace>
                         <Project Language="C#" CommonReferences="true" FilePath="Z:\Project.csproj">
                             <Document FilePath="Z:\Project.cs"><![CDATA[[
@@ -31,13 +36,13 @@ Namespace Microsoft.VisualStudio.LanguageServices.UnitTests.Progression
                         </Project>
                     </Workspace>)
 
-                testState.AssertMarkedSymbolLabelIs(GraphCommandDefinition.Contains.Id, "C<T>", "C<T>")
+                Await testState.AssertMarkedSymbolLabelIsAsync(GraphCommandDefinition.Contains.Id, "C<T>", "C<T>")
             End Using
-        End Sub
+        End Function
 
-        <Fact, Trait(Traits.Feature, Traits.Features.Progression)>
-        Sub GenericMethod()
-            Using testState = New ProgressionTestState(
+        <WpfFact>
+        Public Async Function TestGenericMethod() As Task
+            Using testState = ProgressionTestState.Create(
                     <Workspace>
                         <Project Language="C#" CommonReferences="true" FilePath="Z:\Project.csproj">
                             <Document FilePath="Z:\Project.cs"><![CDATA[[
@@ -46,28 +51,28 @@ Namespace Microsoft.VisualStudio.LanguageServices.UnitTests.Progression
                         </Project>
                     </Workspace>)
 
-                testState.AssertMarkedSymbolLabelIs(GraphCommandDefinition.Contains.Id, "M<T>() : void", "C.M<T>() : void")
+                Await testState.AssertMarkedSymbolLabelIsAsync(GraphCommandDefinition.Contains.Id, "M<T>() : void", "C.M<T>() : void")
             End Using
-        End Sub
+        End Function
 
-        <Fact, Trait(Traits.Feature, Traits.Features.Progression)>
-        Sub MethodWithParamsParameter()
-            Using testState = New ProgressionTestState(
+        <WpfFact>
+        Public Async Function TestMethodWithParamsParameter() As Task
+            Using testState = ProgressionTestState.Create(
                     <Workspace>
                         <Project Language="C#" CommonReferences="true" FilePath="Z:\Project.csproj">
                             <Document FilePath="Z:\Project.cs">
-                                class C { void $$M(params string[] foo) { } }
+                                class C { void $$M(params string[] goo) { } }
                             </Document>
                         </Project>
                     </Workspace>)
 
-                testState.AssertMarkedSymbolLabelIs(GraphCommandDefinition.Contains.Id, "M(params string[]) : void", "C.M(params string[]) : void")
+                Await testState.AssertMarkedSymbolLabelIsAsync(GraphCommandDefinition.Contains.Id, "M(params string[]) : void", "C.M(params string[]) : void")
             End Using
-        End Sub
+        End Function
 
-        <Fact, Trait(Traits.Feature, Traits.Features.Progression)>
-        Sub MethodWithOptionalParameter()
-            Using testState = New ProgressionTestState(
+        <WpfFact>
+        Public Async Function TestMethodWithOptionalParameter() As Task
+            Using testState = ProgressionTestState.Create(
                     <Workspace>
                         <Project Language="C#" CommonReferences="true" FilePath="Z:\Project.csproj">
                             <Document FilePath="Z:\Project.cs">
@@ -76,28 +81,28 @@ Namespace Microsoft.VisualStudio.LanguageServices.UnitTests.Progression
                         </Project>
                     </Workspace>)
 
-                testState.AssertMarkedSymbolLabelIs(GraphCommandDefinition.Contains.Id, "M([int]) : void", "C.M([int]) : void")
+                Await testState.AssertMarkedSymbolLabelIsAsync(GraphCommandDefinition.Contains.Id, "M([int]) : void", "C.M([int]) : void")
             End Using
-        End Sub
+        End Function
 
-        <Fact, Trait(Traits.Feature, Traits.Features.Progression)>
-        Sub MethodWithRefAndOutParameters()
-            Using testState = New ProgressionTestState(
+        <WpfFact>
+        Public Async Function TestMethodWithRefAndOutParameters() As Task
+            Using testState = ProgressionTestState.Create(
                     <Workspace>
                         <Project Language="C#" CommonReferences="true" FilePath="Z:\Project.csproj">
                             <Document FilePath="Z:\Project.cs">
-                                class C { void $$M(out string foo, ref string bar) { } }
+                                class C { void $$M(out string goo, ref string bar) { } }
                             </Document>
                         </Project>
                     </Workspace>)
 
-                testState.AssertMarkedSymbolLabelIs(GraphCommandDefinition.Contains.Id, "M(out string, ref string) : void", "C.M(out string, ref string) : void")
+                Await testState.AssertMarkedSymbolLabelIsAsync(GraphCommandDefinition.Contains.Id, "M(out string, ref string) : void", "C.M(out string, ref string) : void")
             End Using
-        End Sub
+        End Function
 
-        <Fact, Trait(Traits.Feature, Traits.Features.Progression), WorkItem(545017)>
-        Sub EnumMember()
-            Using testState = New ProgressionTestState(
+        <WpfFact, WorkItem(545017, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/545017")>
+        Public Async Function TestEnumMember() As Task
+            Using testState = ProgressionTestState.Create(
                     <Workspace>
                         <Project Language="C#" CommonReferences="true" FilePath="Z:\Project.csproj">
                             <Document FilePath="Z:\Project.cs">
@@ -106,13 +111,13 @@ Namespace Microsoft.VisualStudio.LanguageServices.UnitTests.Progression
                         </Project>
                     </Workspace>)
 
-                testState.AssertMarkedSymbolLabelIs(GraphCommandDefinition.Contains.Id, "M", "E.M")
+                Await testState.AssertMarkedSymbolLabelIsAsync(GraphCommandDefinition.Contains.Id, "M", "E.M")
             End Using
-        End Sub
+        End Function
 
-        <Fact, Trait(Traits.Feature, Traits.Features.Progression), WorkItem(545014)>
-        Sub Constructor()
-            Using testState = New ProgressionTestState(
+        <WpfFact, WorkItem(545014, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/545014")>
+        Public Async Function TestConstructor() As Task
+            Using testState = ProgressionTestState.Create(
                     <Workspace>
                         <Project Language="C#" CommonReferences="true" FilePath="Z:\Project.csproj">
                             <Document FilePath="Z:\Project.cs">
@@ -121,13 +126,13 @@ Namespace Microsoft.VisualStudio.LanguageServices.UnitTests.Progression
                         </Project>
                     </Workspace>)
 
-                testState.AssertMarkedSymbolLabelIs(GraphCommandDefinition.Contains.Id, "C()", "C.C()")
+                Await testState.AssertMarkedSymbolLabelIsAsync(GraphCommandDefinition.Contains.Id, "C()", "C.C()")
             End Using
-        End Sub
+        End Function
 
-        <Fact, Trait(Traits.Feature, Traits.Features.Progression), WorkItem(545014)>
-        Sub Destructor()
-            Using testState = New ProgressionTestState(
+        <WpfFact, WorkItem(545014, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/545014")>
+        Public Async Function TestDestructor() As Task
+            Using testState = ProgressionTestState.Create(
                     <Workspace>
                         <Project Language="C#" CommonReferences="true" FilePath="Z:\Project.csproj">
                             <Document FilePath="Z:\Project.cs">
@@ -136,13 +141,13 @@ Namespace Microsoft.VisualStudio.LanguageServices.UnitTests.Progression
                         </Project>
                     </Workspace>)
 
-                testState.AssertMarkedSymbolLabelIs(GraphCommandDefinition.Contains.Id, "~C()", "C.~C()")
+                Await testState.AssertMarkedSymbolLabelIsAsync(GraphCommandDefinition.Contains.Id, "~C()", "C.~C()")
             End Using
-        End Sub
+        End Function
 
-        <Fact, Trait(Traits.Feature, Traits.Features.Progression), WorkItem(545013)>
-        Sub ExplicitlyImplementedInterface()
-            Using testState = New ProgressionTestState(
+        <WpfFact, WorkItem(545013, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/545013")>
+        Public Async Function TestExplicitlyImplementedInterface() As Task
+            Using testState = ProgressionTestState.Create(
                     <Workspace>
                         <Project Language="C#" CommonReferences="true" FilePath="Z:\Project.csproj">
                             <Document FilePath="Z:\Project.cs">
@@ -152,13 +157,13 @@ Namespace Microsoft.VisualStudio.LanguageServices.UnitTests.Progression
                         </Project>
                     </Workspace>)
 
-                testState.AssertMarkedSymbolLabelIs(GraphCommandDefinition.Contains.Id, "IDisposable.Dispose() : void", "C.Dispose() : void")
+                Await testState.AssertMarkedSymbolLabelIsAsync(GraphCommandDefinition.Contains.Id, "IDisposable.Dispose() : void", "C.Dispose() : void")
             End Using
-        End Sub
+        End Function
 
-        <Fact, Trait(Traits.Feature, Traits.Features.Progression), WorkItem(13229, "DevDiv_Projects/Roslyn"), WorkItem(545353)>
-        Sub FixedFieldInStruct()
-            Using testState = New ProgressionTestState(
+        <WpfFact, WorkItem(13229, "DevDiv_Projects/Roslyn"), WorkItem(545353, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/545353")>
+        Public Async Function TestFixedFieldInStruct() As Task
+            Using testState = ProgressionTestState.Create(
                     <Workspace>
                         <Project Language="C#" CommonReferences="true" FilePath="Z:\Project.csproj">
                             <Document FilePath="Z:\Project.cs">
@@ -167,24 +172,24 @@ Namespace Microsoft.VisualStudio.LanguageServices.UnitTests.Progression
                         </Project>
                     </Workspace>)
 
-                testState.AssertMarkedSymbolLabelIs(GraphCommandDefinition.Contains.Id, "f : int*", "C.f : int*")
+                Await testState.AssertMarkedSymbolLabelIsAsync(GraphCommandDefinition.Contains.Id, "f : int*", "C.f : int*")
             End Using
-        End Sub
+        End Function
 
-        <WorkItem(545011)>
-        <Fact, Trait(Traits.Feature, Traits.Features.Progression), WorkItem(13229, "DevDiv_Projects/Roslyn")>
-        Sub DelegateStyle()
-            Using testState = New ProgressionTestState(
+        <WorkItem(545011, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/545011")>
+        <WpfFact, WorkItem(13229, "DevDiv_Projects/Roslyn")>
+        Public Async Function TestDelegateStyle() As Task
+            Using testState = ProgressionTestState.Create(
                     <Workspace>
                         <Project Language="C#" CommonReferences="true" FilePath="Z:\Project.csproj">
                             <Document FilePath="Z:\Project.cs">
-                                delegate void $$Foo();
+                                delegate void $$Goo();
                             </Document>
                         </Project>
                     </Workspace>)
 
-                testState.AssertMarkedSymbolLabelIs(GraphCommandDefinition.Contains.Id, "Foo() : void", "Foo : void")
+                Await testState.AssertMarkedSymbolLabelIsAsync(GraphCommandDefinition.Contains.Id, "Goo() : void", "Goo : void")
             End Using
-        End Sub
+        End Function
     End Class
 End Namespace

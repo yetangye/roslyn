@@ -1,45 +1,47 @@
-' Copyright (c) Microsoft.  All Rights Reserved.  Licensed under the Apache License, Version 2.0.  See License.txt in the project root for license information.
-
-Imports Microsoft.CodeAnalysis.Text
-Imports Microsoft.CodeAnalysis.VisualBasic
-Imports Microsoft.CodeAnalysis.VisualBasic.Symbols
-Imports Microsoft.CodeAnalysis.VisualBasic.Syntax
-Imports Roslyn.Test.Utilities
-Imports Xunit
+﻿' Licensed to the .NET Foundation under one or more agreements.
+' The .NET Foundation licenses this file to you under the MIT license.
+' See the LICENSE file in the project root for more information.
 
 Namespace Microsoft.CodeAnalysis.Editor.VisualBasic.UnitTests.Recommendations.Declarations
     Public Class LibKeywordRecommenderTests
         <Fact>
         <Trait(Traits.Feature, Traits.Features.KeywordRecommending)>
-        Public Sub LibAfterNameInSub()
-            VerifyRecommendationsAreExactly(<ClassDeclaration>Declare Sub foo |</ClassDeclaration>, "Lib")
+        Public Sub LibAfterNameInSubTest()
+            VerifyRecommendationsAreExactly(<ClassDeclaration>Declare Sub goo |</ClassDeclaration>, "Lib")
         End Sub
 
         <Fact>
         <Trait(Traits.Feature, Traits.Features.KeywordRecommending)>
-        Public Sub LibAfterNameInFunction()
-            VerifyRecommendationsAreExactly(<ClassDeclaration>Declare Function foo |</ClassDeclaration>, "Lib")
+        Public Sub LibAfterNameInFunctionTest()
+            VerifyRecommendationsAreExactly(<ClassDeclaration>Declare Function goo |</ClassDeclaration>, "Lib")
         End Sub
 
         <Fact>
         <Trait(Traits.Feature, Traits.Features.KeywordRecommending)>
-        Public Sub LibNotAfterLibKeyword()
-            VerifyRecommendationsMissing(<ClassDeclaration>Declare Sub foo Lib |</ClassDeclaration>, "Lib")
+        Public Sub LibNotAfterLibKeywordTest()
+            VerifyRecommendationsMissing(<ClassDeclaration>Declare Sub goo Lib |</ClassDeclaration>, "Lib")
         End Sub
 
-        <WorkItem(530953)>
+        <WorkItem(530953, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/530953")>
         <Fact, Trait(Traits.Feature, Traits.Features.KeywordRecommending)>
-        Public Sub NotAfterEol()
+        Public Sub NotAfterEolTest()
             VerifyRecommendationsMissing(
-<ClassDeclaration>Declare Sub foo 
+<ClassDeclaration>Declare Sub goo 
 |</ClassDeclaration>, "Lib")
         End Sub
 
-        <WorkItem(530953)>
+        <WorkItem(530953, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/530953")>
         <Fact, Trait(Traits.Feature, Traits.Features.KeywordRecommending)>
-        Public Sub AfterExplicitLineContinuation()
+        Public Sub AfterExplicitLineContinuationTest()
             VerifyRecommendationsContain(
-<ClassDeclaration>Declare Sub foo _
+<ClassDeclaration>Declare Sub goo _
+|</ClassDeclaration>, "Lib")
+        End Sub
+
+        <Fact, Trait(Traits.Feature, Traits.Features.KeywordRecommending)>
+        Public Sub AfterExplicitLineContinuationTestCommentsAfterLineContinuation()
+            VerifyRecommendationsContain(
+<ClassDeclaration>Declare Sub goo _ ' Test
 |</ClassDeclaration>, "Lib")
         End Sub
     End Class

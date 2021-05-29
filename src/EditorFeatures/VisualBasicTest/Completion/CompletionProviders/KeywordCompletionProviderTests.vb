@@ -1,43 +1,43 @@
-' Copyright (c) Microsoft.  All Rights Reserved.  Licensed under the Apache License, Version 2.0.  See License.txt in the project root for license information.
+﻿' Licensed to the .NET Foundation under one or more agreements.
+' The .NET Foundation licenses this file to you under the MIT license.
+' See the LICENSE file in the project root for more information.
 
-Imports Microsoft.CodeAnalysis.Completion.Providers
 Imports Microsoft.CodeAnalysis.VisualBasic.Completion.Providers
 
 Namespace Microsoft.CodeAnalysis.Editor.VisualBasic.UnitTests.Completion.CompletionProviders
     Public Class KeywordCompletionProviderTests
         Inherits AbstractVisualBasicCompletionProviderTests
 
-        Friend Overrides Function CreateCompletionProvider() As ICompletionProvider
-            Return New KeywordCompletionProvider()
+        Friend Overrides Function GetCompletionProviderType() As Type
+            Return GetType(KeywordCompletionProvider)
         End Function
 
         <Fact(), Trait(Traits.Feature, Traits.Features.KeywordRecommending)>
-        Public Sub IsCommitCharacterTest()
-            TestCommonIsCommitCharacter()
-        End Sub
+        Public Async Function IsCommitCharacterTest() As Task
+            Await VerifyCommonCommitCharactersAsync("$$", textTypedSoFar:="C")
+        End Function
 
         <Fact(), Trait(Traits.Feature, Traits.Features.KeywordRecommending)>
         Public Sub IsTextualTriggerCharacterTest()
             TestCommonIsTextualTriggerCharacter()
 
-            VerifyTextualTriggerCharacter("foo$$(", shouldTriggerWithTriggerOnLettersEnabled:=True, shouldTriggerWithTriggerOnLettersDisabled:=True)
+            VerifyTextualTriggerCharacter("goo$$(", shouldTriggerWithTriggerOnLettersEnabled:=True, shouldTriggerWithTriggerOnLettersDisabled:=True)
         End Sub
 
         <Fact(), Trait(Traits.Feature, Traits.Features.KeywordRecommending)>
-        Public Sub SendEnterThroughToEditorTest()
-            TestCommonSendEnterThroughToEditor()
-        End Sub
-
+        Public Async Function SendEnterThroughToEditorTest() As Task
+            Await VerifySendEnterThroughToEditorAsync("$$", "Class", expected:=True)
+        End Function
 
         <Fact(), Trait(Traits.Feature, Traits.Features.KeywordRecommending)>
-        Public Sub InEmptyFile()
+        Public Async Function InEmptyFile() As Task
 
             Dim markup = "$$"
-            VerifyAnyItemExists(markup)
-        End Sub
+            Await VerifyAnyItemExistsAsync(markup)
+        End Function
 
         <Fact(), Trait(Traits.Feature, Traits.Features.KeywordRecommending)>
-        Public Sub NotInInactiveCode()
+        Public Async Function TestNotInInactiveCode() As Task
             Dim code = <Text>
 Class C
     Sub Main(args As String())
@@ -48,11 +48,11 @@ Class C
 End Class
 </Text>.Value
 
-            VerifyNoItemsExist(code)
-        End Sub
+            Await VerifyNoItemsExistAsync(code)
+        End Function
 
         <Fact(), Trait(Traits.Feature, Traits.Features.KeywordRecommending)>
-        Public Sub NotInString()
+        Public Async Function TestNotInString() As Task
             Dim code = <Text>
 Class C
     Sub Main(args As String())
@@ -61,12 +61,11 @@ Class C
 End Class
 </Text>.Value
 
-            VerifyNoItemsExist(code)
-        End Sub
-
+            Await VerifyNoItemsExistAsync(code)
+        End Function
 
         <Fact(), Trait(Traits.Feature, Traits.Features.KeywordRecommending)>
-        Public Sub NotInUnterminatedString()
+        Public Async Function TestNotInUnterminatedString() As Task
             Dim code = <Text>
 Class C
     Sub Main(args As String())
@@ -75,11 +74,11 @@ Class C
 End Class
 </Text>.Value
 
-            VerifyNoItemsExist(code)
-        End Sub
+            Await VerifyNoItemsExistAsync(code)
+        End Function
 
         <Fact(), Trait(Traits.Feature, Traits.Features.KeywordRecommending)>
-        Public Sub NotInSingleLineComment()
+        Public Async Function TestNotInSingleLineComment() As Task
             Dim code = <Text>
 Class C
     Sub Main(args As String())
@@ -88,22 +87,22 @@ Class C
 End Class
 </Text>.Value
 
-            VerifyNoItemsExist(code)
-        End Sub
+            Await VerifyNoItemsExistAsync(code)
+        End Function
 
-        <WorkItem(968256)>
+        <WorkItem(968256, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/968256")>
         <Fact(), Trait(Traits.Feature, Traits.Features.KeywordRecommending)>
-        Public Sub UnionOfKeywordsFromBothFiles()
+        Public Async Function TestUnionOfKeywordsFromBothFiles() As Task
             Dim markup = <Workspace>
-                             <Project Language="Visual Basic" CommonReferences="true" AssemblyName="Proj1" PreprocessorSymbols="FOO=true">
+                             <Project Language="Visual Basic" CommonReferences="true" AssemblyName="Proj1" PreprocessorSymbols="GOO=true">
                                  <Document FilePath="CurrentDocument.vb"><![CDATA[
 Class C
             Dim x As Integer
-#if FOO then
-    sub foo()
+#if GOO then
+    sub goo()
 #End If
         $$
-#If FOO Then
+#If GOO Then
     end sub
 
 #End If
@@ -115,8 +114,82 @@ End Class]]>
                              </Project>
                          </Workspace>.ToString().NormalizeLineEndings()
 
-            VerifyItemInLinkedFiles(markup, "Public", Nothing)
-            VerifyItemInLinkedFiles(markup, "For", Nothing)
-        End Sub
+            Await VerifyItemInLinkedFilesAsync(markup, "Public", Nothing)
+            Await VerifyItemInLinkedFilesAsync(markup, "For", Nothing)
+        End Function
+
+        <WorkItem(1736, "https://github.com/dotnet/roslyn/issues/1736")>
+        <Fact(), Trait(Traits.Feature, Traits.Features.KeywordRecommending)>
+        Public Async Function TestNotInInteger() As Task
+            Dim code = <Text>
+Class C
+    Sub Main(args As String())
+        dim c = 2$$00
+    End Sub
+End Class
+</Text>.Value
+
+            Await VerifyNoItemsExistAsync(code)
+        End Function
+
+        <WorkItem(1736, "https://github.com/dotnet/roslyn/issues/1736")>
+        <Fact(), Trait(Traits.Feature, Traits.Features.KeywordRecommending)>
+        Public Async Function TestNotInDecimal() As Task
+            Dim code = <Text>
+Class C
+    Sub Main(args As String())
+        dim c = 2$$.00D
+    End Sub
+End Class
+</Text>.Value
+
+            Await VerifyNoItemsExistAsync(code)
+        End Function
+
+        <WorkItem(1736, "https://github.com/dotnet/roslyn/issues/1736")>
+        <Fact(), Trait(Traits.Feature, Traits.Features.KeywordRecommending)>
+        Public Async Function TestNotInFloat() As Task
+            Dim code = <Text>
+Class C
+    Sub Main(args As String())
+        dim c = 2$$.00
+    End Sub
+End Class
+</Text>.Value
+
+            Await VerifyNoItemsExistAsync(code)
+        End Function
+
+        <WorkItem(1736, "https://github.com/dotnet/roslyn/issues/1736")>
+        <Fact(), Trait(Traits.Feature, Traits.Features.KeywordRecommending)>
+        Public Async Function TestNotInDate() As Task
+            Dim code = <Text>
+Class C
+    Sub Main(args As String())
+        dim c = #4/2$$/2015
+    End Sub
+End Class
+</Text>.Value
+
+            Await VerifyNoItemsExistAsync(code)
+        End Function
+
+        <WorkItem(4167, "https://github.com/dotnet/roslyn/issues/4167")>
+        <Fact(), Trait(Traits.Feature, Traits.Features.KeywordRecommending)>
+        Public Async Function ImplementsAfterSub() As Task
+            Dim code = "
+Interface I
+End Interface
+
+Class C
+    Implements I
+
+    Sub M() $$
+    End Sub
+End Class
+"
+
+            Await VerifyItemExistsAsync(code, "Implements")
+        End Function
     End Class
 End Namespace

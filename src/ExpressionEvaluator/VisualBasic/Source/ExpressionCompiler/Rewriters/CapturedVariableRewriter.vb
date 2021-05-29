@@ -1,9 +1,13 @@
-﻿Imports System.Collections.Immutable
+﻿' Licensed to the .NET Foundation under one or more agreements.
+' The .NET Foundation licenses this file to you under the MIT license.
+' See the LICENSE file in the project root for more information.
+
+Imports System.Collections.Immutable
 Imports Microsoft.CodeAnalysis.VisualBasic.Symbols
 
 Namespace Microsoft.CodeAnalysis.VisualBasic.ExpressionEvaluator
     Friend NotInheritable Class CapturedVariableRewriter
-        Inherits BoundTreeRewriter
+        Inherits BoundTreeRewriterWithStackGuardWithoutRecursionOnTheLeftOfBinaryOperator
 
         Friend Shared Function Rewrite(
             targetMethodMeParameter As ParameterSymbol,
@@ -29,6 +33,15 @@ Namespace Microsoft.CodeAnalysis.VisualBasic.ExpressionEvaluator
             _diagnostics = diagnostics
         End Sub
 
+        Public Overrides Function Visit(node As BoundNode) As BoundNode
+            ' Ignore nodes that will be rewritten to literals in the LocalRewriter.
+            If TryCast(node, BoundExpression)?.ConstantValueOpt IsNot Nothing Then
+                Return node
+            End If
+
+            Return MyBase.Visit(node)
+        End Function
+
         Public Overrides Function VisitBlock(node As BoundBlock) As BoundNode
             Dim rewrittenLocals = node.Locals.WhereAsArray(AddressOf IncludeLocal)
             Dim rewrittenStatements = VisitList(node.Statements)
@@ -50,13 +63,13 @@ Namespace Microsoft.CodeAnalysis.VisualBasic.ExpressionEvaluator
                         Nothing,
                         GetRewrittenMeParameter(syntax, New BoundMeReference(syntax, _targetMethodMeParameter.Type)))
                     Dim result = staticLocal.ToBoundExpression(receiver, syntax, node.IsLValue)
-                    Debug.Assert(node.Type = result.Type)
+                    Debug.Assert(TypeSymbol.Equals(node.Type, result.Type, TypeCompareKind.ConsiderEverything))
                     Return result
                 End If
                 Dim variable = GetVariable(local.Name)
                 If variable IsNot Nothing Then
                     Dim result = variable.ToBoundExpression(syntax, node.IsLValue, node.SuppressVirtualCalls)
-                    Debug.Assert(node.Type = result.Type)
+                    Debug.Assert(TypeSymbol.Equals(node.Type, result.Type, TypeCompareKind.ConsiderEverything))
                     Return result
                 End If
             End If
@@ -92,7 +105,7 @@ Namespace Microsoft.CodeAnalysis.VisualBasic.ExpressionEvaluator
                 constantValueOpt:=Nothing,
                 relaxationLambdaOpt:=Nothing,
                 type:=baseType)
-            Debug.Assert(result.Type = node.Type)
+            Debug.Assert(TypeSymbol.Equals(result.Type, node.Type, TypeCompareKind.ConsiderEverything))
             Return result
         End Function
 
@@ -108,7 +121,7 @@ Namespace Microsoft.CodeAnalysis.VisualBasic.ExpressionEvaluator
             Return Me.GetRewrittenMeParameter(node.Syntax, node)
         End Function
 
-        Private Function GetRewrittenMeParameter(syntax As VisualBasicSyntaxNode, node As BoundExpression) As BoundExpression
+        Private Function GetRewrittenMeParameter(syntax As SyntaxNode, node As BoundExpression) As BoundExpression
             If _targetMethodMeParameter Is Nothing Then
                 ReportMissingMe(node.Syntax)
                 Return node
@@ -119,13 +132,16 @@ Namespace Microsoft.CodeAnalysis.VisualBasic.ExpressionEvaluator
             Return result
         End Function
 
-        Private Function RewriteParameter(syntax As VisualBasicSyntaxNode, symbol As ParameterSymbol, node As BoundExpression) As BoundExpression
-            Dim variable = Me.GetVariable(symbol.Name)
+        Private Function RewriteParameter(syntax As SyntaxNode, symbol As ParameterSymbol, node As BoundExpression) As BoundExpression
+            Dim name As String = symbol.Name
+            Dim variable = Me.GetVariable(name)
             If variable Is Nothing Then
                 ' The state machine case is for async lambdas.  The state machine
                 ' will have a hoisted "me" field if it needs access to the containing
                 ' display class, but the display class may not have a "me" field.
-                If symbol.Type.IsClosureOrStateMachineType() Then
+                If symbol.Type.IsClosureOrStateMachineType() AndAlso
+                    GeneratedNames.GetKind(name) <> GeneratedNameKind.TransparentIdentifier Then
+
                     ReportMissingMe(syntax)
                 End If
 
@@ -133,11 +149,12 @@ Namespace Microsoft.CodeAnalysis.VisualBasic.ExpressionEvaluator
             End If
 
             Dim result = variable.ToBoundExpression(syntax, node.IsLValue, node.SuppressVirtualCalls)
-            Debug.Assert(result.Type = node.Type OrElse result.Type.BaseType = node.Type)
+            Debug.Assert(TypeSymbol.Equals(result.Type, node.Type, TypeCompareKind.ConsiderEverything) OrElse
+                         TypeSymbol.Equals(result.Type.BaseTypeNoUseSiteDiagnostics, node.Type, TypeCompareKind.ConsiderEverything))
             Return result
         End Function
 
-        Private Sub ReportMissingMe(syntax As VisualBasicSyntaxNode)
+        Private Sub ReportMissingMe(syntax As SyntaxNode)
             _diagnostics.Add(New VBDiagnostic(ErrorFactory.ErrorInfo(ERRID.ERR_UseOfKeywordNotInInstanceMethod1, syntax.ToString()), syntax.GetLocation()))
         End Sub
 

@@ -1,4 +1,6 @@
-﻿' Copyright (c) Microsoft.  All Rights Reserved.  Licensed under the Apache License, Version 2.0.  See License.txt in the project root for license information.
+﻿' Licensed to the .NET Foundation under one or more agreements.
+' The .NET Foundation licenses this file to you under the MIT license.
+' See the LICENSE file in the project root for more information.
 
 Imports System.Collections.Generic
 Imports System.Collections.Immutable
@@ -11,15 +13,15 @@ Namespace Microsoft.CodeAnalysis.VisualBasic.Symbols
 
     Partial Friend NotInheritable Class AnonymousTypeManager
 
-        Private Class AnonymousTypeOrDelegateTypeParameterSymbol
+        Private NotInheritable Class AnonymousTypeOrDelegateTypeParameterSymbol
             Inherits TypeParameterSymbol
 
-            Private ReadOnly m_container As AnonymousTypeOrDelegateTemplateSymbol
-            Private ReadOnly m_ordinal As Integer
+            Private ReadOnly _container As AnonymousTypeOrDelegateTemplateSymbol
+            Private ReadOnly _ordinal As Integer
 
             Public Sub New(container As AnonymousTypeOrDelegateTemplateSymbol, ordinal As Integer)
-                m_container = container
-                m_ordinal = ordinal
+                _container = container
+                _ordinal = ordinal
             End Sub
 
             Public Overrides ReadOnly Property TypeParameterKind As TypeParameterKind
@@ -30,7 +32,7 @@ Namespace Microsoft.CodeAnalysis.VisualBasic.Symbols
 
             Public Overrides ReadOnly Property ContainingSymbol As Symbol
                 Get
-                    Return m_container
+                    Return _container
                 End Get
             End Property
 
@@ -54,14 +56,14 @@ Namespace Microsoft.CodeAnalysis.VisualBasic.Symbols
 
             Public Overrides ReadOnly Property Name As String
                 Get
-                    If m_container.TypeKind = TypeKind.Delegate Then
-                        If m_container.DelegateInvokeMethod.IsSub OrElse Ordinal < m_container.Arity - 1 Then
+                    If _container.TypeKind = TypeKind.Delegate Then
+                        If _container.DelegateInvokeMethod.IsSub OrElse Ordinal < _container.Arity - 1 Then
                             Return "TArg" & Ordinal
                         Else
                             Return "TResult"
                         End If
                     Else
-                        Debug.Assert(m_container.TypeKind = TypeKind.Class)
+                        Debug.Assert(_container.TypeKind = TypeKind.Class)
                         Return "T" & Ordinal
                     End If
                 End Get
@@ -69,7 +71,7 @@ Namespace Microsoft.CodeAnalysis.VisualBasic.Symbols
 
             Public Overrides ReadOnly Property Ordinal As Integer
                 Get
-                    Return m_ordinal
+                    Return _ordinal
                 End Get
             End Property
 
@@ -106,6 +108,13 @@ Namespace Microsoft.CodeAnalysis.VisualBasic.Symbols
             Friend Overrides Sub EnsureAllConstraintsAreResolved()
             End Sub
 
+            Public Overrides Function GetHashCode() As Integer
+                Return System.Runtime.CompilerServices.RuntimeHelpers.GetHashCode(Me)
+            End Function
+
+            Public Overrides Function Equals(other As TypeSymbol, comparison As TypeCompareKind) As Boolean
+                Return other Is Me
+            End Function
         End Class
 
     End Class

@@ -1,4 +1,8 @@
-// Copyright (c) Microsoft.  All Rights Reserved.  Licensed under the Apache License, Version 2.0.  See License.txt in the project root for license information.
+﻿// Licensed to the .NET Foundation under one or more agreements.
+// The .NET Foundation licenses this file to you under the MIT license.
+// See the LICENSE file in the project root for more information.
+
+#nullable disable
 
 using System;
 using System.Collections.Immutable;
@@ -12,7 +16,7 @@ namespace Microsoft.VisualStudio.LanguageServices.Implementation.CodeModel.Colle
     internal class NodeSnapshot : Snapshot
     {
         private readonly CodeModelState _state;
-        private ComHandle<EnvDTE.FileCodeModel, FileCodeModel> _fileCodeModel;
+        private readonly ComHandle<EnvDTE.FileCodeModel, FileCodeModel> _fileCodeModel;
         private readonly SyntaxNode _parentNode;
         private readonly AbstractCodeElement _parentElement;
         private readonly ImmutableArray<SyntaxNode> _nodes;
@@ -43,25 +47,21 @@ namespace Microsoft.VisualStudio.LanguageServices.Implementation.CodeModel.Colle
 
         private EnvDTE.CodeElement CreateCodeOptionsStatement(SyntaxNode node)
         {
-            string name;
-            int ordinal;
-            this.CodeModelService.GetOptionNameAndOrdinal(_parentNode, node, out name, out ordinal);
+            this.CodeModelService.GetOptionNameAndOrdinal(_parentNode, node, out var name, out var ordinal);
 
-            return (EnvDTE.CodeElement)CodeOptionsStatement.Create(_state, this.FileCodeModel, name, ordinal);
+            return CodeOptionsStatement.Create(_state, this.FileCodeModel, name, ordinal);
         }
 
         private EnvDTE.CodeElement CreateCodeImport(SyntaxNode node)
         {
             var name = this.CodeModelService.GetImportNamespaceOrType(node);
 
-            return (EnvDTE.CodeElement)CodeImport.Create(_state, this.FileCodeModel, _parentElement, name);
+            return CodeImport.Create(_state, this.FileCodeModel, _parentElement, name);
         }
 
         private EnvDTE.CodeElement CreateCodeAttribute(SyntaxNode node)
         {
-            string name;
-            int ordinal;
-            this.CodeModelService.GetAttributeNameAndOrdinal(_parentNode, node, out name, out ordinal);
+            this.CodeModelService.GetAttributeNameAndOrdinal(_parentNode, node, out var name, out var ordinal);
 
             return (EnvDTE.CodeElement)CodeAttribute.Create(_state, this.FileCodeModel, _parentElement, name, ordinal);
         }
@@ -86,7 +86,7 @@ namespace Microsoft.VisualStudio.LanguageServices.Implementation.CodeModel.Colle
             {
                 if (index < 0 || index >= _nodes.Length)
                 {
-                    throw new ArgumentOutOfRangeException("index");
+                    throw new ArgumentOutOfRangeException(nameof(index));
                 }
 
                 var node = _nodes[index];
@@ -109,7 +109,7 @@ namespace Microsoft.VisualStudio.LanguageServices.Implementation.CodeModel.Colle
                 }
 
                 // The node must be something that the FileCodeModel can create.
-                return this.FileCodeModel.CreateCodeElement<EnvDTE.CodeElement>(node);
+                return this.FileCodeModel.GetOrCreateCodeElement<EnvDTE.CodeElement>(node);
             }
         }
     }

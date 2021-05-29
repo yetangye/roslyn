@@ -1,6 +1,7 @@
-' Copyright (c) Microsoft.  All Rights Reserved.  Licensed under the Apache License, Version 2.0.  See License.txt in the project root for license information.
+﻿' Licensed to the .NET Foundation under one or more agreements.
+' The .NET Foundation licenses this file to you under the MIT license.
+' See the LICENSE file in the project root for more information.
 
-Imports Microsoft.CodeAnalysis.Completion.Providers
 Imports Microsoft.CodeAnalysis.VisualBasic.Completion.Providers
 
 Namespace Microsoft.CodeAnalysis.Editor.VisualBasic.UnitTests.Completion.CompletionProviders
@@ -8,7 +9,7 @@ Namespace Microsoft.CodeAnalysis.Editor.VisualBasic.UnitTests.Completion.Complet
         Inherits AbstractVisualBasicCompletionProviderTests
 
         <Fact, Trait(Traits.Feature, Traits.Features.Completion)>
-        Public Sub EditorBrowsable_EnumTypeDotMemberAlways()
+        Public Async Function TestEditorBrowsable_EnumTypeDotMemberAlways() As Task
             Dim markup = <Text><![CDATA[
 Class P
     Sub S()
@@ -25,7 +26,7 @@ Public Class Color
 End Class
 
 ]]></Text>.Value
-            VerifyItemInEditorBrowsableContexts(
+            Await VerifyItemInEditorBrowsableContextsAsync(
                 markup:=markup,
                 referencedCode:=referencedCode,
                 item:="Color.X",
@@ -33,10 +34,10 @@ End Class
                 expectedSymbolsMetadataReference:=1,
                 sourceLanguage:=LanguageNames.VisualBasic,
                 referencedLanguage:=LanguageNames.VisualBasic)
-        End Sub
+        End Function
 
         <Fact, Trait(Traits.Feature, Traits.Features.Completion)>
-        Public Sub EditorBrowsable_EnumTypeDotMemberNever()
+        Public Async Function TestEditorBrowsable_EnumTypeDotMemberNever() As Task
             Dim markup = <Text><![CDATA[
 Class P
     Sub S()
@@ -52,7 +53,7 @@ Public Class Color
     Public Shared Y as Integer = 4
 End Class
 ]]></Text>.Value
-            VerifyItemInEditorBrowsableContexts(
+            Await VerifyItemInEditorBrowsableContextsAsync(
                 markup:=markup,
                 referencedCode:=referencedCode,
                 item:="Color.X",
@@ -60,10 +61,10 @@ End Class
                 expectedSymbolsMetadataReference:=0,
                 sourceLanguage:=LanguageNames.VisualBasic,
                 referencedLanguage:=LanguageNames.VisualBasic)
-        End Sub
+        End Function
 
         <Fact, Trait(Traits.Feature, Traits.Features.Completion)>
-        Public Sub EditorBrowsable_EnumTypeDotMemberAdvanced()
+        Public Async Function TestEditorBrowsable_EnumTypeDotMemberAdvanced() As Task
             Dim markup = <Text><![CDATA[
 Class P
     Sub S()
@@ -79,7 +80,7 @@ Public Class Color
     Public Shared Y as Integer = 4
 End Class
 ]]></Text>.Value
-            VerifyItemInEditorBrowsableContexts(
+            Await VerifyItemInEditorBrowsableContextsAsync(
                 markup:=markup,
                 referencedCode:=referencedCode,
                 item:="Color.X",
@@ -89,7 +90,7 @@ End Class
                 referencedLanguage:=LanguageNames.VisualBasic,
                 hideAdvancedMembers:=True)
 
-            VerifyItemInEditorBrowsableContexts(
+            Await VerifyItemInEditorBrowsableContextsAsync(
                 markup:=markup,
                 referencedCode:=referencedCode,
                 item:="Color.X",
@@ -98,10 +99,10 @@ End Class
                 sourceLanguage:=LanguageNames.VisualBasic,
                 referencedLanguage:=LanguageNames.VisualBasic,
                 hideAdvancedMembers:=False)
-        End Sub
+        End Function
 
         <Fact, Trait(Traits.Feature, Traits.Features.Completion)>
-        Public Sub TriggeredOnOpenParen()
+        Public Async Function TestTriggeredOnOpenParen() As Task
             Dim markup = <Text><![CDATA[
 Module Program
     Sub Main(args As String())
@@ -121,12 +122,12 @@ End Class
 
 ]]></Text>.Value
 
-            VerifyItemExists(markup, "Color.X", usePreviousCharAsTrigger:=True)
-            VerifyItemExists(markup, "Color.Y", usePreviousCharAsTrigger:=True)
-        End Sub
+            Await VerifyItemExistsAsync(markup, "Color.X", usePreviousCharAsTrigger:=True)
+            Await VerifyItemExistsAsync(markup, "Color.Y", usePreviousCharAsTrigger:=True)
+        End Function
 
         <Fact, Trait(Traits.Feature, Traits.Features.Completion)>
-        Public Sub RightSideOfAssignment()
+        Public Async Function TestRightSideOfAssignment() As Task
             Dim markup = <Text><![CDATA[
 Module Program
     Sub Main(args As String())
@@ -142,19 +143,19 @@ Public Class Color
 End Class
 ]]></Text>.Value
 
-            VerifyItemExists(markup, "Color.X", usePreviousCharAsTrigger:=True)
-            VerifyItemExists(markup, "Color.Y", usePreviousCharAsTrigger:=True)
-        End Sub
+            Await VerifyItemExistsAsync(markup, "Color.X", usePreviousCharAsTrigger:=True)
+            Await VerifyItemExistsAsync(markup, "Color.Y", usePreviousCharAsTrigger:=True)
+        End Function
 
         <Fact, Trait(Traits.Feature, Traits.Features.Completion)>
-        Public Sub DoNotCrashInObjectInitializer()
+        Public Async Function TestDoNotCrashInObjectInitializer() As Task
             Dim markup = <Text><![CDATA[
 Module Program
     Sub Main(args As String())
-        Dim z = New Foo() With {.z$$ }
+        Dim z = New Goo() With {.z$$ }
     End Sub
 
-    Class Foo
+    Class Goo
         Property A As Integer
             Get
 
@@ -167,11 +168,11 @@ Module Program
 End Module
 ]]></Text>.Value
 
-            VerifyNoItemsExist(markup)
-        End Sub
+            Await VerifyNoItemsExistAsync(markup)
+        End Function
 
         <Fact, Trait(Traits.Feature, Traits.Features.Completion)>
-        Public Sub InYieldReturn()
+        Public Async Function TestInYieldReturn() As Task
             Dim markup = <Text><![CDATA[
 Imports System
 Imports System.Collections.Generic
@@ -190,11 +191,11 @@ Class C
 End Class
 ]]></Text>.Value
 
-            VerifyItemExists(markup, "Color.X")
-        End Sub
+            Await VerifyItemExistsAsync(markup, "Color.X")
+        End Function
 
         <Fact, Trait(Traits.Feature, Traits.Features.Completion)>
-        Public Sub InAsyncMethodReturnStatement()
+        Public Async Function TestInAsyncMethodReturnStatement() As Task
             Dim markup = <Text><![CDATA[
 Imports System.Threading.Tasks
 
@@ -211,11 +212,11 @@ Class C
 End Class
 ]]></Text>.Value
 
-            VerifyItemExists(markup, "Color.X")
-        End Sub
+            Await VerifyItemExistsAsync(markup, "Color.X")
+        End Function
 
         <Fact, Trait(Traits.Feature, Traits.Features.Completion)>
-        Public Sub InIndexedProperty()
+        Public Async Function TestInIndexedProperty() As Task
             Dim markup = <Text><![CDATA[
 Module Module1
 
@@ -247,11 +248,11 @@ End Class
 End Module
 ]]></Text>.Value
 
-            VerifyItemExists(markup, "Color.Y")
-        End Sub
+            Await VerifyItemExistsAsync(markup, "Color.Y")
+        End Function
 
         <Fact, Trait(Traits.Feature, Traits.Features.Completion)>
-        Public Sub FullyQualified()
+        Public Async Function TestFullyQualified() As Task
             Dim markup = <Text><![CDATA[
 Namespace ColorNamespace
     ''' <completionlist cref="Color"/>
@@ -268,12 +269,12 @@ Class C
 
 End Class
 ]]></Text>.Value
-            VerifyItemExists(markup, "ColorNamespace.Color.X", glyph:=CType(Glyph.EnumMember, Integer))
-            VerifyItemExists(markup, "ColorNamespace.Color.Y", glyph:=CType(Glyph.EnumMember, Integer))
-        End Sub
+            Await VerifyItemExistsAsync(markup, "ColorNamespace.Color.X", glyph:=CType(Glyph.FieldPublic, Integer))
+            Await VerifyItemExistsAsync(markup, "ColorNamespace.Color.Y", glyph:=CType(Glyph.PropertyPublic, Integer))
+        End Function
 
         <Fact, Trait(Traits.Feature, Traits.Features.Completion)>
-        Public Sub TriggeredForNamedArgument()
+        Public Async Function TestTriggeredForNamedArgument() As Task
             Dim markup = <Text><![CDATA[
 Class C
     Public Sub M(day As Color)
@@ -287,27 +288,27 @@ End Class
 
 End Class
 ]]></Text>.Value
-            VerifyItemExists(markup, "Color.X", usePreviousCharAsTrigger:=True)
-        End Sub
+            Await VerifyItemExistsAsync(markup, "Color.X", usePreviousCharAsTrigger:=True)
+        End Function
 
         <Fact, Trait(Traits.Feature, Traits.Features.Completion)>
-        Public Sub NotInObjectCreation()
+        Public Async Function TestNotInObjectCreation() As Task
             Dim markup = <Text><![CDATA[
 ''' <completionlist cref="Program"/>
 Class Program
-    Public Shared Foo As Integer
+    Public Shared Goo As Integer
 
     Sub Main(args As String())
         Dim p As Program = New $$
     End Sub
 End Class
 ]]></Text>.Value
-            VerifyItemIsAbsent(markup, "Program.Foo")
-        End Sub
+            Await VerifyItemIsAbsentAsync(markup, "Program.Goo")
+        End Function
 
-        <WorkItem(954694)>
+        <WorkItem(954694, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/954694")>
         <Fact, Trait(Traits.Feature, Traits.Features.Completion)>
-        Public Sub AnyAccessibleMember()
+        Public Async Function TestAnyAccessibleMember() As Task
             Dim markup = <Text><![CDATA[
 Public Class Program
      Private Shared field1 As Integer
@@ -316,18 +317,18 @@ Public Class Program
     ''' </summary>
     ''' <completionList cref="Program"></completionList>
     Public Class Program2
-        Public Sub M()
+Public Async Function TestM() As Task
             Dim obj As Program2 =$$
         End Sub
     End Class
 End Class
 ]]></Text>.Value
-            VerifyItemExists(markup, "Program.field1")
-        End Sub
+            Await VerifyItemExistsAsync(markup, "Program.field1")
+        End Function
 
         <Fact, Trait(Traits.Feature, Traits.Features.Completion)>
-        <WorkItem(815963)>
-        Public Sub LocalNoAs()
+        <WorkItem(815963, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/815963")>
+        Public Async Function TestLocalNoAs() As Task
             Dim markup = <Text><![CDATA[
 Enum E
     A
@@ -339,11 +340,83 @@ Class C
     End Sub
 End Class
 ]]></Text>.Value
-            VerifyItemIsAbsent(markup, "e As E")
-        End Sub
+            Await VerifyItemIsAbsentAsync(markup, "e As E")
+        End Function
 
-        Friend Overrides Function CreateCompletionProvider() As ICompletionProvider
-            Return New CompletionListTagCompletionProvider()
+        <WorkItem(3518, "https://github.com/dotnet/roslyn/issues/3518")>
+        <Fact, Trait(Traits.Feature, Traits.Features.Completion)>
+        Public Async Function TestNotInTrivia() As Task
+            Dim markup = <Text><![CDATA[
+Class C
+    Sub Test()
+        M(Type2.A)
+        ' $$
+    End Sub
+
+    Private Sub M(a As Type1)
+        Throw New NotImplementedException()
+    End Sub
+End Class
+''' <completionlist cref="Type2"/>
+Public Class Type1
+End Class
+
+Public Class Type2
+    Public Shared A As Type1
+    Public Shared B As Type1
+End Class
+]]></Text>.Value
+            Await VerifyNoItemsExistAsync(markup)
+        End Function
+
+        <WorkItem(3518, "https://github.com/dotnet/roslyn/issues/3518")>
+        <Fact, Trait(Traits.Feature, Traits.Features.Completion)>
+        Public Async Function TestNotAfterInvocationWithCompletionListTagTypeAsFirstParameter() As Task
+            Dim markup = <Text><![CDATA[
+Class C
+    Sub Test()
+        M(Type2.A)
+        $$
+    End Sub
+
+    Private Sub M(a As Type1)
+        Throw New NotImplementedException()
+    End Sub
+End Class
+''' <completionlist cref="Type2"/>
+Public Class Type1
+End Class
+
+Public Class Type2
+    Public Shared A As Type1
+    Public Shared B As Type1
+End Class
+]]></Text>.Value
+            Await VerifyNoItemsExistAsync(markup)
+        End Function
+
+        <WorkItem(18787, "https://github.com/dotnet/roslyn/issues/18787")>
+        <Fact, Trait(Traits.Feature, Traits.Features.Completion)>
+        Public Async Function NotAfterDot() As Task
+            Dim markup = <Text><![CDATA[
+Public Class Program
+     Private Shared field1 As Integer
+ 
+    ''' <summary>
+    ''' </summary>
+    ''' <completionList cref="Program"></completionList>
+    Public Class Program2
+Public Async Function TestM() As Task
+            Dim obj As Program2 = Program.$$
+        End Sub
+    End Class
+End Class
+]]></Text>.Value
+            Await VerifyNoItemsExistAsync(markup)
+        End Function
+
+        Friend Overrides Function GetCompletionProviderType() As Type
+            Return GetType(CompletionListTagCompletionProvider)
         End Function
     End Class
 End Namespace

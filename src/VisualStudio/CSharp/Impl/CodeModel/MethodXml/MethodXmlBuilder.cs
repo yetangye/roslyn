@@ -1,8 +1,11 @@
-// Copyright (c) Microsoft.  All Rights Reserved.  Licensed under the Apache License, Version 2.0.  See License.txt in the project root for license information.
+﻿// Licensed to the .NET Foundation under one or more agreements.
+// The .NET Foundation licenses this file to you under the MIT license.
+// See the LICENSE file in the project root for more information.
+
+#nullable disable
 
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp;
-using Microsoft.CodeAnalysis.CSharp.Symbols;
 using Microsoft.CodeAnalysis.CSharp.Syntax;
 using Microsoft.CodeAnalysis.Shared.Extensions;
 using Microsoft.VisualStudio.LanguageServices.Implementation.CodeModel.MethodXml;
@@ -43,12 +46,11 @@ namespace Microsoft.VisualStudio.LanguageServices.CSharp.CodeModel.MethodXml
                     var firstNonWhitespacePosition = line.GetFirstNonWhitespacePosition() ?? -1;
                     if (firstNonWhitespacePosition == trivia.SpanStart)
                     {
-                        using (var tag = CommentTag())
-                        {
-                            // Skip initial slashes
-                            var trimmedComment = trivia.ToString().Substring(2);
-                            EncodedText(trimmedComment);
-                        }
+                        using var tag = CommentTag();
+
+                        // Skip initial slashes
+                        var trimmedComment = trivia.ToString().Substring(2);
+                        EncodedText(trimmedComment);
                     }
                 }
             }
@@ -57,7 +59,7 @@ namespace Microsoft.VisualStudio.LanguageServices.CSharp.CodeModel.MethodXml
         private void GenerateStatement(StatementSyntax statement)
         {
             var success = false;
-            int mark = GetMark();
+            var mark = GetMark();
 
             switch (statement.Kind())
             {
@@ -162,6 +164,8 @@ namespace Microsoft.VisualStudio.LanguageServices.CSharp.CodeModel.MethodXml
             switch (expression.Kind())
             {
                 case SyntaxKind.CharacterLiteralExpression:
+                    return TryGenerateCharLiteral(expression);
+
                 case SyntaxKind.UnaryMinusExpression:
                 case SyntaxKind.NumericLiteralExpression:
                 case SyntaxKind.StringLiteralExpression:
@@ -261,10 +265,6 @@ namespace Microsoft.VisualStudio.LanguageServices.CSharp.CodeModel.MethodXml
                         GenerateNumber(constantValue.Value, type);
                         return true;
 
-                    case SyntaxKind.CharacterLiteralExpression:
-                        GenerateChar((char)constantValue.Value);
-                        return true;
-
                     case SyntaxKind.StringLiteralExpression:
                         GenerateString((string)constantValue.Value);
                         return true;
@@ -277,6 +277,47 @@ namespace Microsoft.VisualStudio.LanguageServices.CSharp.CodeModel.MethodXml
 
                 return false;
             }
+        }
+
+        private bool TryGenerateCharLiteral(ExpressionSyntax expression)
+        {
+            // For non-letters and digits, generate a cast of the numeric value to a char.
+            // Otherwise, we might end up generating invalid XML.
+            if (expression.Kind() != SyntaxKind.CharacterLiteralExpression)
+            {
+                return false;
+            }
+
+            var constantValue = SemanticModel.GetConstantValue(expression);
+            if (!constantValue.HasValue)
+            {
+                return false;
+            }
+
+            var ch = (char)constantValue.Value;
+
+            if (!char.IsLetterOrDigit(ch))
+            {
+                using (CastTag())
+                {
+                    GenerateType(SpecialType.System_Char);
+
+                    using (ExpressionTag())
+                    using (LiteralTag())
+                    {
+                        GenerateNumber((ushort)ch, SpecialType.System_UInt16);
+                    }
+                }
+            }
+            else
+            {
+                using (LiteralTag())
+                {
+                    GenerateChar(ch);
+                }
+            }
+
+            return true;
         }
 
         private bool TryGenerateParentheses(ParenthesizedExpressionSyntax parenthesizedExpression)
@@ -347,8 +388,7 @@ namespace Microsoft.VisualStudio.LanguageServices.CSharp.CodeModel.MethodXml
 
         private bool TryGenerateNewClass(ObjectCreationExpressionSyntax objectCreationExpression)
         {
-            var type = SemanticModel.GetSymbolInfo(objectCreationExpression.Type).Symbol as ITypeSymbol;
-            if (type == null)
+            if (!(SemanticModel.GetSymbolInfo(objectCreationExpression.Type).Symbol is ITypeSymbol type))
             {
                 return false;
             }
@@ -568,7 +608,7 @@ namespace Microsoft.VisualStudio.LanguageServices.CSharp.CodeModel.MethodXml
 
         public static string Generate(MethodDeclarationSyntax methodDeclaration, SemanticModel semanticModel)
         {
-            var symbol = (IMethodSymbol)semanticModel.GetDeclaredSymbol(methodDeclaration);
+            var symbol = semanticModel.GetDeclaredSymbol(methodDeclaration);
             var builder = new MethodXmlBuilder(symbol, semanticModel);
 
             builder.GenerateBlock(methodDeclaration.Body);

@@ -1,4 +1,6 @@
-' Copyright (c) Microsoft.  All Rights Reserved.  Licensed under the Apache License, Version 2.0.  See License.txt in the project root for license information.
+﻿' Licensed to the .NET Foundation under one or more agreements.
+' The .NET Foundation licenses this file to you under the MIT license.
+' See the LICENSE file in the project root for more information.
 
 Imports Microsoft.VisualStudio.Text
 
@@ -14,7 +16,7 @@ Namespace Microsoft.CodeAnalysis.Editor.VisualBasic.AutomaticEndConstructCorrect
         Private _trackingSpan As ITrackingSpan
         Private _version As ITextVersion
 
-        Sub New(span As SnapshotSpan)
+        Public Sub New(span As SnapshotSpan)
             Contract.ThrowIfNull(span.Snapshot)
 
             Me._trackingSpan = span.Snapshot.CreateTrackingSpan(span.Span, SpanTrackingMode.EdgeInclusive, TrackingFidelityMode.Backward)
@@ -32,7 +34,7 @@ Namespace Microsoft.CodeAnalysis.Editor.VisualBasic.AutomaticEndConstructCorrect
         End Function
 
         Public Function GetSpan(version As ITextVersion) As Span Implements ITrackingSpan.GetSpan
-            Throw New NotSupportedException(VBEditorResources.NotSupported)
+            Throw New NotSupportedException(VBEditorResources.not_supported)
         End Function
 
         Public Function GetStartPoint(snapshot As ITextSnapshot) As SnapshotPoint Implements ITrackingSpan.GetStartPoint
@@ -63,7 +65,7 @@ Namespace Microsoft.CodeAnalysis.Editor.VisualBasic.AutomaticEndConstructCorrect
             End Get
         End Property
 
-        Private Sub GetNextWordIndex(text As String, startIndex As Integer, ByRef firstLetterIndex As Integer, ByRef lastLetterIndex As Integer)
+        Private Shared Sub GetNextWordIndex(text As String, startIndex As Integer, ByRef firstLetterIndex As Integer, ByRef lastLetterIndex As Integer)
             firstLetterIndex = -1
             lastLetterIndex = -1
 
@@ -82,21 +84,21 @@ Namespace Microsoft.CodeAnalysis.Editor.VisualBasic.AutomaticEndConstructCorrect
             Next
         End Sub
 
-        Private Function SameAsOriginal(span As SnapshotSpan, firstLetterIndex As Integer, lastLetterIndex As Integer) As Boolean
+        Private Shared Function SameAsOriginal(span As SnapshotSpan, firstLetterIndex As Integer, lastLetterIndex As Integer) As Boolean
             Return firstLetterIndex = 0 AndAlso span.Length - 1 = lastLetterIndex
         End Function
 
         Private Sub AdjustSpanForErrorCase(span As SnapshotSpan, text As String)
             Dim snapshot = span.Snapshot
-            Dim trimedText = text.Trim()
+            Dim trimmedText = text.Trim()
 
-            If trimedText.Length = 0 Then
+            If trimmedText.Length = 0 Then
                 ' all whitespace, make tracking span to stick to end
                 Me._trackingSpan = snapshot.CreateTrackingSpan(span.End.Position, 0, SpanTrackingMode.EdgeInclusive, TrackingFidelityMode.Backward)
             Else
                 ' something like punctuation is there
                 ' make tracking span to stick after the punctuation
-                Dim position = span.Start.Position + text.IndexOf(trimedText) + trimedText.Length
+                Dim position = span.Start.Position + text.IndexOf(trimmedText, StringComparison.Ordinal) + trimmedText.Length
                 Me._trackingSpan = snapshot.CreateTrackingSpan(position, 0, SpanTrackingMode.EdgeInclusive, TrackingFidelityMode.Backward)
             End If
         End Sub

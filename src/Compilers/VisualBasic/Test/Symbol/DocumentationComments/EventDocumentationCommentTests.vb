@@ -1,4 +1,6 @@
-﻿' Copyright (c) Microsoft.  All Rights Reserved.  Licensed under the Apache License, Version 2.0.  See License.txt in the project root for license information.
+﻿' Licensed to the .NET Foundation under one or more agreements.
+' The .NET Foundation licenses this file to you under the MIT license.
+' See the LICENSE file in the project root for more information.
 
 Imports Microsoft.CodeAnalysis.Text
 Imports Microsoft.CodeAnalysis.VisualBasic.Symbols
@@ -8,12 +10,12 @@ Imports Roslyn.Test.Utilities
 Namespace Microsoft.CodeAnalysis.VisualBasic.UnitTests
     Public Class EventDocumentationCommentTests
 
-        Private m_compilation As VisualBasicCompilation
-        Private m_acmeNamespace As NamespaceSymbol
-        Private m_widgetClass As NamedTypeSymbol
+        Private ReadOnly _compilation As VisualBasicCompilation
+        Private ReadOnly _acmeNamespace As NamespaceSymbol
+        Private ReadOnly _widgetClass As NamedTypeSymbol
 
         Public Sub New()
-            m_compilation = CompilationUtils.CreateCompilationWithMscorlib(
+            _compilation = CompilationUtils.CreateCompilationWithMscorlib40(
 <compilation name="FieldDocumentationCommentTests">
     <file name="a.vb"><![CDATA[
 Namespace Acme
@@ -39,27 +41,27 @@ End Namespace
     </file>
 </compilation>)
 
-            m_acmeNamespace = DirectCast(m_compilation.GlobalNamespace.GetMembers("Acme").Single(), NamespaceSymbol)
-            m_widgetClass = DirectCast(m_acmeNamespace.GetTypeMembers("Widget").Single(), NamedTypeSymbol)
+            _acmeNamespace = DirectCast(_compilation.GlobalNamespace.GetMembers("Acme").Single(), NamespaceSymbol)
+            _widgetClass = DirectCast(_acmeNamespace.GetTypeMembers("Widget").Single(), NamedTypeSymbol)
         End Sub
 
-        <Fact, WorkItem(530915, "DevDiv")>
+        <Fact, WorkItem(530915, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/530915")>
         Public Sub SimpleEvent()
-            Dim member = m_widgetClass.GetMembers("S").First
+            Dim member = _widgetClass.GetMembers("S").First
             Assert.Equal("E:Acme.Widget.S",
                          member.GetDocumentationCommentId())
         End Sub
 
-        <Fact, WorkItem(530915, "DevDiv")>
+        <Fact, WorkItem(530915, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/530915")>
         Public Sub SimpleEventBackingFIeld()
-            Dim member = m_widgetClass.GetMembers("SEvent").First
+            Dim member = _widgetClass.GetMembers("SEvent").First
             Assert.Equal("F:Acme.Widget.SEvent",
                          member.GetDocumentationCommentId())
         End Sub
 
-        <Fact, WorkItem(530915, "DevDiv")>
+        <Fact, WorkItem(530915, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/530915")>
         Public Sub CustomEvent()
-            Dim member = m_widgetClass.GetMembers("C").First
+            Dim member = _widgetClass.GetMembers("C").First
             Assert.Equal("E:Acme.Widget.C",
                          member.GetDocumentationCommentId())
         End Sub

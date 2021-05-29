@@ -1,78 +1,76 @@
-' Copyright (c) Microsoft.  All Rights Reserved.  Licensed under the Apache License, Version 2.0.  See License.txt in the project root for license information.
-
-Imports Microsoft.CodeAnalysis.Text
-Imports Roslyn.Test.Utilities
+﻿' Licensed to the .NET Foundation under one or more agreements.
+' The .NET Foundation licenses this file to you under the MIT license.
+' See the LICENSE file in the project root for more information.
 
 Namespace Microsoft.CodeAnalysis.Editor.VisualBasic.UnitTests.Recommendations.Expressions
     Public Class GetXmlNamespaceKeywordRecommenderTests
         <Fact, Trait(Traits.Feature, Traits.Features.KeywordRecommending)>
-        Public Sub GetXmlNamespaceHelpText()
+        Public Sub GetXmlNamespaceHelpTextTest()
             VerifyRecommendationDescriptionTextIs(<MethodBody>Return |</MethodBody>, "GetXmlNamespace",
-                                                  <Text><![CDATA[
-GetXmlNamespace function
-Returns the System.Xml.Linq.XNamespace object corresponding to the specified XML namespace prefix.
-GetXmlNamespace([<xmlNamespacePrefix>]) As System.Xml.Linq.XNamespace]]></Text>)
+$"{VBFeaturesResources.GetXmlNamespace_function}
+{VBWorkspaceResources.Returns_the_System_Xml_Linq_XNamespace_object_corresponding_to_the_specified_XML_namespace_prefix}
+GetXmlNamespace([{VBWorkspaceResources.xmlNamespacePrefix}]) As System.Xml.Linq.XNamespace")
         End Sub
 
         <Fact, Trait(Traits.Feature, Traits.Features.KeywordRecommending)>
-        Public Sub NoneInClassDeclaration()
+        Public Sub NoneInClassDeclarationTest()
             VerifyRecommendationsMissing(<ClassDeclaration>|</ClassDeclaration>, "GetXmlNamespace")
         End Sub
 
         <Fact, Trait(Traits.Feature, Traits.Features.KeywordRecommending)>
-        Public Sub GetXmlNamespaceNotInStatement()
+        Public Sub GetXmlNamespaceNotInStatementTest()
             VerifyRecommendationsMissing(<MethodBody>|</MethodBody>, "GetXmlNamespace")
         End Sub
 
         <Fact, Trait(Traits.Feature, Traits.Features.KeywordRecommending)>
-        Public Sub GetXmlNamespaceAfterReturn()
+        Public Sub GetXmlNamespaceAfterReturnTest()
             VerifyRecommendationsContain(<MethodBody>Return |</MethodBody>, "GetXmlNamespace")
         End Sub
 
         <Fact, Trait(Traits.Feature, Traits.Features.KeywordRecommending)>
-        Public Sub GetXmlNamespaceAfterArgument1()
-            VerifyRecommendationsContain(<MethodBody>Foo(|</MethodBody>, "GetXmlNamespace")
+        Public Sub GetXmlNamespaceAfterArgument1Test()
+            VerifyRecommendationsContain(<MethodBody>Goo(|</MethodBody>, "GetXmlNamespace")
         End Sub
 
         <Fact, Trait(Traits.Feature, Traits.Features.KeywordRecommending)>
-        Public Sub GetXmlNamespaceAfterArgument2()
-            VerifyRecommendationsContain(<MethodBody>Foo(bar, |</MethodBody>, "GetXmlNamespace")
+        Public Sub GetXmlNamespaceAfterArgument2Test()
+            VerifyRecommendationsContain(<MethodBody>Goo(bar, |</MethodBody>, "GetXmlNamespace")
         End Sub
 
         <Fact, Trait(Traits.Feature, Traits.Features.KeywordRecommending)>
-        Public Sub GetXmlNamespaceAfterBinaryExpression()
-            VerifyRecommendationsContain(<MethodBody>Foo(bar + |</MethodBody>, "GetXmlNamespace")
+        Public Sub GetXmlNamespaceAfterBinaryExpressionTest()
+            VerifyRecommendationsContain(<MethodBody>Goo(bar + |</MethodBody>, "GetXmlNamespace")
         End Sub
 
         <Fact, Trait(Traits.Feature, Traits.Features.KeywordRecommending)>
-        Public Sub GetXmlNamespaceAfterNot()
-            VerifyRecommendationsContain(<MethodBody>Foo(Not |</MethodBody>, "GetXmlNamespace")
+        Public Sub GetXmlNamespaceAfterNotTest()
+            VerifyRecommendationsContain(<MethodBody>Goo(Not |</MethodBody>, "GetXmlNamespace")
         End Sub
 
         <Fact, Trait(Traits.Feature, Traits.Features.KeywordRecommending)>
-        Public Sub GetXmlNamespaceAfterTypeOf()
+        Public Sub GetXmlNamespaceAfterTypeOfTest()
             VerifyRecommendationsContain(<MethodBody>If TypeOf |</MethodBody>, "GetXmlNamespace")
         End Sub
 
         <Fact, Trait(Traits.Feature, Traits.Features.KeywordRecommending)>
-        Public Sub GetXmlNamespaceAfterDoWhile()
+        Public Sub GetXmlNamespaceAfterDoWhileTest()
             VerifyRecommendationsContain(<MethodBody>Do While |</MethodBody>, "GetXmlNamespace")
         End Sub
 
         <Fact, Trait(Traits.Feature, Traits.Features.KeywordRecommending)>
-        Public Sub GetXmlNamespaceAfterDoUntil()
+        Public Sub GetXmlNamespaceAfterDoUntilTest()
             VerifyRecommendationsContain(<MethodBody>Do Until |</MethodBody>, "GetXmlNamespace")
         End Sub
 
         <Fact, Trait(Traits.Feature, Traits.Features.KeywordRecommending)>
-        Public Sub GetXmlNamespaceAfterLoopWhile()
+        Public Sub GetXmlNamespaceAfterLoopWhileTest()
             VerifyRecommendationsContain(<MethodBody>
 Do
 Loop While |</MethodBody>, "GetXmlNamespace")
         End Sub
 
         <Fact, Trait(Traits.Feature, Traits.Features.KeywordRecommending)>
-        Public Sub GetXmlNamespaceAfterLoopUntil()
+        Public Sub GetXmlNamespaceAfterLoopUntilTest()
             VerifyRecommendationsContain(<MethodBody>
 Do
 Loop Until |</MethodBody>, "GetXmlNamespace")
@@ -80,61 +78,61 @@ Loop Until |</MethodBody>, "GetXmlNamespace")
 
         <Fact>
         <Trait(Traits.Feature, Traits.Features.KeywordRecommending)>
-        Public Sub GetXmlNamespaceAfterIf()
+        Public Sub GetXmlNamespaceAfterIfTest()
             VerifyRecommendationsContain(<MethodBody>If |</MethodBody>, "GetXmlNamespace")
         End Sub
 
         <Fact, Trait(Traits.Feature, Traits.Features.KeywordRecommending)>
-        Public Sub GetXmlNamespaceAfterElseIf()
+        Public Sub GetXmlNamespaceAfterElseIfTest()
             VerifyRecommendationsContain(<MethodBody>ElseIf |</MethodBody>, "GetXmlNamespace")
         End Sub
 
         <Fact, Trait(Traits.Feature, Traits.Features.KeywordRecommending)>
-        Public Sub GetXmlNamespaceAfterElseSpaceIf()
+        Public Sub GetXmlNamespaceAfterElseSpaceIfTest()
             VerifyRecommendationsContain(<MethodBody>Else If |</MethodBody>, "GetXmlNamespace")
         End Sub
 
         <Fact, Trait(Traits.Feature, Traits.Features.KeywordRecommending)>
-        Public Sub GetXmlNamespaceAfterError()
+        Public Sub GetXmlNamespaceAfterErrorTest()
             VerifyRecommendationsContain(<MethodBody>Error |</MethodBody>, "GetXmlNamespace")
         End Sub
 
         <Fact, Trait(Traits.Feature, Traits.Features.KeywordRecommending)>
-        Public Sub GetXmlNamespaceAfterThrow()
+        Public Sub GetXmlNamespaceAfterThrowTest()
             VerifyRecommendationsContain(<MethodBody>Throw |</MethodBody>, "GetXmlNamespace")
         End Sub
 
         <Fact, Trait(Traits.Feature, Traits.Features.KeywordRecommending)>
-        Public Sub GetXmlNamespaceAfterInitializer()
+        Public Sub GetXmlNamespaceAfterInitializerTest()
             VerifyRecommendationsContain(<MethodBody>Dim x = |</MethodBody>, "GetXmlNamespace")
         End Sub
 
         <Fact, Trait(Traits.Feature, Traits.Features.KeywordRecommending)>
-        Public Sub GetXmlNamespaceAfterArrayInitializerSquiggle()
+        Public Sub GetXmlNamespaceAfterArrayInitializerSquiggleTest()
             VerifyRecommendationsContain(<MethodBody>Dim x = {|</MethodBody>, "GetXmlNamespace")
         End Sub
 
         <Fact, Trait(Traits.Feature, Traits.Features.KeywordRecommending)>
-        Public Sub GetXmlNamespaceAfterArrayInitializerComma()
+        Public Sub GetXmlNamespaceAfterArrayInitializerCommaTest()
             VerifyRecommendationsContain(<MethodBody>Dim x = {0, |</MethodBody>, "GetXmlNamespace")
         End Sub
 
         <Fact, Trait(Traits.Feature, Traits.Features.KeywordRecommending)>
-        Public Sub GetXmlNamespaceAfterWhileLoop()
+        Public Sub GetXmlNamespaceAfterWhileLoopTest()
             VerifyRecommendationsContain(<MethodBody>While |</MethodBody>, "GetXmlNamespace")
         End Sub
 
-        <WorkItem(543270)>
+        <WorkItem(543270, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/543270")>
         <Fact, Trait(Traits.Feature, Traits.Features.KeywordRecommending)>
-        Public Sub NoGetXmlNamespaceInDelegateCreation()
+        Public Sub NoGetXmlNamespaceInDelegateCreationTest()
             Dim code =
 <File>
 Module Program
     Sub Main(args As String())
-        Dim f1 As New Foo2( |
+        Dim f1 As New Goo2( |
     End Sub
 
-    Delegate Sub Foo2()
+    Delegate Sub Goo2()
 
     Function Bar2() As Object
         Return Nothing
@@ -144,6 +142,5 @@ End Module
 
             VerifyRecommendationsMissing(code, "GetXmlNamespace")
         End Sub
-
     End Class
 End Namespace

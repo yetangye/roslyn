@@ -1,7 +1,10 @@
-﻿' Copyright (c) Microsoft.  All Rights Reserved.  Licensed under the Apache License, Version 2.0.  See License.txt in the project root for license information.
+﻿' Licensed to the .NET Foundation under one or more agreements.
+' The .NET Foundation licenses this file to you under the MIT license.
+' See the LICENSE file in the project root for more information.
 
 Imports System.Collections.Immutable
 Imports System.Threading
+Imports Microsoft.CodeAnalysis.PooledObjects
 Imports Microsoft.CodeAnalysis.Text
 Imports Microsoft.CodeAnalysis.VisualBasic.Symbols
 Imports Microsoft.CodeAnalysis.VisualBasic.Syntax
@@ -14,11 +17,11 @@ Namespace Microsoft.CodeAnalysis.VisualBasic.Symbols
     Friend NotInheritable Class SynthesizedDelegateMethodSymbol
         Inherits MethodSymbol
 
-        Private ReadOnly m_name As String
-        Private ReadOnly m_containingType As NamedTypeSymbol
-        Private ReadOnly m_returnType As TypeSymbol
-        Private ReadOnly m_flags As SourceMemberFlags
-        Private m_parameters As ImmutableArray(Of ParameterSymbol)
+        Private ReadOnly _name As String
+        Private ReadOnly _containingType As NamedTypeSymbol
+        Private ReadOnly _returnType As TypeSymbol
+        Private ReadOnly _flags As SourceMemberFlags
+        Private _parameters As ImmutableArray(Of ParameterSymbol)
 
         ''' <summary>
         ''' Initializes a new instance of the <see cref="SynthesizedDelegateMethodSymbol" /> class. The parameters are not initialized and need to be set 
@@ -33,10 +36,10 @@ Namespace Microsoft.CodeAnalysis.VisualBasic.Symbols
                        flags As SourceMemberFlags,
                        returnType As TypeSymbol)
 
-            m_name = name
-            m_containingType = containingSymbol
-            m_flags = flags
-            m_returnType = returnType
+            _name = name
+            _containingType = containingSymbol
+            _flags = flags
+            _returnType = returnType
         End Sub
 
         ''' <summary>
@@ -49,9 +52,9 @@ Namespace Microsoft.CodeAnalysis.VisualBasic.Symbols
         ''' </remarks>
         Friend Sub SetParameters(parameters As ImmutableArray(Of ParameterSymbol))
             Debug.Assert(Not parameters.IsDefault)
-            Debug.Assert(m_parameters.IsDefault)
+            Debug.Assert(_parameters.IsDefault)
 
-            m_parameters = parameters
+            _parameters = parameters
         End Sub
 
         ''' <summary>
@@ -90,13 +93,13 @@ Namespace Microsoft.CodeAnalysis.VisualBasic.Symbols
         ''' </summary>
         Public Overrides ReadOnly Property ContainingSymbol As Symbol
             Get
-                Return m_containingType
+                Return _containingType
             End Get
         End Property
 
         Public Overrides ReadOnly Property ContainingType As NamedTypeSymbol
             Get
-                Return m_containingType
+                Return _containingType
             End Get
         End Property
 
@@ -210,7 +213,7 @@ Namespace Microsoft.CodeAnalysis.VisualBasic.Symbols
         ''' </value>
         Public Overrides ReadOnly Property IsOverridable As Boolean
             Get
-                Return (m_flags And SourceMemberFlags.Overridable) <> 0
+                Return (_flags And SourceMemberFlags.Overridable) <> 0
             End Get
         End Property
 
@@ -246,7 +249,7 @@ Namespace Microsoft.CodeAnalysis.VisualBasic.Symbols
         ''' </value>
         Public Overrides ReadOnly Property IsSub As Boolean
             Get
-                Return m_returnType.SpecialType = SpecialType.System_Void
+                Return _returnType.SpecialType = SpecialType.System_Void
             End Get
         End Property
 
@@ -257,6 +260,12 @@ Namespace Microsoft.CodeAnalysis.VisualBasic.Symbols
         End Property
 
         Public Overrides ReadOnly Property IsIterator As Boolean
+            Get
+                Return False
+            End Get
+        End Property
+
+        Public Overrides ReadOnly Property IsInitOnly As Boolean
             Get
                 Return False
             End Get
@@ -275,7 +284,7 @@ Namespace Microsoft.CodeAnalysis.VisualBasic.Symbols
         End Property
 
         Friend Overrides Function GetLexicalSortKey() As LexicalSortKey
-            Return m_containingType.GetLexicalSortKey()
+            Return _containingType.GetLexicalSortKey()
         End Function
 
         ''' <summary>
@@ -283,7 +292,7 @@ Namespace Microsoft.CodeAnalysis.VisualBasic.Symbols
         ''' </summary>
         Public Overrides ReadOnly Property Locations As ImmutableArray(Of Location)
             Get
-                Return m_containingType.Locations
+                Return _containingType.Locations
             End Get
         End Property
 
@@ -300,7 +309,7 @@ Namespace Microsoft.CodeAnalysis.VisualBasic.Symbols
         ''' </summary>
         Public Overrides ReadOnly Property MethodKind As MethodKind
             Get
-                Return m_flags.ToMethodKind()
+                Return _flags.ToMethodKind()
             End Get
         End Property
 
@@ -315,11 +324,17 @@ Namespace Microsoft.CodeAnalysis.VisualBasic.Symbols
         ''' </summary>
         Public Overrides ReadOnly Property Parameters As ImmutableArray(Of ParameterSymbol)
             Get
-                If Not m_parameters.IsDefault Then
-                    Return m_parameters
+                If Not _parameters.IsDefault Then
+                    Return _parameters
                 Else
                     Return ImmutableArray(Of ParameterSymbol).Empty
                 End If
+            End Get
+        End Property
+
+        Public Overrides ReadOnly Property ReturnsByRef As Boolean
+            Get
+                Return False
             End Get
         End Property
 
@@ -328,7 +343,7 @@ Namespace Microsoft.CodeAnalysis.VisualBasic.Symbols
         ''' </summary>
         Public Overrides ReadOnly Property ReturnType As TypeSymbol
             Get
-                Return m_returnType
+                Return _returnType
             End Get
         End Property
 
@@ -343,6 +358,12 @@ Namespace Microsoft.CodeAnalysis.VisualBasic.Symbols
         ''' Returns the list of custom modifiers, if any, associated with the returned value.
         ''' </summary>
         Public Overrides ReadOnly Property ReturnTypeCustomModifiers As ImmutableArray(Of CustomModifier)
+            Get
+                Return ImmutableArray(Of CustomModifier).Empty
+            End Get
+        End Property
+
+        Public Overrides ReadOnly Property RefCustomModifiers As ImmutableArray(Of CustomModifier)
             Get
                 Return ImmutableArray(Of CustomModifier).Empty
             End Get
@@ -384,7 +405,7 @@ Namespace Microsoft.CodeAnalysis.VisualBasic.Symbols
         ''' </summary>
         Public Overrides ReadOnly Property Name As String
             Get
-                Return m_name
+                Return _name
             End Get
         End Property
 
@@ -398,7 +419,7 @@ Namespace Microsoft.CodeAnalysis.VisualBasic.Symbols
             Return ImmutableArray(Of String).Empty
         End Function
 
-        Friend Overrides ReadOnly Property Syntax As VisualBasicSyntaxNode
+        Friend Overrides ReadOnly Property Syntax As SyntaxNode
             Get
                 Return Nothing ' The methods are runtime implemented
             End Get

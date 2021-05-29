@@ -1,4 +1,6 @@
-﻿' Copyright (c) Microsoft.  All Rights Reserved.  Licensed under the Apache License, Version 2.0.  See License.txt in the project root for license information.
+﻿' Licensed to the .NET Foundation under one or more agreements.
+' The .NET Foundation licenses this file to you under the MIT license.
+' See the LICENSE file in the project root for more information.
 
 Imports System.Runtime.CompilerServices
 Imports Microsoft.CodeAnalysis.Test.Utilities
@@ -15,7 +17,7 @@ Namespace Microsoft.CodeAnalysis.VisualBasic.UnitTests.AnonymousDelegates
     Public Class CreationAndEmit : Inherits BasicTestBase
 
         <Fact>
-        <WorkItem(1024401)>
+        <WorkItem(1024401, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/1024401")>
         Public Sub DebuggerDisplayAttributeWithNoTypeMember()
             Dim src = "
 Module Test
@@ -149,7 +151,7 @@ End Module
     </file>
 </compilation>
 
-            CompileAndVerify(compilationDef, options:=TestOptions.ReleaseExe, additionalRefs:={SystemCoreRef},
+            CompileAndVerify(compilationDef, options:=TestOptions.ReleaseExe, references:={SystemCoreRef},
                              expectedOutput:=
             <![CDATA[
 1
@@ -290,7 +292,7 @@ End Module
     </file>
 </compilation>
 
-            Dim compilation = CreateCompilationWithMscorlibAndVBRuntimeAndReferences(compilationDef, {SystemCoreRef}, TestOptions.ReleaseExe)
+            Dim compilation = CreateCompilationWithMscorlib40AndVBRuntimeAndReferences(compilationDef, {SystemCoreRef}, TestOptions.ReleaseExe)
 
             Dim tree As SyntaxTree = (From t In compilation.SyntaxTrees Where t.FilePath = "a.vb").Single()
 
@@ -309,6 +311,9 @@ End Module
             Assert.Equal("Function <generated method>.BeginInvoke(ByRef Pp1 As System.Int64, DelegateCallback As System.AsyncCallback, DelegateAsyncState As System.Object) As System.IAsyncResult", x16.GetMember("BeginInvoke").ToTestDisplayString())
             Assert.Equal(MethodKind.Ordinary, x16.GetMember(Of MethodSymbol)("EndInvoke").MethodKind)
             Assert.Equal("Function <generated method>.EndInvoke(ByRef Pp1 As System.Int64, DelegateAsyncResult As System.IAsyncResult) As System.Int64", x16.GetMember("EndInvoke").ToTestDisplayString())
+
+            Assert.IsType(GetType(AnonymousTypeManager.AnonymousDelegatePublicSymbol), x16)
+            Assert.False(DirectCast(x16, INamedTypeSymbol).IsSerializable)
 
             Dim node15 As ModifiedIdentifierSyntax = CompilationUtils.FindBindingText(Of ModifiedIdentifierSyntax)(compilation, "a.vb", 15)
             Dim x15 = DirectCast(semanticModel.GetDeclaredSymbol(node15), LocalSymbol).Type
@@ -463,6 +468,38 @@ VB$AnonymousDelegate_6`2[System.Int32,System.Int32]
 15
 VB$AnonymousDelegate_6`2[System.Int64,System.Int64]
 ]]>)
+        End Sub
+
+        <Fact>
+        <WorkItem(2928, "https://github.com/dotnet/roslyn/issues/2928")>
+        Public Sub ContainingSymbol()
+            Dim comp = CompilationUtils.CreateCompilationWithMscorlib40AndVBRuntime(
+<compilation>
+    <file name="a.vb">
+Module Test
+    Sub Main()
+        Dim x = Function(y) y + 1
+        System.Console.WriteLine(x)
+    End Sub
+End Module
+    </file>
+</compilation>, options:=TestOptions.DebugExe.WithRootNamespace("Ns1.Ns2"))
+
+            Dim tree As SyntaxTree = comp.SyntaxTrees.Single()
+            Dim semanticModel = comp.GetSemanticModel(tree)
+            Dim x = tree.GetRoot().DescendantNodes().OfType(Of IdentifierNameSyntax)().Where(Function(n) n.Identifier.ValueText = "x").Single()
+
+            Dim type = semanticModel.GetTypeInfo(x).Type
+            Assert.Equal("Function <generated method>(y As System.Object) As System.Object", type.ToTestDisplayString())
+            Assert.True(type.ContainingNamespace.IsGlobalNamespace)
+
+            Dim validator As Action(Of ModuleSymbol) =
+                Sub(m As ModuleSymbol)
+                    Dim anonDelegate = (From sym In m.GlobalNamespace.GetMembers()
+                                        Where sym.Name.Contains("AnonymousDelegate")).Single()
+                End Sub
+
+            CompileAndVerify(comp, symbolValidator:=validator, expectedOutput:="VB$AnonymousDelegate_0`2[System.Object,System.Object]")
         End Sub
 
     End Class

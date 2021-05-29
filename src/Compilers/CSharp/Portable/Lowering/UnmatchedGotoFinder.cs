@@ -1,4 +1,8 @@
-﻿// Copyright (c) Microsoft.  All Rights Reserved.  Licensed under the Apache License, Version 2.0.  See License.txt in the project root for license information.
+﻿// Licensed to the .NET Foundation under one or more agreements.
+// The .NET Foundation licenses this file to you under the MIT license.
+// See the LICENSE file in the project root for more information.
+
+#nullable disable
 
 using System.Collections.Generic;
 using System.Diagnostics;
@@ -13,22 +17,23 @@ namespace Microsoft.CodeAnalysis.CSharp
     /// Compiles a list of all labels that are targeted by gotos within a
     /// node, but are not declared within the node.
     /// </summary>
-    internal sealed class UnmatchedGotoFinder : BoundTreeWalker
+    internal sealed class UnmatchedGotoFinder : BoundTreeWalkerWithStackGuardWithoutRecursionOnTheLeftOfBinaryOperator
     {
         private readonly Dictionary<BoundNode, HashSet<LabelSymbol>> _unmatchedLabelsCache; // NB: never modified.
 
         private HashSet<LabelSymbol> _gotos;
         private HashSet<LabelSymbol> _targets;
 
-        private UnmatchedGotoFinder(Dictionary<BoundNode, HashSet<LabelSymbol>> unmatchedLabelsCache)
+        private UnmatchedGotoFinder(Dictionary<BoundNode, HashSet<LabelSymbol>> unmatchedLabelsCache, int recursionDepth)
+            : base(recursionDepth)
         {
             Debug.Assert(unmatchedLabelsCache != null);
             _unmatchedLabelsCache = unmatchedLabelsCache;
         }
 
-        public static HashSet<LabelSymbol> Find(BoundNode node, Dictionary<BoundNode, HashSet<LabelSymbol>> unmatchedLabelsCache)
+        public static HashSet<LabelSymbol> Find(BoundNode node, Dictionary<BoundNode, HashSet<LabelSymbol>> unmatchedLabelsCache, int recursionDepth)
         {
-            UnmatchedGotoFinder finder = new UnmatchedGotoFinder(unmatchedLabelsCache);
+            UnmatchedGotoFinder finder = new UnmatchedGotoFinder(unmatchedLabelsCache, recursionDepth);
             finder.Visit(node);
             HashSet<LabelSymbol> gotos = finder._gotos;
             HashSet<LabelSymbol> targets = finder._targets;
@@ -70,6 +75,17 @@ namespace Microsoft.CodeAnalysis.CSharp
             return base.VisitConditionalGoto(node);
         }
 
+        public override BoundNode VisitSwitchDispatch(BoundSwitchDispatch node)
+        {
+            AddGoto(node.DefaultLabel);
+            foreach ((_, LabelSymbol label) in node.Cases)
+            {
+                AddGoto(label);
+            }
+
+            return base.VisitSwitchDispatch(node);
+        }
+
         public override BoundNode VisitLabelStatement(BoundLabelStatement node)
         {
             AddTarget(node.Label);
@@ -80,18 +96,6 @@ namespace Microsoft.CodeAnalysis.CSharp
         {
             AddTarget(node.Label);
             return base.VisitLabeledStatement(node);
-        }
-
-        public override BoundNode VisitSwitchStatement(BoundSwitchStatement node)
-        {
-            AddTarget(node.BreakLabel);
-            return base.VisitSwitchStatement(node);
-        }
-
-        public override BoundNode VisitSwitchLabel(BoundSwitchLabel node)
-        {
-            AddTarget(node.Label);
-            return base.VisitSwitchLabel(node);
         }
 
         private void AddGoto(LabelSymbol label)

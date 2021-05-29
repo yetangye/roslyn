@@ -1,4 +1,6 @@
-﻿' Copyright (c) Microsoft.  All Rights Reserved.  Licensed under the Apache License, Version 2.0.  See License.txt in the project root for license information.
+﻿' Licensed to the .NET Foundation under one or more agreements.
+' The .NET Foundation licenses this file to you under the MIT license.
+' See the LICENSE file in the project root for more information.
 
 Imports System.Collections.Generic
 Imports System.Collections.Immutable
@@ -13,46 +15,55 @@ Namespace Microsoft.CodeAnalysis.VisualBasic.Symbols
     ''' </summary>
     Friend NotInheritable Class SignatureOnlyParameterSymbol
         Inherits ParameterSymbol
-        Private ReadOnly m_type As TypeSymbol
-        Private ReadOnly m_customModifiers As ImmutableArray(Of CustomModifier)
-        Private ReadOnly m_defaultValue As ConstantValue
-        Private ReadOnly m_isParamArray As Boolean
-        Private ReadOnly m_isByRef As Boolean
-        Private ReadOnly m_isOut As Boolean
-        Private ReadOnly m_isOptional As Boolean
+        Private ReadOnly _type As TypeSymbol
+        Private ReadOnly _customModifiers As ImmutableArray(Of CustomModifier)
+        Private ReadOnly _refCustomModifiers As ImmutableArray(Of CustomModifier)
+        Private ReadOnly _defaultValue As ConstantValue
+        Private ReadOnly _isParamArray As Boolean
+        Private ReadOnly _isByRef As Boolean
+        Private ReadOnly _isOut As Boolean
+        Private ReadOnly _isOptional As Boolean
 
         Public Sub New(ByVal type As TypeSymbol,
                        ByVal customModifiers As ImmutableArray(Of CustomModifier),
+                       ByVal refCustomModifiers As ImmutableArray(Of CustomModifier),
                        ByVal defaultConstantValue As ConstantValue,
                        ByVal isParamArray As Boolean,
                        ByVal isByRef As Boolean,
                        ByVal isOut As Boolean,
                        ByVal isOptional As Boolean)
 
-            Me.m_type = type
-            Me.m_customModifiers = customModifiers
-            Me.m_defaultValue = defaultConstantValue
-            Me.m_isParamArray = isParamArray
-            Me.m_isByRef = isByRef
-            Me.m_isOut = isOut
-            Me.m_isOptional = isOptional
+            Me._type = type
+            Me._customModifiers = customModifiers
+            Me._refCustomModifiers = refCustomModifiers
+            Me._defaultValue = defaultConstantValue
+            Me._isParamArray = isParamArray
+            Me._isByRef = isByRef
+            Me._isOut = isOut
+            Me._isOptional = isOptional
         End Sub
 
         Public Overrides ReadOnly Property Type() As TypeSymbol
             Get
-                Return m_type
+                Return _type
             End Get
         End Property
 
         Public Overrides ReadOnly Property CustomModifiers() As ImmutableArray(Of CustomModifier)
             Get
-                Return m_customModifiers
+                Return _customModifiers
+            End Get
+        End Property
+
+        Public Overrides ReadOnly Property RefCustomModifiers() As ImmutableArray(Of CustomModifier)
+            Get
+                Return _refCustomModifiers
             End Get
         End Property
 
         Public Overrides ReadOnly Property IsParamArray As Boolean
             Get
-                Return m_isParamArray
+                Return _isParamArray
             End Get
         End Property
 
@@ -64,43 +75,43 @@ Namespace Microsoft.CodeAnalysis.VisualBasic.Symbols
 
         Public Overrides ReadOnly Property IsByRef As Boolean
             Get
-                Return m_isByRef
+                Return _isByRef
             End Get
         End Property
 
         Friend Overrides ReadOnly Property IsExplicitByRef As Boolean
             Get
-                Return m_isByRef
+                Return _isByRef
             End Get
         End Property
 
         Friend Overrides ReadOnly Property IsMetadataOut As Boolean
             Get
-                Return m_isOut
+                Return _isOut
             End Get
         End Property
 
         Friend Overrides ReadOnly Property IsMetadataIn As Boolean
             Get
-                Return Not m_isOut
+                Return Not _isOut
             End Get
         End Property
 
         Public Overrides ReadOnly Property IsOptional() As Boolean
             Get
-                Return m_isOptional
+                Return _isOptional
             End Get
         End Property
 
         Public Overrides ReadOnly Property HasExplicitDefaultValue() As Boolean
             Get
-                Return m_defaultValue IsNot Nothing
+                Return _defaultValue IsNot Nothing
             End Get
         End Property
 
         Friend Overrides ReadOnly Property ExplicitDefaultConstantValue(inProgress As SymbolsInProgress(Of ParameterSymbol)) As ConstantValue
             Get
-                Return m_defaultValue
+                Return _defaultValue
             End Get
         End Property
 
@@ -176,13 +187,6 @@ Namespace Microsoft.CodeAnalysis.VisualBasic.Symbols
                 Throw ExceptionUtilities.Unreachable
             End Get
         End Property
-
-        Friend Overrides ReadOnly Property HasByRefBeforeCustomModifiers As Boolean
-            Get
-                Throw ExceptionUtilities.Unreachable
-            End Get
-        End Property
 #End Region
-
     End Class
 End Namespace

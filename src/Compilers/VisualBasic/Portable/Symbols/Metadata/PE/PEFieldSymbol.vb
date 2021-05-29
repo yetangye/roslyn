@@ -1,4 +1,6 @@
-﻿' Copyright (c) Microsoft.  All Rights Reserved.  Licensed under the Apache License, Version 2.0.  See License.txt in the project root for license information.
+﻿' Licensed to the .NET Foundation under one or more agreements.
+' The .NET Foundation licenses this file to you under the MIT license.
+' See the LICENSE file in the project root for more information.
 
 Imports System.Collections.Generic
 Imports System.Collections.Immutable
@@ -21,17 +23,17 @@ Namespace Microsoft.CodeAnalysis.VisualBasic.Symbols.Metadata.PE
     Friend NotInheritable Class PEFieldSymbol
         Inherits FieldSymbol
 
-        Private ReadOnly m_Handle As FieldDefinitionHandle
-        Private ReadOnly m_Name As String
-        Private ReadOnly m_Flags As FieldAttributes
-        Private ReadOnly m_ContainingType As PENamedTypeSymbol
-        Private m_LazyType As TypeSymbol
-        Private m_LazyCustomModifiers As ImmutableArray(Of CustomModifier)
-        Private m_LazyConstantValue As ConstantValue = Microsoft.CodeAnalysis.ConstantValue.Unset
-        Private m_lazyDocComment As Tuple(Of CultureInfo, String)
-        Private m_lazyCustomAttributes As ImmutableArray(Of VisualBasicAttributeData)
-        Private m_lazyUseSiteErrorInfo As DiagnosticInfo = ErrorFactory.EmptyErrorInfo ' Indicates unknown state. 
-        Private m_lazyObsoleteAttributeData As ObsoleteAttributeData = ObsoleteAttributeData.Uninitialized
+        Private ReadOnly _handle As FieldDefinitionHandle
+        Private ReadOnly _name As String
+        Private ReadOnly _flags As FieldAttributes
+        Private ReadOnly _containingType As PENamedTypeSymbol
+        Private _lazyType As TypeSymbol
+        Private _lazyCustomModifiers As ImmutableArray(Of CustomModifier)
+        Private _lazyConstantValue As ConstantValue = Microsoft.CodeAnalysis.ConstantValue.Unset
+        Private _lazyDocComment As Tuple(Of CultureInfo, String)
+        Private _lazyCustomAttributes As ImmutableArray(Of VisualBasicAttributeData)
+        Private _lazyCachedUseSiteInfo As CachedUseSiteInfo(Of AssemblySymbol) = CachedUseSiteInfo(Of AssemblySymbol).Uninitialized ' Indicates unknown state. 
+        Private _lazyObsoleteAttributeData As ObsoleteAttributeData = ObsoleteAttributeData.Uninitialized
 
         Friend Sub New(
             moduleSymbol As PEModuleSymbol,
@@ -42,29 +44,29 @@ Namespace Microsoft.CodeAnalysis.VisualBasic.Symbols.Metadata.PE
             Debug.Assert(containingType IsNot Nothing)
             Debug.Assert(Not handle.IsNil)
 
-            m_Handle = handle
-            m_ContainingType = containingType
+            _handle = handle
+            _containingType = containingType
 
             Try
-                moduleSymbol.Module.GetFieldDefPropsOrThrow(handle, m_Name, m_Flags)
+                moduleSymbol.Module.GetFieldDefPropsOrThrow(handle, _name, _flags)
             Catch mrEx As BadImageFormatException
-                If m_Name Is Nothing Then
-                    m_Name = String.Empty
+                If _name Is Nothing Then
+                    _name = String.Empty
                 End If
 
-                m_lazyUseSiteErrorInfo = ErrorFactory.ErrorInfo(ERRID.ERR_UnsupportedField1, Me)
+                _lazyCachedUseSiteInfo.Initialize(ErrorFactory.ErrorInfo(ERRID.ERR_UnsupportedField1, Me))
             End Try
         End Sub
 
         Public Overrides ReadOnly Property Name As String
             Get
-                Return m_Name
+                Return _name
             End Get
         End Property
 
         Friend ReadOnly Property FieldFlags As FieldAttributes
             Get
-                Return m_Flags
+                Return _flags
             End Get
         End Property
 
@@ -76,13 +78,13 @@ Namespace Microsoft.CodeAnalysis.VisualBasic.Symbols.Metadata.PE
 
         Public Overrides ReadOnly Property ContainingSymbol As Symbol
             Get
-                Return m_ContainingType
+                Return _containingType
             End Get
         End Property
 
         Public Overrides ReadOnly Property ContainingType As NamedTypeSymbol
             Get
-                Return m_ContainingType
+                Return _containingType
             End Get
         End Property
 
@@ -90,7 +92,7 @@ Namespace Microsoft.CodeAnalysis.VisualBasic.Symbols.Metadata.PE
             Get
                 Dim access As Accessibility = Accessibility.Private
 
-                Select Case m_Flags And FieldAttributes.FieldAccessMask
+                Select Case _flags And FieldAttributes.FieldAccessMask
                     Case FieldAttributes.Assembly
                         access = Accessibility.Friend
 
@@ -111,7 +113,7 @@ Namespace Microsoft.CodeAnalysis.VisualBasic.Symbols.Metadata.PE
                         access = Accessibility.Protected
 
                     Case Else
-                        Debug.Assert(False, "Unexpected!!!")
+                        access = Accessibility.Private
                 End Select
 
                 Return access
@@ -119,7 +121,7 @@ Namespace Microsoft.CodeAnalysis.VisualBasic.Symbols.Metadata.PE
         End Property
 
         Public Overloads Overrides Function GetAttributes() As ImmutableArray(Of VisualBasicAttributeData)
-            If m_lazyCustomAttributes.IsDefault Then
+            If _lazyCustomAttributes.IsDefault Then
                 Dim containingPEModuleSymbol = DirectCast(ContainingModule(), PEModuleSymbol)
 
                 Dim filterOutConstantAttributeDescription As AttributeDescription = GetConstantAttributeDescription()
@@ -127,29 +129,29 @@ Namespace Microsoft.CodeAnalysis.VisualBasic.Symbols.Metadata.PE
                 If filterOutConstantAttributeDescription.Signatures IsNot Nothing Then
                     Dim constantAttribute As CustomAttributeHandle
                     Dim attributes = containingPEModuleSymbol.GetCustomAttributesForToken(
-                        m_Handle,
+                        _handle,
                         constantAttribute,
                         filterOutConstantAttributeDescription)
 
-                    ImmutableInterlocked.InterlockedInitialize(m_lazyCustomAttributes, attributes)
+                    ImmutableInterlocked.InterlockedInitialize(_lazyCustomAttributes, attributes)
                 Else
-                    containingPEModuleSymbol.LoadCustomAttributes(m_Handle, m_lazyCustomAttributes)
+                    containingPEModuleSymbol.LoadCustomAttributes(_handle, _lazyCustomAttributes)
                 End If
             End If
 
-            Return m_lazyCustomAttributes
+            Return _lazyCustomAttributes
         End Function
 
         Private Function GetConstantAttributeDescription() As AttributeDescription
             Dim value As ConstantValue
 
             If Me.Type.SpecialType = SpecialType.System_DateTime Then
-                value = GetConstantValue(SymbolsInProgress(Of FieldSymbol).Empty)
+                value = GetConstantValue(ConstantFieldsInProgress.Empty)
                 If value IsNot Nothing AndAlso value.Discriminator = ConstantValueTypeDiscriminator.DateTime Then
                     Return AttributeDescription.DateTimeConstantAttribute
                 End If
             ElseIf Me.Type.SpecialType = SpecialType.System_Decimal Then
-                value = GetConstantValue(SymbolsInProgress(Of FieldSymbol).Empty)
+                value = GetConstantValue(ConstantFieldsInProgress.Empty)
                 If value IsNot Nothing AndAlso value.Discriminator = ConstantValueTypeDiscriminator.Decimal Then
                     Return AttributeDescription.DecimalConstantAttribute
                 End If
@@ -169,46 +171,46 @@ Namespace Microsoft.CodeAnalysis.VisualBasic.Symbols.Metadata.PE
             If filteredOutConstantAttributeDescription.Signatures IsNot Nothing Then
                 Dim containingPEModuleSymbol = DirectCast(ContainingModule(), PEModuleSymbol)
                 Yield New PEAttributeData(containingPEModuleSymbol,
-                                          containingPEModuleSymbol.Module.FindLastTargetAttribute(Me.m_Handle, filteredOutConstantAttributeDescription).Handle)
+                                          containingPEModuleSymbol.Module.FindLastTargetAttribute(Me._handle, filteredOutConstantAttributeDescription).Handle)
             End If
         End Function
 
         Friend Overrides ReadOnly Property HasSpecialName As Boolean
             Get
-                Return (m_Flags And FieldAttributes.SpecialName) <> 0
+                Return (_flags And FieldAttributes.SpecialName) <> 0
             End Get
         End Property
 
         Friend Overrides ReadOnly Property HasRuntimeSpecialName As Boolean
             Get
-                Return (m_Flags And FieldAttributes.RTSpecialName) <> 0
+                Return (_flags And FieldAttributes.RTSpecialName) <> 0
             End Get
         End Property
 
         Friend Overrides ReadOnly Property IsNotSerialized As Boolean
             Get
-                Return (m_Flags And FieldAttributes.NotSerialized) <> 0
+                Return (_flags And FieldAttributes.NotSerialized) <> 0
             End Get
         End Property
 
         Public Overrides ReadOnly Property IsReadOnly As Boolean
             Get
-                Return (m_Flags And FieldAttributes.InitOnly) <> 0
+                Return (_flags And FieldAttributes.InitOnly) <> 0
             End Get
         End Property
 
         Public Overrides ReadOnly Property IsConst As Boolean
             Get
-                Return (m_Flags And FieldAttributes.Literal) <> 0 OrElse GetConstantValue(SymbolsInProgress(Of FieldSymbol).Empty) IsNot Nothing
+                Return (_flags And FieldAttributes.Literal) <> 0 OrElse GetConstantValue(ConstantFieldsInProgress.Empty) IsNot Nothing
             End Get
         End Property
 
-        Friend Overrides Function GetConstantValue(inProgress As SymbolsInProgress(Of FieldSymbol)) As ConstantValue
-            If m_LazyConstantValue Is Microsoft.CodeAnalysis.ConstantValue.Unset Then
+        Friend Overrides Function GetConstantValue(inProgress As ConstantFieldsInProgress) As ConstantValue
+            If _lazyConstantValue Is Microsoft.CodeAnalysis.ConstantValue.Unset Then
                 Dim value As ConstantValue = Nothing
 
-                If (m_Flags And FieldAttributes.Literal) <> 0 Then
-                    value = m_ContainingType.ContainingPEModule.Module.GetConstantFieldValue(m_Handle)
+                If (_flags And FieldAttributes.Literal) <> 0 Then
+                    value = _containingType.ContainingPEModule.Module.GetConstantFieldValue(_handle)
                     value = AdjustConstantValueFromMetadata(value, Me.Type, False)
                     Dim selfOrUnderlyingType = Me.Type.GetEnumUnderlyingTypeOrSelf
                     Dim selfOrUnderlyingSpecialType = selfOrUnderlyingType.SpecialType
@@ -263,17 +265,17 @@ Namespace Microsoft.CodeAnalysis.VisualBasic.Symbols.Metadata.PE
                     End If
                 End If
 
-                Interlocked.CompareExchange(m_LazyConstantValue,
+                Interlocked.CompareExchange(_lazyConstantValue,
                                             value,
                                             Microsoft.CodeAnalysis.ConstantValue.Unset)
             End If
 
-            Return m_LazyConstantValue
+            Return _lazyConstantValue
         End Function
 
         Public Overrides ReadOnly Property IsShared As Boolean
             Get
-                Return (m_Flags And FieldAttributes.Static) <> 0
+                Return (_flags And FieldAttributes.Static) <> 0
             End Get
         End Property
 
@@ -286,46 +288,46 @@ Namespace Microsoft.CodeAnalysis.VisualBasic.Symbols.Metadata.PE
 
         Friend Overrides ReadOnly Property ObsoleteAttributeData As ObsoleteAttributeData
             Get
-                ObsoleteAttributeHelpers.InitializeObsoleteDataFromMetadata(m_lazyObsoleteAttributeData, m_Handle, DirectCast(ContainingModule, PEModuleSymbol))
-                Return m_lazyObsoleteAttributeData
+                ObsoleteAttributeHelpers.InitializeObsoleteDataFromMetadata(_lazyObsoleteAttributeData, _handle, DirectCast(ContainingModule, PEModuleSymbol))
+                Return _lazyObsoleteAttributeData
             End Get
         End Property
 
         Friend Overrides ReadOnly Property IsMarshalledExplicitly As Boolean
             Get
-                Return (m_Flags And FieldAttributes.HasFieldMarshal) <> 0
+                Return (_flags And FieldAttributes.HasFieldMarshal) <> 0
             End Get
         End Property
 
         Friend Overrides ReadOnly Property MarshallingType As UnmanagedType
             Get
-                If (m_Flags And FieldAttributes.HasFieldMarshal) = 0 Then
+                If (_flags And FieldAttributes.HasFieldMarshal) = 0 Then
                     Return Nothing
                 End If
 
-                Return PEModule.GetMarshallingType(m_Handle)
+                Return PEModule.GetMarshallingType(_handle)
             End Get
         End Property
 
         Friend Overrides ReadOnly Property MarshallingDescriptor As ImmutableArray(Of Byte)
             Get
-                If (m_Flags And FieldAttributes.HasFieldMarshal) = 0 Then
+                If (_flags And FieldAttributes.HasFieldMarshal) = 0 Then
                     Return Nothing
                 End If
 
-                Return PEModule.GetMarshallingDescriptor(m_Handle)
+                Return PEModule.GetMarshallingDescriptor(_handle)
             End Get
         End Property
 
         Friend Overrides ReadOnly Property TypeLayoutOffset As Integer?
             Get
-                Return PEModule.GetFieldOffset(m_Handle)
+                Return PEModule.GetFieldOffset(_handle)
             End Get
         End Property
 
         Public Overrides ReadOnly Property Locations As ImmutableArray(Of Location)
             Get
-                Return StaticCast(Of Location).From(m_ContainingType.ContainingPEModule.MetadataLocation)
+                Return StaticCast(Of Location).From(_containingType.ContainingPEModule.MetadataLocation)
             End Get
         End Property
 
@@ -336,63 +338,67 @@ Namespace Microsoft.CodeAnalysis.VisualBasic.Symbols.Metadata.PE
         End Property
 
         Private Sub EnsureSignatureIsLoaded()
-            If m_LazyType Is Nothing Then
-                Dim moduleSymbol = m_ContainingType.ContainingPEModule
+            If _lazyType Is Nothing Then
+                Dim moduleSymbol = _containingType.ContainingPEModule
                 Dim customModifiers As ImmutableArray(Of ModifierInfo(Of TypeSymbol)) = Nothing
-                Dim type As TypeSymbol = New MetadataDecoder(moduleSymbol, m_ContainingType).DecodeFieldSignature(m_Handle, Nothing, customModifiers)
+                Dim type As TypeSymbol = New MetadataDecoder(moduleSymbol, _containingType).DecodeFieldSignature(_handle, customModifiers)
 
-                ImmutableInterlocked.InterlockedCompareExchange(m_LazyCustomModifiers, VisualBasicCustomModifier.Convert(customModifiers), Nothing)
-                Interlocked.CompareExchange(m_LazyType, type, Nothing)
+                type = TupleTypeDecoder.DecodeTupleTypesIfApplicable(type, _handle, moduleSymbol)
+
+                ImmutableInterlocked.InterlockedCompareExchange(_lazyCustomModifiers, VisualBasicCustomModifier.Convert(customModifiers), Nothing)
+                Interlocked.CompareExchange(_lazyType, type, Nothing)
             End If
         End Sub
 
         Public Overrides ReadOnly Property Type As TypeSymbol
             Get
                 EnsureSignatureIsLoaded()
-                Return m_LazyType
+                Return _lazyType
             End Get
         End Property
 
         Public Overrides ReadOnly Property CustomModifiers As ImmutableArray(Of CustomModifier)
             Get
                 EnsureSignatureIsLoaded()
-                Return m_LazyCustomModifiers
+                Return _lazyCustomModifiers
             End Get
         End Property
 
         Public Overrides Function GetDocumentationCommentXml(Optional preferredCulture As CultureInfo = Nothing, Optional expandIncludes As Boolean = False, Optional cancellationToken As CancellationToken = Nothing) As String
             ' Note: m_LazyDocComment is passed ByRef
             Return PEDocumentationCommentUtils.GetDocumentationComment(
-                Me, m_ContainingType.ContainingPEModule, preferredCulture, cancellationToken, m_lazyDocComment)
+                Me, _containingType.ContainingPEModule, preferredCulture, cancellationToken, _lazyDocComment)
         End Function
 
-        Friend Overrides Function GetUseSiteErrorInfo() As DiagnosticInfo
-            If m_lazyUseSiteErrorInfo Is ErrorFactory.EmptyErrorInfo Then
-                Dim fieldUseSiteErrorInfo = CalculateUseSiteErrorInfo()
+        Friend Overrides Function GetUseSiteInfo() As UseSiteInfo(Of AssemblySymbol)
+            Dim primaryDependency As AssemblySymbol = Me.PrimaryDependency
+
+            If Not _lazyCachedUseSiteInfo.IsInitialized Then
+                Dim fieldUseSiteInfo = CalculateUseSiteInfo()
 
                 ' if there was no previous use site error for this symbol, check the constant value
-                If fieldUseSiteErrorInfo Is Nothing Then
+                If fieldUseSiteInfo.DiagnosticInfo Is Nothing Then
 
                     ' report use site errors for invalid constant values 
-                    Dim constantValue = GetConstantValue(SymbolsInProgress(Of FieldSymbol).Empty)
+                    Dim constantValue = GetConstantValue(ConstantFieldsInProgress.Empty)
                     If constantValue IsNot Nothing AndAlso
                         constantValue.IsBad Then
-                        fieldUseSiteErrorInfo = New DiagnosticInfo(MessageProvider.Instance,
-                                                                   ERRID.ERR_UnsupportedConstant2,
-                                                                   Me.ContainingType,
-                                                                   Me.Name)
+                        fieldUseSiteInfo = New UseSiteInfo(Of AssemblySymbol)(New DiagnosticInfo(MessageProvider.Instance,
+                                                                                                 ERRID.ERR_UnsupportedConstant2,
+                                                                                                 Me.ContainingType,
+                                                                                                 Me.Name))
                     End If
                 End If
 
-                m_lazyUseSiteErrorInfo = fieldUseSiteErrorInfo
+                _lazyCachedUseSiteInfo.Initialize(primaryDependency, fieldUseSiteInfo)
             End If
 
-            Return m_lazyUseSiteErrorInfo
+            Return _lazyCachedUseSiteInfo.ToUseSiteInfo(primaryDependency)
         End Function
 
         Friend ReadOnly Property Handle As FieldDefinitionHandle
             Get
-                Return m_Handle
+                Return _handle
             End Get
         End Property
 

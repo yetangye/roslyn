@@ -1,11 +1,15 @@
-﻿Imports Microsoft.CodeAnalysis.ExpressionEvaluator
+﻿' Licensed to the .NET Foundation under one or more agreements.
+' The .NET Foundation licenses this file to you under the MIT license.
+' See the LICENSE file in the project root for more information.
+
+Imports Microsoft.CodeAnalysis.ExpressionEvaluator
 Imports Microsoft.VisualStudio.Debugger.Clr
 Imports Microsoft.VisualStudio.Debugger.Evaluation
 Imports System.Reflection
 Imports Roslyn.Test.Utilities
 Imports Xunit
 
-Namespace Microsoft.CodeAnalysis.VisualBasic.ExpressionEvaluator
+Namespace Microsoft.CodeAnalysis.VisualBasic.ExpressionEvaluator.UnitTests
 
     Public Class ResultsViewTests
         Inherits VisualBasicResultProviderTestBase
@@ -42,13 +46,13 @@ End Class"
                         "{Length=2}",
                         "System.Collections.IEnumerable {Integer()}",
                         "o.e",
-                        DkmEvaluationResultFlags.Expandable),
+                        DkmEvaluationResultFlags.Expandable Or DkmEvaluationResultFlags.CanFavorite),
                     EvalResult(
                         "Results View",
                         "Expanding the Results View will enumerate the IEnumerable",
                         "",
                         "o, results",
-                        DkmEvaluationResultFlags.Expandable Or DkmEvaluationResultFlags.ReadOnly,
+                        DkmEvaluationResultFlags.Expandable Or DkmEvaluationResultFlags.ReadOnly Or DkmEvaluationResultFlags.ExpansionHasSideEffects,
                         DkmEvaluationResultCategory.Method))
                 children = GetChildren(children(1))
                 Verify(children,
@@ -93,13 +97,13 @@ End Class"
                         "{Length=2}",
                         "System.Collections.Generic.IEnumerable(Of Integer) {Integer()}",
                         "o.e",
-                        DkmEvaluationResultFlags.Expandable),
+                        DkmEvaluationResultFlags.Expandable Or DkmEvaluationResultFlags.CanFavorite),
                     EvalResult(
                         "Results View",
                         "Expanding the Results View will enumerate the IEnumerable",
                         "",
                         "o, results",
-                        DkmEvaluationResultFlags.Expandable Or DkmEvaluationResultFlags.ReadOnly,
+                        DkmEvaluationResultFlags.Expandable Or DkmEvaluationResultFlags.ReadOnly Or DkmEvaluationResultFlags.ExpansionHasSideEffects,
                         DkmEvaluationResultCategory.Method))
                 children = GetChildren(children(1))
                 Verify(children,
@@ -108,7 +112,7 @@ End Class"
             End Using
         End Sub
 
-        <WorkItem(1043746)>
+        <WorkItem(1043746, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/1043746")>
         <Fact>
         Public Sub GetProxyPropertyValueError()
             Const source =
@@ -124,7 +128,7 @@ End Class"
             runtime = New DkmClrRuntimeInstance(ReflectionUtilities.GetMscorlibAndSystemCore(GetAssembly(source)), getMemberValue:=getMemberValue)
             Using runtime.Load()
                 Dim type = runtime.GetType("C")
-                Dim value = CreateDkmClrValue(type.Instantiate(), type:=type)
+                Dim value = type.Instantiate()
                 Dim result = FormatResult("o", value)
                 Verify(result,
                        EvalResult("o", "{C}", "C", "o", DkmEvaluationResultFlags.Expandable))
@@ -135,7 +139,7 @@ End Class"
                         "Expanding the Results View will enumerate the IEnumerable",
                         "",
                         "o, results",
-                        DkmEvaluationResultFlags.Expandable Or DkmEvaluationResultFlags.ReadOnly,
+                        DkmEvaluationResultFlags.Expandable Or DkmEvaluationResultFlags.ReadOnly Or DkmEvaluationResultFlags.ExpansionHasSideEffects,
                         DkmEvaluationResultCategory.Method))
                 children = GetChildren(children(0))
                 Verify(children,

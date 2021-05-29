@@ -1,8 +1,8 @@
-' Copyright (c) Microsoft.  All Rights Reserved.  Licensed under the Apache License, Version 2.0.  See License.txt in the project root for license information.
+﻿' Licensed to the .NET Foundation under one or more agreements.
+' The .NET Foundation licenses this file to you under the MIT license.
+' See the LICENSE file in the project root for more information.
 
 Imports System.Threading
-Imports Microsoft.CodeAnalysis.VisualBasic
-Imports Microsoft.CodeAnalysis.VisualBasic.Symbols
 Imports Microsoft.CodeAnalysis.VisualBasic.Syntax
 
 Namespace Microsoft.CodeAnalysis.Editor.VisualBasic.UnitTests.SymbolId
@@ -13,8 +13,7 @@ Namespace Microsoft.CodeAnalysis.Editor.VisualBasic.UnitTests.SymbolId
         <Flags>
         Friend Enum SymbolIdComparison
             None = 0
-            CaseSensitive = 1
-            CaseInsensitive = 2
+            IgnoreCase = 1
             IgnoreAssemblyIds = 4
         End Enum
 
@@ -30,7 +29,9 @@ Namespace Microsoft.CodeAnalysis.Editor.VisualBasic.UnitTests.SymbolId
 
 #Region "Verification"
 
+#Disable Warning IDE0060 ' Remove unused parameter - https://github.com/dotnet/roslyn/issues/45894
         Friend Shared Sub ResolveAndVerifySymbolList(newSymbols As IEnumerable(Of ISymbol), newCompilation As Compilation, originalSymbols As IEnumerable(Of ISymbol), originalCompilation As Compilation)
+#Enable Warning IDE0060 ' Remove unused parameter
 
             Dim newlist = newSymbols.OrderBy(Function(s) s.Name).ToList()
             Dim origlist = originalSymbols.OrderBy(Function(s) s.Name).ToList()
@@ -38,17 +39,17 @@ Namespace Microsoft.CodeAnalysis.Editor.VisualBasic.UnitTests.SymbolId
             Assert.Equal(origlist.Count, newlist.Count)
 
             For i = 0 To newlist.Count - 1
-                ResolveAndVerifySymbol(newlist(i), newCompilation, origlist(i), originalCompilation)
+                ResolveAndVerifySymbol(newlist(i), origlist(i), originalCompilation)
             Next
 
         End Sub
 
         Friend Shared Sub ResolveAndVerifyTypeSymbol(node As ExpressionSyntax, sourceSymbol As ITypeSymbol, model As SemanticModel, sourceComp As Compilation)
             Dim typeinfo = model.GetTypeInfo(node)
-            ResolveAndVerifySymbol(If(typeinfo.Type, typeinfo.ConvertedType), model.Compilation, sourceSymbol, sourceComp)
+            ResolveAndVerifySymbol(If(typeinfo.Type, typeinfo.ConvertedType), sourceSymbol, sourceComp)
         End Sub
 
-        Friend Shared Sub ResolveAndVerifySymbol(node As ExpressionSyntax, sourceSymbol As ISymbol, model As SemanticModel, sourceComp As Compilation, Optional comparison As SymbolIdComparison = SymbolIdComparison.None)
+        Friend Shared Sub ResolveAndVerifySymbol(node As ExpressionSyntax, sourceSymbol As ISymbol, model As SemanticModel, sourceComp As Compilation, Optional comparison As SymbolIdComparison = SymbolIdComparison.IgnoreCase)
             Dim syminfo = model.GetSymbolInfo(node)
             Dim symbol = syminfo.Symbol
 
@@ -56,41 +57,49 @@ Namespace Microsoft.CodeAnalysis.Editor.VisualBasic.UnitTests.SymbolId
                 symbol = syminfo.CandidateSymbols.Single()
             End If
 
-            ResolveAndVerifySymbol(symbol, model.Compilation, sourceSymbol, sourceComp, comparison)
+            ResolveAndVerifySymbol(symbol, sourceSymbol, sourceComp, comparison)
         End Sub
 
-        Friend Shared Sub ResolveAndVerifySymbol(symbol1 As ISymbol, compilation1 As Compilation, symbol2 As ISymbol, compilation2 As Compilation, Optional comparison As SymbolIdComparison = SymbolIdComparison.None)
+        Friend Shared Sub ResolveAndVerifySymbol(symbol1 As ISymbol, symbol2 As ISymbol, compilation2 As Compilation, Optional comparison As SymbolIdComparison = SymbolIdComparison.IgnoreCase)
 
-            AssertSymbolsIdsEqual(symbol1, compilation1, symbol2, compilation2, comparison)
+            AssertSymbolsIdsEqual(symbol1, symbol2, comparison)
 
-            Dim resolvedSymbol = ResolveSymbol(symbol1, compilation1, compilation2, comparison)
+            Dim resolvedSymbol = ResolveSymbol(symbol1, compilation2, comparison)
             Assert.NotNull(resolvedSymbol)
             Assert.Equal(symbol2, resolvedSymbol)
             Assert.Equal(symbol2.GetHashCode(), resolvedSymbol.GetHashCode())
         End Sub
 
-        Friend Shared Function ResolveSymbol(originalSymbol As ISymbol, originalCompilation As Compilation, targetCompilation As Compilation, comparision As SymbolIdComparison) As ISymbol
-            Dim sid = SymbolKey.Create(originalSymbol, originalCompilation, CancellationToken.None)
-            Dim symInfo = sid.Resolve(targetCompilation, (comparision And SymbolIdComparison.IgnoreAssemblyIds) = SymbolIdComparison.IgnoreAssemblyIds)
+        Friend Shared Function ResolveSymbol(originalSymbol As ISymbol, targetCompilation As Compilation, comparison As SymbolIdComparison) As ISymbol
+            Dim sid = SymbolKey.Create(originalSymbol, CancellationToken.None)
+
+            ' Verify that serialization works.
+            Dim serialized = sid.ToString()
+            Dim deserialized = New SymbolKey(serialized)
+
+            Dim comparer = SymbolKey.GetComparer(ignoreCase:=False, ignoreAssemblyKeys:=False)
+            Assert.True(comparer.Equals(sid, deserialized))
+
+            Dim symInfo = sid.Resolve(targetCompilation, (comparison And SymbolIdComparison.IgnoreAssemblyIds) = SymbolIdComparison.IgnoreAssemblyIds)
             Return symInfo.Symbol
         End Function
 
-        Friend Shared Sub AssertSymbolsIdsEqual(symbol1 As ISymbol, compilation1 As Compilation, symbol2 As ISymbol, compilation2 As Compilation, comparision As SymbolIdComparison, Optional expectEqual As Boolean = True)
+        Friend Shared Sub AssertSymbolsIdsEqual(symbol1 As ISymbol, symbol2 As ISymbol, comparison As SymbolIdComparison, Optional expectEqual As Boolean = True)
 
-            Dim sid1 = SymbolKey.Create(symbol1, compilation1, CancellationToken.None)
-            Dim sid2 = SymbolKey.Create(symbol2, compilation2, CancellationToken.None)
+            Dim sid1 = SymbolKey.Create(symbol1, CancellationToken.None)
+            Dim sid2 = SymbolKey.Create(symbol2, CancellationToken.None)
 
-            Dim isCaseSensitive = (comparision And SymbolIdComparison.CaseSensitive) = SymbolIdComparison.CaseSensitive
-            Dim ignoreAssemblyIds = (comparision And SymbolIdComparison.IgnoreAssemblyIds) = SymbolIdComparison.IgnoreAssemblyIds
+            Dim ignoreCase = (comparison And SymbolIdComparison.IgnoreCase) = SymbolIdComparison.IgnoreCase
+            Dim ignoreAssemblyIds = (comparison And SymbolIdComparison.IgnoreAssemblyIds) = SymbolIdComparison.IgnoreAssemblyIds
             Dim message = String.Concat(
-                If(isCaseSensitive, "SymbolID CaseSensitive", "SymbolID CaseInsensitive"),
+                If(ignoreCase, "SymbolID IgnoreCase", "SymbolID"),
                 If(ignoreAssemblyIds, " IgnoreAssemblyIds ", " "),
                 "Compare")
 
             If expectEqual Then
-                Assert.[True](CodeAnalysis.SymbolKey.GetComparer(isCaseSensitive, ignoreAssemblyIds).Equals(sid2, sid1), message)
+                Assert.[True](CodeAnalysis.SymbolKey.GetComparer(ignoreCase, ignoreAssemblyIds).Equals(sid2, sid1), message)
             Else
-                Assert.[False](CodeAnalysis.SymbolKey.GetComparer(isCaseSensitive, ignoreAssemblyIds).Equals(sid2, sid1), message)
+                Assert.[False](CodeAnalysis.SymbolKey.GetComparer(ignoreCase, ignoreAssemblyIds).Equals(sid2, sid1), message)
             End If
         End Sub
 
@@ -212,10 +221,10 @@ Namespace Microsoft.CodeAnalysis.Editor.VisualBasic.UnitTests.SymbolId
 
     End Class
 
-    Class LocalSymbolDumper
-        Private comp As VisualBasicCompilation
+    Friend Class LocalSymbolDumper
+        Private ReadOnly _comp As VisualBasicCompilation
         Public Sub New(comp As VisualBasicCompilation)
-            Me.comp = comp
+            Me._comp = comp
         End Sub
 
         Public Sub GetLocalSymbols(symbol As IFieldSymbol, list As List(Of ISymbol))
@@ -225,7 +234,7 @@ Namespace Microsoft.CodeAnalysis.Editor.VisualBasic.UnitTests.SymbolId
                 Dim declarator = TryCast(node.Parent, VariableDeclaratorSyntax)
                 If declarator IsNot Nothing AndAlso declarator.Initializer IsNot Nothing Then
 
-                    Dim model = comp.GetSemanticModel(declarator.SyntaxTree)
+                    Dim model = _comp.GetSemanticModel(declarator.SyntaxTree)
                     Dim df = model.AnalyzeDataFlow(declarator.Initializer.Value)
 
                     GetLocalAndType(df, list)
@@ -238,14 +247,14 @@ Namespace Microsoft.CodeAnalysis.Editor.VisualBasic.UnitTests.SymbolId
 
         Public Sub GetLocalSymbols(symbol As IMethodSymbol, list As List(Of ISymbol))
 
-            ' Delaration statement is child of Block
+            ' Declaration statement is child of Block
             For Each n In symbol.DeclaringSyntaxReferences.Select(Function(d) d.GetSyntax())
                 Dim body = TryCast(n.Parent, MethodBlockSyntax)
                 ' interface method
                 If body IsNot Nothing Then
                     If body.Statements <> Nothing AndAlso body.Statements.Count > 0 Then
 
-                        Dim model = comp.GetSemanticModel(body.SyntaxTree)
+                        Dim model = _comp.GetSemanticModel(body.SyntaxTree)
                         Dim df As DataFlowAnalysis = Nothing
                         If body.Statements.Count = 1 Then
                             df = model.AnalyzeDataFlow(body.Statements.First)
@@ -262,7 +271,7 @@ Namespace Microsoft.CodeAnalysis.Editor.VisualBasic.UnitTests.SymbolId
 
         End Sub
 
-        Private Sub GetLocalAndType(df As DataFlowAnalysis, list As List(Of ISymbol))
+        Private Shared Sub GetLocalAndType(df As DataFlowAnalysis, list As List(Of ISymbol))
             ' add local symbols to list
             For Each v As ISymbol In df.VariablesDeclared
                 list.Add(v)
@@ -273,7 +282,7 @@ Namespace Microsoft.CodeAnalysis.Editor.VisualBasic.UnitTests.SymbolId
             Next
         End Sub
 
-        Private Sub GetLabelSymbols(body As MethodBlockSyntax, model As SemanticModel, list As List(Of ISymbol))
+        Private Shared Sub GetLabelSymbols(body As MethodBlockSyntax, model As SemanticModel, list As List(Of ISymbol))
             Dim labels = body.DescendantNodes().OfType(Of LabelStatementSyntax)()
             For Each lb As LabelStatementSyntax In labels
                 Dim sym = model.GetDeclaredSymbol(lb)
@@ -283,7 +292,7 @@ Namespace Microsoft.CodeAnalysis.Editor.VisualBasic.UnitTests.SymbolId
             ' VB has not SwitchLabel; it's CaseStatement
         End Sub
 
-        Private Sub GetAnonymousTypeAndFuncSymbols(body As MethodBlockSyntax, model As SemanticModel, list As List(Of ISymbol))
+        Private Shared Sub GetAnonymousTypeAndFuncSymbols(body As MethodBlockSyntax, model As SemanticModel, list As List(Of ISymbol))
 
             Dim exprs As IEnumerable(Of ExpressionSyntax), tmp As IEnumerable(Of ExpressionSyntax)
             exprs = body.DescendantNodes().OfType(Of AnonymousObjectCreationExpressionSyntax)()
@@ -297,7 +306,7 @@ Namespace Microsoft.CodeAnalysis.Editor.VisualBasic.UnitTests.SymbolId
             Next
         End Sub
 
-        Private Sub GetAnonymousExprSymbols(expr As ExpressionSyntax, model As SemanticModel, list As List(Of ISymbol))
+        Private Shared Sub GetAnonymousExprSymbols(expr As ExpressionSyntax, model As SemanticModel, list As List(Of ISymbol))
 
             Dim kind = expr.Kind
             If kind <> SyntaxKind.AnonymousObjectCreationExpression AndAlso

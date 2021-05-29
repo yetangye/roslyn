@@ -1,6 +1,9 @@
-﻿// Copyright (c) Microsoft.  All Rights Reserved.  Licensed under the Apache License, Version 2.0.  See License.txt in the project root for license information.
+﻿// Licensed to the .NET Foundation under one or more agreements.
+// The .NET Foundation licenses this file to you under the MIT license.
+// See the LICENSE file in the project root for more information.
 
 using System.Diagnostics;
+using Roslyn.Utilities;
 
 namespace Microsoft.CodeAnalysis
 {
@@ -34,7 +37,7 @@ namespace Microsoft.CodeAnalysis
         /// <item><description>JIT optimizations are enabled via assembly level attribute (<see cref="DebuggableAttribute"/>).</description></item>
         /// <item><description>Edit and Continue is disabled.</description></item>
         /// <item><description>Sequence points may be optimized away. As a result it might not be possible to place or hit a breakpoint.</description></item>
-        /// <item><description>User-defined locals migth be optimized away. They might not be available while debugging.</description></item>
+        /// <item><description>User-defined locals might be optimized away. They might not be available while debugging.</description></item>
         /// </list>
         /// <para>
         /// Corresponds to command line argument /optimize+.
@@ -42,6 +45,44 @@ namespace Microsoft.CodeAnalysis
         /// </remarks>
         Release = 1
     }
+
+    internal static class OptimizationLevelFacts
+    {
+        public static string ToPdbSerializedString(this OptimizationLevel optimization, bool debugPlusMode)
+        => optimization switch
+        {
+            OptimizationLevel.Release => "release",
+            OptimizationLevel.Debug => debugPlusMode ? "debug-plus" : "debug",
+            _ => throw ExceptionUtilities.UnexpectedValue(optimization)
+        };
+
+        public static bool TryParsePdbSerializedString(string value, out OptimizationLevel optimizationLevel, out bool debugPlusMode)
+        {
+            if (value == "release")
+            {
+                optimizationLevel = OptimizationLevel.Release;
+                debugPlusMode = false;
+                return true;
+            }
+            else if (value == "debug")
+            {
+                optimizationLevel = OptimizationLevel.Debug;
+                debugPlusMode = false;
+                return true;
+            }
+            else if (value == "debug-plus")
+            {
+                optimizationLevel = OptimizationLevel.Debug;
+                debugPlusMode = true;
+                return true;
+            }
+
+            optimizationLevel = default;
+            debugPlusMode = default;
+            return false;
+        }
+    }
+
 
     internal static partial class EnumBounds
     {

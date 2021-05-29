@@ -1,23 +1,18 @@
-' Copyright (c) Microsoft.  All Rights Reserved.  Licensed under the Apache License, Version 2.0.  See License.txt in the project root for license information.
-
-Imports Microsoft.CodeAnalysis.Text
-Imports Microsoft.CodeAnalysis.VisualBasic
-Imports Microsoft.CodeAnalysis.VisualBasic.Symbols
-Imports Microsoft.CodeAnalysis.VisualBasic.Syntax
-Imports Roslyn.Test.Utilities
-Imports Xunit
+﻿' Licensed to the .NET Foundation under one or more agreements.
+' The .NET Foundation licenses this file to you under the MIT license.
+' See the LICENSE file in the project root for more information.
 
 Namespace Microsoft.CodeAnalysis.Editor.VisualBasic.UnitTests.Recommendations.Statements
     Public Class SyncLockKeywordRecommenderTests
         <Fact>
         <Trait(Traits.Feature, Traits.Features.KeywordRecommending)>
-        Public Sub SyncLockInMethodBody()
+        Public Sub SyncLockInMethodBodyTest()
             VerifyRecommendationsContain(<MethodBody>|</MethodBody>, "SyncLock")
         End Sub
 
         <Fact>
         <Trait(Traits.Feature, Traits.Features.KeywordRecommending)>
-        Public Sub SyncLockInMultiLineLambda()
+        Public Sub SyncLockInMultiLineLambdaTest()
             VerifyRecommendationsContain(<ClassDeclaration>
 Private _member = Sub()
 |
@@ -28,7 +23,7 @@ End Sub
 
         <Fact>
         <Trait(Traits.Feature, Traits.Features.KeywordRecommending)>
-        Public Sub SyncLockInSingleLineLambda()
+        Public Sub SyncLockInSingleLineLambdaTest()
             VerifyRecommendationsMissing(<ClassDeclaration>
 Private _member = Sub() |
                                          </ClassDeclaration>, "SyncLock")
@@ -36,7 +31,7 @@ Private _member = Sub() |
 
         <Fact>
         <Trait(Traits.Feature, Traits.Features.KeywordRecommending)>
-        Public Sub SyncLockInSingleLineFunctionLambda()
+        Public Sub SyncLockInSingleLineFunctionLambdaTest()
             VerifyRecommendationsMissing(<ClassDeclaration>
 Private _member = Function() |
                                          </ClassDeclaration>, "SyncLock")

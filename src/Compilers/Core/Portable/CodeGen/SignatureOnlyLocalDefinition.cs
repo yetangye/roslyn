@@ -1,8 +1,10 @@
-﻿// Copyright (c) Microsoft.  All Rights Reserved.  Licensed under the Apache License, Version 2.0.  See License.txt in the project root for license information.
+﻿// Licensed to the .NET Foundation under one or more agreements.
+// The .NET Foundation licenses this file to you under the MIT license.
+// See the LICENSE file in the project root for more information.
 
 using System;
 using System.Collections.Immutable;
-using Microsoft.CodeAnalysis.Symbols;
+using System.Reflection.Metadata;
 using Roslyn.Utilities;
 
 namespace Microsoft.CodeAnalysis.CodeGen
@@ -24,7 +26,7 @@ namespace Microsoft.CodeAnalysis.CodeGen
             _slot = slot;
         }
 
-        public Cci.IMetadataConstant CompileTimeValue
+        public MetadataConstant CompileTimeValue
         {
             get { throw ExceptionUtilities.Unreachable; }
         }
@@ -34,24 +36,21 @@ namespace Microsoft.CodeAnalysis.CodeGen
             get { throw ExceptionUtilities.Unreachable; }
         }
 
-        public ImmutableArray<TypedConstant> DynamicTransformFlags
+        public ImmutableArray<bool> DynamicTransformFlags
         {
-            get { throw ExceptionUtilities.Unreachable; }
+            get { return ImmutableArray<bool>.Empty; }
+        }
+
+        public ImmutableArray<string> TupleElementNames
+        {
+            get { return ImmutableArray<string>.Empty; }
         }
 
         /// <remarks>
         /// This temp is not interesting to the expression compiler.  However, it 
         /// may be replaced by an interesting local in a later stage.
         /// </remarks>
-        public uint PdbAttributes
-        {
-            get { return Cci.PdbWriter.HiddenLocalAttributesValue; }
-        }
-
-        public bool IsDynamic
-        {
-            get { return false; }
-        }
+        public LocalVariableAttributes PdbAttributes => LocalVariableAttributes.DebuggerHidden;
 
         public bool IsPinned
         {
@@ -68,34 +67,20 @@ namespace Microsoft.CodeAnalysis.CodeGen
             get { throw ExceptionUtilities.Unreachable; }
         }
 
-        public Location Location
-        {
-            get { return Location.None; }
-        }
+        public Location Location => Location.None;
 
-        public string Name
-        {
-            get { return null; }
-        }
+        public string? Name => null;
 
-        public int SlotIndex
-        {
-            get { return _slot; }
-        }
+        public int SlotIndex => _slot;
 
         public Cci.ITypeReference Type
         {
             get { throw ExceptionUtilities.Unreachable; }
         }
 
-        public byte[] Signature
-        {
-            get { return _signature; }
-        }
+        public byte[] Signature => _signature;
 
         public LocalSlotDebugInfo SlotInfo
-        {
-            get { return new LocalSlotDebugInfo(SynthesizedLocalKind.EmitterTemp, LocalDebugId.None); }
-        }
+            => new LocalSlotDebugInfo(SynthesizedLocalKind.EmitterTemp, LocalDebugId.None);
     }
 }

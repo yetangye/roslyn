@@ -1,4 +1,6 @@
-﻿' Copyright (c) Microsoft.  All Rights Reserved.  Licensed under the Apache License, Version 2.0.  See License.txt in the project root for license information.
+﻿' Licensed to the .NET Foundation under one or more agreements.
+' The .NET Foundation licenses this file to you under the MIT license.
+' See the LICENSE file in the project root for more information.
 
 Imports System.IO
 Imports Roslyn.Test.Utilities
@@ -473,10 +475,10 @@ End Class
     expectedOutput:=<![CDATA[x = 1, y = 1]]>)
         End Sub
 
-        <WorkItem(540460, "DevDiv")>
+        <WorkItem(540460, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/540460")>
         <Fact>
         Public Sub TestStaticInitializerErrors()
-            Dim compilation = CompilationUtils.CreateCompilationWithReferences(
+            Dim compilation = CompilationUtils.CreateEmptyCompilationWithReferences(
 <compilation>
     <file name="a.vb">
 Class C
@@ -486,7 +488,7 @@ Class C
 End Class
     </file>
 </compilation>,
-                references:=DefaultReferences,
+                references:=DefaultVbReferences,
                 options:=TestOptions.ReleaseDll)
 
             Using executableStream As New MemoryStream()
@@ -500,10 +502,10 @@ BC30491: Expression does not produce a value.
             End Using
         End Sub
 
-        <WorkItem(540460, "DevDiv")>
+        <WorkItem(540460, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/540460")>
         <Fact>
         Public Sub TestInstanceInitializerErrors()
-            Dim compilation = CompilationUtils.CreateCompilationWithReferences(
+            Dim compilation = CompilationUtils.CreateEmptyCompilationWithReferences(
 <compilation>
     <file name="a.vb">
 Class C
@@ -513,7 +515,7 @@ Class C
 End Class
     </file>
 </compilation>,
-                references:=DefaultReferences,
+                references:=DefaultVbReferences,
                 options:=TestOptions.ReleaseDll)
 
             Using executableStream As New MemoryStream()
@@ -527,7 +529,7 @@ BC30491: Expression does not produce a value.
             End Using
         End Sub
 
-        <WorkItem(540467, "DevDiv")>
+        <WorkItem(540467, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/540467")>
         <Fact>
         Public Sub TestCallNoParentheses()
             Dim source =
@@ -550,7 +552,7 @@ End Class
 ]]>)
         End Sub
 
-        <WorkItem(539286, "DevDiv")>
+        <WorkItem(539286, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/539286")>
         <Fact>
         Public Sub TestLambdasInFieldInitializers()
             Dim source =
@@ -573,7 +575,7 @@ Class Class1(Of T)
             Return ff(x, p)
         End Function
 
-    Public Function Foo() As Integer
+    Public Function Goo() As Integer
         Return Nothing
     End Function
 
@@ -602,7 +604,7 @@ System.String
 15129]]>)
         End Sub
 
-        <WorkItem(540603, "DevDiv")>
+        <WorkItem(540603, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/540603")>
         <Fact>
         Public Sub TestAsNewInitializers()
             Dim source =
@@ -651,7 +653,7 @@ End Class
 ]]>
                     </file>
                 </compilation>
-            Dim compilation = CreateCompilationWithMscorlib(source)
+            Dim compilation = CreateCompilationWithMscorlib40(source)
             CompilationUtils.AssertTheseDiagnostics(compilation.Emit(New MemoryStream()).Diagnostics,
 <expected>
 BC30059: Constant expression is required.
@@ -673,7 +675,7 @@ End Class
 ]]>
                     </file>
                 </compilation>
-            Dim compilation1 = CreateCompilationWithMscorlib(source1)
+            Dim compilation1 = CreateCompilationWithMscorlib40(source1)
             compilation1.AssertTheseDiagnostics(<expected>
 BC30059: Constant expression is required.
     Public Const F1 As Integer = F2
@@ -692,10 +694,10 @@ End Class
 ]]>
                     </file>
                 </compilation>
-            Dim compilation2 = CreateCompilationWithMscorlibAndReferences(source2, {New VisualBasicCompilationReference(compilation1)})
+            Dim compilation2 = CreateCompilationWithMscorlib40AndReferences(source2, {New VisualBasicCompilationReference(compilation1)})
             CompilationUtils.AssertTheseDiagnostics(compilation2.Emit(New MemoryStream()).Diagnostics,
 <expected>
-BC36970: Failed to emit module '2110a705-cc34-430b-9450-ca37031aa829.dll'.
+BC36970: Failed to emit module '2110a705-cc34-430b-9450-ca37031aa829.dll': Unable to determine specific cause of the failure.
 </expected>)
         End Sub
 

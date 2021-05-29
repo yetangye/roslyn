@@ -1,23 +1,18 @@
-' Copyright (c) Microsoft.  All Rights Reserved.  Licensed under the Apache License, Version 2.0.  See License.txt in the project root for license information.
-
-Imports Microsoft.CodeAnalysis.Text
-Imports Microsoft.CodeAnalysis.VisualBasic
-Imports Microsoft.CodeAnalysis.VisualBasic.Symbols
-Imports Microsoft.CodeAnalysis.VisualBasic.Syntax
-Imports Roslyn.Test.Utilities
-Imports Xunit
+﻿' Licensed to the .NET Foundation under one or more agreements.
+' The .NET Foundation licenses this file to you under the MIT license.
+' See the LICENSE file in the project root for more information.
 
 Namespace Microsoft.CodeAnalysis.Editor.VisualBasic.UnitTests.Recommendations.Statements
     Public Class WithKeywordRecommenderTests
         <Fact>
         <Trait(Traits.Feature, Traits.Features.KeywordRecommending)>
-        Public Sub WithInMethodBody()
+        Public Sub WithInMethodBodyTest()
             VerifyRecommendationsContain(<MethodBody>|</MethodBody>, "With")
         End Sub
 
         <Fact>
         <Trait(Traits.Feature, Traits.Features.KeywordRecommending)>
-        Public Sub WithInLambda()
+        Public Sub WithInLambdaTest()
             VerifyRecommendationsContain(<MethodBody>
 Dim x = Sub()
 |
@@ -26,7 +21,7 @@ Dim x = Sub()
 
         <Fact>
         <Trait(Traits.Feature, Traits.Features.KeywordRecommending)>
-        Public Sub WithAfterStatement()
+        Public Sub WithAfterStatementTest()
             VerifyRecommendationsContain(<MethodBody>
 Dim x
 |</MethodBody>, "With")
@@ -34,7 +29,7 @@ Dim x
 
         <Fact>
         <Trait(Traits.Feature, Traits.Features.KeywordRecommending)>
-        Public Sub WithNotAfterExitKeyword()
+        Public Sub WithNotAfterExitKeywordTest()
             VerifyRecommendationsMissing(<MethodBody>
 With
 Exit |
@@ -43,7 +38,7 @@ Loop</MethodBody>, "With")
 
         <Fact>
         <Trait(Traits.Feature, Traits.Features.KeywordRecommending)>
-        Public Sub WithNotAfterContinueKeyword()
+        Public Sub WithNotAfterContinueKeywordTest()
             VerifyRecommendationsMissing(<MethodBody>
 With
 Continue |
@@ -52,7 +47,7 @@ Loop</MethodBody>, "With")
 
         <Fact>
         <Trait(Traits.Feature, Traits.Features.KeywordRecommending)>
-        Public Sub WithNotAfterContinueKeywordOutsideLoop()
+        Public Sub WithNotAfterContinueKeywordOutsideLoopTest()
             VerifyRecommendationsMissing(<MethodBody>
 Continue |
 </MethodBody>, "With")
@@ -60,7 +55,7 @@ Continue |
 
         <Fact>
         <Trait(Traits.Feature, Traits.Features.KeywordRecommending)>
-        Public Sub WithNotAfterExitKeywordOutsideLoop()
+        Public Sub WithNotAfterExitKeywordOutsideLoopTest()
             VerifyRecommendationsMissing(<MethodBody>
 Exit |
 </MethodBody>, "With")
@@ -68,7 +63,7 @@ Exit |
 
         <Fact>
         <Trait(Traits.Feature, Traits.Features.KeywordRecommending)>
-        Public Sub WithNotAfterExitInsideLambdaInsideWithBlock()
+        Public Sub WithNotAfterExitInsideLambdaInsideWithBlockTest()
             VerifyRecommendationsMissing(<MethodBody>
 While
 Dim x = Sub()
@@ -80,7 +75,7 @@ Loop
 
         <Fact>
         <Trait(Traits.Feature, Traits.Features.KeywordRecommending)>
-        Public Sub WithAfterExitInsideWhileLoopInsideLambda()
+        Public Sub WithAfterExitInsideWhileLoopInsideLambdaTest()
             VerifyRecommendationsMissing(<MethodBody>
 Dim x = Sub()
             With x

@@ -1,4 +1,8 @@
-﻿// Copyright (c) Microsoft.  All Rights Reserved.  Licensed under the Apache License, Version 2.0.  See License.txt in the project root for license information.
+﻿// Licensed to the .NET Foundation under one or more agreements.
+// The .NET Foundation licenses this file to you under the MIT license.
+// See the LICENSE file in the project root for more information.
+
+#nullable disable
 
 using System;
 using System.Collections.Generic;
@@ -20,6 +24,19 @@ namespace Microsoft.CodeAnalysis.CSharp.UnitTests
 {
     public class DocumentationCommentCompilerTests : CSharpTestBase
     {
+        public static CSharpCompilation CreateCompilationUtil(
+            CSharpTestSource source,
+            IEnumerable<MetadataReference> references = null,
+            CSharpCompilationOptions options = null,
+            string assemblyName = "Test") =>
+            CreateCompilation(
+                source,
+                references,
+                targetFramework: TargetFramework.Mscorlib40,
+                options: (options ?? TestOptions.ReleaseDll).WithXmlReferenceResolver(XmlFileResolver.Default),
+                parseOptions: TestOptions.RegularWithDocumentationComments,
+                assemblyName: assemblyName);
+
         #region Single-line styleWRN_UnqualifiedNestedTypeInCref
 
         [Fact]
@@ -29,7 +46,7 @@ namespace Microsoft.CodeAnalysis.CSharp.UnitTests
 /// <summary>Text</summary>
 public class C { }
 ";
-            var comp = CreateCompilationWithMscorlibAndDocumentationComments(source);
+            var comp = CreateCompilationUtil(source);
             var actual = GetDocumentationCommentText(comp);
             var expected = @"
 <?xml version=""1.0""?>
@@ -56,7 +73,7 @@ public class C { }
 /// </summary>
 public class C { }
 ";
-            var comp = CreateCompilationWithMscorlibAndDocumentationComments(source);
+            var comp = CreateCompilationUtil(source);
             var actual = GetDocumentationCommentText(comp);
             var expected = @"
 <?xml version=""1.0""?>
@@ -83,7 +100,7 @@ public class C { }
 ///
 public class C { }
 ";
-            var comp = CreateCompilationWithMscorlibAndDocumentationComments(source);
+            var comp = CreateCompilationUtil(source);
             var actual = GetDocumentationCommentText(comp);
             var expected = @"
 <?xml version=""1.0""?>
@@ -110,7 +127,7 @@ public class C { }
 ///
 public class C { }
 ";
-            var comp = CreateCompilationWithMscorlibAndDocumentationComments(source);
+            var comp = CreateCompilationUtil(source);
             var actual = GetDocumentationCommentText(comp);
             var expected = @"
 <?xml version=""1.0""?>
@@ -139,7 +156,7 @@ public class C { }
 ///</summary>
 public class C { }
 ";
-            var comp = CreateCompilationWithMscorlibAndDocumentationComments(source);
+            var comp = CreateCompilationUtil(source);
             var actual = GetDocumentationCommentText(comp);
             var expected = @"
 <?xml version=""1.0""?>
@@ -168,7 +185,7 @@ public class C { }
 ///  </summary>
 public class C { }
 ";
-            var comp = CreateCompilationWithMscorlibAndDocumentationComments(source);
+            var comp = CreateCompilationUtil(source);
             var actual = GetDocumentationCommentText(comp);
             var expected = @"
 <?xml version=""1.0""?>
@@ -197,7 +214,7 @@ public class C { }
 /// </summary>
 public class C { }
 ";
-            var comp = CreateCompilationWithMscorlibAndDocumentationComments(source);
+            var comp = CreateCompilationUtil(source);
             var actual = GetDocumentationCommentText(comp);
             var expected = @"
 <?xml version=""1.0""?>
@@ -226,7 +243,7 @@ public class C { }
   /// </summary>
 public class C { }
 ";
-            var comp = CreateCompilationWithMscorlibAndDocumentationComments(source);
+            var comp = CreateCompilationUtil(source);
             var actual = GetDocumentationCommentText(comp);
             var expected = @"
 <?xml version=""1.0""?>
@@ -257,7 +274,7 @@ public class C { }
 /// 
 public class C { }
 ";
-            var comp = CreateCompilationWithMscorlibAndDocumentationComments(source);
+            var comp = CreateCompilationUtil(source);
             var actual = GetDocumentationCommentText(comp);
             var expected = @"
 <?xml version=""1.0""?>
@@ -290,7 +307,7 @@ public class C { }
 /** <summary>Text</summary> */
 public class C { }
 ";
-            var comp = CreateCompilationWithMscorlibAndDocumentationComments(source);
+            var comp = CreateCompilationUtil(source);
             var actual = GetDocumentationCommentText(comp);
             var expected = @"
 <?xml version=""1.0""?>
@@ -315,7 +332,7 @@ public class C { }
 /** */
 public class C { }
 ";
-            var comp = CreateCompilationWithMscorlibAndDocumentationComments(source);
+            var comp = CreateCompilationUtil(source);
             var actual = GetDocumentationCommentText(comp);
             var expected = @"
 <?xml version=""1.0""?>
@@ -341,7 +358,7 @@ public class C { }
  */
 public class C { }
 ";
-            var comp = CreateCompilationWithMscorlibAndDocumentationComments(source);
+            var comp = CreateCompilationUtil(source);
             var actual = GetDocumentationCommentText(comp);
             var expected = @"
 <?xml version=""1.0""?>
@@ -367,7 +384,7 @@ public class C { }
  */
 public class C { }
 ";
-            var comp = CreateCompilationWithMscorlibAndDocumentationComments(source);
+            var comp = CreateCompilationUtil(source);
             var actual = GetDocumentationCommentText(comp);
             var expected = @"
 <?xml version=""1.0""?>
@@ -395,7 +412,7 @@ public class C { }
  */
 public class C { }
 ";
-            var comp = CreateCompilationWithMscorlibAndDocumentationComments(source);
+            var comp = CreateCompilationUtil(source);
             var actual = GetDocumentationCommentText(comp);
             var expected = @"
 <?xml version=""1.0""?>
@@ -425,7 +442,7 @@ public class C { }
  */
 public class C { }
 ";
-            var comp = CreateCompilationWithMscorlibAndDocumentationComments(source);
+            var comp = CreateCompilationUtil(source);
             var actual = GetDocumentationCommentText(comp);
             var expected = @"
 <?xml version=""1.0""?>
@@ -456,7 +473,7 @@ public class C { }
  */
 public class C { }
 ";
-            var comp = CreateCompilationWithMscorlibAndDocumentationComments(source);
+            var comp = CreateCompilationUtil(source);
             var actual = GetDocumentationCommentText(comp);
             var expected = @"
 <?xml version=""1.0""?>
@@ -487,7 +504,7 @@ public class C { }
  */
 public class C { }
 ";
-            var comp = CreateCompilationWithMscorlibAndDocumentationComments(source);
+            var comp = CreateCompilationUtil(source);
             var actual = GetDocumentationCommentText(comp);
             var expected = @"
 <?xml version=""1.0""?>
@@ -518,7 +535,7 @@ public class C { }
  */
 public class C { }
 ";
-            var comp = CreateCompilationWithMscorlibAndDocumentationComments(source);
+            var comp = CreateCompilationUtil(source);
             var actual = GetDocumentationCommentText(comp);
             var expected = @"
 <?xml version=""1.0""?>
@@ -549,7 +566,7 @@ public class C { }
  */
 public class C { }
 ";
-            var comp = CreateCompilationWithMscorlibAndDocumentationComments(source);
+            var comp = CreateCompilationUtil(source);
             var actual = GetDocumentationCommentText(comp);
             var expected = @"
 <?xml version=""1.0""?>
@@ -607,7 +624,7 @@ class A
 	public void foo4(){}
 }
 ";
-            var comp = CreateCompilationWithMscorlibAndDocumentationComments(source);
+            var comp = CreateCompilationUtil(source);
             var actual = GetDocumentationCommentText(comp);
             var expected = @"
 <?xml version=""1.0""?>
@@ -644,7 +661,7 @@ class A
             Assert.Equal(expected, actual);
         }
 
-        [WorkItem(547164, "DevDiv")]
+        [WorkItem(547164, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/547164")]
         [Fact]
         public void MultiLine_PatternShorterOnSubsequentLine()
         {
@@ -667,7 +684,7 @@ public class Point
     }
 }
 ";
-            var comp = CreateCompilationWithMscorlibAndDocumentationComments(source);
+            var comp = CreateCompilationUtil(source);
             var actual = GetDocumentationCommentText(comp,
                 // (3,14): warning CS1591: Missing XML comment for publicly visible type or member 'Point'
                 // public class Point
@@ -707,7 +724,7 @@ public partial class C { }
 /// <summary>Summary 2</summary>
 public partial class C { }
 ";
-            var comp = CreateCompilationWithMscorlibAndDocumentationComments(source);
+            var comp = CreateCompilationUtil(source);
             var actual = GetDocumentationCommentText(comp);
             var expected = @"
 <?xml version=""1.0""?>
@@ -743,7 +760,7 @@ public partial class C { }
             var tree2 = SyntaxFactory.ParseSyntaxTree(source2, options: TestOptions.RegularWithDocumentationComments);
 
             // Files passed in order.
-            var compA = CreateCompilationWithMscorlib(new[] { tree1, tree2 }, assemblyName: "Test");
+            var compA = CreateCompilation(new[] { tree1, tree2 }, assemblyName: "Test");
             var actualA = GetDocumentationCommentText(compA);
             var expectedA = @"
 <?xml version=""1.0""?>
@@ -762,7 +779,7 @@ public partial class C { }
             Assert.Equal(expectedA, actualA);
 
             // Files passed in reverse order.
-            var compB = CreateCompilationWithMscorlib(new[] { tree2, tree1 }, assemblyName: "Test");
+            var compB = CreateCompilation(new[] { tree2, tree1 }, assemblyName: "Test");
             var actualB = GetDocumentationCommentText(compB);
             var expectedB = @"
 <?xml version=""1.0""?>
@@ -791,7 +808,7 @@ public partial class C { }
 /** <summary>Summary 2</summary> */
 public partial class C { }
 ";
-            var comp = CreateCompilationWithMscorlibAndDocumentationComments(source);
+            var comp = CreateCompilationUtil(source);
             var actual = GetDocumentationCommentText(comp);
             var expected = @"
 <?xml version=""1.0""?>
@@ -830,7 +847,7 @@ partial class C
     partial void M() { }
 }
 ";
-            var comp = CreateCompilationWithMscorlibAndDocumentationComments(source);
+            var comp = CreateCompilationUtil(source);
             var actual = GetDocumentationCommentText(comp);
             var expected = @"
 <?xml version=""1.0""?>
@@ -871,7 +888,7 @@ partial class C
             var tree2 = SyntaxFactory.ParseSyntaxTree(source2, options: TestOptions.RegularWithDocumentationComments);
 
             // Files passed in order.
-            var compA = CreateCompilationWithMscorlib(new[] { tree1, tree2 }, assemblyName: "Test");
+            var compA = CreateCompilation(new[] { tree1, tree2 }, assemblyName: "Test");
             var actualA = GetDocumentationCommentText(compA);
             var expectedA = @"
 <?xml version=""1.0""?>
@@ -889,7 +906,66 @@ partial class C
             Assert.Equal(expectedA, actualA);
 
             // Files passed in reverse order.
-            var compB = CreateCompilationWithMscorlib(new[] { tree2, tree1 }, assemblyName: "Test");
+            var compB = CreateCompilation(new[] { tree2, tree1 }, assemblyName: "Test");
+            var actualB = GetDocumentationCommentText(compB);
+            var expectedB = @"
+<?xml version=""1.0""?>
+<doc>
+    <assembly>
+        <name>Test</name>
+    </assembly>
+    <members>
+        <member name=""M:C.M"">
+            <summary>Summary 1</summary>
+        </member>
+    </members>
+</doc>
+".Trim();
+            Assert.Equal(expectedB, actualB);
+        }
+
+        [Fact]
+        public void ExtendedPartialMethods_MultipleFiles()
+        {
+            var source1 = @"
+partial class C
+{
+    /** <summary>Summary 1</summary>*/
+    public partial int M() => 42;
+}
+";
+
+            var source2 = @"
+partial class C
+{
+    /** <summary>Summary 2</summary>*/
+    public partial int M();
+}
+";
+
+            var tree1 = SyntaxFactory.ParseSyntaxTree(source1, options: TestOptions.RegularWithDocumentationComments);
+            var tree2 = SyntaxFactory.ParseSyntaxTree(source2, options: TestOptions.RegularWithDocumentationComments);
+
+            // Files passed in order.
+            var compA = CreateCompilation(new[] { tree1, tree2 }, assemblyName: "Test");
+            var actualA = GetDocumentationCommentText(compA);
+            var expectedA = @"
+<?xml version=""1.0""?>
+<doc>
+    <assembly>
+        <name>Test</name>
+    </assembly>
+    <members>
+        <member name=""M:C.M"">
+            <summary>Summary 1</summary>
+        </member>
+    </members>
+</doc>
+".Trim();
+            Assert.Equal(expectedA, actualA);
+
+            // Files passed in reverse order.
+            var compB = CreateCompilation(new[] { tree2, tree1 }, assemblyName: "Test");
             var actualB = GetDocumentationCommentText(compB);
             var expectedB = @"
 <?xml version=""1.0""?>
@@ -921,7 +997,7 @@ partial class C
 /// </summary>
 public class C { }
 ";
-            var comp = CreateCompilationWithMscorlibAndDocumentationComments(source);
+            var comp = CreateCompilationUtil(source);
             var actual = GetDocumentationCommentText(comp);
             var expected = @"
 <?xml version=""1.0""?>
@@ -956,7 +1032,7 @@ public class C { }
 /// </summary>
 public class D { }
 ";
-            var comp = CreateCompilationWithMscorlibAndDocumentationComments(source);
+            var comp = CreateCompilationUtil(source);
             var actual = GetDocumentationCommentText(comp,
                 // (3,18): warning CS1574: XML comment has cref attribute 'Q' that could not be resolved
                 // /// A <see cref="Q"/>.
@@ -1001,7 +1077,7 @@ public class C
     static void Main() {}
 }
 ";
-            var comp = CreateCompilationWithMscorlibAndDocumentationComments(source, assemblyName: "CompilationName");
+            var comp = CreateCompilationUtil(source, assemblyName: "CompilationName");
             var actual = GetDocumentationCommentText(comp);
             var expected = @"
 <?xml version=""1.0""?>
@@ -1029,7 +1105,7 @@ public class C
     static void Main() {}
 }
 ";
-            var comp = CreateCompilationWithMscorlibAndDocumentationComments(source);
+            var comp = CreateCompilationUtil(source);
             var actual = GetDocumentationCommentText(comp, "OutputName");
             var expected = @"
 <?xml version=""1.0""?>
@@ -1080,7 +1156,7 @@ enum E : byte
 
             var revisedSource = new DocumentationCommentAdder().Visit(Parse(source).GetCompilationUnitRoot()).ToFullString();
             // Manually verified that positions match dev11.
-            CreateCompilationWithMscorlibAndDocumentationComments(revisedSource).VerifyDiagnostics(
+            CreateCompilationUtil(revisedSource).VerifyDiagnostics(
                 // (2,15): warning CS1587: XML comment is not placed on a valid language element
                 // /** 0 */class /** 1 */C/** 2 */</** 3 */T/** 4 */> /** 5 */: /** 6 */object /** 7 */where /** 8 */T /** 9 */: /** 10 */I
                 Diagnostic(ErrorCode.WRN_UnprocessedXMLComment, "/"),
@@ -1264,7 +1340,7 @@ enum E
 
             var revisedSource = new DocumentationCommentAdder().Visit(Parse(source).GetCompilationUnitRoot()).ToFullString();
             // Manually verified that positions match dev11.
-            CreateCompilationWithMscorlibAndDocumentationComments(revisedSource).VerifyDiagnostics(
+            CreateCompilationUtil(revisedSource).VerifyDiagnostics(
                 // (4,41): warning CS0169: The field 'C.field' is never used
                 //     /** 3 */private /** 4 */int /** 5 */field/** 6 */;
                 Diagnostic(ErrorCode.WRN_UnreferencedField, "field").WithArguments("C.field"),
@@ -1633,7 +1709,7 @@ enum E
 
             var revisedSource = new DocumentationCommentAdder().Visit(Parse(source).GetCompilationUnitRoot()).ToFullString();
             // Manually verified that positions match dev11.
-            CreateCompilationWithMscorlibAndDocumentationComments(revisedSource).VerifyDiagnostics(
+            CreateCompilationUtil(revisedSource).VerifyDiagnostics(
                 // (4,41): warning CS0414: The field 'C.field' is assigned but its value is never used
                 //     /** 3 */private /** 4 */int /** 5 */field /** 6 */= /** 7 */1/** 8 */;
                 Diagnostic(ErrorCode.WRN_UnreferencedFieldAssg, "field").WithArguments("C.field"),
@@ -1851,7 +1927,7 @@ class C
 {
 }
 ";
-            CreateCompilationWithMscorlibAndDocumentationComments(source).VerifyDiagnostics(
+            CreateCompilationUtil(source).VerifyDiagnostics(
                 // (3,1): warning CS1587: XML comment is not placed on a valid language element
                 // /// Comment
                 Diagnostic(ErrorCode.WRN_UnprocessedXMLComment, "/"));
@@ -1868,7 +1944,7 @@ class C
 #endif
 }
 ";
-            CreateCompilationWithMscorlibAndDocumentationComments(source).VerifyDiagnostics();
+            CreateCompilationUtil(source).VerifyDiagnostics();
         }
 
         [Fact]
@@ -1889,7 +1965,7 @@ partial class C
             var tree1 = Parse(source1, options: TestOptions.RegularWithDocumentationComments);
             var tree2 = Parse(source2, options: TestOptions.RegularWithDocumentationComments);
 
-            var comp = CreateCompilationWithMscorlib(new[] { tree1, tree2 });
+            var comp = CreateCompilation(new[] { tree1, tree2 });
             comp.GetSemanticModel(tree1).GetDiagnostics().Verify(
                 // (4,5): warning CS1587: XML comment is not placed on a valid language element
                 //     /// Unprocessed 1
@@ -1909,10 +1985,10 @@ partial class C
     /// Unprocessed 1
 }
 ";
-            CreateCompilationWithMscorlib(source).VerifyDiagnostics();
+            CreateCompilation(source).VerifyDiagnostics();
         }
 
-        [WorkItem(547139, "DevDiv")]
+        [WorkItem(547139, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/547139")]
         [Fact]
         public void UnprocessedXMLComment_Accessor()
         {
@@ -1928,7 +2004,7 @@ class MyClass
     }
 }
 ";
-            CreateCompilationWithMscorlibAndDocumentationComments(source).VerifyDiagnostics(
+            CreateCompilationUtil(source).VerifyDiagnostics(
                 // (7,9): warning CS1587: XML comment is not placed on a valid language element
                 //         /// <param name="a" />
                 Diagnostic(ErrorCode.WRN_UnprocessedXMLComment, "/"));
@@ -1976,7 +2052,7 @@ class C3 { }
 /// <bad_attribute_value attr=""&""/>
 class C4 { }
 ";
-            var comp = CreateCompilationWithMscorlibAndDocumentationComments(source);
+            var comp = CreateCompilationUtil(source);
             var actual = GetDocumentationCommentText(comp);
             var expected = (@"
 <?xml version=""1.0""?>
@@ -2009,7 +2085,7 @@ partial class C
 {
 }
 ";
-            var comp = CreateCompilationWithMscorlibAndDocumentationComments(source);
+            var comp = CreateCompilationUtil(source);
             var actual = GetDocumentationCommentText(comp);
             var expected = (@"
 <?xml version=""1.0""?>
@@ -2048,7 +2124,7 @@ partial class C
 }
 ";
             // NOTE: separate error comment for each part.
-            var comp = CreateCompilationWithMscorlibAndDocumentationComments(source);
+            var comp = CreateCompilationUtil(source);
             var actual = GetDocumentationCommentText(comp);
             var expected = (@"
 <?xml version=""1.0""?>
@@ -2068,8 +2144,9 @@ partial class C
             Assert.Equal(expected, actual);
         }
 
-        [Fact]
-        [WorkItem(637435, "DevDiv")]
+        [ConditionalFact(typeof(ClrOnly), typeof(DesktopOnly))]
+        [WorkItem(637435, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/637435")]
+        [WorkItem(18610, "https://github.com/dotnet/roslyn/issues/18610")]
         public void NonXmlWhitespace()
         {
             var ch = '\u1680';
@@ -2087,8 +2164,8 @@ class C {{ }}
             var source = string.Format(sourceTemplate, xml);
 
             // NOTE: separate error comment for each part.
-            var comp = CreateCompilationWithMscorlibAndDocumentationComments(source);
-            var actual = GetDocumentationCommentText(comp, /*ensureEnglishUICulture:*/ true,
+            var comp = CreateCompilationUtil(source);
+            var actual = GetDocumentationCommentText(comp,
                 // (2,4): warning CS1570: XML comment has badly formed XML -- 'The '\u1680' character, hexadecimal value 0x1680, cannot be included in a name.'
                 // /// <see cref='C'/>
                 Diagnostic(ErrorCode.WRN_XMLParseError, "").WithArguments("The '\u1680' character, hexadecimal value 0x1680, cannot be included in a name."));
@@ -2107,8 +2184,9 @@ class C {{ }}
             Assert.Equal(expected, actual);
         }
 
-        [Fact]
-        [WorkItem(637435, "DevDiv")]
+        [ConditionalFact(typeof(ClrOnly), typeof(DesktopOnly))]
+        [WorkItem(637435, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/637435")]
+        [WorkItem(18610, "https://github.com/dotnet/roslyn/issues/18610")]
         public void Repro637435()
         {
             var sourceTemplate = @"
@@ -2141,7 +2219,7 @@ class C4 {{ }}
 ";
             var source = string.Format(sourceTemplate, '\u1680');
 
-            CreateCompilationWithMscorlibAndDocumentationComments(source).GetDiagnostics().VerifyWithFallbackToErrorCodeOnlyForNonEnglish(
+            CreateCompilationUtil(source).GetDiagnostics().VerifyWithFallbackToErrorCodeOnlyForNonEnglish(
                 // (4,4): warning CS1570: XML comment has badly formed XML -- 'Name cannot begin with the '\u1680' character, hexadecimal value 0x1680.'
                 // ///<see
                 Diagnostic(ErrorCode.WRN_XMLParseError, "").WithArguments("Name cannot begin with the '\u1680' character, hexadecimal value 0x1680."),
@@ -2171,7 +2249,7 @@ class C4 {{ }}
 class C {{ }}
 ";
 
-            var comp = CreateCompilationWithMscorlibAndDocumentationComments(string.Format(sourceTemplate, xmlFilePath));
+            var comp = CreateCompilationUtil(string.Format(sourceTemplate, xmlFilePath));
             var actual = GetDocumentationCommentText(comp);
 
             var expectedTemplate = (@"
@@ -2206,7 +2284,7 @@ class C {{ }}
 class C {{ }}
 ";
 
-            var comp = CreateCompilationWithMscorlibAndDocumentationComments(string.Format(sourceTemplate, xmlFilePath));
+            var comp = CreateCompilationUtil(string.Format(sourceTemplate, xmlFilePath));
             var actual = GetDocumentationCommentText(comp);
 
             var expectedTemplate = (@"
@@ -2244,7 +2322,7 @@ class C {{ }}
 class C {{ }}
 ";
 
-            var comp = CreateCompilationWithMscorlibAndDocumentationComments(string.Format(sourceTemplate, xmlFilePath));
+            var comp = CreateCompilationUtil(string.Format(sourceTemplate, xmlFilePath));
             var actual = GetDocumentationCommentText(comp);
 
             var expectedTemplate = (@"
@@ -2281,7 +2359,7 @@ class C {{ }}
 class C {{ }}
 ";
 
-            var comp = CreateCompilationWithMscorlibAndDocumentationComments(string.Format(sourceTemplate, xmlFilePath));
+            var comp = CreateCompilationUtil(string.Format(sourceTemplate, xmlFilePath));
             var actual = GetDocumentationCommentText(comp);
 
             var expectedTemplate = (@"
@@ -2317,7 +2395,7 @@ class C {{ }}
 class C {{ }}
 ";
 
-            var comp = CreateCompilationWithMscorlibAndDocumentationComments(string.Format(sourceTemplate, xmlFilePath));
+            var comp = CreateCompilationUtil(string.Format(sourceTemplate, xmlFilePath));
             var actual = GetDocumentationCommentText(comp);
 
             var expectedTemplate = (@"
@@ -2338,7 +2416,8 @@ class C {{ }}
             Assert.Equal(string.Format(expectedTemplate, xmlFilePath), actual);
         }
 
-        [Fact]
+        [ConditionalFact(typeof(ClrOnly), typeof(DesktopOnly))]
+        [WorkItem(18610, "https://github.com/dotnet/roslyn/issues/18610")]
         public void IncludeFileResolution()
         {
             var xml1 = @"
@@ -2410,7 +2489,7 @@ class C { }
 /// <include file='file'/>
 class C { }
 ";
-            var comp = CreateCompilationWithMscorlibAndDocumentationComments(source);
+            var comp = CreateCompilationUtil(source);
             var actual = GetDocumentationCommentText(comp,
                 // (2,5): warning CS1590: Invalid XML include element -- Missing file attribute
                 // /// <include/>
@@ -2461,7 +2540,7 @@ class C { }
 class C {{ }}
 ";
 
-            var comp = CreateCompilationWithMscorlibAndDocumentationComments(string.Format(sourceTemplate, xmlFile.Path));
+            var comp = CreateCompilationUtil(string.Format(sourceTemplate, xmlFile.Path));
             var actual = GetDocumentationCommentText(comp,
                 // warning CS1590: Invalid XML include element -- Missing file attribute
                 Diagnostic(ErrorCode.WRN_InvalidInclude).WithArguments("Missing file attribute"),
@@ -2496,7 +2575,7 @@ class C {{ }}
 /// <include file='file' path='path'/>
 class C { }
 ";
-            var comp = CreateCompilationWithMscorlibAndDocumentationComments(source);
+            var comp = CreateCompilationUtil(source);
             var actual = GetDocumentationCommentText(comp,
                 // (2,5): warning CS1589: Unable to include XML fragment 'path' of file 'file' -- File not found.
                 // /// <include file='file' path='path'/>
@@ -2532,7 +2611,7 @@ class C { }
 class C {{ }}
 ";
 
-            var comp = CreateCompilationWithMscorlibAndDocumentationComments(string.Format(sourceTemplate, xmlFile.Path));
+            var comp = CreateCompilationUtil(string.Format(sourceTemplate, xmlFile.Path));
             var actual = GetDocumentationCommentText(comp,
                 // 56e57d80-44fc-4e2c-b839-0bf3d9c830b7.xml(3,6): warning CS1589: Unable to include XML fragment 'path' of file 'file' -- File not found.
                 Diagnostic(ErrorCode.WRN_FailedInclude).WithArguments("file", "path", "File not found."));
@@ -2554,7 +2633,7 @@ class C {{ }}
             Assert.Equal(expected, actual);
         }
 
-        [Fact]
+        [ClrOnlyFact(ClrOnlyReason.Unknown)]
         public void WRN_FailedInclude_Locked_Source()
         {
             var xmlFile = Temp.CreateFile(extension: ".xml");
@@ -2569,8 +2648,8 @@ class C {{ }}
 ";
             using (File.Open(xmlFilePath, FileMode.Open, FileAccess.Write, FileShare.None))
             {
-                var comp = CreateCompilationWithMscorlibAndDocumentationComments(string.Format(sourceTemplate, includeElement));
-                var actual = GetDocumentationCommentText(comp, /*ensureEnglishUICulture:*/ true,
+                var comp = CreateCompilationUtil(string.Format(sourceTemplate, includeElement));
+                var actual = GetDocumentationCommentText(comp,
                     // (2,5): warning CS1589: Unable to include XML fragment 'path' of file 'c3af0dc5a3cf.xml' -- The process cannot access the file 'c3af0dc5a3cf.xml' because it is being used by another process.
                     // /// <include file='c3af0dc5a3cf.xml' path='path'/>
                     Diagnostic(ErrorCode.WRN_FailedInclude, includeElement).WithArguments(xmlFilePath, "path", string.Format("The process cannot access the file '{0}' because it is being used by another process.", xmlFilePath)));
@@ -2591,7 +2670,7 @@ class C {{ }}
             }
         }
 
-        [Fact]
+        [ClrOnlyFact(ClrOnlyReason.Unknown)]
         public void WRN_FailedInclude_Locked_Xml()
         {
             var xmlFile1 = Temp.CreateFile(extension: ".xml");
@@ -2606,8 +2685,8 @@ class C {{ }}
 ";
             using (File.Open(xmlFilePath1, FileMode.Open, FileAccess.Write, FileShare.None))
             {
-                var comp = CreateCompilationWithMscorlibAndDocumentationComments(string.Format(sourceTemplate, xmlFilePath2));
-                var actual = GetDocumentationCommentText(comp, /*ensureEnglishUICulture:*/ true,
+                var comp = CreateCompilationUtil(string.Format(sourceTemplate, xmlFilePath2));
+                var actual = GetDocumentationCommentText(comp,
                     // 3fba660141b6.xml(1,2): warning CS1589: Unable to include XML fragment 'path' of file 'd4241d125755.xml' -- The process cannot access the file 'd4241d125755.xml' because it is being used by another process.
                     Diagnostic(ErrorCode.WRN_FailedInclude).WithArguments(xmlFilePath1, "path", string.Format("The process cannot access the file '{0}' because it is being used by another process.", xmlFilePath1)));
                 var expectedTemplate = (@"
@@ -2640,8 +2719,8 @@ class C {{ }}
 /// {0}
 class C {{ }}
 ";
-            var comp = CreateCompilationWithMscorlibAndDocumentationComments(string.Format(sourceTemplate, includeElement));
-            var actual = GetDocumentationCommentText(comp, /*ensureEnglishUICulture:*/ true,
+            var comp = CreateCompilationUtil(string.Format(sourceTemplate, includeElement));
+            var actual = GetDocumentationCommentText(comp,
                 // (2,5): warning CS1589: Unable to include XML fragment 'path' of file 'c3af0dc5a3cf.xml' -- The process cannot access the file 'c3af0dc5a3cf.xml' because it is being used by another process.
                 // /// <include file='c3af0dc5a3cf.xml' path='path'/>
                 Diagnostic(ErrorCode.WRN_FailedInclude, includeElement).WithArguments(xmlFilePath, ":", "':' has an invalid token."));
@@ -2674,8 +2753,8 @@ class C {{ }}
 /// <include file='{0}' path='//include'/>
 class C {{ }}
 ";
-            var comp = CreateCompilationWithMscorlibAndDocumentationComments(string.Format(sourceTemplate, xmlFilePath2));
-            var actual = GetDocumentationCommentText(comp, /*ensureEnglishUICulture:*/ true,
+            var comp = CreateCompilationUtil(string.Format(sourceTemplate, xmlFilePath2));
+            var actual = GetDocumentationCommentText(comp,
                 // 3fba660141b6.xml(1,2): warning CS1589: Unable to include XML fragment 'path' of file 'd4241d125755.xml' -- The process cannot access the file 'd4241d125755.xml' because it is being used by another process.
                 Diagnostic(ErrorCode.WRN_FailedInclude).WithArguments(xmlFilePath1, ":", "':' has an invalid token."));
             var expectedTemplate = (@"
@@ -2694,7 +2773,7 @@ class C {{ }}
             Assert.Equal(string.Format(expectedTemplate, xmlFilePath1), actual);
         }
 
-        [Fact]
+        [ClrOnlyFact(ClrOnlyReason.DocumentationComment, Skip = "https://github.com/dotnet/roslyn/issues/8807")]
         public void WRN_XMLParseIncludeError_Source()
         {
             var xmlFile = Temp.CreateFile(extension: ".xml").WriteAllText("<OpenWithoutClose>");
@@ -2707,8 +2786,8 @@ class C {{ }}
 /// {0}
 class C {{ }}
 ";
-            var comp = CreateCompilationWithMscorlibAndDocumentationComments(string.Format(sourceTemplate, includeElement));
-            var actual = GetDocumentationCommentText(comp, /*ensureEnglishUICulture:*/ true,
+            var comp = CreateCompilationUtil(string.Format(sourceTemplate, includeElement));
+            var actual = GetDocumentationCommentText(comp,
                 // 327697461814.xml(1,19): warning CS1592: Badly formed XML in included comments file -- 'Unexpected end of file has occurred. The following elements are not closed: OpenWithoutClose.'
                 Diagnostic(ErrorCode.WRN_XMLParseIncludeError).WithArguments("Unexpected end of file has occurred. The following elements are not closed: OpenWithoutClose."));
             var expectedTemplate = (@"
@@ -2724,10 +2803,11 @@ class C {{ }}
     </members>
 </doc>
 ").Trim();
-            Assert.Equal(string.Format(expectedTemplate, xmlFilePath), actual);
+            Assert.Equal(string.Format(expectedTemplate, TestHelpers.AsXmlCommentText(xmlFilePath)), actual);
         }
 
-        [Fact]
+        [ConditionalFact(typeof(ClrOnly), typeof(DesktopOnly))]
+        [WorkItem(18610, "https://github.com/dotnet/roslyn/issues/18610")]
         public void WRN_XMLParseIncludeError_Xml()
         {
             var xmlFile1 = Temp.CreateFile(extension: ".xml").WriteAllText("<OpenWithoutClose>");
@@ -2740,8 +2820,8 @@ class C {{ }}
 /// <include file='{0}' path='//include'/>
 class C {{ }}
 ";
-            var comp = CreateCompilationWithMscorlibAndDocumentationComments(string.Format(sourceTemplate, xmlFilePath2));
-            var actual = GetDocumentationCommentText(comp, /*ensureEnglishUICulture:*/ true,
+            var comp = CreateCompilationUtil(string.Format(sourceTemplate, xmlFilePath2));
+            var actual = GetDocumentationCommentText(comp,
                 // 408eee49f410.xml(1,19): warning CS1592: Badly formed XML in included comments file -- 'Unexpected end of file has occurred. The following elements are not closed: OpenWithoutClose.'
                 Diagnostic(ErrorCode.WRN_XMLParseIncludeError).WithArguments("Unexpected end of file has occurred. The following elements are not closed: OpenWithoutClose."));
             var expectedTemplate = (@"
@@ -2772,7 +2852,7 @@ class C {{ }}
 /// <include file='{0}' path='//include'/>
 class C {{ }}
 ";
-            var comp = CreateCompilationWithMscorlibAndDocumentationComments(string.Format(sourceTemplate, xmlFilePath));
+            var comp = CreateCompilationUtil(string.Format(sourceTemplate, xmlFilePath));
             var actual = GetDocumentationCommentText(comp,
                 // 3fba660141b6.xml(1,2): warning CS1589: Unable to include XML fragment 'path' of file 'd4241d125755.xml' -- The process cannot access the file 'd4241d125755.xml' because it is being used by another process.
                 Diagnostic(ErrorCode.WRN_FailedInclude).WithArguments(xmlFilePath, "//include", "Operation caused a stack overflow."));
@@ -2804,7 +2884,7 @@ class C {{ }}
 /// <include file='{0}' path='//include'/>
 class C {{ }}
 ";
-            var comp = CreateCompilationWithMscorlibAndDocumentationComments(string.Format(sourceTemplate, xmlFilePath));
+            var comp = CreateCompilationUtil(string.Format(sourceTemplate, xmlFilePath));
 
             // CONSIDER: differs from dev11, but this is a reasonable recovery.
             var actual = GetDocumentationCommentText(comp,
@@ -2841,7 +2921,7 @@ class C {{ }}
 /// <include file='{0}' path='//include'/>
 class C {{ }}
 ";
-            var comp = CreateCompilationWithMscorlibAndDocumentationComments(string.Format(sourceTemplate, xmlFilePath));
+            var comp = CreateCompilationUtil(string.Format(sourceTemplate, xmlFilePath));
 
             // CONSIDER: not checked against dev11 - just don't blow up.
             var actual = GetDocumentationCommentText(comp,
@@ -2898,7 +2978,7 @@ class C {{ }}
 /// <include file='{0}' path='//include'/>
 class C {{ }}
 ";
-            var comp = CreateCompilationWithMscorlibAndDocumentationComments(string.Format(sourceTemplate, xmlFilePath));
+            var comp = CreateCompilationUtil(string.Format(sourceTemplate, xmlFilePath));
 
             var actual = GetDocumentationCommentText(comp);
             var expected = (@"
@@ -2938,7 +3018,7 @@ class C {{ }}
 /// <include file='{0}' path='//stuff'/>
 class C {{ }}
 ";
-            var comp = CreateCompilationWithMscorlibAndDocumentationComments(string.Format(sourceTemplate, xmlFilePath1));
+            var comp = CreateCompilationUtil(string.Format(sourceTemplate, xmlFilePath1));
 
             var actual = GetDocumentationCommentText(comp);
             var expectedTemplate = (@"
@@ -2957,7 +3037,7 @@ class C {{ }}
             Assert.Equal(string.Format(expectedTemplate, xmlFilePath1), actual);
         }
 
-        [WorkItem(554196, "DevDiv")]
+        [WorkItem(554196, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/554196")]
         [Fact]
         public void XPathDocumentRoot()
         {
@@ -2986,9 +3066,9 @@ enum C {{ }}
 /// <include file=""{0}"" path=""/doc""/>
 enum D {{ }}
 ";
-            var comp = CreateCompilationWithMscorlibAndDocumentationComments(string.Format(sourceTemplate, xmlFilePath));
+            var comp = CreateCompilationUtil(string.Format(sourceTemplate, xmlFilePath));
 
-            var actual = GetDocumentationCommentText(comp, /*ensureEnglishUICulture:*/ true,
+            var actual = GetDocumentationCommentText(comp,
                 // (2,5): warning CS1589: Unable to include XML fragment '/' of file '012bf028d62c.xml' -- The XPath expression evaluated to unexpected type System.Xml.Linq.XDocument.
                 // /// <include file="012bf028d62c.xml" path="/"/>
                 Diagnostic(ErrorCode.WRN_FailedInclude, string.Format(@"<include file=""{0}"" path=""/""/>", xmlFilePath)).WithArguments(xmlFilePath, "/", "The XPath expression evaluated to unexpected type System.Xml.Linq.XDocument."),
@@ -3051,7 +3131,7 @@ class C
     static void Main() {{ }}
 }}
 ";
-            var comp = CreateCompilationWithMscorlibAndDocumentationComments(string.Format(sourceTemplate, includeElement));
+            var comp = CreateCompilationUtil(string.Format(sourceTemplate, includeElement));
 
             var actual = GetDocumentationCommentText(comp);
             var expected = (@"
@@ -3086,7 +3166,7 @@ class C
     static void Main() {{ }}
 }}
 ";
-            var comp = CreateCompilationWithMscorlibAndDocumentationComments(string.Format(sourceTemplate, includeElement));
+            var comp = CreateCompilationUtil(string.Format(sourceTemplate, includeElement));
 
             var actual = GetDocumentationCommentText(comp);
             var expected = (@"
@@ -3129,7 +3209,7 @@ namespace N
     class C {{ }}
 }}
 ";
-            var comp = CreateCompilationWithMscorlibAndDocumentationComments(string.Format(sourceTemplate, includeElement));
+            var comp = CreateCompilationUtil(string.Format(sourceTemplate, includeElement));
 
             // Error for the first include, but not for the second.
             var actual = GetDocumentationCommentText(comp,
@@ -3165,7 +3245,7 @@ namespace N
 /// {0}
 class C {{ }}
 ";
-            var comp = CreateCompilationWithMscorlibAndDocumentationComments(string.Format(sourceTemplate, includeElement));
+            var comp = CreateCompilationUtil(string.Format(sourceTemplate, includeElement));
 
             var actual = GetDocumentationCommentText(comp,
                 // (2,5): warning CS1584: XML comment has syntactically incorrect cref attribute '#'
@@ -3206,7 +3286,7 @@ class C {{ }}
 /// {0}
 class C {{ }}
 ";
-            var comp = CreateCompilationWithMscorlibAndDocumentationComments(string.Format(sourceTemplate, includeElement));
+            var comp = CreateCompilationUtil(string.Format(sourceTemplate, includeElement));
 
             var actual = GetDocumentationCommentText(comp,
                 // (2,5): warning CS1574: XML comment has cref attribute 'Invalid' that could not be resolved
@@ -3228,7 +3308,7 @@ class C {{ }}
             Assert.Equal(expected, actual);
         }
 
-        [WorkItem(552495, "DevDiv")]
+        [WorkItem(552495, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/552495")]
         [Fact]
         public void IncludeMismatchedQuotationMarks()
         {
@@ -3241,11 +3321,11 @@ class C { }
 
             // This is mode typically used by the IDE.
             var tree = Parse(source, options: TestOptions.Regular.WithDocumentationMode(DocumentationMode.Parse));
-            var compilation = CreateCompilationWithMscorlib(tree);
+            var compilation = CreateCompilation(tree);
             compilation.VerifyDiagnostics();
         }
 
-        [WorkItem(598371, "DevDiv")]
+        [WorkItem(598371, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/598371")]
         [Fact]
         public void CrefParameterOrReturnTypeLookup1()
         {
@@ -3270,7 +3350,7 @@ class X
     }}
 }}
 ";
-            var comp = CreateCompilationWithMscorlibAndDocumentationComments(string.Format(sourceTemplate, seeElement, includeElement));
+            var comp = CreateCompilationUtil(string.Format(sourceTemplate, seeElement, includeElement));
 
             var actual = GetDocumentationCommentText(comp);
             var expected = (@"
@@ -3290,7 +3370,7 @@ class X
             Assert.Equal(expected, actual);
         }
 
-        [WorkItem(586815, "DevDiv")]
+        [WorkItem(586815, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/586815")]
         [Fact]
         public void CrefParameterOrReturnTypeLookup2()
         {
@@ -3312,7 +3392,7 @@ class A<T>
     }}
 }}
 ";
-            var comp = CreateCompilationWithMscorlibAndDocumentationComments(string.Format(sourceTemplate, seeElement, includeElement));
+            var comp = CreateCompilationUtil(string.Format(sourceTemplate, seeElement, includeElement));
 
             var actual = GetDocumentationCommentText(comp);
             var expected = (@"
@@ -3392,7 +3472,7 @@ class C<T>
     delegate void D<V>(V v) {{ }}
 }}
 ";
-            var comp = CreateCompilationWithMscorlibAndDocumentationComments(string.Format(sourceTemplate, includeElements));
+            var comp = CreateCompilationUtil(string.Format(sourceTemplate, includeElements));
 
             var actual = GetDocumentationCommentText(comp);
             var expected = (@"
@@ -3470,7 +3550,7 @@ class C<T>
 /// {0}
 delegate void D<U, V>(U u, V v) {{ }}
 ";
-            var comp = CreateCompilationWithMscorlibAndDocumentationComments(string.Format(sourceTemplate, includeElement));
+            var comp = CreateCompilationUtil(string.Format(sourceTemplate, includeElement));
 
             var actual = GetDocumentationCommentText(comp,
                 // (10,5): warning CS1571: XML comment has a duplicate param tag for 'u'
@@ -3539,7 +3619,7 @@ delegate void D<U, V>(U u, V v) {{ }}
 /// {0}
 delegate void D<U, V>(U u, V v) {{ }}
 ";
-            var comp = CreateCompilationWithMscorlibAndDocumentationComments(string.Format(sourceTemplate, includeElement));
+            var comp = CreateCompilationUtil(string.Format(sourceTemplate, includeElement));
 
             var actual = GetDocumentationCommentText(comp);
             var expected = (@"
@@ -3577,7 +3657,7 @@ delegate void D<U, V>(U u, V v) {{ }}
 /// {0}
 class C<T> {{ }}
 ";
-            var comp = CreateCompilationWithMscorlibAndDocumentationComments(string.Format(sourceTemplate, includeElement));
+            var comp = CreateCompilationUtil(string.Format(sourceTemplate, includeElement));
 
             var actual = GetDocumentationCommentText(comp,
                 // (2,5): warning CS1658: Unexpected character '#'. See also error CS1056.
@@ -3618,7 +3698,7 @@ class C
     void M(int x) {{ }}
 }}
 ";
-            var comp = CreateCompilationWithMscorlibAndDocumentationComments(string.Format(sourceTemplate, includeElement));
+            var comp = CreateCompilationUtil(string.Format(sourceTemplate, includeElement));
 
             var actual = GetDocumentationCommentText(comp,
                 // (4,9): warning CS1572: XML comment has a param tag for 'Q', but there is no parameter by that name
@@ -3659,7 +3739,7 @@ class C
     void M(int x, int x) {{ }}
 }}
 ";
-            var comp = CreateCompilationWithMscorlibAndDocumentationComments(string.Format(sourceTemplate, includeElement));
+            var comp = CreateCompilationUtil(string.Format(sourceTemplate, includeElement));
 
             // NOTE: no *xml* diagnostics, not no diagnostics.
             var actual = GetDocumentationCommentText(comp);
@@ -3679,7 +3759,7 @@ class C
             Assert.Equal(expected, actual);
         }
 
-        [Fact]
+        [ClrOnlyFact(ClrOnlyReason.DocumentationComment, Skip = "https://github.com/dotnet/roslyn/issues/8807")]
         public void IncludedName_DuplicateNameAttribute()
         {
             var xmlFile = Temp.CreateFile(extension: ".xml").WriteAllText(@"<param name=""x"" name=""y""/>");
@@ -3695,9 +3775,9 @@ class C
     void M(int x, int y) {{ }}
 }}
 ";
-            var comp = CreateCompilationWithMscorlibAndDocumentationComments(string.Format(sourceTemplate, includeElement));
+            var comp = CreateCompilationUtil(string.Format(sourceTemplate, includeElement));
 
-            var actual = GetDocumentationCommentText(comp, /*ensureEnglishUICulture:*/ true,
+            var actual = GetDocumentationCommentText(comp,
                 // df33b60df5a9.xml(1,17): warning CS1592: Badly formed XML in included comments file -- ''name' is a duplicate attribute name.'
                 Diagnostic(ErrorCode.WRN_XMLParseIncludeError).WithArguments("'name' is a duplicate attribute name."));
             var expectedTemplate = (@"
@@ -3713,7 +3793,7 @@ class C
     </members>
 </doc>
         ").Trim();
-            Assert.Equal(string.Format(expectedTemplate, xmlFilePath), actual);
+            Assert.Equal(string.Format(expectedTemplate, TestHelpers.AsXmlCommentText(xmlFilePath)), actual);
         }
 
         [Fact]
@@ -3745,7 +3825,7 @@ partial class C
     partial void M(int x, int y) {{ }}
 }}
 ";
-            var comp = CreateCompilationWithMscorlibAndDocumentationComments(string.Format(sourceTemplate, includeElement));
+            var comp = CreateCompilationUtil(string.Format(sourceTemplate, includeElement));
 
             var actual = GetDocumentationCommentText(comp);
             var expectedTemplate = (@"
@@ -3762,7 +3842,168 @@ partial class C
     </members>
 </doc>
         ").Trim();
-            Assert.Equal(string.Format(expectedTemplate, xmlFilePath), actual);
+            Assert.Equal(string.Format(expectedTemplate, TestHelpers.AsXmlCommentText(xmlFilePath)), actual);
+        }
+
+        [Fact]
+        [WorkItem(21348, "https://github.com/dotnet/roslyn/issues/21348")]
+        public void IncludedName_TypeParamAndTypeParamRefHandling()
+        {
+            var xml = @"
+<root>
+    <target>
+    Included section
+    <summary>
+      See <typeparam/>.
+      See <typeparam name=""X""/>.
+      See <typeparam name=""Y""/>.
+      See <typeparam name=""XY""/>.
+    </summary>
+    <remarks></remarks>
+    </target>
+    <target>
+    Included section
+    <summary>
+      See <typeparamref/>.
+      See <typeparamref name=""X""/>.
+      See <typeparamref name=""Y""/>.
+      See <typeparamref name=""XY""/>.
+    </summary>
+    <remarks></remarks>
+    </target>
+</root>
+";
+
+            var xmlFile = Temp.CreateFile(extension: ".xml").WriteAllText(xml);
+            var xmlFilePath = xmlFile.Path;
+
+            var includeElementTemplate = @"<include file='{0}' path='//target'/>";
+            string includeElement = string.Format(includeElementTemplate, xmlFilePath);
+
+            var sourceTemplate = @"
+
+/// {0}
+class OuterClass<X>
+{{
+    /// {0}
+    class InnerClass<Y>
+    {{
+        /// {0}
+        public void Foo() {{}}
+    }}
+}}
+";
+            var comp = CreateCompilationUtil(string.Format(sourceTemplate, includeElement));
+
+            var actual = GetDocumentationCommentText(comp, expectedDiagnostics: new[] {
+                // (3,5): warning CS1711: XML comment has a typeparam tag for 'Y', but there is no type parameter by that name
+                // /// <include file='b16c2dc7f738.xml' path='//target'/>
+                Diagnostic(ErrorCode.WRN_UnmatchedTypeParamTag, includeElement).WithArguments("Y").WithLocation(3, 5),
+                // (3,5): warning CS1711: XML comment has a typeparam tag for 'XY', but there is no type parameter by that name
+                // /// <include file='b16c2dc7f738.xml' path='//target'/>
+                Diagnostic(ErrorCode.WRN_UnmatchedTypeParamTag, includeElement).WithArguments("XY").WithLocation(3, 5),
+                // (3,5): warning CS1735: XML comment on 'OuterClass<X>' has a typeparamref tag for 'Y', but there is no type parameter by that name
+                // /// <include file='b16c2dc7f738.xml' path='//target'/>
+                Diagnostic(ErrorCode.WRN_UnmatchedTypeParamRefTag, includeElement).WithArguments("Y", "OuterClass<X>").WithLocation(3, 5),
+                // (3,5): warning CS1735: XML comment on 'OuterClass<X>' has a typeparamref tag for 'XY', but there is no type parameter by that name
+                // /// <include file='b16c2dc7f738.xml' path='//target'/>
+                Diagnostic(ErrorCode.WRN_UnmatchedTypeParamRefTag, includeElement).WithArguments("XY", "OuterClass<X>").WithLocation(3, 5),
+                // (6,9): warning CS1711: XML comment has a typeparam tag for 'X', but there is no type parameter by that name
+                //     /// <include file='b16c2dc7f738.xml' path='//target'/>
+                Diagnostic(ErrorCode.WRN_UnmatchedTypeParamTag, includeElement).WithArguments("X").WithLocation(6, 9),
+                // (6,9): warning CS1711: XML comment has a typeparam tag for 'XY', but there is no type parameter by that name
+                //     /// <include file='b16c2dc7f738.xml' path='//target'/>
+                Diagnostic(ErrorCode.WRN_UnmatchedTypeParamTag, includeElement).WithArguments("XY").WithLocation(6, 9),
+                // (6,9): warning CS1735: XML comment on 'OuterClass<X>.InnerClass<Y>' has a typeparamref tag for 'XY', but there is no type parameter by that name
+                //     /// <include file='b16c2dc7f738.xml' path='//target'/>
+                Diagnostic(ErrorCode.WRN_UnmatchedTypeParamRefTag, includeElement).WithArguments("XY", "OuterClass<X>.InnerClass<Y>").WithLocation(6, 9),
+                // (9,13): warning CS1711: XML comment has a typeparam tag for 'X', but there is no type parameter by that name
+                //         /// <include file='b16c2dc7f738.xml' path='//target'/>
+                Diagnostic(ErrorCode.WRN_UnmatchedTypeParamTag, includeElement).WithArguments("X").WithLocation(9, 13),
+                // (9,13): warning CS1711: XML comment has a typeparam tag for 'Y', but there is no type parameter by that name
+                //         /// <include file='b16c2dc7f738.xml' path='//target'/>
+                Diagnostic(ErrorCode.WRN_UnmatchedTypeParamTag, includeElement).WithArguments("Y").WithLocation(9, 13),
+                // (9,13): warning CS1711: XML comment has a typeparam tag for 'XY', but there is no type parameter by that name
+                //         /// <include file='b16c2dc7f738.xml' path='//target'/>
+                Diagnostic(ErrorCode.WRN_UnmatchedTypeParamTag, includeElement).WithArguments("XY").WithLocation(9, 13),
+                // (9,13): warning CS1735: XML comment on 'OuterClass<X>.InnerClass<Y>.Foo()' has a typeparamref tag for 'XY', but there is no type parameter by that name
+                //         /// <include file='b16c2dc7f738.xml' path='//target'/>
+                Diagnostic(ErrorCode.WRN_UnmatchedTypeParamRefTag, includeElement).WithArguments("XY", "OuterClass<X>.InnerClass<Y>.Foo()").WithLocation(9, 13)
+            });
+            var expected = (@"
+<?xml version=""1.0""?>
+<doc>
+    <assembly>
+        <name>Test</name>
+    </assembly>
+    <members>
+        <member name=""T:OuterClass`1"">
+            <target>
+    Included section
+    <summary>
+      See <typeparam />.
+      See <typeparam name=""X"" />.
+      See <typeparam name=""Y"" />.
+      See <typeparam name=""XY"" />.
+    </summary>
+    <remarks />
+    </target><target>
+    Included section
+    <summary>
+      See <typeparamref />.
+      See <typeparamref name=""X"" />.
+      See <typeparamref name=""Y"" />.
+      See <typeparamref name=""XY"" />.
+    </summary>
+    <remarks />
+    </target>
+        </member>
+        <member name=""T:OuterClass`1.InnerClass`1"">
+            <target>
+    Included section
+    <summary>
+      See <typeparam />.
+      See <typeparam name=""X"" />.
+      See <typeparam name=""Y"" />.
+      See <typeparam name=""XY"" />.
+    </summary>
+    <remarks />
+    </target><target>
+    Included section
+    <summary>
+      See <typeparamref />.
+      See <typeparamref name=""X"" />.
+      See <typeparamref name=""Y"" />.
+      See <typeparamref name=""XY"" />.
+    </summary>
+    <remarks />
+    </target>
+        </member>
+        <member name=""M:OuterClass`1.InnerClass`1.Foo"">
+            <target>
+    Included section
+    <summary>
+      See <typeparam />.
+      See <typeparam name=""X"" />.
+      See <typeparam name=""Y"" />.
+      See <typeparam name=""XY"" />.
+    </summary>
+    <remarks />
+    </target><target>
+    Included section
+    <summary>
+      See <typeparamref />.
+      See <typeparamref name=""X"" />.
+      See <typeparamref name=""Y"" />.
+      See <typeparamref name=""XY"" />.
+    </summary>
+    <remarks />
+    </target>
+        </member>
+    </members>
+</doc>
+        ").Trim();
+            Assert.Equal(expected, actual);
         }
 
         #endregion Included names
@@ -3783,7 +4024,7 @@ partial class C
 class C { }
 ";
 
-            var compilation = CreateCompilationWithMscorlibAndDocumentationComments(source);
+            var compilation = CreateCompilationUtil(source);
 
             var type = compilation.GlobalNamespace.GetMember<NamedTypeSymbol>("C");
             var actualText = DocumentationCommentCompiler.GetDocumentationCommentXml(type, processIncludes: true, cancellationToken: default(CancellationToken));
@@ -3819,7 +4060,7 @@ class C
 ";
             var source = string.Format(sourceTemplate, xmlFilePath);
 
-            var compilation = CreateCompilationWithMscorlibAndDocumentationComments(source);
+            var compilation = CreateCompilationUtil(source);
 
             var type = compilation.GlobalNamespace.GetMember<NamedTypeSymbol>("C");
 
@@ -3881,7 +4122,7 @@ partial class C
             var tree2 = SyntaxFactory.ParseSyntaxTree(source2, options: TestOptions.RegularWithDocumentationComments);
 
             // Files passed in order.
-            var comp = CreateCompilationWithMscorlib(new[] { tree1, tree2 }, assemblyName: "Test");
+            var comp = CreateCompilation(new[] { tree1, tree2 }, assemblyName: "Test");
 
             var actual1 = GetDocumentationCommentText(comp, null, filterTree: tree1, expectedDiagnostics: new[] {
                 // (4,20): warning CS1574: XML comment has cref attribute 'Bogus1' that could not be resolved
@@ -3932,7 +4173,7 @@ public class C
     static void Main() {}
 }
 ";
-            var comp = CreateCompilationWithMscorlibAndDocumentationComments(source);
+            var comp = CreateCompilationUtil(source);
             var actual = GetDocumentationCommentText(comp, "OutputName");
             var expected = (@"
 <?xml version=""1.0""?>
@@ -3950,7 +4191,7 @@ public class C
             Assert.Equal(expected, actual);
         }
 
-        [Fact, WorkItem(921838, "DevDiv")]
+        [Fact, WorkItem(921838, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/921838")]
         public void InaccessibleMembers()
         {
             var source =
@@ -3965,7 +4206,7 @@ class C
 {
     private void M() { }
 }";
-            var comp = CreateCompilationWithMscorlibAndDocumentationComments(source);
+            var comp = CreateCompilationUtil(source);
             var actual = GetDocumentationCommentText(comp, "OutputName");
             var expected = (@"
 <?xml version=""1.0""?>
@@ -3984,7 +4225,7 @@ class C
             Assert.Equal(expected, actual);
         }
 
-        [WorkItem(531144, "DevDiv")]
+        [WorkItem(531144, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/531144")]
         [Fact]
         public void NamespaceCref()
         {
@@ -3995,7 +4236,7 @@ public class C
     static void Main() {}
 }
 ";
-            var comp = CreateCompilationWithMscorlibAndDocumentationComments(source);
+            var comp = CreateCompilationUtil(source);
             var actual = GetDocumentationCommentText(comp);
             var expected = (@"
 <?xml version=""1.0""?>
@@ -4013,7 +4254,7 @@ public class C
             Assert.Equal(expected, actual);
         }
 
-        [WorkItem(531144, "DevDiv")]
+        [WorkItem(531144, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/531144")]
         [Fact]
         public void SymbolKinds()
         {
@@ -4053,7 +4294,7 @@ class Generic<T>
     }
 }
 ";
-            var comp = CreateCompilationWithMscorlibAndDocumentationComments(source);
+            var comp = CreateCompilationUtil(source);
             comp.VerifyDiagnostics(
 
                 // Cref parse warnings.
@@ -4132,7 +4373,7 @@ class Generic<T>
             Assert.Equal(expected, actual);
         }
 
-        [WorkItem(530695, "DevDiv")]
+        [WorkItem(530695, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/530695")]
         [Fact]
         public void FieldDocComment()
         {
@@ -4150,7 +4391,7 @@ class C
     event System.Action q, r;
 }
 ";
-            var comp = CreateCompilationWithMscorlibAndDocumentationComments(source);
+            var comp = CreateCompilationUtil(source);
             var actual = GetDocumentationCommentText(comp);
             var expected = (@"
 <?xml version=""1.0""?>
@@ -4183,7 +4424,7 @@ class C
             Assert.Equal(expected, actual);
         }
 
-        [WorkItem(530695, "DevDiv")]
+        [WorkItem(530695, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/530695")]
         [Fact]
         public void FieldDocCommentDiagnostics()
         {
@@ -4202,7 +4443,7 @@ class C
 }
 ";
             // Duplicate diagnostics, as in dev11.
-            var comp = CreateCompilationWithMscorlibAndDocumentationComments(source);
+            var comp = CreateCompilationUtil(source);
             var actual = GetDocumentationCommentText(comp,
                 // (4,20): warning CS1574: XML comment has cref attribute 'fake1' that could not be resolved
                 //     /// <see cref="fake1"/>
@@ -4253,7 +4494,7 @@ class C
             Assert.Equal(expected, actual);
         }
 
-        [WorkItem(531187, "DevDiv")]
+        [WorkItem(531187, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/531187")]
         [Fact]
         public void DelegateDocComments()
         {
@@ -4268,7 +4509,7 @@ class C
 /// <typeparamref name=""Q""/>
 delegate void D<T, U>(T t, U u);
 ";
-            var comp = CreateCompilationWithMscorlibAndDocumentationComments(source);
+            var comp = CreateCompilationUtil(source);
             var actual = GetDocumentationCommentText(comp,
                 // (3,18): warning CS1572: XML comment has a param tag for 'q', but there is no parameter by that name
                 // /// <param name="q"/>
@@ -4319,7 +4560,7 @@ public class C { }
 ";
             var tree = Parse(source, options: TestOptions.RegularWithDocumentationComments);
             var warnDict = new Dictionary<string, ReportDiagnostic> { { MessageProvider.Instance.GetIdForErrorCode((int)ErrorCode.WRN_MissingXMLComment), ReportDiagnostic.Suppress } };
-            var comp = CreateCompilationWithMscorlib(tree, options: TestOptions.ReleaseDll.WithSpecificDiagnosticOptions(warnDict), assemblyName: "Test");
+            var comp = CreateCompilation(tree, options: TestOptions.ReleaseDll.WithSpecificDiagnosticOptions(warnDict), assemblyName: "Test");
             comp.VerifyDiagnostics(); //NOTE: no WRN_MissingXMLComment
 
             var actual = GetDocumentationCommentText(comp,
@@ -4339,7 +4580,7 @@ public class C { }
             Assert.Equal(expected, actual);
         }
 
-        [WorkItem(531233, "DevDiv")]
+        [WorkItem(531233, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/531233")]
         [Fact]
         public void CrefAttributeInOtherElement()
         {
@@ -4352,7 +4593,7 @@ class C
     }
 }
 ";
-            var comp = CreateCompilationWithMscorlibAndDocumentationComments(source);
+            var comp = CreateCompilationUtil(source);
             comp.VerifyDiagnostics();
 
             var actual = GetDocumentationCommentText(comp);
@@ -4372,7 +4613,7 @@ class C
             Assert.Equal(expected, actual);
         }
 
-        [WorkItem(531233, "DevDiv")]
+        [WorkItem(531233, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/531233")]
         [Fact]
         public void NameAttributeInOtherElement()
         {
@@ -4385,7 +4626,7 @@ class C
     }
 }
 ";
-            var comp = CreateCompilationWithMscorlibAndDocumentationComments(source);
+            var comp = CreateCompilationUtil(source);
             comp.VerifyDiagnostics();
 
             var actual = GetDocumentationCommentText(comp);
@@ -4417,14 +4658,14 @@ class Program
     {
     }
 }";
-            var comp = CreateCompilationWithMscorlibAndDocumentationComments(source);
+            var comp = CreateCompilationUtil(source);
             Assert.NotEmpty(comp.GetParseDiagnostics());
             Assert.Empty(comp.GetDeclarationDiagnostics());
             Assert.Empty(comp.GetMethodBodyDiagnostics());
             Assert.NotEmpty(comp.GetDiagnostics());
         }
 
-        [WorkItem(531349, "DevDiv")]
+        [WorkItem(531349, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/531349")]
         [Fact]
         public void GetDeclarationDiagnostics()
         {
@@ -4439,14 +4680,14 @@ class Program
     {
     }
 }";
-            var comp = CreateCompilationWithMscorlibAndDocumentationComments(source);
+            var comp = CreateCompilationUtil(source);
             Assert.Empty(comp.GetParseDiagnostics());
             Assert.Empty(comp.GetDeclarationDiagnostics());
             Assert.Equal(2, comp.GetMethodBodyDiagnostics().Count());
             Assert.Equal(2, comp.GetDiagnostics().Count());
         }
 
-        [WorkItem(531409, "DevDiv")]
+        [WorkItem(531409, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/531409")]
         [Fact]
         public void ExplicitInterfaceImplementation()
         {
@@ -4462,7 +4703,7 @@ class C<T> : I<T>
     void I<T>.M() { }
 }
 ";
-            var comp = CreateCompilationWithMscorlibAndDocumentationComments(source);
+            var comp = CreateCompilationUtil(source);
             comp.VerifyDiagnostics();
 
             var actual = GetDocumentationCommentText(comp);
@@ -4492,7 +4733,7 @@ class C
     int[][,] M(int[,][] x) { return null; }
 }
 ";
-            var comp = CreateCompilationWithMscorlibAndDocumentationComments(source);
+            var comp = CreateCompilationUtil(source);
             comp.VerifyDiagnostics();
 
             var actual = GetDocumentationCommentText(comp);
@@ -4513,7 +4754,7 @@ class C
         }
 
         // As in dev11, the pragma has no effect.
-        [Fact]
+        [ClrOnlyFact(ClrOnlyReason.DocumentationComment, Skip = "https://github.com/dotnet/roslyn/issues/8807")]
         public void PragmaDisableWarningInXmlFile()
         {
             var xmlFile = Temp.CreateFile(extension: ".xml").WriteAllText("&");
@@ -4523,9 +4764,9 @@ class C
 /// <include file='{0}' path='element'/>
 class C {{ }}
 ";
-            var comp = CreateCompilationWithMscorlibAndDocumentationComments(string.Format(sourceTemplate, xmlFile.Path));
+            var comp = CreateCompilationUtil(string.Format(sourceTemplate, xmlFile.Path));
 
-            var actual = GetDocumentationCommentText(comp, /*ensureEnglishUICulture:*/ true,
+            var actual = GetDocumentationCommentText(comp,
                 // 054c2dcb7959.xml(1,1): warning CS1592: Badly formed XML in included comments file -- 'Data at the root level is invalid.'
                 Diagnostic(ErrorCode.WRN_XMLParseIncludeError).WithArguments("Data at the root level is invalid."));
             var expectedTemplate = (@"
@@ -4541,7 +4782,7 @@ class C {{ }}
     </members>
 </doc>
 ").Trim();
-            Assert.Equal(string.Format(expectedTemplate, xmlFile.Path), actual);
+            Assert.Equal(string.Format(expectedTemplate, TestHelpers.AsXmlCommentText(xmlFile.Path)), actual);
         }
 
         [Fact]
@@ -4570,7 +4811,7 @@ class C<T>
 ";
 
             SyntaxTree tree = Parse(source, options: TestOptions.RegularWithDocumentationComments);
-            var comp = CreateCompilationWithMscorlibAndSystemCore(new[] { tree }, assemblyName: "Test");
+            var comp = CreateCompilationWithMscorlib40AndSystemCore(new[] { tree }, assemblyName: "Test");
 
             var actualText = GetDocumentationCommentText(comp);
             var expectedText = @"
@@ -4596,7 +4837,7 @@ class C<T>
             Assert.Equal(expectedText, actualText);
         }
 
-        [WorkItem(546989, "DevDiv")]
+        [WorkItem(546989, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/546989")]
         [Fact]
         public void GenericMethodWithoutTypeParameters1()
         {
@@ -4619,7 +4860,7 @@ class C
     void M<T>(string x) { }
 }
 ";
-            var comp = CreateCompilationWithMscorlibAndDocumentationComments(source);
+            var comp = CreateCompilationUtil(source);
 
             var actual = GetDocumentationCommentText(comp,
                 // (2,16): warning CS0419: Ambiguous reference in cref attribute: 'M'. Assuming 'C.M(int)', but could have also matched other overloads including 'C.M(string)'.
@@ -4659,7 +4900,7 @@ class C
             Assert.Equal(expected, actual);
         }
 
-        [WorkItem(546989, "DevDiv")]
+        [WorkItem(546989, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/546989")]
         [Fact]
         public void GenericMethodWithoutTypeParameters2()
         {
@@ -4682,7 +4923,7 @@ class C
     void M<T, U>(string x) { }
 }
 ";
-            var comp = CreateCompilationWithMscorlibAndDocumentationComments(source);
+            var comp = CreateCompilationUtil(source);
 
             var actual = GetDocumentationCommentText(comp,
                 // (2,16): warning CS0419: Ambiguous reference in cref attribute: 'M'. Assuming 'C.M<T>(int)', but could have also matched other overloads including 'C.M<T>(string)'.
@@ -4728,7 +4969,7 @@ class C
             Assert.Equal(expected, actual);
         }
 
-        [WorkItem(546989, "DevDiv")]
+        [WorkItem(546989, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/546989")]
         [Fact]
         public void GenericMethodWithoutTypeParameters3()
         {
@@ -4749,7 +4990,7 @@ class C
     void N(string x) { }
 }
 ";
-            var comp = CreateCompilationWithMscorlibAndDocumentationComments(source);
+            var comp = CreateCompilationUtil(source);
 
             var actual = GetDocumentationCommentText(comp,
                 // (5,16): warning CS0419: Ambiguous reference in cref attribute: 'N'. Assuming 'C.N(int)', but could have also matched other overloads including 'C.N(string)'.
@@ -4776,7 +5017,7 @@ class C
             Assert.Equal(expected, actual);
         }
 
-        [WorkItem(547163, "DevDiv")]
+        [WorkItem(547163, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/547163")]
         [Fact]
         public void NestedGenericTypes()
         {
@@ -4795,7 +5036,7 @@ class A<TA1, TA2>
     }
 }
 ";
-            var comp = CreateCompilationWithMscorlibAndDocumentationComments(source);
+            var comp = CreateCompilationUtil(source);
 
             var actual = GetDocumentationCommentText(comp);
 
@@ -4822,7 +5063,7 @@ class A<TA1, TA2>
 /// <see cref=""   A   ""/>
 class A { }
 ";
-            var comp = CreateCompilationWithMscorlibAndDocumentationComments(source);
+            var comp = CreateCompilationUtil(source);
 
             var actual = GetDocumentationCommentText(comp);
 
@@ -4872,7 +5113,7 @@ class A<T>
     }
 }
 ";
-            var comp = CreateCompilationWithMscorlibAndDocumentationComments(source);
+            var comp = CreateCompilationUtil(source);
 
             var actual = GetDocumentationCommentText(comp);
 
@@ -4903,7 +5144,7 @@ class A<T>
             Assert.Equal(expected, actual);
         }
 
-        [WorkItem(527260, "DevDiv")]
+        [WorkItem(527260, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/527260")]
         [Fact]
         public void IllegalXmlCharacter()
         {
@@ -4911,7 +5152,7 @@ class A<T>
 /// <" + "\u037F" + @"/>
 class A { }
 ";
-            var comp = CreateCompilationWithMscorlibAndDocumentationComments(source);
+            var comp = CreateCompilationUtil(source);
 
             var actual = GetDocumentationCommentText(comp);
 
@@ -4929,8 +5170,9 @@ class A { }
             Assert.Equal(expected, actual);
         }
 
-        [WorkItem(547311, "DevDiv")]
-        [Fact]
+        [WorkItem(547311, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/547311")]
+        [ConditionalFact(typeof(ClrOnly), typeof(DesktopOnly))]
+        [WorkItem(18610, "https://github.com/dotnet/roslyn/issues/18610")]
         public void UndeclaredXmlNamespace()
         {
             var source = @"
@@ -4959,9 +5201,9 @@ class A { }
 /// </summary>
 class A { }
 ";
-            var comp = CreateCompilationWithMscorlibAndDocumentationComments(source);
+            var comp = CreateCompilationUtil(source);
 
-            var actual = GetDocumentationCommentText(comp, /*ensureEnglishUICulture:*/ true,
+            var actual = GetDocumentationCommentText(comp,
                 // (2,4): warning CS1570: XML comment has badly formed XML -- ''WpfUtils' is an undeclared prefix.'
                 // /// <summary>
                 Diagnostic(ErrorCode.WRN_XMLParseError, "").WithArguments("'WpfUtils' is an undeclared prefix."));
@@ -4980,7 +5222,7 @@ class A { }
             Assert.Equal(expected, actual);
         }
 
-        [WorkItem(551323, "DevDiv")]
+        [WorkItem(551323, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/551323")]
         [Fact]
         public void MultiLine_OneLinePlusEnding()
         {
@@ -4989,7 +5231,7 @@ class A { }
 */
 class C { }
 ";
-            var comp = CreateCompilationWithMscorlibAndDocumentationComments(source);
+            var comp = CreateCompilationUtil(source);
 
             var actual = GetDocumentationCommentText(comp);
 
@@ -5009,7 +5251,7 @@ class C { }
             Assert.Equal(expected, actual);
         }
 
-        [WorkItem(577385, "DevDiv")]
+        [WorkItem(577385, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/577385")]
         [Fact]
         public void FormatBeforeFinalParse()
         {
@@ -5035,7 +5277,7 @@ class C { }
 /// </remarks>
 class C { }
 ";
-            var comp = CreateCompilationWithMscorlibAndDocumentationComments(source);
+            var comp = CreateCompilationUtil(source);
 
             var actual = GetDocumentationCommentText(comp,
                 // (19,11): warning CS1574: XML comment has cref attribute 'SemanticModel.GetDeclaredSymbol(MemberDeclarationSyntax, CancellationToken)' that could not be resolved
@@ -5076,7 +5318,7 @@ class C { }
             Assert.Equal(expected, actual);
         }
 
-        [WorkItem(587126, "DevDiv")]
+        [WorkItem(587126, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/587126")]
         [Fact]
         public void DeclaringGenericTypeInReturnType()
         {
@@ -5084,7 +5326,7 @@ class C { }
 /// <see cref='System.Nullable{T}.op_Implicit'/>
 class C { }
 ";
-            var comp = CreateCompilationWithMscorlibAndDocumentationComments(source);
+            var comp = CreateCompilationUtil(source);
 
             var actual = GetDocumentationCommentText(comp);
 
@@ -5104,7 +5346,7 @@ class C { }
             Assert.Equal(expected, actual);
         }
 
-        [WorkItem(587126, "DevDiv")]
+        [WorkItem(587126, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/587126")]
         [Fact]
         public void DeclaringGenericTypeInParameterType1()
         {
@@ -5116,7 +5358,7 @@ class C<T>
     void M(T t, C<T> c, C<C<T>> cc) { }
 }
 ";
-            var comp = CreateCompilationWithMscorlibAndDocumentationComments(source);
+            var comp = CreateCompilationUtil(source);
 
             var actual = GetDocumentationCommentText(comp);
 
@@ -5137,7 +5379,7 @@ class C<T>
             Assert.Equal(expected, actual);
         }
 
-        [WorkItem(587126, "DevDiv")]
+        [WorkItem(587126, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/587126")]
         [Fact]
         public void DeclaringGenericTypeInParameterType2()
         {
@@ -5157,7 +5399,7 @@ class B<U>
     }
 }
 ";
-            var comp = CreateCompilationWithMscorlibAndDocumentationComments(source);
+            var comp = CreateCompilationUtil(source);
 
             var actual = GetDocumentationCommentText(comp);
 
@@ -5180,7 +5422,7 @@ class B<U>
             Assert.Equal(expected, actual);
         }
 
-        [WorkItem(552379, "DevDiv")]
+        [WorkItem(552379, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/552379")]
         [Fact]
         public void MultipleDocComments()
         {
@@ -5203,7 +5445,7 @@ public partial class C { }
 /// Single line 2.
 public partial class C { }
 ";
-            var comp = CreateCompilationWithMscorlibAndDocumentationComments(source);
+            var comp = CreateCompilationUtil(source);
 
             var actual = GetDocumentationCommentText(comp);
 
@@ -5236,7 +5478,7 @@ public partial class C { }
             Assert.Equal(expected, actual);
         }
 
-        [WorkItem(552379, "DevDiv")]
+        [WorkItem(552379, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/552379")]
         [Fact]
         public void MultipleDocComments_Separated()
         {
@@ -5268,7 +5510,7 @@ public class D { }
 /** Multiline 2. */
 public class E { }
 ";
-            var comp = CreateCompilationWithMscorlibAndDocumentationComments(source);
+            var comp = CreateCompilationUtil(source);
 
             var actual = GetDocumentationCommentText(comp,
                 // (2,1): warning CS1587: XML comment is not placed on a valid language element
@@ -5313,7 +5555,7 @@ public class E { }
             Assert.Equal(expected, actual);
         }
 
-        [WorkItem(552379, "DevDiv")]
+        [WorkItem(552379, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/552379")]
         [Fact]
         public void MultipleDocComments_SplitXml()
         {
@@ -5322,7 +5564,7 @@ public class E { }
 /** </tag> */
 public class A { }
 ";
-            var comp = CreateCompilationWithMscorlibAndDocumentationComments(source);
+            var comp = CreateCompilationUtil(source);
 
             var actual = GetDocumentationCommentText(comp);
 
@@ -5342,7 +5584,7 @@ public class A { }
             Assert.Equal(expected, actual);
         }
 
-        [WorkItem(689497, "DevDiv")]
+        [WorkItem(689497, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/689497")]
         [Fact]
         public void TriviaBetweenDocCommentAndDeclaration()
         {
@@ -5358,7 +5600,7 @@ public class A { }
 #endregion
 public class A { }
 ";
-            var comp = CreateCompilationWithMscorlibAndDocumentationComments(source);
+            var comp = CreateCompilationUtil(source);
 
             var actual = GetDocumentationCommentText(comp);
 
@@ -5378,7 +5620,7 @@ public class A { }
             Assert.Equal(expected, actual);
         }
 
-        [WorkItem(703368, "DevDiv")]
+        [WorkItem(703368, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/703368")]
         [Fact]
         public void NonGenericBeatsGeneric()
         {
@@ -5390,7 +5632,7 @@ public class C
     void M<T>(string s) { }
 }
 ";
-            var comp = CreateCompilationWithMscorlibAndDocumentationComments(source);
+            var comp = CreateCompilationUtil(source);
 
             var actual = GetDocumentationCommentText(comp);
 
@@ -5410,7 +5652,7 @@ public class C
             Assert.Equal(expected, actual);
         }
 
-        [WorkItem(703587, "DevDiv")]
+        [WorkItem(703587, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/703587")]
         [Fact]
         public void ObjectMemberViaInterface()
         {
@@ -5426,7 +5668,7 @@ public class C : IEquatable<C>
 }
 
 ";
-            var comp = CreateCompilationWithMscorlibAndDocumentationComments(source);
+            var comp = CreateCompilationUtil(source);
 
             var actual = GetDocumentationCommentText(comp,
                 // (7,31): warning CS1574: XML comment has cref attribute 'IEquatable{T}.GetHashCode' that could not be resolved
@@ -5453,8 +5695,8 @@ public class C : IEquatable<C>
             Assert.Equal(expected, actual);
         }
 
-        [WorkItem(531505, "DevDiv")]
-        [Fact]
+        [WorkItem(531505, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/531505")]
+        [ClrOnlyFact]
         public void Pia()
         {
             var source = @"
@@ -5491,7 +5733,7 @@ public class C { }
             // Don't embed.
             {
                 var reference = TestReferences.SymbolsTests.NoPia.GeneralPia.WithEmbedInteropTypes(false);
-                var comp = CreateCompilationWithMscorlibAndDocumentationComments(source, new[] { reference });
+                var comp = CreateCompilationUtil(source, new[] { reference });
                 var actual = GetDocumentationCommentText(comp);
                 Assert.Equal(expected, actual);
 
@@ -5501,7 +5743,7 @@ public class C { }
             // Do embed.
             {
                 var reference = TestReferences.SymbolsTests.NoPia.GeneralPia.WithEmbedInteropTypes(true);
-                var comp = CreateCompilationWithMscorlibAndDocumentationComments(source, new[] { reference });
+                var comp = CreateCompilationUtil(source, new[] { reference });
                 var actual = GetDocumentationCommentText(comp);
                 Assert.Equal(expected, actual);
 
@@ -5509,7 +5751,7 @@ public class C { }
             }
         }
 
-        [WorkItem(757110, "DevDiv")]
+        [WorkItem(757110, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/757110")]
         [Fact]
         public void NoAssemblyElementForNetModule()
         {
@@ -5517,7 +5759,7 @@ public class C { }
 /// <summary>Text</summary>
 public class C { }
 ";
-            var comp = CreateCompilationWithMscorlibAndDocumentationComments(source, options: TestOptions.ReleaseModule);
+            var comp = CreateCompilationUtil(source, options: TestOptions.ReleaseModule);
             var actual = GetDocumentationCommentText(comp);
             var expected = @"
 <?xml version=""1.0""?>
@@ -5532,7 +5774,7 @@ public class C { }
             Assert.Equal(expected, actual);
         }
 
-        [WorkItem(743425, "DevDiv")]
+        [WorkItem(743425, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/743425")]
         [Fact]
         public void WRN_UnqualifiedNestedTypeInCref()
         {
@@ -5551,7 +5793,7 @@ class C<T>
     void N() { }
 }
 ";
-            var comp = CreateCompilationWithMscorlibAndDocumentationComments(source);
+            var comp = CreateCompilationUtil(source);
             var actual = GetDocumentationCommentText(comp,
                 // (12,27): warning CS8018: Within cref attributes, nested types of generic types should be qualified.
                 //     /// <see cref="C{Q}.M(Inner)"/>
@@ -5579,7 +5821,7 @@ class C<T>
             Assert.Equal(expected, actual);
         }
 
-        [WorkItem(743425, "DevDiv")]
+        [WorkItem(743425, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/743425")]
         [Fact]
         public void WRN_UnqualifiedNestedTypeInCref_Buried()
         {
@@ -5595,7 +5837,7 @@ class C<T>
     void N() { }
 }
 ";
-            var comp = CreateCompilationWithMscorlibAndDocumentationComments(source);
+            var comp = CreateCompilationUtil(source);
             var actual = GetDocumentationCommentText(comp,
                 // (8,27): warning CS8018: Within cref attributes, nested types of generic types should be qualified.
                 //     /// <see cref="C{Q}.M(C{Inner[]})"/>
@@ -5620,7 +5862,7 @@ class C<T>
             Assert.Equal(expected, actual);
         }
 
-        [WorkItem(743425, "DevDiv")]
+        [WorkItem(743425, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/743425")]
         [Fact]
         public void WRN_UnqualifiedNestedTypeInCref_Generic()
         {
@@ -5636,7 +5878,7 @@ class C<T>
     void N() { }
 }
 ";
-            var comp = CreateCompilationWithMscorlibAndDocumentationComments(source);
+            var comp = CreateCompilationUtil(source);
             var actual = GetDocumentationCommentText(comp,
                 // (9,27): warning CS8018: Within cref attributes, nested types of generic types should be qualified.
                 //     /// <see cref="C{Q}.M(Inner{int})"/>
@@ -5675,13 +5917,14 @@ public class C {} // CS1587
 
             var tree = Parse(source, options: TestOptions.RegularWithDocumentationComments);
             var compOptions = TestOptions.ReleaseDll.WithGeneralDiagnosticOption(ReportDiagnostic.Error);
-            CreateCompilationWithMscorlib(tree, options: compOptions).VerifyDiagnostics(
+            CreateCompilation(tree, options: compOptions).VerifyDiagnostics(
                 // (2,14): error CS1591: Warning as Error: Missing XML comment for publicly visible type or member 'C'
                 // public class C {} // CS1587
                 Diagnostic(ErrorCode.WRN_MissingXMLComment, "C").WithArguments("C").WithWarningAsError(true));
         }
 
-        [Fact]
+        [ConditionalFact(typeof(ClrOnly), typeof(DesktopOnly))]
+        [WorkItem(18610, "https://github.com/dotnet/roslyn/issues/18610")]
         public void Dev11_303769()
         {
             // XML processing instructions
@@ -5691,8 +5934,8 @@ public class C {} // CS1587
 /// </summary>
 class C { }
 ";
-            var comp = CreateCompilationWithMscorlibAndDocumentationComments(source);
-            var actual = GetDocumentationCommentText(comp, /*ensureEnglishUICulture:*/ true,
+            var comp = CreateCompilationUtil(source);
+            var actual = GetDocumentationCommentText(comp,
                 // (2,4): warning CS1570: XML comment has badly formed XML -- 'The ':' character, hexadecimal value 0x3A, cannot be included in a name.'
                 // /// <summary>
                 Diagnostic(ErrorCode.WRN_XMLParseError, "").WithArguments("The ':' character, hexadecimal value 0x3A, cannot be included in a name."));
@@ -5727,7 +5970,7 @@ class Program
     public static void main() { }
 }
 ";
-            var comp = CreateCompilationWithMscorlibAndDocumentationComments(source);
+            var comp = CreateCompilationUtil(source);
             var actual = GetDocumentationCommentText(comp);
             var expected = @"
 <?xml version=""1.0""?>
@@ -5786,7 +6029,7 @@ class Program
 public class C {{ }}
 ";
 
-            var comp = CreateCompilationWithMscorlibAndDocumentationComments(string.Format(sourceTemplate, xmlFilePath));
+            var comp = CreateCompilationUtil(string.Format(sourceTemplate, xmlFilePath));
             var actual = GetDocumentationCommentText(comp);
             var expected = @"
 <?xml version=""1.0""?>
@@ -5831,7 +6074,7 @@ namespace Demo
     }
 }
 ";
-            var comp = CreateCompilationWithMscorlibAndDocumentationComments(source);
+            var comp = CreateCompilationUtil(source);
             var actual = GetDocumentationCommentText(comp,
                 // (4,18): warning CS1591: Missing XML comment for publicly visible type or member 'Demo.Example'
                 //     public class Example
@@ -5852,7 +6095,8 @@ namespace Demo
             Assert.Equal(expected, actual);
         }
 
-        [Fact]
+        [ConditionalFact(typeof(ClrOnly), typeof(DesktopOnly))]
+        [WorkItem(18610, "https://github.com/dotnet/roslyn/issues/18610")]
         public void Dev11_142553()
         {
             // Need to cache XML files.
@@ -5871,7 +6115,7 @@ namespace Demo
 class C { }
 ";
 
-            CreateCompilationWithMscorlibAndDocumentationComments(source).VerifyDiagnostics();
+            CreateCompilationUtil(source).VerifyDiagnostics();
             Assert.InRange(DocumentationCommentIncludeCache.CacheMissCount, 1, 2); //Not none, not all.
         }
 
@@ -5887,7 +6131,7 @@ class C { }
 class C { }
 ";
 
-            CreateCompilationWithMscorlibAndDocumentationComments(source).VerifyDiagnostics(
+            CreateCompilationUtil(source).VerifyDiagnostics(
                 // (2,5): warning CS1589: Unable to include XML fragment 'hello' of file '' -- Unable to find the specified file.
                 Diagnostic(ErrorCode.WRN_FailedInclude,
                 @"<include file='file://" + xmlFile.Path + @"' path='hello'/>").
@@ -5911,7 +6155,7 @@ class C { }
 class C { }
 ";
 
-            var comp = CreateCompilationWithMscorlib(
+            var comp = CreateCompilation(
                 Parse(source, options: TestOptions.RegularWithDocumentationComments, filename: sourcePath),
                 options: TestOptions.ReleaseDll.WithSourceReferenceResolver(SourceFileResolver.Default).WithXmlReferenceResolver(XmlFileResolver.Default),
                 assemblyName: "Test");
@@ -5933,7 +6177,8 @@ class C { }
             Assert.Equal(expected, actual);
         }
 
-        [Fact]
+        [ConditionalFact(typeof(ClrOnly), typeof(DesktopOnly))]
+        [WorkItem(18610, "https://github.com/dotnet/roslyn/issues/18610")]
         public void DtdDenialOfService()
         {
             var xmlFile = Temp.CreateFile(extension: ".xml").WriteAllText(
@@ -5956,7 +6201,7 @@ class C { }
 class C { }
 ";
 
-            CreateCompilationWithMscorlibAndDocumentationComments(source).GetDiagnostics().VerifyWithFallbackToErrorCodeOnlyForNonEnglish(
+            CreateCompilationUtil(source).GetDiagnostics().VerifyWithFallbackToErrorCodeOnlyForNonEnglish(
                 Diagnostic(ErrorCode.WRN_XMLParseIncludeError).WithArguments("For security reasons DTD is prohibited in this XML document. To enable DTD processing set the DtdProcessing property on XmlReaderSettings to Parse and pass the settings into XmlReader.Create method.").WithLocation(1, 1));
         }
 
@@ -5978,7 +6223,7 @@ class C { }
 <typeparam name=""TComparator"">The type of comparator used to compare items during the search operation.</typeparam>
 <param name=""array"">The sorted array to search.</param>
 <param name=""value"">The object to search for.</param>
-<returns>If found, the index of the specified value in the given array. Otheriwse, if not found, and the value is less than one or more items in the array, a negative number which is the bitwise complement of the index of the first item that is larger than the given value. If the value is not found and it is greater than any of the items in the array, a negative number which is the bitwise complement of (the index of the last item plus 1).</returns>
+<returns>If found, the index of the specified value in the given array. Otherwise, if not found, and the value is less than one or more items in the array, a negative number which is the bitwise complement of the index of the first item that is larger than the given value. If the value is not found and it is greater than any of the items in the array, a negative number which is the bitwise complement of (the index of the last item plus 1).</returns>
 </doc>
 <doc name=""ArrayExtensions.BinarySearch(ArrayType,T)"">
 <include file=""{0}"" path=""docs/doc[@name='ArrayExtensions.BinarySearchCore']/*"" />
@@ -6014,7 +6259,7 @@ class C
 }}
 ";
 
-            var comp = CreateCompilationWithMscorlibAndDocumentationComments(string.Format(sourceTemplate, includeElement));
+            var comp = CreateCompilationUtil(string.Format(sourceTemplate, includeElement));
             var actual = GetDocumentationCommentText(comp,
                 // (2,5): warning CS1711: XML comment has a typeparam tag for 'T', but there is no type parameter by that name
                 // /// <include file="52f50b557f3d.xml" path="docs/doc[@name=&quot;ArrayExtensions.BinarySearch(ArrayType,T)&quot;]/*"/>
@@ -6039,7 +6284,7 @@ class C
             <overloads>Searches a sorted array for a value using a binary search algorithm.</overloads><typeparam name=""T"">" +
             @"The type of items in the array.</typeparam><typeparam name=""TComparator"">The type of comparator used to compare " +
             @"items during the search operation.</typeparam><param name=""array"">The sorted array to search.</param><param name=""value"">" +
-            @"The object to search for.</param><returns>If found, the index of the specified value in the given array. Otheriwse, if not " +
+            @"The object to search for.</param><returns>If found, the index of the specified value in the given array. Otherwise, if not " +
             @"found, and the value is less than one or more items in the array, a negative number which is the bitwise complement of the " +
             @"index of the first item that is larger than the given value. If the value is not found and it is greater than any of the items " +
             @"in the array, a negative number which is the bitwise complement of (the index of the last item plus 1).</returns>
@@ -6062,7 +6307,7 @@ class C
     public void M(int x) { }
 }
 ";
-            var comp = CreateCompilationWithMscorlibAndDocumentationComments(source);
+            var comp = CreateCompilationUtil(source);
             var actual = GetDocumentationCommentText(comp,
                 // (2,16): warning CS0419: Ambiguous reference in cref attribute: 'M'. Assuming 'C.M(char)', but could have also matched other overloads including 'C.M(int)'.
                 // /// <see cref='M'/>
@@ -6097,7 +6342,7 @@ class Module1
     public static void Main() { }
 }
 ";
-            var comp = CreateCompilationWithMscorlibAndDocumentationComments(source);
+            var comp = CreateCompilationUtil(source);
             comp.VerifyDiagnostics(
                 // (7,18): warning CS1570: XML comment has badly formed XML -- 'An identifier was expected.'
                 //     ///<remarks><</remarks>
@@ -6118,5 +6363,65 @@ class Module1
         }
 
         #endregion Dev10 bugs
+
+        [ClrOnlyFact]
+        [WorkItem(1115058, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/1115058")]
+        public void UnterminatedElement()
+        {
+            var source = @"
+class Module1
+{
+    ///<summary>
+    /// Something
+    ///<summary>
+    static void Main()
+    {
+        System.Console.WriteLine(""Here"");
+    }
+}";
+            var comp = CreateCompilationUtil(source, options: TestOptions.ReleaseExe);
+
+            CompileAndVerify(comp, expectedOutput: "Here").VerifyDiagnostics(
+    // (7,1): warning CS1570: XML comment has badly formed XML -- 'Expected an end tag for element 'summary'.'
+    //     static void Main()
+    Diagnostic(ErrorCode.WRN_XMLParseError, "").WithArguments("summary").WithLocation(7, 1),
+    // (7,1): warning CS1570: XML comment has badly formed XML -- 'Expected an end tag for element 'summary'.'
+    //     static void Main()
+    Diagnostic(ErrorCode.WRN_XMLParseError, "").WithArguments("summary").WithLocation(7, 1)
+                );
+        }
+
+        /// <summary>
+        /// "--" is not valid within an XML comment.
+        /// </summary>
+        [WorkItem(8807, "https://github.com/dotnet/roslyn/issues/8807")]
+        [ConditionalFact(typeof(ClrOnly), typeof(DesktopOnly))]
+        [WorkItem(18610, "https://github.com/dotnet/roslyn/issues/18610")]
+        public void IncludeErrorDashDashInName()
+        {
+            var dir = Temp.CreateDirectory();
+            var path = dir.Path;
+            var xmlFile = dir.CreateFile("---.xml").WriteAllText(@"<summary attrib="""" attrib=""""/>");
+            var source =
+$@"/// <include file='{Path.Combine(path, "---.xml")}' path='//summary'/>
+class C {{ }}";
+            var comp = CreateCompilationUtil(source);
+            var actual = GetDocumentationCommentText(comp,
+                // warning CS1592: Badly formed XML in included comments file -- ''attrib' is a duplicate attribute name.'
+                Diagnostic(ErrorCode.WRN_XMLParseIncludeError).WithArguments("'attrib' is a duplicate attribute name.").WithLocation(1, 1));
+            var expected =
+$@"<?xml version=""1.0""?>
+<doc>
+    <assembly>
+        <name>Test</name>
+    </assembly>
+    <members>
+        <member name=""T:C"">
+            <!-- Badly formed XML file ""{Path.Combine(TestHelpers.AsXmlCommentText(path), "- - -.xml")}"" cannot be included -->
+        </member>
+    </members>
+</doc>";
+            Assert.Equal(expected, actual);
+        }
     }
 }

@@ -1,4 +1,8 @@
-﻿// Copyright (c) Microsoft.  All Rights Reserved.  Licensed under the Apache License, Version 2.0.  See License.txt in the project root for license information.
+﻿// Licensed to the .NET Foundation under one or more agreements.
+// The .NET Foundation licenses this file to you under the MIT license.
+// See the LICENSE file in the project root for more information.
+
+#nullable disable
 
 using System.Collections.Generic;
 using System.Collections.Immutable;
@@ -6,8 +10,7 @@ using Roslyn.Utilities;
 
 namespace Microsoft.CodeAnalysis.SymbolDisplay
 {
-    internal abstract partial class AbstractSymbolDisplayVisitor<TSemanticModel> : SymbolVisitor
-        where TSemanticModel : SemanticModel
+    internal abstract partial class AbstractSymbolDisplayVisitor : SymbolVisitor
     {
         protected abstract bool ShouldRestrictMinimallyQualifyLookupToNamespacesAndTypes();
 
@@ -92,30 +95,37 @@ namespace Microsoft.CodeAnalysis.SymbolDisplay
 
         protected static ITypeSymbol GetSymbolType(ISymbol symbol)
         {
-            if (symbol is ILocalSymbol)
+            var localSymbol = symbol as ILocalSymbol;
+            if (localSymbol != null)
             {
-                return ((ILocalSymbol)symbol).Type;
+                return localSymbol.Type;
             }
-            else if (symbol is IFieldSymbol)
+
+            var fieldSymbol = symbol as IFieldSymbol;
+            if (fieldSymbol != null)
             {
-                return ((IFieldSymbol)symbol).Type;
+                return fieldSymbol.Type;
             }
-            else if (symbol is IPropertySymbol)
+
+            var propertySymbol = symbol as IPropertySymbol;
+            if (propertySymbol != null)
             {
-                return ((IPropertySymbol)symbol).Type;
+                return propertySymbol.Type;
             }
-            else if (symbol is IParameterSymbol)
+
+            var parameterSymbol = symbol as IParameterSymbol;
+            if (parameterSymbol != null)
             {
-                return ((IParameterSymbol)symbol).Type;
+                return parameterSymbol.Type;
             }
-            else if (symbol is IAliasSymbol)
+
+            var aliasSymbol = symbol as IAliasSymbol;
+            if (aliasSymbol != null)
             {
-                return ((IAliasSymbol)symbol).Target as ITypeSymbol;
+                return aliasSymbol.Target as ITypeSymbol;
             }
-            else
-            {
-                return symbol as ITypeSymbol;
-            }
+
+            return symbol as ITypeSymbol;
         }
     }
 }

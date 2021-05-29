@@ -1,16 +1,18 @@
-// Copyright (c) Microsoft.  All Rights Reserved.  Licensed under the Apache License, Version 2.0.  See License.txt in the project root for license information.
+﻿// Licensed to the .NET Foundation under one or more agreements.
+// The .NET Foundation licenses this file to you under the MIT license.
+// See the LICENSE file in the project root for more information.
+
+#nullable disable
 
 using System;
-using System.Collections.Generic;
+using System.Collections.Immutable;
 using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.CodeAnalysis.CodeGeneration;
-using Microsoft.CodeAnalysis.CSharp;
 using Microsoft.CodeAnalysis.CSharp.Extensions;
 using Microsoft.CodeAnalysis.CSharp.Syntax;
 using Microsoft.CodeAnalysis.Editing;
-using Microsoft.CodeAnalysis.Editor.Commands;
 using Microsoft.CodeAnalysis.Editor.Shared.Extensions;
 using Microsoft.CodeAnalysis.Editor.Shared.Options;
 using Microsoft.CodeAnalysis.Formatting;
@@ -20,18 +22,20 @@ using Microsoft.CodeAnalysis.Shared.Extensions;
 using Microsoft.CodeAnalysis.Simplification;
 using Microsoft.CodeAnalysis.Text;
 using Microsoft.CodeAnalysis.Text.Shared.Extensions;
+using Microsoft.VisualStudio.Commanding;
 using Microsoft.VisualStudio.Text;
 using Microsoft.VisualStudio.Text.Editor;
+using Microsoft.VisualStudio.Text.Editor.Commanding.Commands;
 using Roslyn.Utilities;
 
 namespace Microsoft.CodeAnalysis.Editor.CSharp.EventHookup
 {
-    internal partial class EventHookupCommandHandler : ICommandHandler<TabKeyCommandArgs>
+    internal partial class EventHookupCommandHandler : IChainedCommandHandler<TabKeyCommandArgs>
     {
-        public void ExecuteCommand(TabKeyCommandArgs args, Action nextHandler)
+        public void ExecuteCommand(TabKeyCommandArgs args, Action nextHandler, CommandExecutionContext cotext)
         {
             AssertIsForeground();
-            if (!args.SubjectBuffer.GetOption(InternalFeatureOnOffOptions.EventHookup))
+            if (!args.SubjectBuffer.GetFeatureOnOffOption(InternalFeatureOnOffOptions.EventHookup))
             {
                 nextHandler();
                 return;
@@ -94,14 +98,6 @@ namespace Microsoft.CodeAnalysis.Editor.CSharp.EventHookup
                 return;
             }
 
-            // If QuickInfoSession is null, then Tab was pressed before the background task
-            // finished (that is, the Wait call above actually needed to wait). Since we know an
-            // event hookup was found, we should set everything up now because the background task 
-            // will not have a chance to set things up until after this Tab has been handled, and
-            // by then it's too late. When the background task alerts that it found an event hookup
-            // nothing will change because QuickInfoSession will already be set.
-            EventHookupSessionManager.EventHookupFoundInSession(EventHookupSessionManager.CurrentSession);
-
             // This tab means we should generate the event handler method. Begin the code
             // generation process.
             GenerateAndAddEventHandler(textView, subjectBuffer, eventHandlerMethodName, nextHandler, cancellationToken);
@@ -123,37 +119,26 @@ namespace Microsoft.CodeAnalysis.Editor.CSharp.EventHookup
                     return;
                 }
 
-                Document document = textView.TextSnapshot.GetOpenDocumentInCurrentContextWithChanges();
-                if (document == null)
-                {
-                    Contract.Fail("Event Hookup could not find the document for the IBufferView.");
-                }
+                var document = textView.TextSnapshot.GetOpenDocumentInCurrentContextWithChanges();
+                Contract.ThrowIfNull(document, "Event Hookup could not find the document for the IBufferView.");
 
                 var position = textView.GetCaretPoint(subjectBuffer).Value.Position;
-                int plusEqualTokenEndPosition;
-
                 var solutionWithEventHandler = CreateSolutionWithEventHandler(
                     document,
                     eventHandlerMethodName,
                     position,
-                    out plusEqualTokenEndPosition,
+                    out var plusEqualTokenEndPosition,
                     cancellationToken);
 
-                if (solutionWithEventHandler == null)
-                {
-                    Contract.Fail("Event Hookup could not create solution with event handler.");
-                }
+                Contract.ThrowIfNull(solutionWithEventHandler, "Event Hookup could not create solution with event handler.");
 
                 // The new solution is created, so start user observable changes
 
-                if (!workspace.TryApplyChanges(solutionWithEventHandler))
-                {
-                    Contract.Fail("Event Hookup could not update the solution.");
-                }
+                Contract.ThrowIfFalse(workspace.TryApplyChanges(solutionWithEventHandler), "Event Hookup could not update the solution.");
 
                 // The += token will not move during this process, so it is safe to use that
                 // position as a location from which to find the identifier we're renaming.
-                BeginInlineRename(workspace, textView, subjectBuffer, plusEqualTokenEndPosition, cancellationToken);
+                BeginInlineRename(textView, plusEqualTokenEndPosition, cancellationToken);
             }
         }
 
@@ -179,43 +164,56 @@ namespace Microsoft.CodeAnalysis.Editor.CSharp.EventHookup
                 return null;
             }
 
-            var simplifiedDocument = Simplifier.ReduceAsync(documentWithNameAndAnnotationsAdded.WithSyntaxRoot(updatedRoot), Simplifier.Annotation, null, cancellationToken).WaitAndGetResult(cancellationToken);
+            var simplifiedDocument = Simplifier.ReduceAsync(documentWithNameAndAnnotationsAdded.WithSyntaxRoot(updatedRoot), Simplifier.Annotation, cancellationToken: cancellationToken).WaitAndGetResult(cancellationToken);
             var formattedDocument = Formatter.FormatAsync(simplifiedDocument, Formatter.Annotation, cancellationToken: cancellationToken).WaitAndGetResult(cancellationToken);
 
-            plusEqualTokenEndPosition = formattedDocument
-                .GetCSharpSyntaxRootAsync(cancellationToken).WaitAndGetResult(cancellationToken)
-                .GetAnnotatedNodesAndTokens(plusEqualsTokenAnnotation)
-                .Single().Span.End;
+            var newRoot = formattedDocument.GetSyntaxRootSynchronously(cancellationToken);
+            plusEqualTokenEndPosition = newRoot.GetAnnotatedNodesAndTokens(plusEqualsTokenAnnotation)
+                                               .Single().Span.End;
 
-            return document.Project.Solution.WithDocumentText(formattedDocument.Id, formattedDocument.GetTextAsync(cancellationToken).WaitAndGetResult(cancellationToken));
+            return document.Project.Solution.WithDocumentText(
+                formattedDocument.Id, formattedDocument.GetTextSynchronously(cancellationToken));
         }
 
-        private Document AddMethodNameAndAnnotationsToSolution(
+        private static Document AddMethodNameAndAnnotationsToSolution(
             Document document,
             string eventHandlerMethodName,
             int position,
             SyntaxAnnotation plusEqualsTokenAnnotation,
             CancellationToken cancellationToken)
         {
-            // Perform a textual insertion of the event handler method name
+            // First find the event hookup to determine if we are in a static context.
+            var root = document.GetSyntaxRootSynchronously(cancellationToken);
+            var plusEqualsToken = root.FindTokenOnLeftOfPosition(position);
+            var eventHookupExpression = plusEqualsToken.GetAncestor<AssignmentExpressionSyntax>();
 
-            var textChange = new TextChange(new TextSpan(position, 0), eventHandlerMethodName + ";");
-            var newText = document.GetTextAsync(cancellationToken).WaitAndGetResult(cancellationToken).WithChanges(textChange);
+            var textToInsert = eventHandlerMethodName + ";";
+            if (!eventHookupExpression.IsInStaticContext())
+            {
+                // This will be simplified later if it's not needed.
+                textToInsert = "this." + textToInsert;
+            }
+
+            // Next, perform a textual insertion of the event handler method name.
+            var textChange = new TextChange(new TextSpan(position, 0), textToInsert);
+            var newText = document.GetTextSynchronously(cancellationToken).WithChanges(textChange);
             var documentWithNameAdded = document.WithText(newText);
 
-            var syntaxTree = documentWithNameAdded.GetCSharpSyntaxTreeAsync(cancellationToken).WaitAndGetResult(cancellationToken);
-            var plusEqualsToken = syntaxTree.FindTokenOnLeftOfPosition(position, cancellationToken);
-            var eventHookupExpression = plusEqualsToken.GetAncestor<AssignmentExpressionSyntax>();
+            // Now find the event hookup again to add the appropriate annotations.
+            root = documentWithNameAdded.GetSyntaxRootSynchronously(cancellationToken);
+            plusEqualsToken = root.FindTokenOnLeftOfPosition(position);
+            eventHookupExpression = plusEqualsToken.GetAncestor<AssignmentExpressionSyntax>();
 
             var updatedEventHookupExpression = eventHookupExpression
                 .ReplaceToken(plusEqualsToken, plusEqualsToken.WithAdditionalAnnotations(plusEqualsTokenAnnotation))
-                .WithAdditionalAnnotations(Formatter.Annotation, Simplifier.Annotation);
+                .WithRight(eventHookupExpression.Right.WithAdditionalAnnotations(Simplifier.Annotation))
+                .WithAdditionalAnnotations(Formatter.Annotation);
 
-            var rootWithUpdatedEventHookupExpression = syntaxTree.GetRoot(cancellationToken).ReplaceNode(eventHookupExpression, updatedEventHookupExpression);
+            var rootWithUpdatedEventHookupExpression = root.ReplaceNode(eventHookupExpression, updatedEventHookupExpression);
             return documentWithNameAdded.WithSyntaxRoot(rootWithUpdatedEventHookupExpression);
         }
 
-        private SyntaxNode AddGeneratedHandlerMethodToSolution(
+        private static SyntaxNode AddGeneratedHandlerMethodToSolution(
             SemanticDocument document,
             string eventHandlerMethodName,
             SyntaxAnnotation plusEqualsTokenAnnotation,
@@ -238,13 +236,13 @@ namespace Microsoft.CodeAnalysis.Editor.CSharp.EventHookup
             return root.ReplaceNode(typeDecl, typeDeclWithMethodAdded);
         }
 
-        private IMethodSymbol GetMethodSymbol(
-            SemanticDocument document,
+        private static IMethodSymbol GetMethodSymbol(
+            SemanticDocument semanticDocument,
             string eventHandlerMethodName,
             AssignmentExpressionSyntax eventHookupExpression,
             CancellationToken cancellationToken)
         {
-            var semanticModel = document.SemanticModel as SemanticModel;
+            var semanticModel = semanticDocument.SemanticModel as SemanticModel;
             var symbolInfo = semanticModel.GetSymbolInfo(eventHookupExpression.Left, cancellationToken);
 
             var symbol = symbolInfo.Symbol;
@@ -253,31 +251,31 @@ namespace Microsoft.CodeAnalysis.Editor.CSharp.EventHookup
                 return null;
             }
 
-            var typeInference = document.Project.LanguageServices.GetService<ITypeInferenceService>();
+            var typeInference = semanticDocument.Document.GetLanguageService<ITypeInferenceService>();
             var delegateType = typeInference.InferDelegateType(semanticModel, eventHookupExpression.Right, cancellationToken);
             if (delegateType == null || delegateType.DelegateInvokeMethod == null)
             {
                 return null;
             }
 
-            var syntaxFactory = document.Project.LanguageServices.GetService<SyntaxGenerator>();
+            var syntaxFactory = semanticDocument.Document.GetLanguageService<SyntaxGenerator>();
+            var delegateInvokeMethod = delegateType.DelegateInvokeMethod.RemoveInaccessibleAttributesAndAttributesOfTypes(semanticDocument.SemanticModel.Compilation.Assembly);
 
             return CodeGenerationSymbolFactory.CreateMethodSymbol(
-                attributes: null,
+                attributes: default,
                 accessibility: Accessibility.Private,
                 modifiers: new DeclarationModifiers(isStatic: eventHookupExpression.IsInStaticContext()),
-                returnType: delegateType.DelegateInvokeMethod.ReturnType,
-                explicitInterfaceSymbol: null,
+                returnType: delegateInvokeMethod.ReturnType,
+                refKind: delegateInvokeMethod.RefKind,
+                explicitInterfaceImplementations: default,
                 name: eventHandlerMethodName,
-                typeParameters: null,
-                parameters: delegateType.DelegateInvokeMethod.Parameters,
-                statements: new List<SyntaxNode>
-                    {
-                        CodeGenerationHelpers.GenerateThrowStatement(syntaxFactory, document, "System.NotImplementedException", cancellationToken)
-                    });
+                typeParameters: default,
+                parameters: delegateInvokeMethod.Parameters,
+                statements: ImmutableArray.Create(
+                    CodeGenerationHelpers.GenerateThrowStatement(syntaxFactory, semanticDocument, "System.NotImplementedException")));
         }
 
-        private void BeginInlineRename(Workspace workspace, ITextView textView, ITextBuffer subjectBuffer, int plusEqualTokenEndPosition, CancellationToken cancellationToken)
+        private void BeginInlineRename(ITextView textView, int plusEqualTokenEndPosition, CancellationToken cancellationToken)
         {
             AssertIsForeground();
 
@@ -287,12 +285,18 @@ namespace Microsoft.CodeAnalysis.Editor.CSharp.EventHookup
                 if (document != null)
                 {
                     // In the middle of a user action, cannot cancel.
-                    var syntaxTree = document.GetCSharpSyntaxTreeAsync(cancellationToken).WaitAndGetResult(cancellationToken);
-                    var token = syntaxTree.FindTokenOnRightOfPosition(plusEqualTokenEndPosition, cancellationToken);
+                    var root = document.GetSyntaxRootSynchronously(cancellationToken);
+                    var token = root.FindTokenOnRightOfPosition(plusEqualTokenEndPosition);
+                    var editSpan = token.Span;
+                    var memberAccessExpression = token.GetAncestor<MemberAccessExpressionSyntax>();
+                    if (memberAccessExpression != null)
+                    {
+                        // the event hookup might look like `MyEvent += this.GeneratedHandlerName;`
+                        editSpan = memberAccessExpression.Name.Span;
+                    }
 
-                    _inlineRenameService.StartInlineSession(document, token.Span, cancellationToken);
-
-                    textView.SetSelection(token.Span.ToSnapshotSpan(textView.TextSnapshot));
+                    _inlineRenameService.StartInlineSession(document, editSpan, cancellationToken);
+                    textView.SetSelection(editSpan.ToSnapshotSpan(textView.TextSnapshot));
                 }
             }
         }

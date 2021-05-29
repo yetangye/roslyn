@@ -1,7 +1,8 @@
-﻿// Copyright (c) Microsoft.  All Rights Reserved.  Licensed under the Apache License, Version 2.0.  See License.txt in the project root for license information.
+﻿// Licensed to the .NET Foundation under one or more agreements.
+// The .NET Foundation licenses this file to you under the MIT license.
+// See the LICENSE file in the project root for more information.
 
 using System;
-using System.Collections.Immutable;
 
 namespace Microsoft.CodeAnalysis.Diagnostics
 {
@@ -14,7 +15,7 @@ namespace Microsoft.CodeAnalysis.Diagnostics
         /// <summary>
         /// The source languages to which this analyzer applies.  See <see cref="LanguageNames"/>.
         /// </summary>
-        public string[] Languages { get; private set; }
+        public string[] Languages { get; }
 
         /// <summary>
         /// Attribute constructor used to specify automatic application of a diagnostic analyzer.
@@ -25,15 +26,15 @@ namespace Microsoft.CodeAnalysis.Diagnostics
         {
             if (firstLanguage == null)
             {
-                throw new ArgumentNullException("firstLanguage");
+                throw new ArgumentNullException(nameof(firstLanguage));
             }
 
             if (additionalLanguages == null)
             {
-                throw new ArgumentNullException("additionalLanguages");
+                throw new ArgumentNullException(nameof(additionalLanguages));
             }
 
-            string[] languages = new string[additionalLanguages.Length + 1];
+            var languages = new string[additionalLanguages.Length + 1];
             languages[0] = firstLanguage;
             for (int index = 0; index < additionalLanguages.Length; index++)
             {

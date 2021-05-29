@@ -1,102 +1,112 @@
-// Copyright (c) Microsoft.  All Rights Reserved.  Licensed under the Apache License, Version 2.0.  See License.txt in the project root for license information.
+﻿// Licensed to the .NET Foundation under one or more agreements.
+// The .NET Foundation licenses this file to you under the MIT license.
+// See the LICENSE file in the project root for more information.
 
+#nullable disable
+
+using System;
+using System.Threading.Tasks;
 using Microsoft.CodeAnalysis.Editor.CSharp.KeywordHighlighting.KeywordHighlighters;
-using Roslyn.Test.Utilities;
+using Microsoft.CodeAnalysis.Test.Utilities;
 using Xunit;
 
 namespace Microsoft.CodeAnalysis.Editor.CSharp.UnitTests.KeywordHighlighting
 {
     public class RegionHighlighterTests : AbstractCSharpKeywordHighlighterTests
     {
-        internal override IHighlighter CreateHighlighter()
+        internal override Type GetHighlighterType()
+            => typeof(RegionHighlighter);
+
+        [Fact, Trait(Traits.Feature, Traits.Features.KeywordHighlighting)]
+        public async Task TestExample1_1()
         {
-            return new RegionHighlighter();
+            await TestAsync(
+@"class C
+{
+    {|Cursor:[|#region|]|} Main
+    static void Main()
+    {
+    }
+    [|#endregion|]
+}");
         }
 
         [Fact, Trait(Traits.Feature, Traits.Features.KeywordHighlighting)]
-        public void TestExample1_1()
+        public async Task TestExample1_2()
         {
-            Test(
-        @"class C {
-{|Cursor:[|#region|]|} Main
-static void Main() {
-}
-[|#endregion|]
-}
-");
+            await TestAsync(
+@"class C
+{
+    [|#region|] Main
+    static void Main()
+    {
+    }
+    {|Cursor:[|#endregion|]|}
+}");
         }
 
         [Fact, Trait(Traits.Feature, Traits.Features.KeywordHighlighting)]
-        public void TestExample1_2()
+        public async Task TestNestedExample1_1()
         {
-            Test(
-        @"class C {
-[|#region|] Main
-static void Main() {
-}
-{|Cursor:[|#endregion|]|}
-}
-");
+            await TestAsync(
+@"class C
+{
+    {|Cursor:[|#region|]|} Main
+    static void Main()
+    {
+        #region body
+        #endregion
+    }
+    [|#endregion|]
+}");
         }
 
         [Fact, Trait(Traits.Feature, Traits.Features.KeywordHighlighting)]
-        public void TestNestedExample1_1()
+        public async Task TestNestedExample1_2()
         {
-            Test(
-        @"class C {
-{|Cursor:[|#region|]|} Main
-static void Main() {
-#region body
-#endregion
-}
-[|#endregion|]
-}
-");
+            await TestAsync(
+@"class C
+{
+    #region Main
+    static void Main()
+    {
+        {|Cursor:[|#region|]|} body
+        [|#endregion|]
+    }
+    #endregion
+}");
         }
 
         [Fact, Trait(Traits.Feature, Traits.Features.KeywordHighlighting)]
-        public void TestNestedExample1_2()
+        public async Task TestNestedExample1_3()
         {
-            Test(
-        @"class C {
-#region Main
-static void Main() {
-{|Cursor:[|#region|]|} body
-[|#endregion|]
-}
-#endregion
-}
-");
+            await TestAsync(
+@"class C
+{
+    #region Main
+    static void Main()
+    {
+        [|#region|] body
+        {|Cursor:[|#endregion|]|}
+    }
+    #endregion
+}");
         }
 
         [Fact, Trait(Traits.Feature, Traits.Features.KeywordHighlighting)]
-        public void TestNestedExample1_3()
+        public async Task TestNestedExample1_4()
         {
-            Test(
-        @"class C {
-#region Main
-static void Main() {
-[|#region|] body
-{|Cursor:[|#endregion|]|}
-}
-#endregion
-}
-");
-        }
-
-        [Fact, Trait(Traits.Feature, Traits.Features.KeywordHighlighting)]
-        public void TestNestedExample1_4()
-        {
-            Test(
-        @"class C {
-[|#region|] Main
-static void Main() {
-#region body
-#endregion
-}
-{|Cursor:[|#endregion|]|}
-}
-");
+            await TestAsync(
+@"class C
+{
+    [|#region|] Main
+    static void Main()
+    {
+        #region body
+        #endregion
+    }
+    {|Cursor:[|#endregion|]|}
+}");
         }
     }
 }

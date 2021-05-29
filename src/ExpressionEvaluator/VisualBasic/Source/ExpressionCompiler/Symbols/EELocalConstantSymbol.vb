@@ -1,4 +1,9 @@
-﻿Imports System.Collections.Immutable
+﻿' Licensed to the .NET Foundation under one or more agreements.
+' The .NET Foundation licenses this file to you under the MIT license.
+' See the LICENSE file in the project root for more information.
+
+Imports System.Collections.Immutable
+Imports System.Threading
 Imports Microsoft.CodeAnalysis.VisualBasic.Symbols
 Imports Roslyn.Utilities
 
@@ -68,9 +73,9 @@ Namespace Microsoft.CodeAnalysis.VisualBasic.ExpressionEvaluator
         End Property
 
         Friend Overrides Function GetConstantValue(binder As Binder) As ConstantValue
+            ' TODO (https://github.com/dotnet/roslyn/issues/1815): report diagnostics if the value is bad
             Return _constantValue
         End Function
-
     End Class
 End Namespace
 

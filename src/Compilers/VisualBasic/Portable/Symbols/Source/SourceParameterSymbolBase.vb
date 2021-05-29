@@ -1,6 +1,9 @@
-﻿' Copyright (c) Microsoft.  All Rights Reserved.  Licensed under the Apache License, Version 2.0.  See License.txt in the project root for license information.
+﻿' Licensed to the .NET Foundation under one or more agreements.
+' The .NET Foundation licenses this file to you under the MIT license.
+' See the LICENSE file in the project root for more information.
 
 Imports System.Collections.Immutable
+Imports Microsoft.CodeAnalysis.PooledObjects
 Imports Microsoft.CodeAnalysis.VisualBasic.Symbols
 Imports Microsoft.CodeAnalysis.VisualBasic.Syntax
 
@@ -11,23 +14,23 @@ Namespace Microsoft.CodeAnalysis.VisualBasic.Symbols
     Friend MustInherit Class SourceParameterSymbolBase
         Inherits ParameterSymbol
 
-        Private ReadOnly m_containingSymbol As Symbol
-        Private ReadOnly m_ordinal As UShort
+        Private ReadOnly _containingSymbol As Symbol
+        Private ReadOnly _ordinal As UShort
 
         Friend Sub New(containingSymbol As Symbol, ordinal As Integer)
-            m_containingSymbol = containingSymbol
-            m_ordinal = CUShort(ordinal)
+            _containingSymbol = containingSymbol
+            _ordinal = CUShort(ordinal)
         End Sub
 
         Public NotOverridable Overrides ReadOnly Property Ordinal As Integer
             Get
-                Return m_ordinal
+                Return _ordinal
             End Get
         End Property
 
         Public NotOverridable Overrides ReadOnly Property ContainingSymbol As Symbol
             Get
-                Return m_containingSymbol
+                Return _containingSymbol
             End Get
         End Property
 
@@ -64,15 +67,13 @@ Namespace Microsoft.CodeAnalysis.VisualBasic.Symbols
                         AddSynthesizedAttribute(attributes, compilation.SynthesizeDecimalConstantAttribute(defaultValue.DecimalValue))
                 End Select
             End If
+
+            If Me.Type.ContainsTupleNames() Then
+                AddSynthesizedAttribute(attributes, DeclaringCompilation.SynthesizeTupleNamesAttribute(Type))
+            End If
         End Sub
 
-        Friend Overrides ReadOnly Property HasByRefBeforeCustomModifiers As Boolean
-            Get
-                Return False
-            End Get
-        End Property
-
-        Friend MustOverride Function WithTypeAndCustomModifiers(type As TypeSymbol, customModifiers As ImmutableArray(Of CustomModifier), hasByRefBeforeCustomModifiers As Boolean) As ParameterSymbol
+        Friend MustOverride Function WithTypeAndCustomModifiers(type As TypeSymbol, customModifiers As ImmutableArray(Of CustomModifier), refCustomModifiers As ImmutableArray(Of CustomModifier)) As ParameterSymbol
 
     End Class
 End Namespace

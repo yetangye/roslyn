@@ -1,4 +1,8 @@
-﻿// Copyright (c) Microsoft.  All Rights Reserved.  Licensed under the Apache License, Version 2.0.  See License.txt in the project root for license information.
+﻿// Licensed to the .NET Foundation under one or more agreements.
+// The .NET Foundation licenses this file to you under the MIT license.
+// See the LICENSE file in the project root for more information.
+
+#nullable disable
 
 using System;
 using Microsoft.CodeAnalysis.CSharp.Symbols;
@@ -17,7 +21,7 @@ namespace Microsoft.CodeAnalysis.CSharp.UnitTests.IncrementalParsing
             SingleName,
             DottedName,
             GenericName,
-            AliassedName,
+            AliasedName,
             PredefinedName,
             ArrayName,
             PointerName,
@@ -48,9 +52,9 @@ namespace Microsoft.CodeAnalysis.CSharp.UnitTests.IncrementalParsing
         [Fact]
         public void BasicToAlias()
         {
-            MakeIncrementalNameChange(NameTypes.SingleName, NameTypes.AliassedName, expressionValidator: nameTree =>
+            MakeIncrementalNameChange(NameTypes.SingleName, NameTypes.AliasedName, expressionValidator: nameTree =>
             {
-                NodeValidators.AliassedNameVerification(nameTree, "b", "d");
+                NodeValidators.AliasedNameVerification(nameTree, "b", "d");
             });
         }
 
@@ -93,9 +97,9 @@ namespace Microsoft.CodeAnalysis.CSharp.UnitTests.IncrementalParsing
         [Fact]
         public void GenericToAlias()
         {
-            MakeIncrementalNameChange(NameTypes.GenericName, NameTypes.AliassedName, expressionValidator: nameTree =>
+            MakeIncrementalNameChange(NameTypes.GenericName, NameTypes.AliasedName, expressionValidator: nameTree =>
             {
-                NodeValidators.AliassedNameVerification(nameTree, "b", "d");
+                NodeValidators.AliasedNameVerification(nameTree, "b", "d");
             });
         }
 
@@ -129,9 +133,9 @@ namespace Microsoft.CodeAnalysis.CSharp.UnitTests.IncrementalParsing
         [Fact]
         public void DottedToAlias()
         {
-            MakeIncrementalNameChange(NameTypes.DottedName, NameTypes.AliassedName, expressionValidator: nameTree =>
+            MakeIncrementalNameChange(NameTypes.DottedName, NameTypes.AliasedName, expressionValidator: nameTree =>
             {
-                NodeValidators.AliassedNameVerification(nameTree, "b", "d");
+                NodeValidators.AliasedNameVerification(nameTree, "b", "d");
             });
         }
 
@@ -156,7 +160,7 @@ namespace Microsoft.CodeAnalysis.CSharp.UnitTests.IncrementalParsing
         [Fact]
         public void DottedToPointer()
         {
-            MakeIncrementalNameChange(NameTypes.AliassedName, NameTypes.PointerName, expressionValidator: nameTree =>
+            MakeIncrementalNameChange(NameTypes.AliasedName, NameTypes.PointerName, expressionValidator: nameTree =>
             {
                 NodeValidators.PointerNameVerification(nameTree, "b");
             });
@@ -165,7 +169,7 @@ namespace Microsoft.CodeAnalysis.CSharp.UnitTests.IncrementalParsing
         [Fact]
         public void AliasToArray()
         {
-            MakeIncrementalNameChange(NameTypes.AliassedName, NameTypes.ArrayName, expressionValidator: nameTree =>
+            MakeIncrementalNameChange(NameTypes.AliasedName, NameTypes.ArrayName, expressionValidator: nameTree =>
             {
                 NodeValidators.ArrayNameVerification(nameTree, "b", 1);
             });
@@ -174,7 +178,7 @@ namespace Microsoft.CodeAnalysis.CSharp.UnitTests.IncrementalParsing
         [Fact]
         public void AliasToPredefined()
         {
-            MakeIncrementalNameChange(NameTypes.AliassedName, NameTypes.PredefinedName, expressionValidator: nameTree =>
+            MakeIncrementalNameChange(NameTypes.AliasedName, NameTypes.PredefinedName, expressionValidator: nameTree =>
             {
                 NodeValidators.PredefinedNameVerification(nameTree, "int");
             });
@@ -183,7 +187,7 @@ namespace Microsoft.CodeAnalysis.CSharp.UnitTests.IncrementalParsing
         [Fact]
         public void AliasToPointer()
         {
-            MakeIncrementalNameChange(NameTypes.AliassedName, NameTypes.PointerName, expressionValidator: nameTree =>
+            MakeIncrementalNameChange(NameTypes.AliasedName, NameTypes.PointerName, expressionValidator: nameTree =>
             {
                 NodeValidators.PointerNameVerification(nameTree, "b");
             });
@@ -228,7 +232,7 @@ namespace Microsoft.CodeAnalysis.CSharp.UnitTests.IncrementalParsing
                 case NameTypes.GenericName: return "b<T>";
                 case NameTypes.DottedName: return "b.b";
                 case NameTypes.ArrayName: return "b[]";
-                case NameTypes.AliassedName: return "b::d";
+                case NameTypes.AliasedName: return "b::d";
                 default:
                     throw new Exception("Unexpected type here!!");
             }

@@ -1,6 +1,9 @@
-﻿// Copyright (c) Microsoft.  All Rights Reserved.  Licensed under the Apache License, Version 2.0.  See License.txt in the project root for license information.
+﻿// Licensed to the .NET Foundation under one or more agreements.
+// The .NET Foundation licenses this file to you under the MIT license.
+// See the LICENSE file in the project root for more information.
 
 using System;
+using System.Diagnostics;
 using System.Threading;
 using Roslyn.Utilities;
 
@@ -9,8 +12,10 @@ namespace Microsoft.CodeAnalysis
     /// <summary>
     /// VersionStamp should be only used to compare versions returned by same API.
     /// </summary>
-    public struct VersionStamp : IEquatable<VersionStamp>, IObjectWritable
+    public readonly struct VersionStamp : IEquatable<VersionStamp>, IObjectWritable
     {
+        public static VersionStamp Default => default;
+
         private const int GlobalVersionMarker = -1;
         private const int InitialGlobalVersion = 10000;
 
@@ -41,15 +46,16 @@ namespace Microsoft.CodeAnalysis
         }
 
         private VersionStamp(DateTime utcLastModified, int localIncrement)
+            : this(utcLastModified, localIncrement, GetNextGlobalVersion())
         {
-            _utcLastModified = utcLastModified;
-            _localIncrement = localIncrement;
-            _globalIncrement = GetNextGlobalVersion();
         }
 
         private VersionStamp(DateTime utcLastModified, int localIncrement, int globalIncrement)
         {
-            Contract.ThrowIfFalse(utcLastModified == default(DateTime) || utcLastModified.Kind == DateTimeKind.Utc);
+            if (utcLastModified != default && utcLastModified.Kind != DateTimeKind.Utc)
+            {
+                throw new ArgumentException(WorkspacesResources.DateTimeKind_must_be_Utc, nameof(utcLastModified));
+            }
 
             _utcLastModified = utcLastModified;
             _localIncrement = localIncrement;
@@ -60,17 +66,13 @@ namespace Microsoft.CodeAnalysis
         /// Creates a new instance of a VersionStamp.
         /// </summary>
         public static VersionStamp Create()
-        {
-            return new VersionStamp(DateTime.UtcNow);
-        }
+            => new(DateTime.UtcNow);
 
         /// <summary>
         /// Creates a new instance of a version stamp based on the specified DateTime.
         /// </summary>
-        public static VersionStamp Create(DateTime utcIimeLastModified)
-        {
-            return new VersionStamp(utcIimeLastModified);
-        }
+        public static VersionStamp Create(DateTime utcTimeLastModified)
+            => new(utcTimeLastModified);
 
         /// <summary>
         /// compare two different versions and return either one of the versions if there is no collision, otherwise, create a new version
@@ -82,7 +84,7 @@ namespace Microsoft.CodeAnalysis
             // in current design/implementation, there are 4 possible ways for a version to be created.
             //
             // 1. created from a file stamp (most likely by starting a new session). "increment" will have 0 as value
-            // 2. created by modifing existing item (text changes, project changes etc).
+            // 2. created by modifying existing item (text changes, project changes etc).
             //    "increment" will have either 0 or previous increment + 1 if there was a collision.
             // 3. created from deserialization (probably by using persistent service).
             // 4. created by accumulating versions of multiple items.
@@ -120,7 +122,7 @@ namespace Microsoft.CodeAnalysis
         public VersionStamp GetNewerVersion()
         {
             // global version can't be moved to newer version
-            Contract.Requires(_globalIncrement != GlobalVersionMarker);
+            Debug.Assert(_globalIncrement != GlobalVersionMarker);
 
             var now = DateTime.UtcNow;
             var incr = (now == _utcLastModified) ? _localIncrement + 1 : 0;
@@ -138,15 +140,13 @@ namespace Microsoft.CodeAnalysis
         }
 
         public override int GetHashCode()
-        {
-            return Hash.Combine(_utcLastModified.GetHashCode(), _localIncrement);
-        }
+            => Hash.Combine(_utcLastModified.GetHashCode(), _localIncrement);
 
-        public override bool Equals(object obj)
+        public override bool Equals(object? obj)
         {
-            if (obj is VersionStamp)
+            if (obj is VersionStamp v)
             {
-                return this.Equals((VersionStamp)obj);
+                return this.Equals(v);
             }
 
             return false;
@@ -163,17 +163,13 @@ namespace Microsoft.CodeAnalysis
         }
 
         public static bool operator ==(VersionStamp left, VersionStamp right)
-        {
-            return left.Equals(right);
-        }
+            => left.Equals(right);
 
         public static bool operator !=(VersionStamp left, VersionStamp right)
-        {
-            return !left.Equals(right);
-        }
+            => !left.Equals(right);
 
         /// <summary>
-        /// check whether given persisted version is re-usable
+        /// Check whether given persisted version is re-usable. Used by VS for Mac
         /// </summary>
         internal static bool CanReusePersistedVersion(VersionStamp baseVersion, VersionStamp persistedVersion)
         {
@@ -191,10 +187,10 @@ namespace Microsoft.CodeAnalysis
             return baseVersion._utcLastModified == persistedVersion._utcLastModified;
         }
 
+        bool IObjectWritable.ShouldReuseInSerialization => true;
+
         void IObjectWritable.WriteTo(ObjectWriter writer)
-        {
-            WriteTo(writer);
-        }
+            => WriteTo(writer);
 
         internal void WriteTo(ObjectWriter writer)
         {
@@ -224,33 +220,42 @@ namespace Microsoft.CodeAnalysis
             // with 50ms (typing) as an interval for a new version, it gives more than 1 year before int32 to overflow.
             // with 5ms as an interval, it gives more than 120 days before it overflows.
             // since global version is only for per VS session, I think we don't need to worry about overflow.
-            // or we could use Int64 which will give more than a milliion years turn around even on 1ms internval.
+            // or we could use Int64 which will give more than a million years turn around even on 1ms interval.
 
             // this will let versions to be compared safely between multiple items
-            // without worring about collision within same session
+            // without worrying about collision within same session
             var globalVersion = Interlocked.Increment(ref VersionStamp.s_globalVersion);
 
             return globalVersion;
         }
 
-        public static readonly VersionStamp Default = default(VersionStamp);
+        internal TestAccessor GetTestAccessor()
+            => new(this);
 
-        /// <summary>
-        /// True if this VersionStamp is newer than the specified one.
-        /// </summary>
-        internal bool TestOnly_IsNewerThan(VersionStamp version)
+        internal readonly struct TestAccessor
         {
-            if (_utcLastModified > version._utcLastModified)
-            {
-                return true;
-            }
+            private readonly VersionStamp _versionStamp;
 
-            if (_utcLastModified == version._utcLastModified)
-            {
-                return GetGlobalVersion(this) > GetGlobalVersion(version);
-            }
+            public TestAccessor(in VersionStamp versionStamp)
+                => _versionStamp = versionStamp;
 
-            return false;
+            /// <summary>
+            /// True if this VersionStamp is newer than the specified one.
+            /// </summary>
+            internal bool IsNewerThan(in VersionStamp version)
+            {
+                if (_versionStamp._utcLastModified > version._utcLastModified)
+                {
+                    return true;
+                }
+
+                if (_versionStamp._utcLastModified == version._utcLastModified)
+                {
+                    return GetGlobalVersion(_versionStamp) > GetGlobalVersion(version);
+                }
+
+                return false;
+            }
         }
     }
 }

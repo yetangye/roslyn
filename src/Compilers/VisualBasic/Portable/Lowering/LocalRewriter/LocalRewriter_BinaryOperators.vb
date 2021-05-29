@@ -1,8 +1,11 @@
-﻿' Copyright (c) Microsoft.  All Rights Reserved.  Licensed under the Apache License, Version 2.0.  See License.txt in the project root for license information.
+﻿' Licensed to the .NET Foundation under one or more agreements.
+' The .NET Foundation licenses this file to you under the MIT license.
+' See the LICENSE file in the project root for more information.
 
 Imports System.Collections.Immutable
 Imports System.Diagnostics
 Imports System.Runtime.InteropServices
+Imports Microsoft.CodeAnalysis.PooledObjects
 Imports Microsoft.CodeAnalysis.Text
 Imports Microsoft.CodeAnalysis.VisualBasic.Symbols
 Imports Microsoft.CodeAnalysis.VisualBasic.Syntax
@@ -10,10 +13,10 @@ Imports TypeKind = Microsoft.CodeAnalysis.TypeKind
 
 Namespace Microsoft.CodeAnalysis.VisualBasic
 
-    Partial Class LocalRewriter
+    Partial Friend Class LocalRewriter
 
         Public Overrides Function VisitUserDefinedBinaryOperator(node As BoundUserDefinedBinaryOperator) As BoundNode
-            If inExpressionLambda Then
+            If _inExpressionLambda Then
                 Return node.Update(node.OperatorKind, DirectCast(Visit(node.UnderlyingExpression), BoundExpression), node.Checked, node.Type)
             End If
 
@@ -25,7 +28,7 @@ Namespace Microsoft.CodeAnalysis.VisualBasic
         End Function
 
         Public Overrides Function VisitUserDefinedShortCircuitingOperator(node As BoundUserDefinedShortCircuitingOperator) As BoundNode
-            If inExpressionLambda Then
+            If _inExpressionLambda Then
                 ' If we are inside expression lambda we need to rewrite it into just a bitwise operator call
                 Dim placeholder As BoundRValuePlaceholder = node.LeftOperandPlaceholder
                 Dim leftOperand As BoundExpression = node.LeftOperand
@@ -50,7 +53,7 @@ Namespace Microsoft.CodeAnalysis.VisualBasic
             ' The rewrite that should happen here is:
             '     If(LeftTest(temp = left), temp, BitwiseOperator)
 
-            Dim temp As New SynthesizedLocal(currentMethodOrLambda, node.LeftOperand.Type, SynthesizedLocalKind.LoweringTemp)
+            Dim temp As New SynthesizedLocal(_currentMethodOrLambda, node.LeftOperand.Type, SynthesizedLocalKind.LoweringTemp)
 
             Dim tempAccess As New BoundLocal(node.Syntax, temp, True, temp.Type)
 
@@ -81,10 +84,86 @@ Namespace Microsoft.CodeAnalysis.VisualBasic
         End Function
 
         Public Overrides Function VisitBinaryOperator(node As BoundBinaryOperator) As BoundNode
-            Dim opKind = node.OperatorKind
+            ' Do not blow the stack due to a deep recursion on the left. 
 
-            If (opKind And BinaryOperatorKind.Lifted) <> 0 Then
-                Return RewriteLiftedIntrinsicBinaryOperator(node)
+            Dim optimizeForConditionalBranch As Boolean = (node.OperatorKind And BinaryOperatorKind.OptimizableForConditionalBranch) <> 0
+            Dim optimizeChildForConditionalBranch As Boolean = optimizeForConditionalBranch
+
+            Dim child As BoundExpression = GetLeftOperand(node, optimizeChildForConditionalBranch)
+
+            If child.Kind <> BoundKind.BinaryOperator Then
+                Return RewriteBinaryOperatorSimple(node, optimizeForConditionalBranch)
+            End If
+
+            Dim stack = ArrayBuilder(Of (Binary As BoundBinaryOperator, OptimizeForConditionalBranch As Boolean)).GetInstance()
+            stack.Push((node, optimizeForConditionalBranch))
+
+            Dim binary As BoundBinaryOperator = DirectCast(child, BoundBinaryOperator)
+
+            Do
+                If optimizeChildForConditionalBranch Then
+                    Select Case (binary.OperatorKind And BinaryOperatorKind.OpMask)
+                        Case BinaryOperatorKind.AndAlso, BinaryOperatorKind.OrElse
+                            Exit Select
+                        Case Else
+                            optimizeChildForConditionalBranch = False
+                    End Select
+                End If
+
+                stack.Push((binary, optimizeChildForConditionalBranch))
+
+                child = GetLeftOperand(binary, optimizeChildForConditionalBranch)
+
+                If child.Kind <> BoundKind.BinaryOperator Then
+                    Exit Do
+                End If
+
+                binary = DirectCast(child, BoundBinaryOperator)
+            Loop
+
+            Dim left = VisitExpressionNode(child)
+
+            Do
+                Dim tuple As (Binary As BoundBinaryOperator, OptimizeForConditionalBranch As Boolean) = stack.Pop()
+                binary = tuple.Binary
+
+                Dim right = VisitExpression(GetRightOperand(binary, tuple.OptimizeForConditionalBranch))
+
+                If (binary.OperatorKind And BinaryOperatorKind.Lifted) <> 0 Then
+                    left = FinishRewriteOfLiftedIntrinsicBinaryOperator(binary, left, right, tuple.OptimizeForConditionalBranch)
+                Else
+                    left = TransformRewrittenBinaryOperator(binary.Update(binary.OperatorKind, left, right, binary.Checked, binary.ConstantValueOpt, Me.VisitType(binary.Type)))
+                End If
+            Loop While binary IsNot node
+
+            Debug.Assert(stack.Count = 0)
+            stack.Free()
+
+            Return left
+        End Function
+
+        Private Shared Function GetLeftOperand(binary As BoundBinaryOperator, ByRef optimizeForConditionalBranch As Boolean) As BoundExpression
+            If optimizeForConditionalBranch AndAlso (binary.OperatorKind And BinaryOperatorKind.OpMask) <> BinaryOperatorKind.OrElse Then
+                Debug.Assert((binary.OperatorKind And BinaryOperatorKind.OpMask) = BinaryOperatorKind.AndAlso)
+                ' If left operand is evaluated to Null, three-valued Boolean logic dictates that the right operand of AndAlso
+                ' should still be evaluated. So, we cannot simply snap the left operand to Boolean.
+                optimizeForConditionalBranch = False
+            End If
+
+            Return binary.Left.GetMostEnclosedParenthesizedExpression()
+        End Function
+
+        Private Shared Function GetRightOperand(binary As BoundBinaryOperator, adjustIfOptimizableForConditionalBranch As Boolean) As BoundExpression
+            If adjustIfOptimizableForConditionalBranch Then
+                Return LocalRewriter.AdjustIfOptimizableForConditionalBranch(binary.Right, Nothing)
+            Else
+                Return binary.Right
+            End If
+        End Function
+
+        Private Function RewriteBinaryOperatorSimple(node As BoundBinaryOperator, optimizeForConditionalBranch As Boolean) As BoundNode
+            If (node.OperatorKind And BinaryOperatorKind.Lifted) <> 0 Then
+                Return RewriteLiftedIntrinsicBinaryOperatorSimple(node, optimizeForConditionalBranch)
             End If
 
             Return TransformRewrittenBinaryOperator(DirectCast(MyBase.VisitBinaryOperator(node), BoundBinaryOperator))
@@ -97,9 +176,9 @@ Namespace Microsoft.CodeAnalysis.VisualBasic
             End If
 
             ' See Semantics::AlterForMyGroup
-            ' "foo.Form1 IS something" is translated to "foo.m_Form1 IS something" when
+            ' "goo.Form1 IS something" is translated to "goo.m_Form1 IS something" when
             ' Form1 is a property generated by MyGroupCollection
-            ' Otherwise 'foo.Form1 IS Nothing" would be always false because 'foo.Form1'
+            ' Otherwise 'goo.Form1 IS Nothing" would be always false because 'goo.Form1'
             ' property call creates an instance on the fly.
 
             Select Case operand.Kind
@@ -114,7 +193,7 @@ Namespace Microsoft.CodeAnalysis.VisualBasic
                     Dim cast = DirectCast(operand, BoundConversion)
                     Return cast.Update(ReplaceMyGroupCollectionPropertyGetWithUnderlyingField(cast.Operand),
                                        cast.ConversionKind, cast.Checked, cast.ExplicitCastInCode, cast.ConstantValueOpt,
-                                       cast.ConstructorOpt, cast.RelaxationLambdaOpt, cast.RelaxationReceiverPlaceholderOpt,
+                                       cast.ExtendedInfoOpt,
                                        cast.Type)
 
                 Case BoundKind.Call
@@ -132,7 +211,7 @@ Namespace Microsoft.CodeAnalysis.VisualBasic
 
                 Case BoundKind.PropertyAccess
                     ' Can get here when we are inside a lambda converted to an expression tree.
-                    Debug.Assert(inExpressionLambda)
+                    Debug.Assert(_inExpressionLambda)
                     Dim propertyAccess = DirectCast(operand, BoundPropertyAccess)
 
                     If propertyAccess.AccessKind = PropertyAccessKind.Get AndAlso
@@ -192,7 +271,7 @@ Namespace Microsoft.CodeAnalysis.VisualBasic
                     '       despite what is said in comments in RuntimeMembers CodeGenerator::GetHelperForObjRelOp
                     ' TODO: Recheck
 
-                    If node.Type.IsObjectType() OrElse Me.inExpressionLambda AndAlso leftType.IsObjectType() Then
+                    If node.Type.IsObjectType() OrElse Me._inExpressionLambda AndAlso leftType.IsObjectType() Then
                         Return RewriteObjectComparisonOperator(node, WellKnownMember.Microsoft_VisualBasic_CompilerServices_Operators__CompareObjectEqualObjectObjectBoolean)
                     ElseIf node.Type.IsBooleanType() Then
 
@@ -211,7 +290,7 @@ Namespace Microsoft.CodeAnalysis.VisualBasic
                     Dim leftType = node.Left.Type
                     ' NOTE: See comment above
 
-                    If node.Type.IsObjectType() OrElse Me.inExpressionLambda AndAlso leftType.IsObjectType() Then
+                    If node.Type.IsObjectType() OrElse Me._inExpressionLambda AndAlso leftType.IsObjectType() Then
                         Return RewriteObjectComparisonOperator(node, WellKnownMember.Microsoft_VisualBasic_CompilerServices_Operators__CompareObjectNotEqualObjectObjectBoolean)
                     ElseIf node.Type.IsBooleanType() Then
 
@@ -230,7 +309,7 @@ Namespace Microsoft.CodeAnalysis.VisualBasic
                     Dim leftType = node.Left.Type
                     ' NOTE: See comment above
 
-                    If node.Type.IsObjectType() OrElse Me.inExpressionLambda AndAlso leftType.IsObjectType() Then
+                    If node.Type.IsObjectType() OrElse Me._inExpressionLambda AndAlso leftType.IsObjectType() Then
                         Return RewriteObjectComparisonOperator(node, WellKnownMember.Microsoft_VisualBasic_CompilerServices_Operators__CompareObjectLessEqualObjectObjectBoolean)
                     ElseIf node.Type.IsBooleanType() Then
 
@@ -249,7 +328,7 @@ Namespace Microsoft.CodeAnalysis.VisualBasic
                     Dim leftType = node.Left.Type
                     ' NOTE: See comment above
 
-                    If node.Type.IsObjectType() OrElse Me.inExpressionLambda AndAlso leftType.IsObjectType() Then
+                    If node.Type.IsObjectType() OrElse Me._inExpressionLambda AndAlso leftType.IsObjectType() Then
                         Return RewriteObjectComparisonOperator(node, WellKnownMember.Microsoft_VisualBasic_CompilerServices_Operators__CompareObjectGreaterEqualObjectObjectBoolean)
                     ElseIf node.Type.IsBooleanType() Then
 
@@ -268,7 +347,7 @@ Namespace Microsoft.CodeAnalysis.VisualBasic
                     Dim leftType = node.Left.Type
                     ' NOTE: See comment above
 
-                    If node.Type.IsObjectType() OrElse Me.inExpressionLambda AndAlso leftType.IsObjectType() Then
+                    If node.Type.IsObjectType() OrElse Me._inExpressionLambda AndAlso leftType.IsObjectType() Then
                         Return RewriteObjectComparisonOperator(node, WellKnownMember.Microsoft_VisualBasic_CompilerServices_Operators__CompareObjectLessObjectObjectBoolean)
                     ElseIf node.Type.IsBooleanType() Then
 
@@ -287,7 +366,7 @@ Namespace Microsoft.CodeAnalysis.VisualBasic
                     Dim leftType = node.Left.Type
                     ' NOTE: See comment above
 
-                    If node.Type.IsObjectType() OrElse Me.inExpressionLambda AndAlso leftType.IsObjectType() Then
+                    If node.Type.IsObjectType() OrElse Me._inExpressionLambda AndAlso leftType.IsObjectType() Then
                         Return RewriteObjectComparisonOperator(node, WellKnownMember.Microsoft_VisualBasic_CompilerServices_Operators__CompareObjectGreaterObjectObjectBoolean)
                     ElseIf node.Type.IsBooleanType() Then
 
@@ -303,79 +382,79 @@ Namespace Microsoft.CodeAnalysis.VisualBasic
                     End If
 
                 Case BinaryOperatorKind.Add
-                    If node.Type.IsObjectType() AndAlso Not inExpressionLambda Then
+                    If node.Type.IsObjectType() AndAlso Not _inExpressionLambda Then
                         Return RewriteObjectBinaryOperator(node, WellKnownMember.Microsoft_VisualBasic_CompilerServices_Operators__AddObjectObjectObject)
                     ElseIf node.Type.IsDecimalType() Then
                         Return RewriteDecimalBinaryOperator(node, SpecialMember.System_Decimal__AddDecimalDecimal)
                     End If
 
                 Case BinaryOperatorKind.Subtract
-                    If node.Type.IsObjectType() AndAlso Not inExpressionLambda Then
+                    If node.Type.IsObjectType() AndAlso Not _inExpressionLambda Then
                         Return RewriteObjectBinaryOperator(node, WellKnownMember.Microsoft_VisualBasic_CompilerServices_Operators__SubtractObjectObjectObject)
                     ElseIf node.Type.IsDecimalType() Then
                         Return RewriteDecimalBinaryOperator(node, SpecialMember.System_Decimal__SubtractDecimalDecimal)
                     End If
 
                 Case BinaryOperatorKind.Multiply
-                    If node.Type.IsObjectType() AndAlso Not inExpressionLambda Then
+                    If node.Type.IsObjectType() AndAlso Not _inExpressionLambda Then
                         Return RewriteObjectBinaryOperator(node, WellKnownMember.Microsoft_VisualBasic_CompilerServices_Operators__MultiplyObjectObjectObject)
                     ElseIf node.Type.IsDecimalType() Then
                         Return RewriteDecimalBinaryOperator(node, SpecialMember.System_Decimal__MultiplyDecimalDecimal)
                     End If
 
                 Case BinaryOperatorKind.Modulo
-                    If node.Type.IsObjectType() AndAlso Not inExpressionLambda Then
+                    If node.Type.IsObjectType() AndAlso Not _inExpressionLambda Then
                         Return RewriteObjectBinaryOperator(node, WellKnownMember.Microsoft_VisualBasic_CompilerServices_Operators__ModObjectObjectObject)
                     ElseIf node.Type.IsDecimalType() Then
                         Return RewriteDecimalBinaryOperator(node, SpecialMember.System_Decimal__RemainderDecimalDecimal)
                     End If
 
                 Case BinaryOperatorKind.Divide
-                    If node.Type.IsObjectType() AndAlso Not inExpressionLambda Then
+                    If node.Type.IsObjectType() AndAlso Not _inExpressionLambda Then
                         Return RewriteObjectBinaryOperator(node, WellKnownMember.Microsoft_VisualBasic_CompilerServices_Operators__DivideObjectObjectObject)
                     ElseIf node.Type.IsDecimalType() Then
                         Return RewriteDecimalBinaryOperator(node, SpecialMember.System_Decimal__DivideDecimalDecimal)
                     End If
 
                 Case BinaryOperatorKind.IntegerDivide
-                    If node.Type.IsObjectType() AndAlso Not inExpressionLambda Then
+                    If node.Type.IsObjectType() AndAlso Not _inExpressionLambda Then
                         Return RewriteObjectBinaryOperator(node, WellKnownMember.Microsoft_VisualBasic_CompilerServices_Operators__IntDivideObjectObjectObject)
                     End If
 
                 Case BinaryOperatorKind.Power
-                    If node.Type.IsObjectType() AndAlso Not inExpressionLambda Then
+                    If node.Type.IsObjectType() AndAlso Not _inExpressionLambda Then
                         Return RewriteObjectBinaryOperator(node, WellKnownMember.Microsoft_VisualBasic_CompilerServices_Operators__ExponentObjectObjectObject)
                     Else
                         Return RewritePowOperator(node)
                     End If
 
                 Case BinaryOperatorKind.LeftShift
-                    If node.Type.IsObjectType() AndAlso Not inExpressionLambda Then
+                    If node.Type.IsObjectType() AndAlso Not _inExpressionLambda Then
                         Return RewriteObjectBinaryOperator(node, WellKnownMember.Microsoft_VisualBasic_CompilerServices_Operators__LeftShiftObjectObjectObject)
                     End If
 
                 Case BinaryOperatorKind.RightShift
-                    If node.Type.IsObjectType() AndAlso Not inExpressionLambda Then
+                    If node.Type.IsObjectType() AndAlso Not _inExpressionLambda Then
                         Return RewriteObjectBinaryOperator(node, WellKnownMember.Microsoft_VisualBasic_CompilerServices_Operators__RightShiftObjectObjectObject)
                     End If
 
                 Case BinaryOperatorKind.OrElse, BinaryOperatorKind.AndAlso
-                    If node.Type.IsObjectType() AndAlso Not inExpressionLambda Then
+                    If node.Type.IsObjectType() AndAlso Not _inExpressionLambda Then
                         Return RewriteObjectShortCircuitOperator(node)
                     End If
 
                 Case BinaryOperatorKind.Xor
-                    If node.Type.IsObjectType() AndAlso Not inExpressionLambda Then
+                    If node.Type.IsObjectType() AndAlso Not _inExpressionLambda Then
                         Return RewriteObjectBinaryOperator(node, WellKnownMember.Microsoft_VisualBasic_CompilerServices_Operators__XorObjectObjectObject)
                     End If
 
                 Case BinaryOperatorKind.Or
-                    If node.Type.IsObjectType() AndAlso Not inExpressionLambda Then
+                    If node.Type.IsObjectType() AndAlso Not _inExpressionLambda Then
                         Return RewriteObjectBinaryOperator(node, WellKnownMember.Microsoft_VisualBasic_CompilerServices_Operators__OrObjectObjectObject)
                     End If
 
                 Case BinaryOperatorKind.And
-                    If node.Type.IsObjectType() AndAlso Not inExpressionLambda Then
+                    If node.Type.IsObjectType() AndAlso Not _inExpressionLambda Then
                         Return RewriteObjectBinaryOperator(node, WellKnownMember.Microsoft_VisualBasic_CompilerServices_Operators__AndObjectObjectObject)
                     End If
 
@@ -385,7 +464,7 @@ Namespace Microsoft.CodeAnalysis.VisualBasic
         End Function
 
         Private Function RewriteDateComparisonOperator(node As BoundBinaryOperator) As BoundExpression
-            If inExpressionLambda Then
+            If _inExpressionLambda Then
                 Return node
             End If
 
@@ -424,7 +503,7 @@ Namespace Microsoft.CodeAnalysis.VisualBasic
         End Function
 
         Private Function RewriteDecimalComparisonOperator(node As BoundBinaryOperator) As BoundExpression
-            If inExpressionLambda Then
+            If _inExpressionLambda Then
                 Return node
             End If
 
@@ -533,14 +612,14 @@ Namespace Microsoft.CodeAnalysis.VisualBasic
                 End If
 
             Else
-                Debug.Assert(False)
+                Throw ExceptionUtilities.Unreachable
             End If
 
             Return result
         End Function
 
         Private Function RewritePowOperator(node As BoundBinaryOperator) As BoundExpression
-            If inExpressionLambda Then
+            If _inExpressionLambda Then
                 Return node
             End If
 
@@ -568,7 +647,7 @@ Namespace Microsoft.CodeAnalysis.VisualBasic
         End Function
 
         Private Function RewriteDecimalBinaryOperator(node As BoundBinaryOperator, member As SpecialMember) As BoundExpression
-            If inExpressionLambda Then
+            If _inExpressionLambda Then
                 Return node
             End If
 
@@ -649,7 +728,7 @@ Namespace Microsoft.CodeAnalysis.VisualBasic
             Dim memberSymbol = DirectCast(Compilation.GetWellKnownTypeMember(member), MethodSymbol)
 
             If Not ReportMissingOrBadRuntimeHelper(node, member, memberSymbol) Then
-                Debug.Assert(memberSymbol.ReturnType Is node.Type OrElse Me.inExpressionLambda AndAlso memberSymbol.ReturnType.IsObjectType)
+                Debug.Assert(memberSymbol.ReturnType Is node.Type OrElse Me._inExpressionLambda AndAlso memberSymbol.ReturnType.IsObjectType)
                 Debug.Assert(memberSymbol.Parameters(2).Type.IsBooleanType())
 
                 result = New BoundCall(node.Syntax, memberSymbol, Nothing, Nothing,
@@ -660,7 +739,7 @@ Namespace Microsoft.CodeAnalysis.VisualBasic
                                         memberSymbol.ReturnType,
                                         suppressObjectClone:=True)
 
-                If Me.inExpressionLambda AndAlso memberSymbol.ReturnType.IsObjectType AndAlso node.Type.IsBooleanType Then
+                If Me._inExpressionLambda AndAlso memberSymbol.ReturnType.IsObjectType AndAlso node.Type.IsBooleanType Then
                     result = New BoundConversion(node.Syntax, DirectCast(result, BoundExpression), ConversionKind.NarrowingBoolean, node.Checked, False, node.Type)
                 End If
             End If
@@ -717,29 +796,46 @@ Namespace Microsoft.CodeAnalysis.VisualBasic
             Return result
         End Function
 
-        Private Function RewriteLiftedIntrinsicBinaryOperator(node As BoundBinaryOperator) As BoundNode
-            Debug.Assert((node.OperatorKind And BinaryOperatorKind.Lifted) <> 0)
-
+        Private Function RewriteLiftedIntrinsicBinaryOperatorSimple(node As BoundBinaryOperator, optimizeForConditionalBranch As Boolean) As BoundNode
             Dim left As BoundExpression = VisitExpressionNode(node.Left)
-            Dim right As BoundExpression = VisitExpressionNode(node.Right)
+            Dim right As BoundExpression = VisitExpressionNode(GetRightOperand(node, optimizeForConditionalBranch))
 
-            If Me.inExpressionLambda Then
+            Return FinishRewriteOfLiftedIntrinsicBinaryOperator(node, left, right, optimizeForConditionalBranch)
+        End Function
+
+        Private Function FinishRewriteOfLiftedIntrinsicBinaryOperator(node As BoundBinaryOperator, left As BoundExpression, right As BoundExpression, optimizeForConditionalBranch As Boolean) As BoundExpression
+            Debug.Assert((node.OperatorKind And BinaryOperatorKind.Lifted) <> 0)
+            Debug.Assert(Not optimizeForConditionalBranch OrElse
+                         (node.OperatorKind And BinaryOperatorKind.OpMask) = BinaryOperatorKind.OrElse OrElse
+                         (node.OperatorKind And BinaryOperatorKind.OpMask) = BinaryOperatorKind.AndAlso)
+
+            Dim leftHasValue = HasValue(left)
+            Dim rightHasValue = HasValue(right)
+
+            Dim leftHasNoValue = HasNoValue(left)
+            Dim rightHasNoValue = HasNoValue(right)
+
+            ' The goal of optimization is to eliminate the need to deal with instances of Nullable(Of Boolean) type as early as possible,
+            ' and, as a result, simplify evaluation of built-in OrElse/AndAlso operators by eliminating the need to use three-valued Boolean logic.
+            ' The optimization is possible because when an entire Boolean Expression is evaluated to Null, that has the same effect as if result
+            ' of evaluation was False. However, we do want to preserve the original order of evaluation, according to language rules. 
+            If optimizeForConditionalBranch AndAlso node.Type.IsNullableOfBoolean() AndAlso left.Type.IsNullableOfBoolean() AndAlso right.Type.IsNullableOfBoolean() AndAlso
+               (leftHasValue OrElse Not Me._inExpressionLambda OrElse (node.OperatorKind And BinaryOperatorKind.OpMask) = BinaryOperatorKind.OrElse) Then
+
+                Return RewriteAndOptimizeLiftedIntrinsicLogicalShortCircuitingOperator(node, left, right, leftHasNoValue, leftHasValue, rightHasNoValue, rightHasValue)
+            End If
+
+            If Me._inExpressionLambda Then
                 Return node.Update(node.OperatorKind, left, right, node.Checked, node.ConstantValueOpt, node.Type)
             End If
 
             ' Check for trivial (no nulls, two nulls) Cases
-
-            Dim leftHasNoValue = HasNoValue(left)
-            Dim rightHasNoValue = HasNoValue(right)
 
             '== TWO NULLS
             If leftHasNoValue And rightHasNoValue Then
                 ' return new R?()
                 Return NullableNull(left, node.Type)
             End If
-
-            Dim leftHasValue = HasValue(left)
-            Dim rightHasValue = HasValue(right)
 
             '== NO NULLS
             If leftHasValue And rightHasValue Then
@@ -778,22 +874,22 @@ Namespace Microsoft.CodeAnalysis.VisualBasic
             ' We may also statically know if one is definitely not a null
             ' we cannot know, though, if whole operator yields null or not.
 
-            If rightHasValue AndAlso left.Kind = BoundKind.LoweredConditionalAccess Then
-                Dim rightValue = NullableValueOrDefault(right)
-                Dim conditional = DirectCast(left, BoundLoweredConditionalAccess)
+            If rightHasValue Then
+                Dim whenNotNull As BoundExpression = Nothing
+                Dim whenNull As BoundExpression = Nothing
+                If IsConditionalAccess(left, whenNotNull, whenNull) Then
+                    Dim rightValue = NullableValueOrDefault(right)
 
-                If (rightValue.IsConstant OrElse rightValue.Kind = BoundKind.Local OrElse rightValue.Kind = BoundKind.Parameter) AndAlso
-                   HasValue(conditional.WhenNotNull) AndAlso HasNoValue(conditional.WhenNullOpt) Then
+                    If (rightValue.IsConstant OrElse rightValue.Kind = BoundKind.Local OrElse rightValue.Kind = BoundKind.Parameter) AndAlso
+                       HasValue(whenNotNull) AndAlso HasNoValue(whenNull) Then
 
-                    Return conditional.Update(conditional.ReceiverOrCondition,
-                                              conditional.CaptureReceiver,
-                                              conditional.PlaceholderId,
-                                              WrapInNullable(ApplyUnliftedBinaryOp(node,
-                                                                                   NullableValueOrDefault(conditional.WhenNotNull),
-                                                                                   rightValue),
-                                                             node.Type),
-                                              NullableNull(conditional.WhenNullOpt, node.Type),
-                                              node.Type)
+                        Return UpdateConditionalAccess(left,
+                                                       WrapInNullable(ApplyUnliftedBinaryOp(node,
+                                                                                            NullableValueOrDefault(whenNotNull),
+                                                                                            rightValue),
+                                                                      node.Type),
+                                                       NullableNull(whenNull, node.Type))
+                    End If
                 End If
             End If
 
@@ -807,7 +903,7 @@ Namespace Microsoft.CodeAnalysis.VisualBasic
                                                        leftHasValueExpr,
                                                        temps,
                                                        inits,
-                                                       RightCanChangeLeftLocal(left, right),
+                                                       RightCantChangeLeftLocal(left, right),
                                                        leftHasValue)
 
             ' left is done when right is running, so right cannot change if it is a local
@@ -846,13 +942,128 @@ Namespace Microsoft.CodeAnalysis.VisualBasic
             Return value
         End Function
 
+        ''' <summary>
+        ''' The goal of optimization is to eliminate the need to deal with instances of Nullable(Of Boolean) type as early as possible,
+        ''' and, as a result, simplify evaluation of built-in OrElse/AndAlso operators by eliminating the need to use three-valued Boolean logic.
+        ''' The optimization is possible because when an entire Boolean Expression is evaluated to Null, that has the same effect as if result
+        ''' of evaluation was False. However, we do want to preserve the original order of evaluation, according to language rules. 
+        ''' This method returns an expression that still has Nullable(Of Boolean) type, but that expression is much simpler and can be 
+        ''' further simplified by the consumer.
+        ''' </summary>
+        Private Function RewriteAndOptimizeLiftedIntrinsicLogicalShortCircuitingOperator(node As BoundBinaryOperator,
+                                                                                         left As BoundExpression, right As BoundExpression,
+                                                                                         leftHasNoValue As Boolean, leftHasValue As Boolean,
+                                                                                         rightHasNoValue As Boolean, rightHasValue As Boolean) As BoundExpression
+
+            Debug.Assert(leftHasValue OrElse Not Me._inExpressionLambda OrElse (node.OperatorKind And BinaryOperatorKind.OpMask) = BinaryOperatorKind.OrElse)
+            Dim booleanResult As BoundExpression = Nothing
+
+            If Not Me._inExpressionLambda Then
+                If leftHasNoValue And rightHasNoValue Then
+                    ' return new R?(), the consumer will take care of optimizing it out if possible. 
+                    Return NullableNull(left, node.Type)
+                End If
+
+                If (node.OperatorKind And BinaryOperatorKind.OpMask) = BinaryOperatorKind.OrElse Then
+                    If leftHasNoValue Then
+                        ' There is nothing to evaluate on the left, the result is True only if Right is True
+                        Return right
+                    ElseIf rightHasNoValue Then
+                        ' There is nothing to evaluate on the right, the result is True only if Left is True
+                        Return left
+                    End If
+                Else
+                    Debug.Assert((node.OperatorKind And BinaryOperatorKind.OpMask) = BinaryOperatorKind.AndAlso)
+
+                    If leftHasNoValue Then
+                        ' We can return False in this case. There is nothing to evaluate on the left, but we still need to evaluate the right
+                        booleanResult = EvaluateOperandAndReturnFalse(node, right, rightHasValue)
+                    ElseIf rightHasNoValue Then
+                        ' We can return False in this case. There is nothing to evaluate on the right, but we still need to evaluate the left
+                        booleanResult = EvaluateOperandAndReturnFalse(node, left, leftHasValue)
+                    ElseIf Not leftHasValue Then
+                        ' We cannot tell whether Left is Null or not.
+                        ' For [x AndAlso y] we can produce Boolean result as follows:
+                        '
+                        ' tempX = x
+                        ' (Not tempX.HasValue OrElse tempX.GetValueOrDefault()) AndAlso
+                        ' (y.GetValueOrDefault() AndAlso tempX.HasValue)
+                        '
+                        Dim leftTemp As SynthesizedLocal = Nothing
+                        Dim leftInit As BoundExpression = Nothing
+
+                        ' Right may be a method that takes Left byref - " local AndAlso TakesArgByref(local) "
+                        ' So in general we must capture Left even if it is a local.
+                        Dim capturedLeft = CaptureNullableIfNeeded(left, leftTemp, leftInit, RightCantChangeLeftLocal(left, right))
+
+                        booleanResult = MakeBooleanBinaryExpression(node.Syntax,
+                                            BinaryOperatorKind.AndAlso,
+                                            MakeBooleanBinaryExpression(node.Syntax,
+                                                BinaryOperatorKind.OrElse,
+                                                New BoundUnaryOperator(node.Syntax,
+                                                                       UnaryOperatorKind.Not,
+                                                                       NullableHasValue(capturedLeft),
+                                                                       False,
+                                                                       node.Type.GetNullableUnderlyingType()),
+                                                NullableValueOrDefault(capturedLeft)),
+                                            MakeBooleanBinaryExpression(node.Syntax,
+                                                BinaryOperatorKind.AndAlso,
+                                                NullableValueOrDefault(right),
+                                                NullableHasValue(capturedLeft)))
+
+                        ' if we used temp, put it in a sequence
+                        Debug.Assert((leftTemp Is Nothing) = (leftInit Is Nothing))
+                        If leftTemp IsNot Nothing Then
+                            booleanResult = New BoundSequence(node.Syntax,
+                                                              ImmutableArray.Create(Of LocalSymbol)(leftTemp),
+                                                              ImmutableArray.Create(Of BoundExpression)(leftInit),
+                                                              booleanResult,
+                                                              booleanResult.Type)
+                        End If
+                    End If
+                End If
+            End If
+
+            If booleanResult Is Nothing Then
+                ' UnliftedOp(left.GetValueOrDefault(), right.GetValueOrDefault()))
+                ' For AndAlso, this optimization is valid only when we know that left has value
+                Debug.Assert(leftHasValue OrElse (node.OperatorKind And BinaryOperatorKind.OpMask) = BinaryOperatorKind.OrElse)
+
+                booleanResult = ApplyUnliftedBinaryOp(node, NullableValueOrDefault(left, leftHasValue), NullableValueOrDefault(right, rightHasValue))
+            End If
+
+            ' return new R?(booleanResult), the consumer will take care of optimizing out the creation of this Nullable(Of Boolean) instance, if possible.
+            Return WrapInNullable(booleanResult, node.Type)
+        End Function
+
+        Private Function EvaluateOperandAndReturnFalse(node As BoundBinaryOperator, operand As BoundExpression, operandHasValue As Boolean) As BoundExpression
+            Debug.Assert(node.Type.IsNullableOfBoolean())
+            Debug.Assert(operand.Type.IsNullableOfBoolean())
+
+            Dim result = New BoundLiteral(node.Syntax, ConstantValue.False, node.Type.GetNullableUnderlyingType())
+            Return New BoundSequence(node.Syntax, ImmutableArray(Of LocalSymbol).Empty,
+                                     ImmutableArray.Create(If(operandHasValue, NullableValueOrDefault(operand), operand)),
+                                     result, result.Type)
+        End Function
+
+        Private Function NullableValueOrDefault(operand As BoundExpression, operandHasValue As Boolean) As BoundExpression
+            Debug.Assert(operand.Type.IsNullableOfBoolean())
+
+            If Not Me._inExpressionLambda OrElse operandHasValue Then
+                Return NullableValueOrDefault(operand)
+            Else
+                ' In expression tree this will be shown as Coalesce, which is preferred over a GetValueOrDefault call  
+                Return New BoundNullableIsTrueOperator(operand.Syntax, operand, operand.Type.GetNullableUnderlyingType())
+            End If
+        End Function
+
         Private Function RewriteLiftedBooleanBinaryOperator(node As BoundBinaryOperator,
                                                             left As BoundExpression,
                                                             right As BoundExpression,
                                                             leftHasNoValue As Boolean,
                                                             rightHasNoValue As Boolean,
                                                             leftHasValue As Boolean,
-                                                            rightHasValue As Boolean) As BoundNode
+                                                            rightHasValue As Boolean) As BoundExpression
 
             Debug.Assert(left.Type.IsNullableOfBoolean AndAlso right.Type.IsNullableOfBoolean AndAlso node.Type.IsNullableOfBoolean)
             Debug.Assert(Not (leftHasNoValue And rightHasNoValue))
@@ -946,10 +1157,10 @@ Namespace Microsoft.CodeAnalysis.VisualBasic
             ' x And y is rewritten into:
             '
             ' tempX = x
-            ' [tempY = y] ' if not shorcircuiting
+            ' [tempY = y] ' if not short-circuiting
             ' If (tempX.HasValue AndAlso Not tempX.GetValueOrDefault(),
             '   False?,                             ' result based on the left operand
-            '   If ((tempY = y).HasValue,           ' if shortcircuiting, otherwise just "y.HasValue"
+            '   If ((tempY = y).HasValue,           ' if short-circuiting, otherwise just "y.HasValue"
             '       If (tempY.GetValueOrDefault(),  ' innermost If
             '           tempX,
             '           False?),
@@ -969,7 +1180,7 @@ Namespace Microsoft.CodeAnalysis.VisualBasic
             If Not leftHasValue Then
                 ' Right may be a method that takes Left byref - " local And TakesArgByref(local) "
                 ' So in general we must capture Left even if it is a local.
-                capturedLeft = CaptureNullableIfNeeded(left, leftTemp, leftInit, RightCanChangeLeftLocal(left, right))
+                capturedLeft = CaptureNullableIfNeeded(left, leftTemp, leftInit, RightCantChangeLeftLocal(left, right))
             End If
 
             Dim rightTemp As SynthesizedLocal = Nothing
@@ -1009,7 +1220,7 @@ Namespace Microsoft.CodeAnalysis.VisualBasic
                     '       nestedIf,
                     '       Null)
                     '
-                    ' note that we use init of the Right as a target of HasValue when shortcircuiting 
+                    ' note that we use init of the Right as a target of HasValue when short-circuiting 
                     ' it will run only if we do not get result after looking at left
                     '
                     ' NOTE: when not short circuiting we use captured right and evaluate init 
@@ -1108,11 +1319,11 @@ Namespace Microsoft.CodeAnalysis.VisualBasic
             Debug.Assert(left.IsNothingLiteral OrElse right.IsNothingLiteral)
             Debug.Assert(node.OperatorKind = BinaryOperatorKind.Is OrElse node.OperatorKind = BinaryOperatorKind.IsNot)
 
-            If inExpressionLambda Then
+            If _inExpressionLambda Then
                 Return node
             End If
 
-            Return RewriteNullableIsOrIsNotOperator(node.OperatorKind = BinaryOperatorKind.Is, If(left.IsNothingLiteral, right, left), node.Type)
+            Return RewriteNullableIsOrIsNotOperator((node.OperatorKind And BinaryOperatorKind.OpMask) = BinaryOperatorKind.Is, If(left.IsNothingLiteral, right, left), node.Type)
         End Function
 
         Private Function RewriteNullableIsOrIsNotOperator(isIs As Boolean, operand As BoundExpression, resultType As TypeSymbol) As BoundExpression
@@ -1134,16 +1345,13 @@ Namespace Microsoft.CodeAnalysis.VisualBasic
                                     resultType))
             Else
 
-                If operand.Kind = BoundKind.LoweredConditionalAccess Then
-                    Dim conditional = DirectCast(operand, BoundLoweredConditionalAccess)
-
-                    If HasNoValue(conditional.WhenNullOpt) Then
-                        Return conditional.Update(conditional.ReceiverOrCondition,
-                                                  conditional.CaptureReceiver,
-                                                  conditional.PlaceholderId,
-                                                  RewriteNullableIsOrIsNotOperator(isIs, conditional.WhenNotNull, resultType),
-                                                  RewriteNullableIsOrIsNotOperator(isIs, conditional.WhenNullOpt, resultType),
-                                                  resultType)
+                Dim whenNotNull As BoundExpression = Nothing
+                Dim whenNull As BoundExpression = Nothing
+                If IsConditionalAccess(operand, whenNotNull, whenNull) Then
+                    If HasNoValue(whenNull) Then
+                        Return UpdateConditionalAccess(operand,
+                                                       RewriteNullableIsOrIsNotOperator(isIs, whenNotNull, resultType),
+                                                       RewriteNullableIsOrIsNotOperator(isIs, whenNull, resultType))
                     End If
                 End If
 
@@ -1175,10 +1383,10 @@ Namespace Microsoft.CodeAnalysis.VisualBasic
             '         |                   |
             '       LEFT                RIGHT
             '
-            ' Implicit left/right unwraping conversions if present are always L? -> L and R? -> R
+            ' Implicit left/right unwrapping conversions if present are always L? -> L and R? -> R
             ' They are encoded as a disparity between CALL argument types and parameter types of the call symbol.
             '
-            ' Implicit wrapping conversion of the resilt, if present, is always T -> T?
+            ' Implicit wrapping conversion of the result, if present, is always T -> T?
             '
             ' The rewrite is:
             '   If (LEFT.HasValue And RIGHT.HasValue, CALL(LEFT, RIGHT), Null)
@@ -1243,24 +1451,26 @@ Namespace Microsoft.CodeAnalysis.VisualBasic
                 condition = MakeBooleanBinaryExpression(node.Syntax, BinaryOperatorKind.And, leftHasValueExpression, rightHasValueExpression)
             End If
 
-            Debug.Assert(leftCallInput.Type.IsSameTypeIgnoringCustomModifiers(operatorCall.Method.Parameters(0).Type),
+            Debug.Assert(leftCallInput.Type.IsSameTypeIgnoringAll(operatorCall.Method.Parameters(0).Type),
                          "operator must take either unwrapped values or not-nullable left directly")
-            Debug.Assert(rightCallInput.Type.IsSameTypeIgnoringCustomModifiers(operatorCall.Method.Parameters(1).Type),
+            Debug.Assert(rightCallInput.Type.IsSameTypeIgnoringAll(operatorCall.Method.Parameters(1).Type),
                          "operator must take either unwrapped values or not-nullable right directly")
 
             Dim whenHasValue As BoundExpression = operatorCall.Update(operatorCall.Method,
                                                                        Nothing,
                                                                        operatorCall.ReceiverOpt,
                                                                        ImmutableArray.Create(Of BoundExpression)(leftCallInput, rightCallInput),
+                                                                       Nothing,
                                                                        operatorCall.ConstantValueOpt,
-                                                                       operatorCall.SuppressObjectClone,
-                                                                       operatorCall.Method.ReturnType)
+                                                                       isLValue:=operatorCall.IsLValue,
+                                                                       suppressObjectClone:=operatorCall.SuppressObjectClone,
+                                                                       type:=operatorCall.Method.ReturnType)
 
-            If Not whenHasValue.Type.IsSameTypeIgnoringCustomModifiers(resultType) Then
+            If Not whenHasValue.Type.IsSameTypeIgnoringAll(resultType) Then
                 whenHasValue = WrapInNullable(whenHasValue, resultType)
             End If
 
-            Debug.Assert(whenHasValue.Type.IsSameTypeIgnoringCustomModifiers(resultType), "result type must be same as resultType")
+            Debug.Assert(whenHasValue.Type.IsSameTypeIgnoringAll(resultType), "result type must be same as resultType")
 
             ' RESULT
 

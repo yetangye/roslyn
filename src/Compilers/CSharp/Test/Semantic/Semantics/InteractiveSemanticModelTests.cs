@@ -1,10 +1,16 @@
-﻿// Copyright (c) Microsoft.  All Rights Reserved.  Licensed under the Apache License, Version 2.0.  See License.txt in the project root for license information.
+﻿// Licensed to the .NET Foundation under one or more agreements.
+// The .NET Foundation licenses this file to you under the MIT license.
+// See the LICENSE file in the project root for more information.
 
+#nullable disable
+
+using System;
 using System.Collections.Generic;
 using System.Linq;
 using Microsoft.CodeAnalysis.CSharp.Symbols;
 using Microsoft.CodeAnalysis.CSharp.Syntax;
 using Microsoft.CodeAnalysis.CSharp.Test.Utilities;
+using Microsoft.CodeAnalysis.Test.Utilities;
 using Microsoft.CodeAnalysis.Text;
 using Roslyn.Test.Utilities;
 using Xunit;
@@ -16,18 +22,18 @@ namespace Microsoft.CodeAnalysis.CSharp.UnitTests
         [Fact]
         public void NamespaceBindingInInteractiveCode()
         {
-            var compilation = CreateCompilationWithMscorlib(@"
-using Z = Foo.Bar.Script.C;
+            var compilation = CreateCompilation(@"
+using Z = Goo.Bar.Script.C;
 
 class C { }
 
-namespace Foo.Bar
+namespace Goo.Bar
 {
     class B : Z { }
 }
 ",
                 parseOptions: TestOptions.Script,
-                options: TestOptions.ReleaseExe.WithScriptClassName("Foo.Bar.Script")
+                options: TestOptions.ReleaseExe.WithScriptClassName("Goo.Bar.Script")
             );
 
             var tree = compilation.SyntaxTrees[0];
@@ -35,10 +41,10 @@ namespace Foo.Bar
             var classB = (root.Members[1] as NamespaceDeclarationSyntax).Members[0] as TypeDeclarationSyntax;
             var model = compilation.GetSemanticModel(tree);
             var symbol = model.GetDeclaredSymbol(classB);
-            Assert.NotNull(symbol);
-            Assert.NotNull(symbol.BaseType);
-            Assert.Equal("Foo.Bar.B", symbol.ToTestDisplayString());
-            Assert.Equal("Foo.Bar.Script.C", symbol.BaseType.ToTestDisplayString());
+            var baseType = symbol?.BaseType;
+            Assert.NotNull(baseType);
+            Assert.Equal(TypeKind.Error, baseType.TypeKind);
+            Assert.Equal(LookupResultKind.Inaccessible, baseType.GetSymbol<ErrorTypeSymbol>().ResultKind); // Script class members are private.
         }
 
         [Fact]
@@ -46,10 +52,10 @@ namespace Foo.Bar
         {
             CompileAndVerifyBindInfo(@"
 public static string[] str = null;
-public static void Foo(string[] r, string i) { str = r;}
-public static void Foo(params string[] r) { str = r;}
-/*<bind>*/ Foo(""1"", ""2"") /*</bind>*/;",
-"Foo(params string[])");
+public static void Goo(string[] r, string i) { str = r;}
+public static void Goo(params string[] r) { str = r;}
+/*<bind>*/ Goo(""1"", ""2"") /*</bind>*/;",
+"Goo(params string[])");
         }
 
         [Fact]
@@ -70,8 +76,8 @@ InnerClass iC = new InnerClass();
         public void MethodCallBinding()
         {
             var testSrc = @"
-void Foo() {};
-/*<bind>*/Foo()/*</bind>*/;
+void Goo() {};
+/*<bind>*/Goo()/*</bind>*/;
 ";
             // Get the bind info for the text identified within the commented <bind> </bind> tags
             var bindInfo = GetBindInfoForTest(testSrc);
@@ -90,7 +96,7 @@ void Foo() {};
         }
 
         [Fact]
-        public void BindBoolenField()
+        public void BindBooleanField()
         {
             var testSrc = @"
 bool result = true ;
@@ -120,10 +126,10 @@ int field = constantField;
             Assert.Equal(SpecialType.System_Int32, bindInfo.Type.SpecialType);
             var symbol = bindInfo.Symbol;
             Assert.Equal("System.Int32 local1", symbol.ToTestDisplayString());
-            Assert.IsAssignableFrom<SourceLocalSymbol>(symbol);
+            Assert.IsAssignableFrom<SourceLocalSymbol>(symbol.GetSymbol());
         }
 
-        [WorkItem(540513, "DevDiv")]
+        [WorkItem(540513, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/540513")]
         [Fact]
         public void BindVariableInGlobalStatement()
         {
@@ -138,7 +144,7 @@ int i = 2;
             Assert.Equal(SymbolKind.Field, symbol.Kind);
         }
 
-        [WorkItem(543860, "DevDiv")]
+        [WorkItem(543860, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/543860")]
         [Fact]
         public void BindVarKeyword()
         {
@@ -163,7 +169,7 @@ int i = 2;
             Assert.False(semanticInfo.IsCompileTimeConstant);
         }
 
-        [WorkItem(543860, "DevDiv")]
+        [WorkItem(543860, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/543860")]
         [Fact]
         public void BindVarKeyword_MultipleDeclarators()
         {
@@ -188,7 +194,7 @@ int i = 2;
             Assert.False(semanticInfo.IsCompileTimeConstant);
         }
 
-        [WorkItem(543860, "DevDiv")]
+        [WorkItem(543860, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/543860")]
         [Fact]
         public void BindVarNamedType()
         {
@@ -214,7 +220,7 @@ public class var { }
             Assert.False(semanticInfo.IsCompileTimeConstant);
         }
 
-        [WorkItem(543860, "DevDiv")]
+        [WorkItem(543860, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/543860")]
         [Fact]
         public void BindVarNamedType_Ambiguous()
         {
@@ -247,14 +253,14 @@ public struct var { }
             Assert.False(semanticInfo.IsCompileTimeConstant);
         }
 
-        [WorkItem(543864, "DevDiv")]
+        [WorkItem(543864, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/543864")]
         [Fact]
         public void BindQueryVariable()
         {
             string testSrc = @"
 using System.Linq;
 
-var x = from c in ""foo"" select /*<bind>*/c/*</bind>*/";
+var x = from c in ""goo"" select /*<bind>*/c/*</bind>*/";
             // Get the bind info for the text identified within the commented <bind> </bind> tags
             var semanticInfo = GetBindInfoForTest(testSrc);
             Assert.Equal("c", semanticInfo.Symbol.Name);
@@ -263,60 +269,6 @@ var x = from c in ""foo"" select /*<bind>*/c/*</bind>*/";
         }
 
         #region helpers
-
-        protected List<SyntaxNode> GetSyntaxNodeList(SyntaxTree syntaxTree)
-        {
-            return GetSyntaxNodeList(syntaxTree.GetCompilationUnitRoot(), null);
-        }
-
-        protected List<SyntaxNode> GetSyntaxNodeList(SyntaxNode node, List<SyntaxNode> synList)
-        {
-            if (synList == null)
-                synList = new List<SyntaxNode>();
-
-            synList.Add(node);
-
-            foreach (var child in node.ChildNodesAndTokens())
-            {
-                if (child.IsNode)
-                    synList = GetSyntaxNodeList(child.AsNode(), synList);
-            }
-
-            return synList;
-        }
-
-        protected SyntaxNode GetSyntaxNodeForBinding(List<SyntaxNode> synList)
-        {
-            foreach (var node in synList)
-            {
-                string exprFullText = node.ToFullString();
-                exprFullText = exprFullText.Trim();
-
-                if (exprFullText.StartsWith("/*<bind>*/"))
-                {
-                    if (exprFullText.Contains("/*</bind>*/"))
-                        if (exprFullText.EndsWith("/*</bind>*/"))
-                            return node;
-                        else
-                            continue;
-                    else
-                        return node;
-                }
-
-                if (exprFullText.EndsWith("/*</bind>*/"))
-                {
-                    if (exprFullText.Contains("/*<bind>*/"))
-                        if (exprFullText.StartsWith("/*<bind>*/"))
-                            return node;
-                        else
-                            continue;
-                    else
-                        return node;
-                }
-            }
-
-            return null;
-        }
 
         private List<ExpressionSyntax> GetExprSyntaxList(SyntaxTree syntaxTree)
         {
@@ -349,11 +301,11 @@ var x = from c in ""foo"" select /*<bind>*/c/*</bind>*/";
                 string exprFullText = exprSyntax.ToFullString();
                 exprFullText = exprFullText.Trim();
 
-                if (exprFullText.StartsWith("/*<bind>*/"))
+                if (exprFullText.StartsWith("/*<bind>*/", StringComparison.Ordinal))
                 {
                     if (exprFullText.Contains("/*</bind>*/"))
                     {
-                        if (exprFullText.EndsWith("/*</bind>*/"))
+                        if (exprFullText.EndsWith("/*</bind>*/", StringComparison.Ordinal))
                         {
                             return exprSyntax;
                         }
@@ -368,11 +320,11 @@ var x = from c in ""foo"" select /*<bind>*/c/*</bind>*/";
                     }
                 }
 
-                if (exprFullText.EndsWith("/*</bind>*/"))
+                if (exprFullText.EndsWith("/*</bind>*/", StringComparison.Ordinal))
                 {
                     if (exprFullText.Contains("/*<bind>*/"))
                     {
-                        if (exprFullText.StartsWith("/*<bind>*/"))
+                        if (exprFullText.StartsWith("/*<bind>*/", StringComparison.Ordinal))
                         {
                             return exprSyntax;
                         }
@@ -402,8 +354,7 @@ var x = from c in ""foo"" select /*<bind>*/c/*</bind>*/";
 
         private CompilationUtils.SemanticInfoSummary GetBindInfoForTest(string testSrc)
         {
-            var compilation = CreateCompilationWithMscorlib(
-                testSrc, parseOptions: TestOptions.Script, references: new[] { SystemCoreRef });
+            var compilation = CreateCompilation(testSrc, parseOptions: TestOptions.Script);
             var tree = compilation.SyntaxTrees[0];
             var model = compilation.GetSemanticModel(tree);
             var exprSyntaxToBind = GetExprSyntaxForBinding(GetExprSyntaxList(tree));

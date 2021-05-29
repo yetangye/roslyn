@@ -1,4 +1,8 @@
-// Copyright (c) Microsoft.  All Rights Reserved.  Licensed under the Apache License, Version 2.0.  See License.txt in the project root for license information.
+﻿// Licensed to the .NET Foundation under one or more agreements.
+// The .NET Foundation licenses this file to you under the MIT license.
+// See the LICENSE file in the project root for more information.
+
+#nullable disable
 
 using System;
 using System.Collections.Generic;
@@ -10,17 +14,17 @@ namespace Microsoft.CodeAnalysis.Editor
 {
     internal interface ITextBufferAssociatedViewService
     {
-        IEnumerable<IWpfTextView> GetAssociatedTextViews(ITextBuffer textBuffer);
+        IEnumerable<ITextView> GetAssociatedTextViews(ITextBuffer textBuffer);
 
         event EventHandler<SubjectBuffersConnectedEventArgs> SubjectBuffersConnected;
     }
 
     internal class SubjectBuffersConnectedEventArgs
     {
-        public ReadOnlyCollection<ITextBuffer> SubjectBuffers { get; private set; }
-        public IWpfTextView TextView { get; private set; }
+        public ReadOnlyCollection<ITextBuffer> SubjectBuffers { get; }
+        public ITextView TextView { get; }
 
-        public SubjectBuffersConnectedEventArgs(IWpfTextView textView, ReadOnlyCollection<ITextBuffer> subjectBuffers)
+        public SubjectBuffersConnectedEventArgs(ITextView textView, ReadOnlyCollection<ITextBuffer> subjectBuffers)
         {
             this.TextView = textView;
             this.SubjectBuffers = subjectBuffers;

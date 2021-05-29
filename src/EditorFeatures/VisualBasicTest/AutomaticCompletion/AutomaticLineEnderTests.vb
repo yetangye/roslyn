@@ -1,55 +1,53 @@
-' Copyright (c) Microsoft.  All Rights Reserved.  Licensed under the Apache License, Version 2.0.  See License.txt in the project root for license information.
+﻿' Licensed to the .NET Foundation under one or more agreements.
+' The .NET Foundation licenses this file to you under the MIT license.
+' See the LICENSE file in the project root for more information.
 
-Imports System.ComponentModel.Composition.Hosting
-Imports System.Xml.Linq
-Imports Microsoft.CodeAnalysis.Editor.Commands
-Imports Microsoft.CodeAnalysis.Editor.Host
 Imports Microsoft.CodeAnalysis.Editor.UnitTests.AutomaticCompletion
 Imports Microsoft.CodeAnalysis.Editor.UnitTests.Extensions
+Imports Microsoft.CodeAnalysis.Editor.UnitTests.Utilities
 Imports Microsoft.CodeAnalysis.Editor.UnitTests.Workspaces
 Imports Microsoft.CodeAnalysis.Editor.VisualBasic.AutomaticCompletion
 Imports Microsoft.CodeAnalysis.Editor.VisualBasic.EndConstructGeneration
-Imports Microsoft.CodeAnalysis.Options
-Imports Microsoft.CodeAnalysis.Text
-Imports Microsoft.VisualStudio.Language.Intellisense
+Imports Microsoft.VisualStudio.Commanding
+Imports Microsoft.VisualStudio.Text.Editor.Commanding.Commands
 Imports Microsoft.VisualStudio.Text.Operations
 
 Namespace Microsoft.CodeAnalysis.Editor.VisualBasic.UnitTests.AutomaticCompletion
     Public Class AutomaticLineEnderTests
         Inherits AbstractAutomaticLineEnderTests
 
-        <Fact, Trait(Traits.Feature, Traits.Features.AutomaticCompletion)>
-        Public Sub Creation()
+        <WpfFact, Trait(Traits.Feature, Traits.Features.AutomaticCompletion)>
+        Public Sub TestCreation()
             Test(<code>
 $$</code>, <code>$$</code>)
         End Sub
 
-        <Fact, Trait(Traits.Feature, Traits.Features.AutomaticCompletion)>
-        Public Sub [Imports]()
+        <WpfFact, Trait(Traits.Feature, Traits.Features.AutomaticCompletion)>
+        Public Sub TestImports()
             Test(<code>Imports _
     $$
 </code>, <code>Imports$$
 </code>)
         End Sub
 
-        <WorkItem(530591)>
-        <Fact, Trait(Traits.Feature, Traits.Features.AutomaticCompletion)>
-        Public Sub [Namespace]()
+        <WorkItem(530591, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/530591")>
+        <WpfFact, Trait(Traits.Feature, Traits.Features.AutomaticCompletion)>
+        Public Sub TestNamespace()
             Test(<code>Namespace NS
     $$
 End Namespace</code>, <code>Namespace NS$$</code>)
         End Sub
 
-        <WorkItem(530591)>
-        <Fact, Trait(Traits.Feature, Traits.Features.AutomaticCompletion)>
-        Public Sub [Class]()
+        <WorkItem(530591, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/530591")>
+        <WpfFact, Trait(Traits.Feature, Traits.Features.AutomaticCompletion)>
+        Public Sub TestClass()
             Test(<code>Class C
     $$
 End Class</code>, <code>Class C$$</code>)
         End Sub
 
-        <Fact, Trait(Traits.Feature, Traits.Features.AutomaticCompletion)>
-        Public Sub Method()
+        <WpfFact, Trait(Traits.Feature, Traits.Features.AutomaticCompletion)>
+        Public Sub TestMethod()
             Test(<code>Class C
     Sub Method()
         $$
@@ -59,8 +57,8 @@ End Class</code>, <code>Class C
 End Class</code>)
         End Sub
 
-        <Fact, Trait(Traits.Feature, Traits.Features.AutomaticCompletion)>
-        Public Sub [Dim]()
+        <WpfFact, Trait(Traits.Feature, Traits.Features.AutomaticCompletion)>
+        Public Sub TestDim()
             Test(<code>Class C
     Sub Method()
         Dim _
@@ -73,8 +71,8 @@ End Class</code>, <code>Class C
 End Class</code>)
         End Sub
 
-        <Fact, Trait(Traits.Feature, Traits.Features.AutomaticCompletion)>
-        Public Sub Dim1()
+        <WpfFact, Trait(Traits.Feature, Traits.Features.AutomaticCompletion)>
+        Public Sub TestDim1()
             Test(<code>Class C
     Sub Method()
         Dim i =
@@ -87,8 +85,8 @@ End Class</code>, <code>Class C
 End Class</code>)
         End Sub
 
-        <Fact, Trait(Traits.Feature, Traits.Features.AutomaticCompletion)>
-        Public Sub Dim2()
+        <WpfFact, Trait(Traits.Feature, Traits.Features.AutomaticCompletion)>
+        Public Sub TestDim2()
             Test(<code>Class C
     Sub Method()
         Dim i
@@ -101,9 +99,9 @@ End Class</code>, <code>Class C
 End Class</code>)
         End Sub
 
-        <WorkItem(712977)>
-        <Fact(), Trait(Traits.Feature, Traits.Features.AutomaticCompletion)>
-        Public Sub Dim3()
+        <WorkItem(712977, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/712977")>
+        <WpfFact(), Trait(Traits.Feature, Traits.Features.AutomaticCompletion)>
+        Public Sub TestDim3()
             Test(<code>Class C
     Sub Method()
         Dim _
@@ -118,25 +116,25 @@ $$
 End Class</code>)
         End Sub
 
-        <WorkItem(530591)>
-        <Fact, Trait(Traits.Feature, Traits.Features.AutomaticCompletion)>
-        Public Sub Dim_After_MalformedStatement()
+        <WorkItem(530591, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/530591")>
+        <WpfFact, Trait(Traits.Feature, Traits.Features.AutomaticCompletion)>
+        Public Sub TestDim_After_MalformedStatement()
             Test(<code>Class C
     Sub Method()
-        Dim _ ' test
+        Dim _  test
 
         $$
     End Sub
 End Class</code>, <code>Class C
     Sub Method()
-        Dim _ ' test
+        Dim _  test
 $$
     End Sub
 End Class</code>)
         End Sub
 
-        <Fact, Trait(Traits.Feature, Traits.Features.AutomaticCompletion)>
-        Public Sub [If]()
+        <WpfFact, Trait(Traits.Feature, Traits.Features.AutomaticCompletion)>
+        Public Sub TestIf()
             Test(
 <code>
 Class C
@@ -156,9 +154,9 @@ End Class
 </code>)
         End Sub
 
-        <WorkItem(530591)>
-        <Fact, Trait(Traits.Feature, Traits.Features.AutomaticCompletion)>
-        Public Sub If_Trivia()
+        <WorkItem(530591, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/530591")>
+        <WpfFact, Trait(Traits.Feature, Traits.Features.AutomaticCompletion)>
+        Public Sub TestIf_Trivia()
             Test(
 <code>
 Class C
@@ -178,9 +176,9 @@ End Class
 </code>)
         End Sub
 
-        <WorkItem(530591)>
-        <Fact, Trait(Traits.Feature, Traits.Features.AutomaticCompletion)>
-        Public Sub If_Trivia2()
+        <WorkItem(530591, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/530591")>
+        <WpfFact, Trait(Traits.Feature, Traits.Features.AutomaticCompletion)>
+        Public Sub TestIf_Trivia2()
             Test(
 <code>
 Class C
@@ -200,9 +198,9 @@ End Class
 </code>)
         End Sub
 
-        <WorkItem(577920)>
-        <Fact, Trait(Traits.Feature, Traits.Features.AutomaticCompletion)>
-        Public Sub EndOfFile_SkippedToken()
+        <WorkItem(577920, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/577920")>
+        <WpfFact, Trait(Traits.Feature, Traits.Features.AutomaticCompletion)>
+        Public Sub TestEndOfFile_SkippedToken()
             Test(
 <code>
 Module M
@@ -221,8 +219,10 @@ End Module
 </code>)
         End Sub
 
-        <Fact, Trait(Traits.Feature, Traits.Features.AutomaticCompletion)>
-        Public Sub WithLineContinuation()
+        ' The test verifies the integrated behavior which keeps the space '_'.
+        ' This corresponds to the actual VS behavior.
+        <WpfFact, Trait(Traits.Feature, Traits.Features.AutomaticCompletion)>
+        Public Sub TestWithLineContinuation()
             Test(
 <code>
 Module M
@@ -241,17 +241,36 @@ End Module
 </code>)
         End Sub
 
+        <WpfFact, Trait(Traits.Feature, Traits.Features.AutomaticCompletion)>
+        Public Sub TestWithLineContinuationCommentsAfterLineContinuation()
+            Test(
+<code>
+Module M
+    Sub Main()
+        Dim _ ' Test
+            $$
+    End Sub
+End Module
+</code>,
+<code>
+Module M
+    Sub Main()
+        Dim _ ' Test$$
+    End Sub
+End Module
+</code>)
+        End Sub
+
         Private Overloads Sub Test(expected As XElement, code As XElement)
             Test(expected.NormalizedValue(), code.NormalizedValue())
         End Sub
 
-        Friend Overrides Function CreateCommandHandler(
-            waitIndicator As Microsoft.CodeAnalysis.Editor.Host.IWaitIndicator,
-            undoRegistry As ITextUndoHistoryRegistry,
-            editorOperations As IEditorOperationsFactoryService
-        ) As ICommandHandler(Of AutomaticLineEnderCommandArgs)
+        Friend Overrides Function GetCommandHandler(workspace As TestWorkspace) As IChainedCommandHandler(Of AutomaticLineEnderCommandArgs)
 
-            Return New AutomaticLineEnderCommandHandler(waitIndicator, undoRegistry, editorOperations)
+            Return Assert.IsType(Of AutomaticLineEnderCommandHandler)(
+                workspace.GetService(Of ICommandHandler)(
+                    ContentTypeNames.VisualBasicContentType,
+                    PredefinedCommandHandlerNames.AutomaticLineEnder))
         End Function
 
         Protected Overrides Function CreateNextHandler(workspace As TestWorkspace) As Action
@@ -264,12 +283,14 @@ End Module
 
             Return Sub()
                        endConstructor.ExecuteCommand_AutomaticLineEnderCommandHandler(
-                           New AutomaticLineEnderCommandArgs(view, buffer), Sub() Exit Sub)
+                           New AutomaticLineEnderCommandArgs(view, buffer), Sub() Exit Sub, TestCommandExecutionContext.Create())
                    End Sub
         End Function
 
-        Protected Overrides Function CreateWorkspace(code() As String) As TestWorkspace
-            Return VisualBasicWorkspaceFactory.CreateWorkspaceFromLines(code)
-        End Function
+        Protected Overrides ReadOnly Property Language As String
+            Get
+                Return LanguageNames.VisualBasic
+            End Get
+        End Property
     End Class
 End Namespace

@@ -1,10 +1,14 @@
-﻿// Copyright (c) Microsoft.  All Rights Reserved.  Licensed under the Apache License, Version 2.0.  See License.txt in the project root for license information.
+﻿// Licensed to the .NET Foundation under one or more agreements.
+// The .NET Foundation licenses this file to you under the MIT license.
+// See the LICENSE file in the project root for more information.
 
 using System;
 using System.Collections.Generic;
 using System.Collections.Immutable;
 using System.Diagnostics;
+using System.Reflection.Metadata;
 using Roslyn.Utilities;
+using static System.Linq.ImmutableArrayExtensions;
 
 namespace Microsoft.CodeAnalysis.CodeGen
 {
@@ -30,7 +34,7 @@ namespace Microsoft.CodeAnalysis.CodeGen
             Debug.Assert(!code.IsControlTransfer(),
                 "Control transferring opcodes should not be emitted directly. Use special methods such as EmitRet().");
 
-            WriteOpCode(this.GetCurrentStream(), code);
+            WriteOpCode(this.GetCurrentWriter(), code);
 
             _emitState.AdjustStack(stackAdjustment);
             _emitState.InstructionAdded();
@@ -38,14 +42,42 @@ namespace Microsoft.CodeAnalysis.CodeGen
 
         internal void EmitToken(string value)
         {
-            uint token = module == null ? 0xFFFF : module.GetFakeStringTokenForIL(value);
-            this.GetCurrentStream().WriteUint(token);
+            uint token = module?.GetFakeStringTokenForIL(value) ?? 0xFFFF;
+            this.GetCurrentWriter().WriteUInt32(token);
         }
 
-        internal void EmitToken(Microsoft.Cci.IReference value, SyntaxNode syntaxNode, DiagnosticBag diagnostics)
+        internal void EmitToken(Cci.IReference value, SyntaxNode syntaxNode, DiagnosticBag diagnostics, bool encodeAsRawToken = false)
         {
-            uint token = module == null ? 0xFFFF : module.GetFakeSymbolTokenForIL(value, syntaxNode, diagnostics);
-            this.GetCurrentStream().WriteUint(token);
+            uint token = module?.GetFakeSymbolTokenForIL(value, syntaxNode, diagnostics) ?? 0xFFFF;
+            // Setting the high bit indicates that the token value is to be interpreted literally rather than as a handle.
+            if (encodeAsRawToken)
+            {
+                token |= Cci.MetadataWriter.LiteralMethodDefinitionToken;
+            }
+            this.GetCurrentWriter().WriteUInt32(token);
+        }
+
+        internal void EmitToken(Cci.ISignature value, SyntaxNode syntaxNode, DiagnosticBag diagnostics)
+        {
+            uint token = module?.GetFakeSymbolTokenForIL(value, syntaxNode, diagnostics) ?? 0xFFFF;
+            this.GetCurrentWriter().WriteUInt32(token);
+        }
+
+        internal void EmitGreatestMethodToken()
+        {
+            // A magic value indicates that the token value is to be the literal value of the greatest method definition token.
+            this.GetCurrentWriter().WriteUInt32(Cci.MetadataWriter.LiteralGreatestMethodDefinitionToken);
+        }
+
+        internal void EmitModuleVersionIdStringToken()
+        {
+            // A magic value indicates that the token value is to refer to a string constant for the spelling of the current module's MVID.
+            this.GetCurrentWriter().WriteUInt32(Cci.MetadataWriter.ModuleVersionIdStringToken);
+        }
+
+        internal void EmitSourceDocumentIndexToken(Cci.DebugSourceDocument document)
+        {
+            this.GetCurrentWriter().WriteUInt32((module?.GetSourceDocumentIndexForIL(document) ?? 0xFFFF) | Cci.MetadataWriter.SourceDocumentIndex);
         }
 
         internal void EmitArrayBlockInitializer(ImmutableArray<byte> data, SyntaxNode syntaxNode, DiagnosticBag diagnostics)
@@ -62,6 +94,38 @@ namespace Microsoft.CodeAnalysis.CodeGen
             EmitToken(field, syntaxNode, diagnostics);      //block
             EmitOpCode(ILOpCode.Call, -2);
             EmitToken(initializeArray, syntaxNode, diagnostics);
+        }
+
+        internal void EmitStackAllocBlockInitializer(ImmutableArray<byte> data, SyntaxNode syntaxNode, bool emitInitBlock, DiagnosticBag diagnostics)
+        {
+            if (emitInitBlock)
+            {
+                // All bytes are the same, no need for metadata blob
+
+                EmitOpCode(ILOpCode.Dup);
+                EmitIntConstant(data[0]);
+                EmitIntConstant(data.Length);
+                EmitOpCode(ILOpCode.Initblk, -3);
+            }
+            else
+            {
+                var field = module.GetFieldForData(data, syntaxNode, diagnostics);
+
+                EmitOpCode(ILOpCode.Dup);
+                EmitOpCode(ILOpCode.Ldsflda);
+                EmitToken(field, syntaxNode, diagnostics);
+                EmitIntConstant(data.Length);
+                EmitOpCode(ILOpCode.Cpblk, -3);
+            }
+        }
+
+        internal void EmitArrayBlockFieldRef(ImmutableArray<byte> data, SyntaxNode syntaxNode, DiagnosticBag diagnostics)
+        {
+            // map a field to the block (that makes it addressable)
+            var field = module.GetFieldForData(data, syntaxNode, diagnostics);
+
+            EmitOpCode(ILOpCode.Ldsflda);
+            EmitToken(field, syntaxNode, diagnostics);
         }
 
         /// <summary>
@@ -92,13 +156,13 @@ namespace Microsoft.CodeAnalysis.CodeGen
                 var curStack = _emitState.CurStack;
 
                 // we have already seen a branch to this label so we know its stack.
-                // Now we will require that fallthrough must agree with that stack value.
+                // Now we will require that fall-through must agree with that stack value.
                 // For the purpose of this assert we assume that all codepaths are reachable. 
                 // This is a minor additional burden for languages to makes sure that stack is balanced 
                 // even at labels that follow unconditional branches.
                 // What we get is an invariant that satisfies 1.7.5 in reachable code 
                 // even though we do not know yet what is reachable.
-                Debug.Assert(curStack == labelStack, "forward branches and fallthrough must agree on stack depth");
+                Debug.Assert(curStack == labelStack, "forward branches and fall-through must agree on stack depth");
 
                 _labelInfos[label] = labelInfo.WithNewTarget(block);
             }
@@ -126,10 +190,10 @@ namespace Microsoft.CodeAnalysis.CodeGen
 
         internal void EmitBranch(ILOpCode code, object label, ILOpCode revOpCode = ILOpCode.Nop)
         {
-            bool validOpCode = (code == ILOpCode.Nop) || code.IsBranchToLabel();
+            bool validOpCode = (code == ILOpCode.Nop) || code.IsBranch();
 
             Debug.Assert(validOpCode);
-            Debug.Assert(revOpCode == ILOpCode.Nop || revOpCode.IsBranchToLabel());
+            Debug.Assert(revOpCode == ILOpCode.Nop || revOpCode.IsBranch());
             Debug.Assert(!code.HasVariableStackBehavior());
 
             _emitState.AdjustStack(code.NetStackBehavior());
@@ -184,7 +248,7 @@ namespace Microsoft.CodeAnalysis.CodeGen
             KeyValuePair<ConstantValue, object>[] caseLabels,
             object fallThroughLabel,
             LocalOrParameter key,
-            LocalDefinition keyHash,
+            LocalDefinition? keyHash,
             SwitchStringJumpTableEmitter.EmitStringCompareAndBranch emitStringCondBranchDelegate,
             SwitchStringJumpTableEmitter.GetStringHashCode computeStringHashcodeDelegate)
         {
@@ -316,7 +380,7 @@ namespace Microsoft.CodeAnalysis.CodeGen
         /// </summary>
         internal void EmitArrayCreation(Microsoft.Cci.IArrayTypeReference arrayType, SyntaxNode syntaxNode, DiagnosticBag diagnostics)
         {
-            Debug.Assert(arrayType.Rank > 1, "should be used only with multidimensional arrays");
+            Debug.Assert(!arrayType.IsSZArray, "should be used only with multidimensional arrays");
 
             var ctor = module.ArrayMethods.GetArrayConstructor(arrayType);
 
@@ -330,7 +394,7 @@ namespace Microsoft.CodeAnalysis.CodeGen
         /// </summary>
         internal void EmitArrayElementLoad(Microsoft.Cci.IArrayTypeReference arrayType, SyntaxNode syntaxNode, DiagnosticBag diagnostics)
         {
-            Debug.Assert(arrayType.Rank > 1, "should be used only with multidimensional arrays");
+            Debug.Assert(!arrayType.IsSZArray, "should be used only with multidimensional arrays");
 
             var load = module.ArrayMethods.GetArrayGet(arrayType);
 
@@ -344,7 +408,7 @@ namespace Microsoft.CodeAnalysis.CodeGen
         /// </summary>
         internal void EmitArrayElementAddress(Microsoft.Cci.IArrayTypeReference arrayType, SyntaxNode syntaxNode, DiagnosticBag diagnostics)
         {
-            Debug.Assert(arrayType.Rank > 1, "should be used only with multidimensional arrays");
+            Debug.Assert(!arrayType.IsSZArray, "should be used only with multidimensional arrays");
 
             var address = module.ArrayMethods.GetArrayAddress(arrayType);
 
@@ -358,7 +422,7 @@ namespace Microsoft.CodeAnalysis.CodeGen
         /// </summary>
         internal void EmitArrayElementStore(Cci.IArrayTypeReference arrayType, SyntaxNode syntaxNode, DiagnosticBag diagnostics)
         {
-            Debug.Assert(arrayType.Rank > 1, "should be used only with multidimensional arrays");
+            Debug.Assert(!arrayType.IsSZArray, "should be used only with multidimensional arrays");
 
             var store = module.ArrayMethods.GetArraySet(arrayType);
 
@@ -401,18 +465,6 @@ namespace Microsoft.CodeAnalysis.CodeGen
                         EmitInt32(slot);
                     }
                     break;
-            }
-
-            // As in ILGENREC::dumpLocal
-            // CONSIDER: this is somewhat C# specific - it might be better to incorporate this
-            // into the bound tree as a conversion to int.
-            // VSADOV: pinned locals are used in C# to represent pointers in "fixed" statements.
-            // in the user's code they are used as pointers (*), however in their implementation
-            // they hold pinned references (O or &) to the fixed data so they need to be converted 
-            // them to unmanaged pointer type when loaded.
-            if (local.IsPinned)
-            {
-                EmitOpCode(ILOpCode.Conv_i);
             }
         }
 
@@ -549,6 +601,12 @@ namespace Microsoft.CodeAnalysis.CodeGen
                 case ConstantValueTypeDiscriminator.UInt64:
                     EmitLongConstant(value.Int64Value);
                     break;
+                case ConstantValueTypeDiscriminator.NInt:
+                    EmitNativeIntConstant(value.Int32Value);
+                    break;
+                case ConstantValueTypeDiscriminator.NUInt:
+                    EmitNativeIntConstant(value.UInt32Value);
+                    break;
                 case ConstantValueTypeDiscriminator.Single:
                     EmitSingleConstant(value.SingleValue);
                     break;
@@ -647,6 +705,24 @@ namespace Microsoft.CodeAnalysis.CodeGen
             }
         }
 
+        internal void EmitNativeIntConstant(long value)
+        {
+            if (value >= int.MinValue && value <= int.MaxValue)
+            {
+                EmitIntConstant((int)value);
+                EmitOpCode(ILOpCode.Conv_i);
+            }
+            else if (value >= uint.MinValue && value <= uint.MaxValue)
+            {
+                EmitIntConstant(unchecked((int)value));
+                EmitOpCode(ILOpCode.Conv_u);
+            }
+            else
+            {
+                throw ExceptionUtilities.UnexpectedValue(value);
+            }
+        }
+
         internal void EmitSingleConstant(float value)
         {
             EmitOpCode(ILOpCode.Ldc_r4);
@@ -664,7 +740,7 @@ namespace Microsoft.CodeAnalysis.CodeGen
             EmitOpCode(ILOpCode.Ldnull);
         }
 
-        internal void EmitStringConstant(string value)
+        internal void EmitStringConstant(string? value)
         {
             if (value == null)
             {
@@ -679,32 +755,32 @@ namespace Microsoft.CodeAnalysis.CodeGen
 
         private void EmitInt8(sbyte int8)
         {
-            this.GetCurrentStream().WriteSbyte(int8);
+            this.GetCurrentWriter().WriteSByte(int8);
         }
 
         private void EmitInt32(int int32)
         {
-            this.GetCurrentStream().WriteInt(int32);
+            this.GetCurrentWriter().WriteInt32(int32);
         }
 
         private void EmitInt64(long int64)
         {
-            this.GetCurrentStream().WriteLong(int64);
+            this.GetCurrentWriter().WriteInt64(int64);
         }
 
         private void EmitFloat(float floatValue)
         {
             int int32 = BitConverter.ToInt32(BitConverter.GetBytes(floatValue), 0);
-            this.GetCurrentStream().WriteInt(int32);
+            this.GetCurrentWriter().WriteInt32(int32);
         }
 
         private void EmitDouble(double doubleValue)
         {
             long int64 = BitConverter.DoubleToInt64Bits(doubleValue);
-            this.GetCurrentStream().WriteLong(int64);
+            this.GetCurrentWriter().WriteInt64(int64);
         }
 
-        private static void WriteOpCode(Microsoft.Cci.BinaryWriter writer, ILOpCode code)
+        private static void WriteOpCode(BlobBuilder writer, ILOpCode code)
         {
             var size = code.Size();
             if (size == 1)
@@ -724,7 +800,7 @@ namespace Microsoft.CodeAnalysis.CodeGen
             }
         }
 
-        private Microsoft.Cci.BinaryWriter GetCurrentStream()
+        private BlobBuilder GetCurrentWriter()
         {
             return this.GetCurrentBlock().Writer;
         }

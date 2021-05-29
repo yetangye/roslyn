@@ -1,4 +1,6 @@
-﻿' Copyright (c) Microsoft.  All Rights Reserved.  Licensed under the Apache License, Version 2.0.  See License.txt in the project root for license information.
+﻿' Licensed to the .NET Foundation under one or more agreements.
+' The .NET Foundation licenses this file to you under the MIT license.
+' See the LICENSE file in the project root for more information.
 
 Imports System.IO
 Imports Microsoft.CodeAnalysis
@@ -85,9 +87,9 @@ End Namespace
     </file>
 </compilation>
 
-            Dim compilation = CompilationUtils.CreateCompilationWithReferences(compilationDef, New MetadataReference() {})
+            Dim compilation = CompilationUtils.CreateEmptyCompilationWithReferences(compilationDef, New MetadataReference() {})
 
-            CompilationUtils.AssertTheseDiagnostics(compilation,
+            AssertTheseEmitDiagnostics(compilation,
 <expected>
 BC35000: Requested operation is not available because the runtime library function 'System.DateTime.New' is not defined.
     Dim Da as Date = Nothing
@@ -126,7 +128,6 @@ BC35000: Requested operation is not available because the runtime library functi
     Test(CInt([Do]))
          ~~~~~~~~~~
 </expected>)
-
         End Sub
 
         <Fact>
@@ -160,9 +161,9 @@ End Class
     </file>
 </compilation>
 
-            Dim compilation = CompilationUtils.CreateCompilationWithMscorlib(compilationDef)
+            Dim compilation = CompilationUtils.CreateCompilationWithMscorlib40(compilationDef)
 
-            CompilationUtils.AssertTheseDiagnostics(compilation,
+            AssertTheseEmitDiagnostics(compilation,
 <expected>
 BC35000: Requested operation is not available because the runtime library function 'Microsoft.VisualBasic.CompilerServices.Operators.CompareString' is not defined.
     Test(St > St)
@@ -264,7 +265,7 @@ End Namespace
     </file>
 </compilation>
 
-            Dim compilation = CompilationUtils.CreateCompilationWithReferences(compilationDef, New MetadataReference() {})
+            Dim compilation = CompilationUtils.CreateEmptyCompilationWithReferences(compilationDef, New MetadataReference() {})
 
             CompilationUtils.AssertTheseDeclarationDiagnostics(compilation,
 <expected>
@@ -358,7 +359,7 @@ End Namespace
     </file>
 </compilation>
 
-            Dim compilation = CompilationUtils.CreateCompilationWithReferences(compilationDef, New MetadataReference() {})
+            Dim compilation = CompilationUtils.CreateEmptyCompilationWithReferences(compilationDef, New MetadataReference() {})
 
             CompilationUtils.AssertTheseCompileDiagnostics(compilation,
 <expected>

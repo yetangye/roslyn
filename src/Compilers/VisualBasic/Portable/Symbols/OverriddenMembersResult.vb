@@ -1,11 +1,10 @@
-﻿' Copyright (c) Microsoft.  All Rights Reserved.  Licensed under the Apache License, Version 2.0.  See License.txt in the project root for license information.
+﻿' Licensed to the .NET Foundation under one or more agreements.
+' The .NET Foundation licenses this file to you under the MIT license.
+' See the LICENSE file in the project root for more information.
 
 Imports System.Collections.Generic
 Imports System.Collections.Immutable
-Imports System.Threading
-Imports Microsoft.CodeAnalysis.Text
 Imports Microsoft.CodeAnalysis.VisualBasic.Symbols
-Imports Microsoft.CodeAnalysis.VisualBasic.Syntax
 
 Namespace Microsoft.CodeAnalysis.VisualBasic.Symbols
 
@@ -84,6 +83,36 @@ Namespace Microsoft.CodeAnalysis.VisualBasic.Symbols
             End If
         End Function
 
+        Public Shared Function GetOverriddenMember(substitutedOverridingMember As TSymbol, overriddenByDefinitionMember As TSymbol) As TSymbol
+            Debug.Assert(Not substitutedOverridingMember.IsDefinition)
+
+            If overriddenByDefinitionMember IsNot Nothing Then
+                Dim overriddenByDefinitionContaining As NamedTypeSymbol = overriddenByDefinitionMember.ContainingType
+                Dim overriddenByDefinitionContainingTypeDefinition As NamedTypeSymbol = overriddenByDefinitionContaining.OriginalDefinition
+                Dim baseType As NamedTypeSymbol = substitutedOverridingMember.ContainingType.BaseTypeNoUseSiteDiagnostics
+                While baseType IsNot Nothing
+                    If TypeSymbol.Equals(baseType.OriginalDefinition, overriddenByDefinitionContainingTypeDefinition, TypeCompareKind.ConsiderEverything) Then
+                        If TypeSymbol.Equals(baseType, overriddenByDefinitionContaining, TypeCompareKind.ConsiderEverything) Then
+                            Return overriddenByDefinitionMember
+                        End If
+
+                        Return DirectCast(overriddenByDefinitionMember.OriginalDefinition.AsMember(baseType), TSymbol)
+                    End If
+
+                    baseType = baseType.BaseTypeNoUseSiteDiagnostics
+                End While
+
+                Throw ExceptionUtilities.Unreachable
+            End If
+
+            Return Nothing
+        End Function
+
+        ''' <summary>
+        ''' It is not suitable to call this method on a <see cref="OverriddenMembersResult"/> object
+        ''' associated with a member within substituted type, <see cref="GetOverriddenMember(TSymbol, TSymbol)"/>
+        ''' should be used instead.
+        ''' </summary>
         Public ReadOnly Property OverriddenMember As TSymbol
             Get
                 For Each overridden In OverriddenMembers

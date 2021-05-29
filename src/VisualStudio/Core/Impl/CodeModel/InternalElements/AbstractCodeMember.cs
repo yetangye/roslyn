@@ -1,4 +1,8 @@
-// Copyright (c) Microsoft.  All Rights Reserved.  Licensed under the Apache License, Version 2.0.  See License.txt in the project root for license information.
+﻿// Licensed to the .NET Foundation under one or more agreements.
+// The .NET Foundation licenses this file to you under the MIT license.
+// See the LICENSE file in the project root for more information.
+
+#nullable disable
 
 using System;
 using System.Collections.Immutable;
@@ -33,9 +37,7 @@ namespace Microsoft.VisualStudio.LanguageServices.Implementation.CodeModel.Inter
         }
 
         protected SyntaxNode GetContainingTypeNode()
-        {
-            return LookupNode().Ancestors().Where(CodeModelService.IsType).FirstOrDefault();
-        }
+            => LookupNode().Ancestors().Where(CodeModelService.IsType).FirstOrDefault();
 
         public override object Parent
         {
@@ -47,7 +49,7 @@ namespace Microsoft.VisualStudio.LanguageServices.Implementation.CodeModel.Inter
                     throw Exceptions.ThrowEUnexpected();
                 }
 
-                return FileCodeModel.CreateCodeElement<EnvDTE.CodeElement>(containingTypeNode);
+                return FileCodeModel.GetOrCreateCodeElement<EnvDTE.CodeElement>(containingTypeNode);
             }
         }
 
@@ -120,7 +122,7 @@ namespace Microsoft.VisualStudio.LanguageServices.Implementation.CodeModel.Inter
 
             set
             {
-                UpdateNodeAndReaquireNodeKey(FileCodeModel.UpdateIsShared, value);
+                UpdateNodeAndReacquireNodeKey(FileCodeModel.UpdateIsShared, value);
             }
         }
 
@@ -152,10 +154,8 @@ namespace Microsoft.VisualStudio.LanguageServices.Implementation.CodeModel.Inter
             }
         }
 
-        internal virtual ImmutableArray<IParameterSymbol> GetParameters()
-        {
-            throw Exceptions.ThrowEFail();
-        }
+        internal virtual ImmutableArray<SyntaxNode> GetParameters()
+            => throw Exceptions.ThrowEFail();
 
         public EnvDTE.CodeElements Parameters
         {
@@ -173,7 +173,7 @@ namespace Microsoft.VisualStudio.LanguageServices.Implementation.CodeModel.Inter
 
                 var parameter = FileCodeModel.AddParameter(this, node, name, type, position);
 
-                ReaquireNodeKey(nodePath, CancellationToken.None);
+                ReacquireNodeKey(nodePath, CancellationToken.None);
 
                 return parameter;
             });
@@ -197,12 +197,12 @@ namespace Microsoft.VisualStudio.LanguageServices.Implementation.CodeModel.Inter
 
                 if (codeElement == null)
                 {
-                    throw new ArgumentException(ServicesVSResources.ElementIsNotValid, "element");
+                    throw new ArgumentException(ServicesVSResources.Element_is_not_valid, nameof(element));
                 }
 
                 codeElement.Delete();
 
-                ReaquireNodeKey(nodePath, CancellationToken.None);
+                ReacquireNodeKey(nodePath, CancellationToken.None);
             });
         }
 

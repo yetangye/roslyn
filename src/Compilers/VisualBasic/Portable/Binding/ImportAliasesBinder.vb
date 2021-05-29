@@ -1,7 +1,10 @@
-﻿' Copyright (c) Microsoft.  All Rights Reserved.  Licensed under the Apache License, Version 2.0.  See License.txt in the project root for license information.
+﻿' Licensed to the .NET Foundation under one or more agreements.
+' The .NET Foundation licenses this file to you under the MIT license.
+' See the LICENSE file in the project root for more information.
 
 Imports System.Collections.Concurrent
 Imports System.Collections.Generic
+Imports System.Collections.Immutable
 Imports System.Runtime.InteropServices
 Imports System.Threading
 Imports Microsoft.CodeAnalysis.RuntimeMembers
@@ -14,17 +17,20 @@ Imports TypeKind = Microsoft.CodeAnalysis.TypeKind
 Namespace Microsoft.CodeAnalysis.VisualBasic
 
     ''' <summary>
-    ''' A ImportAliasesBinder provides lookup for looking up import aliases (A = Foo.Bar),
+    ''' A ImportAliasesBinder provides lookup for looking up import aliases (A = Goo.Bar),
     ''' either at file level or project level.
     ''' </summary>
     Friend Class ImportAliasesBinder
         Inherits Binder
 
-        Private ReadOnly m_importedAliases As Dictionary(Of String, AliasAndImportsClausePosition)
+        Private ReadOnly _importedAliases As IReadOnlyDictionary(Of String, AliasAndImportsClausePosition)
 
-        Public Sub New(containingBinder As Binder, importedAliases As Dictionary(Of String, AliasAndImportsClausePosition))
+        Public Sub New(containingBinder As Binder, importedAliases As IReadOnlyDictionary(Of String, AliasAndImportsClausePosition))
             MyBase.New(containingBinder)
-            m_importedAliases = importedAliases
+
+            Debug.Assert(importedAliases IsNot Nothing)
+
+            _importedAliases = importedAliases
 
             ' Binder.Lookup relies on the following invariant.
             Debug.Assert(TypeOf containingBinder Is SourceFileBinder OrElse TypeOf containingBinder Is SourceModuleBinder OrElse
@@ -39,14 +45,14 @@ Namespace Microsoft.CodeAnalysis.VisualBasic
                                                      arity As Integer,
                                                      options As LookupOptions,
                                                      originalBinder As Binder,
-                                                     <[In], Out> ByRef useSiteDiagnostics As HashSet(Of DiagnosticInfo))
+                                                     <[In], Out> ByRef useSiteInfo As CompoundUseSiteInfo(Of AssemblySymbol))
             Debug.Assert(lookupResult.IsClear)
 
             Dim [alias] As AliasAndImportsClausePosition = Nothing
-            If m_importedAliases.TryGetValue(name, [alias]) Then
+            If _importedAliases.TryGetValue(name, [alias]) Then
                 ' Got an alias. Return it without checking arity.
 
-                Dim res = CheckViability([alias].Alias, arity, options, Nothing, useSiteDiagnostics)
+                Dim res = CheckViability([alias].Alias, arity, options, Nothing, useSiteInfo)
                 If res.IsGoodOrAmbiguous AndAlso Not originalBinder.IsSemanticModelBinder Then
                     Me.Compilation.MarkImportDirectiveAsUsed(Me.SyntaxTree, [alias].ImportsClausePosition)
                 End If
@@ -60,12 +66,24 @@ Namespace Microsoft.CodeAnalysis.VisualBasic
         Friend Overrides Sub AddLookupSymbolsInfoInSingleBinder(nameSet As LookupSymbolsInfo,
                                                                     options As LookupOptions,
                                                                     originalBinder As Binder)
-            For Each [alias] In m_importedAliases.Values
-                If originalBinder.CheckViability([alias].Alias.Target, -1, options, Nothing, useSiteDiagnostics:=Nothing).IsGoodOrAmbiguous Then
+            For Each [alias] In _importedAliases.Values
+                If originalBinder.CheckViability([alias].Alias.Target, -1, options, Nothing, useSiteInfo:=CompoundUseSiteInfo(Of AssemblySymbol).Discarded).IsGoodOrAmbiguous Then
                     nameSet.AddSymbol([alias].Alias, [alias].Alias.Name, 0)
                 End If
             Next
         End Sub
+
+        Public Overrides ReadOnly Property ContainingMember As Symbol
+            Get
+                Return Me.Compilation.SourceModule
+            End Get
+        End Property
+
+        Public Overrides ReadOnly Property AdditionalContainingMembers As ImmutableArray(Of Symbol)
+            Get
+                Return ImmutableArray(Of Symbol).Empty
+            End Get
+        End Property
     End Class
 
 End Namespace

@@ -1,8 +1,11 @@
-﻿' Copyright (c) Microsoft.  All Rights Reserved.  Licensed under the Apache License, Version 2.0.  See License.txt in the project root for license information.
+﻿' Licensed to the .NET Foundation under one or more agreements.
+' The .NET Foundation licenses this file to you under the MIT license.
+' See the LICENSE file in the project root for more information.
 
 Imports System.Collections.Immutable
 Imports System.Reflection
 Imports System.Runtime.InteropServices
+Imports Microsoft.CodeAnalysis.Symbols
 
 Namespace Microsoft.CodeAnalysis.VisualBasic.Symbols
     ''' <summary>
@@ -10,7 +13,7 @@ Namespace Microsoft.CodeAnalysis.VisualBasic.Symbols
     ''' </summary>
     Friend MustInherit Class ModuleSymbol
         Inherits Symbol
-        Implements IModuleSymbol
+        Implements IModuleSymbol, IModuleSymbolInternal
 
         ' !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
         ' Changes to the public interface of this class should remain synchronized with the C# version of Symbol.
@@ -124,6 +127,13 @@ Namespace Microsoft.CodeAnalysis.VisualBasic.Symbols
         End Property
 
         ''' <summary>
+        ''' If this symbol represents a metadata module returns the underlying <see cref="ModuleMetadata"/>.
+        ''' 
+        ''' Otherwise, this returns <see langword="Nothing"/>.
+        ''' </summary>
+        Public MustOverride Function GetMetadata() As ModuleMetadata Implements IModuleSymbol.GetMetadata
+
+        ''' <summary>
         ''' Returns an array of assembly identities for assemblies referenced by this module.
         ''' Items at the same position from GetReferencedAssemblies and from GetReferencedAssemblySymbols 
         ''' should correspond to each other.
@@ -148,11 +158,27 @@ Namespace Microsoft.CodeAnalysis.VisualBasic.Symbols
         ''' by this module. Items at the same position from GetReferencedAssemblies and 
         ''' from GetReferencedAssemblySymbols should correspond to each other. If reference is 
         ''' not resolved by compiler, GetReferencedAssemblySymbols returns MissingAssemblySymbol in the
-        ''' correspnding item.
+        ''' corresponding item.
         ''' 
         ''' The array and its content is provided by ReferenceManager and must not be modified.
         ''' </summary>
         Friend MustOverride Function GetReferencedAssemblySymbols() As ImmutableArray(Of AssemblySymbol) ' TODO: Remove this method and make ReferencedAssemblySymbols property abstract instead.
+
+        Friend Function GetReferencedAssemblySymbol(referencedAssemblyIndex As Integer) As AssemblySymbol
+            Dim referencedAssemblies = GetReferencedAssemblySymbols()
+            If referencedAssemblyIndex < referencedAssemblies.Length Then
+                Return referencedAssemblies(referencedAssemblyIndex)
+            End If
+
+            ' This module must be a corlib where the original metadata contains assembly
+            ' references (see https://github.com/dotnet/roslyn/issues/13275).
+            Dim assembly = ContainingAssembly
+            If assembly IsNot assembly.CorLibrary Then
+                Throw New ArgumentOutOfRangeException(NameOf(referencedAssemblyIndex))
+            End If
+
+            Return Nothing
+        End Function
 
         ''' <summary>
         ''' A helper method for ReferenceManager to set assembly identities for assemblies
@@ -232,7 +258,7 @@ Namespace Microsoft.CodeAnalysis.VisualBasic.Symbols
         ''' </summary>
         Public Function GetModuleNamespace(namespaceSymbol As INamespaceSymbol) As NamespaceSymbol
             If namespaceSymbol Is Nothing Then
-                Throw New ArgumentNullException("namespaceSymbol")
+                Throw New ArgumentNullException(NameOf(namespaceSymbol))
             End If
 
             Dim moduleNs = TryCast(namespaceSymbol, NamespaceSymbol)
@@ -290,7 +316,7 @@ Namespace Microsoft.CodeAnalysis.VisualBasic.Symbols
 
         Private ReadOnly Property IModuleSymbol_ReferencedAssemblySymbols As ImmutableArray(Of IAssemblySymbol) Implements IModuleSymbol.ReferencedAssemblySymbols
             Get
-                Return ImmutableArray.Create(Of IAssemblySymbol, AssemblySymbol)(ReferencedAssemblySymbols)
+                Return ImmutableArray(Of IAssemblySymbol).CastUp(ReferencedAssemblySymbols)
             End Get
         End Property
 

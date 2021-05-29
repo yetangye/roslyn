@@ -1,23 +1,25 @@
-' Copyright (c) Microsoft.  All Rights Reserved.  Licensed under the Apache License, Version 2.0.  See License.txt in the project root for license information.
+﻿' Licensed to the .NET Foundation under one or more agreements.
+' The .NET Foundation licenses this file to you under the MIT license.
+' See the LICENSE file in the project root for more information.
 
+Imports Microsoft.CodeAnalysis.ChangeSignature
 Imports Microsoft.CodeAnalysis.Editor.UnitTests.Extensions
 
 Namespace Microsoft.CodeAnalysis.Editor.VisualBasic.UnitTests.ChangeSignature
     Partial Public Class ChangeSignatureTests
         <Fact, Trait(Traits.Feature, Traits.Features.ChangeSignature)>
-        Public Sub ReorderMethodParameters_InvokeOnClassName_ShouldFail()
+        Public Async Function TestReorderMethodParameters_InvokeOnClassName_ShouldFail() As Task
             Dim markup = <Text><![CDATA[
 Class C$$
     Sub M()
     End Sub
 End Class]]></Text>.NormalizedValue()
 
-            TestChangeSignatureViaCommand(LanguageNames.VisualBasic, markup, expectedSuccess:=False, expectedErrorText:=FeaturesResources.YouCanOnlyChangeTheSignatureOfAConstructorIndexerMethodOrDelegate)
-        End Sub
-
+            Await TestChangeSignatureViaCommandAsync(LanguageNames.VisualBasic, markup, expectedSuccess:=False, expectedFailureReason:=ChangeSignatureFailureKind.IncorrectKind)
+        End Function
 
         <Fact, Trait(Traits.Feature, Traits.Features.ChangeSignature)>
-        Public Sub ReorderMethodParameters_InvokeOnField_ShouldFail()
+        Public Async Function TestReorderMethodParameters_InvokeOnField_ShouldFail() As Task
             Dim markup = <Text><![CDATA[
 Class C
     Dim t$$ = 7
@@ -26,22 +28,11 @@ Class C
     End Sub
 End Class]]></Text>.NormalizedValue()
 
-            TestChangeSignatureViaCommand(LanguageNames.VisualBasic, markup, expectedSuccess:=False, expectedErrorText:=FeaturesResources.YouCanOnlyChangeTheSignatureOfAConstructorIndexerMethodOrDelegate)
-        End Sub
+            Await TestChangeSignatureViaCommandAsync(LanguageNames.VisualBasic, markup, expectedSuccess:=False, expectedFailureReason:=ChangeSignatureFailureKind.IncorrectKind)
+        End Function
 
         <Fact, Trait(Traits.Feature, Traits.Features.ChangeSignature)>
-        Public Sub ReorderMethodParameters_InsufficientParameters_None()
-            Dim markup = <Text><![CDATA[
-Class C
-    Sub $$M()
-    End Sub
-End Class]]></Text>.NormalizedValue()
-
-            TestChangeSignatureViaCommand(LanguageNames.VisualBasic, markup, expectedSuccess:=False, expectedErrorText:=FeaturesResources.ThisSignatureDoesNotContainParametersThatCanBeChanged)
-        End Sub
-
-        <Fact, Trait(Traits.Feature, Traits.Features.ChangeSignature)>
-        Public Sub ReorderMethodParameters_InvokeOnOperator_ShouldFail()
+        Public Async Function TestReorderMethodParameters_NoChangeableParameters() As Task
             Dim markup = <Text><![CDATA[
 Class C
     Public Shared $$Operator +(c1 As C, c2 As C)
@@ -49,7 +40,18 @@ Class C
     End Operator
 End Class]]></Text>.NormalizedValue()
 
-            TestChangeSignatureViaCommand(LanguageNames.VisualBasic, markup, expectedSuccess:=False, expectedErrorText:=FeaturesResources.YouCanOnlyChangeTheSignatureOfAConstructorIndexerMethodOrDelegate)
-        End Sub
+            Await TestChangeSignatureViaCommandAsync(LanguageNames.VisualBasic, markup, expectedSuccess:=False, expectedFailureReason:=ChangeSignatureFailureKind.IncorrectKind)
+        End Function
+
+        <Fact, Trait(Traits.Feature, Traits.Features.ChangeSignature)>
+        Public Async Function TestChangeSignature_AllowedWithNoParameters() As Task
+            Dim markup = <Text><![CDATA[
+Class C
+    Sub $$M()
+    End Sub
+End Class]]></Text>.NormalizedValue()
+
+            Await TestChangeSignatureViaCommandAsync(LanguageNames.VisualBasic, markup, expectedSuccess:=True)
+        End Function
     End Class
 End Namespace

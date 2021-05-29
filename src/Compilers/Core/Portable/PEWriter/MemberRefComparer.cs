@@ -1,6 +1,9 @@
-﻿// Copyright (c) Microsoft.  All Rights Reserved.  Licensed under the Apache License, Version 2.0.  See License.txt in the project root for license information.
+﻿// Licensed to the .NET Foundation under one or more agreements.
+// The .NET Foundation licenses this file to you under the MIT license.
+// See the LICENSE file in the project root for more information.
 
 using System.Collections.Generic;
+using System.Diagnostics.CodeAnalysis;
 using Roslyn.Utilities;
 
 namespace Microsoft.Cci
@@ -14,16 +17,17 @@ namespace Microsoft.Cci
             _metadataWriter = metadataWriter;
         }
 
-        public bool Equals(ITypeMemberReference x, ITypeMemberReference y)
+        public bool Equals(ITypeMemberReference? x, ITypeMemberReference? y)
         {
             if (x == y)
             {
                 return true;
             }
+            RoslynDebug.Assert(x is object && y is object);
 
             if (x.GetContainingType(_metadataWriter.Context) != y.GetContainingType(_metadataWriter.Context))
             {
-                if (_metadataWriter.GetMemberRefParentCodedIndex(x) != _metadataWriter.GetMemberRefParentCodedIndex(y))
+                if (_metadataWriter.GetMemberReferenceParent(x) != _metadataWriter.GetMemberReferenceParent(y))
                 {
                     return false;
                 }
@@ -34,18 +38,18 @@ namespace Microsoft.Cci
                 return false;
             }
 
-            IFieldReference/*?*/ xf = x as IFieldReference;
-            IFieldReference/*?*/ yf = y as IFieldReference;
+            var xf = x as IFieldReference;
+            var yf = y as IFieldReference;
             if (xf != null && yf != null)
             {
                 return _metadataWriter.GetFieldSignatureIndex(xf) == _metadataWriter.GetFieldSignatureIndex(yf);
             }
 
-            IMethodReference/*?*/ xm = x as IMethodReference;
-            IMethodReference/*?*/ ym = y as IMethodReference;
+            var xm = x as IMethodReference;
+            var ym = y as IMethodReference;
             if (xm != null && ym != null)
             {
-                return _metadataWriter.GetMethodSignatureIndex(xm) == _metadataWriter.GetMethodSignatureIndex(ym);
+                return _metadataWriter.GetMethodSignatureHandle(xm) == _metadataWriter.GetMethodSignatureHandle(ym);
             }
 
             return false;
@@ -53,19 +57,19 @@ namespace Microsoft.Cci
 
         public int GetHashCode(ITypeMemberReference memberRef)
         {
-            int hash = Hash.Combine(memberRef.Name, (int)_metadataWriter.GetMemberRefParentCodedIndex(memberRef) << 4);
+            int hash = Hash.Combine(memberRef.Name, _metadataWriter.GetMemberReferenceParent(memberRef).GetHashCode());
 
-            IFieldReference/*?*/ fieldRef = memberRef as IFieldReference;
+            var fieldRef = memberRef as IFieldReference;
             if (fieldRef != null)
             {
-                hash = Hash.Combine(hash, (int)_metadataWriter.GetFieldSignatureIndex(fieldRef));
+                hash = Hash.Combine(hash, _metadataWriter.GetFieldSignatureIndex(fieldRef).GetHashCode());
             }
             else
             {
-                IMethodReference/*?*/ methodRef = memberRef as IMethodReference;
+                var methodRef = memberRef as IMethodReference;
                 if (methodRef != null)
                 {
-                    hash = Hash.Combine(hash, (int)_metadataWriter.GetMethodSignatureIndex(methodRef));
+                    hash = Hash.Combine(hash, _metadataWriter.GetMethodSignatureHandle(methodRef).GetHashCode());
                 }
             }
 

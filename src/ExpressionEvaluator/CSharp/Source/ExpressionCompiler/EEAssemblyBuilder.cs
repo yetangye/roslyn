@@ -1,39 +1,43 @@
-// Copyright (c) Microsoft.  All Rights Reserved.  Licensed under the Apache License, Version 2.0.  See License.txt in the project root for license information.
+﻿// Licensed to the .NET Foundation under one or more agreements.
+// The .NET Foundation licenses this file to you under the MIT license.
+// See the LICENSE file in the project root for more information.
 
-using Microsoft.Cci;
 using Microsoft.CodeAnalysis.CodeGen;
 using Microsoft.CodeAnalysis.CSharp.Emit;
 using Microsoft.CodeAnalysis.CSharp.Symbols;
 using Microsoft.CodeAnalysis.CSharp.Symbols.Metadata.PE;
 using Microsoft.CodeAnalysis.Emit;
 using Microsoft.CodeAnalysis.ExpressionEvaluator;
+using Microsoft.CodeAnalysis.PooledObjects;
+using Microsoft.CodeAnalysis.Symbols;
 using Roslyn.Utilities;
+using System;
 using System.Collections.Immutable;
 using System.Diagnostics;
+using System.Reflection.Metadata;
 
 namespace Microsoft.CodeAnalysis.CSharp.ExpressionEvaluator
 {
     internal sealed class EEAssemblyBuilder : PEAssemblyBuilderBase
     {
-        private readonly ImmutableHashSet<MethodSymbol> _methods;
+        private readonly Func<NamedTypeSymbol, NamedTypeSymbol> _getDynamicOperationContextType;
 
         public EEAssemblyBuilder(
             SourceAssemblySymbol sourceAssembly,
             EmitOptions emitOptions,
-            ImmutableArray<MethodSymbol> methods,
-            ModulePropertiesForSerialization serializationProperties,
+            Cci.ModulePropertiesForSerialization serializationProperties,
             ImmutableArray<NamedTypeSymbol> additionalTypes,
-            CompilationTestData testData) :
+            Func<NamedTypeSymbol, NamedTypeSymbol> getDynamicOperationContextType,
+            CompilationTestData? testData) :
             base(
                   sourceAssembly,
                   emitOptions,
                   outputKind: OutputKind.DynamicallyLinkedLibrary,
                   serializationProperties: serializationProperties,
                   manifestResources: SpecializedCollections.EmptyEnumerable<ResourceDescription>(),
-                  assemblySymbolMapper: null,
                   additionalTypes: additionalTypes)
         {
-            _methods = ImmutableHashSet.CreateRange(methods);
+            _getDynamicOperationContextType = getDynamicOperationContextType;
 
             if (testData != null)
             {
@@ -42,10 +46,9 @@ namespace Microsoft.CodeAnalysis.CSharp.ExpressionEvaluator
             }
         }
 
-        protected override IModuleReference TranslateModule(ModuleSymbol symbol, DiagnosticBag diagnostics)
+        protected override Cci.IModuleReference TranslateModule(ModuleSymbol symbol, DiagnosticBag diagnostics)
         {
-            var moduleSymbol = symbol as PEModuleSymbol;
-            if ((object)moduleSymbol != null)
+            if (symbol is PEModuleSymbol moduleSymbol)
             {
                 var module = moduleSymbol.Module;
                 // Expose the individual runtime Windows.*.winmd modules as assemblies.
@@ -61,22 +64,19 @@ namespace Microsoft.CodeAnalysis.CSharp.ExpressionEvaluator
             return base.TranslateModule(symbol, diagnostics);
         }
 
-        public override int CurrentGenerationOrdinal => 0;
+        internal override bool IgnoreAccessibility => true;
 
-        internal override VariableSlotAllocator TryCreateVariableSlotAllocator(MethodSymbol symbol)
+        internal override NamedTypeSymbol GetDynamicOperationContextType(NamedTypeSymbol contextType)
         {
-            var method = symbol as EEMethodSymbol;
-            if (((object)method != null) && _methods.Contains(method))
-            {
-                var defs = GetLocalDefinitions(method.Locals);
-                return new SlotAllocator(defs);
-            }
-
-            Debug.Assert(!_methods.Contains(symbol));
-            return null;
+            return _getDynamicOperationContextType(contextType);
         }
 
-        private static ImmutableArray<LocalDefinition> GetLocalDefinitions(ImmutableArray<LocalSymbol> locals)
+        public override int CurrentGenerationOrdinal => 0;
+
+        internal override VariableSlotAllocator? TryCreateVariableSlotAllocator(MethodSymbol symbol, MethodSymbol topLevelMethod, DiagnosticBag diagnostics)
+            => (symbol is EEMethodSymbol method) ? new SlotAllocator(GetLocalDefinitions(method.Locals, diagnostics)) : null;
+
+        private ImmutableArray<LocalDefinition> GetLocalDefinitions(ImmutableArray<LocalSymbol> locals, DiagnosticBag diagnostics)
         {
             var builder = ArrayBuilder<LocalDefinition>.GetInstance();
             foreach (var local in locals)
@@ -85,14 +85,14 @@ namespace Microsoft.CodeAnalysis.CSharp.ExpressionEvaluator
                 {
                     continue;
                 }
-                var def = ToLocalDefinition(local, builder.Count);
+                var def = ToLocalDefinition(local, builder.Count, diagnostics);
                 Debug.Assert(((EELocalSymbol)local).Ordinal == def.SlotIndex);
                 builder.Add(def);
             }
             return builder.ToImmutableAndFree();
         }
 
-        private static LocalDefinition ToLocalDefinition(LocalSymbol local, int index)
+        private LocalDefinition ToLocalDefinition(LocalSymbol local, int index, DiagnosticBag diagnostics)
         {
             // See EvaluationContext.GetLocals.
             TypeSymbol type;
@@ -111,14 +111,14 @@ namespace Microsoft.CodeAnalysis.CSharp.ExpressionEvaluator
             return new LocalDefinition(
                 local,
                 local.Name,
-                (Cci.ITypeReference)type,
+                Translate(type, syntaxNodeOpt: null, diagnostics),
                 slot: index,
-                synthesizedKind: (SynthesizedLocalKind)local.SynthesizedKind,
+                synthesizedKind: local.SynthesizedKind,
                 id: LocalDebugId.None,
-                pdbAttributes: Cci.PdbWriter.DefaultLocalAttributesValue,
+                pdbAttributes: LocalVariableAttributes.None,
                 constraints: constraints,
-                isDynamic: false,
-                dynamicTransformFlags: ImmutableArray<TypedConstant>.Empty);
+                dynamicTransformFlags: ImmutableArray<bool>.Empty,
+                tupleElementNames: ImmutableArray<string>.Empty);
         }
 
         private sealed class SlotAllocator : VariableSlotAllocator
@@ -135,72 +135,48 @@ namespace Microsoft.CodeAnalysis.CSharp.ExpressionEvaluator
                 builder.AddRange(_locals);
             }
 
-            public override LocalDefinition GetPreviousLocal(
+            public override LocalDefinition? GetPreviousLocal(
                 Cci.ITypeReference type,
                 ILocalSymbolInternal symbol,
-                string nameOpt,
+                string? name,
                 SynthesizedLocalKind synthesizedKind,
                 LocalDebugId id,
-                uint pdbAttributes,
+                LocalVariableAttributes pdbAttributes,
                 LocalSlotConstraints constraints,
-                bool isDynamic,
-                ImmutableArray<TypedConstant> dynamicTransformFlags)
+                ImmutableArray<bool> dynamicTransformFlags,
+                ImmutableArray<string> tupleElementNames)
             {
-                var local = symbol as EELocalSymbol;
-                if ((object)local == null)
-                {
-                    return null;
-                }
-
-                return _locals[local.Ordinal];
+                return (symbol is EELocalSymbol local) ? _locals[local.Ordinal] : null;
             }
 
-            public override string PreviousStateMachineTypeName
-            {
-                get { return null; }
-            }
-
-            public override bool TryGetPreviousHoistedLocalSlotIndex(SyntaxNode currentDeclarator, Cci.ITypeReference currentType, SynthesizedLocalKind synthesizedKind, LocalDebugId currentId, out int slotIndex)
+            public override bool TryGetPreviousHoistedLocalSlotIndex(SyntaxNode currentDeclarator, Cci.ITypeReference currentType, SynthesizedLocalKind synthesizedKind, LocalDebugId currentId, DiagnosticBag diagnostics, out int slotIndex)
             {
                 slotIndex = -1;
                 return false;
             }
 
-            public override int PreviousHoistedLocalSlotCount
-            {
-                get { return 0; }
-            }
-
-            public override bool TryGetPreviousAwaiterSlotIndex(Cci.ITypeReference currentType, out int slotIndex)
+            public override bool TryGetPreviousAwaiterSlotIndex(Cci.ITypeReference currentType, DiagnosticBag diagnostics, out int slotIndex)
             {
                 slotIndex = -1;
                 return false;
             }
 
-            public override bool TryGetPreviousClosure(SyntaxNode closureSyntax, out int closureOrdinal)
+            public override bool TryGetPreviousClosure(SyntaxNode closureSyntax, out DebugId closureId)
             {
-                closureOrdinal = -1;
+                closureId = default;
                 return false;
             }
 
-            public override bool TryGetPreviousLambda(SyntaxNode lambdaOrLambdaBodySyntax, bool isLambdaBody, out int lambdaOrdinal)
+            public override bool TryGetPreviousLambda(SyntaxNode lambdaOrLambdaBodySyntax, bool isLambdaBody, out DebugId lambdaId)
             {
-                lambdaOrdinal = -1;
+                lambdaId = default;
                 return false;
             }
 
-            public override int PreviousAwaiterSlotCount
-            {
-                get { return 0; }
-            }
-
-            public override MethodDebugId PreviousMethodId
-            {
-                get
-                {
-                    return default(MethodDebugId);
-                }
-            }
+            public override string? PreviousStateMachineTypeName => null;
+            public override int PreviousHoistedLocalSlotCount => 0;
+            public override int PreviousAwaiterSlotCount => 0;
+            public override DebugId? MethodId => null;
         }
     }
 }

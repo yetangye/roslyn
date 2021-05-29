@@ -1,4 +1,8 @@
-﻿// Copyright (c) Microsoft.  All Rights Reserved.  Licensed under the Apache License, Version 2.0.  See License.txt in the project root for license information.
+﻿// Licensed to the .NET Foundation under one or more agreements.
+// The .NET Foundation licenses this file to you under the MIT license.
+// See the LICENSE file in the project root for more information.
+
+#nullable disable
 
 using System.Collections.Immutable;
 using System.Diagnostics;
@@ -7,6 +11,7 @@ using System.Text;
 using Microsoft.CodeAnalysis.Collections;
 using Microsoft.CodeAnalysis.CSharp.Symbols;
 using Microsoft.CodeAnalysis.CSharp.Syntax;
+using Microsoft.CodeAnalysis.PooledObjects;
 using Microsoft.CodeAnalysis.Text;
 using Roslyn.Utilities;
 using System;
@@ -39,7 +44,7 @@ namespace Microsoft.CodeAnalysis.CSharp
                 Visit(symbol.ElementType, builder);
 
                 // Rank-one arrays are displayed different than rectangular arrays
-                if (symbol.Rank == 1)
+                if (symbol.IsSZArray)
                 {
                     builder.Append("[]");
                 }
@@ -146,8 +151,14 @@ namespace Microsoft.CodeAnalysis.CSharp
 
                 // Is this a type parameter on a type?
                 Symbol containingSymbol = symbol.ContainingSymbol;
-                if (containingSymbol.Kind == SymbolKind.NamedType)
+                if (containingSymbol.Kind == SymbolKind.Method)
                 {
+                    builder.Append("``");
+                }
+                else
+                {
+                    Debug.Assert(containingSymbol is NamedTypeSymbol);
+
                     // If the containing type is nested within other types, then we need to add their arities.
                     // e.g. A<T>.B<U>.M<V>(T t, U u, V v) should be M(`0, `1, ``0).
                     for (NamedTypeSymbol curr = containingSymbol.ContainingType; (object)curr != null; curr = curr.ContainingType)
@@ -155,14 +166,6 @@ namespace Microsoft.CodeAnalysis.CSharp
                         ordinalOffset += curr.Arity;
                     }
                     builder.Append('`');
-                }
-                else if (containingSymbol.Kind == SymbolKind.Method)
-                {
-                    builder.Append("``");
-                }
-                else
-                {
-                    throw ExceptionUtilities.UnexpectedValue(containingSymbol.Kind);
                 }
 
                 builder.Append(symbol.Ordinal + ordinalOffset);
@@ -184,7 +187,7 @@ namespace Microsoft.CodeAnalysis.CSharp
                 {
                     // Special case: dev11 treats types instances of the declaring type in the parameter list
                     // (and return type, for conversions) as constructed with its own type parameters.
-                    if (!_inParameterOrReturnType && symbol == symbol.ConstructedFrom)
+                    if (!_inParameterOrReturnType && TypeSymbol.Equals(symbol, symbol.ConstructedFrom, TypeCompareKind.ConsiderEverything2))
                     {
                         builder.Append('`');
                         builder.Append(symbol.Arity);
@@ -195,14 +198,14 @@ namespace Microsoft.CodeAnalysis.CSharp
 
                         bool needsComma = false;
 
-                        foreach (var typeArgument in symbol.TypeArgumentsNoUseSiteDiagnostics)
+                        foreach (var typeArgument in symbol.TypeArgumentsWithAnnotationsNoUseSiteDiagnostics)
                         {
                             if (needsComma)
                             {
                                 builder.Append(',');
                             }
 
-                            Visit(typeArgument, builder);
+                            Visit(typeArgument.Type, builder);
 
                             needsComma = true;
                         }

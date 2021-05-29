@@ -1,4 +1,6 @@
-﻿' Copyright (c) Microsoft.  All Rights Reserved.  Licensed under the Apache License, Version 2.0.  See License.txt in the project root for license information.
+﻿' Licensed to the .NET Foundation under one or more agreements.
+' The .NET Foundation licenses this file to you under the MIT license.
+' See the LICENSE file in the project root for more information.
 
 Imports System.Collections.Immutable
 Imports System.Diagnostics
@@ -18,12 +20,12 @@ Namespace Microsoft.CodeAnalysis.VisualBasic.Symbols
     Friend Class SourceClonedParameterSymbol
         Inherits SourceParameterSymbolBase
 
-        Private ReadOnly m_originalParam As SourceParameterSymbol
+        Private ReadOnly _originalParam As SourceParameterSymbol
 
         Friend Sub New(originalParam As SourceParameterSymbol, newOwner As MethodSymbol, newOrdinal As Integer)
             MyBase.New(newOwner, newOrdinal)
             Debug.Assert(originalParam IsNot Nothing)
-            m_originalParam = originalParam
+            _originalParam = originalParam
         End Sub
 
         Public Overrides ReadOnly Property IsImplicitlyDeclared As Boolean
@@ -34,7 +36,7 @@ Namespace Microsoft.CodeAnalysis.VisualBasic.Symbols
 
         Public Overrides ReadOnly Property DeclaringSyntaxReferences As ImmutableArray(Of SyntaxReference)
             Get
-                ' Since you can't get from the syntax node that represents the orginal parameter 
+                ' Since you can't get from the syntax node that represents the original parameter 
                 ' back to this symbol we decided not to return the original syntax node here.
                 Return ImmutableArray(Of SyntaxReference).Empty
             End Get
@@ -43,151 +45,151 @@ Namespace Microsoft.CodeAnalysis.VisualBasic.Symbols
 
         Public Overrides ReadOnly Property Type As TypeSymbol
             Get
-                Return m_originalParam.Type
+                Return _originalParam.Type
             End Get
         End Property
 
         Friend Overrides ReadOnly Property IsMetadataIn As Boolean
             Get
-                Return m_originalParam.IsMetadataIn
+                Return _originalParam.IsMetadataIn
             End Get
         End Property
 
         Friend Overrides ReadOnly Property IsMetadataOut As Boolean
             Get
-                Return m_originalParam.IsMetadataOut
+                Return _originalParam.IsMetadataOut
             End Get
         End Property
 
         Public Overrides ReadOnly Property Locations As ImmutableArray(Of Location)
             Get
-                Return m_originalParam.Locations
+                Return _originalParam.Locations
             End Get
         End Property
 
         Public Overrides Function GetAttributes() As ImmutableArray(Of VisualBasicAttributeData)
-            Return m_originalParam.GetAttributes()
+            Return _originalParam.GetAttributes()
         End Function
 
         Public Overrides ReadOnly Property Name As String
             Get
-                Return m_originalParam.Name
+                Return _originalParam.Name
             End Get
         End Property
 
         Public Overrides ReadOnly Property CustomModifiers As ImmutableArray(Of CustomModifier)
             Get
-                Return m_originalParam.CustomModifiers
+                Return _originalParam.CustomModifiers
             End Get
         End Property
 
-        Friend Overrides ReadOnly Property HasByRefBeforeCustomModifiers As Boolean
+        Public Overrides ReadOnly Property RefCustomModifiers As ImmutableArray(Of CustomModifier)
             Get
-                Return m_originalParam.HasByRefBeforeCustomModifiers
+                Return _originalParam.RefCustomModifiers
             End Get
         End Property
 
         Friend Overloads Overrides ReadOnly Property ExplicitDefaultConstantValue(inProgress As SymbolsInProgress(Of ParameterSymbol)) As ConstantValue
             Get
-                Return m_originalParam.ExplicitDefaultConstantValue(inProgress)
+                Return _originalParam.ExplicitDefaultConstantValue(inProgress)
             End Get
         End Property
 
         Friend Overrides ReadOnly Property HasParamArrayAttribute As Boolean
             Get
-                Return m_originalParam.HasParamArrayAttribute
+                Return _originalParam.HasParamArrayAttribute
             End Get
         End Property
 
         Friend Overrides ReadOnly Property HasDefaultValueAttribute As Boolean
             Get
-                Return m_originalParam.HasDefaultValueAttribute
+                Return _originalParam.HasDefaultValueAttribute
             End Get
         End Property
 
         Public Overrides ReadOnly Property HasExplicitDefaultValue As Boolean
             Get
-                Return m_originalParam.HasExplicitDefaultValue
+                Return _originalParam.HasExplicitDefaultValue
             End Get
         End Property
 
         Friend Overrides ReadOnly Property HasOptionCompare As Boolean
             Get
-                Return m_originalParam.HasOptionCompare
+                Return _originalParam.HasOptionCompare
             End Get
         End Property
 
         Friend Overrides ReadOnly Property IsIDispatchConstant As Boolean
             Get
-                Return m_originalParam.IsIDispatchConstant
+                Return _originalParam.IsIDispatchConstant
             End Get
         End Property
 
         Friend Overrides ReadOnly Property IsIUnknownConstant As Boolean
             Get
-                Return m_originalParam.IsIUnknownConstant
+                Return _originalParam.IsIUnknownConstant
             End Get
         End Property
 
         Friend Overrides ReadOnly Property IsCallerLineNumber As Boolean
             Get
-                Return m_originalParam.IsCallerLineNumber
+                Return _originalParam.IsCallerLineNumber
             End Get
         End Property
 
         Friend Overrides ReadOnly Property IsCallerMemberName As Boolean
             Get
-                Return m_originalParam.IsCallerMemberName
+                Return _originalParam.IsCallerMemberName
             End Get
         End Property
 
         Friend Overrides ReadOnly Property IsCallerFilePath As Boolean
             Get
-                Return m_originalParam.IsCallerFilePath
+                Return _originalParam.IsCallerFilePath
             End Get
         End Property
 
         Public Overrides ReadOnly Property IsByRef As Boolean
             Get
-                Return m_originalParam.IsByRef
+                Return _originalParam.IsByRef
             End Get
         End Property
 
         Friend Overrides ReadOnly Property IsExplicitByRef As Boolean
             Get
-                Return m_originalParam.IsExplicitByRef
+                Return _originalParam.IsExplicitByRef
             End Get
         End Property
 
         Public Overrides ReadOnly Property IsOptional As Boolean
             Get
-                Return m_originalParam.IsOptional
+                Return _originalParam.IsOptional
             End Get
         End Property
 
         Public Overrides ReadOnly Property IsParamArray As Boolean
             Get
-                Return m_originalParam.IsParamArray
+                Return _originalParam.IsParamArray
             End Get
         End Property
 
         Friend Overrides ReadOnly Property MarshallingInformation As MarshalPseudoCustomAttributeData
             Get
-                Return m_originalParam.MarshallingInformation
+                Return _originalParam.MarshallingInformation
             End Get
         End Property
 #End Region
 
-        Friend Overrides Function WithTypeAndCustomModifiers(type As TypeSymbol, customModifiers As ImmutableArray(Of CustomModifier), hasByRefBeforeCustomModifiers As Boolean) As ParameterSymbol
-            Return New SourceClonedParameterSymbolWithCustomModifiers(m_originalParam, DirectCast(Me.ContainingSymbol, MethodSymbol), Me.Ordinal, type, customModifiers, hasByRefBeforeCustomModifiers)
+        Friend Overrides Function WithTypeAndCustomModifiers(type As TypeSymbol, customModifiers As ImmutableArray(Of CustomModifier), refCustomModifiers As ImmutableArray(Of CustomModifier)) As ParameterSymbol
+            Return New SourceClonedParameterSymbolWithCustomModifiers(_originalParam, DirectCast(Me.ContainingSymbol, MethodSymbol), Me.Ordinal, type, customModifiers, refCustomModifiers)
         End Function
 
         Friend NotInheritable Class SourceClonedParameterSymbolWithCustomModifiers
             Inherits SourceClonedParameterSymbol
 
-            Private ReadOnly m_type As TypeSymbol
-            Private ReadOnly m_customModifiers As ImmutableArray(Of CustomModifier)
-            Private ReadOnly m_hasByRefBeforeCustomModifiers As Boolean
+            Private ReadOnly _type As TypeSymbol
+            Private ReadOnly _customModifiers As ImmutableArray(Of CustomModifier)
+            Private ReadOnly _refCustomModifiers As ImmutableArray(Of CustomModifier)
 
             Friend Sub New(
                 originalParam As SourceParameterSymbol,
@@ -195,33 +197,35 @@ Namespace Microsoft.CodeAnalysis.VisualBasic.Symbols
                 newOrdinal As Integer,
                 type As TypeSymbol,
                 customModifiers As ImmutableArray(Of CustomModifier),
-                hasByRefBeforeCustomModifiers As Boolean
+                refCustomModifiers As ImmutableArray(Of CustomModifier)
             )
                 MyBase.New(originalParam, newOwner, newOrdinal)
-                m_type = type
-                m_customModifiers = If(customModifiers.IsDefault, ImmutableArray(Of CustomModifier).Empty, customModifiers)
-                m_hasByRefBeforeCustomModifiers = hasByRefBeforeCustomModifiers
+                _type = type
+                _customModifiers = customModifiers.NullToEmpty()
+                _refCustomModifiers = refCustomModifiers.NullToEmpty()
+
+                Debug.Assert(_refCustomModifiers.IsEmpty OrElse IsByRef)
             End Sub
 
             Public Overrides ReadOnly Property Type As TypeSymbol
                 Get
-                    Return m_type
+                    Return _type
                 End Get
             End Property
 
             Public Overrides ReadOnly Property CustomModifiers As ImmutableArray(Of CustomModifier)
                 Get
-                    Return m_customModifiers
+                    Return _customModifiers
                 End Get
             End Property
 
-            Friend Overrides ReadOnly Property HasByRefBeforeCustomModifiers As Boolean
+            Public Overrides ReadOnly Property RefCustomModifiers As ImmutableArray(Of CustomModifier)
                 Get
-                    Return m_hasByRefBeforeCustomModifiers
+                    Return _refCustomModifiers
                 End Get
             End Property
 
-            Friend Overrides Function WithTypeAndCustomModifiers(type As TypeSymbol, customModifiers As ImmutableArray(Of CustomModifier), hasByRefBeforeCustomModifiers As Boolean) As ParameterSymbol
+            Friend Overrides Function WithTypeAndCustomModifiers(type As TypeSymbol, customModifiers As ImmutableArray(Of CustomModifier), refCustomModifiers As ImmutableArray(Of CustomModifier)) As ParameterSymbol
                 Throw ExceptionUtilities.Unreachable
             End Function
         End Class

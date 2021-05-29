@@ -1,8 +1,10 @@
-﻿// Copyright (c) Microsoft.  All Rights Reserved.  Licensed under the Apache License, Version 2.0.  See License.txt in the project root for license information.
+﻿// Licensed to the .NET Foundation under one or more agreements.
+// The .NET Foundation licenses this file to you under the MIT license.
+// See the LICENSE file in the project root for more information.
 
 using System;
 using System.Collections.Generic;
-using Microsoft.CodeAnalysis.Text;
+using System.Diagnostics;
 using Roslyn.Utilities;
 
 namespace Microsoft.CodeAnalysis.Text
@@ -10,17 +12,20 @@ namespace Microsoft.CodeAnalysis.Text
     /// <summary>
     /// Represents the change to a span of text.
     /// </summary>
-    public struct TextChangeRange : IEquatable<TextChangeRange>
+    [DebuggerDisplay("{GetDebuggerDisplay(),nq}")]
+    public readonly struct TextChangeRange : IEquatable<TextChangeRange>
     {
         /// <summary>
         /// The span of text before the edit which is being changed
         /// </summary>
-        public TextSpan Span { get; private set; }
+        public TextSpan Span { get; }
 
         /// <summary>
         /// Width of the span after the edit.  A 0 here would represent a delete
         /// </summary>
-        public int NewLength { get; private set; }
+        public int NewLength { get; }
+
+        internal int NewEnd => Span.Start + NewLength;
 
         /// <summary>
         /// Initializes a new instance of <see cref="TextChangeRange"/>.
@@ -32,7 +37,7 @@ namespace Microsoft.CodeAnalysis.Text
         {
             if (newLength < 0)
             {
-                throw new ArgumentOutOfRangeException("newLength");
+                throw new ArgumentOutOfRangeException(nameof(newLength));
             }
 
             this.Span = span;
@@ -52,13 +57,13 @@ namespace Microsoft.CodeAnalysis.Text
         /// <summary>
         /// Compares current instance of <see cref="TextChangeRange"/> to another.
         /// </summary>
-        public override bool Equals(object obj)
+        public override bool Equals(object? obj)
         {
-            return obj is TextChangeRange && Equals((TextChangeRange)obj);
+            return obj is TextChangeRange range && Equals(range);
         }
 
         /// <summary>
-        /// Provides hash code for current instnce of <see cref="TextChangeRange"/>.
+        /// Provides hash code for current instance of <see cref="TextChangeRange"/>.
         /// </summary>
         /// <returns></returns>
         public override int GetHashCode()
@@ -85,7 +90,7 @@ namespace Microsoft.CodeAnalysis.Text
         /// <summary>
         /// An empty set of changes.
         /// </summary>
-        public static readonly IReadOnlyList<TextChangeRange> NoChanges = SpecializedCollections.EmptyReadOnlyList<TextChangeRange>();
+        public static IReadOnlyList<TextChangeRange> NoChanges => SpecializedCollections.EmptyReadOnlyList<TextChangeRange>();
 
         /// <summary>
         /// Collapse a set of <see cref="TextChangeRange"/>s into a single encompassing range.  If
@@ -122,6 +127,11 @@ namespace Microsoft.CodeAnalysis.Text
             var newLen = combined.Length + diff;
 
             return new TextChangeRange(combined, newLen);
+        }
+
+        private string GetDebuggerDisplay()
+        {
+            return $"new TextChangeRange(new TextSpan({Span.Start}, {Span.Length}), {NewLength})";
         }
     }
 }

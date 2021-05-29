@@ -1,4 +1,6 @@
-﻿' Copyright (c) Microsoft.  All Rights Reserved.  Licensed under the Apache License, Version 2.0.  See License.txt in the project root for license information.
+﻿' Licensed to the .NET Foundation under one or more agreements.
+' The .NET Foundation licenses this file to you under the MIT license.
+' See the LICENSE file in the project root for more information.
 
 Imports System
 Imports System.Collections.Generic
@@ -17,13 +19,13 @@ Namespace Microsoft.CodeAnalysis.VisualBasic.Symbols
     Friend Class SourceAttributeData
         Inherits VisualBasicAttributeData
 
-        Private ReadOnly m_AttributeClass As NamedTypeSymbol ' TODO - Remove attribute class. It is available from the constructor.
-        Private ReadOnly m_AttributeConstructor As MethodSymbol
-        Private ReadOnly m_ConstructorArguments As ImmutableArray(Of TypedConstant)
-        Private ReadOnly m_NamedArguments As ImmutableArray(Of KeyValuePair(Of String, TypedConstant))
-        Private ReadOnly m_IsConditionallyOmitted As Boolean
-        Private ReadOnly m_HasErrors As Boolean
-        Private ReadOnly m_ApplicationNode As SyntaxReference
+        Private ReadOnly _attributeClass As NamedTypeSymbol ' TODO - Remove attribute class. It is available from the constructor.
+        Private ReadOnly _attributeConstructor As MethodSymbol
+        Private ReadOnly _constructorArguments As ImmutableArray(Of TypedConstant)
+        Private ReadOnly _namedArguments As ImmutableArray(Of KeyValuePair(Of String, TypedConstant))
+        Private ReadOnly _isConditionallyOmitted As Boolean
+        Private ReadOnly _hasErrors As Boolean
+        Private ReadOnly _applicationNode As SyntaxReference
 
         Friend Sub New(ByVal applicationNode As SyntaxReference,
                        ByVal attrClass As NamedTypeSymbol,
@@ -32,48 +34,48 @@ Namespace Microsoft.CodeAnalysis.VisualBasic.Symbols
                        ByVal namedArgs As ImmutableArray(Of KeyValuePair(Of String, TypedConstant)),
                        ByVal isConditionallyOmitted As Boolean,
                        ByVal hasErrors As Boolean)
-            Me.m_ApplicationNode = applicationNode
-            Me.m_AttributeClass = attrClass
-            Me.m_AttributeConstructor = attrMethod
-            Me.m_ConstructorArguments = If(constructorArgs.IsDefault, ImmutableArray(Of TypedConstant).Empty, constructorArgs)
-            Me.m_NamedArguments = If(namedArgs.IsDefault, ImmutableArray.Create(Of KeyValuePair(Of String, TypedConstant))(), namedArgs)
-            Me.m_IsConditionallyOmitted = isConditionallyOmitted
-            Me.m_HasErrors = hasErrors
+            Me._applicationNode = applicationNode
+            Me._attributeClass = attrClass
+            Me._attributeConstructor = attrMethod
+            Me._constructorArguments = constructorArgs.NullToEmpty()
+            Me._namedArguments = If(namedArgs.IsDefault, ImmutableArray.Create(Of KeyValuePair(Of String, TypedConstant))(), namedArgs)
+            Me._isConditionallyOmitted = isConditionallyOmitted
+            Me._hasErrors = hasErrors
         End Sub
 
         Public Overrides ReadOnly Property AttributeClass As NamedTypeSymbol
             Get
-                Return m_AttributeClass
+                Return _attributeClass
             End Get
         End Property
 
         Public Overrides ReadOnly Property AttributeConstructor As MethodSymbol
             Get
-                Return m_AttributeConstructor
+                Return _attributeConstructor
             End Get
         End Property
 
         Public Overrides ReadOnly Property ApplicationSyntaxReference As SyntaxReference
             Get
-                Return m_ApplicationNode
+                Return _applicationNode
             End Get
         End Property
 
         Protected Overrides ReadOnly Property CommonConstructorArguments As ImmutableArray(Of TypedConstant)
             Get
-                Return m_ConstructorArguments
+                Return _constructorArguments
             End Get
         End Property
 
         Protected Overrides ReadOnly Property CommonNamedArguments As ImmutableArray(Of KeyValuePair(Of String, TypedConstant))
             Get
-                Return m_NamedArguments
+                Return _namedArguments
             End Get
         End Property
 
         Friend NotOverridable Overrides ReadOnly Property IsConditionallyOmitted As Boolean
             Get
-                Return m_IsConditionallyOmitted
+                Return _isConditionallyOmitted
             End Get
         End Property
 
@@ -93,7 +95,7 @@ Namespace Microsoft.CodeAnalysis.VisualBasic.Symbols
 
         Friend NotOverridable Overrides ReadOnly Property HasErrors As Boolean
             Get
-                Return m_HasErrors
+                Return _hasErrors
             End Get
         End Property
 
@@ -166,6 +168,10 @@ Namespace Microsoft.CodeAnalysis.VisualBasic.Symbols
                         End If
 
                         targetType = CByte(targetInfo.Underlying)
+
+                    ElseIf parameterType.IsArrayType Then
+                        specType = DirectCast(parameterType, ArrayTypeSymbol).ElementType.SpecialType
+
                     End If
 
                     Select Case targetType
@@ -230,8 +236,12 @@ Namespace Microsoft.CodeAnalysis.VisualBasic.Symbols
                                 lazySystemType = GetSystemType(targetSymbol)
                             End If
 
-                            foundMatch = parameterType = lazySystemType
+                            foundMatch = TypeSymbol.Equals(parameterType, lazySystemType, TypeCompareKind.ConsiderEverything)
                             k += 1
+
+                        Case CByte(SignatureTypeCode.SZArray)
+                            ' skip over and check the next byte
+                            foundMatch = parameterType.IsArrayType
 
                         Case Else
                             Return -1

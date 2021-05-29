@@ -1,23 +1,18 @@
-' Copyright (c) Microsoft.  All Rights Reserved.  Licensed under the Apache License, Version 2.0.  See License.txt in the project root for license information.
-
-Imports Microsoft.CodeAnalysis.Text
-Imports Microsoft.CodeAnalysis.VisualBasic
-Imports Microsoft.CodeAnalysis.VisualBasic.Symbols
-Imports Microsoft.CodeAnalysis.VisualBasic.Syntax
-Imports Roslyn.Test.Utilities
-Imports Xunit
+﻿' Licensed to the .NET Foundation under one or more agreements.
+' The .NET Foundation licenses this file to you under the MIT license.
+' See the LICENSE file in the project root for more information.
 
 Namespace Microsoft.CodeAnalysis.Editor.VisualBasic.UnitTests.Recommendations.PreprocessorDirectives
     Public Class ElseDirectiveKeywordRecommenderTests
         <Fact>
         <Trait(Traits.Feature, Traits.Features.KeywordRecommending)>
-        Public Sub HashElseNotInFile()
+        Public Sub HashElseNotInFileTest()
             VerifyRecommendationsMissing(<File>|</File>, "#Else")
         End Sub
 
         <Fact>
         <Trait(Traits.Feature, Traits.Features.KeywordRecommending)>
-        Public Sub HashElseInFileAfterIf()
+        Public Sub HashElseInFileAfterIfTest()
             VerifyRecommendationsContain(<File>
 #If True Then
 |</File>, "#Else")
@@ -25,7 +20,7 @@ Namespace Microsoft.CodeAnalysis.Editor.VisualBasic.UnitTests.Recommendations.Pr
 
         <Fact>
         <Trait(Traits.Feature, Traits.Features.KeywordRecommending)>
-        Public Sub HashElseInFileAfterElseIf()
+        Public Sub HashElseInFileAfterElseIfTest()
             VerifyRecommendationsContain(<File>
 #If True Then
 #ElseIf True Then
@@ -34,7 +29,7 @@ Namespace Microsoft.CodeAnalysis.Editor.VisualBasic.UnitTests.Recommendations.Pr
 
         <Fact>
         <Trait(Traits.Feature, Traits.Features.KeywordRecommending)>
-        Public Sub HashElseNotInFileAfterElse1()
+        Public Sub HashElseNotInFileAfterElse1Test()
             VerifyRecommendationsMissing(<File>
 #If True Then
 #Else
@@ -43,7 +38,7 @@ Namespace Microsoft.CodeAnalysis.Editor.VisualBasic.UnitTests.Recommendations.Pr
 
         <Fact>
         <Trait(Traits.Feature, Traits.Features.KeywordRecommending)>
-        Public Sub HashElseNotInFileAfterElse2()
+        Public Sub HashElseNotInFileAfterElse2Test()
             VerifyRecommendationsMissing(<File>
 #If True Then
 #ElseIf True Then

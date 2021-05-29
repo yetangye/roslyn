@@ -1,4 +1,6 @@
-﻿' Copyright (c) Microsoft.  All Rights Reserved.  Licensed under the Apache License, Version 2.0.  See License.txt in the project root for license information.
+﻿' Licensed to the .NET Foundation under one or more agreements.
+' The .NET Foundation licenses this file to you under the MIT license.
+' See the LICENSE file in the project root for more information.
 
 Imports System.Collections.Generic
 Imports System.Collections.Immutable
@@ -15,10 +17,10 @@ Namespace Microsoft.CodeAnalysis.VisualBasic.Symbols
     Friend Class SynthesizedMyGroupCollectionPropertySymbol
         Inherits SynthesizedPropertyBase
 
-        Private ReadOnly m_name As String
-        Private ReadOnly m_field As SynthesizedMyGroupCollectionPropertyBackingFieldSymbol
-        Private ReadOnly m_getMethod As SynthesizedMyGroupCollectionPropertyGetAccessorSymbol
-        Private ReadOnly m_setMethodOpt As SynthesizedMyGroupCollectionPropertySetAccessorSymbol
+        Private ReadOnly _name As String
+        Private ReadOnly _field As SynthesizedMyGroupCollectionPropertyBackingFieldSymbol
+        Private ReadOnly _getMethod As SynthesizedMyGroupCollectionPropertyGetAccessorSymbol
+        Private ReadOnly _setMethodOpt As SynthesizedMyGroupCollectionPropertySetAccessorSymbol
         Public ReadOnly AttributeSyntax As SyntaxReference
         Public ReadOnly DefaultInstanceAlias As String
 
@@ -35,36 +37,36 @@ Namespace Microsoft.CodeAnalysis.VisualBasic.Symbols
             Me.AttributeSyntax = attributeSyntax.SyntaxTree.GetReference(attributeSyntax)
             Me.DefaultInstanceAlias = defaultInstanceAlias
 
-            m_name = propertyName
-            m_field = New SynthesizedMyGroupCollectionPropertyBackingFieldSymbol(container, Me, type, fieldName)
-            m_getMethod = New SynthesizedMyGroupCollectionPropertyGetAccessorSymbol(container, Me, createMethod)
+            _name = propertyName
+            _field = New SynthesizedMyGroupCollectionPropertyBackingFieldSymbol(container, Me, type, fieldName)
+            _getMethod = New SynthesizedMyGroupCollectionPropertyGetAccessorSymbol(container, Me, createMethod)
 
             If disposeMethod.Length > 0 Then
-                m_setMethodOpt = New SynthesizedMyGroupCollectionPropertySetAccessorSymbol(container, Me, disposeMethod)
+                _setMethodOpt = New SynthesizedMyGroupCollectionPropertySetAccessorSymbol(container, Me, disposeMethod)
             End If
         End Sub
 
         Public Overrides ReadOnly Property Name As String
             Get
-                Return m_name
+                Return _name
             End Get
         End Property
 
         Public Overrides ReadOnly Property Type As TypeSymbol
             Get
-                Return m_field.Type
+                Return _field.Type
             End Get
         End Property
 
         Public Overrides ReadOnly Property GetMethod As MethodSymbol
             Get
-                Return m_getMethod
+                Return _getMethod
             End Get
         End Property
 
         Public Overrides ReadOnly Property SetMethod As MethodSymbol
             Get
-                Return m_setMethodOpt
+                Return _setMethodOpt
             End Get
         End Property
 
@@ -74,19 +76,19 @@ Namespace Microsoft.CodeAnalysis.VisualBasic.Symbols
 
         Public Overrides ReadOnly Property ContainingSymbol As Symbol
             Get
-                Return m_field.ContainingSymbol
+                Return _field.ContainingSymbol
             End Get
         End Property
 
         Public Overrides ReadOnly Property ContainingType As NamedTypeSymbol
             Get
-                Return m_field.ContainingType
+                Return _field.ContainingType
             End Get
         End Property
 
         Friend Overrides ReadOnly Property AssociatedField As FieldSymbol
             Get
-                Return m_field
+                Return _field
             End Get
         End Property
 

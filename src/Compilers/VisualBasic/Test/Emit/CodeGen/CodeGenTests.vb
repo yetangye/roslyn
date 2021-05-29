@@ -1,19 +1,24 @@
-﻿' Copyright (c) Microsoft.  All Rights Reserved.  Licensed under the Apache License, Version 2.0.  See License.txt in the project root for license information.
+﻿' Licensed to the .NET Foundation under one or more agreements.
+' The .NET Foundation licenses this file to you under the MIT license.
+' See the LICENSE file in the project root for more information.
 
+Imports System.Collections.Immutable
+Imports System.Reflection
 Imports System.Xml.Linq
 Imports Microsoft.CodeAnalysis
+Imports Microsoft.CodeAnalysis.Test.Resources.Proprietary
 Imports Microsoft.CodeAnalysis.Test.Utilities
 Imports Microsoft.CodeAnalysis.VisualBasic
 Imports Microsoft.CodeAnalysis.VisualBasic.Symbols
-Imports ProprietaryTestResources = Microsoft.CodeAnalysis.Test.Resources.Proprietary
 Imports Roslyn.Test.Utilities
+Imports Roslyn.Test.Utilities.TestMetadata
 
 Namespace Microsoft.CodeAnalysis.VisualBasic.UnitTests
 
     Public Class CodeGenTests
         Inherits BasicTestBase
 
-        <WorkItem(776642, "DevDiv")>
+        <WorkItem(776642, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/776642")>
         <Fact()>
         Public Sub Bug776642a()
             CompileAndVerify(
@@ -68,7 +73,7 @@ End Structure
 ]]>)
         End Sub
 
-        <WorkItem(776642, "DevDiv")>
+        <WorkItem(776642, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/776642")>
         <Fact()>
         Public Sub Bug776642b()
             CompileAndVerify(
@@ -187,7 +192,7 @@ End Structure
 ]]>)
         End Sub
 
-        <WorkItem(776642, "DevDiv")>
+        <WorkItem(776642, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/776642")>
         <Fact()>
         Public Sub Bug776642_shared()
             CompileAndVerify(
@@ -234,7 +239,7 @@ End Class
 ]]>)
         End Sub
 
-        <WorkItem(545724, "DevDiv")>
+        <WorkItem(545724, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/545724")>
         <Fact()>
         Public Sub Bug14352()
             CompileAndVerify(
@@ -274,8 +279,9 @@ End Module
 </compilation>, expectedOutput:="Passed - 1")
         End Sub
 
-        <WorkItem(578074, "DevDiv")>
-        <Fact()>
+        <WorkItem(578074, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/578074")>
+        <WorkItem(32576, "https://github.com/dotnet/roslyn/issues/32576")>
+        <Fact>
         Public Sub PreserveZeroDigitsInDecimal()
             CompileAndVerify(
 <compilation>
@@ -411,7 +417,7 @@ expectedOutput:=<![CDATA[False]]>).
 ]]>)
         End Sub
 
-        <WorkItem(546809, "DevDiv")>
+        <WorkItem(546809, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/546809")>
         <Fact()>
         Public Sub Bug16872()
             CompileAndVerify(
@@ -489,7 +495,7 @@ expectedOutput:="").
 ]]>)
         End Sub
 
-        <WorkItem(529861, "DevDiv")>
+        <WorkItem(529861, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/529861")>
         <Fact()>
         Public Sub Bug14632a()
 
@@ -543,11 +549,11 @@ expectedOutput:=<![CDATA[
 
         End Sub
 
-        <WorkItem(529861, "DevDiv")>
+        <WorkItem(529861, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/529861")>
         <WorkItem(568475, "DevDiv")>
         <Fact()>
         Public Sub Bug14632b()
-            Dim compilation = CompilationUtils.CreateCompilationWithMscorlibAndVBRuntime(
+            Dim compilation = CompilationUtils.CreateCompilationWithMscorlib40AndVBRuntime(
 <compilation>
     <file name="a.vb">
 Imports System
@@ -590,7 +596,7 @@ BC30036: Overflow.
 
         End Sub
 
-        <WorkItem(529861, "DevDiv")>
+        <WorkItem(529861, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/529861")>
         <Fact()>
         Public Sub Bug14632c()
             CompileAndVerify(
@@ -620,10 +626,13 @@ expectedOutput:=<![CDATA[
         ''' Breaking change: native compiler considers
         ''' digits &lt; 1e-49 when rounding.
         ''' </summary>
-        <Fact, WorkItem(568494, "DevDiv"), WorkItem(568520, "DevDiv")>
+        <WorkItem(568494, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/568494")>
+        <WorkItem(568520, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/568520")>
+        <WorkItem(32576, "https://github.com/dotnet/roslyn/issues/32576")>
+        <WorkItem(375, "https://github.com/dotnet/roslyn/issues/375")>
+        <Fact>
         Public Sub DecimalLiteral_BreakingChange()
-
-            CompileAndVerify(
+            Dim source =
 <compilation>
     <file name="c.vb"><![CDATA[
 Imports System
@@ -644,7 +653,9 @@ Module M
     End Sub
 End Module
     ]]></file>
-</compilation>, additionalRefs:=XmlReferences, expectedOutput:=<![CDATA[
+</compilation>
+            If (ExecutionConditionUtil.IsDesktop) Then
+                CompileAndVerify(source, references:=XmlReferences, expectedOutput:=<![CDATA[
 0.0000000000000000000000000031
 0.0000000000000000000000000030
 
@@ -656,7 +667,20 @@ End Module
 
 0.1000000000000000000000000000
 ]]>)
+            ElseIf ExecutionConditionUtil.IsCoreClr Then
+                CompileAndVerify(source, references:=XmlReferences, expectedOutput:=<![CDATA[
+0.0000000000000000000000000031
+0.0000000000000000000000000031
 
+0.0000000000000000000000000001
+0.0000000000000000000000000001
+
+-0.0000000000000000000000000001
+-0.0000000000000000000000000001
+
+0.1000000000000000000000000001
+]]>)
+            End If
         End Sub
 
         <Fact()>
@@ -702,7 +726,7 @@ Module M
     End Sub
 End Module
     ]]></file>
-</compilation>, additionalRefs:=XmlReferences, expectedOutput:=<![CDATA[
+</compilation>, references:=XmlReferences, expectedOutput:=<![CDATA[
 00000000000000000000000000000000
 00000000000000000000000000010000
 00000000000000000000000000020000
@@ -733,7 +757,7 @@ End Module
         <WorkItem(568475, "DevDiv")>
         <Fact()>
         Public Sub DecimalZero_BreakingChange()
-            Dim compilation = CompilationUtils.CreateCompilationWithMscorlibAndVBRuntime(
+            Dim compilation = CompilationUtils.CreateCompilationWithMscorlib40AndVBRuntime(
 <compilation>
     <file name="c.vb"><![CDATA[
 Imports System
@@ -846,7 +870,7 @@ expectedOutput:=<![CDATA[Done]]>).
 ]]>)
         End Sub
 
-        <WorkItem(545120, "DevDiv")>
+        <WorkItem(545120, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/545120")>
         <Fact()>
         Public Sub Bug13399a()
             CompileAndVerify(
@@ -881,7 +905,7 @@ End Module
 expectedOutput:="S:1-S:2")
         End Sub
 
-        <WorkItem(545120, "DevDiv")>
+        <WorkItem(545120, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/545120")>
         <Fact()>
         Public Sub Bug13399b()
             CompileAndVerify(
@@ -1025,7 +1049,7 @@ expectedOutput:=<![CDATA[False]]>).
 ]]>)
         End Sub
 
-        <WorkItem(545404, "DevDiv")>
+        <WorkItem(545404, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/545404")>
         <Fact()>
         Public Sub Bug13798()
             CompileAndVerify(
@@ -1122,7 +1146,7 @@ End Class
     </file>
 </compilation>
 
-            CompileWithCustomILSource(vbSource, ClassesWithReadWriteProperties.Value, TestOptions.ReleaseDll, emitOptions:=TestEmitters.RefEmitBug).
+            CompileWithCustomILSource(vbSource, ClassesWithReadWriteProperties.Value, TestOptions.ReleaseDll).
             VerifyIL("D3.Test",
             <![CDATA[
 {
@@ -1449,7 +1473,6 @@ End Module
 </compilation>
 
             CompileWithCustomILSource(vbSource, AttributesWithReadWriteProperties.Value,
-                                      emitOptions:=TestEmitters.RefEmitBug,
                                       options:=New VisualBasicCompilationOptions(OutputKind.ConsoleApplication),
                                       expectedOutput:=<![CDATA[
 Void .ctor()(..0..)
@@ -1583,7 +1606,7 @@ End Module
     </file>
 </compilation>
 
-            CompileWithCustomILSource(vbSource, ilSource.Value, TestOptions.ReleaseDll, emitOptions:=TestEmitters.RefEmitBug).
+            CompileWithCustomILSource(vbSource, ilSource.Value, TestOptions.ReleaseDll).
                 VerifyIL("M.Main",
             <![CDATA[
                                                {
@@ -1610,9 +1633,9 @@ End Module
                                                ]]>)
         End Sub
 
-        <WorkItem(546853, "DevDiv")>
+        <WorkItem(546853, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/546853")>
         <Fact()>
-        Public Sub CallingVistualFinalMethod()
+        Public Sub CallingVirtualFinalMethod()
             Dim ilSource = <![CDATA[
 .class public auto ansi beforefieldinit B
        extends [mscorlib]System.Object
@@ -1664,7 +1687,7 @@ End Module
     </file>
 </compilation>
 
-            CompileWithCustomILSource(vbSource, ilSource.Value, TestOptions.ReleaseDll, emitOptions:=TestEmitters.RefEmitBug).
+            CompileWithCustomILSource(vbSource, ilSource.Value, TestOptions.ReleaseDll).
                 VerifyIL("C.S",
             <![CDATA[
 {
@@ -1737,7 +1760,7 @@ End Module
     </file>
 </compilation>
 
-            CompileWithCustomILSource(vbSource, ilSource.Value, TestOptions.ReleaseDll, emitOptions:=TestEmitters.RefEmitBug).
+            CompileWithCustomILSource(vbSource, ilSource.Value, TestOptions.ReleaseDll).
                 VerifyIL("M.Main",
             <![CDATA[
 {
@@ -1842,7 +1865,7 @@ IL_0063:  ret
 
         End Sub
 
-        <WorkItem(529442, "DevDiv")>
+        <WorkItem(529442, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/529442")>
         <Fact>
         Public Sub ExplicitStandardModuleAttribute()
             CompileAndVerify(
@@ -1904,7 +1927,7 @@ S1
         End Sub
 
         <Fact()>
-        Public Sub EmitCallToOverridenToStringOnStruct()
+        Public Sub EmitCallToOverriddenToStringOnStruct()
             CompileAndVerify(
 <compilation>
     <file name="a.vb">
@@ -1945,7 +1968,7 @@ expectedOutput:=<![CDATA[
         End Sub
 
         <Fact()>
-        Public Sub EmitIntefaceMethodOnStruct()
+        Public Sub EmitInterfaceMethodOnStruct()
             CompileAndVerify(
 <compilation>
     <file name="a.vb">
@@ -1995,7 +2018,7 @@ S1:M
 ]]>)
         End Sub
 
-        <WorkItem(531085, "DevDiv")>
+        <WorkItem(531085, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/531085")>
         <Fact()>
         Public Sub EmitMyBaseCall()
             CompileAndVerify(
@@ -2237,7 +2260,7 @@ expectedOutput:=<![CDATA[
 ]]>)
         End Sub
 
-        <WorkItem(546809, "DevDiv")>
+        <WorkItem(546809, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/546809")>
         <Fact()>
         Public Sub TestBinaryConditionalOperator_16872a()
             CompileAndVerify(
@@ -2295,7 +2318,7 @@ expectedOutput:="C1").
 ]]>)
         End Sub
 
-        <WorkItem(634407, "DevDiv")>
+        <WorkItem(634407, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/634407")>
         <Fact()>
         Public Sub TestTernary_Null()
             CompileAndVerify(
@@ -2353,7 +2376,7 @@ End Class
         End Sub
 
 
-        <WorkItem(546809, "DevDiv")>
+        <WorkItem(546809, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/546809")>
         <Fact()>
         Public Sub TestBinaryConditionalOperator_16872b()
             CompileAndVerify(
@@ -3135,17 +3158,17 @@ expectedOutput:=<![CDATA[
 Public Module Program
     Public Sub Main()
         Dim a As Integer = 1
-        Dim i As IFoo(Of String) = Nothing
-        Dim e As New FooVal()
+        Dim i As IGoo(Of String) = Nothing
+        Dim e As New GooVal()
 
         i = If(a > 1, i, e)
-        System.Console.Write(i.Foo())
+        System.Console.Write(i.Goo())
     End Sub
 
-    Interface IFoo(Of T) : Function Foo() As T : End Interface
+    Interface IGoo(Of T) : Function Goo() As T : End Interface
 
-    Structure FooVal : Implements IFoo(Of String)
-        Public Function Foo() As String Implements IFoo(Of String).Foo
+    Structure GooVal : Implements IGoo(Of String)
+        Public Function Goo() As String Implements IGoo(Of String).Goo
             Return "Val "
         End Function
     End Structure
@@ -3156,23 +3179,23 @@ End Module</file>
             <![CDATA[{
   // Code size       41 (0x29)
   .maxstack  2
-  .locals init (Program.IFoo(Of String) V_0, //i
-  Program.FooVal V_1) //e
+  .locals init (Program.IGoo(Of String) V_0, //i
+  Program.GooVal V_1) //e
   IL_0000:  ldc.i4.1
   IL_0001:  ldnull
   IL_0002:  stloc.0
   IL_0003:  ldloca.s   V_1
-  IL_0005:  initobj    "Program.FooVal"
+  IL_0005:  initobj    "Program.GooVal"
   IL_000b:  ldc.i4.1
   IL_000c:  bgt.s      IL_001b
   IL_000e:  ldloc.1
-  IL_000f:  box        "Program.FooVal"
-  IL_0014:  castclass  "Program.IFoo(Of String)"
+  IL_000f:  box        "Program.GooVal"
+  IL_0014:  castclass  "Program.IGoo(Of String)"
   IL_0019:  br.s       IL_001c
   IL_001b:  ldloc.0
   IL_001c:  stloc.0
   IL_001d:  ldloc.0
-  IL_001e:  callvirt   "Function Program.IFoo(Of String).Foo() As String"
+  IL_001e:  callvirt   "Function Program.IGoo(Of String).Goo() As String"
   IL_0023:  call       "Sub System.Console.Write(String)"
   IL_0028:  ret
 }]]>)
@@ -3185,22 +3208,22 @@ End Module</file>
     <file name="a.vb">
 Public Module Program
     Public Sub Main()
-        Dim i As IFoo(Of String) = Nothing
-        Dim e As New FooVal()
-        Dim n? As FooVal = e
+        Dim i As IGoo(Of String) = Nothing
+        Dim e As New GooVal()
+        Dim n? As GooVal = e
 
         i = If(i, e)
-        System.Console.Write(i.Foo())
+        System.Console.Write(i.Goo())
 
         i = Nothing
         i = If(n, i)
-        System.Console.Write(i.Foo())
+        System.Console.Write(i.Goo())
     End Sub
 
-    Interface IFoo(Of T) : Function Foo() As T : End Interface
+    Interface IGoo(Of T) : Function Goo() As T : End Interface
 
-    Structure FooVal : Implements IFoo(Of String)
-        Public Function Foo() As String Implements IFoo(Of String).Foo
+    Structure GooVal : Implements IGoo(Of String)
+        Public Function Goo() As String Implements IGoo(Of String).Goo
             Return "Val "
         End Function
     End Structure
@@ -3212,45 +3235,366 @@ End Module</file>
 {
   // Code size       90 (0x5a)
   .maxstack  2
-  .locals init (Program.IFoo(Of String) V_0, //i
-  Program.FooVal V_1, //e
-  Program.FooVal? V_2) //n
+  .locals init (Program.IGoo(Of String) V_0, //i
+  Program.GooVal V_1, //e
+  Program.GooVal? V_2) //n
   IL_0000:  ldnull
   IL_0001:  stloc.0
   IL_0002:  ldloca.s   V_1
-  IL_0004:  initobj    "Program.FooVal"
+  IL_0004:  initobj    "Program.GooVal"
   IL_000a:  ldloca.s   V_2
   IL_000c:  ldloc.1
-  IL_000d:  call       "Sub Program.FooVal?..ctor(Program.FooVal)"
+  IL_000d:  call       "Sub Program.GooVal?..ctor(Program.GooVal)"
   IL_0012:  ldloc.0
   IL_0013:  dup
   IL_0014:  brtrue.s   IL_0022
   IL_0016:  pop
   IL_0017:  ldloc.1
-  IL_0018:  box        "Program.FooVal"
-  IL_001d:  castclass  "Program.IFoo(Of String)"
+  IL_0018:  box        "Program.GooVal"
+  IL_001d:  castclass  "Program.IGoo(Of String)"
   IL_0022:  stloc.0
   IL_0023:  ldloc.0
-  IL_0024:  callvirt   "Function Program.IFoo(Of String).Foo() As String"
+  IL_0024:  callvirt   "Function Program.IGoo(Of String).Goo() As String"
   IL_0029:  call       "Sub System.Console.Write(String)"
   IL_002e:  ldnull
   IL_002f:  stloc.0
   IL_0030:  ldloca.s   V_2
-  IL_0032:  call       "Function Program.FooVal?.get_HasValue() As Boolean"
+  IL_0032:  call       "Function Program.GooVal?.get_HasValue() As Boolean"
   IL_0037:  brtrue.s   IL_003c
   IL_0039:  ldloc.0
   IL_003a:  br.s       IL_004d
   IL_003c:  ldloca.s   V_2
-  IL_003e:  call       "Function Program.FooVal?.GetValueOrDefault() As Program.FooVal"
-  IL_0043:  box        "Program.FooVal"
-  IL_0048:  castclass  "Program.IFoo(Of String)"
+  IL_003e:  call       "Function Program.GooVal?.GetValueOrDefault() As Program.GooVal"
+  IL_0043:  box        "Program.GooVal"
+  IL_0048:  castclass  "Program.IGoo(Of String)"
   IL_004d:  stloc.0
   IL_004e:  ldloc.0
-  IL_004f:  callvirt   "Function Program.IFoo(Of String).Foo() As String"
+  IL_004f:  callvirt   "Function Program.IGoo(Of String).Goo() As String"
   IL_0054:  call       "Sub System.Console.Write(String)"
   IL_0059:  ret
 }
 ]]>)
+        End Sub
+
+        <Fact()>
+        Public Sub TestNullCoalesce_NullableWithDefault_Optimization()
+            CompileAndVerify(
+<compilation>
+    <file name="a.vb">
+Public Module Program
+    Public Structure S
+        public _a As Integer
+        public _b As System.Guid
+
+        Public Sub New(a as Integer, b As System.Guid)
+            _a = a
+            _b = b
+        End Sub
+
+        Public Overrides Function ToString() As String
+            Return (_a, _b).ToString()
+        End Function
+    End Structure
+
+    Public Function CoalesceInt32(x As Integer?) As Integer
+        Return If(x, 0)
+    End Function
+
+    Public Function CoalesceGeneric(Of T As Structure)(x As T?) As T
+        Return If(x, CType(Nothing, T))
+    End Function
+        
+    public Function CoalesceTuple(x As (a As Boolean, b As System.Guid)?) As (a As Boolean, b As System.Guid)
+        Return If(x, CType(Nothing, (a As Boolean, b As System.Guid)))
+    End Function
+
+    public Function CoalesceUserStruct(x As S?) As S
+        Return If(x, CType(Nothing, S))
+    End Function
+
+    public Function CoalesceStructWithImplicitConstructor(x As S?) As S
+        Return If(x, New S())
+    End Function
+
+    public Sub Main()
+        System.Console.WriteLine(CoalesceInt32(42))
+        System.Console.WriteLine(CoalesceInt32(Nothing))
+        System.Console.WriteLine(CoalesceGeneric(Of System.Guid)(new System.Guid("44ed2f0b-c2fa-4791-81f6-97222fffa466")))
+        System.Console.WriteLine(CoalesceGeneric(Of System.Guid)(Nothing))
+        System.Console.WriteLine(CoalesceTuple((true, new System.Guid("1c95cef0-1aae-4adb-a43c-54b2e7c083a0"))))
+        System.Console.WriteLine(CoalesceTuple(Nothing))
+        System.Console.WriteLine(CoalesceUserStruct(new S(42, new System.Guid("8683f371-81b4-45f6-aaed-1c665b371594"))))
+        System.Console.WriteLine(CoalesceUserStruct(Nothing))
+        System.Console.WriteLine(CoalesceStructWithImplicitConstructor(new S()))
+        System.Console.WriteLine(CoalesceStructWithImplicitConstructor(Nothing))
+    End Sub
+End Module</file>
+</compilation>,
+            references:={ValueTupleRef, SystemRuntimeFacadeRef},
+            expectedOutput:=<![CDATA[
+42
+0
+44ed2f0b-c2fa-4791-81f6-97222fffa466
+00000000-0000-0000-0000-000000000000
+(True, 1c95cef0-1aae-4adb-a43c-54b2e7c083a0)
+(False, 00000000-0000-0000-0000-000000000000)
+(42, 8683f371-81b4-45f6-aaed-1c665b371594)
+(0, 00000000-0000-0000-0000-000000000000)
+(0, 00000000-0000-0000-0000-000000000000)
+(0, 00000000-0000-0000-0000-000000000000)
+]]>).
+            VerifyIL("Program.CoalesceInt32",
+            <![CDATA[
+{
+  // Code size        8 (0x8)
+  .maxstack  1
+  IL_0000:  ldarga.s   V_0
+  IL_0002:  call       "Function Integer?.GetValueOrDefault() As Integer"
+  IL_0007:  ret
+}]]>).
+            VerifyIL("Program.CoalesceGeneric(Of T)",
+            <![CDATA[
+{
+  // Code size        8 (0x8)
+  .maxstack  1
+  IL_0000:  ldarga.s   V_0
+  IL_0002:  call       "Function T?.GetValueOrDefault() As T"
+  IL_0007:  ret
+}]]>).
+            VerifyIL("Program.CoalesceTuple",
+            <![CDATA[
+{
+  // Code size        8 (0x8)
+  .maxstack  1
+  IL_0000:  ldarga.s   V_0
+  IL_0002:  call       "Function (a As Boolean, b As System.Guid)?.GetValueOrDefault() As (a As Boolean, b As System.Guid)"
+  IL_0007:  ret
+}]]>).
+            VerifyIL("Program.CoalesceUserStruct",
+            <![CDATA[
+{
+  // Code size        8 (0x8)
+  .maxstack  1
+  IL_0000:  ldarga.s   V_0
+  IL_0002:  call       "Function Program.S?.GetValueOrDefault() As Program.S"
+  IL_0007:  ret
+}]]>).
+            VerifyIL("Program.CoalesceStructWithImplicitConstructor",
+            <![CDATA[
+{
+  // Code size        8 (0x8)
+  .maxstack  1
+  IL_0000:  ldarga.s   V_0
+  IL_0002:  call       "Function Program.S?.GetValueOrDefault() As Program.S"
+  IL_0007:  ret
+}]]>)
+        End Sub
+
+        <Fact()>
+        Public Sub TestNullCoalesce_NullableWithConvertedDefault_Optimization()
+            CompileAndVerify(
+<compilation>
+    <file name="a.vb">
+Public Module Program
+    Public Function CoalesceDifferentTupleNames(x As (a As Boolean, b As System.Guid, c As String)?) As (a As Boolean, b As System.Guid, c As String)
+        Return If(x, CType(Nothing, (c As Boolean, d As System.Guid, e As String)))
+    End Function
+
+    Public Sub Main()
+        System.Console.WriteLine(CoalesceDifferentTupleNames((true, new System.Guid("533d4d3b-5013-461e-ae9e-b98eb593d761"), "value")))
+        System.Console.WriteLine(CoalesceDifferentTupleNames(Nothing))
+    End Sub
+End Module</file>
+</compilation>,
+            references:={ValueTupleRef, SystemRuntimeFacadeRef},
+            expectedOutput:=<![CDATA[
+(True, 533d4d3b-5013-461e-ae9e-b98eb593d761, value)
+(False, 00000000-0000-0000-0000-000000000000, )
+]]>).
+            VerifyIL("Program.CoalesceDifferentTupleNames",
+            <![CDATA[
+ {
+  // Code size        8 (0x8)
+  .maxstack  1
+  IL_0000:  ldarga.s   V_0
+  IL_0002:  call       "Function (a As Boolean, b As System.Guid, c As String)?.GetValueOrDefault() As (a As Boolean, b As System.Guid, c As String)"
+  IL_0007:  ret
+}
+]]>)
+        End Sub
+
+        <Fact()>
+        Public Sub TestNullCoalesce_NullableWithNonDefault_NoOptimization()
+            CompileAndVerify(
+<compilation>
+    <file name="a.vb">
+Public Module Program
+    Public Function CoalesceWithNonDefault1(x As Integer?) As Integer
+        Return If(x, 2)
+    End Function
+
+    Public Function CoalesceWithNonDefault2(x As Integer?, y As Integer) As Integer
+        Return If(x, y)
+    End Function
+
+    Public Function CoalesceWithNonDefault3(x As Integer?, y As Integer?) As Integer?
+        Return If(x, y)
+    End Function
+
+    Public Function CoalesceWithNonDefault4(x As Integer?) As Integer?
+        Return If(x, Nothing)
+    End Function
+
+    Public Sub WriteLine(value As Object)
+        System.Console.WriteLine(If(value?.ToString, "*Nothing*"))
+    End Sub
+
+    Public Sub Main
+        WriteLine(CoalesceWithNonDefault1(42))
+        WriteLine(CoalesceWithNonDefault1(Nothing))
+        WriteLine(CoalesceWithNonDefault2(12, 34))
+        WriteLine(CoalesceWithNonDefault2(Nothing, 34))
+        WriteLine(CoalesceWithNonDefault3(123, 456))
+        WriteLine(CoalesceWithNonDefault3(123, Nothing))
+        WriteLine(CoalesceWithNonDefault3(Nothing, 456))
+        WriteLine(CoalesceWithNonDefault3(Nothing, Nothing))
+        WriteLine(CoalesceWithNonDefault4(42))
+        WriteLine(CoalesceWithNonDefault4(Nothing))
+    End Sub
+End Module</file>
+</compilation>,
+            expectedOutput:=<![CDATA[
+42
+2
+12
+34
+123
+123
+456
+*Nothing*
+42
+*Nothing*
+]]>).
+            VerifyIL("Program.CoalesceWithNonDefault1",
+            <![CDATA[
+ { 
+  // Code size       19 (0x13)
+  .maxstack  1
+  IL_0000:  ldarga.s   V_0
+  IL_0002:  call       "Function Integer?.get_HasValue() As Boolean"
+  IL_0007:  brtrue.s   IL_000b
+  IL_0009:  ldc.i4.2
+  IL_000a:  ret
+  IL_000b:  ldarga.s   V_0
+  IL_000d:  call       "Function Integer?.GetValueOrDefault() As Integer"
+  IL_0012:  ret
+}
+]]>).
+            VerifyIL("Program.CoalesceWithNonDefault2",
+            <![CDATA[
+ {
+  // Code size       19 (0x13)
+  .maxstack  1
+  IL_0000:  ldarga.s   V_0
+  IL_0002:  call       "Function Integer?.get_HasValue() As Boolean"
+  IL_0007:  brtrue.s   IL_000b
+  IL_0009:  ldarg.1
+  IL_000a:  ret
+  IL_000b:  ldarga.s   V_0
+  IL_000d:  call       "Function Integer?.GetValueOrDefault() As Integer"
+  IL_0012:  ret
+}
+]]>).
+            VerifyIL("Program.CoalesceWithNonDefault3",
+            <![CDATA[
+ {
+  // Code size       13 (0xd)
+  .maxstack  1
+  IL_0000:  ldarga.s   V_0
+  IL_0002:  call       "Function Integer?.get_HasValue() As Boolean"
+  IL_0007:  brtrue.s   IL_000b
+  IL_0009:  ldarg.1
+  IL_000a:  ret
+  IL_000b:  ldarg.0
+  IL_000c:  ret
+}
+]]>).
+            VerifyIL("Program.CoalesceWithNonDefault4",
+            <![CDATA[
+{
+  // Code size       21 (0x15)
+  .maxstack  1
+  .locals init (Integer? V_0)
+  IL_0000:  ldarga.s   V_0
+  IL_0002:  call       "Function Integer?.get_HasValue() As Boolean"
+  IL_0007:  brtrue.s   IL_0013
+  IL_0009:  ldloca.s   V_0
+  IL_000b:  initobj    "Integer?"
+  IL_0011:  ldloc.0
+  IL_0012:  ret
+  IL_0013:  ldarg.0
+  IL_0014:  ret
+}
+            ]]>)
+        End Sub
+
+        <Fact()>
+        Public Sub TestNullCoalesce_NonNullableWithDefault_NoOptimization()
+            CompileAndVerify(
+<compilation>
+    <file name="a.vb">
+Public Module Program
+    Public Function CoalesceNonNullableWithDefault(x As String)
+        Return If(x, Nothing)
+    End Function
+
+    Public Sub WriteLine(value As Object)
+        System.Console.WriteLine(If(value?.ToString, "*Nothing*"))
+    End Sub
+
+    Public Sub Main()
+        WriteLine(CoalesceNonNullableWithDefault("value"))
+        WriteLine(CoalesceNonNullableWithDefault(Nothing))
+    End Sub
+End Module</file>
+</compilation>,
+            expectedOutput:=<![CDATA[
+value
+*Nothing*
+]]>).
+            VerifyIL("Program.CoalesceNonNullableWithDefault",
+            <![CDATA[
+{
+  // Code size        7 (0x7)
+  .maxstack  2
+  IL_0000:  ldarg.0
+  IL_0001:  dup
+  IL_0002:  brtrue.s   IL_0006
+  IL_0004:  pop
+  IL_0005:  ldnull
+  IL_0006:  ret
+}
+]]>)
+        End Sub
+
+        <Fact()>
+        Public Sub TestNullCoalesce_NullableDefault_MissingGetValueOrDefault()
+            Dim compilation = CreateCompilation(
+<compilation>
+    <file name="a.vb">
+Public Module Program
+    Public Function Coalesce(x As Integer?)
+        Return If(x, 0)
+    End Function
+End Module</file>
+</compilation>)
+            compilation.MakeMemberMissing(SpecialMember.System_Nullable_T_GetValueOrDefault)
+            compilation.AssertTheseEmitDiagnostics(
+<errors>
+BC35000: Requested operation is not available because the runtime library function 'System.Nullable`1.GetValueOrDefault' is not defined.
+        Return If(x, 0)
+                  ~
+</errors>)
         End Sub
 
         <Fact()>
@@ -3312,7 +3656,7 @@ Module M1
 End Module
     </file>
 </compilation>,
-            expectedOutput:="ThenPart" & vbCrLf & "After" & vbCrLf).
+            expectedOutput:="ThenPart" & Environment.NewLine & "After" & Environment.NewLine).
             VerifyIL("M1.Main",
             <![CDATA[
 {
@@ -3371,24 +3715,24 @@ Namespace TernaryAndVarianceConversion
     Delegate Sub ContravariantDelegateWithValidInParm(Of In T)(inVal As T)
 
     Interface ICovariantInterface(Of Out T)
-        Sub CovariantInterfaceMathodWithVoidReturn()
-        Function CovariantInterfaceMathodWithValidReturn() As T
+        Sub CovariantInterfaceMethodWithVoidReturn()
+        Function CovariantInterfaceMethodWithValidReturn() As T
         ReadOnly Property CovariantInterfacePropertyWithValidGetter As T
         Sub Test()
     End Interface
 
     Interface IContravariantInterface(Of In T)
-        Sub ContravariantInterfaceMathodWithVoidReturn()
-        Sub ContravariantInterfaceMathodWithValidInParm(inVal As T)
+        Sub ContravariantInterfaceMethodWithVoidReturn()
+        Sub ContravariantInterfaceMethodWithValidInParm(inVal As T)
         WriteOnly Property ContravariantInterfacePropertyWithValidSetter As T
         Sub Test()
     End Interface
 
     Class CovariantInterfaceImpl(Of T) : Implements ICovariantInterface(Of T)
-        Public Sub CovariantInterfaceMathodWithVoidReturn() Implements ICovariantInterface(Of T).CovariantInterfaceMathodWithVoidReturn
+        Public Sub CovariantInterfaceMethodWithVoidReturn() Implements ICovariantInterface(Of T).CovariantInterfaceMethodWithVoidReturn
 
         End Sub
-        Public Function CovariantInterfaceMathodWithValidReturn() As T Implements ICovariantInterface(Of T).CovariantInterfaceMathodWithValidReturn
+        Public Function CovariantInterfaceMethodWithValidReturn() As T Implements ICovariantInterface(Of T).CovariantInterfaceMethodWithValidReturn
             Return Nothing
         End Function
 
@@ -3404,11 +3748,11 @@ Namespace TernaryAndVarianceConversion
     End Class
 
     Class ContravariantInterfaceImpl(Of T) : Implements IContravariantInterface(Of T)
-        Public Sub ContravariantInterfaceMathodWithVoidReturn() Implements IContravariantInterface(Of T).ContravariantInterfaceMathodWithVoidReturn
+        Public Sub ContravariantInterfaceMethodWithVoidReturn() Implements IContravariantInterface(Of T).ContravariantInterfaceMethodWithVoidReturn
 
         End Sub
 
-        Public Sub ContravariantInterfaceMathodWithValidInParm(inVal As T) Implements IContravariantInterface(Of T).ContravariantInterfaceMathodWithValidInParm
+        Public Sub ContravariantInterfaceMethodWithValidInParm(inVal As T) Implements IContravariantInterface(Of T).ContravariantInterfaceMethodWithValidInParm
 
         End Sub
 
@@ -3983,7 +4327,7 @@ Class C(Of V)
         Console.WriteLine("Success")
     End Sub
 
-    Public Sub Foo(ByVal z As V)
+    Public Sub Goo(ByVal z As V)
         Me.S(z)
     End Sub
 
@@ -3992,7 +4336,7 @@ End Class
 Module M222
     Sub Main(args As String())
         Dim c As New C(Of Integer)
-        c.Foo(1)
+        c.Goo(1)
     End Sub
 End Module
 
@@ -4016,7 +4360,7 @@ Class C(Of V)
         Console.WriteLine("Success")
     End Sub
 
-    Public Sub Foo(ByVal z As V)
+    Public Sub Goo(ByVal z As V)
         Me.S(z)
     End Sub
 
@@ -4025,7 +4369,7 @@ End Class
 Module M222
     Sub Main(args As String())
         Dim c As New C(Of Integer)
-        c.Foo(1)
+        c.Goo(1)
     End Sub
 End Module
 
@@ -4049,7 +4393,7 @@ Class C(Of V)
         Console.WriteLine("Success")
     End Sub
 
-    Public Sub Foo(ByVal z As V)
+    Public Sub Goo(ByVal z As V)
         Me.S(z)
     End Sub
 
@@ -4058,7 +4402,7 @@ End Class
 Module M222
     Sub Main(args As String())
         Dim c As New C(Of Integer)
-        c.Foo(1)
+        c.Goo(1)
     End Sub
 End Module
 
@@ -4082,7 +4426,7 @@ Structure C(Of V)
         Console.WriteLine("Success")
     End Sub
 
-    Public Sub Foo(ByVal z As Integer)
+    Public Sub Goo(ByVal z As Integer)
         Me.S(z)
     End Sub
 
@@ -4091,7 +4435,7 @@ End Structure
 Module M222
     Sub Main(args As String())
         Dim c As New C(Of Integer)
-        c.Foo(1)
+        c.Goo(1)
     End Sub
 End Module
 
@@ -4114,7 +4458,7 @@ Class C
         Console.WriteLine("Success")
     End Sub
 
-    Public Sub Foo(Of V)(ByVal z As V)
+    Public Sub Goo(Of V)(ByVal z As V)
         Me.S(z)
     End Sub
 End Class
@@ -4122,7 +4466,7 @@ End Class
 Module MMM
     Sub Main(args As String())
         Dim c As New C
-        c.Foo(1)
+        c.Goo(1)
     End Sub
 End Module
 
@@ -4145,7 +4489,7 @@ Structure C
         Console.WriteLine("Success")
     End Sub
 
-    Public Sub Foo(ByVal z As Integer)
+    Public Sub Goo(ByVal z As Integer)
         Me.S(z)
     End Sub
 End Structure
@@ -4153,7 +4497,7 @@ End Structure
 Module MMM
     Sub Main(args As String())
         Dim c As New C
-        c.Foo(1)
+        c.Goo(1)
     End Sub
 End Module
 
@@ -4176,7 +4520,7 @@ Class C
         Console.WriteLine("Success")
     End Sub
 
-    Public Sub Foo(Of V)(ByVal z As V)
+    Public Sub Goo(Of V)(ByVal z As V)
         Me.S(z)
     End Sub
 End Class
@@ -4184,7 +4528,7 @@ End Class
 Module MMM
     Sub Main(args As String())
         Dim c As New C
-        c.Foo(1)
+        c.Goo(1)
     End Sub
 End Module
     </file>
@@ -4206,7 +4550,7 @@ Structure C
         Console.WriteLine("Success")
     End Sub
 
-    Public Sub Foo(ByVal z As Integer)
+    Public Sub Goo(ByVal z As Integer)
         Me.S(z)
     End Sub
 End Structure
@@ -4214,7 +4558,7 @@ End Structure
 Module MMM
     Sub Main(args As String())
         Dim c As New C
-        c.Foo(1)
+        c.Goo(1)
     End Sub
 End Module
     </file>
@@ -4248,7 +4592,7 @@ Partial Class C1(Of T) : Implements C1(Of A).I(Of A)
     Interface I(Of J)
     End Interface
     Partial Class C2(Of K As T)
-        Partial Private Sub Foo(Of U As {A, T, I(Of K)}, V As {U, A})(x As A, y As T, z As C1(Of T),
+        Partial Private Sub Goo(Of U As {A, T, I(Of K)}, V As {U, A})(x As A, y As T, z As C1(Of T),
                                                                       aa As K, bb As I(Of K),
                                                                       cc As U, dd As V, ee As IDictionary(Of C1(Of U), I(Of V)),
                                                                       ff As Exception, yy As C1(Of ArgumentException))
@@ -4258,7 +4602,7 @@ Partial Class C1(Of T) : Implements C1(Of A).I(Of A)
                                                                       aa As K, bb As I(Of K),
                                                                       cc As U, dd As V, ee As IDictionary(Of C1(Of U), I(Of V)),
                                                                       ff As Exception, yy As C1(Of ArgumentException))
-            Foo(x, y, z, aa, bb, cc, dd, ee, ff, yy)
+            Goo(x, y, z, aa, bb, cc, dd, ee, ff, yy)
         End Sub
     End Class
 End Class
@@ -4268,7 +4612,7 @@ End Class
 
 Partial Class C1(Of T)
     Partial Class C2(Of K As T)
-        Private Sub Foo(Of U As {T, I(Of K), C1(Of Integer)}, V As {C1(Of Integer), U})(x As C1(Of Integer), y As T, z As C1(Of T),
+        Private Sub Goo(Of U As {T, I(Of K), C1(Of Integer)}, V As {C1(Of Integer), U})(x As C1(Of Integer), y As T, z As C1(Of T),
                                                                       aa As K, bb As I(Of K),
                                                                       cc As U, dd As V, ee As IDictionary(Of C1(Of U), I(Of V)),
                                                                       ff As Exception, yy As C1(Of ArgumentException))
@@ -4284,18 +4628,18 @@ End Class]]>,
             vbVerifier.VerifyDiagnostics()
         End Sub
 
-        <WorkItem(544432, "DevDiv")>
+        <WorkItem(544432, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/544432")>
         <Fact()>
         Public Sub PartialMethod_InNestedStructsAndModules()
             Dim vbCompilation = CreateVisualBasicCompilation("PartialMethod_InNestedStructsAndModules",
             <![CDATA[Imports System
 
 Public Module M
-    Private Sub Foo(Of V)(ByRef x As V,
+    Private Sub Goo(Of V)(ByRef x As V,
                           ParamArray y() As Integer)
-        Console.WriteLine("M.Foo - Integer")
+        Console.WriteLine("M.Goo - Integer")
     End Sub
-    Partial Private Sub Foo(Of V)(ByRef x As V,
+    Partial Private Sub Goo(Of V)(ByRef x As V,
                                   ParamArray y() As Long)
     End Sub
 
@@ -4306,37 +4650,37 @@ Public Module M
         'Modules
         Dim x = 1
         Dim y = 1L
-        Foo(x, x, x, x)
-        Foo(x, x, x, y)
+        Goo(x, x, x, x)
+        Goo(x, x, x, y)
     End Sub
 
-    Partial Private Sub Foo(Of V)(ByRef x As V,
+    Partial Private Sub Goo(Of V)(ByRef x As V,
                                   ParamArray y() As Integer)
     End Sub
-    Private Sub Foo(Of V)(ByRef x As V,
+    Private Sub Goo(Of V)(ByRef x As V,
                           ParamArray y() As Long)
-        Console.WriteLine("M.Foo - Long")
+        Console.WriteLine("M.Goo - Long")
     End Sub
 End Module
 
 Interface I(Of T)
     Partial Structure S(Of U As T)
-        Partial Private Sub Foo(Of V As {T, U})(ByRef x As C(Of S(Of V)),
+        Partial Private Sub Goo(Of V As {T, U})(ByRef x As C(Of S(Of V)),
                                                 ParamArray y() As Integer)
         End Sub
-        Private Sub Foo(Of V As {T, U})(ByRef x As C(Of S(Of V)),
+        Private Sub Goo(Of V As {T, U})(ByRef x As C(Of S(Of V)),
                                         ParamArray y() As Long)
-            Console.WriteLine("S.Foo - Long")
+            Console.WriteLine("S.Goo - Long")
         End Sub
     End Structure
     Class C(Of W As Structure)
     End Class
     Partial Structure S(Of U As T)
-        Private Sub Foo(Of V As {T, U})(ByRef x As C(Of S(Of V)),
+        Private Sub Goo(Of V As {T, U})(ByRef x As C(Of S(Of V)),
                                         ParamArray y() As Integer)
-            Console.WriteLine("S.Foo - Integer")
+            Console.WriteLine("S.Goo - Integer")
         End Sub
-        Partial Private Sub Foo(Of V As {T, U})(ByRef x As C(Of S(Of V)),
+        Partial Private Sub Goo(Of V As {T, U})(ByRef x As C(Of S(Of V)),
                                                 ParamArray y() As Long)
         End Sub
         Shared Sub Test(Of J As U)()
@@ -4344,17 +4688,17 @@ Interface I(Of T)
             Dim c = New I(Of T).C(Of S(Of J))
             Dim x = 1
             Dim y = 1L
-            s.Foo(c, x, x, x)
-            s.Foo(c, x, x, y)
+            s.Goo(c, x, x, x)
+            s.Goo(c, x, x, y)
         End Sub
     End Structure
 End Interface]]>,
                 compilationOptions:=New VisualBasicCompilationOptions(OutputKind.ConsoleApplication))
             Dim vbVerifier = CompileAndVerify(vbCompilation,
-                expectedOutput:=<![CDATA[S.Foo - Integer
-S.Foo - Long
-M.Foo - Integer
-M.Foo - Long
+                expectedOutput:=<![CDATA[S.Goo - Integer
+S.Goo - Long
+M.Goo - Integer
+M.Goo - Long
 ]]>)
             vbVerifier.VerifyDiagnostics()
         End Sub
@@ -4405,7 +4749,7 @@ expectedOutput:=<![CDATA[Base.New(): 0]]>).
 Imports System        
 
 Module M1
-    Sub Foo(xParam as Integer, ByRef yParam As Long)
+    Sub Goo(xParam as Integer, ByRef yParam As Long)
         Console.WriteLine(xParam)
         Console.WriteLine(yParam)
         xParam = 17
@@ -4419,7 +4763,7 @@ Module M1
         y = 16442
         Console.WriteLine("x = {0}", x)
         Console.WriteLine("y = {0}", y)
-        Foo(x,y)
+        Goo(x,y)
         Console.WriteLine("x = {0}", x)
         Console.WriteLine("y = {0}", y)
     End Sub
@@ -4434,7 +4778,7 @@ y = 16442
 x = 143
 y = 189
 ]]>).
-            VerifyIL("M1.Foo",
+            VerifyIL("M1.Goo",
             <![CDATA[
 {
   // Code size       26 (0x1a)
@@ -4493,7 +4837,7 @@ hi
 ]]>)
         End Sub
 
-        <Fact()>
+        <ConditionalFact(GetType(DesktopOnly), Reason:="https://github.com/dotnet/roslyn/issues/28046")>
         Public Sub ParameterByRefVal()
             CompileAndVerify(
            <compilation>
@@ -4503,7 +4847,7 @@ Imports System
 Namespace VBN
     Friend Structure SBar
         Public Field1 As Decimal
-        Public Field2 As SFoo
+        Public Field2 As SGoo
     End Structure
 End Namespace
 ]]></file>
@@ -4516,8 +4860,8 @@ Imports VBN
 Module Program
 
             Sub Main(args As String())
-                Dim sss As VBN.SFoo, ccc As SBar = New SBar()
-                sss = New SFoo()
+                Dim sss As VBN.SGoo, ccc As SBar = New SBar()
+                sss = New SGoo()
                 Dim val As Short = 9
                 sss.M1(val)
                 ' () - ByRef
@@ -4555,7 +4899,7 @@ Imports System
 
 Namespace VBN
 
-            Structure SFoo
+            Structure SGoo
                 Public Sub M1(ByVal x As Object)
                     console.write("O:{0}|", x)
                 End Sub
@@ -4819,7 +5163,7 @@ End Class
 ]]>)
         End Sub
 
-        <WorkItem(538660, "DevDiv")>
+        <WorkItem(538660, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/538660")>
         <Fact()>
         Public Sub LocalArray3()
             CompileAndVerify(
@@ -4835,7 +5179,7 @@ Module M1
     End Sub
 End Module
     </file>
-</compilation>,
+</compilation>, options:=TestOptions.ReleaseExe.WithModuleName("MODULE"),
 expectedOutput:="3b").VerifyIL("M1.Main",
             <![CDATA[
 {
@@ -4845,7 +5189,7 @@ expectedOutput:="3b").VerifyIL("M1.Main",
   IL_0000:  ldc.i4.3
   IL_0001:  newarr     "Integer"
   IL_0006:  dup
-  IL_0007:  ldtoken    "<PrivateImplementationDetails>.__StaticArrayInitTypeSize=12 <PrivateImplementationDetails>.$$method0x6000001-E429CCA3F703A39CC5954A6572FEC9086135B34E"
+  IL_0007:  ldtoken    "<PrivateImplementationDetails>.__StaticArrayInitTypeSize=12 <PrivateImplementationDetails>.4636993D3E1DA4E9D6B8F87B79E8F7C6D018580D52661950EABC3845C5897A4D"
   IL_000c:  call       "Sub System.Runtime.CompilerServices.RuntimeHelpers.InitializeArray(System.Array, System.RuntimeFieldHandle)"
   IL_0011:  stloc.0
   IL_0012:  ldc.i4.2
@@ -4937,8 +5281,9 @@ End Class
 ]]>)
         End Sub
 
-        <WorkItem(529849, "DevDiv")>
         <Fact>
+        <WorkItem(33564, "https://github.com/dotnet/roslyn/issues/33564")>
+        <WorkItem(529849, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/529849")>
         Public Sub ArrayWithTypeCharsWithStaticLocals()
             CompileAndVerify(
 <compilation>
@@ -4954,11 +5299,11 @@ Class MyArray
         Static B01#(3), B02!(idx), B03$(fidx)
         B01(0) = 1.1#
         B01#(2) = 2.2!
-        Console.WriteLine(B01(0).ToString(cul))
-        Console.WriteLine(B01(2).ToString(cul))
+        Console.WriteLine(B01(0).ToString("G15", cul))
+        Console.WriteLine(B01(2).ToString("G15", cul))
 
         B02!(idx - 1) = 0.123
-        Console.WriteLine(B02(idx - 1).ToString(cul))
+        Console.WriteLine(B02(idx - 1).ToString("G6", cul))
 
         B03$(fidx - 1) = "c c"
         Console.WriteLine(B03(1))
@@ -4974,9 +5319,9 @@ c c
 ]]>)
         End Sub
 
-        <WorkItem(538660, "DevDiv")>
+        <WorkItem(538660, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/538660")>
         <Fact()>
-        Public Sub ArrayOneDimention()
+        Public Sub ArrayOneDimension()
             CompileAndVerify(
 <compilation>
     <file name="a.vb">
@@ -5024,10 +5369,10 @@ XXX
 ]]>)
         End Sub
 
-        <WorkItem(538660, "DevDiv")>
-        <WorkItem(529849, "DevDiv")>
+        <WorkItem(538660, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/538660")>
+        <WorkItem(529849, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/529849")>
         <Fact>
-        Public Sub ArrayOneDimentionWitStaticLocals()
+        Public Sub ArrayOneDimensionWithStaticLocals()
             CompileAndVerify(
 <compilation>
     <file name="a.vb">
@@ -5200,10 +5545,10 @@ Char: v
             CompileAndVerify(
 <compilation>
     <file name="a.vb">
-        <%= My.Resources.Resource.ConversionsILGenTestSource %>
+        <%= EmitResourceUtil.ConversionsILGenTestSource %>
     </file>
 </compilation>,
-            expectedOutput:=My.Resources.Resource.ConversionsILGenTestBaseline)
+            expectedOutput:=EmitResourceUtil.ConversionsILGenTestBaseline)
 
         End Sub
 
@@ -5213,10 +5558,10 @@ Char: v
             CompileAndVerify(
 <compilation>
     <file name="a.vb">
-        <%= My.Resources.Resource.ConversionsILGenTestSource1 %>
+        <%= EmitResourceUtil.ConversionsILGenTestSource1 %>
     </file>
 </compilation>,
-            expectedOutput:=My.Resources.Resource.ConversionsILGenTestBaseline1)
+            expectedOutput:=EmitResourceUtil.ConversionsILGenTestBaseline1)
 
         End Sub
 
@@ -5226,7 +5571,7 @@ Char: v
             CompileAndVerify(
 <compilation>
     <file name="a.vb">
-        <%= My.Resources.Resource.ConversionsILGenTestSource2 %>
+        <%= EmitResourceUtil.ConversionsILGenTestSource2 %>
     </file>
 </compilation>,
             expectedOutput:=<![CDATA[
@@ -5427,23 +5772,23 @@ Imports VBN
 Module Program
 
     Sub Main(args As String())
-        Dim x As VBN.IFoo(Of Char, Char) = Nothing, y As CFoo(Of Char, Char), z As SFoo = Nothing, local As Boolean = True
-        y = New CFoo(Of Char, Char)()
+        Dim x As VBN.IGoo(Of Char, Char) = Nothing, y As CGoo(Of Char, Char), z As SGoo = Nothing, local As Boolean = True
+        y = New CGoo(Of Char, Char)()
         Do
             If y IsNot Nothing OrElse x IsNot Nothing Then
-                'x = DirectCast(y, IFoo(Of Char, Char))
+                'x = DirectCast(y, IGoo(Of Char, Char))
                 y.ImplF1("q"c, "c"c)
                 Dim w As String = "If"
                 y = Nothing
             ElseIf x Is Nothing AndAlso y Is Nothing AndAlso z.Field2 Is Nothing Then
-                z = New SFoo()
-                z.Field2 = New CFoo(Of SFoo, UShort)
+                z = New SGoo()
+                z.Field2 = New CGoo(Of SGoo, UShort)
                 z.Field2.ImplF2("Aa", "Bb", "Cc")
                 Dim w& = 11223344
                 Console.Write(w)
             Else
-                SFoo.Field1 = 9D
-                Console.Write(SFoo.Field1)
+                SGoo.Field1 = 9D
+                Console.Write(SGoo.Field1)
                 Dim w As Boolean = False
                 Console.Write(w)
                 local = False
@@ -5458,17 +5803,17 @@ Imports System
 Imports System.Collections.Generic
 
 Namespace VBN
-    Public Interface IFoo(Of T, V)
+    Public Interface IGoo(Of T, V)
         Sub F1(ByRef x As T, ByVal y As V)
         Function F2(ParamArray ary As String()) As String
     End Interface
 
-    Class CFoo(Of T, V)
-        'Implements IFoo(Of T, V)
-        Public Sub ImplF1(ByRef x As T, ByVal y As V) 'Implements IFoo(Of T, V).F1
+    Class CGoo(Of T, V)
+        'Implements IGoo(Of T, V)
+        Public Sub ImplF1(ByRef x As T, ByVal y As V) 'Implements IGoo(Of T, V).F1
             console.Write(String.Format("-ImpF1:{0},{1}-", x, y))
         End Sub
-        Public Function ImplF2(ParamArray ary As String()) As String 'Implements IFoo(Of T, V).F2
+        Public Function ImplF2(ParamArray ary As String()) As String 'Implements IGoo(Of T, V).F2
             If (ary IsNot Nothing) Then
                 Console.write("-ImpF2:{0}-", ary(0))
             Else
@@ -5478,9 +5823,9 @@ Namespace VBN
         End Function
     End Class
 
-    Friend Structure SFoo
+    Friend Structure SGoo
         Public Shared Field1 As Decimal
-        Public Field2 As CFoo(Of SFoo, UShort)
+        Public Field2 As CGoo(Of SGoo, UShort)
     End Structure
 
 End Namespace
@@ -5519,7 +5864,7 @@ End Module
 
 #Region "Regressions"
 
-        <WorkItem(543277, "DevDiv")>
+        <WorkItem(543277, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/543277")>
         <Fact()>
         Public Sub Bug10931_1()
             CompileAndVerify(
@@ -5533,10 +5878,10 @@ Imports System
 Module Program
     Sub Main(args As String())
         Dim b = Function() Sub() Return
-        Foo(Of Func(Of Action(Of Integer)))(b)()(1)
+        Goo(Of Func(Of Action(Of Integer)))(b)()(1)
     End Sub
  
-    Function Foo(Of T)(x As T) As T
+    Function Goo(Of T)(x As T) As T
         Return x
     End Function
 End Module
@@ -5545,7 +5890,7 @@ End Module
     expectedOutput:="")
         End Sub
 
-        <WorkItem(538751, "DevDiv")>
+        <WorkItem(538751, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/538751")>
         <Fact()>
         Public Sub AssertCondBranchWithLogicOperator()
             CompileAndVerify(
@@ -5578,7 +5923,7 @@ End Module
     expectedOutput:="True")
         End Sub
 
-        <WorkItem(538752, "DevDiv")>
+        <WorkItem(538752, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/538752")>
         <Fact()>
         Public Sub StructureDefaultAccessibilityPublic()
             CompileAndVerify(
@@ -5623,10 +5968,10 @@ End Namespace
     expectedOutput:="PublicSub400")
         End Sub
 
-        <WorkItem(538800, "DevDiv")>
+        <WorkItem(538800, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/538800")>
         <Fact>
         Public Sub ObjectComparisonWithNoReferenceToVBRuntime()
-            CompilationUtils.CreateCompilationWithMscorlib(
+            CompilationUtils.CreateCompilationWithMscorlib40(
 <compilation>
     <file name="a.vb"><![CDATA[
 Imports System
@@ -5640,12 +5985,12 @@ Class Program
 End Class
 ]]></file>
 </compilation>, OutputKind.DynamicallyLinkedLibrary).
-            VerifyDiagnostics(Diagnostic(ERRID.ERR_MissingRuntimeHelper, "o = o").WithArguments("Microsoft.VisualBasic.CompilerServices.Operators.ConditionalCompareObjectEqual"))
+            VerifyEmitDiagnostics(Diagnostic(ERRID.ERR_MissingRuntimeHelper, "o = o").WithArguments("Microsoft.VisualBasic.CompilerServices.Operators.ConditionalCompareObjectEqual"))
         End Sub
 
         <Fact>
         Public Sub ObjectComparisonWithNoReferenceToVBRuntime_1()
-            CompilationUtils.CreateCompilationWithMscorlib(
+            CompilationUtils.CreateCompilationWithMscorlib40(
 <compilation>
     <file name="a.vb"><![CDATA[
 Class Program
@@ -5656,12 +6001,12 @@ Class Program
 End Class
 ]]></file>
 </compilation>, OutputKind.DynamicallyLinkedLibrary).
-            VerifyDiagnostics(Diagnostic(ERRID.ERR_MissingRuntimeHelper, "o = o").WithArguments("Microsoft.VisualBasic.CompilerServices.Operators.CompareObjectEqual"))
+            VerifyEmitDiagnostics(Diagnostic(ERRID.ERR_MissingRuntimeHelper, "o = o").WithArguments("Microsoft.VisualBasic.CompilerServices.Operators.CompareObjectEqual"))
         End Sub
 
         <Fact>
         Public Sub ObjectComparisonWithNoReferenceToVBRuntime_2()
-            CompilationUtils.CreateCompilationWithMscorlib(
+            CompilationUtils.CreateCompilationWithMscorlib40(
 <compilation>
     <file name="a.vb"><![CDATA[
 Class Program
@@ -5672,12 +6017,12 @@ Class Program
 End Class
 ]]></file>
 </compilation>, OutputKind.DynamicallyLinkedLibrary).
-            VerifyDiagnostics(Diagnostic(ERRID.ERR_MissingRuntimeHelper, "o = o").WithArguments("Microsoft.VisualBasic.CompilerServices.Operators.ConditionalCompareObjectEqual"))
+            VerifyEmitDiagnostics(Diagnostic(ERRID.ERR_MissingRuntimeHelper, "o = o").WithArguments("Microsoft.VisualBasic.CompilerServices.Operators.ConditionalCompareObjectEqual"))
         End Sub
 
         <Fact>
         Public Sub ObjectComparisonWithNoReferenceToVBRuntime_3()
-            CompilationUtils.CreateCompilationWithMscorlib(
+            CompilationUtils.CreateCompilationWithMscorlib40(
 <compilation>
     <file name="a.vb"><![CDATA[
 Class Program
@@ -5688,10 +6033,10 @@ Class Program
 End Class
 ]]></file>
 </compilation>, OutputKind.DynamicallyLinkedLibrary).
-            VerifyDiagnostics(Diagnostic(ERRID.ERR_MissingRuntimeHelper, "o = o").WithArguments("Microsoft.VisualBasic.CompilerServices.Operators.CompareObjectEqual"))
+            VerifyEmitDiagnostics(Diagnostic(ERRID.ERR_MissingRuntimeHelper, "o = o").WithArguments("Microsoft.VisualBasic.CompilerServices.Operators.CompareObjectEqual"))
         End Sub
 
-        <WorkItem(538792, "DevDiv")>
+        <WorkItem(538792, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/538792")>
         <Fact>
         Public Sub InvokeGenericSharedMethods()
             CompileAndVerify(
@@ -5713,7 +6058,7 @@ End Module
             expectedOutput:="Pass")
         End Sub
 
-        <WorkItem(538865, "DevDiv")>
+        <WorkItem(538865, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/538865")>
         <Fact>
         Public Sub TestGetObjectValueCalls()
 
@@ -5941,7 +6286,7 @@ Module Program1
 
 End Module
     </file>
-</compilation>, additionalRefs:={TestReferences.SymbolsTests.PropertiesWithByRef})
+</compilation>, references:={TestReferences.SymbolsTests.PropertiesWithByRef})
 
             verifier.VerifyIL("Module1.M",
             <![CDATA[
@@ -6044,7 +6389,7 @@ End Module
   // Code size       10 (0xa)
   .maxstack  2
   IL_0000:  ldarg.0
-  IL_0001:  dup
+  IL_0001:  ldarg.0
   IL_0002:  call       "Function Microsoft.VisualBasic.CompilerServices.Operators.ExponentObject(Object, Object) As Object"
   IL_0007:  starg.s    V_0
   IL_0009:  ret
@@ -6081,7 +6426,7 @@ End Module
   // Code size       10 (0xa)
   .maxstack  2
   IL_0000:  ldarg.0
-  IL_0001:  dup
+  IL_0001:  ldarg.0
   IL_0002:  call       "Function Microsoft.VisualBasic.CompilerServices.Operators.DivideObject(Object, Object) As Object"
   IL_0007:  starg.s    V_0
   IL_0009:  ret
@@ -6094,7 +6439,7 @@ End Module
   // Code size       10 (0xa)
   .maxstack  2
   IL_0000:  ldarg.0
-  IL_0001:  dup
+  IL_0001:  ldarg.0
   IL_0002:  call       "Function Microsoft.VisualBasic.CompilerServices.Operators.ModObject(Object, Object) As Object"
   IL_0007:  starg.s    V_0
   IL_0009:  ret
@@ -6107,7 +6452,7 @@ End Module
   // Code size       10 (0xa)
   .maxstack  2
   IL_0000:  ldarg.0   
-  IL_0001:  dup
+  IL_0001:  ldarg.0
   IL_0002:  call       "Function Microsoft.VisualBasic.CompilerServices.Operators.IntDivideObject(Object, Object) As Object"
   IL_0007:  starg.s    V_0
   IL_0009:  ret       
@@ -6120,7 +6465,7 @@ End Module
   // Code size       10 (0xa)
   .maxstack  2
   IL_0000:  ldarg.0
-  IL_0001:  dup
+  IL_0001:  ldarg.0
   IL_0002:  call       "Function Microsoft.VisualBasic.CompilerServices.Operators.ConcatenateObject(Object, Object) As Object"
   IL_0007:  starg.s    V_0
   IL_0009:  ret
@@ -6145,7 +6490,7 @@ End Module
   // Code size       10 (0xa)
   .maxstack  2
   IL_0000:  ldarg.0   
-  IL_0001:  dup
+  IL_0001:  ldarg.0
   IL_0002:  call       "Function Microsoft.VisualBasic.CompilerServices.Operators.AndObject(Object, Object) As Object"
   IL_0007:  starg.s    V_0
   IL_0009:  ret       
@@ -6176,7 +6521,7 @@ End Module
   // Code size       10 (0xa)
   .maxstack  2
   IL_0000:  ldarg.0   
-  IL_0001:  dup
+  IL_0001:  ldarg.0
   IL_0002:  call       "Function Microsoft.VisualBasic.CompilerServices.Operators.OrObject(Object, Object) As Object"
   IL_0007:  starg.s    V_0
   IL_0009:  ret       
@@ -6207,7 +6552,7 @@ End Module
   // Code size       10 (0xa)
   .maxstack  2
   IL_0000:  ldarg.0   
-  IL_0001:  dup
+  IL_0001:  ldarg.0
   IL_0002:  call       "Function Microsoft.VisualBasic.CompilerServices.Operators.XorObject(Object, Object) As Object"
   IL_0007:  starg.s    V_0
   IL_0009:  ret       
@@ -6220,7 +6565,7 @@ End Module
   // Code size       10 (0xa)
   .maxstack  2
   IL_0000:  ldarg.0   
-  IL_0001:  dup
+  IL_0001:  ldarg.0
   IL_0002:  call       "Function Microsoft.VisualBasic.CompilerServices.Operators.MultiplyObject(Object, Object) As Object"
   IL_0007:  starg.s    V_0
   IL_0009:  ret       
@@ -6233,7 +6578,7 @@ End Module
   // Code size       10 (0xa)
   .maxstack  2
   IL_0000:  ldarg.0   
-  IL_0001:  dup
+  IL_0001:  ldarg.0
   IL_0002:  call       "Function Microsoft.VisualBasic.CompilerServices.Operators.AddObject(Object, Object) As Object"
   IL_0007:  starg.s    V_0
   IL_0009:  ret       
@@ -6246,7 +6591,7 @@ End Module
   // Code size       10 (0xa)
   .maxstack  2
   IL_0000:  ldarg.0   
-  IL_0001:  dup
+  IL_0001:  ldarg.0
   IL_0002:  call       "Function Microsoft.VisualBasic.CompilerServices.Operators.SubtractObject(Object, Object) As Object"
   IL_0007:  starg.s    V_0
   IL_0009:  ret       
@@ -6259,7 +6604,7 @@ End Module
   // Code size       10 (0xa)
   .maxstack  2
   IL_0000:  ldarg.0   
-  IL_0001:  dup
+  IL_0001:  ldarg.0
   IL_0002:  call       "Function Microsoft.VisualBasic.CompilerServices.Operators.LeftShiftObject(Object, Object) As Object"
   IL_0007:  starg.s    V_0
   IL_0009:  ret       
@@ -6272,7 +6617,7 @@ End Module
   // Code size       10 (0xa)
   .maxstack  2
   IL_0000:  ldarg.0   
-  IL_0001:  dup
+  IL_0001:  ldarg.0
   IL_0002:  call       "Function Microsoft.VisualBasic.CompilerServices.Operators.RightShiftObject(Object, Object) As Object"
   IL_0007:  starg.s    V_0
   IL_0009:  ret       
@@ -6657,7 +7002,7 @@ End Module
 ]]>)
         End Sub
 
-        <WorkItem(540882, "DevDiv")>
+        <WorkItem(540882, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/540882")>
         <Fact>
         Public Sub TestGetObjectValueCalls2()
             Dim verifier = CompileAndVerify(
@@ -6726,7 +7071,7 @@ End Module
 ]]>)
         End Sub
 
-        <WorkItem(538853, "DevDiv")>
+        <WorkItem(538853, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/538853")>
         <Fact>
         Public Sub Bug4597()
             CompileAndVerify(
@@ -6767,7 +7112,7 @@ End Module
 ]]>)
         End Sub
 
-        <WorkItem(538852, "DevDiv")>
+        <WorkItem(538852, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/538852")>
         <Fact>
         Public Sub Bug4596()
             CompileAndVerify(
@@ -6787,7 +7132,7 @@ Module M1
     End Sub
 End Module
     </file>
-</compilation>).
+</compilation>, options:=TestOptions.ReleaseDll.WithModuleName("MODULE")).
             VerifyIL("M1.M",
             <![CDATA[
 {
@@ -6796,25 +7141,25 @@ End Module
   IL_0000:  ldc.i4.5
   IL_0001:  newarr     "Byte"
   IL_0006:  dup
-  IL_0007:  ldtoken    "<PrivateImplementationDetails>.__StaticArrayInitTypeSize=5 <PrivateImplementationDetails>.$$method0x6000001-9755240DD0C4C1AD226DEBD40C6D2EBD408250CB"
+  IL_0007:  ldtoken    "<PrivateImplementationDetails>.__StaticArrayInitTypeSize=5 <PrivateImplementationDetails>.5BD81897B38CE00BCF990B5AED9316FE43E7A3854DA09401C14DF4AF21B2F90D"
   IL_000c:  call       "Sub System.Runtime.CompilerServices.RuntimeHelpers.InitializeArray(System.Array, System.RuntimeFieldHandle)"
   IL_0011:  pop
   IL_0012:  ldc.i4.5
   IL_0013:  newarr     "Double"
   IL_0018:  dup
-  IL_0019:  ldtoken    "<PrivateImplementationDetails>.__StaticArrayInitTypeSize=40 <PrivateImplementationDetails>.$$method0x6000001-11F3436B917FFBA0FAB0FAD5563AF18FA24AC16A"
+  IL_0019:  ldtoken    "<PrivateImplementationDetails>.__StaticArrayInitTypeSize=40 <PrivateImplementationDetails>.F9D819AD50107F52959882DF3549DE08003AC644DCC12AFEA2B9BD936EE7D325"
   IL_001e:  call       "Sub System.Runtime.CompilerServices.RuntimeHelpers.InitializeArray(System.Array, System.RuntimeFieldHandle)"
   IL_0023:  pop
   IL_0024:  ldc.i4.5
   IL_0025:  newarr     "Boolean"
   IL_002a:  dup
-  IL_002b:  ldtoken    "<PrivateImplementationDetails>.__StaticArrayInitTypeSize=5 <PrivateImplementationDetails>.$$method0x6000001-4E724558F6B816715597A51663AD8F05247E2C4A"
+  IL_002b:  ldtoken    "<PrivateImplementationDetails>.__StaticArrayInitTypeSize=5 <PrivateImplementationDetails>.A4E9167DC11A5B8BA7E09C85BAFDEA0B6E0B399CE50086545509017050B33097"
   IL_0030:  call       "Sub System.Runtime.CompilerServices.RuntimeHelpers.InitializeArray(System.Array, System.RuntimeFieldHandle)"
   IL_0035:  pop
   IL_0036:  ldc.i4.5
   IL_0037:  newarr     "Char"
   IL_003c:  dup
-  IL_003d:  ldtoken    "<PrivateImplementationDetails>.__StaticArrayInitTypeSize=10 <PrivateImplementationDetails>.$$method0x6000001-E313A2813013780396D58750DC5D62221C86F42F"
+  IL_003d:  ldtoken    "<PrivateImplementationDetails>.__StaticArrayInitTypeSize=10 <PrivateImplementationDetails>.DC0F42A41F058686A364AF5B6BD49175C5B2CF3C4D5AE95417448BE3517B4008"
   IL_0042:  call       "Sub System.Runtime.CompilerServices.RuntimeHelpers.InitializeArray(System.Array, System.RuntimeFieldHandle)"
   IL_0047:  pop
   IL_0048:  ret
@@ -6889,7 +7234,7 @@ Module M1
     End Sub
 End Module
     </file>
-</compilation>)).VerifyIL("M1.M",
+</compilation>, options:=TestOptions.ReleaseDll.WithModuleName("MODULE"))).VerifyIL("M1.M",
             <![CDATA[
 {
   // Code size       19 (0x13)
@@ -6897,7 +7242,7 @@ End Module
   IL_0000:  ldc.i4.5
   IL_0001:  newarr     "System.TypeCode"
   IL_0006:  dup
-  IL_0007:  ldtoken    "<PrivateImplementationDetails>.__StaticArrayInitTypeSize=20 <PrivateImplementationDetails>.$$method0x6000001-3191FF614021ADF3122AC274EA5B6097C21BEB81"
+  IL_0007:  ldtoken    "<PrivateImplementationDetails>.__StaticArrayInitTypeSize=20 <PrivateImplementationDetails>.095C4722BB84316FEEE41ADFDAFED13FECA8836A520BDE3AB77C52F5C9F6B620"
   IL_000c:  call       "Sub System.Runtime.CompilerServices.RuntimeHelpers.InitializeArray(System.Array, System.RuntimeFieldHandle)"
   IL_0011:  pop
   IL_0012:  ret
@@ -6939,7 +7284,7 @@ End Module
         ''' Won't fix :(
         ''' </summary>
         ''' <remarks></remarks>
-        <Fact, WorkItem(527773, "DevDiv")>
+        <Fact, WorkItem(527773, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/527773")>
         Public Sub ConstantLiteralToDecimal()
             CompileAndVerify(
 <compilation>
@@ -7136,7 +7481,7 @@ IL_0046:  ret
 ]]>)
         End Sub
 
-        <WorkItem(539920, "DevDiv")>
+        <WorkItem(539920, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/539920")>
         <Fact>
         Public Sub TestNestedFunctionLambdas()
             CompileAndVerify(
@@ -7146,10 +7491,10 @@ Imports System
 
 Module Program
     Sub Main()
-        Foo(Function(x) Function() x)
+        Goo(Function(x) Function() x)
     End Sub
 
-    Sub Foo(x As Func(Of String, Func(Of String)))
+    Sub Goo(x As Func(Of String, Func(Of String)))
         Console.WriteLine(x.Invoke("ABC").Invoke().ToLower())
     End Sub
 End Module
@@ -7158,7 +7503,7 @@ End Module
             expectedOutput:="abc")
         End Sub
 
-        <WorkItem(540121, "DevDiv")>
+        <WorkItem(540121, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/540121")>
         <Fact>
         Public Sub TestEmitBinaryTrueAndFalseExpressionForDebug()
             CompileAndVerify(
@@ -7175,7 +7520,7 @@ End Module
                 expectedOutput:="")
         End Sub
 
-        <WorkItem(540121, "DevDiv")>
+        <WorkItem(540121, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/540121")>
         <Fact>
         Public Sub BooleanAndOrInDebug()
             Dim c = CompileAndVerify(
@@ -7198,48 +7543,39 @@ End Module
                 options:=TestOptions.DebugExe,
                 expectedOutput:="")
 
-            c.VerifyIL("M1.Main",
-            <![CDATA[
+            c.VerifyIL("M1.Main", "
 {
-  // Code size       38 (0x26)
+  // Code size       25 (0x19)
   .maxstack  2
   .locals init (Boolean V_0, //b1
-  Boolean V_1, //b2
-  Boolean V_2)
-  IL_0000:  nop
-  IL_0001:  ldc.i4.1
+                Boolean V_1, //b2
+                Boolean V_2,
+                Boolean V_3,
+                Boolean V_4)
+ -IL_0000:  nop
+ -IL_0001:  ldc.i4.1
   IL_0002:  stloc.0
-  IL_0003:  ldc.i4.0
+ -IL_0003:  ldc.i4.0
   IL_0004:  stloc.1
-  IL_0005:  ldloc.0
+ -IL_0005:  ldloc.0
   IL_0006:  ldloc.1
   IL_0007:  and
-  IL_0008:  ldc.i4.0
-  IL_0009:  ceq
-  IL_000b:  stloc.2
-  IL_000c:  ldloc.2
-  IL_000d:  brtrue.s   IL_0010
-  IL_000f:  nop
-  IL_0010:  nop
-  IL_0011:  ldc.i4.1
-  IL_0012:  ldc.i4.0
-  IL_0013:  ceq
-  IL_0015:  stloc.2
-  IL_0016:  ldloc.2
-  IL_0017:  brtrue.s   IL_001a
-  IL_0019:  nop
-  IL_001a:  nop
-  IL_001b:  ldc.i4.0
-  IL_001c:  ldc.i4.0
-  IL_001d:  ceq
-  IL_001f:  stloc.2
-  IL_0020:  ldloc.2
-  IL_0021:  brtrue.s   IL_0024
-  IL_0023:  nop
-  IL_0024:  nop
-  IL_0025:  ret
+  IL_0008:  stloc.2
+ ~IL_0009:  ldloc.2
+  IL_000a:  brfalse.s  IL_000d
+ -IL_000c:  nop
+ -IL_000d:  nop
+ -IL_000e:  ldc.i4.1
+  IL_000f:  stloc.3
+ -IL_0010:  nop
+ -IL_0011:  nop
+ -IL_0012:  ldc.i4.0
+  IL_0013:  stloc.s    V_4
+  IL_0015:  br.s       IL_0017
+ -IL_0017:  nop
+ -IL_0018:  ret
 }
-        ]]>)
+", sequencePoints:="M1.Main")
         End Sub
 
         <Fact>
@@ -7447,7 +7783,7 @@ End Module
 ]]>)
         End Sub
 
-        <WorkItem(540443, "DevDiv")>
+        <WorkItem(540443, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/540443")>
         <Fact>
         Public Sub LoadReadOnlyField()
             CompileAndVerify(
@@ -7463,10 +7799,10 @@ Class A
         Return Value.ToString()
     End Function
 
-    private sub foo(byref x as integer)
+    private sub goo(byref x as integer)
     end sub
     private sub moo()
-        foo(Value)
+        goo(Value)
     end sub
 End Class
     </file>
@@ -7513,7 +7849,7 @@ IL_0001:  ldarg.0
 IL_0002:  ldfld      "A.Value As Integer"
 IL_0007:  stloc.0
 IL_0008:  ldloca.s   V_0
-IL_000a:  call       "Sub A.foo(ByRef Integer)"
+IL_000a:  call       "Sub A.goo(ByRef Integer)"
 IL_000f:  ret
 }
 ]]>)
@@ -7528,10 +7864,10 @@ Imports System
 Module M1
     Dim i as integer = 42
     Sub Main()
-        Foo(Integer.MaxValue)
+        Goo(Integer.MaxValue)
     End Sub
 
-    Sub Foo(ByRef x as integer)
+    Sub Goo(ByRef x as integer)
         x = 42
     End Sub
 End Module
@@ -7547,7 +7883,7 @@ End Module
 IL_0000:  ldc.i4     0x7fffffff
 IL_0005:  stloc.0
 IL_0006:  ldloca.s   V_0
-IL_0008:  call       "Sub M1.Foo(ByRef Integer)"
+IL_0008:  call       "Sub M1.Goo(ByRef Integer)"
 IL_000d:  ret
 }
 ]]>)
@@ -7555,7 +7891,7 @@ IL_000d:  ret
 
         ' Constructor initializers don't bind yet
         <WorkItem(7926, "DevDiv_Projects/Roslyn")>
-        <WorkItem(541123, "DevDiv")>
+        <WorkItem(541123, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/541123")>
         <Fact>
         Public Sub StructDefaultConstructorInitializer()
             CompileAndVerify(
@@ -7671,7 +8007,7 @@ S1.New(x As C1)
 ]]>)
         End Sub
 
-        <WorkItem(543751, "DevDiv")>
+        <WorkItem(543751, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/543751")>
         <Fact>
         Public Sub StructConstructorWithOptionalParametersCSVB()
 
@@ -7708,7 +8044,7 @@ End Class
             vbexeVerifier.VerifyDiagnostics()
         End Sub
 
-        <WorkItem(543751, "DevDiv")>
+        <WorkItem(543751, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/543751")>
         <Fact>
         Public Sub StructConstructorWithOptionalParametersVBVB()
 
@@ -7741,7 +8077,7 @@ End Class
             vbexeVerifier.VerifyDiagnostics()
         End Sub
 
-        <WorkItem(543751, "DevDiv")>
+        <WorkItem(543751, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/543751")>
         <Fact>
         Public Sub StructConstructorWithOptionalParametersVBVB2()
 
@@ -7885,7 +8221,7 @@ DERIVED: f(x As Integer, Optional y As Integer = 0)
 DERIVED: f(x As Integer, Optional y As String = "")
 ]]>)
         End Sub
-        <WorkItem(543751, "DevDiv")>
+        <WorkItem(543751, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/543751")>
         <Fact>
         Public Sub OverloadsWithOnlyOptionalParameters()
 
@@ -7925,7 +8261,7 @@ End Class
             vbexeVerifier.VerifyDiagnostics()
         End Sub
 
-        <WorkItem(543751, "DevDiv")>
+        <WorkItem(543751, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/543751")>
         <Fact>
         Public Sub OverloadsWithOnlyOptionalParameters2()
 
@@ -8134,7 +8470,7 @@ End Structure
         End Sub
 
         <WorkItem(7926, "DevDiv_Projects/Roslyn")>
-        <WorkItem(541123, "DevDiv")>
+        <WorkItem(541123, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/541123")>
         <Fact>
         Public Sub StructNonDefaultConstructorInitializer()
             CompileAndVerify(
@@ -8193,7 +8529,7 @@ End Class
     </file>
 </compilation>
 
-            CompileAndVerify(vbSource, emitOptions:=TestEmitters.RefEmitBug).
+            CompileAndVerify(vbSource).
                 VerifyIL("C.M",
             <![CDATA[
 {
@@ -8267,7 +8603,7 @@ End Class
     </file>
 </compilation>
 
-            CompileAndVerify(vbSource, emitOptions:=TestEmitters.RefEmitBug).
+            CompileAndVerify(vbSource).
                 VerifyIL("C.M",
             <![CDATA[
 {
@@ -8429,7 +8765,7 @@ End Class
     </file>
 </compilation>
 
-            CompileAndVerify(vbSource, emitOptions:=TestEmitters.RefEmitBug).
+            CompileAndVerify(vbSource).
                 VerifyIL("C.M",
             <![CDATA[
 {
@@ -8437,26 +8773,26 @@ End Class
   .maxstack  2
   .locals init (System.Exception V_0) //ex
   .try
-{
-  IL_0000:  ldc.i4.1
-  IL_0001:  newobj     "Sub S..ctor(Integer)"
-  IL_0006:  pop
-  IL_0007:  ldc.i4.1
-  IL_0008:  newobj     "Sub S..ctor(Integer)"
-  IL_000d:  pop
-  IL_000e:  ldc.i4.1
-  IL_000f:  newobj     "Sub S..ctor(Integer)"
-  IL_0014:  pop
-  IL_0015:  leave.s    IL_0025
-}
+  {
+    IL_0000:  ldc.i4.1
+    IL_0001:  newobj     "Sub S..ctor(Integer)"
+    IL_0006:  pop
+    IL_0007:  ldc.i4.1
+    IL_0008:  newobj     "Sub S..ctor(Integer)"
+    IL_000d:  pop
+    IL_000e:  ldc.i4.1
+    IL_000f:  newobj     "Sub S..ctor(Integer)"
+    IL_0014:  pop
+    IL_0015:  leave.s    IL_0025
+  }
   catch System.Exception
-{
-  IL_0017:  dup
-  IL_0018:  call       "Sub Microsoft.VisualBasic.CompilerServices.ProjectData.SetProjectError(System.Exception)"
-  IL_001d:  stloc.0
-  IL_001e:  call       "Sub Microsoft.VisualBasic.CompilerServices.ProjectData.ClearProjectError()"
-  IL_0023:  leave.s    IL_0025
-}
+  {
+    IL_0017:  dup
+    IL_0018:  call       "Sub Microsoft.VisualBasic.CompilerServices.ProjectData.SetProjectError(System.Exception)"
+    IL_001d:  stloc.0
+    IL_001e:  call       "Sub Microsoft.VisualBasic.CompilerServices.ProjectData.ClearProjectError()"
+    IL_0023:  leave.s    IL_0025
+  }
   IL_0025:  ret
 }
 ]]>)
@@ -8491,7 +8827,7 @@ End Class
 </compilation>
 
             ' NOTE: Current implementation does not support optimization for constructor calls with side effects
-            CompileAndVerify(vbSource, emitOptions:=TestEmitters.RefEmitBug).
+            CompileAndVerify(vbSource).
                 VerifyIL("C.M",
             <![CDATA[
 {
@@ -8578,7 +8914,7 @@ End Class
     </file>
 </compilation>
 
-            CompileAndVerify(vbSource, emitOptions:=TestEmitters.RefEmitBug).
+            CompileAndVerify(vbSource).
                 VerifyIL("C.M",
             <![CDATA[
 {
@@ -8655,7 +8991,7 @@ End Class
     </file>
 </compilation>
 
-            CompileWithCustomILSource(vbSource, ilSource.Value, TestOptions.ReleaseDll, emitOptions:=TestEmitters.RefEmitBug).
+            CompileWithCustomILSource(vbSource, ilSource.Value, TestOptions.ReleaseDll).
                 VerifyIL("C.M",
             <![CDATA[
 {
@@ -8734,7 +9070,7 @@ End Class
     </file>
 </compilation>
 
-            CompileWithCustomILSource(vbSource, ilSource.Value, TestOptions.ReleaseDll, emitOptions:=TestEmitters.RefEmitBug).
+            CompileWithCustomILSource(vbSource, ilSource.Value, TestOptions.ReleaseDll).
                 VerifyIL("C.M",
             <![CDATA[
 {
@@ -8810,7 +9146,7 @@ End Class
 </compilation>
 
             ' TODO (tomat): verification fails
-            CompileWithCustomILSource(vbSource, ilSource.Value, TestOptions.ReleaseDll, emitOptions:=TestEmitters.RefEmitBug).
+            CompileWithCustomILSource(vbSource, ilSource.Value, TestOptions.ReleaseDll).
                 VerifyIL("C.M",
             <![CDATA[
 {
@@ -8877,7 +9213,7 @@ End Class
     </file>
 </compilation>
 
-            CompileWithCustomILSource(vbSource, ilSource.Value, TestOptions.ReleaseDll, emitOptions:=TestEmitters.RefEmitBug).
+            CompileWithCustomILSource(vbSource, ilSource.Value, TestOptions.ReleaseDll).
                 VerifyIL("C.M",
             <![CDATA[
 {
@@ -8950,7 +9286,7 @@ End Class
     </file>
 </compilation>
 
-            CompileWithCustomILSource(vbSource, ilSource.Value, TestOptions.ReleaseDll, emitOptions:=TestEmitters.RefEmitBug).
+            CompileWithCustomILSource(vbSource, ilSource.Value, TestOptions.ReleaseDll).
                 VerifyIL("C.M",
             <![CDATA[
 {
@@ -9015,7 +9351,7 @@ End Class
     </file>
 </compilation>
 
-            CompileWithCustomILSource(vbSource, ilSource.Value, TestOptions.ReleaseDll, emitOptions:=TestEmitters.RefEmitBug).
+            CompileWithCustomILSource(vbSource, ilSource.Value, TestOptions.ReleaseDll).
                 VerifyIL("C.M",
             <![CDATA[
 {
@@ -9047,8 +9383,8 @@ End Class
 ]]>)
         End Sub
 
-        <WorkItem(541123, "DevDiv")>
-        <WorkItem(541308, "DevDiv")>
+        <WorkItem(541123, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/541123")>
+        <WorkItem(541308, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/541308")>
         <Fact>
         Public Sub PublicParameterlessConstructorInMetadata_Public()
             Dim ilSource = <![CDATA[
@@ -9086,7 +9422,7 @@ End Class
     </file>
 </compilation>
 
-            CompileWithCustomILSource(vbSource, ilSource.Value, TestOptions.ReleaseDll, emitOptions:=TestEmitters.RefEmitBug).
+            CompileWithCustomILSource(vbSource, ilSource.Value, TestOptions.ReleaseDll).
                 VerifyIL("C.Main",
             <![CDATA[
 {
@@ -9117,7 +9453,7 @@ End Class
 ]]>)
         End Sub
 
-        <WorkItem(541308, "DevDiv")>
+        <WorkItem(541308, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/541308")>
         <Fact>
         Public Sub PublicParameterlessConstructorInMetadata_Protected()
             Dim ilSource = <![CDATA[
@@ -9155,7 +9491,7 @@ End Class
     </file>
 </compilation>
 
-            CompileWithCustomILSource(vbSource, ilSource.Value, TestOptions.ReleaseDll, emitOptions:=TestEmitters.RefEmitBug).
+            CompileWithCustomILSource(vbSource, ilSource.Value, TestOptions.ReleaseDll).
                 VerifyIL("C.Main",
             <![CDATA[
 {
@@ -9186,7 +9522,7 @@ End Class
 ]]>)
         End Sub
 
-        <WorkItem(541308, "DevDiv")>
+        <WorkItem(541308, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/541308")>
         <Fact>
         Public Sub PublicParameterlessConstructorInMetadata_Private()
             Dim ilSource = <![CDATA[
@@ -9224,7 +9560,7 @@ End Class
     </file>
 </compilation>
 
-            CompileWithCustomILSource(vbSource, ilSource.Value, TestOptions.ReleaseDll, emitOptions:=TestEmitters.RefEmitBug).
+            CompileWithCustomILSource(vbSource, ilSource.Value, TestOptions.ReleaseDll).
                 VerifyIL("C.Main",
             <![CDATA[
 {
@@ -9255,7 +9591,84 @@ End Class
 ]]>)
         End Sub
 
-        <WorkItem(541308, "DevDiv")>
+        <Fact>
+        Public Sub PublicParameterlessConstructorInMetadata_Private_D()
+            Dim ilSource = <![CDATA[
+.class public sequential ansi sealed beforefieldinit S
+       extends [mscorlib]System.ValueType
+{
+  .pack 0
+  .size 1
+
+  .method private hidebysig specialname rtspecialname 
+        instance void  .ctor() cil managed
+  {
+    ret
+  }
+}
+]]>
+
+            Dim vbSource =
+<compilation>
+    <file name="a.vb">
+Option Infer Off
+Class C
+    Shared Sub Main()
+        Dim s As S = New S()
+        s = Nothing
+        s = New S()
+        SS(Nothing)
+        SS(New S())
+        Dim a = (New S()).ToString()
+        s = DirectCast(Nothing, S)
+    End Sub
+    Shared Sub SS(s As S)
+    End Sub
+End Class
+    </file>
+</compilation>
+
+            CompileWithCustomILSource(vbSource, ilSource.Value, TestOptions.ReleaseDebugDll).
+                VerifyIL("C.Main",
+            <![CDATA[
+{
+  // Code size       84 (0x54)
+  .maxstack  1
+  .locals init (S V_0, //s
+                Object V_1, //a
+                S V_2)
+  IL_0000:  ldloca.s   V_0
+  IL_0002:  initobj    "S"
+  IL_0008:  ldloca.s   V_0
+  IL_000a:  initobj    "S"
+  IL_0010:  ldloca.s   V_0
+  IL_0012:  initobj    "S"
+  IL_0018:  ldloca.s   V_2
+  IL_001a:  initobj    "S"
+  IL_0020:  ldloc.2
+  IL_0021:  call       "Sub C.SS(S)"
+  IL_0026:  ldloca.s   V_2
+  IL_0028:  initobj    "S"
+  IL_002e:  ldloc.2
+  IL_002f:  call       "Sub C.SS(S)"
+  IL_0034:  ldloca.s   V_2
+  IL_0036:  initobj    "S"
+  IL_003c:  ldloc.2
+  IL_003d:  stloc.2
+  IL_003e:  ldloca.s   V_2
+  IL_0040:  constrained. "S"
+  IL_0046:  callvirt   "Function System.ValueType.ToString() As String"
+  IL_004b:  stloc.1
+  IL_004c:  ldnull
+  IL_004d:  unbox.any  "S"
+  IL_0052:  stloc.0
+  IL_0053:  ret
+}
+]]>)
+        End Sub
+
+
+        <WorkItem(541308, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/541308")>
         <Fact>
         Public Sub PublicParameterlessConstructorInMetadata_OptionalParameter()
             Dim ilSource = <![CDATA[
@@ -9294,7 +9707,7 @@ End Class
     </file>
 </compilation>
 
-            CompileWithCustomILSource(vbSource, ilSource.Value, TestOptions.ReleaseDll, emitOptions:=TestEmitters.RefEmitBug).
+            CompileWithCustomILSource(vbSource, ilSource.Value, TestOptions.ReleaseDll).
                 VerifyIL("C.Main",
             <![CDATA[
 {
@@ -9325,7 +9738,7 @@ End Class
 ]]>)
         End Sub
 
-        <WorkItem(541308, "DevDiv")>
+        <WorkItem(541308, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/541308")>
         <Fact>
         Public Sub SimpleStructInstantiationAndAssigningNothing()
             Dim ilSource = <![CDATA[
@@ -9357,7 +9770,7 @@ End Class
     </file>
 </compilation>
 
-            CompileWithCustomILSource(vbSource, ilSource.Value, TestOptions.ReleaseDll, emitOptions:=TestEmitters.RefEmitBug).
+            CompileWithCustomILSource(vbSource, ilSource.Value, TestOptions.ReleaseDll).
                 VerifyIL("C.Main",
             <![CDATA[
 {
@@ -9388,7 +9801,7 @@ End Class
 ]]>)
         End Sub
 
-        <WorkItem(541308, "DevDiv")>
+        <WorkItem(541308, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/541308")>
         <Fact>
         Public Sub TypeParameterInitializationWithNothing()
             CompileAndVerify(
@@ -9416,7 +9829,7 @@ End Module
 ]]>)
         End Sub
 
-        <WorkItem(541308, "DevDiv")>
+        <WorkItem(541308, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/541308")>
         <Fact()>
         Public Sub TypeParameterInitializationWithNothing_StructConstraint()
             CompileAndVerify(
@@ -9450,7 +9863,7 @@ End Module
 ]]>)
         End Sub
 
-        <WorkItem(541308, "DevDiv")>
+        <WorkItem(541308, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/541308")>
         <Fact()>
         Public Sub TypeParameterInitializationWithNothing_NewConstraint()
             CompileAndVerify(
@@ -9484,7 +9897,7 @@ End Module
 ]]>)
         End Sub
 
-        <WorkItem(541308, "DevDiv")>
+        <WorkItem(541308, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/541308")>
         <Fact>
         Public Sub StructInstantiationWithParameters()
             CompileAndVerify(
@@ -9529,8 +9942,8 @@ End Module
 ]]>)
         End Sub
 
-        <WorkItem(541123, "DevDiv")>
-        <WorkItem(541309, "DevDiv")>
+        <WorkItem(541123, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/541123")>
+        <WorkItem(541309, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/541309")>
         <Fact>
         Public Sub PrivateParameterlessConstructorInMetadata()
             Dim ilSource = <![CDATA[
@@ -9562,8 +9975,8 @@ End Class
 
             ' CONSIDER: This is the dev10 behavior.
             ' Shouldn't there be an error for trying to call an inaccessible ctor?
-            ' NOTE: Current behaviour is to skip private constructor and use 'initobj'
-            CompileWithCustomILSource(vbSource, ilSource.Value, TestOptions.ReleaseDll, emitOptions:=TestEmitters.RefEmitBug).
+            ' NOTE: Current behavior is to skip private constructor and use 'initobj'
+            CompileWithCustomILSource(vbSource, ilSource.Value, TestOptions.ReleaseDll).
                 VerifyIL("C.Main",
             <![CDATA[
 {
@@ -9630,7 +10043,7 @@ expectedOutput:=<![CDATA[
 ]]>)
         End Sub
 
-        <WorkItem(540533, "DevDiv")>
+        <WorkItem(540533, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/540533")>
         <Fact()>
         Public Sub Bug6817()
             CompileAndVerify(
@@ -9638,12 +10051,12 @@ expectedOutput:=<![CDATA[
     <file name="a.vb">
 Imports System
 Module M1
-    Sub foo()
+    Sub goo()
         apCompare(1.CompareTo(2))
         Exit Sub
     End Sub
     Sub Main()
-        foo
+        goo
     End Sub
 End Module
 Public Module M2
@@ -9653,7 +10066,7 @@ End Module
     </file>
 </compilation>,
 expectedOutput:="").
-            VerifyIL("M1.foo",
+            VerifyIL("M1.goo",
             <![CDATA[
 {
   // Code size       21 (0x15)
@@ -9728,7 +10141,7 @@ End Module
 ]]>)
         End Sub
 
-        <WorkItem(528679, "DevDiv")>
+        <WorkItem(528679, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/528679")>
         <Fact()>
         Public Sub FunctionCallWhileOptionInferOn()
             CompileAndVerify(
@@ -9740,18 +10153,18 @@ Public Class MyClass1
     Const global_y As Long = 20
     Public Shared Sub Main()
     End Sub
-    Function foo(ByRef x As Integer) As Integer
+    Function goo(ByRef x As Integer) As Integer
         x = x + 10
         Return x + 10
     End Function
-    Sub foo1()
-        Dim global_y As Integer = foo(global_y)
+    Sub goo1()
+        Dim global_y As Integer = goo(global_y)
     End Sub
 End Class
                 </file>
             </compilation>,
             expectedOutput:="").
-                        VerifyIL("MyClass1.foo1",
+                        VerifyIL("MyClass1.goo1",
             <![CDATA[
 {
     // Code size       10 (0xa)
@@ -9759,14 +10172,14 @@ End Class
     .locals init (Integer V_0) //global_y
     IL_0000:  ldarg.0
     IL_0001:  ldloca.s   V_0
-    IL_0003:  call       "Function MyClass1.foo(ByRef Integer) As Integer"
+    IL_0003:  call       "Function MyClass1.goo(ByRef Integer) As Integer"
     IL_0008:  stloc.0
     IL_0009:  ret
 }]]>)
         End Sub
 
         ' Verify that the metadata for an attribute with a serialized an enum type with generics and nested class is correctly written by compiler and read by reflection.
-        <WorkItem(541278, "DevDiv")>
+        <WorkItem(541278, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/541278")>
         <Fact>
         Public Sub EmittingAttributesWithGenericsAndNestedClasses()
             CompileAndVerify(
@@ -9905,10 +10318,10 @@ End Class
 ]]>)
         End Sub
 
-        <WorkItem(542593, "DevDiv")>
+        <WorkItem(542593, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/542593")>
         <Fact>
-        Sub InheritClassFromRetargetedAssemblyReference()
-            Dim ref1 = New VisualBasicCompilationReference(CompilationUtils.CreateCompilationWithReferences(
+        Public Sub InheritClassFromRetargetedAssemblyReference()
+            Dim ref1 = New VisualBasicCompilationReference(CompilationUtils.CreateEmptyCompilationWithReferences(
                 <compilation>
                     <file name="a.vb">
 Imports System.Collections.Generic
@@ -9926,9 +10339,9 @@ Public Class C1(Of T)
     End Function
 End Class
                     </file>
-                </compilation>, references:={MetadataReference.CreateFromImage(ProprietaryTestResources.NetFX.v4_0_21006.mscorlib.AsImmutableOrNull())}))
+                </compilation>, references:={MetadataReference.CreateFromImage(ResourcesNet40.mscorlib.AsImmutableOrNull())}))
 
-            Dim comp = CompilationUtils.CreateCompilationWithReferences(
+            Dim comp = CompilationUtils.CreateEmptyCompilationWithReferences(
                 <compilation>
                     <file name="b.vb">
 Imports System.Collections.Generic
@@ -9943,7 +10356,7 @@ Public Class C2(Of U)
     End Function
 End Class
                     </file>
-                </compilation>, references:={MetadataReference.CreateFromImage(ProprietaryTestResources.NetFX.v4_0_30319.mscorlib.AsImmutableOrNull()), ref1})
+                </compilation>, references:={MetadataReference.CreateFromImage(ResourcesNet40.mscorlib.AsImmutableOrNull()), ref1})
 
             CompileAndVerify(comp)
 
@@ -9958,10 +10371,10 @@ End Class
                          c2GetEnumerator2.ExplicitInterfaceImplementations(0).OriginalDefinition)
         End Sub
 
-        <WorkItem(542593, "DevDiv")>
+        <WorkItem(542593, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/542593")>
         <Fact>
-        Sub InheritClassFromRetargetedAssemblyReferenceProperty()
-            Dim ref1 = New VisualBasicCompilationReference(CompilationUtils.CreateCompilationWithReferences(
+        Public Sub InheritClassFromRetargetedAssemblyReferenceProperty()
+            Dim ref1 = New VisualBasicCompilationReference(CompilationUtils.CreateEmptyCompilationWithReferences(
                 <compilation>
                     <file name="a.vb">
 Imports System.Collections.Generic
@@ -9984,9 +10397,9 @@ Public Class C1
     End Sub
 End Class
                     </file>
-                </compilation>, references:={MetadataReference.CreateFromImage(ProprietaryTestResources.NetFX.v4_0_21006.mscorlib.AsImmutableOrNull())}))
+                </compilation>, references:={MetadataReference.CreateFromImage(ResourcesNet40.mscorlib.AsImmutableOrNull())}))
 
-            Dim comp = CompilationUtils.CreateCompilationWithReferences(
+            Dim comp = CompilationUtils.CreateEmptyCompilationWithReferences(
                 <compilation>
                     <file name="b.vb">
 Imports System.Collections.Generic
@@ -10011,7 +10424,7 @@ Public Class C2
     End Sub
 End Class
                     </file>
-                </compilation>, references:={MetadataReference.CreateFromImage(ProprietaryTestResources.NetFX.v4_0_30319.mscorlib.AsImmutableOrNull()), ref1})
+                </compilation>, references:={MetadataReference.CreateFromImage(ResourcesNet40.mscorlib.AsImmutableOrNull()), ref1})
 
             Dim compilationVerifier = CompileAndVerify(comp)
 
@@ -10065,33 +10478,33 @@ End Module
             Dim source =
 <compilation>
     <file name="a.vb">
-Namespace Foo
+Namespace Goo
     Class B
     End Class
 End Namespace
-Namespace FOO
+Namespace GOO
     Class C
     End Class
 End Namespace
 
-Namespace FoO.Bar
+Namespace GoO.Bar
     Partial Class D
     End Class
 End Namespace
 
-Namespace foo.Baz
+Namespace goo.Baz
     Class E
     End Class
 End Namespace
 
-Namespace foO
+Namespace goO
     Namespace Bar
         Class F
         End Class
     End Namespace
 End Namespace
 
-Namespace FOo.Bar
+Namespace GOo.Bar
     Partial Class D
     End Class
 End Namespace
@@ -10111,19 +10524,19 @@ End Namespace
 </compilation>
 
             Dim comp = CompileAndVerify(source, options:=TestOptions.ReleaseDll.WithRootNamespace("Project"), validator:=
-                Sub(a, _omitted)
+                Sub(a)
                     AssertEx.SetEqual({"<Module>",
                                        "PROJEcT.Quuz.A",
-                                       "Project.FOO.C",
-                                       "Project.FoO.Bar.D",
-                                       "Project.Foo.B",
-                                       "Project.foO.Bar.F",
-                                       "Project.foo.Baz.E",
-                                       "SYStem.G"}, GetFullTypeNames(a.GetMetadataReader()))
+                                       "Project.GOO.C",
+                                       "Project.GoO.Bar.D",
+                                       "Project.Goo.B",
+                                       "Project.goO.Bar.F",
+                                       "Project.goo.Baz.E",
+                                       "SYStem.G"}, MetadataValidation.GetFullTypeNames(a.GetMetadataReader()))
                 End Sub)
         End Sub
 
-        <Fact, WorkItem(542974, "DevDiv")>
+        <Fact, WorkItem(542974, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/542974")>
         Public Sub LogicalOrWithBinaryExpressionOperands()
             Dim comp = CompileAndVerify(
 <compilation>
@@ -10144,11 +10557,11 @@ End Module
 
             comp.VerifyIL("Module1.Main", <![CDATA[
 {
-  // Code size       80 (0x50)
+  // Code size       77 (0x4d)
   .maxstack  3
   .locals init (String V_0, //a
-  Double V_1, //b
-  Boolean V_2)
+                Double V_1, //b
+                Boolean V_2)
   IL_0000:  nop
   IL_0001:  ldstr      "1"
   IL_0006:  stloc.0
@@ -10164,27 +10577,25 @@ End Module
   IL_0021:  ldc.r8     0.1
   IL_002a:  cgt
   IL_002c:  or
-  IL_002d:  ldc.i4.0
-  IL_002e:  ceq
-  IL_0030:  stloc.2
-  IL_0031:  ldloc.2
-  IL_0032:  brtrue.s   IL_0042
-  IL_0034:  ldstr      "Fail"
-  IL_0039:  call       "Sub System.Console.WriteLine(String)"
-  IL_003e:  nop
+  IL_002d:  stloc.2
+  IL_002e:  ldloc.2
+  IL_002f:  brfalse.s  IL_003f
+  IL_0031:  ldstr      "Fail"
+  IL_0036:  call       "Sub System.Console.WriteLine(String)"
+  IL_003b:  nop
+  IL_003c:  nop
+  IL_003d:  br.s       IL_004c
   IL_003f:  nop
-  IL_0040:  br.s       IL_004f
-  IL_0042:  nop
-  IL_0043:  ldstr      "Pass"
-  IL_0048:  call       "Sub System.Console.WriteLine(String)"
-  IL_004d:  nop
-  IL_004e:  nop
-  IL_004f:  ret
+  IL_0040:  ldstr      "Pass"
+  IL_0045:  call       "Sub System.Console.WriteLine(String)"
+  IL_004a:  nop
+  IL_004b:  nop
+  IL_004c:  ret
 }
 ]]>)
         End Sub
 
-        <WorkItem(543243, "DevDiv")>
+        <WorkItem(543243, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/543243")>
         <Fact()>
         Public Sub TestAutoProperty()
             Dim vbCompilation = CreateVisualBasicCompilation("TestAutoProperty",
@@ -10203,7 +10614,7 @@ End Module]]>,
             vbVerifier.VerifyDiagnostics()
         End Sub
 
-        <WorkItem(543243, "DevDiv")>
+        <WorkItem(543243, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/543243")>
         <Fact()>
         Public Sub TestOrInDebug()
             Dim c = CompileAndVerify(
@@ -10228,11 +10639,11 @@ End Module
 
             c.VerifyIL("Module1.Main", <![CDATA[
 {
-  // Code size       80 (0x50)
+  // Code size       77 (0x4d)
   .maxstack  3
   .locals init (String V_0, //a
-  Double V_1, //b
-  Boolean V_2)
+                Double V_1, //b
+                Boolean V_2)
   IL_0000:  nop
   IL_0001:  ldstr      "1"
   IL_0006:  stloc.0
@@ -10248,27 +10659,25 @@ End Module
   IL_0021:  ldc.r8     0.1
   IL_002a:  cgt
   IL_002c:  or
-  IL_002d:  ldc.i4.0
-  IL_002e:  ceq
-  IL_0030:  stloc.2
-  IL_0031:  ldloc.2
-  IL_0032:  brtrue.s   IL_0042
-  IL_0034:  ldstr      "Fail"
-  IL_0039:  call       "Sub System.Console.WriteLine(String)"
-  IL_003e:  nop
+  IL_002d:  stloc.2
+  IL_002e:  ldloc.2
+  IL_002f:  brfalse.s  IL_003f
+  IL_0031:  ldstr      "Fail"
+  IL_0036:  call       "Sub System.Console.WriteLine(String)"
+  IL_003b:  nop
+  IL_003c:  nop
+  IL_003d:  br.s       IL_004c
   IL_003f:  nop
-  IL_0040:  br.s       IL_004f
-  IL_0042:  nop
-  IL_0043:  ldstr      "Pass"
-  IL_0048:  call       "Sub System.Console.WriteLine(String)"
-  IL_004d:  nop
-  IL_004e:  nop
-  IL_004f:  ret
+  IL_0040:  ldstr      "Pass"
+  IL_0045:  call       "Sub System.Console.WriteLine(String)"
+  IL_004a:  nop
+  IL_004b:  nop
+  IL_004c:  ret
 }
 ]]>)
         End Sub
 
-        <WorkItem(539392, "DevDiv")>
+        <WorkItem(539392, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/539392")>
         <Fact()>
         Public Sub DecimalBinaryOp_01()
             CompileAndVerify(
@@ -10299,7 +10708,7 @@ End Module
 ]]>)
         End Sub
 
-        <WorkItem(543611, "DevDiv")>
+        <WorkItem(543611, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/543611")>
         <Fact()>
         Public Sub CompareToOnDecimalLiteral()
             CompileAndVerify(
@@ -10332,7 +10741,7 @@ End Module
 ]]>)
         End Sub
 
-        <WorkItem(543611, "DevDiv")>
+        <WorkItem(543611, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/543611")>
         <Fact()>
         Public Sub CallOnReadonlyValField()
             CompileAndVerify(
@@ -10347,12 +10756,12 @@ Class Test
 
     End Structure
 
-    Shared Function Foo() As C1
+    Shared Function Goo() As C1
         Return New C1()
     End Function
 
     Shared Sub Main()
-        Console.Write(Foo().x.CompareTo(Decimal.One))
+        Console.Write(Goo().x.CompareTo(Decimal.One))
     End Sub
 
 End Class
@@ -10364,7 +10773,7 @@ End Class
   // Code size       29 (0x1d)
   .maxstack  2
   .locals init (Test.C1 V_0)
-  IL_0000:  call       "Function Test.Foo() As Test.C1"
+  IL_0000:  call       "Function Test.Goo() As Test.C1"
   IL_0005:  stloc.0
   IL_0006:  ldloca.s   V_0
   IL_0008:  ldflda     "Test.C1.x As Decimal"
@@ -10464,7 +10873,7 @@ End Structure
         End Sub
 
 
-        <WorkItem(543611, "DevDiv")>
+        <WorkItem(543611, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/543611")>
         <Fact()>
         Public Sub MultipleconstsByRef()
             CompileAndVerify(
@@ -10531,7 +10940,7 @@ End Module
 ]]>)
         End Sub
 
-        <WorkItem(638119, "DevDiv")>
+        <WorkItem(638119, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/638119")>
         <Fact()>
         Public Sub ArrayInitZero()
             CompileAndVerify(
@@ -10573,7 +10982,7 @@ Module Program
     End Sub
 End Module
     </file>
-</compilation>, expectedOutput:=<![CDATA[False
+</compilation>, options:=TestOptions.ReleaseExe.WithModuleName("MODULE"), expectedOutput:=<![CDATA[False
 
 True
 System.Exception: Exception of type 'System.Exception' was thrown.
@@ -10615,7 +11024,7 @@ True
   IL_0040:  ldc.i4.4
   IL_0041:  newarr     "Boolean"
   IL_0046:  dup
-  IL_0047:  ldtoken    "Integer <PrivateImplementationDetails>.$$method0x6000001-35CCB1599F52363510686EF38B7DB5E7998DB108"
+  IL_0047:  ldtoken    "Integer <PrivateImplementationDetails>.52A5C4A10657220CAC05C63ADFA923C7771C55D868A58EE360EB3D1511985C3E"
   IL_004c:  call       "Sub System.Runtime.CompilerServices.RuntimeHelpers.InitializeArray(System.Array, System.RuntimeFieldHandle)"
   IL_0051:  ldc.i4.2
   IL_0052:  ldelem.u1
@@ -10625,7 +11034,116 @@ True
 ]]>)
         End Sub
 
-        <Fact, WorkItem(529162, "DevDiv")>
+        <Fact()>
+        Public Sub ArrayInitZero_D()
+            CompileAndVerify(
+<compilation>
+    <file name="a.vb">
+Imports System
+Module Program
+    Sub Main()
+        Dim saveUICulture = System.Threading.Thread.CurrentThread.CurrentUICulture
+        System.Threading.Thread.CurrentThread.CurrentUICulture = System.Globalization.CultureInfo.InvariantCulture
+        Try
+            Test()
+        Finally
+            System.Threading.Thread.CurrentThread.CurrentUICulture = saveUICulture
+        End Try
+    End Sub
+
+    Sub Test()
+            ' no element inits
+            Dim arrB1 = new boolean() {false, false, false}
+            System.Console.WriteLine(arrB1(0))
+
+            ' no element inits
+            Dim arrE1 = new Exception() {Nothing, Nothing, Nothing}
+            System.Console.WriteLine(arrE1(0))
+
+            ' 1 element init
+            Dim arrB2 = new boolean() {false, true, false}
+            System.Console.WriteLine(arrB2(1))
+
+            ' 1 element init
+            Dim arrE2 = new Exception() {Nothing, new Exception(), Nothing, Nothing, Nothing, Nothing, Nothing}
+            System.Console.WriteLine(arrE2(1))
+
+            ' blob init
+            Dim arrB3 = new boolean() {true, false, true, true}
+            System.Console.WriteLine(arrB3(2))
+
+    End Sub
+End Module
+    </file>
+</compilation>, options:=TestOptions.ReleaseDebugExe.WithModuleName("MODULE"), expectedOutput:=<![CDATA[False
+
+True
+System.Exception: Exception of type 'System.Exception' was thrown.
+True
+]]>).
+            VerifyIL("Program.Test",
+            <![CDATA[
+{
+  // Code size      101 (0x65)
+  .maxstack  4
+  .locals init (Boolean() V_0, //arrB1
+                System.Exception() V_1, //arrE1
+                Boolean() V_2, //arrB2
+                System.Exception() V_3, //arrE2
+                Boolean() V_4) //arrB3
+  IL_0000:  ldc.i4.3
+  IL_0001:  newarr     "Boolean"
+  IL_0006:  stloc.0
+  IL_0007:  ldloc.0
+  IL_0008:  ldc.i4.0
+  IL_0009:  ldelem.u1
+  IL_000a:  call       "Sub System.Console.WriteLine(Boolean)"
+  IL_000f:  ldc.i4.3
+  IL_0010:  newarr     "System.Exception"
+  IL_0015:  stloc.1
+  IL_0016:  ldloc.1
+  IL_0017:  ldc.i4.0
+  IL_0018:  ldelem.ref
+  IL_0019:  call       "Sub System.Console.WriteLine(Object)"
+  IL_001e:  ldc.i4.3
+  IL_001f:  newarr     "Boolean"
+  IL_0024:  dup
+  IL_0025:  ldc.i4.1
+  IL_0026:  ldc.i4.1
+  IL_0027:  stelem.i1
+  IL_0028:  stloc.2
+  IL_0029:  ldloc.2
+  IL_002a:  ldc.i4.1
+  IL_002b:  ldelem.u1
+  IL_002c:  call       "Sub System.Console.WriteLine(Boolean)"
+  IL_0031:  ldc.i4.7
+  IL_0032:  newarr     "System.Exception"
+  IL_0037:  dup
+  IL_0038:  ldc.i4.1
+  IL_0039:  newobj     "Sub System.Exception..ctor()"
+  IL_003e:  stelem.ref
+  IL_003f:  stloc.3
+  IL_0040:  ldloc.3
+  IL_0041:  ldc.i4.1
+  IL_0042:  ldelem.ref
+  IL_0043:  call       "Sub System.Console.WriteLine(Object)"
+  IL_0048:  ldc.i4.4
+  IL_0049:  newarr     "Boolean"
+  IL_004e:  dup
+  IL_004f:  ldtoken    "Integer <PrivateImplementationDetails>.52A5C4A10657220CAC05C63ADFA923C7771C55D868A58EE360EB3D1511985C3E"
+  IL_0054:  call       "Sub System.Runtime.CompilerServices.RuntimeHelpers.InitializeArray(System.Array, System.RuntimeFieldHandle)"
+  IL_0059:  stloc.s    V_4
+  IL_005b:  ldloc.s    V_4
+  IL_005d:  ldc.i4.2
+  IL_005e:  ldelem.u1
+  IL_005f:  call       "Sub System.Console.WriteLine(Boolean)"
+  IL_0064:  ret
+}
+]]>)
+        End Sub
+
+        <WorkItem(529162, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/529162")>
+        <ConditionalFact(GetType(WindowsDesktopOnly), Reason:="https://github.com/dotnet/roslyn/issues/28044")>
         Public Sub TestMSVBTypeNameAPI()
             Dim vbCompilation = CreateVisualBasicCompilation("TestMSVBTypeNameAPI",
             <![CDATA[Public Module Program
@@ -10683,7 +11201,7 @@ End Class]]>
         End Sub
 
 
-        <WorkItem(543757, "DevDiv")>
+        <WorkItem(543757, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/543757")>
         <Fact()>
         Public Sub TestNotXor()
             CompileAndVerify(
@@ -10794,7 +11312,7 @@ End Class
 ]]>)
         End Sub
 
-        <Fact(), WorkItem(544128, "DevDiv")>
+        <Fact(), WorkItem(544128, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/544128")>
         Public Sub CodeGenLambdaNarrowingRelaxation()
             CompileAndVerify(
 <compilation>
@@ -10808,7 +11326,7 @@ End Class
 </compilation>)
         End Sub
 
-        <Fact(), WorkItem(544182, "DevDiv")>
+        <Fact(), WorkItem(544182, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/544182")>
         Public Sub OverrideImplementMembersWithOptArguments()
             Dim optParameterSource = <![CDATA[
 .class interface public abstract auto ansi IAnimal
@@ -10879,7 +11397,7 @@ End Class
     </file>
 </compilation>
 
-            CompileWithCustomILSource(vbSource, optParameterSource, emitOptions:=TestEmitters.RefEmitBug)
+            CompileWithCustomILSource(vbSource, optParameterSource)
         End Sub
 
         <Fact()>
@@ -10936,7 +11454,7 @@ expectedOutput:="")
 
         End Sub
 
-        <WorkItem(545201, "DevDiv")>
+        <WorkItem(545201, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/545201")>
         <Fact()>
         Public Sub TestConversionMultiDimArrayToIList()
             Dim vbCompilation = CreateVisualBasicCompilation("TestConversionMultiDimArrayToIList",
@@ -10997,7 +11515,7 @@ PASS
             vbVerifier.VerifyDiagnostics()
         End Sub
 
-        <WorkItem(545349, "DevDiv")>
+        <WorkItem(545349, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/545349")>
         <Fact()>
         Public Sub CompoundPropGeneric()
             CompileAndVerify(
@@ -11081,7 +11599,7 @@ expectedOutput:="2").
                                                            type = globalNamespace.GetMember(Of NamedTypeSymbol)("C")
                                                            Assert.False(type.IsComImport())
                                                        End Sub
-            Dim compilation = CreateCompilationWithMscorlib(
+            Dim compilation = CreateCompilationWithMscorlib40(
 <compilation>
     <file name="c.vb"><![CDATA[
 Option Strict On
@@ -11100,14 +11618,14 @@ Class C
 End Class
     ]]></file>
 </compilation>)
-            CompileAndVerify(compilation, sourceSymbolValidator:=validator, symbolValidator:=validator, verify:=False)
+            CompileAndVerify(compilation, sourceSymbolValidator:=validator, symbolValidator:=validator, verify:=Verification.Passes)
         End Sub
 
-        <Fact()>
+        <ConditionalFact(GetType(WindowsOnly), Reason:=ConditionalSkipReason.TestExecutionNeedsWindowsTypes)>
         Public Sub ComImportMethods()
             Dim sourceValidator As Action(Of ModuleSymbol) = Sub([module])
-                                                                 Dim expectedMethodImplAttributes As System.Reflection.MethodImplAttributes = Reflection.MethodImplAttributes.Managed Or
-                                                                     Reflection.MethodImplAttributes.Runtime Or Reflection.MethodImplAttributes.InternalCall
+                                                                 Dim expectedMethodImplAttributes As System.Reflection.MethodImplAttributes = MethodImplAttributes.Managed Or
+                                                                     MethodImplAttributes.Runtime Or MethodImplAttributes.InternalCall
 
                                                                  Dim globalNamespace = [module].GlobalNamespace
                                                                  Dim typeA = globalNamespace.GetMember(Of NamedTypeSymbol)("A")
@@ -11115,14 +11633,14 @@ End Class
                                                                  Assert.Equal(1, typeA.GetAttributes().Length)
                                                                  Dim ctorA = typeA.InstanceConstructors.First()
                                                                  Assert.Equal(expectedMethodImplAttributes, ctorA.ImplementationAttributes)
-                                                                 Dim methodFoo = DirectCast(typeA.GetMembers("Foo").First(), MethodSymbol)
-                                                                 Assert.Equal(expectedMethodImplAttributes, methodFoo.ImplementationAttributes)
+                                                                 Dim methodGoo = DirectCast(typeA.GetMembers("Goo").First(), MethodSymbol)
+                                                                 Assert.Equal(expectedMethodImplAttributes, methodGoo.ImplementationAttributes)
 
                                                                  Dim typeB = globalNamespace.GetMember(Of NamedTypeSymbol)("B")
                                                                  Assert.True(typeB.IsComImport())
                                                                  Assert.Equal(1, typeB.GetAttributes().Length)
                                                                  Dim ctorB = typeB.InstanceConstructors.First()
-                                                                 Assert.True(DirectCast(ctorB, Microsoft.Cci.IMethodDefinition).IsExternal)
+                                                                 Assert.True(DirectCast(ctorB.GetCciAdapter(), Cci.IMethodDefinition).IsExternal)
                                                                  Assert.Equal(expectedMethodImplAttributes, ctorB.ImplementationAttributes)
                                                              End Sub
 
@@ -11142,7 +11660,7 @@ End Class
                                                                    Assert.True(ctorB.IsExternalMethod)
                                                                End Sub
 
-            Dim compilation = CreateCompilationWithMscorlibAndVBRuntime(
+            Dim compilation = CreateCompilationWithMscorlib40AndVBRuntime(
 <compilation>
     <file name="c.vb"><![CDATA[
 Imports System
@@ -11154,7 +11672,7 @@ Class A
         Console.WriteLine("FAIL")
     End Sub
 
-    Public Shared Function Foo() As Integer
+    Public Shared Function Goo() As Integer
         Console.WriteLine("FAIL")
         Return 0
     End Function
@@ -11173,7 +11691,7 @@ Module M1
         End Try
 
         Try
-            A.Foo()
+            A.Goo()
         Catch ex As Exception
             Console.WriteLine("PASS2")
         End Try
@@ -11186,7 +11704,7 @@ End Module
 
         <Fact()>
         Public Sub ExitPropertyDefaultReturnValue()
-            Dim compilation = CreateCompilationWithMscorlib(
+            Dim compilation = CreateCompilationWithMscorlib40(
 <compilation>
     <file name="c.vb"><![CDATA[
 Option Strict On
@@ -11228,7 +11746,7 @@ End Class
 
         <Fact()>
         Public Sub ExitPropertyGetterSetReturnValue()
-            Dim compilation = CreateCompilationWithMscorlib(
+            Dim compilation = CreateCompilationWithMscorlib40(
 <compilation>
     <file name="c.vb"><![CDATA[
 Option Strict On
@@ -11261,7 +11779,7 @@ End Class
 
         <Fact()>
         Public Sub ExitPropertySetterSetReturnValue()
-            Dim compilation = CreateCompilationWithMscorlib(
+            Dim compilation = CreateCompilationWithMscorlib40(
 <compilation>
     <file name="c.vb"><![CDATA[
 Option Strict On
@@ -11305,7 +11823,7 @@ BC42026: Expression recursively calls the containing property 'Public Property P
 
         <Fact()>
         Public Sub ExitPropertyOutput()
-            Dim compilation = CreateCompilationWithMscorlib(
+            Dim compilation = CreateCompilationWithMscorlib40(
 <compilation>
     <file name="c.vb"><![CDATA[
 Imports System
@@ -11333,7 +11851,7 @@ Class Program
     End Property
 End Class
     ]]></file>
-</compilation>, TestOptions.ReleaseExe)
+</compilation>, options:=TestOptions.ReleaseExe)
             Dim verifier = CompileAndVerify(compilation, expectedOutput:=<![CDATA[
 In get
 1
@@ -11344,7 +11862,7 @@ In get
 ]]>)
         End Sub
 
-        <WorkItem(545716, "DevDiv")>
+        <WorkItem(545716, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/545716")>
         <Fact()>
         Public Sub Regress14344()
             CompileAndVerify(
@@ -11360,23 +11878,24 @@ End Class
             VerifyIL("EdmFunction.SetFunctionAttribute",
             <![CDATA[
 {
-  // Code size       10 (0xa)
+  // Code size       11 (0xb)
   .maxstack  4
   IL_0000:  ldarg.0
-  IL_0001:  dup
+  IL_0001:  ldarg.0
   IL_0002:  ldind.u1
-  IL_0003:  dup
-  IL_0004:  ldarg.1
-  IL_0005:  and
-  IL_0006:  add
-  IL_0007:  conv.ovf.u1.un
-  IL_0008:  stind.i1
-  IL_0009:  ret
+  IL_0003:  ldarg.0
+  IL_0004:  ldind.u1
+  IL_0005:  ldarg.1
+  IL_0006:  and
+  IL_0007:  add
+  IL_0008:  conv.ovf.u1.un
+  IL_0009:  stind.i1
+  IL_000a:  ret
 }
 ]]>)
         End Sub
 
-        <WorkItem(546189, "DevDiv")>
+        <WorkItem(546189, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/546189")>
         <Fact()>
         Public Sub Regress15299()
             CompileAndVerify(
@@ -11431,7 +11950,7 @@ End Module
 ]]>)
         End Sub
 
-        <WorkItem(546422, "DevDiv")>
+        <WorkItem(546422, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/546422")>
         <Fact()>
         Public Sub LateBindingToSystemArrayIndex01()
             CompileAndVerify(
@@ -11461,7 +11980,7 @@ Module Module1
 End Module
 
     </file>
-</compilation>, expectedOutput:="12").
+</compilation>, options:=TestOptions.ReleaseExe.WithModuleName("MODULE"), expectedOutput:="12").
             VerifyIL("Module1.getTypes",
             <![CDATA[
 {
@@ -11474,7 +11993,7 @@ End Module
   IL_0000:  ldc.i4.4
   IL_0001:  newarr     "Integer"
   IL_0006:  dup
-  IL_0007:  ldtoken    "<PrivateImplementationDetails>.__StaticArrayInitTypeSize=16 <PrivateImplementationDetails>.$$method0x6000001-1456763F890A84558F99AFA687C36B9037697848"
+  IL_0007:  ldtoken    "<PrivateImplementationDetails>.__StaticArrayInitTypeSize=16 <PrivateImplementationDetails>.CF97ADEEDB59E05BFD73A2B4C2A8885708C4F4F70C84C64B27120E72AB733B72"
   IL_000c:  call       "Sub System.Runtime.CompilerServices.RuntimeHelpers.InitializeArray(System.Array, System.RuntimeFieldHandle)"
   IL_0011:  stloc.0
   IL_0012:  ldloc.0
@@ -11530,7 +12049,112 @@ End Module
 ]]>)
         End Sub
 
-        <WorkItem(575547, "DevDiv")>
+        <WorkItem(546422, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/546422")>
+        <Fact()>
+        Public Sub LateBindingToSystemArrayIndex01_D()
+            CompileAndVerify(
+<compilation>
+    <file name="a.vb">
+option strict off        
+
+Imports System
+
+Module Module1
+    Sub Main()
+        Console.WriteLine(getTypes().Length)
+    End Sub
+
+    Function getTypes() As Array
+        Dim types As Array = {1, 2, 3, 4}
+        Dim s(types.Length - 1) As Object
+        Dim arr As Array
+        arr = Array.CreateInstance(New Integer.GetType, 12)
+        Dim i As Integer
+        For i = 0 To types.Length - 1
+            arr(i) = types.GetValue(i)
+        Next
+        Return arr
+    End Function
+
+End Module
+
+    </file>
+</compilation>, options:=TestOptions.ReleaseDebugExe.WithModuleName("MODULE"), expectedOutput:="12").
+            VerifyIL("Module1.getTypes",
+            <![CDATA[
+{
+  // Code size      127 (0x7f)
+  .maxstack  6
+  .locals init (System.Array V_0, //getTypes
+                System.Array V_1, //types
+                Object() V_2, //s
+                System.Array V_3, //arr
+                Integer V_4, //i
+                Integer V_5,
+                Integer V_6)
+  IL_0000:  ldc.i4.4
+  IL_0001:  newarr     "Integer"
+  IL_0006:  dup
+  IL_0007:  ldtoken    "<PrivateImplementationDetails>.__StaticArrayInitTypeSize=16 <PrivateImplementationDetails>.CF97ADEEDB59E05BFD73A2B4C2A8885708C4F4F70C84C64B27120E72AB733B72"
+  IL_000c:  call       "Sub System.Runtime.CompilerServices.RuntimeHelpers.InitializeArray(System.Array, System.RuntimeFieldHandle)"
+  IL_0011:  stloc.1
+  IL_0012:  ldloc.1
+  IL_0013:  callvirt   "Function System.Array.get_Length() As Integer"
+  IL_0018:  ldc.i4.1
+  IL_0019:  sub.ovf
+  IL_001a:  ldc.i4.1
+  IL_001b:  add.ovf
+  IL_001c:  newarr     "Object"
+  IL_0021:  stloc.2
+  IL_0022:  ldloca.s   V_5
+  IL_0024:  initobj    "Integer"
+  IL_002a:  ldloc.s    V_5
+  IL_002c:  box        "Integer"
+  IL_0031:  call       "Function Object.GetType() As System.Type"
+  IL_0036:  ldc.i4.s   12
+  IL_0038:  call       "Function System.Array.CreateInstance(System.Type, Integer) As System.Array"
+  IL_003d:  stloc.3
+  IL_003e:  ldloc.1
+  IL_003f:  callvirt   "Function System.Array.get_Length() As Integer"
+  IL_0044:  ldc.i4.1
+  IL_0045:  sub.ovf
+  IL_0046:  stloc.s    V_6
+  IL_0048:  ldc.i4.0
+  IL_0049:  stloc.s    V_4
+  IL_004b:  br.s       IL_0075
+  IL_004d:  ldloc.3
+  IL_004e:  ldc.i4.2
+  IL_004f:  newarr     "Object"
+  IL_0054:  dup
+  IL_0055:  ldc.i4.0
+  IL_0056:  ldloc.s    V_4
+  IL_0058:  box        "Integer"
+  IL_005d:  stelem.ref
+  IL_005e:  dup
+  IL_005f:  ldc.i4.1
+  IL_0060:  ldloc.1
+  IL_0061:  ldloc.s    V_4
+  IL_0063:  callvirt   "Function System.Array.GetValue(Integer) As Object"
+  IL_0068:  stelem.ref
+  IL_0069:  ldnull
+  IL_006a:  call       "Sub Microsoft.VisualBasic.CompilerServices.NewLateBinding.LateIndexSet(Object, Object(), String())"
+  IL_006f:  ldloc.s    V_4
+  IL_0071:  ldc.i4.1
+  IL_0072:  add.ovf
+  IL_0073:  stloc.s    V_4
+  IL_0075:  ldloc.s    V_4
+  IL_0077:  ldloc.s    V_6
+  IL_0079:  ble.s      IL_004d
+  IL_007b:  ldloc.3
+  IL_007c:  stloc.0
+  IL_007d:  ldloc.0
+  IL_007e:  ret
+}
+]]>)
+        End Sub
+
+
+        <WorkItem(575547, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/575547")>
         <Fact()>
         Public Sub LateBindingToSystemArrayIndex02()
             ' Option Strict On
@@ -11553,7 +12177,7 @@ End Module
 ]]>
                     </file>
                 </compilation>
-            Dim compilation1 = CreateCompilationWithMscorlibAndVBRuntime(source1)
+            Dim compilation1 = CreateCompilationWithMscorlib40AndVBRuntime(source1)
             compilation1.AssertTheseDiagnostics(
 <expected>
 BC30574: Option Strict On disallows late binding.
@@ -11583,11 +12207,11 @@ End Module
 ]]>
                     </file>
                 </compilation>
-            Dim compilation2 = CreateCompilationWithMscorlibAndVBRuntime(source2)
+            Dim compilation2 = CreateCompilationWithMscorlib40AndVBRuntime(source2)
             compilation2.AssertNoErrors()
         End Sub
 
-        <Fact(), WorkItem(546860, "DevDiv")>
+        <Fact(), WorkItem(546860, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/546860")>
         Public Sub Bug17007()
             CompileAndVerify(
 <compilation>
@@ -11619,8 +12243,6 @@ expectedOutput:=
 <compilation>
     <file name="a.vb">
         <![CDATA[
-Imports System
-
 Module Module1
     Public Sub Main()
     End Sub
@@ -11740,9 +12362,8 @@ End Class
     </file>
 </compilation>
 
-            Dim compilation = CreateCompilationWithMscorlibAndVBRuntime(source, TestOptions.ReleaseExe)
-
-            AssertTheseDiagnostics(compilation,
+            Dim compilation = CreateCompilationWithMscorlib40AndVBRuntime(source, TestOptions.ReleaseExe)
+            AssertTheseEmitDiagnostics(compilation,
 <expected>
 BC40054: 'Public Sub New(a As Integer)' in designer-generated type 'FromDesigner1' should call InitializeComponent method.
     Sub New(a As Integer)
@@ -11808,7 +12429,7 @@ BC40054: 'Public Sub New(c As Integer)' in designer-generated type 'FromDesigner
 ]]>)
         End Sub
 
-        <WorkItem(530067, "DevDiv")>
+        <WorkItem(530067, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/530067")>
         <Fact>
         Public Sub NopAfterCall()
             ' For a nop to be inserted after a call, two conditions must be met:
@@ -11834,8 +12455,8 @@ End Module
     </file>
                 </compilation>
 
-            Dim compRelease = CreateCompilationWithMscorlibAndVBRuntime(source, options:=TestOptions.ReleaseExe)
-            Dim compDebug = CreateCompilationWithMscorlibAndVBRuntime(source, options:=TestOptions.DebugExe)
+            Dim compRelease = CreateCompilationWithMscorlib40AndVBRuntime(source, options:=TestOptions.ReleaseExe)
+            Dim compDebug = CreateCompilationWithMscorlib40AndVBRuntime(source, options:=TestOptions.DebugExe)
 
             ' (2) is not met.
             CompileAndVerify(compRelease).VerifyIL("C.Main",
@@ -11866,8 +12487,8 @@ End Module
 ]]>)
         End Sub
 
-        <WorkItem(529162, "DevDiv")>
-        <Fact()>
+        <WorkItem(529162, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/529162")>
+        <ConditionalFact(GetType(WindowsDesktopOnly), Reason:="https://github.com/dotnet/roslyn/issues/28044")>
         Public Sub Bug529162()
             Dim source =
 <compilation>
@@ -11919,7 +12540,7 @@ End Module
     </file>
 </compilation>
 
-            Dim compilation = CreateCompilationWithMscorlibAndVBRuntimeAndReferences(source, {SystemCoreRef}, TestOptions.ReleaseExe)
+            Dim compilation = CreateCompilationWithMscorlib40AndVBRuntimeAndReferences(source, {SystemCoreRef}, TestOptions.ReleaseExe)
 
             Dim verifier = CompileAndVerify(compilation,
             <![CDATA[
@@ -11995,7 +12616,7 @@ Microsoft.VisualBasic.CompilerServices.Versioned - System.String VbTypeName(Syst
 ]]>)
         End Sub
 
-        <WorkItem(653588, "DevDiv")>
+        <WorkItem(653588, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/653588")>
         <Fact()>
         Public Sub UnusedStructFieldLoad()
             CompileAndVerify(
@@ -12031,7 +12652,7 @@ End Class
 ]]>)
         End Sub
 
-        <WorkItem(531166, "DevDiv")>
+        <WorkItem(531166, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/531166")>
         <Fact()>
         Public Sub LoadingEnumValue__()
             CompileAndVerify(
@@ -12039,11 +12660,11 @@ End Class
     <file name="a.vb">
 Imports System        
 Module Program
-    Function Foo() As AttributeTargets
+    Function Goo() As AttributeTargets
         Return AttributeTargets.All
     End Function
     Sub Main(args As String())
-        Console.Write(Foo().value__)
+        Console.Write(Goo().value__)
     End Sub
 End Module
     </file>
@@ -12054,7 +12675,7 @@ End Module
   // Code size       19 (0x13)
   .maxstack  1
   .locals init (System.AttributeTargets V_0)
-  IL_0000:  call       "Function Program.Foo() As System.AttributeTargets"
+  IL_0000:  call       "Function Program.Goo() As System.AttributeTargets"
   IL_0005:  stloc.0
   IL_0006:  ldloca.s   V_0
   IL_0008:  ldfld      "System.AttributeTargets.value__ As Integer"
@@ -12064,7 +12685,7 @@ End Module
 ]]>)
         End Sub
 
-        <WorkItem(665317, "DevDiv")>
+        <WorkItem(665317, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/665317")>
         <Fact()>
         Public Sub InitGenericElement()
             CompileAndVerify(
@@ -12079,7 +12700,7 @@ Class B : Inherits A
 End Class
 
 Class Program
-    Shared Sub Foo(Of T As Class)(array As T())
+    Shared Sub Goo(Of T As Class)(array As T())
         array(0) = Nothing
     End Sub
 
@@ -12093,7 +12714,7 @@ Class Program
 
     Shared Sub Main()
         Dim array = New B(5) {}
-        Foo(Of A)(array)
+        Goo(Of A)(array)
         Bar(Of A)(array)
 
         Dim array1 = New B(5)() {}
@@ -12103,7 +12724,7 @@ End Class
 
     </file>
 </compilation>, expectedOutput:="").
-            VerifyIL("Program.Foo(Of T)(T())",
+            VerifyIL("Program.Goo(Of T)(T())",
             <![CDATA[
 {
   // Code size       17 (0x11)
@@ -12147,7 +12768,7 @@ End Class
 ]]>)
         End Sub
 
-        <WorkItem(718502, "DevDiv")>
+        <WorkItem(718502, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/718502")>
         <Fact()>
         Public Sub UnaryMinusInCondition()
             CompileAndVerify(
@@ -12210,9 +12831,9 @@ End Class
 ]]>)
         End Sub
 
-        <WorkItem(745103, "DevDiv")>
+        <WorkItem(745103, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/745103")>
         <Fact()>
-        Public Sub TestCompoundOnAfieldOfGeneric()
+        Public Sub TestCompoundOnAFieldOfGeneric()
             CompileAndVerify(
 <compilation>
     <file name="a.vb">
@@ -12248,11 +12869,11 @@ Class c0
         End Set
     End Property
 
-    Public Shared Function Foo(arg As c0) As Integer
+    Public Shared Function Goo(arg As c0) As Integer
         Return 1
     End Function
 
-    Public Function Foo() As Integer
+    Public Function Goo() As Integer
         Return 1
     End Function
 End Class
@@ -12265,8 +12886,8 @@ Class test(Of T As c0)
     End Sub
 
     Public Shared Sub Repro2(arg As T)
-        arg.x = c0.Foo(arg)
-        arg.x = arg.Foo()
+        arg.x = c0.Goo(arg)
+        arg.x = arg.Goo()
     End Sub
 End class
 
@@ -12319,13 +12940,13 @@ End class
   IL_0006:  ldarg.0
   IL_0007:  box        "T"
   IL_000c:  castclass  "c0"
-  IL_0011:  call       "Function c0.Foo(c0) As Integer"
+  IL_0011:  call       "Function c0.Goo(c0) As Integer"
   IL_0016:  stfld      "c0.x As Integer"
   IL_001b:  ldarg.0
   IL_001c:  box        "T"
   IL_0021:  ldarga.s   V_0
   IL_0023:  constrained. "T"
-  IL_0029:  callvirt   "Function c0.Foo() As Integer"
+  IL_0029:  callvirt   "Function c0.Goo() As Integer"
   IL_002e:  stfld      "c0.x As Integer"
   IL_0033:  ret
 }
@@ -12348,23 +12969,23 @@ Module Module1
     End Sub
 
     Sub Test1(Of T As cls1)(arg As T)
-        arg.Foo()
+        arg.Goo()
     End Sub
 
     Sub Test2(Of T As cls2)(arg As T)
-        arg.Foo()
+        arg.Goo()
     End Sub
 End Module
 
 Class cls0
-    Overridable Sub Foo()
+    Overridable Sub Goo()
 
     End Sub
 End Class
 
 Class cls1 : Inherits cls0
-    Public NotOverridable Overrides Sub Foo()
-        System.Console.Write("Foo")
+    Public NotOverridable Overrides Sub Goo()
+        System.Console.Write("Goo")
     End Sub
 End Class
 
@@ -12373,7 +12994,7 @@ End Class
 
 
     </file>
-</compilation>, expectedOutput:="FooFooFoo").
+</compilation>, expectedOutput:="GooGooGoo").
             VerifyIL("Module1.Test1(Of T)(T)",
             <![CDATA[
 {
@@ -12381,7 +13002,7 @@ End Class
   .maxstack  1
   IL_0000:  ldarga.s   V_0
   IL_0002:  constrained. "T"
-  IL_0008:  callvirt   "Sub cls1.Foo()"
+  IL_0008:  callvirt   "Sub cls1.Goo()"
   IL_000d:  ret
 }
 
@@ -12393,14 +13014,14 @@ End Class
   .maxstack  1
   IL_0000:  ldarga.s   V_0
   IL_0002:  constrained. "T"
-  IL_0008:  callvirt   "Sub cls1.Foo()"
+  IL_0008:  callvirt   "Sub cls1.Goo()"
   IL_000d:  ret
 }
 
 ]]>)
         End Sub
 
-        <WorkItem(770557, "DevDiv")>
+        <WorkItem(770557, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/770557")>
         <Fact()>
         Public Sub BoolConditionDebug001()
             CompileAndVerify(
@@ -12471,7 +13092,7 @@ End Module
 ]]>)
         End Sub
 
-        <WorkItem(770557, "DevDiv")>
+        <WorkItem(770557, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/770557")>
         <Fact()>
         Public Sub BoolConditionDebug002()
             Dim c = CompileAndVerify(
@@ -12514,56 +13135,61 @@ End Module
             c.VerifyIL("Module1.Main",
             <![CDATA[
 {
-  // Code size       96 (0x60)
+  // Code size      102 (0x66)
   .maxstack  2
   .locals init (BoolBreaker V_0, //x
-                Boolean V_1)
+                Boolean V_1,
+                Boolean V_2)
   IL_0000:  nop
   IL_0001:  ldloca.s   V_0
   IL_0003:  ldc.i4.2
   IL_0004:  stfld      "BoolBreaker.i As Integer"
   IL_0009:  ldloc.0
   IL_000a:  ldfld      "BoolBreaker.bool As Boolean"
-  IL_000f:  stloc.1
-  IL_0010:  ldloc.1
-  IL_0011:  brtrue.s   IL_0021
-  IL_0013:  ldstr      "i=2 -> x.bool <> True "
-  IL_0018:  call       "Sub System.Console.Write(String)"
-  IL_001d:  nop
-  IL_001e:  nop
-  IL_001f:  br.s       IL_002e
+  IL_000f:  ldc.i4.0
+  IL_0010:  ceq
+  IL_0012:  stloc.1
+  IL_0013:  ldloc.1
+  IL_0014:  brfalse.s  IL_0024
+  IL_0016:  ldstr      "i=2 -> x.bool <> True "
+  IL_001b:  call       "Sub System.Console.Write(String)"
+  IL_0020:  nop
   IL_0021:  nop
-  IL_0022:  ldstr      "i=2 -> x.bool = True "
-  IL_0027:  call       "Sub System.Console.Write(String)"
-  IL_002c:  nop
-  IL_002d:  nop
-  IL_002e:  ldloca.s   V_0
-  IL_0030:  ldc.i4     0x7fffffff
-  IL_0035:  stfld      "BoolBreaker.i As Integer"
-  IL_003a:  ldloc.0
-  IL_003b:  ldfld      "BoolBreaker.bool As Boolean"
-  IL_0040:  stloc.1
-  IL_0041:  ldloc.1
-  IL_0042:  brtrue.s   IL_0052
-  IL_0044:  ldstr      "i=2147483647 -> x.bool <> True "
-  IL_0049:  call       "Sub System.Console.Write(String)"
-  IL_004e:  nop
-  IL_004f:  nop
-  IL_0050:  br.s       IL_005f
-  IL_0052:  nop
-  IL_0053:  ldstr      "i=21474836472 -> x.bool = True "
-  IL_0058:  call       "Sub System.Console.Write(String)"
-  IL_005d:  nop
-  IL_005e:  nop
-  IL_005f:  ret
+  IL_0022:  br.s       IL_0031
+  IL_0024:  nop
+  IL_0025:  ldstr      "i=2 -> x.bool = True "
+  IL_002a:  call       "Sub System.Console.Write(String)"
+  IL_002f:  nop
+  IL_0030:  nop
+  IL_0031:  ldloca.s   V_0
+  IL_0033:  ldc.i4     0x7fffffff
+  IL_0038:  stfld      "BoolBreaker.i As Integer"
+  IL_003d:  ldloc.0
+  IL_003e:  ldfld      "BoolBreaker.bool As Boolean"
+  IL_0043:  ldc.i4.0
+  IL_0044:  ceq
+  IL_0046:  stloc.2
+  IL_0047:  ldloc.2
+  IL_0048:  brfalse.s  IL_0058
+  IL_004a:  ldstr      "i=2147483647 -> x.bool <> True "
+  IL_004f:  call       "Sub System.Console.Write(String)"
+  IL_0054:  nop
+  IL_0055:  nop
+  IL_0056:  br.s       IL_0065
+  IL_0058:  nop
+  IL_0059:  ldstr      "i=21474836472 -> x.bool = True "
+  IL_005e:  call       "Sub System.Console.Write(String)"
+  IL_0063:  nop
+  IL_0064:  nop
+  IL_0065:  ret
 }
 ]]>)
         End Sub
 
-        <WorkItem(797996, "DevDiv")>
+        <WorkItem(797996, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/797996")>
         <Fact()>
         Public Sub MissingMember_Microsoft_VisualBasic_CompilerServices_Operators__CompareStringStringStringBoolean()
-            Dim comp = CreateCompilationWithoutReferences(
+            Dim compilation = CreateEmptyCompilation(
 <compilation>
     <file name="a.vb"><![CDATA[
 Namespace System
@@ -12592,7 +13218,8 @@ Class C
 End Class
 ]]></file>
 </compilation>)
-            comp.AssertTheseDiagnostics(
+
+            AssertTheseEmitDiagnostics(compilation,
 <errors>
 BC35000: Requested operation is not available because the runtime library function 'Microsoft.VisualBasic.CompilerServices.Operators.CompareString' is not defined.
         Select Case s
@@ -12604,10 +13231,10 @@ BC35000: Requested operation is not available because the runtime library functi
         End Sub
 
         ' As above with Microsoft.VisualBasic.CompilerServices.EmbeddedOperators defined.
-        <WorkItem(797996, "DevDiv")>
+        <WorkItem(797996, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/797996")>
         <Fact()>
         Public Sub MissingMember_Microsoft_VisualBasic_CompilerServices_EmbeddedOperators__CompareStringStringStringBoolean()
-            Dim comp = CreateCompilationWithoutReferences(
+            Dim compilation = CreateEmptyCompilation(
 <compilation>
     <file name="a.vb"><![CDATA[
 Namespace System
@@ -12640,7 +13267,7 @@ Class C
 End Class
 ]]></file>
 </compilation>)
-            comp.AssertTheseDiagnostics(
+            AssertTheseEmitDiagnostics(compilation,
 <errors>
 BC35000: Requested operation is not available because the runtime library function 'Microsoft.VisualBasic.CompilerServices.EmbeddedOperators.CompareString' is not defined.
         Select Case s
@@ -12651,10 +13278,10 @@ BC35000: Requested operation is not available because the runtime library functi
 </errors>)
         End Sub
 
-        <WorkItem(797996, "DevDiv")>
+        <WorkItem(797996, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/797996")>
         <Fact()>
         Public Sub MissingMember_System_Type__GetTypeFromHandle()
-            Dim comp = CreateCompilationWithoutReferences(
+            Dim compilation = CreateEmptyCompilation(
 <compilation>
     <file name="a.vb"><![CDATA[
 Namespace System
@@ -12676,7 +13303,7 @@ Class C
 End Class
 ]]></file>
 </compilation>)
-            comp.AssertTheseDiagnostics(
+            AssertTheseEmitDiagnostics(compilation,
 <errors>
 BC35000: Requested operation is not available because the runtime library function 'System.Type.GetTypeFromHandle' is not defined.
     Shared F As Object = GetType(C)
@@ -12684,10 +13311,10 @@ BC35000: Requested operation is not available because the runtime library functi
 </errors>)
         End Sub
 
-        <WorkItem(797996, "DevDiv")>
+        <WorkItem(797996, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/797996")>
         <Fact()>
         Public Sub MissingMember_Microsoft_VisualBasic_CompilerServices_ProjectData__SetProjectError()
-            Dim comp = CreateCompilationWithoutReferences(
+            Dim compilation = CreateEmptyCompilation(
 <compilation>
     <file name="a.vb"><![CDATA[
 Imports System
@@ -12704,13 +13331,14 @@ End Namespace
 Class C
     Shared Sub M()
         Try
+            Dim o = Nothing
         Catch e As Exception
         End Try
     End Sub
 End Class
 ]]></file>
 </compilation>)
-            comp.AssertTheseDiagnostics(
+            AssertTheseEmitDiagnostics(compilation,
 <errors>
 BC35000: Requested operation is not available because the runtime library function 'Microsoft.VisualBasic.CompilerServices.ProjectData.ClearProjectError' is not defined.
         Catch e As Exception
@@ -12721,7 +13349,7 @@ BC35000: Requested operation is not available because the runtime library functi
 </errors>)
         End Sub
 
-        <WorkItem(765569, "DevDiv")>
+        <WorkItem(765569, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/765569")>
         <Fact()>
         Public Sub ConstMatchesType()
             CompileAndVerify(
@@ -12755,10 +13383,10 @@ End CLass
 ]]>)
         End Sub
 
-        <WorkItem(824308, "DevDiv")>
+        <WorkItem(824308, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/824308")>
         <Fact()>
         Public Sub ConstCircular001()
-            Dim comp = CreateCompilationWithMscorlibAndVBRuntime(
+            Dim comp = CreateCompilationWithMscorlib40AndVBRuntime(
 <compilation>
     <file name="a.vb"><![CDATA[
 Imports System
@@ -12786,10 +13414,10 @@ BC30500: Constant 'blah' cannot depend on its own value.
 
         End Sub
 
-        <WorkItem(824308, "DevDiv")>
+        <WorkItem(824308, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/824308")>
         <Fact()>
         Public Sub ConstCircular002()
-            Dim comp = CreateCompilationWithMscorlibAndVBRuntime(
+            Dim comp = CreateCompilationWithMscorlib40AndVBRuntime(
 <compilation>
     <file name="a.vb"><![CDATA[
 Imports System
@@ -12820,10 +13448,10 @@ BC42104: Variable 'blah' is used before it has been assigned a value. A null ref
 
         End Sub
 
-        <WorkItem(824308, "DevDiv")>
+        <WorkItem(824308, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/824308")>
         <Fact()>
         Public Sub ConstCircular003()
-            Dim comp = CreateCompilationWithMscorlibAndVBRuntime(
+            Dim comp = CreateCompilationWithMscorlib40AndVBRuntime(
 <compilation>
     <file name="a.vb"><![CDATA[
 Imports System
@@ -12861,5 +13489,1331 @@ BC42104: Variable 'blah1' is used before it has been assigned a value. A null re
 </errors>)
 
         End Sub
+
+        <Fact>
+        <WorkItem(4196, "https://github.com/dotnet/roslyn/issues/4196")>
+        Public Sub BadDefaultParameterValue()
+            Dim source =
+<compilation>
+    <file name="a.vb">
+Imports BadDefaultParameterValue
+Module C
+    Sub Main
+        Util.M("test")
+    End Sub
+End Module
+    </file>
+</compilation>
+
+            Dim testReference = AssemblyMetadata.CreateFromImage(ProprietaryTestResources.Repros.BadDefaultParameterValue).GetReference()
+            Dim compilation = CompileAndVerify(source, references:=New MetadataReference() {testReference})
+            compilation.VerifyIL("C.Main",
+            <![CDATA[
+{
+  // Code size       12 (0xc)
+  .maxstack  2
+  IL_0000:  ldstr      "test"
+  IL_0005:  ldnull
+  IL_0006:  call       "Sub BadDefaultParameterValue.Util.M(String, String)"
+  IL_000b:  ret
+}]]>)
+        End Sub
+
+        <ConditionalFact(GetType(NoIOperationValidation))>
+        <WorkItem(5395, "https://github.com/dotnet/roslyn/issues/5395")>
+        Public Sub EmitSequenceOfBinaryExpressions_01()
+            Dim source =
+$"
+Class Test
+    Shared Sub Main()
+        Dim f = new Long(4096-1) {{}}
+        for i As Integer = 0 To 4095
+            f(i) = 4096 - i
+        Next
+
+        System.Console.WriteLine(If(Calculate1(f) = Calculate2(f), ""True"", ""False""))
+    End Sub
+
+    Shared Function Calculate1(f As Long()) As Long
+        Return {BuildSequenceOfBinaryExpressions_01()}
+    End Function
+
+    Shared Function Calculate2(f As Long()) As Long
+        Dim result as Long = 0
+        Dim i as Integer
+        For i = 0 To f.Length - 1
+            result+=(i + 1)*f(i)
+        Next
+
+        return result + (i + 1)
+    End Function
+End Class
+"
+            Dim compilation = CreateCompilationWithMscorlib40({source}, options:=TestOptions.ReleaseExe)
+
+            CompileAndVerify(compilation, expectedOutput:="True")
+        End Sub
+
+        Private Shared Function BuildSequenceOfBinaryExpressions_01(Optional count As Integer = 4096) As String
+            Dim builder = New System.Text.StringBuilder()
+            Dim i As Integer
+
+            For i = 0 To count - 1
+                builder.Append(i + 1)
+                builder.Append(" * ")
+                builder.Append("f(")
+                builder.Append(i)
+                builder.Append(") + ")
+            Next
+
+            builder.Append(i + 1)
+
+            Return builder.ToString()
+        End Function
+
+        <ConditionalFact(GetType(NoIOperationValidation))>
+        <WorkItem(5395, "https://github.com/dotnet/roslyn/issues/5395")>
+        Public Sub EmitSequenceOfBinaryExpressions_02()
+            Dim source =
+$"
+Class Test
+    Shared Sub Main()
+        Dim f = new Long(4096-1) {{}}
+        for i As Integer = 0 To 4095
+            f(i) = 4096 - i
+        Next
+
+        System.Console.WriteLine(Calculate(f))
+    End Sub
+
+    Shared Function Calculate(f As Long()) As Double
+        Return {BuildSequenceOfBinaryExpressions_01()}
+    End Function
+End Class
+"
+            Dim compilation = CreateCompilationWithMscorlib40({source}, options:=TestOptions.ReleaseExe.WithOverflowChecks(True))
+
+            CompileAndVerify(compilation, expectedOutput:="11461640193")
+        End Sub
+
+        <ConditionalFact(GetType(NoIOperationValidation))>
+        <WorkItem(6077, "https://github.com/dotnet/roslyn/issues/6077")>
+        <WorkItem(5395, "https://github.com/dotnet/roslyn/issues/5395")>
+        Public Sub EmitSequenceOfBinaryExpressions_03()
+
+            Dim diagnostics = ImmutableArray(Of Diagnostic).Empty
+
+            Const start = 8192
+            Const [step] = 4096
+            Const limit = start * 4
+
+            For count As Integer = start To limit Step [step]
+                Dim source =
+$"
+Class Test
+    Shared Sub Main()
+    End Sub
+
+    Shared Function Calculate(a As Boolean(), f As Boolean()) As Boolean
+        Return {BuildSequenceOfBinaryExpressions_03(count)}
+    End Function
+End Class
+"
+                Dim compilation = CreateCompilationWithMscorlib40({source}, options:=TestOptions.ReleaseExe.WithOverflowChecks(True))
+                diagnostics = compilation.GetEmitDiagnostics()
+
+                If Not diagnostics.IsEmpty Then
+                    Exit For
+                End If
+            Next
+
+            diagnostics.Verify(
+    Diagnostic(ERRID.ERR_TooLongOrComplexExpression, "a").WithLocation(7, 16)
+                )
+        End Sub
+
+        Private Shared Function BuildSequenceOfBinaryExpressions_03(Optional count As Integer = 8192) As String
+            Dim builder = New System.Text.StringBuilder()
+            Dim i As Integer
+
+            For i = 0 To count - 1
+                builder.Append("a(")
+                builder.Append(i)
+                builder.Append(")")
+                builder.Append(" AndAlso ")
+                builder.Append("f(")
+                builder.Append(i)
+                builder.Append(") OrElse ")
+            Next
+
+            builder.Append("a(")
+            builder.Append(i)
+            builder.Append(")")
+
+            Return builder.ToString()
+        End Function
+
+        <ConditionalFact(GetType(NoIOperationValidation))>
+        <WorkItem(5395, "https://github.com/dotnet/roslyn/issues/5395")>
+        Public Sub EmitSequenceOfBinaryExpressions_04()
+            Dim size = 8192
+            Dim source =
+$"
+Class Test
+    Shared Sub Main()
+        Dim f = new Single?({size}-1) {{}}
+        for i As Integer = 0 To ({size} - 1)
+            f(i) = 4096 - i
+        Next
+
+        System.Console.WriteLine(Calculate(f))
+    End Sub
+
+    Shared Function Calculate(f As Single?()) As Double?
+        Return {BuildSequenceOfBinaryExpressions_01(size)}
+    End Function
+End Class
+"
+            Dim compilation = CreateCompilationWithMscorlib40({source}, options:=TestOptions.ReleaseExe)
+
+            compilation.VerifyEmitDiagnostics(
+    Diagnostic(ERRID.ERR_TooLongOrComplexExpression, "1").WithLocation(13, 16)
+                )
+        End Sub
+
+        <ConditionalFact(GetType(NoIOperationValidation))>
+        <WorkItem(5395, "https://github.com/dotnet/roslyn/issues/5395")>
+        Public Sub EmitSequenceOfBinaryExpressions_05()
+            Dim count As Integer = 50
+            Dim source =
+$"
+Class Test
+    Shared Sub Main()
+        Test1()
+        Test2()
+    End Sub
+
+    Shared Sub Test1()
+        Dim f = new Double({count}-1) {{}}
+        for i As Integer = 0 To {count}-1
+            f(i) = 4096 - i
+        Next
+
+        System.Console.WriteLine(Calculate(f))
+    End Sub
+
+    Shared Function Calculate(f As Double()) As Double
+        Return {BuildSequenceOfBinaryExpressions_01(count)}
+    End Function
+
+    Shared Sub Test2()
+        Dim f = new Double?({count}-1) {{}}
+        for i As Integer = 0 To {count}-1
+            f(i) = 4096 - i
+        Next
+
+        System.Console.WriteLine(Calculate(f))
+    End Sub
+
+    Shared Function Calculate(f As Double?()) As Double?
+        Return {BuildSequenceOfBinaryExpressions_01(count)}
+    End Function
+
+End Class
+"
+            Dim compilation = CreateCompilationWithMscorlib40({source}, options:=TestOptions.ReleaseExe)
+
+            CompileAndVerify(compilation, expectedOutput:="5180801
+5180801")
+        End Sub
+
+        <ConditionalFact(GetType(NoIOperationValidation), GetType(WindowsOnly))>
+        <WorkItem(5395, "https://github.com/dotnet/roslyn/issues/5395")>
+        Public Sub EmitSequenceOfBinaryExpressions_06()
+            Dim source =
+$"
+Class Test
+    Shared Sub Main()
+    End Sub
+
+    Shared Function Calculate(a As S1(), f As S1()) As Boolean
+        Return {BuildSequenceOfBinaryExpressions_03()}
+    End Function
+End Class
+
+Structure S1
+    Public Shared Operator And(x As S1, y As S1) As S1
+        Return New S1()
+    End Operator
+
+    Public Shared Operator Or(x As S1, y As S1) As S1
+        Return New S1()
+    End Operator
+
+    Public Shared Operator IsTrue(x As S1) As Boolean
+        Return True
+    End Operator
+
+    Public Shared Operator IsFalse(x As S1) As Boolean
+        Return True
+    End Operator
+
+    Public Shared Widening Operator CType(x As S1) As Boolean
+        Return True
+    End Operator
+End Structure
+"
+            Dim compilation = CreateCompilationWithMscorlib40({source}, options:=TestOptions.ReleaseExe.WithOverflowChecks(True))
+
+            compilation.VerifyEmitDiagnostics(
+    Diagnostic(ERRID.ERR_TooLongOrComplexExpression, "a").WithLocation(7, 16),
+    Diagnostic(ERRID.ERR_TooLongOrComplexExpression, "a").WithLocation(7, 16),
+    Diagnostic(ERRID.ERR_TooLongOrComplexExpression, "a").WithLocation(7, 16)
+                )
+        End Sub
+
+
+        <Fact()>
+        Public Sub InplaceCtorUsesLocal()
+            Dim c = CompileAndVerify(
+<compilation>
+    <file name="a.vb">
+
+        <![CDATA[
+
+Module Module1
+    Private arr As S1() = New S1(1) {}
+
+    Structure S1
+        Public a, b As Integer
+
+        Public Sub New(a As Integer, b As Integer)
+            Me.a = a
+            Me.b = b
+        End Sub
+
+        Public Sub New(a As Integer)
+            Me.a = a
+        End Sub
+
+    End Structure
+
+    Sub Main()
+        Dim arg = System.Math.Max(1, 2)
+        Dim val = New S1(arg, arg)
+        arr(0) = val
+        System.Console.WriteLine(arr(0).a)
+    End Sub
+End Module
+
+]]>
+    </file>
+</compilation>, options:=TestOptions.ReleaseExe,
+                expectedOutput:="2")
+
+            c.VerifyIL("Module1.Main",
+            <![CDATA[
+{
+  // Code size       51 (0x33)
+  .maxstack  3
+  .locals init (Integer V_0, //arg
+                Module1.S1 V_1) //val
+  IL_0000:  ldc.i4.1
+  IL_0001:  ldc.i4.2
+  IL_0002:  call       "Function System.Math.Max(Integer, Integer) As Integer"
+  IL_0007:  stloc.0
+  IL_0008:  ldloca.s   V_1
+  IL_000a:  ldloc.0
+  IL_000b:  ldloc.0
+  IL_000c:  call       "Sub Module1.S1..ctor(Integer, Integer)"
+  IL_0011:  ldsfld     "Module1.arr As Module1.S1()"
+  IL_0016:  ldc.i4.0
+  IL_0017:  ldloc.1
+  IL_0018:  stelem     "Module1.S1"
+  IL_001d:  ldsfld     "Module1.arr As Module1.S1()"
+  IL_0022:  ldc.i4.0
+  IL_0023:  ldelema    "Module1.S1"
+  IL_0028:  ldfld      "Module1.S1.a As Integer"
+  IL_002d:  call       "Sub System.Console.WriteLine(Integer)"
+  IL_0032:  ret
+}
+]]>)
+        End Sub
+
+        <Fact()>
+        <WorkItem(33564, "https://github.com/dotnet/roslyn/issues/33564")>
+        <WorkItem(7148, "https://github.com/dotnet/roslyn/issues/7148")>
+        Public Sub Issue7148_1()
+            Dim c = CompileAndVerify(
+<compilation>
+    <file name="a.vb">
+Public Class TestClass
+    Private _rotation As Decimal
+    Private Sub CalculateDimensions()
+        _rotation *= 180 / System.Math.PI 'This line causes '"vbc.exe" exited with code -2146232797'
+    End Sub
+
+    Shared Sub Main()
+        Dim x as New TestClass()
+        x._rotation = 1
+        x.CalculateDimensions()
+        System.Console.WriteLine(x._rotation)
+    End Sub    
+End Class
+    </file>
+</compilation>, options:=TestOptions.ReleaseExe,
+                expectedOutput:="57.2957795130823")
+
+            c.VerifyIL("TestClass.CalculateDimensions",
+            <![CDATA[
+{
+  // Code size       40 (0x28)
+  .maxstack  3
+  .locals init (Decimal& V_0)
+  IL_0000:  ldarg.0
+  IL_0001:  ldflda     "TestClass._rotation As Decimal"
+  IL_0006:  dup
+  IL_0007:  stloc.0
+  IL_0008:  ldloc.0
+  IL_0009:  ldobj      "Decimal"
+  IL_000e:  call       "Function System.Convert.ToDouble(Decimal) As Double"
+  IL_0013:  ldc.r8     57.2957795130823
+  IL_001c:  mul
+  IL_001d:  newobj     "Sub Decimal..ctor(Double)"
+  IL_0022:  stobj      "Decimal"
+  IL_0027:  ret
+}
+]]>)
+        End Sub
+
+        <Fact()>
+        <WorkItem(33564, "https://github.com/dotnet/roslyn/issues/33564")>
+        <WorkItem(7148, "https://github.com/dotnet/roslyn/issues/7148")>
+        Public Sub Issue7148_2()
+            Dim c = CompileAndVerify(
+<compilation>
+    <file name="a.vb">
+Public Class TestClass
+    Private Shared Sub CalculateDimensions(_rotation As Decimal())
+        _rotation(GetIndex()) *= 180 / System.Math.PI 'This line causes '"vbc.exe" exited with code -2146232797'
+    End Sub
+
+    Private Shared Function GetIndex() As Integer
+        Return 0
+    End Function 
+
+    Shared Sub Main()
+        Dim _rotation(0) as Decimal
+        _rotation(0) = 1
+        CalculateDimensions(_rotation)
+        System.Console.WriteLine(_rotation(0))
+    End Sub    
+End Class
+    </file>
+</compilation>, options:=TestOptions.ReleaseExe,
+                expectedOutput:="57.2957795130823")
+
+            c.VerifyIL("TestClass.CalculateDimensions",
+            <![CDATA[
+{
+  // Code size       45 (0x2d)
+  .maxstack  3
+  .locals init (Decimal& V_0)
+  IL_0000:  ldarg.0
+  IL_0001:  call       "Function TestClass.GetIndex() As Integer"
+  IL_0006:  ldelema    "Decimal"
+  IL_000b:  dup
+  IL_000c:  stloc.0
+  IL_000d:  ldloc.0
+  IL_000e:  ldobj      "Decimal"
+  IL_0013:  call       "Function System.Convert.ToDouble(Decimal) As Double"
+  IL_0018:  ldc.r8     57.2957795130823
+  IL_0021:  mul
+  IL_0022:  newobj     "Sub Decimal..ctor(Double)"
+  IL_0027:  stobj      "Decimal"
+  IL_002c:  ret
+}
+]]>)
+        End Sub
+
+
+        <Fact, WorkItem(9703, "https://github.com/dotnet/roslyn/issues/9703")>
+        Public Sub IgnoredConversion()
+            CompileAndVerify(
+                <compilation>
+                    <file name="ignoreNullableValue.vb">
+Module MainModule
+    Public Class Form1
+        Public Class BadCompiler
+            Public Property Value As Date?
+        End Class
+
+        Private TestObj As BadCompiler = New BadCompiler()
+
+        Public Sub IPE()
+            Dim o as Object
+            o = TestObj.Value
+        End Sub
+    End Class
+
+    Public Sub Main()
+        Dim f = new Form1
+        f.IPE()
+    End Sub
+End Module
+                    </file>
+                </compilation>).
+                            VerifyIL("MainModule.Form1.IPE",
+            <![CDATA[
+{
+// Code size       13 (0xd)
+.maxstack  1
+IL_0000:  ldarg.0
+IL_0001:  ldfld      "MainModule.Form1.TestObj As MainModule.Form1.BadCompiler"
+IL_0006:  callvirt   "Function MainModule.Form1.BadCompiler.get_Value() As Date?"
+IL_000b:  pop
+IL_000c:  ret
+}
+]]>)
+        End Sub
+
+        <Fact, WorkItem(15672, "https://github.com/dotnet/roslyn/pull/15672")>
+        Public Sub ConditionalAccessOffOfUnconstrainedDefault1()
+            Dim c = CompileAndVerify(
+                <compilation>
+                    <file name="ignoreNullableValue.vb">
+Module Module1
+    Public Sub Main()
+        Test(42)
+        Test("")
+    End Sub
+
+    Public Sub Test(of T)(arg as T)
+        System.Console.WriteLine(DirectCast(Nothing, T)?.ToString())
+    End Sub
+End Module
+                    </file>
+                </compilation>, options:=TestOptions.ReleaseExe,
+                expectedOutput:="0")
+
+            c.VerifyIL("Module1.Test",
+            <![CDATA[
+{
+  // Code size       48 (0x30)
+  .maxstack  1
+  .locals init (T V_0)
+  IL_0000:  ldloca.s   V_0
+  IL_0002:  initobj    "T"
+  IL_0008:  ldloc.0
+  IL_0009:  box        "T"
+  IL_000e:  brtrue.s   IL_0013
+  IL_0010:  ldnull
+  IL_0011:  br.s       IL_002a
+  IL_0013:  ldloca.s   V_0
+  IL_0015:  initobj    "T"
+  IL_001b:  ldloc.0
+  IL_001c:  stloc.0
+  IL_001d:  ldloca.s   V_0
+  IL_001f:  constrained. "T"
+  IL_0025:  callvirt   "Function Object.ToString() As String"
+  IL_002a:  call       "Sub System.Console.WriteLine(String)"
+  IL_002f:  ret
+}
+]]>)
+        End Sub
+
+        <Fact, WorkItem(22533, "https://github.com/dotnet/roslyn/issues/22533")>
+        Public Sub TestExplicitDoubleConversionEmitted()
+            CompileAndVerify(
+<compilation>
+    <file name="a.vb">
+Imports System
+
+Module Program
+    Function M() As Boolean
+        Dim dValue As Double = 600.1
+        Dim mbytDeciWgt As Byte = 1
+
+        Return CDbl(dValue) > CDbl(dValue + CDbl(10 ^ -mbytDeciWgt))
+    End Function
+End Module
+    </file>
+</compilation>).
+            VerifyIL("Program.M",
+            <![CDATA[
+{
+  // Code size       39 (0x27)
+  .maxstack  4
+  .locals init (Double V_0, //dValue
+                Byte V_1) //mbytDeciWgt
+  IL_0000:  ldc.r8     600.1
+  IL_0009:  stloc.0
+  IL_000a:  ldc.i4.1
+  IL_000b:  stloc.1
+  IL_000c:  ldloc.0
+  IL_000d:  conv.r8
+  IL_000e:  ldloc.0
+  IL_000f:  ldc.r8     10
+  IL_0018:  ldloc.1
+  IL_0019:  neg
+  IL_001a:  conv.ovf.i2
+  IL_001b:  conv.r8
+  IL_001c:  call       "Function System.Math.Pow(Double, Double) As Double"
+  IL_0021:  conv.r8
+  IL_0022:  add
+  IL_0023:  conv.r8
+  IL_0024:  cgt
+  IL_0026:  ret
+}
+]]>)
+
+        End Sub
+
+        <Fact, WorkItem(22533, "https://github.com/dotnet/roslyn/issues/22533")>
+        Public Sub TestImplicitDoubleConversionEmitted()
+            CompileAndVerify(
+<compilation>
+    <file name="a.vb">
+Imports System
+
+Module Program
+    Function M() As Boolean
+        Dim dValue As Double = 600.1
+        Dim mbytDeciWgt As Byte = 1
+
+        Return dValue > dValue + (10 ^ -mbytDeciWgt)
+    End Function
+End Module
+    </file>
+</compilation>).
+            VerifyIL("Program.M",
+            <![CDATA[
+{
+  // Code size       34 (0x22)
+  .maxstack  4
+  .locals init (Byte V_0) //mbytDeciWgt
+  IL_0000:  ldc.r8     600.1
+  IL_0009:  ldc.i4.1
+  IL_000a:  stloc.0
+  IL_000b:  dup
+  IL_000c:  ldc.r8     10
+  IL_0015:  ldloc.0
+  IL_0016:  neg
+  IL_0017:  conv.ovf.i2
+  IL_0018:  conv.r8
+  IL_0019:  call       "Function System.Math.Pow(Double, Double) As Double"
+  IL_001e:  add
+  IL_001f:  cgt
+  IL_0021:  ret
+}
+]]>)
+
+        End Sub
+
+        <Fact, WorkItem(22533, "https://github.com/dotnet/roslyn/issues/22533")>
+        Public Sub TestExplicitSingleConversionEmitted()
+            CompileAndVerify(
+<compilation>
+    <file name="a.vb">
+Imports System
+
+Module Program
+    Function M() As Boolean
+        Dim dValue As Single = 600.1
+        Dim mbytDeciWgt As Byte = 1
+
+        Return CSng(dValue) > CSng(dValue + CSng(10 ^ -mbytDeciWgt))
+    End Function
+End Module
+    </file>
+</compilation>).
+            VerifyIL("Program.M",
+            <![CDATA[
+{
+  // Code size       35 (0x23)
+  .maxstack  4
+  .locals init (Single V_0, //dValue
+                Byte V_1) //mbytDeciWgt
+  IL_0000:  ldc.r4     600.1
+  IL_0005:  stloc.0
+  IL_0006:  ldc.i4.1
+  IL_0007:  stloc.1
+  IL_0008:  ldloc.0
+  IL_0009:  conv.r4
+  IL_000a:  ldloc.0
+  IL_000b:  ldc.r8     10
+  IL_0014:  ldloc.1
+  IL_0015:  neg
+  IL_0016:  conv.ovf.i2
+  IL_0017:  conv.r8
+  IL_0018:  call       "Function System.Math.Pow(Double, Double) As Double"
+  IL_001d:  conv.r4
+  IL_001e:  add
+  IL_001f:  conv.r4
+  IL_0020:  cgt
+  IL_0022:  ret
+}
+]]>)
+
+        End Sub
+
+        <Fact, WorkItem(22533, "https://github.com/dotnet/roslyn/issues/22533")>
+        Public Sub TestExplicitSingleConversionNotEmittedOnConstantValue()
+            CompileAndVerify(
+<compilation>
+    <file name="a.vb">
+Imports System
+
+Module Program
+    Function M() As Boolean
+        Dim dValue As Single = 600.1
+        Dim mbytDeciWgt As Byte = 1
+
+        Return CSng(dValue) > CSng(CSng(600) + CSng(0.1))
+    End Function
+End Module
+    </file>
+</compilation>).
+            VerifyIL("Program.M",
+            <![CDATA[
+{
+  // Code size       14 (0xe)
+  .maxstack  2
+  IL_0000:  ldc.r4     600.1
+  IL_0005:  conv.r4
+  IL_0006:  ldc.r4     600.1
+  IL_000b:  cgt
+  IL_000d:  ret
+}
+]]>)
+
+        End Sub
+
+        <Fact>
+        Public Sub ArrayElementByReference_Invariant()
+            Dim comp =
+<compilation>
+    <file>
+Option Strict Off
+Module M
+    Sub Main()
+        F(New String() {"b"})
+    End Sub
+    Sub F(a() As String)
+        G(a)
+        System.Console.Write(a(0))
+    End Sub
+    Sub G(a() As String)
+        H(a(0))
+    End Sub
+    Sub H(ByRef s As String)
+        s = s.ToUpper()
+    End Sub
+End Module
+    </file>
+</compilation>
+            CompileAndVerify(comp, expectedOutput:="B").
+            VerifyIL("M.G",
+            <![CDATA[
+{
+  // Code size       13 (0xd)
+  .maxstack  2
+  IL_0000:  ldarg.0
+  IL_0001:  ldc.i4.0
+  IL_0002:  ldelema    "String"
+  IL_0007:  call       "Sub M.H(ByRef String)"
+  IL_000c:  ret
+}
+]]>)
+        End Sub
+
+        <Fact, WorkItem(547533, "https://devdiv.visualstudio.com/DevDiv/_workitems?id=547533")>
+        Public Sub ArrayElementByReference_Covariant()
+            Dim comp =
+<compilation>
+    <file>
+Option Strict Off
+Module M
+    Sub Main()
+        F(New Object() {"a"})
+        F(New String() {"b"})
+    End Sub
+    Sub F(a() As Object)
+        G(a)
+        System.Console.Write(a(0))
+    End Sub
+    Sub G(a() As Object)
+        H(a(0))
+    End Sub
+    Sub H(ByRef s As String)
+        s = s.ToUpper()
+    End Sub
+End Module
+    </file>
+</compilation>
+            CompileAndVerify(comp, expectedOutput:="AB").
+            VerifyIL("M.G",
+            <![CDATA[
+{
+  // Code size       21 (0x15)
+  .maxstack  3
+  .locals init (String V_0)
+  IL_0000:  ldarg.0
+  IL_0001:  dup
+  IL_0002:  ldc.i4.0
+  IL_0003:  ldelem.ref
+  IL_0004:  call       "Function Microsoft.VisualBasic.CompilerServices.Conversions.ToString(Object) As String"
+  IL_0009:  stloc.0
+  IL_000a:  ldloca.s   V_0
+  IL_000c:  call       "Sub M.H(ByRef String)"
+  IL_0011:  ldc.i4.0
+  IL_0012:  ldloc.0
+  IL_0013:  stelem.ref
+  IL_0014:  ret
+}
+]]>)
+        End Sub
+
+        ' Generated code results in ArrayTypeMismatchException,
+        ' matching native compiler.
+        <Fact, WorkItem(547533, "https://devdiv.visualstudio.com/DevDiv/_workitems?id=547533")>
+        Public Sub ArrayElementByReferenceBase_Covariant()
+            Dim comp =
+<compilation>
+    <file>
+Option Strict Off
+Module M
+    Sub Main()
+        F(New Object() {"a"})
+        F(New String() {"b"})
+    End Sub
+    Sub F(a() As Object)
+        Try
+            G(a)
+            System.Console.Write(a(0))
+        Catch e As System.Exception
+            System.Console.Write(e.GetType().Name)
+        End Try
+    End Sub
+    Sub G(a() As Object)
+        H(a(0))
+    End Sub
+    Sub H(ByRef s As Object)
+        s = s.ToString().ToUpper()
+    End Sub
+End Module
+    </file>
+</compilation>
+            CompileAndVerify(comp, expectedOutput:="AArrayTypeMismatchException").
+            VerifyIL("M.G",
+            <![CDATA[
+{
+  // Code size       13 (0xd)
+  .maxstack  2
+  IL_0000:  ldarg.0
+  IL_0001:  ldc.i4.0
+  IL_0002:  ldelema    "Object"
+  IL_0007:  call       "Sub M.H(ByRef Object)"
+  IL_000c:  ret
+}
+]]>)
+        End Sub
+
+        <Fact, WorkItem(547533, "https://devdiv.visualstudio.com/DevDiv/_workitems?id=547533")>
+        Public Sub ArrayElementByReference_TypeParameter()
+            Dim comp =
+<compilation>
+    <file>
+Option Strict Off
+Module M
+    Sub Main()
+        Dim a = New String() { "b" }
+        Dim b = New B()
+        b.F(a)
+        System.Console.Write(a(0))
+    End Sub
+End Module
+MustInherit Class A(Of T)
+    Friend MustOverride Sub F(Of U As T)(a() As U)
+End Class
+Class B
+    Inherits A(Of String)
+    Friend Overrides Sub F(Of U As String)(a() As U)
+        G(a(0))
+    End Sub
+    Sub G(ByRef s As String)
+        s = s.ToUpper()
+    End Sub
+End Class
+    </file>
+</compilation>
+            CompileAndVerify(comp, expectedOutput:="B").
+            VerifyIL("B.F",
+            <![CDATA[
+{
+  // Code size       42 (0x2a)
+  .maxstack  3
+  .locals init (U() V_0,
+                String V_1)
+  IL_0000:  ldarg.0
+  IL_0001:  ldarg.1
+  IL_0002:  dup
+  IL_0003:  stloc.0
+  IL_0004:  ldc.i4.0
+  IL_0005:  ldelem     "U"
+  IL_000a:  box        "U"
+  IL_000f:  castclass  "String"
+  IL_0014:  stloc.1
+  IL_0015:  ldloca.s   V_1
+  IL_0017:  call       "Sub B.G(ByRef String)"
+  IL_001c:  ldloc.0
+  IL_001d:  ldc.i4.0
+  IL_001e:  ldloc.1
+  IL_001f:  unbox.any  "U"
+  IL_0024:  stelem     "U"
+  IL_0029:  ret
+}
+]]>)
+        End Sub
+
+        <Fact, WorkItem(547533, "https://devdiv.visualstudio.com/DevDiv/_workitems?id=547533")>
+        Public Sub ArrayElementByReference_StructConstraint()
+            Dim comp =
+<compilation>
+    <file>
+Option Strict Off
+Module M
+    Sub Main()
+        Dim a = New Integer() { 1 }
+        Dim b = New B()
+        b.F(a)
+        System.Console.Write(a(0))
+    End Sub
+End Module
+MustInherit Class A(Of T)
+    Friend MustOverride Sub F(Of U As {T, Structure})(a() As U)
+End Class
+Class B
+    Inherits A(Of Integer)
+    Friend Overrides Sub F(Of U As {Integer, Structure})(a() As U)
+        G(a(0))
+    End Sub
+    Sub G(ByRef i As Integer)
+        i += 1
+    End Sub
+End Class
+    </file>
+</compilation>
+            CompileAndVerify(comp, expectedOutput:="2").
+            VerifyIL("B.F",
+            <![CDATA[
+{
+  // Code size       47 (0x2f)
+  .maxstack  3
+  .locals init (U() V_0,
+                Integer V_1)
+  IL_0000:  ldarg.0
+  IL_0001:  ldarg.1
+  IL_0002:  dup
+  IL_0003:  stloc.0
+  IL_0004:  ldc.i4.0
+  IL_0005:  ldelem     "U"
+  IL_000a:  box        "U"
+  IL_000f:  unbox.any  "Integer"
+  IL_0014:  stloc.1
+  IL_0015:  ldloca.s   V_1
+  IL_0017:  call       "Sub B.G(ByRef Integer)"
+  IL_001c:  ldloc.0
+  IL_001d:  ldc.i4.0
+  IL_001e:  ldloc.1
+  IL_001f:  box        "Integer"
+  IL_0024:  unbox.any  "U"
+  IL_0029:  stelem     "U"
+  IL_002e:  ret
+}
+]]>)
+        End Sub
+
+        <Fact>
+        Public Sub ArrayElementByReference_ValueType()
+            Dim comp =
+<compilation>
+    <file>
+Option Strict Off
+Module M
+    Sub Main()
+        F(New Integer() {1})
+    End Sub
+    Sub F(a() As Integer)
+        G(a)
+        System.Console.Write(a(0))
+    End Sub
+    Sub G(a() As Integer)
+        H(a(0))
+    End Sub
+    Sub H(ByRef i As Integer)
+        i = 2
+    End Sub
+End Module
+    </file>
+</compilation>
+            CompileAndVerify(comp, expectedOutput:="2").
+            VerifyIL("M.G",
+            <![CDATA[
+{
+  // Code size       13 (0xd)
+  .maxstack  2
+  IL_0000:  ldarg.0
+  IL_0001:  ldc.i4.0
+  IL_0002:  ldelema    "Integer"
+  IL_0007:  call       "Sub M.H(ByRef Integer)"
+  IL_000c:  ret
+}
+]]>)
+        End Sub
+
+        <Fact>
+        Public Sub ArrayElementCompoundAssignment_Invariant()
+            Dim comp =
+<compilation>
+    <file>
+Option Strict Off
+Module M
+    Sub Main()
+        F(New String() {""}, "B")
+    End Sub
+    Sub F(a() As String, s As String)
+        G(a, s)
+        System.Console.Write(a(0))
+    End Sub
+    Sub G(a() As String, s As String)
+        a(0) += s
+    End Sub
+End Module
+    </file>
+</compilation>
+            CompileAndVerify(comp, expectedOutput:="B").
+            VerifyIL("M.G",
+            <![CDATA[
+{
+  // Code size       19 (0x13)
+  .maxstack  3
+  .locals init (String& V_0)
+  IL_0000:  ldarg.0
+  IL_0001:  ldc.i4.0
+  IL_0002:  ldelema    "String"
+  IL_0007:  dup
+  IL_0008:  stloc.0
+  IL_0009:  ldloc.0
+  IL_000a:  ldind.ref
+  IL_000b:  ldarg.1
+  IL_000c:  call       "Function String.Concat(String, String) As String"
+  IL_0011:  stind.ref
+  IL_0012:  ret
+}
+]]>)
+        End Sub
+
+        <Fact, WorkItem(547533, "https://devdiv.visualstudio.com/DevDiv/_workitems?id=547533")>
+        Public Sub ArrayElementCompoundAssignment_Covariant()
+            Dim comp =
+<compilation>
+    <file>
+Option Strict Off
+Module M
+    Sub Main()
+        F(New Object() {""}, "A")
+        F(New String() {""}, "B")
+    End Sub
+    Sub F(a() As Object, s As String)
+        G(a, s)
+        System.Console.Write(a(0))
+    End Sub
+    Sub G(a() As Object, s As String)
+        a(0) += s
+    End Sub
+End Module
+    </file>
+</compilation>
+            CompileAndVerify(comp, expectedOutput:="AB").
+            VerifyIL("M.G",
+            <![CDATA[
+{
+  // Code size       15 (0xf)
+  .maxstack  4
+  .locals init (Object() V_0)
+  IL_0000:  ldarg.0
+  IL_0001:  dup
+  IL_0002:  stloc.0
+  IL_0003:  ldc.i4.0
+  IL_0004:  ldloc.0
+  IL_0005:  ldc.i4.0
+  IL_0006:  ldelem.ref
+  IL_0007:  ldarg.1
+  IL_0008:  call       "Function Microsoft.VisualBasic.CompilerServices.Operators.AddObject(Object, Object) As Object"
+  IL_000d:  stelem.ref
+  IL_000e:  ret
+}
+]]>)
+        End Sub
+
+        <Fact>
+        Public Sub ArrayElementCompoundAssignment_ValueType()
+            Dim comp =
+<compilation>
+    <file>
+Option Strict Off
+Module M
+    Sub Main()
+        F(New Integer() {1}, 2)
+    End Sub
+    Sub F(a() As Integer, i As Integer)
+        G(a, i)
+        System.Console.Write(a(0))
+    End Sub
+    Sub G(a() As Integer, i As Integer)
+        a(0) += i
+    End Sub
+End Module
+    </file>
+</compilation>
+            CompileAndVerify(comp, expectedOutput:="3").
+            VerifyIL("M.G",
+            <![CDATA[
+{
+  // Code size       15 (0xf)
+  .maxstack  3
+  .locals init (Integer& V_0)
+  IL_0000:  ldarg.0
+  IL_0001:  ldc.i4.0
+  IL_0002:  ldelema    "Integer"
+  IL_0007:  dup
+  IL_0008:  stloc.0
+  IL_0009:  ldloc.0
+  IL_000a:  ldind.i4
+  IL_000b:  ldarg.1
+  IL_000c:  add.ovf
+  IL_000d:  stind.i4
+  IL_000e:  ret
+}
+]]>)
+        End Sub
+
+        <Fact, WorkItem(547533, "https://devdiv.visualstudio.com/DevDiv/_workitems?id=547533")>
+        Public Sub ArrayElementCompoundAssignment_Covariant_NonConstantIndex()
+            Dim comp =
+<compilation>
+    <file>
+Option Strict Off
+Module M
+    Sub Main()
+        F(New Object() {""}, "A")
+        F(New String() {""}, "B")
+    End Sub
+    Sub F(a() As Object, s As String)
+        G(a, s)
+        System.Console.Write(a(0))
+    End Sub
+    Sub G(a() As Object, s As String)
+        a(Index(a)) += s
+    End Sub
+    Function Index(arg As Object) As Integer
+        System.Console.Write(arg.GetType().Name)
+        Return 0
+    End Function
+End Module
+    </file>
+</compilation>
+            CompileAndVerify(comp, expectedOutput:="Object[]AString[]B").
+            VerifyIL("M.G",
+            <![CDATA[
+{
+  // Code size       22 (0x16)
+  .maxstack  4
+  .locals init (Object() V_0,
+                Integer V_1)
+  IL_0000:  ldarg.0
+  IL_0001:  dup
+  IL_0002:  stloc.0
+  IL_0003:  ldarg.0
+  IL_0004:  call       "Function M.Index(Object) As Integer"
+  IL_0009:  dup
+  IL_000a:  stloc.1
+  IL_000b:  ldloc.0
+  IL_000c:  ldloc.1
+  IL_000d:  ldelem.ref
+  IL_000e:  ldarg.1
+  IL_000f:  call       "Function Microsoft.VisualBasic.CompilerServices.Operators.AddObject(Object, Object) As Object"
+  IL_0014:  stelem.ref
+  IL_0015:  ret
+}
+]]>)
+        End Sub
+
+        <Fact>
+        Public Sub ArrayElementWithBlock_Invariant()
+            Dim comp =
+<compilation>
+    <file>
+Option Strict Off
+Module M
+    Sub Main()
+        F(New String() {"B"})
+    End Sub
+    Sub F(a() As String)
+        System.Console.Write(G(a))
+    End Sub
+    Function G(a() As String) As String
+        With a(0)
+            Return .ToString() + .ToLower()
+        End With
+    End Function
+End Module
+    </file>
+</compilation>
+            CompileAndVerify(comp, expectedOutput:="Bb").
+            VerifyIL("M.G",
+            <![CDATA[
+{
+  // Code size       22 (0x16)
+  .maxstack  2
+  .locals init (String V_0) //$W0
+  IL_0000:  ldarg.0
+  IL_0001:  ldc.i4.0
+  IL_0002:  ldelem.ref
+  IL_0003:  stloc.0
+  IL_0004:  ldloc.0
+  IL_0005:  callvirt   "Function String.ToString() As String"
+  IL_000a:  ldloc.0
+  IL_000b:  callvirt   "Function String.ToLower() As String"
+  IL_0010:  call       "Function String.Concat(String, String) As String"
+  IL_0015:  ret
+}
+]]>)
+        End Sub
+
+        <Fact>
+        Public Sub ArrayElementWithBlock_Covariant()
+            Dim comp =
+<compilation>
+    <file>
+Option Strict Off
+Module M
+    Sub Main()
+        F(New Object() {"A"})
+        F(New String() {"B"})
+    End Sub
+    Sub F(a() As Object)
+        System.Console.Write(G(a))
+    End Sub
+    Function G(a() As Object) As String
+        With a(0)
+            Return .ToString() + .ToLower()
+        End With
+    End Function
+End Module
+    </file>
+</compilation>
+            CompileAndVerify(comp, expectedOutput:="AaBb").
+            VerifyIL("M.G",
+            <![CDATA[
+{
+  // Code size       42 (0x2a)
+  .maxstack  8
+  .locals init (Object V_0) //$W0
+  IL_0000:  ldarg.0
+  IL_0001:  ldc.i4.0
+  IL_0002:  ldelem.ref
+  IL_0003:  stloc.0
+  IL_0004:  ldloc.0
+  IL_0005:  callvirt   "Function Object.ToString() As String"
+  IL_000a:  ldloc.0
+  IL_000b:  ldnull
+  IL_000c:  ldstr      "ToLower"
+  IL_0011:  ldc.i4.0
+  IL_0012:  newarr     "Object"
+  IL_0017:  ldnull
+  IL_0018:  ldnull
+  IL_0019:  ldnull
+  IL_001a:  call       "Function Microsoft.VisualBasic.CompilerServices.NewLateBinding.LateGet(Object, System.Type, String, Object(), String(), System.Type(), Boolean()) As Object"
+  IL_001f:  call       "Function Microsoft.VisualBasic.CompilerServices.Operators.AddObject(Object, Object) As Object"
+  IL_0024:  call       "Function Microsoft.VisualBasic.CompilerServices.Conversions.ToString(Object) As String"
+  IL_0029:  ret
+}
+]]>)
+        End Sub
+
+        <Fact>
+        Public Sub ArrayElementWithBlock_ValueType()
+            Dim comp =
+<compilation>
+    <file>
+Option Strict Off
+Module M
+    Sub Main()
+        F(New Integer() {1})
+    End Sub
+    Sub F(a() As Integer)
+        System.Console.Write(G(a))
+    End Sub
+    Function G(a() As Integer) As String
+        With a(0)
+            Return .ToString() + .ToString()
+        End With
+    End Function
+End Module
+    </file>
+</compilation>
+            CompileAndVerify(comp, expectedOutput:="11").
+            VerifyIL("M.G",
+            <![CDATA[
+{
+  // Code size       26 (0x1a)
+  .maxstack  2
+  .locals init (Integer& V_0) //$W0
+  IL_0000:  ldarg.0
+  IL_0001:  ldc.i4.0
+  IL_0002:  ldelema    "Integer"
+  IL_0007:  stloc.0
+  IL_0008:  ldloc.0
+  IL_0009:  call       "Function Integer.ToString() As String"
+  IL_000e:  ldloc.0
+  IL_000f:  call       "Function Integer.ToString() As String"
+  IL_0014:  call       "Function String.Concat(String, String) As String"
+  IL_0019:  ret
+}
+]]>)
+        End Sub
+
+        Public Sub NormalizedNaN()
+            CompileAndVerify(
+<compilation>
+    <file name="a.vb">
+Class Program
+    Shared Sub Main()
+        CheckNaN(Double.NaN)
+        CheckNaN(Single.NaN)
+        CheckNaN(0.0 / 0.0)
+        CheckNaN(0.0 / -0.0)
+        Dim inf As Double = 1.0 / 0.0
+        CheckNaN(inf + Double.NaN)
+        CheckNaN(inf - Double.NaN)
+        CheckNaN(-Double.NaN)
+    End Sub
+
+    Shared Sub CheckNaN(nan As Double)
+        Dim expected As Long = &amp;HFFF8000000000000
+        Dim actual As Long = System.BitConverter.DoubleToInt64Bits(nan)
+        If expected &lt;> actual Then
+            Throw New System.Exception($"expected=0X{expected: X} actual=0X{actual:X}")
+        End If
+    End Sub
+End Class
+    </file>
+</compilation>,
+expectedOutput:=<![CDATA[
+]]>)
+        End Sub
+
     End Class
 End Namespace

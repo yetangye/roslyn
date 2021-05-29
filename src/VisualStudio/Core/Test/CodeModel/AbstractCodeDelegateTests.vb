@@ -1,4 +1,8 @@
-' Copyright (c) Microsoft.  All Rights Reserved.  Licensed under the Apache License, Version 2.0.  See License.txt in the project root for license information.
+﻿' Licensed to the .NET Foundation under one or more agreements.
+' The .NET Foundation licenses this file to you under the MIT license.
+' See the LICENSE file in the project root for more information.
+
+Imports System.Threading.Tasks
 
 Namespace Microsoft.VisualStudio.LanguageServices.UnitTests.CodeModel
     Public MustInherit Class AbstractCodeDelegateTests
@@ -6,6 +10,10 @@ Namespace Microsoft.VisualStudio.LanguageServices.UnitTests.CodeModel
 
         Protected Overrides Function GetAccess(codeElement As EnvDTE80.CodeDelegate2) As EnvDTE.vsCMAccess
             Return codeElement.Access
+        End Function
+
+        Protected Overrides Function GetAttributes(codeElement As EnvDTE80.CodeDelegate2) As EnvDTE.CodeElements
+            Return codeElement.Attributes
         End Function
 
         Protected Overrides Function GetComment(codeElement As EnvDTE80.CodeDelegate2) As String
@@ -60,18 +68,24 @@ Namespace Microsoft.VisualStudio.LanguageServices.UnitTests.CodeModel
             Return codeElement.AddParameter(data.Name, data.Type, data.Position)
         End Function
 
+        Protected Overrides Function GetParameters(codeElement As EnvDTE80.CodeDelegate2) As EnvDTE.CodeElements
+            Return codeElement.Parameters
+        End Function
+
+        Protected Overrides Function AddAttribute(codeElement As EnvDTE80.CodeDelegate2, data As AttributeData) As EnvDTE.CodeAttribute
+            Return codeElement.AddAttribute(data.Name, data.Value, data.Position)
+        End Function
+
         Protected Overrides Sub RemoveChild(codeElement As EnvDTE80.CodeDelegate2, child As Object)
             codeElement.RemoveParameter(child)
         End Sub
 
         Protected Sub TestBaseClass(code As XElement, expectedFullName As String)
-            Using state = CreateCodeModelTestState(GetWorkspaceDefinition(code))
-                Dim codeElement = state.GetCodeElementAtCursor(Of EnvDTE80.CodeDelegate2)()
-                Assert.NotNull(codeElement)
-                Assert.NotNull(codeElement.BaseClass)
-
-                Assert.Equal(expectedFullName, codeElement.BaseClass.FullName)
-            End Using
+            TestElement(code,
+                Sub(codeElement)
+                    Assert.NotNull(codeElement.BaseClass)
+                    Assert.Equal(expectedFullName, codeElement.BaseClass.FullName)
+                End Sub)
         End Sub
 
     End Class

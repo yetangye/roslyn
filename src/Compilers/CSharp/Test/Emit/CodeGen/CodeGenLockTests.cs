@@ -1,4 +1,8 @@
-﻿// Copyright (c) Microsoft.  All Rights Reserved.  Licensed under the Apache License, Version 2.0.  See License.txt in the project root for license information.
+﻿// Licensed to the .NET Foundation under one or more agreements.
+// The .NET Foundation licenses this file to you under the MIT license.
+// See the LICENSE file in the project root for more information.
+
+#nullable disable
 
 using Microsoft.CodeAnalysis.CSharp.Test.Utilities;
 using Microsoft.CodeAnalysis.Test.Utilities;
@@ -57,7 +61,7 @@ public class Test
     IL_0023:  brfalse.s  IL_002b
     IL_0025:  ldloc.0
     IL_0026:  call       ""void System.Threading.Monitor.Exit(object)""
-    IL_002b:  endfinally
+   ~IL_002b:  endfinally
   }
  -IL_002c:  ldstr      ""After""
   IL_0031:  call       ""void System.Console.WriteLine(string)""
@@ -112,7 +116,7 @@ public class Test
     IL_0027:  brfalse.s  IL_002f
     IL_0029:  ldloc.0
     IL_002a:  call       ""void System.Threading.Monitor.Exit(object)""
-    IL_002f:  endfinally
+   ~IL_002f:  endfinally
   }
  -IL_0030:  ldstr      ""After""
   IL_0035:  call       ""void System.Console.WriteLine(string)""
@@ -387,7 +391,7 @@ public class Test
     IL_0027:  brfalse.s  IL_002f
     IL_0029:  ldloc.0
     IL_002a:  call       ""void System.Threading.Monitor.Exit(object)""
-    IL_002f:  endfinally
+   ~IL_002f:  endfinally
   }
  -IL_0030:  ldstr      ""After""
   IL_0035:  call       ""void System.Console.WriteLine(string)""
@@ -470,7 +474,7 @@ class Test
     }
 }
 ";
-            var compilation = CreateCompilationWithMscorlibAndSystemCore(text);
+            var compilation = CreateCompilationWithMscorlib40AndSystemCore(text);
             CompileAndVerify(compilation).VerifyIL("Test.Main", @"
 {
   // Code size       95 (0x5f)
@@ -643,7 +647,7 @@ public static partial class Extensions
     public static object Test(this object o) { return o; }
 }
 ";
-            var compilation = CreateCompilationWithMscorlibAndSystemCore(text);
+            var compilation = CreateCompilationWithMscorlib40AndSystemCore(text);
             CompileAndVerify(compilation).VerifyIL("Test.Main", @"
 {
   // Code size       72 (0x48)
@@ -1101,7 +1105,7 @@ class Test
 class Test
 {
     private object syncroot = new object();
-    public void foo()
+    public void goo()
     {
         lock (syncroot)
         {
@@ -1112,7 +1116,7 @@ class Test
     }
 }
 ";
-            CompileAndVerify(text).VerifyIL("Test.foo", @"
+            CompileAndVerify(text).VerifyIL("Test.goo", @"
 {
   // Code size       57 (0x39)
   .maxstack  2
@@ -1209,7 +1213,7 @@ class Test
 {
     public static void Main()
     { }
-    public IEnumerable<int> Foo()
+    public IEnumerable<int> Goo()
     {
         lock (new object())
         {
@@ -1737,7 +1741,7 @@ public class Test
 
         private static CSharpCompilation CreateCompilationWithCorlib20(string text)
         {
-            return CreateCompilation(new string[] { text }, new[] { TestReferences.NetFx.v2_0_50727.mscorlib });
+            return CreateEmptyCompilation(new string[] { text }, new[] { TestMetadata.Net20.mscorlib });
         }
 
         #endregion Pre-4.0 codegen
@@ -1811,7 +1815,7 @@ public class Program
     }
 }
 ";
-            CompileAndVerify(text, emitOptions: TestEmitters.RefEmitBug, expectedOutput: @"Writer wrote 0
+            CompileAndVerify(text, expectedOutput: @"Writer wrote 0
 Reader read 0
 Writer wrote 1
 Reader read 1
@@ -1846,7 +1850,7 @@ class C
         System.Threading.Thread[] t = new System.Threading.Thread[20];
         for (int i = 0; i < 20; i++)
         {
-            t[i] = new System.Threading.Thread(p.foo);
+            t[i] = new System.Threading.Thread(p.goo);
             t[i].Start();
         }
         for (int i = 0; i < 20; i++)
@@ -1861,7 +1865,7 @@ class D
 {
     private object syncroot = new object();
     public int s;
-    public void foo()
+    public void goo()
     {
         lock (syncroot)
         {
@@ -1879,7 +1883,7 @@ class D
 
         #endregion Execution
 
-        [Fact(), WorkItem(1106943, "DevDiv")]
+        [Fact(), WorkItem(1106943, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/1106943")]
         public void Bug1106943_01()
         {
             var source = @"
@@ -1894,13 +1898,13 @@ class C1
     }
 }";
 
-            var compilation = CreateCompilationWithMscorlib(source, options: TestOptions.ReleaseExe);
+            var compilation = CreateCompilation(source, options: TestOptions.ReleaseExe);
             compilation.MakeMemberMissing(WellKnownMember.System_Threading_Monitor__Enter);
 
             CompileAndVerify(compilation, expectedOutput: "Inside lock.");
         }
 
-        [Fact(), WorkItem(1106943, "DevDiv")]
+        [Fact(), WorkItem(1106943, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/1106943")]
         public void Bug1106943_02()
         {
             var source = @"
@@ -1915,13 +1919,13 @@ class C1
     }
 }";
 
-            var compilation = CreateCompilationWithMscorlib(source, options: TestOptions.ReleaseExe);
+            var compilation = CreateCompilation(source, options: TestOptions.ReleaseExe);
             compilation.MakeMemberMissing(WellKnownMember.System_Threading_Monitor__Enter2);
 
             CompileAndVerify(compilation, expectedOutput: "Inside lock.");
         }
 
-        [Fact(), WorkItem(1106943, "DevDiv")]
+        [Fact(), WorkItem(1106943, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/1106943")]
         public void Bug1106943_03()
         {
             var source = @"
@@ -1936,7 +1940,7 @@ class C1
     }
 }";
 
-            var compilation = CreateCompilationWithMscorlib(source, options: TestOptions.ReleaseExe);
+            var compilation = CreateCompilation(source, options: TestOptions.ReleaseExe);
             compilation.MakeMemberMissing(WellKnownMember.System_Threading_Monitor__Enter);
             compilation.MakeMemberMissing(WellKnownMember.System_Threading_Monitor__Enter2);
 
@@ -1950,7 +1954,7 @@ class C1
                 );
         }
 
-        [Fact(), WorkItem(1106943, "DevDiv")]
+        [Fact(), WorkItem(1106943, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/1106943")]
         public void Bug1106943_04()
         {
             var source = @"
@@ -1965,7 +1969,7 @@ class C1
     }
 }";
 
-            var compilation = CreateCompilationWithMscorlib(source, options: TestOptions.ReleaseExe);
+            var compilation = CreateCompilation(source, options: TestOptions.ReleaseExe);
             compilation.MakeMemberMissing(WellKnownMember.System_Threading_Monitor__Exit);
 
             compilation.VerifyEmitDiagnostics(
@@ -1978,7 +1982,7 @@ class C1
                 );
         }
 
-        [Fact(), WorkItem(1106943, "DevDiv")]
+        [Fact(), WorkItem(1106943, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/1106943")]
         public void Bug1106943_05()
         {
             var source = @"
@@ -1993,7 +1997,7 @@ class C1
     }
 }";
 
-            var compilation = CreateCompilationWithMscorlib(source, options: TestOptions.ReleaseExe);
+            var compilation = CreateCompilation(source, options: TestOptions.ReleaseExe);
             compilation.MakeMemberMissing(WellKnownMember.System_Threading_Monitor__Enter);
             compilation.MakeMemberMissing(WellKnownMember.System_Threading_Monitor__Enter2);
             compilation.MakeMemberMissing(WellKnownMember.System_Threading_Monitor__Exit);
@@ -2014,7 +2018,7 @@ class C1
                 );
         }
 
-        [Fact(), WorkItem(1106943, "DevDiv")]
+        [Fact(), WorkItem(1106943, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/1106943")]
         public void Bug1106943_06()
         {
             var source = @"
@@ -2029,7 +2033,7 @@ class C1
     }
 }";
 
-            var compilation = CreateCompilationWithMscorlib(source, options: TestOptions.ReleaseExe);
+            var compilation = CreateCompilation(source, options: TestOptions.ReleaseExe);
             compilation.MakeTypeMissing(WellKnownType.System_Threading_Monitor);
 
             compilation.VerifyEmitDiagnostics(

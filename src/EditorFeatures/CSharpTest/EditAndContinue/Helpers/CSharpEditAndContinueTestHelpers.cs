@@ -1,36 +1,35 @@
-﻿// Copyright (c) Microsoft.  All Rights Reserved.  Licensed under the Apache License, Version 2.0.  See License.txt in the project root for license information.
+﻿// Licensed to the .NET Foundation under one or more agreements.
+// The .NET Foundation licenses this file to you under the MIT license.
+// See the LICENSE file in the project root for more information.
 
-using System.Collections.Generic;
+#nullable disable
+
+using System;
 using System.Collections.Immutable;
-using Microsoft.CodeAnalysis.CSharp;
-using Microsoft.CodeAnalysis.CSharp.EditAndContinue;
-using Microsoft.CodeAnalysis.CSharp.EditAndContinue.UnitTests;
-using Microsoft.CodeAnalysis.CSharp.Emit;
 using Microsoft.CodeAnalysis.CSharp.Symbols;
-using Microsoft.CodeAnalysis.CSharp.Test.Utilities;
+using Microsoft.CodeAnalysis.Differencing;
 using Microsoft.CodeAnalysis.EditAndContinue;
 using Microsoft.CodeAnalysis.EditAndContinue.UnitTests;
 using Microsoft.CodeAnalysis.Text;
 using Xunit;
 
-namespace Microsoft.CodeAnalysis.Editor.CSharp.UnitTests.EditAndContinue
+namespace Microsoft.CodeAnalysis.CSharp.EditAndContinue.UnitTests
 {
     internal sealed class CSharpEditAndContinueTestHelpers : EditAndContinueTestHelpers
     {
-        internal static readonly CSharpEditAndContinueTestHelpers Instance = new CSharpEditAndContinueTestHelpers();
-        private static readonly CSharpEditAndContinueAnalyzer s_analyzer = new CSharpEditAndContinueAnalyzer();
+        private readonly CSharpEditAndContinueAnalyzer _analyzer;
 
-        public override AbstractEditAndContinueAnalyzer Analyzer { get { return s_analyzer; } }
-
-        public override Compilation CreateLibraryCompilation(string name, IEnumerable<SyntaxTree> trees)
+        public CSharpEditAndContinueTestHelpers(Action<SyntaxNode> faultInjector = null)
         {
-            return CSharpCompilation.Create("New", trees, new[] { TestReferences.NetFx.v4_0_30319.mscorlib }, TestOptions.ReleaseDll);
+            _analyzer = new CSharpEditAndContinueAnalyzer(faultInjector);
         }
+
+        public override AbstractEditAndContinueAnalyzer Analyzer => _analyzer;
+        public override string LanguageName => LanguageNames.CSharp;
+        public override TreeComparer<SyntaxNode> TopSyntaxComparer => SyntaxComparer.TopLevel;
 
         public override SyntaxTree ParseText(string source)
-        {
-            return SyntaxFactory.ParseSyntaxTree(source);
-        }
+            => SyntaxFactory.ParseSyntaxTree(source, CSharpParseOptions.Default.WithLanguageVersion(LanguageVersion.Preview));
 
         public override SyntaxNode FindNode(SyntaxNode root, TextSpan span)
         {
@@ -47,7 +46,7 @@ namespace Microsoft.CodeAnalysis.Editor.CSharp.UnitTests.EditAndContinue
         public override ImmutableArray<SyntaxNode> GetDeclarators(ISymbol method)
         {
             Assert.True(method is MethodSymbol, "Only methods should have a syntax map.");
-            return LocalVariableDeclaratorsCollector.GetDeclarators((SourceMethodSymbol)method);
+            return LocalVariableDeclaratorsCollector.GetDeclarators((SourceMemberMethodSymbol)method);
         }
     }
 }

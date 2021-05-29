@@ -1,12 +1,17 @@
-﻿// Copyright (c) Microsoft.  All Rights Reserved.  Licensed under the Apache License, Version 2.0.  See License.txt in the project root for license information.
+﻿// Licensed to the .NET Foundation under one or more agreements.
+// The .NET Foundation licenses this file to you under the MIT license.
+// See the LICENSE file in the project root for more information.
+
+#nullable disable
 
 using System;
 using System.Collections.Immutable;
 using System.Diagnostics;
 using System.Threading;
 using Microsoft.CodeAnalysis;
+using Microsoft.VisualStudio.LanguageServices.Implementation.F1Help;
 using Microsoft.VisualStudio.LanguageServices.Implementation.Library.ObjectBrowser.Lists;
-using Microsoft.VisualStudio.LanguageServices.Implementation.Library.ObjectBrowser.NavInfos;
+using Microsoft.VisualStudio.LanguageServices.Implementation.Library.VsNavInfo;
 using Microsoft.VisualStudio.Shell;
 using Microsoft.VisualStudio.Shell.Interop;
 using Roslyn.Utilities;
@@ -55,14 +60,7 @@ namespace Microsoft.VisualStudio.LanguageServices.Implementation.Library.ObjectB
         }
 
         private bool IsClassView()
-        {
-            return Helpers.IsClassView(_flags);
-        }
-
-        private bool IsFindSymbol()
-        {
-            return Helpers.IsFindSymbol(_flags);
-        }
+            => Helpers.IsClassView(_flags);
 
         private ObjectListItem GetListItem(uint index)
         {
@@ -101,8 +99,7 @@ namespace Microsoft.VisualStudio.LanguageServices.Implementation.Library.ObjectB
         {
             if (srcType == VSOBJGOTOSRCTYPE.GS_DEFINITION)
             {
-                var symbolItem = GetListItem(index) as SymbolListItem;
-                if (symbolItem != null)
+                if (GetListItem(index) is SymbolListItem symbolItem)
                 {
                     return symbolItem.SupportsGoToDefinition;
                 }
@@ -421,8 +418,7 @@ namespace Microsoft.VisualStudio.LanguageServices.Implementation.Library.ObjectB
 
         private bool IsExpandableType(uint index)
         {
-            var typeListItem = GetListItem(index) as TypeListItem;
-            if (typeListItem == null)
+            if (!(GetListItem(index) is TypeListItem typeListItem))
             {
                 return false;
             }
@@ -460,9 +456,7 @@ namespace Microsoft.VisualStudio.LanguageServices.Implementation.Library.ObjectB
         }
 
         protected override uint GetItemCount()
-        {
-            return (uint)_items.Length;
-        }
+            => (uint)_items.Length;
 
         protected override IVsSimpleObjectList2 GetList(uint index, uint listType, uint flags, VSOBSEARCHCRITERIA2[] pobSrch)
         {
@@ -535,8 +529,7 @@ namespace Microsoft.VisualStudio.LanguageServices.Implementation.Library.ObjectB
 
         protected override object GetBrowseObject(uint index)
         {
-            var symbolListItem = GetListItem(index) as SymbolListItem;
-            if (symbolListItem != null)
+            if (GetListItem(index) is SymbolListItem symbolListItem)
             {
                 return this.LibraryManager.Workspace.GetBrowseObject(symbolListItem);
             }
@@ -557,20 +550,21 @@ namespace Microsoft.VisualStudio.LanguageServices.Implementation.Library.ObjectB
                 return null;
             }
 
-            var projectListItem = listItem as ProjectListItem;
-            if (projectListItem != null)
+            if (listItem is ProjectListItem projectListItem)
             {
-                return this.LibraryManager.GetProjectNavInfo(projectListItem.ProjectId);
+                var project = this.LibraryManager.GetProject(projectListItem.ProjectId);
+                if (project != null)
+                {
+                    return this.LibraryManager.LibraryService.NavInfoFactory.CreateForProject(project);
+                }
             }
 
-            var referenceListItem = listItem as ReferenceListItem;
-            if (referenceListItem != null)
+            if (listItem is ReferenceListItem referenceListItem)
             {
-                return this.LibraryManager.GetReferenceNavInfo(referenceListItem.MetadataReference);
+                return this.LibraryManager.LibraryService.NavInfoFactory.CreateForReference(referenceListItem.MetadataReference);
             }
 
-            var symbolListItem = listItem as SymbolListItem;
-            if (symbolListItem != null)
+            if (listItem is SymbolListItem symbolListItem)
             {
                 return this.LibraryManager.GetNavInfo(symbolListItem, useExpandedHierarchy: IsClassView());
             }
@@ -601,15 +595,12 @@ namespace Microsoft.VisualStudio.LanguageServices.Implementation.Library.ObjectB
         {
             var itemCount = GetItemCount();
             index = 0xffffffffu;
-
-            string matchName;
-            if (ErrorHandler.Failed(pNavInfoNode.get_Name(out matchName)))
+            if (ErrorHandler.Failed(pNavInfoNode.get_Name(out var matchName)))
             {
                 return false;
             }
 
-            uint type;
-            if (ErrorHandler.Failed(pNavInfoNode.get_Type(out type)))
+            if (ErrorHandler.Failed(pNavInfoNode.get_Type(out _)))
             {
                 return false;
             }
@@ -639,10 +630,7 @@ namespace Microsoft.VisualStudio.LanguageServices.Implementation.Library.ObjectB
                     }
                     else if (_kind == ObjectListKind.Projects)
                     {
-                        var lowerMatchName = matchName.ToLower();
-                        var lowerName = name.ToLower();
-
-                        if (lowerMatchName.IndexOf(lowerName) >= 0)
+                        if (matchName.IndexOf(name, StringComparison.OrdinalIgnoreCase) >= 0)
                         {
                             if (longestMatchedName.Length < name.Length)
                             {
@@ -654,9 +642,7 @@ namespace Microsoft.VisualStudio.LanguageServices.Implementation.Library.ObjectB
                 }
             }
 
-            return index != 0xffffffffu
-                ? true
-                : false;
+            return index != 0xffffffffu;
         }
 
         protected override bool SupportsDescription
@@ -686,6 +672,29 @@ namespace Microsoft.VisualStudio.LanguageServices.Implementation.Library.ObjectB
                 case _VSOBJLISTELEMPROPID.VSOBJLISTELEMPROPID_FULLNAME:
                     pvar = listItem.FullNameText;
                     return true;
+
+                case _VSOBJLISTELEMPROPID.VSOBJLISTELEMPROPID_HELPKEYWORD:
+                    if (listItem is SymbolListItem symbolListItem)
+                    {
+                        var project = this.LibraryManager.Workspace.CurrentSolution.GetProject(symbolListItem.ProjectId);
+                        if (project != null)
+                        {
+                            var compilation = project
+                                .GetCompilationAsync(CancellationToken.None)
+                                .WaitAndGetResult_ObjectBrowser(CancellationToken.None);
+
+                            var symbol = symbolListItem.ResolveSymbol(compilation);
+                            if (symbol != null)
+                            {
+                                var helpContextService = project.LanguageServices.GetService<IHelpContextService>();
+
+                                pvar = helpContextService.FormatSymbol(symbol);
+                                return true;
+                            }
+                        }
+                    }
+
+                    return false;
             }
 
             return false;
@@ -723,21 +732,16 @@ namespace Microsoft.VisualStudio.LanguageServices.Implementation.Library.ObjectB
         }
 
         protected override string GetText(uint index, VSTREETEXTOPTIONS tto)
-        {
-            return GetDisplayText(index, tto);
-        }
+            => GetDisplayText(index, tto);
 
         protected override string GetTipText(uint index, VSTREETOOLTIPTYPE eTipType)
-        {
-            return null;
-        }
+            => null;
 
         protected override int GoToSource(uint index, VSOBJGOTOSRCTYPE srcType)
         {
             if (srcType == VSOBJGOTOSRCTYPE.GS_DEFINITION)
             {
-                var symbolItem = GetListItem(index) as SymbolListItem;
-                if (symbolItem != null && symbolItem.SupportsGoToDefinition)
+                if (GetListItem(index) is SymbolListItem symbolItem && symbolItem.SupportsGoToDefinition)
                 {
                     var project = this.LibraryManager.Workspace.CurrentSolution.GetProject(symbolItem.ProjectId);
                     var compilation = project.GetCompilationAsync(CancellationToken.None).WaitAndGetResult(CancellationToken.None);
@@ -831,14 +835,12 @@ namespace Microsoft.VisualStudio.LanguageServices.Implementation.Library.ObjectB
 
                 if (data.type == VSCOMPONENTTYPE.VSCOMPONENTTYPE_ComPlus)
                 {
-                    var referenceListItem = listItem as ReferenceListItem;
-                    if (referenceListItem == null)
+                    if (!(listItem is ReferenceListItem referenceListItem))
                     {
                         continue;
                     }
 
-                    var metadataReference = referenceListItem.MetadataReference as PortableExecutableReference;
-                    if (metadataReference == null)
+                    if (!(referenceListItem.MetadataReference is PortableExecutableReference metadataReference))
                     {
                         continue;
                     }
@@ -859,14 +861,12 @@ namespace Microsoft.VisualStudio.LanguageServices.Implementation.Library.ObjectB
                         continue;
                     }
 
-                    var vsSolution = this.LibraryManager.ServiceProvider.GetService(typeof(SVsSolution)) as IVsSolution;
-                    if (vsSolution == null)
+                    if (!(this.LibraryManager.ServiceProvider.GetService(typeof(SVsSolution)) is IVsSolution vsSolution))
                     {
                         return false;
                     }
 
-                    string projectRef;
-                    if (ErrorHandler.Failed(vsSolution.GetProjrefOfProject(hierarchy, out projectRef)))
+                    if (ErrorHandler.Failed(vsSolution.GetProjrefOfProject(hierarchy, out var projectRef)))
                     {
                         return false;
                     }
@@ -886,8 +886,7 @@ namespace Microsoft.VisualStudio.LanguageServices.Implementation.Library.ObjectB
         {
             var listItem = GetListItem(index);
 
-            var projectListItem = listItem as ProjectListItem;
-            if (projectListItem != null)
+            if (listItem is ProjectListItem projectListItem)
             {
                 var hierarchy = this.LibraryManager.Workspace.GetHierarchy(projectListItem.ProjectId);
                 if (hierarchy == null)
@@ -895,14 +894,12 @@ namespace Microsoft.VisualStudio.LanguageServices.Implementation.Library.ObjectB
                     return false;
                 }
 
-                var vsSolution = this.LibraryManager.ServiceProvider.GetService(typeof(SVsSolution)) as IVsSolution;
-                if (vsSolution == null)
+                if (!(this.LibraryManager.ServiceProvider.GetService(typeof(SVsSolution)) is IVsSolution vsSolution))
                 {
                     return false;
                 }
 
-                string projectRef;
-                if (ErrorHandler.Failed(vsSolution.GetProjrefOfProject(hierarchy, out projectRef)))
+                if (ErrorHandler.Failed(vsSolution.GetProjrefOfProject(hierarchy, out var projectRef)))
                 {
                     return false;
                 }
@@ -920,39 +917,29 @@ namespace Microsoft.VisualStudio.LanguageServices.Implementation.Library.ObjectB
             }
             else
             {
-                var referenceListItem = listItem as ReferenceListItem;
-                if (referenceListItem == null)
+                if (!(listItem is ReferenceListItem referenceListItem))
                 {
                     return false;
                 }
 
-                var metadataReference = referenceListItem.MetadataReference as PortableExecutableReference;
-                if (metadataReference == null)
+                if (!(referenceListItem.MetadataReference is PortableExecutableReference portableExecutableReference))
                 {
                     return false;
                 }
 
-                var compilation = referenceListItem.GetCompilation(this.LibraryManager.Workspace);
-                if (compilation == null)
+                var assemblyIdentity = AssemblyIdentityUtils.TryGetAssemblyIdentity(portableExecutableReference.FilePath);
+                if (assemblyIdentity == null)
                 {
                     return false;
                 }
 
-                var assemblySymbol = referenceListItem.GetAssembly(compilation);
-                if (assemblySymbol == null)
-                {
-                    return false;
-                }
-
-                data.bstrFile = metadataReference.FilePath;
+                data.bstrFile = portableExecutableReference.FilePath;
                 data.type = VSCOMPONENTTYPE.VSCOMPONENTTYPE_ComPlus;
 
-                var identity = assemblySymbol.Identity;
-
-                data.wFileMajorVersion = (ushort)identity.Version.Major;
-                data.wFileMinorVersion = (ushort)identity.Version.Minor;
-                data.wFileBuildNumber = (ushort)identity.Version.Build;
-                data.wFileRevisionNumber = (ushort)identity.Version.Revision;
+                data.wFileMajorVersion = (ushort)assemblyIdentity.Version.Major;
+                data.wFileMinorVersion = (ushort)assemblyIdentity.Version.Minor;
+                data.wFileBuildNumber = (ushort)assemblyIdentity.Version.Build;
+                data.wFileRevisionNumber = (ushort)assemblyIdentity.Version.Revision;
             }
 
             return true;

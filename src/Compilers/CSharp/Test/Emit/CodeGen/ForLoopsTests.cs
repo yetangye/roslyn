@@ -1,4 +1,8 @@
-﻿// Copyright (c) Microsoft.  All Rights Reserved.  Licensed under the Apache License, Version 2.0.  See License.txt in the project root for license information.
+﻿// Licensed to the .NET Foundation under one or more agreements.
+// The .NET Foundation licenses this file to you under the MIT license.
+// See the LICENSE file in the project root for more information.
+
+#nullable disable
 
 using Microsoft.CodeAnalysis.CSharp.Symbols;
 using Microsoft.CodeAnalysis.CSharp.Syntax;
@@ -648,7 +652,7 @@ class C
 
         // Inner for loop referencing the outer for loop iteration variable
         [Fact]
-        public void InnerRefOuterInteration()
+        public void InnerRefOuterIteration()
         {
             var text =
 @"
@@ -700,7 +704,7 @@ class C
         }
 
         // Breaking from nested Loops
-        [Fact, WorkItem(527952, "DevDiv")]
+        [Fact, WorkItem(527952, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/527952")]
         public void BreakFromNestedLoop()
         {
             var source = @"
@@ -755,7 +759,7 @@ class C
 ");
         }
 
-        [WorkItem(539555, "DevDiv")]
+        [WorkItem(539555, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/539555")]
         // Continuing for nested Loops
         [Fact]
         public void ContinueForNestedLoop()
@@ -880,7 +884,7 @@ class C
         }
 
         // Goto in for Loops
-        [Fact, WorkItem(527952, "DevDiv")]
+        [Fact, WorkItem(527952, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/527952")]
         public void GotoForNestedLoop_2()
         {
             var source = @"
@@ -933,7 +937,7 @@ class C
         }
 
         // Goto in for Loops
-        [Fact, WorkItem(527952, "DevDiv")]
+        [Fact, WorkItem(527952, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/527952")]
         public void GotoForNestedLoop_3()
         {
             var source =
@@ -1245,7 +1249,7 @@ class C
                 VerifyDiagnostics(Diagnostic(ErrorCode.WRN_UnreachableCode, "System"));
         }
 
-        [Fact, WorkItem(527952, "DevDiv")]
+        [Fact, WorkItem(527952, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/527952")]
         public void CS0162WRN_UnreachableCode_2()
         {
             var source = @"
@@ -1270,7 +1274,7 @@ class C
 ");
         }
 
-        [Fact, WorkItem(528275, "DevDiv")]
+        [Fact, WorkItem(528275, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/528275")]
         public void CS0162WRN_UnreachableCode_3()
         {
             var text = @"
@@ -1457,38 +1461,39 @@ class C
 {
     static void Main(string[] args)
     {
-        for (Foo f = new Foo { i = 0, s = ""abc"" }; f.i < 5; f.i = f.i + 1)
+        for (Goo f = new Goo { i = 0, s = ""abc"" }; f.i < 5; f.i = f.i + 1)
         {
         }
     }
 }
-public class Foo
+public class Goo
 {
     public int i;
     public string s;
 }
 ";
-            string expectedIL = @"{
+            string expectedIL = @"
+{
   // Code size       50 (0x32)
   .maxstack  3
-  .locals init (Foo V_0) //f
-  IL_0000:  newobj     ""Foo..ctor()""
+  .locals init (Goo V_0) //f
+  IL_0000:  newobj     ""Goo..ctor()""
   IL_0005:  dup
   IL_0006:  ldc.i4.0
-  IL_0007:  stfld      ""int Foo.i""
+  IL_0007:  stfld      ""int Goo.i""
   IL_000c:  dup
   IL_000d:  ldstr      ""abc""
-  IL_0012:  stfld      ""string Foo.s""
+  IL_0012:  stfld      ""string Goo.s""
   IL_0017:  stloc.0
   IL_0018:  br.s       IL_0028
   IL_001a:  ldloc.0
-  IL_001b:  dup
-  IL_001c:  ldfld      ""int Foo.i""
+  IL_001b:  ldloc.0
+  IL_001c:  ldfld      ""int Goo.i""
   IL_0021:  ldc.i4.1
   IL_0022:  add
-  IL_0023:  stfld      ""int Foo.i""
+  IL_0023:  stfld      ""int Goo.i""
   IL_0028:  ldloc.0
-  IL_0029:  ldfld      ""int Foo.i""
+  IL_0029:  ldfld      ""int Goo.i""
   IL_002e:  ldc.i4.5
   IL_002f:  blt.s      IL_001a
   IL_0031:  ret
@@ -1538,7 +1543,7 @@ public class myFor
     }
 }
 ";
-            CompileAndVerify(text, additionalRefs: new MetadataReference[] { CSharpRef, SystemCoreRef }, expectedOutput: @"Initialize
+            CompileAndVerify(text, references: new MetadataReference[] { CSharpRef }, expectedOutput: @"Initialize
 Done
 Next
 Done
@@ -1613,7 +1618,7 @@ class C
     }
 }
 ";
-            var comp = CompileAndVerify(text, additionalRefs: new[] { LinqAssemblyRef }, expectedOutput: @"1
+            var comp = CompileAndVerify(text, expectedOutput: @"1
 2
 3");
         }
@@ -1649,7 +1654,7 @@ class C
     }
 }
 ";
-            var comp = CompileAndVerify(text, additionalRefs: new[] { LinqAssemblyRef }, expectedOutput: @"1
+            var comp = CompileAndVerify(text, expectedOutput: @"1
 2
 3");
         }
@@ -1673,7 +1678,7 @@ class C
     }
 }
 ";
-            CompileAndVerify(text, additionalRefs: new[] { SystemCoreRef }, expectedOutput: @"1
+            CompileAndVerify(text, expectedOutput: @"1
 4
 9
 16");
@@ -1698,7 +1703,7 @@ class C
 }
 ";
 
-            var comp = CompileAndVerify(text, additionalRefs: new[] { SystemCoreRef }, expectedOutput: @"1
+            var comp = CompileAndVerify(text, expectedOutput: @"1
 4
 9
 16");
@@ -1746,7 +1751,7 @@ public class C1
         }
 
         // PostFix Increment In For
-        [Fact, WorkItem(539759, "DevDiv")]
+        [Fact, WorkItem(539759, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/539759")]
         public void PostFixIncrementInFor()
         {
             var text =
@@ -1844,12 +1849,12 @@ class Program
 {
     static void Main(string[] args)
     {
-        for (int i = 0; foo(i--) > -5;)
+        for (int i = 0; goo(i--) > -5;)
         {
             System.Console.WriteLine(i);
         }
     }
-    static int foo(int x)
+    static int goo(int x)
     {
         return x;
     }
@@ -1862,7 +1867,7 @@ class Program
 -5");
         }
 
-        [Fact, WorkItem(992882, "DevDiv")]
+        [Fact, WorkItem(992882, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/992882")]
         public void InfiniteLoopVerify()
         {
             var text =
@@ -1891,7 +1896,7 @@ class Program
                 VerifyIL("Program.Main", expectedIL);
         }
 
-        [Fact, WorkItem(992882, "DevDiv")]
+        [Fact, WorkItem(992882, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/992882")]
         public void InfiniteLoopVerify01()
         {
             var text =

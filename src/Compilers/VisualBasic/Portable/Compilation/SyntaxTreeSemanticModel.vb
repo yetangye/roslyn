@@ -1,4 +1,6 @@
-﻿' Copyright (c) Microsoft.  All Rights Reserved.  Licensed under the Apache License, Version 2.0.  See License.txt in the project root for license information.
+﻿' Licensed to the .NET Foundation under one or more agreements.
+' The .NET Foundation licenses this file to you under the MIT license.
+' See the LICENSE file in the project root for more information.
 
 Imports System.Collections.Concurrent
 Imports System.Collections.Generic
@@ -7,7 +9,8 @@ Imports System.Collections.ObjectModel
 Imports System.IO
 Imports System.Runtime.InteropServices
 Imports System.Threading
-Imports Microsoft.CodeAnalysis.Instrumentation
+Imports Microsoft.CodeAnalysis.PooledObjects
+Imports Microsoft.CodeAnalysis.Operations
 Imports Microsoft.CodeAnalysis.Text
 Imports Microsoft.CodeAnalysis.VisualBasic.Symbols
 Imports Microsoft.CodeAnalysis.VisualBasic.Syntax
@@ -25,14 +28,16 @@ Namespace Microsoft.CodeAnalysis.VisualBasic
         Private ReadOnly _sourceModule As SourceModuleSymbol
         Private ReadOnly _syntaxTree As SyntaxTree
         Private ReadOnly _binderFactory As BinderFactory
+        Private ReadOnly _ignoresAccessibility As Boolean
 
         ' maps from a higher-level binder to an appropriate SemanticModel for the construct (such as a method, or initializer).
-        Private ReadOnly _semanticModelCache As New ConcurrentDictionary(Of Binder, MemberSemanticModel)()
+        Private ReadOnly _semanticModelCache As New ConcurrentDictionary(Of (binder As Binder, ignoresAccessibility As Boolean), MemberSemanticModel)()
 
-        Friend Sub New(compilation As VisualBasicCompilation, sourceModule As SourceModuleSymbol, syntaxTree As SyntaxTree)
+        Friend Sub New(compilation As VisualBasicCompilation, sourceModule As SourceModuleSymbol, syntaxTree As SyntaxTree, Optional ignoreAccessibility As Boolean = False)
             _compilation = compilation
             _sourceModule = sourceModule
             _syntaxTree = syntaxTree
+            _ignoresAccessibility = ignoreAccessibility
             _binderFactory = New BinderFactory(sourceModule, syntaxTree)
         End Sub
 
@@ -48,7 +53,7 @@ Namespace Microsoft.CodeAnalysis.VisualBasic
         ''' <summary> 
         ''' The root node of the syntax tree that this binding is based on.
         ''' </summary> 
-        Friend Overrides ReadOnly Property Root As VisualBasicSyntaxNode
+        Friend Overrides ReadOnly Property Root As SyntaxNode
             Get
                 Return DirectCast(_syntaxTree.GetRoot(), VisualBasicSyntaxNode)
             End Get
@@ -64,6 +69,15 @@ Namespace Microsoft.CodeAnalysis.VisualBasic
         End Property
 
         ''' <summary>
+        ''' Returns true if this Is a SemanticModel that ignores accessibility rules when answering semantic questions.
+        ''' </summary>
+        Public NotOverridable Overrides ReadOnly Property IgnoresAccessibility As Boolean
+            Get
+                Return Me._ignoresAccessibility
+            End Get
+        End Property
+
+        ''' <summary>
         ''' Get all the errors within the syntax tree associated with this object. Includes errors involving compiling
         ''' method bodies or initializers, in addition to the errors returned by GetDeclarationDiagnostics and parse errors.
         ''' </summary>
@@ -72,14 +86,12 @@ Namespace Microsoft.CodeAnalysis.VisualBasic
         ''' <param name="cancellationToken">A cancellation token that can be used to cancel the process of obtaining the
         ''' diagnostics.</param>
         ''' <remarks>
-        ''' Because this method must semantically analyse all method bodies and initializers to check for diagnostics, it may
+        ''' Because this method must semantically analyze all method bodies and initializers to check for diagnostics, it may
         ''' take a significant amount of time. Unlike GetDeclarationDiagnostics, diagnostics for method bodies and
         ''' initializers are not cached, the any semantic information used to obtain the diagnostics is discarded.
         ''' </remarks>
         Public Overrides Function GetDiagnostics(Optional span As TextSpan? = Nothing, Optional cancellationToken As CancellationToken = Nothing) As ImmutableArray(Of Diagnostic)
-            Using Logger.LogBlock(FunctionId.VisualBasic_SemanticModel_GetDiagnostics, message:=Me.SyntaxTree.FilePath, cancellationToken:=cancellationToken)
-                Return _compilation.GetDiagnosticsForTree(CompilationStage.Compile, _syntaxTree, span, True, cancellationToken)
-            End Using
+            Return _compilation.GetDiagnosticsForSyntaxTree(CompilationStage.Compile, _syntaxTree, span, includeEarlierStages:=True, cancellationToken:=cancellationToken)
         End Function
 
         ''' <summary>
@@ -91,9 +103,7 @@ Namespace Microsoft.CodeAnalysis.VisualBasic
         ''' <param name="cancellationToken">A cancellation token that can be used to cancel the
         ''' process of obtaining the diagnostics.</param>
         Public Overrides Function GetSyntaxDiagnostics(Optional span As TextSpan? = Nothing, Optional cancellationToken As CancellationToken = Nothing) As ImmutableArray(Of Diagnostic)
-            Using Logger.LogBlock(FunctionId.VisualBasic_SemanticModel_GetDiagnostics, message:=Me.SyntaxTree.FilePath, cancellationToken:=cancellationToken)
-                Return _compilation.GetDiagnosticsForTree(CompilationStage.Parse, _syntaxTree, span, False, cancellationToken)
-            End Using
+            Return _compilation.GetDiagnosticsForSyntaxTree(CompilationStage.Parse, _syntaxTree, span, includeEarlierStages:=False, cancellationToken:=cancellationToken)
         End Function
 
         ''' <summary>
@@ -108,9 +118,7 @@ Namespace Microsoft.CodeAnalysis.VisualBasic
         ''' declarations are analyzed for diagnostics. Calling this a second time will return the cached diagnostics.
         ''' </remarks>
         Public Overrides Function GetDeclarationDiagnostics(Optional span As TextSpan? = Nothing, Optional cancellationToken As CancellationToken = Nothing) As ImmutableArray(Of Diagnostic)
-            Using Logger.LogBlock(FunctionId.VisualBasic_SemanticModel_GetDiagnostics, message:=Me.SyntaxTree.FilePath, cancellationToken:=cancellationToken)
-                Return _compilation.GetDiagnosticsForTree(CompilationStage.Declare, _syntaxTree, span, False, cancellationToken)
-            End Using
+            Return _compilation.GetDiagnosticsForSyntaxTree(CompilationStage.Declare, _syntaxTree, span, includeEarlierStages:=False, cancellationToken:=cancellationToken)
         End Function
 
         ''' <summary>
@@ -125,33 +133,30 @@ Namespace Microsoft.CodeAnalysis.VisualBasic
         ''' declarations are analyzed for diagnostics. Calling this a second time will return the cached diagnostics.
         ''' </remarks>
         Public Overrides Function GetMethodBodyDiagnostics(Optional span As TextSpan? = Nothing, Optional cancellationToken As CancellationToken = Nothing) As ImmutableArray(Of Diagnostic)
-            Using Logger.LogBlock(FunctionId.VisualBasic_SemanticModel_GetDiagnostics, message:=Me.SyntaxTree.FilePath, cancellationToken:=cancellationToken)
-                Return _compilation.GetDiagnosticsForTree(CompilationStage.Compile, _syntaxTree, span, False, cancellationToken)
-            End Using
+            Return _compilation.GetDiagnosticsForSyntaxTree(CompilationStage.Compile, _syntaxTree, span, includeEarlierStages:=False, cancellationToken:=cancellationToken)
         End Function
 
-        ' PERF: These shared variables avoid repeated allocation of Func(Of Binder, MemberSemanticModel) in GetMemberSemanticModel
-        Private Shared ReadOnly _methodBodySemanticModelCreator As Func(Of Binder, MemberSemanticModel) = Function(key As Binder) MethodBodySemanticModel.Create(DirectCast(key, MethodBodyBinder))
-        Private Shared ReadOnly _initializerSemanticModelCreator As Func(Of Binder, MemberSemanticModel) = Function(key As Binder) InitializerSemanticModel.Create(DirectCast(key, DeclarationInitializerBinder))
-        Private Shared ReadOnly _attributeSemanticModelCreator As Func(Of Binder, MemberSemanticModel) = Function(key As Binder) AttributeSemanticModel.Create(DirectCast(key, AttributeBinder))
-        Private Shared ReadOnly _topLevelCodeSemanticModelCreator As Func(Of Binder, MemberSemanticModel) = Function(key As Binder) New TopLevelCodeSemanticModel(DirectCast(key, TopLevelCodeBinder))
+        ' PERF: These variables avoid repeated allocation of Func(Of Binder, MemberSemanticModel) in GetMemberSemanticModel
+        Private ReadOnly _methodBodySemanticModelCreator As Func(Of (binder As Binder, ignoresAccessibility As Boolean), MemberSemanticModel) = Function(key As (binder As Binder, ignoresAccessibility As Boolean)) MethodBodySemanticModel.Create(Me, DirectCast(key.binder, SubOrFunctionBodyBinder), key.ignoresAccessibility)
+        Private ReadOnly _initializerSemanticModelCreator As Func(Of (binder As Binder, ignoresAccessibility As Boolean), MemberSemanticModel) = Function(key As (binder As Binder, ignoresAccessibility As Boolean)) InitializerSemanticModel.Create(Me, DirectCast(key.binder, DeclarationInitializerBinder), key.ignoresAccessibility)
+        Private ReadOnly _attributeSemanticModelCreator As Func(Of (binder As Binder, ignoresAccessibility As Boolean), MemberSemanticModel) = Function(key As (binder As Binder, ignoresAccessibility As Boolean)) AttributeSemanticModel.Create(Me, DirectCast(key.binder, AttributeBinder), key.ignoresAccessibility)
 
         Public Function GetMemberSemanticModel(binder As Binder) As MemberSemanticModel
 
             If TypeOf binder Is MethodBodyBinder Then
-                Return _semanticModelCache.GetOrAdd(binder, _methodBodySemanticModelCreator)
+                Return _semanticModelCache.GetOrAdd((binder, IgnoresAccessibility), _methodBodySemanticModelCreator)
             End If
 
             If TypeOf binder Is DeclarationInitializerBinder Then
-                Return _semanticModelCache.GetOrAdd(binder, _initializerSemanticModelCreator)
+                Return _semanticModelCache.GetOrAdd((binder, IgnoresAccessibility), _initializerSemanticModelCreator)
             End If
 
             If TypeOf binder Is AttributeBinder Then
-                Return _semanticModelCache.GetOrAdd(binder, _attributeSemanticModelCreator)
+                Return _semanticModelCache.GetOrAdd((binder, IgnoresAccessibility), _attributeSemanticModelCreator)
             End If
 
             If TypeOf binder Is TopLevelCodeBinder Then
-                Return _semanticModelCache.GetOrAdd(binder, _topLevelCodeSemanticModelCreator)
+                Return _semanticModelCache.GetOrAdd((binder, IgnoresAccessibility), _methodBodySemanticModelCreator)
             End If
 
             Return Nothing
@@ -164,7 +169,7 @@ Namespace Microsoft.CodeAnalysis.VisualBasic
             Return model
         End Function
 
-        Friend Function GetMemberSemanticModel(node As VisualBasicSyntaxNode) As MemberSemanticModel
+        Friend Function GetMemberSemanticModel(node As SyntaxNode) As MemberSemanticModel
             Return GetMemberSemanticModel(node.SpanStart)
         End Function
 
@@ -177,7 +182,7 @@ Namespace Microsoft.CodeAnalysis.VisualBasic
                 Return model.GetEnclosingBinder(position)
             Else
                 Dim binder As binder = _binderFactory.GetBinderForPosition(FindInitialNodeFromPosition(position), position)
-                Return SemanticModelBinder.Mark(binder)
+                Return SemanticModelBinder.Mark(binder, IgnoresAccessibility)
             End If
         End Function
 
@@ -266,9 +271,7 @@ Namespace Microsoft.CodeAnalysis.VisualBasic
             Dim binder As Binder = GetEnclosingBinder(node.SpanStart)
 
             If binder IsNot Nothing Then
-                Dim diagnostics As DiagnosticBag = DiagnosticBag.GetInstance()
-                Dim bound As BoundExpression = binder.BindExpression(node, diagnostics)
-                diagnostics.Free()
+                Dim bound As BoundExpression = binder.BindExpression(node, BindingDiagnosticBag.Discarded)
 
                 Dim newSymbolInfo = GetSymbolInfoForNode(options, New BoundNodeSummary(bound, bound, Nothing), binderOpt:=Nothing)
 
@@ -311,7 +314,10 @@ Namespace Microsoft.CodeAnalysis.VisualBasic
                 ElseIf SyntaxFacts.IsHandlesProperty(node) Then
                     Return GetHandlesPropertyTypeInfo(DirectCast(node.Parent.Parent, HandlesClauseItemSyntax))
                 ElseIf IsInCrefOrNameAttributeInterior(node) Then
-                    Return GetTypeInfoForCrefOrNameAttributeReference(DirectCast(node, TypeSyntax))
+                    Dim typeSyntax = TryCast(node, TypeSyntax)
+                    If typeSyntax IsNot Nothing Then
+                        Return GetTypeInfoForCrefOrNameAttributeReference(typeSyntax)
+                    End If
                 ElseIf SyntaxFacts.IsInNamespaceOrTypeContext(node) Then
                     ' Bind the type or namespace name.
                     Return GetTypeOrNamespaceTypeInfoNotInMember(DirectCast(node, TypeSyntax))
@@ -340,6 +346,28 @@ Namespace Microsoft.CodeAnalysis.VisualBasic
 
             If model IsNot Nothing Then
                 Return model.GetExpressionConstantValue(node, cancellationToken)
+            Else
+                Return Nothing
+            End If
+        End Function
+
+        Friend Overrides Function GetOperationWorker(node As VisualBasicSyntaxNode, cancellationToken As CancellationToken) As IOperation
+            Dim model As MemberSemanticModel
+
+            Dim methodBlock = TryCast(node, MethodBlockBaseSyntax)
+            If methodBlock IsNot Nothing Then
+                ' Trying to get the MemberSemanticModel for a MethodBlock will end up returning
+                ' nothing.  That's because trying to get Binder for the MethodBlock will actually
+                ' return the binder for the containing type.  To avoid this we ask for the model
+                ' passing in a position at the end of the method's starting block-statement.
+                ' This will cause it to try to get the interior MemberSemanticModel.
+                model = GetMemberSemanticModel(methodBlock.BlockStatement.EndPosition)
+            Else
+                model = Me.GetMemberSemanticModel(node)
+            End If
+
+            If model IsNot Nothing Then
+                Return model.GetOperationWorker(node, cancellationToken)
             Else
                 Return Nothing
             End If
@@ -426,24 +454,19 @@ Namespace Microsoft.CodeAnalysis.VisualBasic
         End Function
 
         Private Function GetTypeOrNamespaceSymbolNotInMember(expression As TypeSyntax) As Symbol
-            Dim diagnostics As DiagnosticBag = DiagnosticBag.GetInstance()
-            Try
-                ' Set up the binding context.
-                Dim binder As Binder = GetEnclosingBinder(expression.SpanStart)
+            ' Set up the binding context.
+            Dim binder As Binder = GetEnclosingBinder(expression.SpanStart)
 
-                ' Attempt to bind the type or namespace
-                Dim resultSymbol As Symbol
-                If SyntaxFacts.IsInTypeOnlyContext(expression) Then
-                    resultSymbol = binder.BindTypeOrAliasSyntax(expression, diagnostics)
-                Else
-                    resultSymbol = binder.BindNamespaceOrTypeOrAliasSyntax(expression, diagnostics)
-                End If
+            ' Attempt to bind the type or namespace
+            Dim resultSymbol As Symbol
+            If SyntaxFacts.IsInTypeOnlyContext(expression) Then
+                resultSymbol = binder.BindTypeOrAliasSyntax(expression, BindingDiagnosticBag.Discarded)
+            Else
+                resultSymbol = binder.BindNamespaceOrTypeOrAliasSyntax(expression, BindingDiagnosticBag.Discarded)
+            End If
 
-                ' Create the result.
-                Return resultSymbol
-            Finally
-                diagnostics.Free()
-            End Try
+            ' Create the result.
+            Return resultSymbol
         End Function
 
         ' Get the symbol info of reference from 'cref' or 'name' attribute value
@@ -521,7 +544,7 @@ Namespace Microsoft.CodeAnalysis.VisualBasic
                                                                 <Out> ByRef typeParameters As ImmutableArray(Of Symbol)) As ImmutableArray(Of Symbol)
             typeParameters = ImmutableArray(Of Symbol).Empty
 
-            ' We only allow a sertain list of node kinds to be processed here
+            ' We only allow a certain list of node kinds to be processed here
             If node.Kind = SyntaxKind.XmlString Then
                 Return Nothing
             End If
@@ -571,17 +594,17 @@ Namespace Microsoft.CodeAnalysis.VisualBasic
             End If
 
             Dim docCommentBinder = Me._binderFactory.GetBinderForPosition(node, node.SpanStart)
-            docCommentBinder = SemanticModelBinder.Mark(docCommentBinder)
+            docCommentBinder = SemanticModelBinder.Mark(docCommentBinder, IgnoresAccessibility)
 
             If isCrefAttribute Then
                 Dim symbols As ImmutableArray(Of Symbol)
                 Dim isTopLevel As Boolean
                 If node.Kind = SyntaxKind.CrefReference Then
                     isTopLevel = True
-                    symbols = docCommentBinder.BindInsideCrefAttributeValue(DirectCast(node, CrefReferenceSyntax), preserveAlias, Nothing, Nothing)
+                    symbols = docCommentBinder.BindInsideCrefAttributeValue(DirectCast(node, CrefReferenceSyntax), preserveAlias, Nothing, CompoundUseSiteInfo(Of AssemblySymbol).Discarded)
                 Else
                     isTopLevel = node.Parent IsNot Nothing AndAlso node.Parent.Kind = SyntaxKind.CrefReference
-                    symbols = docCommentBinder.BindInsideCrefAttributeValue(DirectCast(node, TypeSyntax), preserveAlias, Nothing, Nothing)
+                    symbols = docCommentBinder.BindInsideCrefAttributeValue(DirectCast(node, TypeSyntax), preserveAlias, Nothing, CompoundUseSiteInfo(Of AssemblySymbol).Discarded)
                 End If
 
                 If isTopLevel Then
@@ -610,7 +633,7 @@ Namespace Microsoft.CodeAnalysis.VisualBasic
 
                 Return symbols
             Else
-                Return docCommentBinder.BindXmlNameAttributeValue(DirectCast(node, IdentifierNameSyntax), useSiteDiagnostics:=Nothing)
+                Return docCommentBinder.BindXmlNameAttributeValue(DirectCast(node, IdentifierNameSyntax), useSiteInfo:=CompoundUseSiteInfo(Of AssemblySymbol).Discarded)
             End If
         End Function
 
@@ -677,60 +700,55 @@ Namespace Microsoft.CodeAnalysis.VisualBasic
         Private Function GetImplementedMemberAndResultKind(symbolBuilder As ArrayBuilder(Of Symbol), memberName As QualifiedNameSyntax) As LookupResultKind
             Debug.Assert(symbolBuilder.Count = 0)
 
-            Dim diagnostics As DiagnosticBag = DiagnosticBag.GetInstance()
             Dim resultKind As LookupResultKind = LookupResultKind.Good
-            Try
 
-                ' Set up the binding context.
-                Dim binder As Binder = GetEnclosingBinder(memberName.SpanStart)
+            ' Set up the binding context.
+            Dim binder As Binder = GetEnclosingBinder(memberName.SpanStart)
 
-                ' Figure out the symbol this implements clause is on, and bind the syntax for it.
-                Dim implementingMemberSyntax = TryCast(memberName.Parent.Parent, MethodBaseSyntax)
-                If implementingMemberSyntax IsNot Nothing Then
-                    Dim implementingMember = GetDeclaredSymbol(implementingMemberSyntax)
+            ' Figure out the symbol this implements clause is on, and bind the syntax for it.
+            Dim implementingMemberSyntax = TryCast(memberName.Parent.Parent, MethodBaseSyntax)
+            If implementingMemberSyntax IsNot Nothing Then
+                Dim implementingMember = GetDeclaredSymbol(implementingMemberSyntax)
 
-                    If implementingMember IsNot Nothing Then
-                        Select Case implementingMember.Kind
-                            Case SymbolKind.Method
-                                ImplementsHelper.FindExplicitlyImplementedMember(Of MethodSymbol)(
-                                                        DirectCast(implementingMember, MethodSymbol),
-                                                        DirectCast(implementingMember, MethodSymbol).ContainingType,
-                                                        memberName,
-                                                        binder,
-                                                        diagnostics,
-                                                        symbolBuilder,
-                                                        resultKind)
+                If implementingMember IsNot Nothing Then
+                    Select Case implementingMember.Kind
+                        Case SymbolKind.Method
+                            ImplementsHelper.FindExplicitlyImplementedMember(Of MethodSymbol)(
+                                                    DirectCast(implementingMember, MethodSymbol),
+                                                    DirectCast(implementingMember, MethodSymbol).ContainingType,
+                                                    memberName,
+                                                    binder,
+                                                    BindingDiagnosticBag.Discarded,
+                                                    symbolBuilder,
+                                                    resultKind)
 
-                            Case SymbolKind.Property
-                                ImplementsHelper.FindExplicitlyImplementedMember(Of PropertySymbol)(
-                                                        DirectCast(implementingMember, PropertySymbol),
-                                                        DirectCast(implementingMember, PropertySymbol).ContainingType,
-                                                        memberName,
-                                                        binder,
-                                                        diagnostics,
-                                                        symbolBuilder,
-                                                        resultKind)
+                        Case SymbolKind.Property
+                            ImplementsHelper.FindExplicitlyImplementedMember(Of PropertySymbol)(
+                                                    DirectCast(implementingMember, PropertySymbol),
+                                                    DirectCast(implementingMember, PropertySymbol).ContainingType,
+                                                    memberName,
+                                                    binder,
+                                                    BindingDiagnosticBag.Discarded,
+                                                    symbolBuilder,
+                                                    resultKind)
 
-                            Case SymbolKind.Event
-                                ImplementsHelper.FindExplicitlyImplementedMember(Of EventSymbol)(
-                                                        DirectCast(implementingMember, EventSymbol),
-                                                        DirectCast(implementingMember, EventSymbol).ContainingType,
-                                                        memberName,
-                                                        binder,
-                                                        diagnostics,
-                                                        symbolBuilder,
-                                                        resultKind)
+                        Case SymbolKind.Event
+                            ImplementsHelper.FindExplicitlyImplementedMember(Of EventSymbol)(
+                                                    DirectCast(implementingMember, EventSymbol),
+                                                    DirectCast(implementingMember, EventSymbol).ContainingType,
+                                                    memberName,
+                                                    binder,
+                                                    BindingDiagnosticBag.Discarded,
+                                                    symbolBuilder,
+                                                    resultKind)
 
-                            Case Else
-                                Throw ExceptionUtilities.UnexpectedValue(implementingMember.Kind)
-                        End Select
-                    End If
+                        Case Else
+                            Throw ExceptionUtilities.UnexpectedValue(implementingMember.Kind)
+                    End Select
                 End If
+            End If
 
-                Return resultKind
-            Finally
-                diagnostics.Free()
-            End Try
+            Return resultKind
         End Function
 
         Private Function GetHandledEventOrContainerSymbolsAndResultKind(eventSymbolBuilder As ArrayBuilder(Of Symbol),
@@ -751,16 +769,13 @@ Namespace Microsoft.CodeAnalysis.VisualBasic
                 If implementingMember IsNot Nothing Then
                     Dim methodSym = DirectCast(implementingMember, SourceMemberMethodSymbol)
 
-                    Dim diagbag = DiagnosticBag.GetInstance()
-                    Dim boundClause = methodSym.BindSingleHandlesClause(handlesClause,
-                                                                        binder,
-                                                                        diagbag,
-                                                                        eventSymbolBuilder,
-                                                                        containerSymbolBuilder,
-                                                                        propertySymbolBuilder,
-                                                                        resultKind)
-
-                    diagbag.Free()
+                    methodSym.BindSingleHandlesClause(handlesClause,
+                                                      binder,
+                                                      BindingDiagnosticBag.Discarded,
+                                                      eventSymbolBuilder,
+                                                      containerSymbolBuilder,
+                                                      propertySymbolBuilder,
+                                                      resultKind)
                 End If
             End If
 
@@ -805,7 +820,7 @@ Namespace Microsoft.CodeAnalysis.VisualBasic
             Return SymbolInfoFactory.Create(symbols, resultKind)
         End Function
 
-        ' Get the symbol info of an withevents sourcing property in a handles clause.
+        ' Get the symbol info of a withevents sourcing property in a handles clause.
         Private Function GetHandlesPropertySymbolInfo(handlesClause As HandlesClauseItemSyntax, options As SymbolInfoOptions) As SymbolInfo
             Dim builder As ArrayBuilder(Of Symbol) = ArrayBuilder(Of Symbol).GetInstance()
             Dim resultKind As LookupResultKind = GetHandledEventOrContainerSymbolsAndResultKind(eventSymbolBuilder:=Nothing,
@@ -844,12 +859,12 @@ Namespace Microsoft.CodeAnalysis.VisualBasic
         End Function
 
         ''' <summary>
-        ''' Checks all symbol locations against the syntax provided and rreturn symbol if any of the locations is 
+        ''' Checks all symbol locations against the syntax provided and return symbol if any of the locations is 
         ''' inside the syntax span. Returns Nothing otherwise.
         ''' </summary>
         Private Function CheckSymbolLocationsAgainstSyntax(symbol As NamedTypeSymbol, nodeToCheck As VisualBasicSyntaxNode) As NamedTypeSymbol
             For Each location In symbol.Locations
-                If location.SourceTree Is Me.SyntaxTree AndAlso nodeToCheck.Span.Contains(location.SourceSpan.Start) Then
+                If location.SourceTree Is Me.SyntaxTree AndAlso nodeToCheck.Span.Contains(location.SourceSpan) Then
                     Return symbol
                 End If
             Next
@@ -862,19 +877,17 @@ Namespace Microsoft.CodeAnalysis.VisualBasic
         ''' <param name="declarationSyntax">The syntax node that declares a type.</param>
         ''' <returns>The type symbol that was declared.</returns>
         Public Overloads Function GetDeclaredSymbol(declarationSyntax As DelegateStatementSyntax, Optional cancellationToken As CancellationToken = Nothing) As NamedTypeSymbol
-            Using Logger.LogBlock(FunctionId.VisualBasic_SemanticModel_GetDeclaredSymbol, message:=Me.SyntaxTree.FilePath, cancellationToken:=cancellationToken)
-                If declarationSyntax Is Nothing Then Throw New ArgumentNullException("declarationSyntax")
-                If Not IsInTree(declarationSyntax) Then Throw New ArgumentException(VBResources.DeclarationSyntaxNotWithinTree)
+            If declarationSyntax Is Nothing Then Throw New ArgumentNullException(NameOf(declarationSyntax))
+            If Not IsInTree(declarationSyntax) Then Throw New ArgumentException(VBResources.DeclarationSyntaxNotWithinTree)
 
-                ' Don't need to wrap in a SemanticModelBinder, since we're not binding.
-                Dim binder As Binder = _binderFactory.GetNamedTypeBinder(declarationSyntax)
+            ' Don't need to wrap in a SemanticModelBinder, since we're not binding.
+            Dim binder As Binder = _binderFactory.GetNamedTypeBinder(declarationSyntax)
 
-                If binder IsNot Nothing AndAlso TypeOf binder Is NamedTypeBinder Then
-                    Return CheckSymbolLocationsAgainstSyntax(DirectCast(binder.ContainingType, NamedTypeSymbol), declarationSyntax)
-                Else
-                    Return Nothing  ' Can this happen? Maybe in some edge case error cases.
-                End If
-            End Using
+            If binder IsNot Nothing AndAlso TypeOf binder Is NamedTypeBinder Then
+                Return CheckSymbolLocationsAgainstSyntax(DirectCast(binder.ContainingType, NamedTypeSymbol), declarationSyntax)
+            Else
+                Return Nothing  ' Can this happen? Maybe in some edge case error cases.
+            End If
         End Function
 
 
@@ -884,19 +897,17 @@ Namespace Microsoft.CodeAnalysis.VisualBasic
         ''' <param name="declarationSyntax">The syntax node that declares a type.</param>
         ''' <returns>The type symbol that was declared.</returns>
         Public Overloads Overrides Function GetDeclaredSymbol(declarationSyntax As TypeStatementSyntax, Optional cancellationToken As CancellationToken = Nothing) As INamedTypeSymbol
-            Using Logger.LogBlock(FunctionId.VisualBasic_SemanticModel_GetDeclaredSymbol, message:=Me.SyntaxTree.FilePath, cancellationToken:=cancellationToken)
-                If declarationSyntax Is Nothing Then Throw New ArgumentNullException("declarationSyntax")
-                If Not IsInTree(declarationSyntax) Then Throw New ArgumentException(VBResources.DeclarationSyntaxNotWithinTree)
+            If declarationSyntax Is Nothing Then Throw New ArgumentNullException(NameOf(declarationSyntax))
+            If Not IsInTree(declarationSyntax) Then Throw New ArgumentException(VBResources.DeclarationSyntaxNotWithinTree)
 
-                ' Don't need to wrap in a SemanticModelBinder, since we're not binding.
-                Dim binder As Binder = _binderFactory.GetNamedTypeBinder(declarationSyntax)
+            ' Don't need to wrap in a SemanticModelBinder, since we're not binding.
+            Dim binder As Binder = _binderFactory.GetNamedTypeBinder(declarationSyntax)
 
-                If binder IsNot Nothing AndAlso TypeOf binder Is NamedTypeBinder Then
-                    Return CheckSymbolLocationsAgainstSyntax(DirectCast(binder.ContainingType, NamedTypeSymbol), declarationSyntax)
-                Else
-                    Return Nothing  ' Can this happen? Maybe in some edge case error cases.
-                End If
-            End Using
+            If binder IsNot Nothing AndAlso TypeOf binder Is NamedTypeBinder Then
+                Return CheckSymbolLocationsAgainstSyntax(DirectCast(binder.ContainingType, NamedTypeSymbol), declarationSyntax)
+            Else
+                Return Nothing  ' Can this happen? Maybe in some edge case error cases.
+            End If
         End Function
 
         ''' <summary>
@@ -905,19 +916,17 @@ Namespace Microsoft.CodeAnalysis.VisualBasic
         ''' <param name="declarationSyntax">The syntax node that declares an enum.</param>
         ''' <returns>The type symbol that was declared.</returns>
         Public Overloads Overrides Function GetDeclaredSymbol(declarationSyntax As EnumStatementSyntax, Optional cancellationToken As CancellationToken = Nothing) As INamedTypeSymbol
-            Using Logger.LogBlock(FunctionId.VisualBasic_SemanticModel_GetDeclaredSymbol, message:=Me.SyntaxTree.FilePath, cancellationToken:=cancellationToken)
-                If declarationSyntax Is Nothing Then Throw New ArgumentNullException("declarationSyntax")
-                If Not IsInTree(declarationSyntax) Then Throw New ArgumentException(VBResources.DeclarationSyntaxNotWithinTree)
+            If declarationSyntax Is Nothing Then Throw New ArgumentNullException(NameOf(declarationSyntax))
+            If Not IsInTree(declarationSyntax) Then Throw New ArgumentException(VBResources.DeclarationSyntaxNotWithinTree)
 
-                ' Don't need to wrap in a SemanticModelBinder, since we're not binding.
-                Dim binder As Binder = _binderFactory.GetNamedTypeBinder(declarationSyntax)
+            ' Don't need to wrap in a SemanticModelBinder, since we're not binding.
+            Dim binder As Binder = _binderFactory.GetNamedTypeBinder(declarationSyntax)
 
-                If binder IsNot Nothing AndAlso TypeOf binder Is NamedTypeBinder Then
-                    Return CheckSymbolLocationsAgainstSyntax(DirectCast(binder.ContainingType, NamedTypeSymbol), declarationSyntax)
-                Else
-                    Return Nothing  ' Can this happen? Maybe in some edge case with errors
-                End If
-            End Using
+            If binder IsNot Nothing AndAlso TypeOf binder Is NamedTypeBinder Then
+                Return CheckSymbolLocationsAgainstSyntax(DirectCast(binder.ContainingType, NamedTypeSymbol), declarationSyntax)
+            Else
+                Return Nothing  ' Can this happen? Maybe in some edge case with errors
+            End If
         End Function
 
         ''' <summary>
@@ -926,22 +935,20 @@ Namespace Microsoft.CodeAnalysis.VisualBasic
         ''' <param name="declarationSyntax">The syntax node that declares a namespace.</param>
         ''' <returns>The namespace symbol that was declared.</returns>
         Public Overloads Overrides Function GetDeclaredSymbol(declarationSyntax As NamespaceStatementSyntax, Optional cancellationToken As CancellationToken = Nothing) As INamespaceSymbol
-            Using Logger.LogBlock(FunctionId.VisualBasic_SemanticModel_GetDeclaredSymbol, message:=Me.SyntaxTree.FilePath, cancellationToken:=cancellationToken)
-                If declarationSyntax Is Nothing Then Throw New ArgumentNullException("declarationSyntax")
-                If Not IsInTree(declarationSyntax) Then Throw New ArgumentException(VBResources.DeclarationSyntaxNotWithinTree)
+            If declarationSyntax Is Nothing Then Throw New ArgumentNullException(NameOf(declarationSyntax))
+            If Not IsInTree(declarationSyntax) Then Throw New ArgumentException(VBResources.DeclarationSyntaxNotWithinTree)
 
-                Dim parentBlock = TryCast(declarationSyntax.Parent, NamespaceBlockSyntax)
-                If parentBlock IsNot Nothing Then
-                    ' Don't need to wrap in a SemanticModelBinder, since we're not binding.
-                    Dim binder As Binder = _binderFactory.GetNamespaceBinder(parentBlock)
+            Dim parentBlock = TryCast(declarationSyntax.Parent, NamespaceBlockSyntax)
+            If parentBlock IsNot Nothing Then
+                ' Don't need to wrap in a SemanticModelBinder, since we're not binding.
+                Dim binder As Binder = _binderFactory.GetNamespaceBinder(parentBlock)
 
-                    If binder IsNot Nothing AndAlso TypeOf binder Is NamespaceBinder Then
-                        Return DirectCast(binder.ContainingNamespaceOrType, NamespaceSymbol)
-                    End If
+                If binder IsNot Nothing AndAlso TypeOf binder Is NamespaceBinder Then
+                    Return DirectCast(binder.ContainingNamespaceOrType, NamespaceSymbol)
                 End If
+            End If
 
-                Return Nothing ' Edge case with errors
-            End Using
+            Return Nothing ' Edge case with errors
         End Function
 
         ''' <summary>
@@ -950,92 +957,90 @@ Namespace Microsoft.CodeAnalysis.VisualBasic
         ''' <param name="declarationSyntax">The syntax node that declares a method, property, or event.</param>
         ''' <returns>The method, property, or event symbol that was declared.</returns>
         Friend Overloads Overrides Function GetDeclaredSymbol(declarationSyntax As MethodBaseSyntax, Optional cancellationToken As CancellationToken = Nothing) As ISymbol
-            Using Logger.LogBlock(FunctionId.VisualBasic_SemanticModel_GetDeclaredSymbol, message:=Me.SyntaxTree.FilePath, cancellationToken:=cancellationToken)
-                If declarationSyntax Is Nothing Then Throw New ArgumentNullException("declarationSyntax")
-                If Not IsInTree(declarationSyntax) Then
-                    Throw New ArgumentException(VBResources.DeclarationSyntaxNotWithinTree)
-                End If
+            If declarationSyntax Is Nothing Then Throw New ArgumentNullException(NameOf(declarationSyntax))
+            If Not IsInTree(declarationSyntax) Then
+                Throw New ArgumentException(VBResources.DeclarationSyntaxNotWithinTree)
+            End If
 
-                ' Delegate declarations are a subclass of MethodBaseSyntax syntax-wise, but they are
-                ' more like a type declaration, so we need to special case here.
-                If declarationSyntax.Kind = SyntaxKind.DelegateFunctionStatement OrElse
-                    declarationSyntax.Kind = SyntaxKind.DelegateSubStatement Then
-                    Return GetDeclaredSymbol(DirectCast(declarationSyntax, DelegateStatementSyntax), cancellationToken)
-                End If
+            ' Delegate declarations are a subclass of MethodBaseSyntax syntax-wise, but they are
+            ' more like a type declaration, so we need to special case here.
+            If declarationSyntax.Kind = SyntaxKind.DelegateFunctionStatement OrElse
+                declarationSyntax.Kind = SyntaxKind.DelegateSubStatement Then
+                Return GetDeclaredSymbol(DirectCast(declarationSyntax, DelegateStatementSyntax), cancellationToken)
+            End If
 
-                Dim statementSyntax = TryCast(declarationSyntax.Parent, StatementSyntax)
-                If statementSyntax IsNot Nothing Then
+            Dim statementSyntax = TryCast(declarationSyntax.Parent, StatementSyntax)
+            If statementSyntax IsNot Nothing Then
 
-                    '  get parent type block
-                    Dim parentTypeBlock As TypeBlockSyntax = Nothing
-                    Select Case statementSyntax.Kind
-                        Case SyntaxKind.ClassBlock, SyntaxKind.EnumBlock, SyntaxKind.StructureBlock, SyntaxKind.InterfaceBlock, SyntaxKind.ModuleBlock
-                            parentTypeBlock = TryCast(statementSyntax, TypeBlockSyntax)
+                '  get parent type block
+                Dim parentTypeBlock As TypeBlockSyntax = Nothing
+                Select Case statementSyntax.Kind
+                    Case SyntaxKind.ClassBlock, SyntaxKind.EnumBlock, SyntaxKind.StructureBlock, SyntaxKind.InterfaceBlock, SyntaxKind.ModuleBlock
+                        parentTypeBlock = TryCast(statementSyntax, TypeBlockSyntax)
 
-                        Case SyntaxKind.SubBlock, SyntaxKind.FunctionBlock, SyntaxKind.ConstructorBlock, SyntaxKind.OperatorBlock, SyntaxKind.PropertyBlock, SyntaxKind.EventBlock
-                            parentTypeBlock = TryCast(statementSyntax.Parent, TypeBlockSyntax)
+                    Case SyntaxKind.SubBlock, SyntaxKind.FunctionBlock, SyntaxKind.ConstructorBlock, SyntaxKind.OperatorBlock, SyntaxKind.PropertyBlock, SyntaxKind.EventBlock
+                        parentTypeBlock = TryCast(statementSyntax.Parent, TypeBlockSyntax)
 
-                            ' EDMAURER maybe this is a top-level decl in which case the parent is a CompilationUnitSyntax
-                            If parentTypeBlock Is Nothing AndAlso statementSyntax.Parent IsNot Nothing Then
-                                Dim namespaceToLookInForImplicitType As INamespaceSymbol = Nothing
-                                Select Case statementSyntax.Parent.Kind
-                                    Case SyntaxKind.CompilationUnit
-                                        namespaceToLookInForImplicitType = Me._sourceModule.RootNamespace
-                                    Case SyntaxKind.NamespaceBlock
-                                        namespaceToLookInForImplicitType = GetDeclaredSymbol(DirectCast(statementSyntax.Parent, NamespaceBlockSyntax))
-                                End Select
+                        ' EDMAURER maybe this is a top-level decl in which case the parent is a CompilationUnitSyntax
+                        If parentTypeBlock Is Nothing AndAlso statementSyntax.Parent IsNot Nothing Then
+                            Dim namespaceToLookInForImplicitType As INamespaceSymbol = Nothing
+                            Select Case statementSyntax.Parent.Kind
+                                Case SyntaxKind.CompilationUnit
+                                    namespaceToLookInForImplicitType = Me._sourceModule.RootNamespace
+                                Case SyntaxKind.NamespaceBlock
+                                    namespaceToLookInForImplicitType = GetDeclaredSymbol(DirectCast(statementSyntax.Parent, NamespaceBlockSyntax))
+                            End Select
 
-                                If namespaceToLookInForImplicitType IsNot Nothing Then
-                                    Dim implicitType = DirectCast(namespaceToLookInForImplicitType.GetMembers(TypeSymbol.ImplicitTypeName).SingleOrDefault(), NamedTypeSymbol)
+                            If namespaceToLookInForImplicitType IsNot Nothing Then
+                                Dim implicitType = DirectCast(namespaceToLookInForImplicitType.GetMembers(TypeSymbol.ImplicitTypeName).SingleOrDefault(), NamedTypeSymbol)
 
-                                    If implicitType IsNot Nothing Then
-                                        Return SourceMethodSymbol.FindSymbolFromSyntax(declarationSyntax, _syntaxTree, implicitType)
-                                    End If
+                                If implicitType IsNot Nothing Then
+                                    Return SourceMethodSymbol.FindSymbolFromSyntax(declarationSyntax, _syntaxTree, implicitType)
                                 End If
                             End If
-                        Case SyntaxKind.GetAccessorBlock, SyntaxKind.SetAccessorBlock, SyntaxKind.AddHandlerAccessorBlock, SyntaxKind.RemoveHandlerAccessorBlock, SyntaxKind.RaiseEventAccessorBlock
-                            '  redirect to upper property or event symbol
-                            If statementSyntax.Parent IsNot Nothing Then
-                                parentTypeBlock = TryCast(statementSyntax.Parent.Parent, TypeBlockSyntax)
-                            End If
-
-                        Case SyntaxKind.AddHandlerAccessorBlock, SyntaxKind.RemoveHandlerAccessorBlock
-                            '  redirect to upper event symbol
-                            If statementSyntax.Parent IsNot Nothing Then
-                                parentTypeBlock = TryCast(statementSyntax.Parent.Parent, TypeBlockSyntax)
-                            End If
-
-                        Case Else
-                            ' broken code scenarios end up here
-
-                            ' to end up here, a methodbasesyntax's parent must be a statement and not be one of the above. 
-                            ' The parser does e.g. not generate an enclosing block for accessors statements,
-                            ' but for Operators, conversions and constructors.
-
-                            ' The case where an invalid accessor is contained in e.g. an interface is handled further down in "FindSymbolFromSyntax".
-
-                            ' TODO: consider always creating a (missing) block around the statements in the parser
-
-                            ' We are asserting what we know so far. If this assert fails, this is not a bug, we either need to remove this assert or relax the assert. 
-                            Debug.Assert(statementSyntax.Kind = SyntaxKind.NamespaceBlock AndAlso
-                                         (TypeOf (declarationSyntax) Is AccessorStatementSyntax OrElse
-                                          TypeOf (declarationSyntax) Is EventStatementSyntax OrElse
-                                          TypeOf (declarationSyntax) Is MethodStatementSyntax OrElse
-                                          TypeOf (declarationSyntax) Is PropertyStatementSyntax))
-
-                            Return Nothing
-                    End Select
-
-                    If parentTypeBlock IsNot Nothing Then
-                        Dim containingType = DirectCast(GetDeclaredSymbol(parentTypeBlock.BlockStatement, cancellationToken), NamedTypeSymbol)
-                        If containingType IsNot Nothing Then
-                            Return SourceMethodSymbol.FindSymbolFromSyntax(declarationSyntax, _syntaxTree, containingType)
                         End If
+                    Case SyntaxKind.GetAccessorBlock, SyntaxKind.SetAccessorBlock, SyntaxKind.AddHandlerAccessorBlock, SyntaxKind.RemoveHandlerAccessorBlock, SyntaxKind.RaiseEventAccessorBlock
+                        '  redirect to upper property or event symbol
+                        If statementSyntax.Parent IsNot Nothing Then
+                            parentTypeBlock = TryCast(statementSyntax.Parent.Parent, TypeBlockSyntax)
+                        End If
+
+                    Case SyntaxKind.AddHandlerAccessorBlock, SyntaxKind.RemoveHandlerAccessorBlock
+                        '  redirect to upper event symbol
+                        If statementSyntax.Parent IsNot Nothing Then
+                            parentTypeBlock = TryCast(statementSyntax.Parent.Parent, TypeBlockSyntax)
+                        End If
+
+                    Case Else
+                        ' broken code scenarios end up here
+
+                        ' to end up here, a methodbasesyntax's parent must be a statement and not be one of the above. 
+                        ' The parser does e.g. not generate an enclosing block for accessors statements,
+                        ' but for Operators, conversions and constructors.
+
+                        ' The case where an invalid accessor is contained in e.g. an interface is handled further down in "FindSymbolFromSyntax".
+
+                        ' TODO: consider always creating a (missing) block around the statements in the parser
+
+                        ' We are asserting what we know so far. If this assert fails, this is not a bug, we either need to remove this assert or relax the assert. 
+                        Debug.Assert(statementSyntax.Kind = SyntaxKind.NamespaceBlock AndAlso
+                                     (TypeOf (declarationSyntax) Is AccessorStatementSyntax OrElse
+                                      TypeOf (declarationSyntax) Is EventStatementSyntax OrElse
+                                      TypeOf (declarationSyntax) Is MethodStatementSyntax OrElse
+                                      TypeOf (declarationSyntax) Is PropertyStatementSyntax))
+
+                        Return Nothing
+                End Select
+
+                If parentTypeBlock IsNot Nothing Then
+                    Dim containingType = DirectCast(GetDeclaredSymbol(parentTypeBlock.BlockStatement, cancellationToken), NamedTypeSymbol)
+                    If containingType IsNot Nothing Then
+                        Return SourceMethodSymbol.FindSymbolFromSyntax(declarationSyntax, _syntaxTree, containingType)
                     End If
                 End If
+            End If
 
-                Return Nothing
-            End Using
+            Return Nothing
         End Function
 
         ''' <summary>
@@ -1044,46 +1049,52 @@ Namespace Microsoft.CodeAnalysis.VisualBasic
         ''' <param name="parameter">The syntax node that declares a parameter.</param>
         ''' <returns>The parameter symbol that was declared.</returns>
         Public Overloads Overrides Function GetDeclaredSymbol(parameter As ParameterSyntax, Optional cancellationToken As CancellationToken = Nothing) As IParameterSymbol
-            Using Logger.LogBlock(FunctionId.VisualBasic_SemanticModel_GetDeclaredSymbol, message:=Me.SyntaxTree.FilePath, cancellationToken:=cancellationToken)
-                If parameter Is Nothing Then
-                    Throw New ArgumentNullException("parameter")
-                End If
+            If parameter Is Nothing Then
+                Throw New ArgumentNullException(NameOf(parameter))
+            End If
 
-                Dim paramList As ParameterListSyntax = TryCast(parameter.Parent, ParameterListSyntax)
-                If paramList IsNot Nothing Then
-                    Dim declarationSyntax As MethodBaseSyntax = TryCast(paramList.Parent, MethodBaseSyntax)
-                    If declarationSyntax IsNot Nothing Then
-                        Dim symbol = GetDeclaredSymbol(declarationSyntax, cancellationToken)
-                        If symbol IsNot Nothing Then
-                            Select Case symbol.Kind
-                                Case SymbolKind.Method
-                                    Return GetParameterSymbol(DirectCast(symbol, MethodSymbol).Parameters, parameter)
-                                Case SymbolKind.Event
-                                    Return GetParameterSymbol(DirectCast(symbol, EventSymbol).DelegateParameters, parameter)
-                                Case SymbolKind.Property
-                                    Return GetParameterSymbol(DirectCast(symbol, PropertySymbol).Parameters, parameter)
-                                Case SymbolKind.NamedType
-                                    '  check for being delegate 
-                                    Dim typeSymbol = DirectCast(symbol, NamedTypeSymbol)
-                                    Debug.Assert(typeSymbol.TypeKind = TypeKind.Delegate)
-                                    If typeSymbol.DelegateInvokeMethod IsNot Nothing Then
-                                        Return GetParameterSymbol(typeSymbol.DelegateInvokeMethod.Parameters, parameter)
-                                    End If
-                            End Select
+            Dim paramList As ParameterListSyntax = TryCast(parameter.Parent, ParameterListSyntax)
+            If paramList IsNot Nothing Then
+                Dim declarationSyntax As MethodBaseSyntax = TryCast(paramList.Parent, MethodBaseSyntax)
+                If declarationSyntax IsNot Nothing Then
+                    Dim symbol = GetDeclaredSymbol(declarationSyntax, cancellationToken)
+                    If symbol IsNot Nothing Then
+                        Select Case symbol.Kind
+                            Case SymbolKind.Method
+                                Return GetParameterSymbol(DirectCast(symbol, MethodSymbol).Parameters, parameter)
+                            Case SymbolKind.Event
+                                Dim eventSymbol As EventSymbol = DirectCast(symbol, EventSymbol)
+                                Dim type = TryCast(eventSymbol.Type, NamedTypeSymbol)
 
-                        ElseIf TypeOf declarationSyntax Is LambdaHeaderSyntax Then
-                            ' This could be a lambda parameter.
-                            Dim model As MemberSemanticModel = Me.GetMemberSemanticModel(declarationSyntax)
+                                If type?.AssociatedSymbol Is eventSymbol Then
+                                    Return GetParameterSymbol(type.DelegateInvokeMethod.Parameters, parameter)
+                                End If
 
-                            If model IsNot Nothing Then
-                                Return model.GetDeclaredSymbol(parameter, cancellationToken)
-                            End If
+                                Return Nothing
+
+                            Case SymbolKind.Property
+                                Return GetParameterSymbol(DirectCast(symbol, PropertySymbol).Parameters, parameter)
+                            Case SymbolKind.NamedType
+                                '  check for being delegate 
+                                Dim typeSymbol = DirectCast(symbol, NamedTypeSymbol)
+                                Debug.Assert(typeSymbol.TypeKind = TYPEKIND.Delegate)
+                                If typeSymbol.DelegateInvokeMethod IsNot Nothing Then
+                                    Return GetParameterSymbol(typeSymbol.DelegateInvokeMethod.Parameters, parameter)
+                                End If
+                        End Select
+
+                    ElseIf TypeOf declarationSyntax Is LambdaHeaderSyntax Then
+                        ' This could be a lambda parameter.
+                        Dim model As MemberSemanticModel = Me.GetMemberSemanticModel(declarationSyntax)
+
+                        If model IsNot Nothing Then
+                            Return model.GetDeclaredSymbol(parameter, cancellationToken)
                         End If
                     End If
                 End If
+            End If
 
-                Return Nothing
-            End Using
+            Return Nothing
         End Function
 
         ''' <summary>
@@ -1092,40 +1103,38 @@ Namespace Microsoft.CodeAnalysis.VisualBasic
         ''' <param name="typeParameter">The syntax node that declares a type parameter.</param>
         ''' <returns>The type parameter symbol that was declared.</returns>
         Public Overloads Overrides Function GetDeclaredSymbol(typeParameter As TypeParameterSyntax, Optional cancellationToken As CancellationToken = Nothing) As ITypeParameterSymbol
-            Using Logger.LogBlock(FunctionId.VisualBasic_SemanticModel_GetDeclaredSymbol, message:=Me.SyntaxTree.FilePath, cancellationToken:=cancellationToken)
-                If typeParameter Is Nothing Then
-                    Throw New ArgumentNullException("typeParameter")
-                End If
-                If Not IsInTree(typeParameter) Then
-                    Throw New ArgumentException(VBResources.TypeParameterNotWithinTree)
+            If typeParameter Is Nothing Then
+                Throw New ArgumentNullException(NameOf(typeParameter))
+            End If
+            If Not IsInTree(typeParameter) Then
+                Throw New ArgumentException(VBResources.TypeParameterNotWithinTree)
+            End If
+
+            Dim symbol As ISymbol = Nothing
+            Dim typeParamList = TryCast(typeParameter.Parent, TypeParameterListSyntax)
+            If typeParamList IsNot Nothing AndAlso typeParamList.Parent IsNot Nothing Then
+                If TypeOf typeParamList.Parent Is MethodStatementSyntax Then
+                    symbol = GetDeclaredSymbol(DirectCast(typeParamList.Parent, MethodStatementSyntax), cancellationToken)
+                ElseIf TypeOf typeParamList.Parent Is TypeStatementSyntax Then
+                    symbol = GetDeclaredSymbol(DirectCast(typeParamList.Parent, TypeStatementSyntax), cancellationToken)
+                ElseIf TypeOf typeParamList.Parent Is DelegateStatementSyntax Then
+                    symbol = GetDeclaredSymbol(DirectCast(typeParamList.Parent, DelegateStatementSyntax), cancellationToken)
                 End If
 
-                Dim symbol As ISymbol = Nothing
-                Dim typeParamList = TryCast(typeParameter.Parent, TypeParameterListSyntax)
-                If typeParamList IsNot Nothing AndAlso typeParamList.Parent IsNot Nothing Then
-                    If TypeOf typeParamList.Parent Is MethodStatementSyntax Then
-                        symbol = GetDeclaredSymbol(DirectCast(typeParamList.Parent, MethodStatementSyntax), cancellationToken)
-                    ElseIf TypeOf typeParamList.Parent Is TypeStatementSyntax Then
-                        symbol = GetDeclaredSymbol(DirectCast(typeParamList.Parent, TypeStatementSyntax), cancellationToken)
-                    ElseIf TypeOf typeParamList.Parent Is DelegateStatementSyntax Then
-                        symbol = GetDeclaredSymbol(DirectCast(typeParamList.Parent, DelegateStatementSyntax), cancellationToken)
+                If symbol IsNot Nothing Then
+                    Dim typeSymbol = TryCast(symbol, NamedTypeSymbol)
+                    If typeSymbol IsNot Nothing Then
+                        Return Me.GetTypeParameterSymbol(typeSymbol.TypeParameters, typeParameter)
                     End If
 
-                    If symbol IsNot Nothing Then
-                        Dim typeSymbol = TryCast(symbol, NamedTypeSymbol)
-                        If typeSymbol IsNot Nothing Then
-                            Return Me.GetTypeParameterSymbol(typeSymbol.TypeParameters, typeParameter)
-                        End If
-
-                        Dim methodSymbol = TryCast(symbol, MethodSymbol)
-                        If methodSymbol IsNot Nothing Then
-                            Return Me.GetTypeParameterSymbol(methodSymbol.TypeParameters, typeParameter)
-                        End If
+                    Dim methodSymbol = TryCast(symbol, MethodSymbol)
+                    If methodSymbol IsNot Nothing Then
+                        Return Me.GetTypeParameterSymbol(methodSymbol.TypeParameters, typeParameter)
                     End If
                 End If
+            End If
 
-                Return Nothing
-            End Using
+            Return Nothing
         End Function
 
         ' Get a type parameter symbol from a ROA of TypeParametersSymbols and the syntax for one.
@@ -1142,26 +1151,24 @@ Namespace Microsoft.CodeAnalysis.VisualBasic
         End Function
 
         Public Overrides Function GetDeclaredSymbol(declarationSyntax As EnumMemberDeclarationSyntax, Optional cancellationToken As CancellationToken = Nothing) As IFieldSymbol
-            Using Logger.LogBlock(FunctionId.VisualBasic_SemanticModel_GetDeclaredSymbol, message:=Me.SyntaxTree.FilePath, cancellationToken:=cancellationToken)
-                If declarationSyntax Is Nothing Then
-                    Throw New ArgumentNullException("declarationSyntax")
+            If declarationSyntax Is Nothing Then
+                Throw New ArgumentNullException(NameOf(declarationSyntax))
+            End If
+
+            If Not IsInTree(declarationSyntax) Then
+                Throw New ArgumentException(VBResources.DeclarationSyntaxNotWithinTree)
+            End If
+
+            Dim enumBlock As EnumBlockSyntax = DirectCast(declarationSyntax.Parent, EnumBlockSyntax)
+
+            If enumBlock IsNot Nothing Then
+                Dim containingType = DirectCast(GetDeclaredSymbol(enumBlock.EnumStatement, cancellationToken), NamedTypeSymbol)
+                If containingType IsNot Nothing Then
+                    Return DirectCast(SourceFieldSymbol.FindFieldOrWithEventsSymbolFromSyntax(declarationSyntax.Identifier, _syntaxTree, containingType), FieldSymbol)
                 End If
+            End If
 
-                If Not IsInTree(declarationSyntax) Then
-                    Throw New ArgumentException(VBResources.DeclarationSyntaxNotWithinTree)
-                End If
-
-                Dim enumBlock As EnumBlockSyntax = DirectCast(declarationSyntax.Parent, EnumBlockSyntax)
-
-                If enumBlock IsNot Nothing Then
-                    Dim containingType = DirectCast(GetDeclaredSymbol(enumBlock.EnumStatement, cancellationToken), NamedTypeSymbol)
-                    If containingType IsNot Nothing Then
-                        Return DirectCast(SourceFieldSymbol.FindFieldOrWithEventsSymbolFromSyntax(declarationSyntax.Identifier, _syntaxTree, containingType), FieldSymbol)
-                    End If
-                End If
-
-                Return Nothing
-            End Using
+            Return Nothing
         End Function
 
         ''' <summary>
@@ -1170,68 +1177,64 @@ Namespace Microsoft.CodeAnalysis.VisualBasic
         ''' <param name="declarationSyntax">The syntax node that declares a variable.</param>
         ''' <returns>The symbol that was declared.</returns>
         Public Overrides Function GetDeclaredSymbol(declarationSyntax As ModifiedIdentifierSyntax, Optional cancellationToken As CancellationToken = Nothing) As ISymbol
-            Using Logger.LogBlock(FunctionId.VisualBasic_SemanticModel_GetDeclaredSymbol, message:=Me.SyntaxTree.FilePath, cancellationToken:=cancellationToken)
-                If declarationSyntax Is Nothing Then
-                    Throw New ArgumentNullException("declarationSyntax")
+            If declarationSyntax Is Nothing Then
+                Throw New ArgumentNullException(NameOf(declarationSyntax))
+            End If
+
+            If Not IsInTree(declarationSyntax) Then
+                Throw New ArgumentException(VBResources.DeclarationSyntaxNotWithinTree)
+            End If
+
+            Dim declarationParent = declarationSyntax.Parent
+
+            ' Possibility 1: Field syntax, could be a Field or WithEvent property
+            Dim fieldSyntax As FieldDeclarationSyntax = Nothing
+            If declarationParent IsNot Nothing Then
+                fieldSyntax = TryCast(declarationParent.Parent, FieldDeclarationSyntax)
+            End If
+
+            Dim parentTypeBlock As TypeBlockSyntax = Nothing
+            If fieldSyntax IsNot Nothing Then
+                parentTypeBlock = TryCast(fieldSyntax.Parent, TypeBlockSyntax)
+            Else : End If
+
+            If parentTypeBlock IsNot Nothing Then
+                Dim containingType = DirectCast(GetDeclaredSymbol(parentTypeBlock.BlockStatement, cancellationToken), NamedTypeSymbol)
+                If containingType IsNot Nothing Then
+                    Return SourceFieldSymbol.FindFieldOrWithEventsSymbolFromSyntax(declarationSyntax.Identifier, _syntaxTree, containingType)
                 End If
+            End If
 
-                If Not IsInTree(declarationSyntax) Then
-                    Throw New ArgumentException(VBResources.DeclarationSyntaxNotWithinTree)
-                End If
+            ' Possibility 2: Parameter
+            Dim parameterSyntax As ParameterSyntax = TryCast(declarationParent, ParameterSyntax)
 
-                Dim declarationParent = declarationSyntax.Parent
+            If parameterSyntax IsNot Nothing Then
+                Return GetDeclaredSymbol(parameterSyntax, cancellationToken)
+            End If
 
-                ' Possibility 1: Field syntax, could be a Field or WithEvent property
-                Dim fieldSyntax As FieldDeclarationSyntax = Nothing
-                If declarationParent IsNot Nothing Then
-                    fieldSyntax = TryCast(declarationParent.Parent, FieldDeclarationSyntax)
-                End If
+            ' Possibility 3: Local variable
+            Dim model As MemberSemanticModel = Me.GetMemberSemanticModel(declarationSyntax)
 
-                Dim parentTypeBlock As TypeBlockSyntax = Nothing
-                If fieldSyntax IsNot Nothing Then
-                    parentTypeBlock = TryCast(fieldSyntax.Parent, TypeBlockSyntax)
-                Else : End If
+            If model IsNot Nothing Then
+                Return model.GetDeclaredSymbol(declarationSyntax, cancellationToken)
+            End If
 
-                If parentTypeBlock IsNot Nothing Then
-                    Dim containingType = DirectCast(GetDeclaredSymbol(parentTypeBlock.BlockStatement, cancellationToken), NamedTypeSymbol)
-                    If containingType IsNot Nothing Then
-                        Return SourceFieldSymbol.FindFieldOrWithEventsSymbolFromSyntax(declarationSyntax.Identifier, _syntaxTree, containingType)
-                    End If
-                End If
-
-                ' Possibility 2: Parameter
-                Dim parameterSyntax As ParameterSyntax = TryCast(declarationParent, ParameterSyntax)
-
-                If parameterSyntax IsNot Nothing Then
-                    Return GetDeclaredSymbol(parameterSyntax, cancellationToken)
-                End If
-
-                ' Possibility 3: Local variable
-                Dim model As MemberSemanticModel = Me.GetMemberSemanticModel(declarationSyntax)
-
-                If model IsNot Nothing Then
-                    Return model.GetDeclaredSymbol(declarationSyntax, cancellationToken)
-                End If
-
-                Return MyBase.GetDeclaredSymbol(declarationSyntax, cancellationToken)
-            End Using
+            Return MyBase.GetDeclaredSymbol(declarationSyntax, cancellationToken)
         End Function
 
         ''' <summary>
-        ''' Given an FieldInitializerSyntax, get the corresponding symbol of anonymous type creation.
+        ''' Given a FieldInitializerSyntax, get the corresponding symbol of anonymous type creation.
         ''' </summary>
         ''' <param name="fieldInitializerSyntax">The anonymous object creation field initializer syntax.</param>
         ''' <returns>The symbol that was declared, or Nothing if no such symbol exists.</returns>
         Public Overrides Function GetDeclaredSymbol(fieldInitializerSyntax As FieldInitializerSyntax, Optional cancellationToken As System.Threading.CancellationToken = Nothing) As IPropertySymbol
-            Using Logger.LogBlock(FunctionId.VisualBasic_SemanticModel_GetDeclaredSymbol, message:=Me.SyntaxTree.FilePath, cancellationToken:=cancellationToken)
-                Dim model As MemberSemanticModel = Me.GetMemberSemanticModel(fieldInitializerSyntax)
+            Dim model As MemberSemanticModel = Me.GetMemberSemanticModel(fieldInitializerSyntax)
 
-                If model IsNot Nothing Then
-                    Return model.GetDeclaredSymbol(fieldInitializerSyntax, cancellationToken)
-                End If
+            If model IsNot Nothing Then
+                Return model.GetDeclaredSymbol(fieldInitializerSyntax, cancellationToken)
+            End If
 
-                Return MyBase.GetDeclaredSymbol(fieldInitializerSyntax, cancellationToken)
-            End Using
+            Return MyBase.GetDeclaredSymbol(fieldInitializerSyntax, cancellationToken)
         End Function
 
         ''' <summary>
@@ -1240,15 +1243,13 @@ Namespace Microsoft.CodeAnalysis.VisualBasic
         ''' <param name="anonymousObjectCreationExpressionSyntax">The anonymous object creation syntax.</param>
         ''' <returns>The symbol that was declared, or Nothing if no such symbol exists.</returns>
         Public Overrides Function GetDeclaredSymbol(anonymousObjectCreationExpressionSyntax As AnonymousObjectCreationExpressionSyntax, Optional cancellationToken As CancellationToken = Nothing) As INamedTypeSymbol
-            Using Logger.LogBlock(FunctionId.VisualBasic_SemanticModel_GetDeclaredSymbol, message:=Me.SyntaxTree.FilePath, cancellationToken:=cancellationToken)
-                Dim model As MemberSemanticModel = Me.GetMemberSemanticModel(anonymousObjectCreationExpressionSyntax)
+            Dim model As MemberSemanticModel = Me.GetMemberSemanticModel(anonymousObjectCreationExpressionSyntax)
 
-                If model IsNot Nothing Then
-                    Return model.GetDeclaredSymbol(anonymousObjectCreationExpressionSyntax, cancellationToken)
-                End If
+            If model IsNot Nothing Then
+                Return model.GetDeclaredSymbol(anonymousObjectCreationExpressionSyntax, cancellationToken)
+            End If
 
-                Return MyBase.GetDeclaredSymbol(anonymousObjectCreationExpressionSyntax, cancellationToken)
-            End Using
+            Return MyBase.GetDeclaredSymbol(anonymousObjectCreationExpressionSyntax, cancellationToken)
         End Function
 
         ''' <summary>
@@ -1257,32 +1258,28 @@ Namespace Microsoft.CodeAnalysis.VisualBasic
         ''' <param name="rangeVariableSyntax">The range variable syntax that declares a variable.</param>
         ''' <returns>The symbol that was declared, or Nothing if no such symbol exists.</returns>
         Public Overrides Function GetDeclaredSymbol(rangeVariableSyntax As ExpressionRangeVariableSyntax, Optional cancellationToken As CancellationToken = Nothing) As IRangeVariableSymbol
-            Using Logger.LogBlock(FunctionId.VisualBasic_SemanticModel_GetDeclaredSymbol, message:=Me.SyntaxTree.FilePath, cancellationToken:=cancellationToken)
-                Dim model As MemberSemanticModel = Me.GetMemberSemanticModel(rangeVariableSyntax)
+            Dim model As MemberSemanticModel = Me.GetMemberSemanticModel(rangeVariableSyntax)
 
-                If model IsNot Nothing Then
-                    Return model.GetDeclaredSymbol(rangeVariableSyntax, cancellationToken)
-                End If
+            If model IsNot Nothing Then
+                Return model.GetDeclaredSymbol(rangeVariableSyntax, cancellationToken)
+            End If
 
-                Return MyBase.GetDeclaredSymbol(rangeVariableSyntax, cancellationToken)
-            End Using
+            Return MyBase.GetDeclaredSymbol(rangeVariableSyntax, cancellationToken)
         End Function
 
         ''' <summary>
-        ''' Given an CollectionRangeVariableSyntax, get the corresponding symbol.
+        ''' Given a CollectionRangeVariableSyntax, get the corresponding symbol.
         ''' </summary>
         ''' <param name="rangeVariableSyntax">The range variable syntax that declares a variable.</param>
         ''' <returns>The symbol that was declared, or Nothing if no such symbol exists.</returns>
         Public Overrides Function GetDeclaredSymbol(rangeVariableSyntax As CollectionRangeVariableSyntax, Optional cancellationToken As CancellationToken = Nothing) As IRangeVariableSymbol
-            Using Logger.LogBlock(FunctionId.VisualBasic_SemanticModel_GetDeclaredSymbol, message:=Me.SyntaxTree.FilePath, cancellationToken:=cancellationToken)
-                Dim model As MemberSemanticModel = Me.GetMemberSemanticModel(rangeVariableSyntax)
+            Dim model As MemberSemanticModel = Me.GetMemberSemanticModel(rangeVariableSyntax)
 
-                If model IsNot Nothing Then
-                    Return model.GetDeclaredSymbol(rangeVariableSyntax, cancellationToken)
-                End If
+            If model IsNot Nothing Then
+                Return model.GetDeclaredSymbol(rangeVariableSyntax, cancellationToken)
+            End If
 
-                Return MyBase.GetDeclaredSymbol(rangeVariableSyntax, cancellationToken)
-            End Using
+            Return MyBase.GetDeclaredSymbol(rangeVariableSyntax, cancellationToken)
         End Function
 
         ''' <summary>
@@ -1291,15 +1288,13 @@ Namespace Microsoft.CodeAnalysis.VisualBasic
         ''' <param name="rangeVariableSyntax">The range variable syntax that declares a variable.</param>
         ''' <returns>The symbol that was declared, or Nothing if no such symbol exists.</returns>
         Public Overrides Function GetDeclaredSymbol(rangeVariableSyntax As AggregationRangeVariableSyntax, Optional cancellationToken As CancellationToken = Nothing) As IRangeVariableSymbol
-            Using Logger.LogBlock(FunctionId.VisualBasic_SemanticModel_GetDeclaredSymbol, message:=Me.SyntaxTree.FilePath, cancellationToken:=cancellationToken)
-                Dim model As MemberSemanticModel = Me.GetMemberSemanticModel(rangeVariableSyntax)
+            Dim model As MemberSemanticModel = Me.GetMemberSemanticModel(rangeVariableSyntax)
 
-                If model IsNot Nothing Then
-                    Return model.GetDeclaredSymbol(rangeVariableSyntax, cancellationToken)
-                End If
+            If model IsNot Nothing Then
+                Return model.GetDeclaredSymbol(rangeVariableSyntax, cancellationToken)
+            End If
 
-                Return MyBase.GetDeclaredSymbol(rangeVariableSyntax, cancellationToken)
-            End Using
+            Return MyBase.GetDeclaredSymbol(rangeVariableSyntax, cancellationToken)
         End Function
 
         ''' <summary>
@@ -1308,49 +1303,46 @@ Namespace Microsoft.CodeAnalysis.VisualBasic
         ''' <param name="declarationSyntax">The import statement syntax node.</param>
         ''' <returns>The alias symbol that was declared or Nothing if no alias symbol was declared.</returns>
         Public Overloads Overrides Function GetDeclaredSymbol(declarationSyntax As SimpleImportsClauseSyntax, Optional cancellationToken As CancellationToken = Nothing) As IAliasSymbol
-            Using Logger.LogBlock(FunctionId.VisualBasic_SemanticModel_GetDeclaredSymbol, message:=Me.SyntaxTree.FilePath, cancellationToken:=cancellationToken)
-                If declarationSyntax Is Nothing Then
-                    Throw New ArgumentNullException("declarationSyntax")
-                End If
+            If declarationSyntax Is Nothing Then
+                Throw New ArgumentNullException(NameOf(declarationSyntax))
+            End If
 
-                If Not IsInTree(declarationSyntax) Then
-                    Throw New ArgumentException(VBResources.DeclarationSyntaxNotWithinTree)
-                End If
+            If Not IsInTree(declarationSyntax) Then
+                Throw New ArgumentException(VBResources.DeclarationSyntaxNotWithinTree)
+            End If
 
-                If declarationSyntax.Alias Is Nothing Then
-                    Return Nothing
-                End If
+            If declarationSyntax.Alias Is Nothing Then
+                Return Nothing
+            End If
 
-                Dim aliasName As String = declarationSyntax.Alias.Identifier.ValueText
+            Dim aliasName As String = declarationSyntax.Alias.Identifier.ValueText
 
-                If Not String.IsNullOrEmpty(aliasName) Then
-                    Dim sourceFile = Me._sourceModule.GetSourceFile(Me.SyntaxTree)
+            If Not String.IsNullOrEmpty(aliasName) Then
+                Dim sourceFile = Me._sourceModule.TryGetSourceFile(Me.SyntaxTree)
+                Debug.Assert(sourceFile IsNot Nothing)
 
-                    Dim aliasImports As Dictionary(Of String, AliasAndImportsClausePosition) = sourceFile.AliasImports
-                    Dim symbol As AliasAndImportsClausePosition = Nothing
+                Dim aliasImports As IReadOnlyDictionary(Of String, AliasAndImportsClausePosition) = sourceFile.AliasImportsOpt
+                Dim symbol As AliasAndImportsClausePosition = Nothing
 
-                    If aliasImports IsNot Nothing AndAlso aliasImports.TryGetValue(aliasName, symbol) Then
-                        '  make sure the symbol is declared inside declarationSyntax node
-                        For Each location In symbol.Alias.Locations
-                            If location.IsInSource AndAlso location.SourceTree Is _syntaxTree AndAlso declarationSyntax.Span.Contains(location.SourceSpan) Then
-                                Return symbol.Alias
-                            End If
-                        Next
-
-                        ' If the alias name was in the map but the location didn't match, then the syntax declares a duplicate alias.
-                        ' We'll return a new AliasSymbol to improve the API experience.
-                        Dim binder As Binder = GetEnclosingBinder(declarationSyntax.SpanStart)
-                        Dim discardedDiagnostics = DiagnosticBag.GetInstance()
-                        Dim targetSymbol As NamespaceOrTypeSymbol = binder.BindNamespaceOrTypeSyntax(declarationSyntax.Name, discardedDiagnostics)
-                        discardedDiagnostics.Free()
-                        If targetSymbol IsNot Nothing Then
-                            Return New AliasSymbol(binder.Compilation, binder.ContainingNamespaceOrType, aliasName, targetSymbol, declarationSyntax.GetLocation())
+                If aliasImports IsNot Nothing AndAlso aliasImports.TryGetValue(aliasName, symbol) Then
+                    '  make sure the symbol is declared inside declarationSyntax node
+                    For Each location In symbol.Alias.Locations
+                        If location.IsInSource AndAlso location.SourceTree Is _syntaxTree AndAlso declarationSyntax.Span.Contains(location.SourceSpan) Then
+                            Return symbol.Alias
                         End If
+                    Next
+
+                    ' If the alias name was in the map but the location didn't match, then the syntax declares a duplicate alias.
+                    ' We'll return a new AliasSymbol to improve the API experience.
+                    Dim binder As Binder = GetEnclosingBinder(declarationSyntax.SpanStart)
+                    Dim targetSymbol As NamespaceOrTypeSymbol = binder.BindNamespaceOrTypeSyntax(declarationSyntax.Name, BindingDiagnosticBag.Discarded)
+                    If targetSymbol IsNot Nothing Then
+                        Return New AliasSymbol(binder.Compilation, binder.ContainingNamespaceOrType, aliasName, targetSymbol, declarationSyntax.GetLocation())
                     End If
                 End If
+            End If
 
-                Return Nothing
-            End Using
+            Return Nothing
         End Function
 
         ''' <summary>
@@ -1360,7 +1352,7 @@ Namespace Microsoft.CodeAnalysis.VisualBasic
         ''' <returns>The field symbols that were declared.</returns>
         Friend Overrides Function GetDeclaredSymbols(declarationSyntax As FieldDeclarationSyntax, Optional cancellationToken As CancellationToken = Nothing) As ImmutableArray(Of ISymbol)
             If declarationSyntax Is Nothing Then
-                Throw New ArgumentNullException("declarationSyntax")
+                Throw New ArgumentNullException(NameOf(declarationSyntax))
             End If
 
             If Not IsInTree(declarationSyntax) Then
@@ -1394,24 +1386,22 @@ Namespace Microsoft.CodeAnalysis.VisualBasic
         ''' <remarks>To determine the conversion between two types (instead of an expression and a type), use
         ''' Compilation.ClassifyConversion.</remarks>
         Public Overrides Function ClassifyConversion(expression As ExpressionSyntax, destination As ITypeSymbol) As Conversion
-            Using Logger.LogBlock(FunctionId.VisualBasic_SemanticModel_ClassifyConversion, message:=Me.SyntaxTree.FilePath)
-                CheckSyntaxNode(expression)
-                If destination Is Nothing Then
-                    Throw New ArgumentNullException("destination")
-                End If
+            CheckSyntaxNode(expression)
+            If destination Is Nothing Then
+                Throw New ArgumentNullException(NameOf(destination))
+            End If
 
-                Dim vbdestination = destination.EnsureVbSymbolOrNothing(Of TypeSymbol)("destination")
+            Dim vbdestination = destination.EnsureVbSymbolOrNothing(Of TypeSymbol)(NameOf(destination))
 
-                ' TODO(cyrusn): Check arguments.  This is a public entrypoint, so we must do appropriate
-                ' checks here.  However, no other methods in this type do any checking currently.  SO i'm
-                ' going to hold off on this until we do a full sweep of the API.
-                Dim binding = Me.GetMemberSemanticModel(expression)
-                If binding Is Nothing Then
-                    Return New Conversion(Nothing)  'NoConversion
-                End If
+            ' TODO(cyrusn): Check arguments.  This is a public entrypoint, so we must do appropriate
+            ' checks here.  However, no other methods in this type do any checking currently.  So I'm
+            ' going to hold off on this until we do a full sweep of the API.
+            Dim binding = Me.GetMemberSemanticModel(expression)
+            If binding Is Nothing Then
+                Return New Conversion(Nothing)  'NoConversion
+            End If
 
-                Return binding.ClassifyConversion(expression, vbdestination)
-            End Using
+            Return binding.ClassifyConversion(expression, vbdestination)
         End Function
 
         Public Overrides ReadOnly Property IsSpeculativeSemanticModel As Boolean
@@ -1429,6 +1419,12 @@ Namespace Microsoft.CodeAnalysis.VisualBasic
         Public Overrides ReadOnly Property ParentModel As SemanticModel
             Get
                 Return Nothing
+            End Get
+        End Property
+
+        Friend Overrides ReadOnly Property ContainingModelOrSelf As SemanticModel
+            Get
+                Return Me
             End Get
         End Property
 
@@ -1496,18 +1492,16 @@ Namespace Microsoft.CodeAnalysis.VisualBasic
         ''' <returns>An object that can be used to obtain the result of the control flow analysis.</returns>
         ''' <exception cref="ArgumentException">The two statements are not contained within the same statement list.</exception>
         Public Overrides Function AnalyzeControlFlow(firstStatement As StatementSyntax, lastStatement As StatementSyntax) As ControlFlowAnalysis
-            Using Logger.LogBlock(FunctionId.VisualBasic_SemanticModel_AnalyzeControlFlow, message:=Me.SyntaxTree.FilePath)
-                Dim context As RegionAnalysisContext = If(ValidateRegionDefiningStatementsRange(firstStatement, lastStatement),
-                                                          CreateRegionAnalysisContext(firstStatement, lastStatement),
-                                                          CreateFailedRegionAnalysisContext())
+            Dim context As RegionAnalysisContext = If(ValidateRegionDefiningStatementsRange(firstStatement, lastStatement),
+                                                      CreateRegionAnalysisContext(firstStatement, lastStatement),
+                                                      CreateFailedRegionAnalysisContext())
 
-                Dim result = New VisualBasicControlFlowAnalysis(context)
+            Dim result = New VisualBasicControlFlowAnalysis(context)
 
-                ' we assume the analysis should only fail if the original context is invalid
-                Debug.Assert(result.Succeeded OrElse context.Failed)
+            ' we assume the analysis should only fail if the original context is invalid
+            Debug.Assert(result.Succeeded OrElse context.Failed)
 
-                Return result
-            End Using
+            Return result
         End Function
 
         ''' <summary>
@@ -1518,18 +1512,16 @@ Namespace Microsoft.CodeAnalysis.VisualBasic
         ''' <returns>An object that can be used to obtain the result of the data flow analysis.</returns>
         ''' <exception cref="ArgumentException">The two statements are not contained within the same statement list.</exception>
         Public Overrides Function AnalyzeDataFlow(firstStatement As StatementSyntax, lastStatement As StatementSyntax) As DataFlowAnalysis
-            Using Logger.LogBlock(FunctionId.VisualBasic_SemanticModel_AnalyzeDataFlow, message:=Me.SyntaxTree.FilePath)
-                Dim context As RegionAnalysisContext = If(ValidateRegionDefiningStatementsRange(firstStatement, lastStatement),
-                                                          CreateRegionAnalysisContext(firstStatement, lastStatement),
-                                                          CreateFailedRegionAnalysisContext())
+            Dim context As RegionAnalysisContext = If(ValidateRegionDefiningStatementsRange(firstStatement, lastStatement),
+                                                      CreateRegionAnalysisContext(firstStatement, lastStatement),
+                                                      CreateFailedRegionAnalysisContext())
 
-                Dim result = New VisualBasicDataFlowAnalysis(context)
+            Dim result = New VisualBasicDataFlowAnalysis(context)
 
-                ' we assume the analysis should only fail if the original context is invalid
-                Debug.Assert(result.Succeeded OrElse result.InvalidRegionDetectedInternal OrElse context.Failed)
+            ' we assume the analysis should only fail if the original context is invalid
+            Debug.Assert(result.Succeeded OrElse result.InvalidRegionDetectedInternal OrElse context.Failed)
 
-                Return result
-            End Using
+            Return result
         End Function
 
         ''' <summary>
@@ -1538,19 +1530,17 @@ Namespace Microsoft.CodeAnalysis.VisualBasic
         ''' <param name="expression">The expression within the associated SyntaxTree to analyze.</param>
         ''' <returns>An object that can be used to obtain the result of the data flow analysis.</returns>
         Public Overrides Function AnalyzeDataFlow(expression As ExpressionSyntax) As DataFlowAnalysis
-            Using Logger.LogBlock(FunctionId.VisualBasic_SemanticModel_AnalyzeDataFlow, message:=Me.SyntaxTree.FilePath)
-                Dim context As RegionAnalysisContext = If(ValidateRegionDefiningExpression(expression),
-                                                          CreateRegionAnalysisContext(expression),
-                                                          CreateFailedRegionAnalysisContext())
+            Dim context As RegionAnalysisContext = If(ValidateRegionDefiningExpression(expression),
+                                                      CreateRegionAnalysisContext(expression),
+                                                      CreateFailedRegionAnalysisContext())
 
-                Dim result = New VisualBasicDataFlowAnalysis(context)
+            Dim result = New VisualBasicDataFlowAnalysis(context)
 
-                ' Assert that we either correctly precalculated succeeded 
-                ' flag or we know for sure why we failed to precalculate it
-                CheckSucceededFlagInAnalyzeDataFlow(expression, result, context)
+            ' Assert that we either correctly precalculated succeeded 
+            ' flag or we know for sure why we failed to precalculate it
+            CheckSucceededFlagInAnalyzeDataFlow(expression, result, context)
 
-                Return result
-            End Using
+            Return result
         End Function
 
         <Conditional("DEBUG")>
@@ -1580,7 +1570,7 @@ Namespace Microsoft.CodeAnalysis.VisualBasic
                 Return
             End If
 
-            ' CASE 2: If the region flow analysis is performed on the argiments of field declaration of array
+            ' CASE 2: If the region flow analysis is performed on the arguments of field declaration of array
             '         data type having explicit initializer, like 'Public AnArray(2) = {0, 1}'; 
             '         VB semantics generates an error about specifying both bounds and initializer and ignores them
             If expression.Kind = SyntaxKind.NumericLiteralExpression AndAlso
@@ -1588,7 +1578,7 @@ Namespace Microsoft.CodeAnalysis.VisualBasic
 
                 '           VariableDeclarator
                 '          |                  |
-                '  ModifiedIdenitfier     EqualsValue
+                '  ModifiedIdentifier     EqualsValue
                 '          |
                 '  ArgumentList
                 '      |...|...|
@@ -1609,7 +1599,7 @@ Namespace Microsoft.CodeAnalysis.VisualBasic
                 End If
             End If
 
-            Debug.Assert(False)
+            Throw ExceptionUtilities.Unreachable
         End Sub
 
         ''' <summary>
@@ -1693,7 +1683,7 @@ Namespace Microsoft.CodeAnalysis.VisualBasic
                         Case SyntaxKind.ArgumentList,
                              SyntaxKind.SimpleArgument,
                              SyntaxKind.ObjectMemberInitializer
-                        ' proceed to the upper-level node
+                            ' proceed to the upper-level node
 
                         Case SyntaxKind.GoToStatement
                             Return False
@@ -1730,7 +1720,7 @@ Namespace Microsoft.CodeAnalysis.VisualBasic
         End Sub
 
         Private Function ValidateRegionDefiningExpression(expression As ExpressionSyntax) As Boolean
-            AssertNodeInTree(expression, "expression")
+            AssertNodeInTree(expression, NameOf(expression))
 
             If expression.Kind = SyntaxKind.PredefinedType OrElse SyntaxFacts.IsInNamespaceOrTypeContext(expression) Then
                 Return False
@@ -1792,8 +1782,8 @@ Namespace Microsoft.CodeAnalysis.VisualBasic
         End Function
 
         Private Function ValidateRegionDefiningStatementsRange(firstStatement As StatementSyntax, lastStatement As StatementSyntax) As Boolean
-            AssertNodeInTree(firstStatement, "firstStatement")
-            AssertNodeInTree(lastStatement, "lastStatement")
+            AssertNodeInTree(firstStatement, NameOf(firstStatement))
+            AssertNodeInTree(lastStatement, NameOf(lastStatement))
 
             If firstStatement.Parent Is Nothing OrElse firstStatement.Parent IsNot lastStatement.Parent Then
                 Throw New ArgumentException("statements not within the same statement list")

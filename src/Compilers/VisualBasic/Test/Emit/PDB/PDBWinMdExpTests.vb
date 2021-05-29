@@ -1,4 +1,6 @@
-﻿' Copyright (c) Microsoft.  All Rights Reserved.  Licensed under the Apache License, Version 2.0.  See License.txt in the project root for license information.
+﻿' Licensed to the .NET Foundation under one or more agreements.
+' The .NET Foundation licenses this file to you under the MIT license.
+' See the LICENSE file in the project root for more information.
 
 Imports Roslyn.Test.Utilities
 Imports System.IO
@@ -9,7 +11,7 @@ Namespace Microsoft.CodeAnalysis.VisualBasic.UnitTests.PDB
     Public Class PDBWinMdExpTests
         Inherits BasicTestBase
 
-        <Fact()>
+        <ConditionalFact(GetType(WindowsOnly), Reason:=ConditionalSkipReason.NativePdbRequiresDesktop)>
         Public Sub TestWinMdExpData_Empty()
             Dim source =
 <compilation>
@@ -18,9 +20,9 @@ Imports System
 ]]></file>
 </compilation>
 
-            Dim compilation = CompilationUtils.CreateCompilationWithMscorlibAndVBRuntime(source, TestOptions.ReleaseDll.WithOutputKind(OutputKind.WindowsRuntimeMetadata))
+            Dim compilation = CompilationUtils.CreateCompilationWithMscorlib40AndVBRuntime(source, TestOptions.ReleaseDll.WithOutputKind(OutputKind.WindowsRuntimeMetadata))
 
-            Dim actual = PDBTests.GetTokenToLocationMap(compilation, True)
+            Dim actual = PdbTestUtilities.GetTokenToLocationMap(compilation, True)
 
             Dim expected =
 <?xml version="1.0" encoding="utf-16"?>
@@ -29,7 +31,7 @@ Imports System
             AssertEqual(expected, actual)
         End Sub
 
-        <Fact()>
+        <ConditionalFact(GetType(WindowsOnly), Reason:=ConditionalSkipReason.NativePdbRequiresDesktop)>
         Public Sub TestWinMdExpData_Basic()
             Dim source =
 <compilation>
@@ -63,9 +65,9 @@ End Module
 ]]></file>
 </compilation>
 
-            Dim compilation = CompilationUtils.CreateCompilationWithMscorlibAndVBRuntime(source, TestOptions.ReleaseDll.WithOutputKind(OutputKind.WindowsRuntimeMetadata))
+            Dim compilation = CompilationUtils.CreateCompilationWithMscorlib40AndVBRuntime(source, TestOptions.ReleaseDll.WithOutputKind(OutputKind.WindowsRuntimeMetadata))
 
-            Dim actual = PDBTests.GetTokenToLocationMap(compilation, True)
+            Dim actual = PdbTestUtilities.GetTokenToLocationMap(compilation, True)
 
             Dim expected =
 <?xml version="1.0" encoding="utf-16"?>
@@ -77,8 +79,8 @@ End Module
             AssertEqual(expected, actual)
         End Sub
 
-        <WorkItem(693206, "DevDiv")>
-        <Fact()>
+        <WorkItem(693206, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/693206")>
+        <ConditionalFact(GetType(WindowsOnly), Reason:=ConditionalSkipReason.NativePdbRequiresDesktop)>
         Public Sub Bug693206()
             Dim source =
 <compilation>
@@ -95,9 +97,9 @@ End Namespace
 ]]></file>
 </compilation>
 
-            Dim compilation = CompilationUtils.CreateCompilationWithMscorlibAndVBRuntime(source, TestOptions.ReleaseDll.WithOutputKind(OutputKind.WindowsRuntimeMetadata))
+            Dim compilation = CompilationUtils.CreateCompilationWithMscorlib40AndVBRuntime(source, TestOptions.ReleaseDll.WithOutputKind(OutputKind.WindowsRuntimeMetadata))
 
-            Dim actual = PDBTests.GetTokenToLocationMap(compilation, True)
+            Dim actual = PdbTestUtilities.GetTokenToLocationMap(compilation, True)
 
             Dim expected =
 <?xml version="1.0" encoding="utf-16"?>
@@ -111,7 +113,7 @@ End Namespace
             AssertEqual(expected, actual)
         End Sub
 
-        <Fact()>
+        <ConditionalFact(GetType(WindowsOnly), Reason:=ConditionalSkipReason.NativePdbRequiresDesktop)>
         Public Sub TestWinMdExpData_Property_Event()
             Dim source =
 <compilation>
@@ -154,13 +156,13 @@ End Namespace
 </compilation>
 
             Dim compilation =
-                CompilationUtils.CreateCompilationWithReferences(
+                CompilationUtils.CreateEmptyCompilationWithReferences(
                     source,
-                    LatestReferences,
+                    LatestVbReferences,
                     options:=TestOptions.ReleaseDll.WithOutputKind(OutputKind.WindowsRuntimeMetadata))
             CompilationUtils.AssertNoDiagnostics(compilation)
 
-            Dim actual = PDBTests.GetTokenToLocationMap(compilation, True)
+            Dim actual = PdbTestUtilities.GetTokenToLocationMap(compilation, True)
 
             Dim expected =
 <?xml version="1.0" encoding="utf-16"?>
@@ -202,7 +204,7 @@ End Namespace
             Assert.Equal(builder.ToString(), actual)
         End Sub
 
-        <Fact()>
+        <ConditionalFact(GetType(WindowsOnly), Reason:=ConditionalSkipReason.NativePdbRequiresDesktop)>
         Public Sub TestWinMdExpData_AnonymousTypes()
             Dim source =
 <compilation>
@@ -220,9 +222,9 @@ End Namespace
 ]]></file>
 </compilation>
 
-            Dim compilation = CompilationUtils.CreateCompilationWithMscorlibAndVBRuntime(source, TestOptions.ReleaseDll.WithOutputKind(OutputKind.WindowsRuntimeMetadata))
+            Dim compilation = CompilationUtils.CreateCompilationWithMscorlib40AndVBRuntime(source, TestOptions.ReleaseDll.WithOutputKind(OutputKind.WindowsRuntimeMetadata))
 
-            Dim actual = PDBTests.GetTokenToLocationMap(compilation, True)
+            Dim actual = PdbTestUtilities.GetTokenToLocationMap(compilation, True)
 
             Dim expected =
 <?xml version="1.0" encoding="utf-16"?>

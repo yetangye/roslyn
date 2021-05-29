@@ -1,15 +1,19 @@
-' Copyright (c) Microsoft.  All Rights Reserved.  Licensed under the Apache License, Version 2.0.  See License.txt in the project root for license information.
+﻿' Licensed to the .NET Foundation under one or more agreements.
+' The .NET Foundation licenses this file to you under the MIT license.
+' See the LICENSE file in the project root for more information.
 
-Imports Microsoft.VisualStudio.LanguageServices.VisualBasic.ProjectSystemShim.Interop
-Imports Roslyn.Test.Utilities
+Imports Microsoft.CodeAnalysis.Test.Utilities
 Imports Microsoft.VisualStudio.LanguageServices.UnitTests.ProjectSystemShim.Framework
 Imports Microsoft.VisualStudio.LanguageServices.UnitTests.ProjectSystemShim.VisualBasicHelpers
+Imports Microsoft.VisualStudio.LanguageServices.VisualBasic.ProjectSystemShim.Interop
+Imports Roslyn.Test.Utilities
 
 Namespace Microsoft.VisualStudio.LanguageServices.UnitTests.ProjectSystemShim
+    <[UseExportProvider]>
     Public Class VisualBasicSpecialReferencesTests
-        <Fact()>
+        <WpfFact()>
         <Trait(Traits.Feature, Traits.Features.ProjectSystemShims)>
-        Sub ProjectIncludesReferencesToMscorlibSystemAndMicrosoftVisualBasic()
+        Public Sub ProjectIncludesReferencesToMscorlibSystemAndMicrosoftVisualBasic()
             Using environment = New TestEnvironment()
                 Dim project = CreateVisualBasicProject(environment, "Test")
 
@@ -25,9 +29,9 @@ Namespace Microsoft.VisualStudio.LanguageServices.UnitTests.ProjectSystemShim
             End Using
         End Sub
 
-        <Fact()>
+        <WpfFact()>
         <Trait(Traits.Feature, Traits.Features.ProjectSystemShims)>
-        Sub ProjectWithoutStandardLibsDoesNotReferenceSystem()
+        Public Sub ProjectWithoutStandardLibsDoesNotReferenceSystem()
             Using environment = New TestEnvironment()
                 Dim project = CreateVisualBasicProject(environment, "Test")
                 Dim options = CreateMinimalCompilerOptions(project)
@@ -45,9 +49,9 @@ Namespace Microsoft.VisualStudio.LanguageServices.UnitTests.ProjectSystemShim
             End Using
         End Sub
 
-        <Fact()>
+        <WpfFact()>
         <Trait(Traits.Feature, Traits.Features.ProjectSystemShims)>
-        Sub ProjectWithoutVisualBasicRuntimeDoesNotReferenceMicrosoftVisualBasic()
+        Public Sub ProjectWithoutVisualBasicRuntimeDoesNotReferenceMicrosoftVisualBasic()
             Using environment = New TestEnvironment()
                 Dim project = CreateVisualBasicProject(environment, "Test")
                 Dim options = CreateMinimalCompilerOptions(project)
@@ -65,10 +69,10 @@ Namespace Microsoft.VisualStudio.LanguageServices.UnitTests.ProjectSystemShim
             End Using
         End Sub
 
-        <Fact()>
+        <WpfFact()>
         <Trait(Traits.Feature, Traits.Features.ProjectSystemShims)>
-        <WorkItem(860964)>
-        Sub AddingReferenceToMicrosoftVisualBasicBeforeSettingOptionsShouldNotCrash()
+        <WorkItem(860964, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/860964")>
+        Public Sub AddingReferenceToMicrosoftVisualBasicBeforeSettingOptionsShouldNotCrash()
             Using environment = New TestEnvironment()
                 Dim project = CreateVisualBasicProject(environment, "Test")
 
@@ -96,11 +100,27 @@ Namespace Microsoft.VisualStudio.LanguageServices.UnitTests.ProjectSystemShim
             End Using
         End Sub
 
-
-        <Fact()>
+        <WpfFact()>
         <Trait(Traits.Feature, Traits.Features.ProjectSystemShims)>
-        <WorkItem(860964)>
-        Sub AddingReferenceToMicrosoftVisualBasicAfterSettingOptionsShouldNotCrash()
+        <WorkItem(3477, "https://github.com/dotnet/roslyn/issues/3477")>
+        Public Sub ProjectWithEmptySdkPathHasNoReferences()
+            Using environment = New TestEnvironment()
+                Dim project = CreateVisualBasicProject(environment, "Test", compilerHost:=MockCompilerHost.NoSdkCompilerHost)
+
+                project.SetCompilerOptions(CreateMinimalCompilerOptions(project))
+
+                ' We should have no references
+                Dim workspaceProject = environment.Workspace.CurrentSolution.Projects.Single()
+                Assert.Empty(workspaceProject.MetadataReferences)
+
+                project.Disconnect()
+            End Using
+        End Sub
+
+        <WpfFact()>
+        <Trait(Traits.Feature, Traits.Features.ProjectSystemShims)>
+        <WorkItem(860964, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/860964")>
+        Public Sub AddingReferenceToMicrosoftVisualBasicAfterSettingOptionsShouldNotCrash()
             Using environment = New TestEnvironment()
                 Dim project = CreateVisualBasicProject(environment, "Test")
 

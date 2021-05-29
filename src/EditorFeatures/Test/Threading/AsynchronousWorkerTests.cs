@@ -1,35 +1,42 @@
-// Copyright (c) Microsoft.  All Rights Reserved.  Licensed under the Apache License, Version 2.0.  See License.txt in the project root for license information.
+﻿// Licensed to the .NET Foundation under one or more agreements.
+// The .NET Foundation licenses this file to you under the MIT license.
+// See the LICENSE file in the project root for more information.
+
+#nullable disable
 
 using System;
-using System.Linq;
 using System.Threading;
-using System.Windows.Threading;
 using Microsoft.CodeAnalysis.Editor.Shared.Threading;
-using Microsoft.CodeAnalysis.Editor.UnitTests.Workspaces;
+using Microsoft.CodeAnalysis.Editor.Shared.Utilities;
 using Microsoft.CodeAnalysis.Shared.TestHooks;
+using Microsoft.CodeAnalysis.Test.Utilities;
+using Microsoft.VisualStudio.Composition;
 using Roslyn.Test.Utilities;
 using Xunit;
 
 namespace Microsoft.CodeAnalysis.Editor.UnitTests.Threading
 {
+    [UseExportProvider]
     public class AsynchronousWorkerTests
     {
         private readonly SynchronizationContext _foregroundSyncContext;
 
         public AsynchronousWorkerTests()
         {
-            TestWorkspace.ResetThreadAffinity();
-            SynchronizationContext.SetSynchronizationContext(new DispatcherSynchronizationContext());
+            WpfTestRunner.RequireWpfFact($"Tests are testing {nameof(AsynchronousSerialWorkQueue)} which is designed to run methods on the UI thread");
             _foregroundSyncContext = SynchronizationContext.Current;
             Assert.NotNull(_foregroundSyncContext);
         }
 
         // Ensure a background action actually runs on the background.
-        [Fact]
+        [WpfFact]
         public void TestBackgroundAction()
         {
-            var listener = new AggregateAsynchronousOperationListener(Enumerable.Empty<Lazy<IAsynchronousOperationListener, FeatureMetadata>>(), "Test");
-            var worker = new AsynchronousSerialWorkQueue(listener);
+            var exportProvider = EditorTestCompositions.EditorFeatures.ExportProviderFactory.CreateExportProvider();
+            var threadingContext = exportProvider.GetExportedValue<IThreadingContext>();
+            var listenerProvider = exportProvider.GetExportedValue<IAsynchronousOperationListenerProvider>();
+
+            var worker = new AsynchronousSerialWorkQueue(threadingContext, listenerProvider.GetListener("Test"));
             var doneEvent = new AutoResetEvent(initialState: false);
 
             var actionRan = false;
@@ -45,12 +52,15 @@ namespace Microsoft.CodeAnalysis.Editor.UnitTests.Threading
             Assert.True(actionRan);
         }
 
-        [Fact]
+        [WpfFact]
         public void TestMultipleBackgroundAction()
         {
+            var exportProvider = EditorTestCompositions.EditorFeatures.ExportProviderFactory.CreateExportProvider();
+            var threadingContext = exportProvider.GetExportedValue<IThreadingContext>();
+            var listenerProvider = exportProvider.GetExportedValue<IAsynchronousOperationListenerProvider>();
+
             // Test that background actions don't run at the same time.
-            var listener = new AggregateAsynchronousOperationListener(Enumerable.Empty<Lazy<IAsynchronousOperationListener, FeatureMetadata>>(), "Test");
-            var worker = new AsynchronousSerialWorkQueue(listener);
+            var worker = new AsynchronousSerialWorkQueue(threadingContext, listenerProvider.GetListener("Test"));
             var doneEvent = new AutoResetEvent(false);
 
             var action1Ran = false;
@@ -79,12 +89,15 @@ namespace Microsoft.CodeAnalysis.Editor.UnitTests.Threading
             Assert.True(action2Ran);
         }
 
-        [Fact]
+        [WpfFact]
         public void TestBackgroundCancel1()
         {
+            var exportProvider = EditorTestCompositions.EditorFeatures.ExportProviderFactory.CreateExportProvider();
+            var threadingContext = exportProvider.GetExportedValue<IThreadingContext>();
+            var listenerProvider = exportProvider.GetExportedValue<IAsynchronousOperationListenerProvider>();
+
             // Ensure that we can cancel a background action.
-            var listener = new AggregateAsynchronousOperationListener(Enumerable.Empty<Lazy<IAsynchronousOperationListener, FeatureMetadata>>(), "Test");
-            var worker = new AsynchronousSerialWorkQueue(listener);
+            var worker = new AsynchronousSerialWorkQueue(threadingContext, listenerProvider.GetListener("Test"));
 
             var taskRunningEvent = new AutoResetEvent(false);
             var cancelEvent = new AutoResetEvent(false);
@@ -119,13 +132,16 @@ namespace Microsoft.CodeAnalysis.Editor.UnitTests.Threading
             Assert.True(actionRan);
         }
 
-        [Fact]
+        [WpfFact]
         public void TestBackgroundCancelOneAction()
         {
+            var exportProvider = EditorTestCompositions.EditorFeatures.ExportProviderFactory.CreateExportProvider();
+            var threadingContext = exportProvider.GetExportedValue<IThreadingContext>();
+            var listenerProvider = exportProvider.GetExportedValue<IAsynchronousOperationListenerProvider>();
+
             // Ensure that when a background action is cancelled the next
             // one starts (if it has a different cancellation token).
-            var listener = new AggregateAsynchronousOperationListener(Enumerable.Empty<Lazy<IAsynchronousOperationListener, FeatureMetadata>>(), "Test");
-            var worker = new AsynchronousSerialWorkQueue(listener);
+            var worker = new AsynchronousSerialWorkQueue(threadingContext, listenerProvider.GetListener("Test"));
 
             var taskRunningEvent = new AutoResetEvent(false);
             var cancelEvent = new AutoResetEvent(false);
@@ -183,13 +199,16 @@ namespace Microsoft.CodeAnalysis.Editor.UnitTests.Threading
             Assert.True(action2Ran);
         }
 
-        [Fact]
+        [WpfFact]
         public void TestBackgroundCancelMultipleActions()
         {
+            var exportProvider = EditorTestCompositions.EditorFeatures.ExportProviderFactory.CreateExportProvider();
+            var threadingContext = exportProvider.GetExportedValue<IThreadingContext>();
+            var listenerProvider = exportProvider.GetExportedValue<IAsynchronousOperationListenerProvider>();
+
             // Ensure that multiple background actions are cancelled if they
             // use the same cancellation token.
-            var listener = new AggregateAsynchronousOperationListener(Enumerable.Empty<Lazy<IAsynchronousOperationListener, FeatureMetadata>>(), "Test");
-            var worker = new AsynchronousSerialWorkQueue(listener);
+            var worker = new AsynchronousSerialWorkQueue(threadingContext, listenerProvider.GetListener("Test"));
 
             var taskRunningEvent = new AutoResetEvent(false);
             var cancelEvent = new AutoResetEvent(false);
@@ -229,7 +248,7 @@ namespace Microsoft.CodeAnalysis.Editor.UnitTests.Threading
 
             try
             {
-                worker.WaitUntilCompletion_ForTestingPurposesOnly();
+                worker.GetTestAccessor().WaitUntilCompletion();
                 Assert.True(false);
             }
             catch (AggregateException ae)

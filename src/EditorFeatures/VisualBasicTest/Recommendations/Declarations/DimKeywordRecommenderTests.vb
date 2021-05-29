@@ -1,27 +1,22 @@
-' Copyright (c) Microsoft.  All Rights Reserved.  Licensed under the Apache License, Version 2.0.  See License.txt in the project root for license information.
-
-Imports Microsoft.CodeAnalysis.Text
-Imports Microsoft.CodeAnalysis.VisualBasic
-Imports Microsoft.CodeAnalysis.VisualBasic.Symbols
-Imports Microsoft.CodeAnalysis.VisualBasic.Syntax
-Imports Roslyn.Test.Utilities
-Imports Xunit
+﻿' Licensed to the .NET Foundation under one or more agreements.
+' The .NET Foundation licenses this file to you under the MIT license.
+' See the LICENSE file in the project root for more information.
 
 Namespace Microsoft.CodeAnalysis.Editor.VisualBasic.UnitTests.Recommendations.Declarations
     Public Class DimKeywordRecommenderTests
 
         <Fact, Trait(Traits.Feature, Traits.Features.KeywordRecommending)>
-        Public Sub DimInMethodDeclaration()
+        Public Sub DimInMethodDeclarationTest()
             VerifyRecommendationsContain(<MethodBody>|</MethodBody>, "Dim")
         End Sub
 
         <Fact, Trait(Traits.Feature, Traits.Features.KeywordRecommending)>
-        Public Sub DimNotAfterStaticInMethodBody()
+        Public Sub DimNotAfterStaticInMethodBodyTest()
             VerifyRecommendationsMissing(<MethodBody>Static |</MethodBody>, "Dim")
         End Sub
 
         <Fact, Trait(Traits.Feature, Traits.Features.KeywordRecommending)>
-        Public Sub DimInMultiLineLambda()
+        Public Sub DimInMultiLineLambdaTest()
             VerifyRecommendationsContain(<MethodBody>
 Dim x = Sub()
 |
@@ -29,169 +24,169 @@ End Sub</MethodBody>, "Dim")
         End Sub
 
         <Fact, Trait(Traits.Feature, Traits.Features.KeywordRecommending)>
-        Public Sub DimNotInSingleLineLambda()
+        Public Sub DimNotInSingleLineLambdaTest()
             VerifyRecommendationsMissing(<MethodBody>Dim x = Sub() |</MethodBody>, "Dim")
         End Sub
 
         <Fact, Trait(Traits.Feature, Traits.Features.KeywordRecommending)>
-        Public Sub DimInClassDeclaration()
+        Public Sub DimInClassDeclarationTest()
             VerifyRecommendationsContain(<ClassDeclaration>|</ClassDeclaration>, "Dim")
         End Sub
 
         <Fact, Trait(Traits.Feature, Traits.Features.KeywordRecommending)>
-        Public Sub DimNotInNamespace()
+        Public Sub DimNotInNamespaceTest()
             VerifyRecommendationsMissing(<NamespaceDeclaration>|</NamespaceDeclaration>, "Dim")
         End Sub
 
         <Fact, Trait(Traits.Feature, Traits.Features.KeywordRecommending)>
-        Public Sub DimNotInInterface()
+        Public Sub DimNotInInterfaceTest()
             VerifyRecommendationsMissing(<InterfaceDeclaration>|</InterfaceDeclaration>, "Dim")
         End Sub
 
         <Fact, Trait(Traits.Feature, Traits.Features.KeywordRecommending)>
-        Public Sub DimNotInEnum()
+        Public Sub DimNotInEnumTest()
             VerifyRecommendationsMissing(<EnumDeclaration>|</EnumDeclaration>, "Dim")
         End Sub
 
         <Fact, Trait(Traits.Feature, Traits.Features.KeywordRecommending)>
-        Public Sub DimInStructure()
+        Public Sub DimInStructureTest()
             VerifyRecommendationsContain(<StructureDeclaration>|</StructureDeclaration>, "Dim")
         End Sub
 
         <Fact, Trait(Traits.Feature, Traits.Features.KeywordRecommending)>
-        Public Sub DimInModule()
+        Public Sub DimInModuleTest()
             VerifyRecommendationsContain(<ModuleDeclaration>|</ModuleDeclaration>, "Dim")
         End Sub
 
         <Fact, Trait(Traits.Feature, Traits.Features.KeywordRecommending)>
-        Public Sub DimNotAfterPartial()
+        Public Sub DimNotAfterPartialTest()
             VerifyRecommendationsMissing(<ClassDeclaration>Partial |</ClassDeclaration>, "Dim")
         End Sub
 
-        <WorkItem(545036)>
+        <WorkItem(545036, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/545036")>
         <Fact, Trait(Traits.Feature, Traits.Features.KeywordRecommending)>
-        Public Sub DimNotAfterDim()
+        Public Sub DimNotAfterDimTest()
             VerifyRecommendationsMissing(<ClassDeclaration>Dim |</ClassDeclaration>, "Dim")
         End Sub
 
         <Fact, Trait(Traits.Feature, Traits.Features.KeywordRecommending)>
-        Public Sub DimAfterPublic()
+        Public Sub DimAfterPublicTest()
             VerifyRecommendationsContain(<ClassDeclaration>Public |</ClassDeclaration>, "Dim")
         End Sub
 
         <Fact, Trait(Traits.Feature, Traits.Features.KeywordRecommending)>
-        Public Sub DimAfterProtected()
+        Public Sub DimAfterProtectedTest()
             VerifyRecommendationsContain(<ClassDeclaration>Protected |</ClassDeclaration>, "Dim")
         End Sub
 
         <Fact, Trait(Traits.Feature, Traits.Features.KeywordRecommending)>
-        Public Sub DimAfterFriend()
+        Public Sub DimAfterFriendTest()
             VerifyRecommendationsContain(<ClassDeclaration>Friend |</ClassDeclaration>, "Dim")
         End Sub
 
         <Fact, Trait(Traits.Feature, Traits.Features.KeywordRecommending)>
-        Public Sub DimAfterPrivate()
+        Public Sub DimAfterPrivateTest()
             VerifyRecommendationsContain(<ClassDeclaration>Private |</ClassDeclaration>, "Dim")
         End Sub
 
         <Fact, Trait(Traits.Feature, Traits.Features.KeywordRecommending)>
-        Public Sub DimAfterProtectedFriend()
+        Public Sub DimAfterProtectedFriendTest()
             VerifyRecommendationsContain(<ClassDeclaration>Protected Friend |</ClassDeclaration>, "Dim")
         End Sub
 
         <Fact, Trait(Traits.Feature, Traits.Features.KeywordRecommending)>
-        Public Sub DimNotAfterOverloads()
+        Public Sub DimNotAfterOverloadsTest()
             VerifyRecommendationsMissing(<ClassDeclaration>Overloads |</ClassDeclaration>, "Dim")
         End Sub
 
         <Fact, Trait(Traits.Feature, Traits.Features.KeywordRecommending)>
-        Public Sub DimNotAfterOverrides()
+        Public Sub DimNotAfterOverridesTest()
             VerifyRecommendationsMissing(<ClassDeclaration>Overrides |</ClassDeclaration>, "Dim")
         End Sub
 
         <Fact, Trait(Traits.Feature, Traits.Features.KeywordRecommending)>
-        Public Sub DimNotAfterOverridable()
+        Public Sub DimNotAfterOverridableTest()
             VerifyRecommendationsMissing(<ClassDeclaration>Overridable |</ClassDeclaration>, "Dim")
         End Sub
 
         <Fact, Trait(Traits.Feature, Traits.Features.KeywordRecommending)>
-        Public Sub DimNotAfterNotOverridable()
+        Public Sub DimNotAfterNotOverridableTest()
             VerifyRecommendationsMissing(<ClassDeclaration>NotOverridable |</ClassDeclaration>, "Dim")
         End Sub
 
         <Fact, Trait(Traits.Feature, Traits.Features.KeywordRecommending)>
-        Public Sub DimNotAfterMustOverride()
+        Public Sub DimNotAfterMustOverrideTest()
             VerifyRecommendationsMissing(<ClassDeclaration>MustOverride |</ClassDeclaration>, "Dim")
         End Sub
 
         <Fact, Trait(Traits.Feature, Traits.Features.KeywordRecommending)>
-        Public Sub DimNotAfterMustOverrideOverrides()
+        Public Sub DimNotAfterMustOverrideOverridesTest()
             VerifyRecommendationsMissing(<ClassDeclaration>MustOverride Overrides |</ClassDeclaration>, "Dim")
         End Sub
 
         <Fact, Trait(Traits.Feature, Traits.Features.KeywordRecommending)>
-        Public Sub DimNotAfterNotOverridableOverrides()
+        Public Sub DimNotAfterNotOverridableOverridesTest()
             VerifyRecommendationsMissing(<ClassDeclaration>NotOverridable Overrides |</ClassDeclaration>, "Dim")
         End Sub
 
         <Fact, Trait(Traits.Feature, Traits.Features.KeywordRecommending)>
-        Public Sub DimNotAfterConst()
+        Public Sub DimNotAfterConstTest()
             VerifyRecommendationsMissing(<ClassDeclaration>Const |</ClassDeclaration>, "Dim")
         End Sub
 
         <Fact, Trait(Traits.Feature, Traits.Features.KeywordRecommending)>
-        Public Sub DimNotAfterDefault()
+        Public Sub DimNotAfterDefaultTest()
             VerifyRecommendationsMissing(<ClassDeclaration>Default |</ClassDeclaration>, "Dim")
         End Sub
 
         <Fact, Trait(Traits.Feature, Traits.Features.KeywordRecommending)>
-        Public Sub DimNotAfterMustInherit()
+        Public Sub DimNotAfterMustInheritTest()
             VerifyRecommendationsMissing(<ClassDeclaration>MustInherit |</ClassDeclaration>, "Dim")
         End Sub
 
         <Fact, Trait(Traits.Feature, Traits.Features.KeywordRecommending)>
-        Public Sub DimNotAfterNotInheritable()
+        Public Sub DimNotAfterNotInheritableTest()
             VerifyRecommendationsMissing(<ClassDeclaration>NotInheritable |</ClassDeclaration>, "Dim")
         End Sub
 
         <Fact, Trait(Traits.Feature, Traits.Features.KeywordRecommending)>
-        Public Sub DimNotAfterNarrowing()
+        Public Sub DimNotAfterNarrowingTest()
             VerifyRecommendationsMissing(<ClassDeclaration>Narrowing |</ClassDeclaration>, "Dim")
         End Sub
 
         <Fact, Trait(Traits.Feature, Traits.Features.KeywordRecommending)>
-        Public Sub DimNotAfterWidening()
+        Public Sub DimNotAfterWideningTest()
             VerifyRecommendationsMissing(<ClassDeclaration>Widening |</ClassDeclaration>, "Dim")
         End Sub
 
         <Fact, Trait(Traits.Feature, Traits.Features.KeywordRecommending)>
-        Public Sub DimAfterReadOnly()
+        Public Sub DimAfterReadOnlyTest()
             VerifyRecommendationsContain(<ClassDeclaration>ReadOnly |</ClassDeclaration>, "Dim")
         End Sub
 
         <Fact, Trait(Traits.Feature, Traits.Features.KeywordRecommending)>
-        Public Sub DimNotAfterWriteOnly()
+        Public Sub DimNotAfterWriteOnlyTest()
             VerifyRecommendationsMissing(<ClassDeclaration>WriteOnly |</ClassDeclaration>, "Dim")
         End Sub
 
         <Fact, Trait(Traits.Feature, Traits.Features.KeywordRecommending)>
-        Public Sub DimNotAfterCustom()
+        Public Sub DimNotAfterCustomTest()
             VerifyRecommendationsMissing(<ClassDeclaration>Custom |</ClassDeclaration>, "Dim")
         End Sub
 
         <Fact, Trait(Traits.Feature, Traits.Features.KeywordRecommending)>
-        Public Sub DimAfterShared()
+        Public Sub DimAfterSharedTest()
             VerifyRecommendationsContain(<ClassDeclaration>Shared |</ClassDeclaration>, "Dim")
         End Sub
 
-        <WorkItem(542720)>
+        <WorkItem(542720, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/542720")>
         <Fact, Trait(Traits.Feature, Traits.Features.KeywordRecommending)>
-        Public Sub DimInSingleLineIf()
+        Public Sub DimInSingleLineIfTest()
             VerifyRecommendationsContain(<MethodBody>If True Then Di|</MethodBody>, "Dim")
         End Sub
 
         <Fact, Trait(Traits.Feature, Traits.Features.KeywordRecommending)>
-        Public Sub DimAfterSingleLineLambda()
+        Public Sub DimAfterSingleLineLambdaTest()
             Dim code =
 <MethodBody>
 Dim X = Function() True
@@ -201,9 +196,9 @@ Dim X = Function() True
             VerifyRecommendationsContain(code, "Dim")
         End Sub
 
-        <WorkItem(674791)>
+        <WorkItem(674791, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/674791")>
         <Fact, Trait(Traits.Feature, Traits.Features.KeywordRecommending)>
-        Public Sub NotAfterHash()
+        Public Sub NotAfterHashTest()
             VerifyRecommendationsMissing(<File>
 Imports System
 

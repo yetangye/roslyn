@@ -1,11 +1,14 @@
-﻿// Copyright (c) Microsoft.  All Rights Reserved.  Licensed under the Apache License, Version 2.0.  See License.txt in the project root for license information.
+﻿// Licensed to the .NET Foundation under one or more agreements.
+// The .NET Foundation licenses this file to you under the MIT license.
+// See the LICENSE file in the project root for more information.
+
+#nullable disable
 
 using System;
 using System.Collections.Generic;
-using System.Collections.Immutable;
-using System.Linq;
+using System.Diagnostics;
 using System.Threading;
-using Microsoft.CodeAnalysis.Collections;
+using Microsoft.CodeAnalysis.PooledObjects;
 using Roslyn.Utilities;
 
 namespace Microsoft.CodeAnalysis.CSharp
@@ -34,12 +37,11 @@ namespace Microsoft.CodeAnalysis.CSharp
         private readonly Cache _cache;
 
         // The lazily computed total merged declaration.
-        private readonly Lazy<MergedNamespaceDeclaration> _mergedRoot;
+        private MergedNamespaceDeclaration _mergedRoot;
 
         private readonly Lazy<ICollection<string>> _typeNames;
         private readonly Lazy<ICollection<string>> _namespaceNames;
         private readonly Lazy<ICollection<ReferenceDirective>> _referenceDirectives;
-        private readonly Lazy<ICollection<Diagnostic>> _referenceDirectiveDiagnostics;
 
         private DeclarationTable(
             ImmutableSetWithInsertionOrder<RootSingleNamespaceDeclaration> allOlderRootDeclarations,
@@ -49,11 +51,9 @@ namespace Microsoft.CodeAnalysis.CSharp
             _allOlderRootDeclarations = allOlderRootDeclarations;
             _latestLazyRootDeclaration = latestLazyRootDeclaration;
             _cache = cache ?? new Cache(this);
-            _mergedRoot = new Lazy<MergedNamespaceDeclaration>(GetMergedRoot);
             _typeNames = new Lazy<ICollection<string>>(GetMergedTypeNames);
             _namespaceNames = new Lazy<ICollection<string>>(GetMergedNamespaceNames);
             _referenceDirectives = new Lazy<ICollection<ReferenceDirective>>(GetMergedReferenceDirectives);
-            _referenceDirectiveDiagnostics = new Lazy<ICollection<Diagnostic>>(GetMergedDiagnostics);
         }
 
         public DeclarationTable AddRootDeclaration(Lazy<RootSingleNamespaceDeclaration> lazyRootDeclaration)
@@ -92,18 +92,6 @@ namespace Microsoft.CodeAnalysis.CSharp
             }
         }
 
-        public IEnumerable<RootSingleNamespaceDeclaration> AllRootNamespacesUnordered()
-        {
-            if (_latestLazyRootDeclaration == null)
-            {
-                return _allOlderRootDeclarations;
-            }
-            else
-            {
-                return _allOlderRootDeclarations.Concat(SpecializedCollections.SingletonEnumerable(_latestLazyRootDeclaration.Value));
-            }
-        }
-
         // The merged-tree-reuse story goes like this. We have a "forest" of old declarations, and
         // possibly a lone tree of new declarations. We construct a merged declaration by merging
         // together everything in the forest. This we can re-use from edit to edit, provided that
@@ -118,8 +106,18 @@ namespace Microsoft.CodeAnalysis.CSharp
         //   old merged root            new merged root
         //  /   |   |   |   \                \
         // old singles forest                 new single tree
+        public MergedNamespaceDeclaration GetMergedRoot(CSharpCompilation compilation)
+        {
+            Debug.Assert(compilation.Declarations == this);
+            if (_mergedRoot == null)
+            {
+                Interlocked.CompareExchange(ref _mergedRoot, CalculateMergedRoot(compilation), null);
+            }
+            return _mergedRoot;
+        }
 
-        private MergedNamespaceDeclaration GetMergedRoot()
+        // Internal for unit tests only.
+        internal MergedNamespaceDeclaration CalculateMergedRoot(CSharpCompilation compilation)
         {
             var oldRoot = _cache.MergedRoot.Value;
             if (_latestLazyRootDeclaration == null)
@@ -132,7 +130,34 @@ namespace Microsoft.CodeAnalysis.CSharp
             }
             else
             {
-                return MergedNamespaceDeclaration.Create(oldRoot, _latestLazyRootDeclaration.Value);
+                var oldRootDeclarations = oldRoot.Declarations;
+                var builder = ArrayBuilder<SingleNamespaceDeclaration>.GetInstance(oldRootDeclarations.Length + 1);
+                builder.AddRange(oldRootDeclarations);
+                builder.Add(_latestLazyRootDeclaration.Value);
+                // Sort the root namespace declarations to match the order of SyntaxTrees.
+                if (compilation != null)
+                {
+                    builder.Sort(new RootNamespaceLocationComparer(compilation));
+                }
+                return MergedNamespaceDeclaration.Create(builder.ToImmutableAndFree());
+            }
+        }
+
+        private sealed class RootNamespaceLocationComparer : IComparer<SingleNamespaceDeclaration>
+        {
+            private readonly CSharpCompilation _compilation;
+
+            internal RootNamespaceLocationComparer(CSharpCompilation compilation)
+            {
+                _compilation = compilation;
+            }
+
+            [PerformanceSensitive(
+                "https://github.com/dotnet/roslyn/issues/23582",
+                Constraint = "Avoid " + nameof(SingleNamespaceOrTypeDeclaration.Location) + " since it has a costly allocation on this fast path.")]
+            public int Compare(SingleNamespaceDeclaration x, SingleNamespaceDeclaration y)
+            {
+                return _compilation.CompareSourceLocations(x.SyntaxReference, y.SyntaxReference);
             }
         }
 
@@ -178,20 +203,6 @@ namespace Microsoft.CodeAnalysis.CSharp
             }
         }
 
-        private ICollection<Diagnostic> GetMergedDiagnostics()
-        {
-            var cachedDiagnostics = _cache.ReferenceDirectiveDiagnostics.Value;
-
-            if (_latestLazyRootDeclaration == null)
-            {
-                return cachedDiagnostics;
-            }
-            else
-            {
-                return UnionCollection<Diagnostic>.Create(cachedDiagnostics, _latestLazyRootDeclaration.Value.ReferenceDirectiveDiagnostics);
-            }
-        }
-
         private static readonly Predicate<Declaration> s_isNamespacePredicate = d => d.Kind == DeclarationKind.Namespace;
         private static readonly Predicate<Declaration> s_isTypePredicate = d => d.Kind != DeclarationKind.Namespace;
 
@@ -233,14 +244,6 @@ namespace Microsoft.CodeAnalysis.CSharp
             return SpecializedCollections.ReadOnlySet(set);
         }
 
-        public MergedNamespaceDeclaration MergedRoot
-        {
-            get
-            {
-                return _mergedRoot.Value;
-            }
-        }
-
         public ICollection<string> TypeNames
         {
             get
@@ -265,23 +268,55 @@ namespace Microsoft.CodeAnalysis.CSharp
             }
         }
 
-
-        public IEnumerable<Diagnostic> Diagnostics
+        public static bool ContainsName(
+            MergedNamespaceDeclaration mergedRoot,
+            string name,
+            SymbolFilter filter,
+            CancellationToken cancellationToken)
         {
-            get
-            {
-                return _referenceDirectiveDiagnostics.Value;
-            }
+            return ContainsNameHelper(
+                mergedRoot,
+                n => n == name,
+                filter,
+                t => t.MemberNames.Contains(name),
+                cancellationToken);
         }
 
-        public bool ContainsName(Func<string, bool> predicate, SymbolFilter filter, CancellationToken cancellationToken)
+        public static bool ContainsName(
+            MergedNamespaceDeclaration mergedRoot,
+            Func<string, bool> predicate,
+            SymbolFilter filter,
+            CancellationToken cancellationToken)
+        {
+            return ContainsNameHelper(
+                mergedRoot, predicate, filter,
+                t =>
+                {
+                    foreach (var name in t.MemberNames)
+                    {
+                        if (predicate(name))
+                        {
+                            return true;
+                        }
+                    }
+
+                    return false;
+                }, cancellationToken);
+        }
+
+        private static bool ContainsNameHelper(
+            MergedNamespaceDeclaration mergedRoot,
+            Func<string, bool> predicate,
+            SymbolFilter filter,
+            Func<SingleTypeDeclaration, bool> typePredicate,
+            CancellationToken cancellationToken)
         {
             var includeNamespace = (filter & SymbolFilter.Namespace) == SymbolFilter.Namespace;
             var includeType = (filter & SymbolFilter.Type) == SymbolFilter.Type;
             var includeMember = (filter & SymbolFilter.Member) == SymbolFilter.Member;
 
             var stack = new Stack<MergedNamespaceOrTypeDeclaration>();
-            stack.Push(this.MergedRoot);
+            stack.Push(mergedRoot);
 
             while (stack.Count > 0)
             {
@@ -310,9 +345,9 @@ namespace Microsoft.CodeAnalysis.CSharp
                     if (includeMember)
                     {
                         var mergedType = (MergedTypeDeclaration)current;
-                        foreach (var name in mergedType.MemberNames)
+                        foreach (var typeDecl in mergedType.Declarations)
                         {
-                            if (predicate(name))
+                            if (typePredicate(typeDecl))
                             {
                                 return true;
                             }
@@ -320,17 +355,14 @@ namespace Microsoft.CodeAnalysis.CSharp
                     }
                 }
 
-                foreach (var child in current.Children.OfType<MergedNamespaceOrTypeDeclaration>())
+                foreach (var child in current.Children)
                 {
-                    if (includeMember || includeType)
+                    if (child is MergedNamespaceOrTypeDeclaration childNamespaceOrType)
                     {
-                        stack.Push(child);
-                        continue;
-                    }
-
-                    if (child.Kind == DeclarationKind.Namespace)
-                    {
-                        stack.Push(child);
+                        if (includeMember || includeType || childNamespaceOrType.Kind == DeclarationKind.Namespace)
+                        {
+                            stack.Push(childNamespaceOrType);
+                        }
                     }
                 }
             }

@@ -1,16 +1,22 @@
-// Copyright (c) Microsoft.  All Rights Reserved.  Licensed under the Apache License, Version 2.0.  See License.txt in the project root for license information.
+﻿// Licensed to the .NET Foundation under one or more agreements.
+// The .NET Foundation licenses this file to you under the MIT license.
+// See the LICENSE file in the project root for more information.
+
+#nullable disable
 
 using System;
-using System.Linq;
 using System.Threading;
 using Microsoft.CodeAnalysis.Editor.Shared.Extensions;
+using Microsoft.CodeAnalysis.Indentation;
 using Microsoft.CodeAnalysis.Internal.Log;
 using Microsoft.CodeAnalysis.Shared.Extensions;
 using Microsoft.CodeAnalysis.Text;
 using Microsoft.VisualStudio.Text;
 using Microsoft.VisualStudio.Text.Editor;
-using Microsoft.VisualStudio.Text.Editor.OptionsExtensionMethods;
 using Roslyn.Utilities;
+using NewIndentationService = Microsoft.CodeAnalysis.Indentation.IIndentationService;
+using OldIndentationService = Microsoft.CodeAnalysis.Editor.IIndentationService;
+using OldSynchronousIndentationService = Microsoft.CodeAnalysis.Editor.ISynchronousIndentationService;
 
 namespace Microsoft.CodeAnalysis.Editor.Implementation.SmartIndent
 {
@@ -19,19 +25,10 @@ namespace Microsoft.CodeAnalysis.Editor.Implementation.SmartIndent
         private readonly ITextView _textView;
 
         public SmartIndent(ITextView textView)
-        {
-            if (textView == null)
-            {
-                throw new ArgumentNullException("textView");
-            }
-
-            _textView = textView;
-        }
+            => _textView = textView ?? throw new ArgumentNullException(nameof(textView));
 
         public int? GetDesiredIndentation(ITextSnapshotLine line)
-        {
-            return GetDesiredIndentation(line, CancellationToken.None);
-        }
+            => GetDesiredIndentation(line, CancellationToken.None);
 
         public void Dispose()
         {
@@ -52,19 +49,34 @@ namespace Microsoft.CodeAnalysis.Editor.Implementation.SmartIndent
                     return null;
                 }
 
-                var service = document.GetLanguageService<IIndentationService>();
-                if (service == null)
+                // First, try to go through the normal feature-layer indentation service.
+                var newService = document.GetLanguageService<NewIndentationService>();
+                if (newService != null)
                 {
-                    return null;
+                    var result = newService.GetIndentation(document, lineToBeIndented.LineNumber, cancellationToken);
+                    return result.GetIndentation(_textView, lineToBeIndented);
                 }
 
-                var result = service.GetDesiredIndentationAsync(document, lineToBeIndented.LineNumber, cancellationToken).WaitAndGetResult(cancellationToken);
-                if (result == null)
+                // If we don't have a feature-layer service, try to fall back to the legacy
+                // editor-feature-layer interfaces.
+
+#pragma warning disable CS0618 // Type or member is obsolete
+                var oldSyncService = document.GetLanguageService<OldSynchronousIndentationService>();
+                if (oldSyncService != null)
                 {
-                    return null;
+                    var result = (Indentation.IndentationResult?)oldSyncService.GetDesiredIndentation(document, lineToBeIndented.LineNumber, cancellationToken);
+                    return result?.GetIndentation(_textView, lineToBeIndented);
                 }
 
-                return result.Value.GetIndentation(_textView, lineToBeIndented);
+                var oldAsyncService = document.GetLanguageService<OldIndentationService>();
+                if (oldAsyncService != null)
+                {
+                    var result = (Indentation.IndentationResult?)oldAsyncService.GetDesiredIndentation(document, lineToBeIndented.LineNumber, cancellationToken).WaitAndGetResult(cancellationToken);
+                    return result?.GetIndentation(_textView, lineToBeIndented);
+                }
+#pragma warning restore CS0618 // Type or member is obsolete
+
+                return null;
             }
         }
     }

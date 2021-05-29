@@ -1,7 +1,14 @@
-﻿// Copyright (c) Microsoft.  All Rights Reserved.  Licensed under the Apache License, Version 2.0.  See License.txt in the project root for license information.
+﻿// Licensed to the .NET Foundation under one or more agreements.
+// The .NET Foundation licenses this file to you under the MIT license.
+// See the LICENSE file in the project root for more information.
 
-using Microsoft.CodeAnalysis.Completion.Providers;
+#nullable disable
+
+using System;
+using System.Threading.Tasks;
+using Microsoft.CodeAnalysis.Completion;
 using Microsoft.CodeAnalysis.CSharp.Completion.Providers;
+using Microsoft.CodeAnalysis.Test.Utilities;
 using Roslyn.Test.Utilities;
 using Xunit;
 
@@ -9,43 +16,41 @@ namespace Microsoft.CodeAnalysis.Editor.CSharp.UnitTests.Completion.CompletionPr
 {
     public class ObjectCreationCompletionProviderTests : AbstractCSharpCompletionProviderTests
     {
-        internal override ICompletionProvider CreateCompletionProvider()
-        {
-            return new ObjectCreationCompletionProvider();
-        }
+        internal override Type GetCompletionProviderType()
+            => typeof(ObjectCreationCompletionProvider);
 
         [Fact, Trait(Traits.Feature, Traits.Features.Completion)]
-        public void InObjectCreation()
+        public async Task InObjectCreation()
         {
             var markup = @"
 class MyGeneric<T> { }
 
-void foo()
+void goo()
 {
-   MyGeneric<string> foo = new $$
+   MyGeneric<string> goo = new $$
 }";
 
-            VerifyItemExists(markup, "MyGeneric<string>");
+            await VerifyItemExistsAsync(markup, "MyGeneric<string>");
         }
 
         [Fact, Trait(Traits.Feature, Traits.Features.Completion)]
-        public void NotInAnonymouTypeObjectCreation1()
+        public async Task NotInAnonymousTypeObjectCreation1()
         {
             var markup = @"
 class C
 {
     void M()
     {
-        var x = new[] { new { Foo = ""asdf"", Bar = 1 }, new $$
+        var x = new[] { new { Goo = ""asdf"", Bar = 1 }, new $$
     }
 }";
 
-            VerifyItemIsAbsent(markup, "<anonymous type: string Foo, int Bar>");
+            await VerifyItemIsAbsentAsync(markup, "<anonymous type: string Goo, int Bar>");
         }
 
-        [WorkItem(854497)]
+        [WorkItem(854497, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/854497")]
         [Fact, Trait(Traits.Feature, Traits.Features.Completion)]
-        public void NotVoid()
+        public async Task NotVoid()
         {
             var markup = @"
 class C
@@ -56,12 +61,12 @@ class C
     }
 }";
 
-            VerifyItemIsAbsent(markup, "void");
+            await VerifyItemIsAbsentAsync(markup, "void");
         }
 
-        [WorkItem(827897)]
+        [WorkItem(827897, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/827897")]
         [Fact, Trait(Traits.Feature, Traits.Features.Completion)]
-        public void InYieldReturn()
+        public async Task InYieldReturn()
         {
             var markup =
 @"using System;
@@ -74,12 +79,12 @@ class Program
         yield return new $$
     }
 }";
-            VerifyItemExists(markup, "FieldAccessException");
+            await VerifyItemExistsAsync(markup, "FieldAccessException");
         }
 
-        [WorkItem(827897)]
+        [WorkItem(827897, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/827897")]
         [Fact, Trait(Traits.Feature, Traits.Features.Completion)]
-        public void InAsyncMethodReturnStatement()
+        public async Task InAsyncMethodReturnStatement()
         {
             var markup =
 @"using System;
@@ -93,31 +98,25 @@ class Program
         return new $$
     }
 }";
-            VerifyItemExists(markup, "FieldAccessException");
+            await VerifyItemExistsAsync(markup, "FieldAccessException");
         }
 
         [Fact, Trait(Traits.Feature, Traits.Features.Completion)]
-        public void IsCommitCharacterTest()
+        public async Task IsCommitCharacterTest()
         {
-            var validCharacters = new[]
-            {
-                ' ', '(', '{', '['
-            };
+            const string markup = @"
+using D = System.Globalization.DigitShapes; 
+class Program
+{
+    static void Main(string[] args)
+    {
+        D d = new $$
+    }
+}";
 
-            var invalidCharacters = new[]
-            {
-                'x', ',', '#'
-            };
-
-            foreach (var ch in validCharacters)
-            {
-                Assert.True(CompletionProvider.IsCommitCharacter(null, ch, null), "Expected '" + ch + "' to be a commit character");
-            }
-
-            foreach (var ch in invalidCharacters)
-            {
-                Assert.False(CompletionProvider.IsCommitCharacter(null, ch, null), "Expected '" + ch + "' to NOT be a commit character");
-            }
+            await VerifyCommitCharactersAsync(markup, textTypedSoFar: "",
+                validChars: new[] { ' ', '(', '{', '[' },
+                invalidChars: new[] { 'x', ',', '#' });
         }
 
         [Fact, Trait(Traits.Feature, Traits.Features.Completion)]
@@ -131,15 +130,26 @@ class Program
         }
 
         [Fact, Trait(Traits.Feature, Traits.Features.Completion)]
-        public void SendEnterThroughToEditorTest()
+        public async Task SendEnterThroughToEditorTest()
         {
-            VerifySendEnterThroughToEnter("Foo", "Foo", sendThroughEnterEnabled: false, expected: false);
-            VerifySendEnterThroughToEnter("Foo", "Foo", sendThroughEnterEnabled: true, expected: true);
+            const string markup = @"
+using D = System.Globalization.DigitShapes; 
+class Program
+{
+    static void Main(string[] args)
+    {
+        D d = new $$
+    }
+}";
+
+            await VerifySendEnterThroughToEnterAsync(markup, "D", sendThroughEnterOption: EnterKeyRule.Never, expected: false);
+            await VerifySendEnterThroughToEnterAsync(markup, "D", sendThroughEnterOption: EnterKeyRule.AfterFullyTypedWord, expected: true);
+            await VerifySendEnterThroughToEnterAsync(markup, "D", sendThroughEnterOption: EnterKeyRule.Always, expected: true);
         }
 
-        [WorkItem(828196)]
+        [WorkItem(828196, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/828196")]
         [Fact, Trait(Traits.Feature, Traits.Features.Completion)]
-        public void SuggestAlias()
+        public async Task SuggestAlias()
         {
             var markup = @"
 using D = System.Globalization.DigitShapes; 
@@ -150,12 +160,12 @@ class Program
         D d=  new $$
     }
 }";
-            VerifyItemExists(markup, "D");
+            await VerifyItemExistsAsync(markup, "D");
         }
 
-        [WorkItem(828196)]
+        [WorkItem(828196, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/828196")]
         [Fact, Trait(Traits.Feature, Traits.Features.Completion)]
-        public void SuggestAlias2()
+        public async Task SuggestAlias2()
         {
             var markup = @"
 namespace N
@@ -171,12 +181,12 @@ class Program
 }
 
 ";
-            VerifyItemExists(markup, "D");
+            await VerifyItemExistsAsync(markup, "D");
         }
 
-        [WorkItem(1075275)]
+        [WorkItem(1075275, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/1075275")]
         [Fact, Trait(Traits.Feature, Traits.Features.Completion)]
-        public void CommitAlias()
+        public async Task CommitAlias()
         {
             var markup = @"
 using D = System.Globalization.DigitShapes; 
@@ -194,10 +204,594 @@ class Program
 {
     static void Main(string[] args)
     {
-        D d=  new D
+        D d=  new D(
     }
 }";
-            VerifyProviderCommit(markup, "D", expected, '(', "");
+            await VerifyProviderCommitAsync(markup, "D", expected, '(');
+        }
+
+        [WorkItem(1090377, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/1090377")]
+        [Fact, Trait(Traits.Feature, Traits.Features.Completion)]
+        public async Task AfterNewFollowedByAssignment()
+        {
+            var markup = @"
+class Location {}
+enum EAB { A, B }
+class Goo
+{
+    Location Loc {get; set;}
+    EAB E {get; set;}
+
+    void stuff()
+    {
+        var x = new Goo
+            {
+                Loc = new $$
+                E = EAB.A
+            };
+    }
+}
+
+";
+            await VerifyItemExistsAsync(markup, "Location");
+        }
+
+        [WorkItem(1090377, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/1090377")]
+        [Fact, Trait(Traits.Feature, Traits.Features.Completion)]
+        public async Task AfterNewFollowedByAssignment_GrandParentIsSimpleAssignment()
+        {
+            var markup = @"
+class Program
+{
+    static void Main(string[] args)
+    {
+        Program p = new $$
+        bool b = false;
+    }
+}";
+            await VerifyItemExistsAsync(markup, "Program");
+        }
+
+        [WorkItem(2836, "https://github.com/dotnet/roslyn/issues/2836")]
+        [Fact, Trait(Traits.Feature, Traits.Features.Completion)]
+        public async Task AfterNewFollowedBySimpleAssignment_GrandParentIsEqualsValueClause()
+        {
+            var markup = @"
+class Program
+{
+    static void Main(string[] args)
+    {
+        bool b;
+        Program p = new $$
+        b = false;
+    }
+}";
+            await VerifyItemExistsAsync(markup, "Program");
+        }
+
+        [WorkItem(2836, "https://github.com/dotnet/roslyn/issues/2836")]
+        [Fact, Trait(Traits.Feature, Traits.Features.Completion)]
+        public async Task AfterNewFollowedByCompoundAssignment_GrandParentIsEqualsValueClause()
+        {
+            var markup = @"
+class Program
+{
+    static void Main(string[] args)
+    {
+        int i;
+        Program p = new $$
+        i += 5;
+    }
+}";
+            await VerifyItemExistsAsync(markup, "Program");
+        }
+
+        [WorkItem(2836, "https://github.com/dotnet/roslyn/issues/2836")]
+        [Fact, Trait(Traits.Feature, Traits.Features.Completion)]
+        public async Task AfterNewFollowedByCompoundAssignment_GrandParentIsEqualsValueClause2()
+        {
+            var markup = @"
+class Program
+{
+    static void Main(string[] args)
+    {
+        int i = 1000;
+        Program p = new $$
+        i <<= 4;
+    }
+}";
+            await VerifyItemExistsAsync(markup, "Program");
+        }
+
+        [WorkItem(4115, "https://github.com/dotnet/roslyn/issues/4115")]
+        [Fact, Trait(Traits.Feature, Traits.Features.Completion)]
+        public async Task CommitObjectWithParenthesis1()
+        {
+            var markup = @"
+class C
+{
+    void M1()
+    {
+        object o = new $$
+    }
+}";
+
+            var expected = @"
+class C
+{
+    void M1()
+    {
+        object o = new object(
+    }
+}";
+
+            await VerifyProviderCommitAsync(markup, "object", expected, '(');
+        }
+
+        [WorkItem(4115, "https://github.com/dotnet/roslyn/issues/4115")]
+        [Fact, Trait(Traits.Feature, Traits.Features.Completion)]
+        public async Task CommitObjectWithParenthesis2()
+        {
+            var markup = @"
+class C
+{
+    void M1()
+    {
+        M2(new $$
+    }
+
+    void M2(object o) { }
+}";
+
+            var expected = @"
+class C
+{
+    void M1()
+    {
+        M2(new object(
+    }
+
+    void M2(object o) { }
+}";
+
+            await VerifyProviderCommitAsync(markup, "object", expected, '(');
+        }
+
+        [WorkItem(4115, "https://github.com/dotnet/roslyn/issues/4115")]
+        [Fact, Trait(Traits.Feature, Traits.Features.Completion)]
+        public async Task DontCommitObjectWithOpenBrace1()
+        {
+            var markup = @"
+class C
+{
+    void M1()
+    {
+        object o = new $$
+    }
+}";
+
+            var expected = @"
+class C
+{
+    void M1()
+    {
+        object o = new {
+    }
+}";
+
+            await VerifyProviderCommitAsync(markup, "object", expected, '{');
+        }
+
+        [WorkItem(4115, "https://github.com/dotnet/roslyn/issues/4115")]
+        [Fact, Trait(Traits.Feature, Traits.Features.Completion)]
+        public async Task DontCommitObjectWithOpenBrace2()
+        {
+            var markup = @"
+class C
+{
+    void M1()
+    {
+        M2(new $$
+    }
+
+    void M2(object o) { }
+}";
+
+            var expected = @"
+class C
+{
+    void M1()
+    {
+        M2(new {
+    }
+
+    void M2(object o) { }
+}";
+
+            await VerifyProviderCommitAsync(markup, "object", expected, '{');
+        }
+
+        [WorkItem(4310, "https://github.com/dotnet/roslyn/issues/4310")]
+        [Fact, Trait(Traits.Feature, Traits.Features.Completion)]
+        public async Task InExpressionBodiedProperty()
+        {
+            var markup =
+@"class C
+{
+    object Object => new $$
+}
+";
+            await VerifyItemExistsAsync(markup, "object");
+        }
+
+        [WorkItem(4310, "https://github.com/dotnet/roslyn/issues/4310")]
+        [Fact, Trait(Traits.Feature, Traits.Features.Completion)]
+        public async Task InExpressionBodiedMethod()
+        {
+            var markup =
+@"class C
+{
+    object GetObject() => new $$
+}
+";
+            await VerifyItemExistsAsync(markup, "object");
+        }
+
+        [WorkItem(15804, "https://github.com/dotnet/roslyn/issues/15804")]
+        [Fact, Trait(Traits.Feature, Traits.Features.Completion)]
+        public async Task BeforeAttributeParsedAsImplicitArray()
+        {
+            var markup =
+@"class Program
+{
+    Program p = new $$ 
+
+    [STAThread]
+    static void Main() { }
+}
+";
+            await VerifyItemExistsAsync(markup, "Program");
+        }
+
+        [WorkItem(14084, "https://github.com/dotnet/roslyn/issues/14084")]
+        [Fact, Trait(Traits.Feature, Traits.Features.Completion)]
+        public async Task InMethodCallBeforeAssignment1()
+        {
+            var markup =
+@"namespace ConsoleApplication1
+{
+    class Program
+    {
+        static void Main(string[] args)
+        {
+            object o;
+            string s;
+
+            Test(new $$
+            o = s;
+        }
+        static void Test(TimeSpan t, TimeSpan t2) { }
+    }
+}
+";
+            await VerifyItemExistsAsync(markup, "TimeSpan");
+        }
+
+        [WorkItem(14084, "https://github.com/dotnet/roslyn/issues/14084")]
+        [Fact, Trait(Traits.Feature, Traits.Features.Completion)]
+        public async Task InMethodCallBeforeAssignment2()
+        {
+            var markup =
+@"namespace ConsoleApplication1
+{
+    class Program
+    {
+        static void Main(string[] args)
+        {
+            object o;
+            string s;
+
+            Test(new TimeSpan(), new $$
+            o = s;
+        }
+        static void Test(TimeSpan t, TimeSpan t2) { }
+    }
+}
+";
+            await VerifyItemExistsAsync(markup, "TimeSpan");
+        }
+
+        [WorkItem(2644, "https://github.com/dotnet/roslyn/issues/2644")]
+        [Fact, Trait(Traits.Feature, Traits.Features.Completion)]
+        public async Task InPropertyWithSameNameAsGenericTypeArgument1()
+        {
+            var markup =
+@"namespace ConsoleApplication1
+{
+    class Program
+    {
+        public static List<Bar> Bar { get; set; }
+
+        static void Main(string[] args)
+        {
+            Bar = new $$
+        }
+    }
+
+    class Bar
+    {
+    }
+}
+";
+            await VerifyItemExistsAsync(markup, "List<Bar>");
+        }
+
+        [WorkItem(2644, "https://github.com/dotnet/roslyn/issues/2644")]
+        [Fact, Trait(Traits.Feature, Traits.Features.Completion)]
+        public async Task InPropertyWithSameNameAsGenericTypeArgument2()
+        {
+            var markup =
+@"namespace ConsoleApplication1
+{
+    class Program
+    {
+        public static List<Bar> Bar { get; set; } = new $$
+    }
+
+    class Bar
+    {
+    }
+}
+";
+            await VerifyItemExistsAsync(markup, "List<Bar>");
+        }
+
+        [WorkItem(2644, "https://github.com/dotnet/roslyn/issues/2644")]
+        [Fact, Trait(Traits.Feature, Traits.Features.Completion)]
+        public async Task InPropertyWithSameNameAsGenericTypeArgument3()
+        {
+            var markup =
+@"namespace ConsoleApplication1
+{
+    class Program
+    {
+        public static List<Bar> Bar { get; set; } => new $$
+    }
+
+    class Bar
+    {
+    }
+}
+";
+            await VerifyItemExistsAsync(markup, "List<Bar>");
+        }
+
+        [WorkItem(2644, "https://github.com/dotnet/roslyn/issues/2644")]
+        [Fact, Trait(Traits.Feature, Traits.Features.Completion)]
+        public async Task InPropertyWithSameNameAsGenericTypeArgument4()
+        {
+            var markup =
+@"namespace ConsoleApplication1
+{
+    class Program
+    {
+        static C<A> B { get; set; }
+        static C<B> A { get; set; }
+
+        static void Main(string[] args)
+        {
+            B = new $$
+        }
+    }
+    class A { }
+    class B { }
+    class C<T> { }
+}
+";
+            await VerifyItemExistsAsync(markup, "C<A>");
+        }
+
+        [WorkItem(21674, "https://github.com/dotnet/roslyn/issues/21674")]
+        [Fact, Trait(Traits.Feature, Traits.Features.Completion)]
+        public async Task PropertyWithSameNameAsOtherType()
+        {
+            var markup =
+@"namespace ConsoleApplication1
+{
+    class Program
+    {
+        static A B { get; set; }
+        static B A { get; set; }
+
+        static void Main()
+        {
+            B = new $$
+        }
+    }
+    class A { }
+    class B { }
+}
+";
+            await VerifyItemExistsAsync(markup, "A");
+        }
+
+        [Fact, Trait(Traits.Feature, Traits.Features.Completion)]
+        public async Task NullableTypeCreation()
+        {
+            var markup =
+@"#nullable enable
+namespace ConsoleApplication1
+{
+    class Program
+    {
+        void M()
+        {
+            object? o;
+            o = new $$
+        }
+    }
+}
+";
+            await VerifyItemExistsAsync(markup, "object");
+        }
+
+        [Fact, Trait(Traits.Feature, Traits.Features.Completion)]
+        public async Task NullableTypeCreation_AssignedNull()
+        {
+            var markup =
+@"#nullable enable
+namespace ConsoleApplication1
+{
+    class Program
+    {
+        void M()
+        {
+            object? o = null;
+            o = new $$
+        }
+    }
+}
+";
+            await VerifyItemExistsAsync(markup, "object");
+        }
+
+        [Fact, Trait(Traits.Feature, Traits.Features.Completion)]
+        public async Task NullableTypeCreation_NestedNull()
+        {
+            var markup =
+@"#nullable enable
+
+using System.Collections.Generic;
+
+namespace ConsoleApplication1
+{
+    class Program
+    {
+        void M()
+        {
+            List<object?> l;
+            l = new $$
+        }
+    }
+}
+";
+            await VerifyItemExistsAsync(markup, "List<object?>");
+        }
+
+        [Theory, Trait(Traits.Feature, Traits.Features.Completion)]
+        [InlineData('.')]
+        [InlineData(';')]
+        public async Task CreateObjectAndCommitWithCustomizedCommitChar(char commitChar)
+        {
+            var markup = @"
+class Program
+{
+    void Bar()
+    {
+        object o = new $$
+    }
+}";
+            var expectedMark = $@"
+class Program
+{{
+    void Bar()
+    {{
+        object o = new object(){commitChar}
+    }}
+}}";
+            await VerifyProviderCommitAsync(markup, "object", expectedMark, commitChar: commitChar);
+        }
+
+        [Theory, Trait(Traits.Feature, Traits.Features.Completion)]
+        [InlineData('.')]
+        [InlineData(';')]
+        public async Task CreateNullableObjectAndCommitWithCustomizedCommitChar(char commitChar)
+        {
+            var markup = @"
+class Program
+{
+    void Bar()
+    {
+        object? o = new $$
+    }
+}";
+            var expectedMark = $@"
+class Program
+{{
+    void Bar()
+    {{
+        object? o = new object(){commitChar}
+    }}
+}}";
+            await VerifyProviderCommitAsync(markup, "object", expectedMark, commitChar: commitChar);
+        }
+
+        [Theory, Trait(Traits.Feature, Traits.Features.Completion)]
+        [InlineData('.')]
+        [InlineData(';')]
+        public async Task CreateStringAsLocalAndCommitWithCustomizedCommitChar(char commitChar)
+        {
+            var markup = @"
+class Program
+{
+    void Bar()
+    {
+        string o = new $$
+    }
+}";
+            var expectedMark = $@"
+class Program
+{{
+    void Bar()
+    {{
+        string o = new string(){commitChar}
+    }}
+}}";
+            await VerifyProviderCommitAsync(markup, "string", expectedMark, commitChar: commitChar);
+        }
+
+        [Theory, Trait(Traits.Feature, Traits.Features.Completion)]
+        [InlineData('.')]
+        [InlineData(';')]
+        public async Task CreateGenericListAsLocalAndCommitWithCustomizedChar(char commitChar)
+        {
+            var markup = @"
+using System.Collections.Generic;
+class Program
+{
+    void Bar()
+    {
+        List<int> o = new $$
+    }
+}";
+            var expectedMark = $@"
+using System.Collections.Generic;
+class Program
+{{
+    void Bar()
+    {{
+        List<int> o = new List<int>(){commitChar}
+    }}
+}}";
+            await VerifyProviderCommitAsync(markup, "List<int>", expectedMark, commitChar: commitChar);
+        }
+
+        [Fact, Trait(Traits.Feature, Traits.Features.Completion)]
+        public async Task CreateGenericListAsFieldAndCommitWithSemicolon()
+        {
+            var markup = @"
+using System.Collections.Generic;
+class Program
+{
+    private List<int> o = new $$
+}";
+            var expectedMark = @"
+using System.Collections.Generic;
+class Program
+{
+    private List<int> o = new List<int>();
+}";
+            await VerifyProviderCommitAsync(markup, "List<int>", expectedMark, commitChar: ';');
         }
     }
 }

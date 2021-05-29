@@ -1,4 +1,6 @@
-﻿' Copyright (c) Microsoft.  All Rights Reserved.  Licensed under the Apache License, Version 2.0.  See License.txt in the project root for license information.
+﻿' Licensed to the .NET Foundation under one or more agreements.
+' The .NET Foundation licenses this file to you under the MIT license.
+' See the LICENSE file in the project root for more information.
 
 Imports System.Runtime.CompilerServices
 Imports Microsoft.CodeAnalysis.Text
@@ -10,16 +12,16 @@ Namespace Microsoft.CodeAnalysis.VisualBasic.Symbols
     ''' <summary>
     ''' A NoPiaMissingCanonicalTypeSymbol is a special kind of ErrorSymbol that represents
     ''' a NoPia embedded type symbol that was attempted to be substituted with canonical type, 
-    ''' but the canonocal type couldn't be found.
+    ''' but the canonical type couldn't be found.
     ''' </summary>
-    Friend Class NoPiaMissingCanonicalTypeSymbol
+    Friend NotInheritable Class NoPiaMissingCanonicalTypeSymbol
         Inherits ErrorTypeSymbol ' TODO: Should probably inherit from MissingMetadataType.TopLevel, but review TypeOf checks for MissingMetadataType.
 
-        Private ReadOnly m_EmbeddingAssembly As AssemblySymbol
-        Private ReadOnly m_Guid As String
-        Private ReadOnly m_Scope As String
-        Private ReadOnly m_Identifier As String
-        Private ReadOnly m_FullTypeName As String
+        Private ReadOnly _embeddingAssembly As AssemblySymbol
+        Private ReadOnly _guid As String
+        Private ReadOnly _scope As String
+        Private ReadOnly _identifier As String
+        Private ReadOnly _fullTypeName As String
 
         Public Sub New(
             embeddingAssembly As AssemblySymbol,
@@ -28,28 +30,28 @@ Namespace Microsoft.CodeAnalysis.VisualBasic.Symbols
             scope As String,
             identifier As String
         )
-            m_FullTypeName = fullTypeName
-            m_EmbeddingAssembly = embeddingAssembly
-            m_Guid = guid
-            m_Scope = scope
-            m_Identifier = identifier
+            _fullTypeName = fullTypeName
+            _embeddingAssembly = embeddingAssembly
+            _guid = guid
+            _scope = scope
+            _identifier = identifier
         End Sub
 
         Public ReadOnly Property EmbeddingAssembly As AssemblySymbol
             Get
-                Return m_EmbeddingAssembly
+                Return _embeddingAssembly
             End Get
         End Property
 
         Public ReadOnly Property FullTypeName As String
             Get
-                Return m_FullTypeName
+                Return _fullTypeName
             End Get
         End Property
 
         Public Overrides ReadOnly Property Name As String
             Get
-                Return m_FullTypeName
+                Return _fullTypeName
             End Get
         End Property
 
@@ -63,19 +65,19 @@ Namespace Microsoft.CodeAnalysis.VisualBasic.Symbols
 
         Public ReadOnly Property Guid As String
             Get
-                Return m_Guid
+                Return _guid
             End Get
         End Property
 
         Public ReadOnly Property Scope As String
             Get
-                Return m_Scope
+                Return _scope
             End Get
         End Property
 
         Public ReadOnly Property Identifier As String
             Get
-                Return m_Identifier
+                Return _identifier
             End Get
         End Property
 
@@ -83,13 +85,13 @@ Namespace Microsoft.CodeAnalysis.VisualBasic.Symbols
             Return RuntimeHelpers.GetHashCode(Me)
         End Function
 
-        Public Overrides Function Equals(obj As Object) As Boolean
+        Public Overrides Function Equals(obj As TypeSymbol, comparison As TypeCompareKind) As Boolean
             Return obj Is Me
         End Function
 
         Friend Overrides ReadOnly Property ErrorInfo As DiagnosticInfo
             Get
-                Return ErrorFactory.ErrorInfo(ERRID.ERR_AbsentReferenceToPIA1, m_FullTypeName)
+                Return ErrorFactory.ErrorInfo(ERRID.ERR_AbsentReferenceToPIA1, _fullTypeName)
             End Get
         End Property
     End Class

@@ -1,10 +1,12 @@
-﻿' Copyright (c) Microsoft.  All Rights Reserved.  Licensed under the Apache License, Version 2.0.  See License.txt in the project root for license information.
+﻿' Licensed to the .NET Foundation under one or more agreements.
+' The .NET Foundation licenses this file to you under the MIT license.
+' See the LICENSE file in the project root for more information.
 
 Imports System.Collections.Immutable
+Imports System.Reflection.Metadata
 Imports System.Runtime.InteropServices
 Imports Microsoft.CodeAnalysis.CodeGen
-Imports Microsoft.CodeAnalysis.Collections
-Imports Microsoft.CodeAnalysis.Symbols
+Imports Microsoft.CodeAnalysis.PooledObjects
 Imports Microsoft.CodeAnalysis.Text
 Imports Microsoft.CodeAnalysis.VisualBasic.Emit
 Imports Microsoft.CodeAnalysis.VisualBasic.Symbols
@@ -16,7 +18,7 @@ Namespace Microsoft.CodeAnalysis.VisualBasic.CodeGen
         Private ReadOnly _builder As ILBuilder
         Private ReadOnly _module As PEModuleBuilder
         Private ReadOnly _diagnostics As DiagnosticBag
-        Private ReadOnly _optimizations As OptimizationLevel
+        Private ReadOnly _ilEmitStyle As ILEmitStyle
         Private ReadOnly _emitPdbSequencePoints As Boolean
 
         Private ReadOnly _stackLocals As HashSet(Of LocalSymbol) = Nothing
@@ -30,8 +32,8 @@ Namespace Microsoft.CodeAnalysis.VisualBasic.CodeGen
         Private ReadOnly _synthesizedLocalOrdinals As SynthesizedLocalOrdinalsDispenser = New SynthesizedLocalOrdinalsDispenser()
         Private _uniqueNameId As Integer
 
-        ' label used when when return is emitted in a form of store/goto
-        Private Shared ReadOnly ReturnLabel As New Object
+        ' label used when return is emitted in a form of store/goto
+        Private Shared ReadOnly s_returnLabel As New Object
 
         Private _unhandledReturn As Boolean
 
@@ -47,7 +49,7 @@ Namespace Microsoft.CodeAnalysis.VisualBasic.CodeGen
                        moduleBuilder As PEModuleBuilder,
                        diagnostics As DiagnosticBag,
                        optimizations As OptimizationLevel,
-                       emittingPdbs As Boolean)
+                       emittingPdb As Boolean)
 
             Debug.Assert(method IsNot Nothing)
             Debug.Assert(boundBody IsNot Nothing)
@@ -55,30 +57,48 @@ Namespace Microsoft.CodeAnalysis.VisualBasic.CodeGen
             Debug.Assert(moduleBuilder IsNot Nothing)
             Debug.Assert(diagnostics IsNot Nothing)
 
-            Me._method = method
-            Me._block = boundBody
-            Me._builder = builder
-            Me._module = moduleBuilder
-            Me._diagnostics = diagnostics
+            _method = method
+            _block = boundBody
+            _builder = builder
+            _module = moduleBuilder
+            _diagnostics = diagnostics
 
-            ' Always optimize synthesized methods that don't contain user code.
-            Me._optimizations = If(method.GenerateDebugInfo, optimizations, OptimizationLevel.Release)
+            'Always optimize synthesized methods that don't contain user code.
+            If Not method.GenerateDebugInfo Then
+                _ilEmitStyle = ILEmitStyle.Release
+
+            Else
+                If optimizations = OptimizationLevel.Debug Then
+                    _ilEmitStyle = ILEmitStyle.Debug
+                Else
+                    _ilEmitStyle = If(IsDebugPlus(),
+                                        ILEmitStyle.DebugFriendlyRelease,
+                                        ILEmitStyle.Release)
+                End If
+            End If
 
             ' Emit sequence points unless
             ' - the PDBs are not being generated
             ' - debug information for the method is not generated since the method does not contain
-            '   user code that can be stepped thru, or changed during EnC.
+            '   user code that can be stepped through, or changed during EnC.
             ' 
             ' This setting only affects generating PDB sequence points, it shall Not affect generated IL in any way.
-            Me._emitPdbSequencePoints = emittingPdbs AndAlso method.GenerateDebugInfo
+            _emitPdbSequencePoints = emittingPdb AndAlso method.GenerateDebugInfo
 
-            If Me._optimizations = OptimizationLevel.Release Then
-                Me._block = Optimizer.Optimize(method, boundBody, Me._stackLocals)
-            End If
+            Try
+                _block = Optimizer.Optimize(method, boundBody, debugFriendly:=_ilEmitStyle <> ILEmitStyle.Release, stackLocals:=_stackLocals)
+            Catch ex As BoundTreeVisitor.CancelledByStackGuardException
+                ex.AddAnError(diagnostics)
+                _block = boundBody
+            End Try
 
-            Me._checkCallsForUnsafeJITOptimization = (Me._method.ImplementationAttributes And MethodSymbol.DisableJITOptimizationFlags) <> MethodSymbol.DisableJITOptimizationFlags
-            Debug.Assert(Not Me._module.JITOptimizationIsDisabled(Me._method))
+            _checkCallsForUnsafeJITOptimization = (_method.ImplementationAttributes And MethodSymbol.DisableJITOptimizationFlags) <> MethodSymbol.DisableJITOptimizationFlags
+            Debug.Assert(Not _module.JITOptimizationIsDisabled(_method))
         End Sub
+
+        Private Function IsDebugPlus() As Boolean
+            Return Me._module.Compilation.Options.DebugPlusMode
+        End Function
 
         Public Sub Generate()
             Debug.Assert(_asyncYieldPoints Is Nothing)
@@ -141,21 +161,26 @@ Namespace Microsoft.CodeAnalysis.VisualBasic.CodeGen
                 _builder.DefineInitialHiddenSequencePoint()
             End If
 
-            EmitStatement(_block)
+            Try
+                EmitStatement(_block)
 
-            If _unhandledReturn Then
-                HandleReturn()
-            End If
+                If _unhandledReturn Then
+                    HandleReturn()
+                End If
 
-            If Not _diagnostics.HasAnyErrors Then
-                _builder.Realize()
-            End If
+                If Not _diagnostics.HasAnyErrors Then
+                    _builder.Realize()
+                End If
+
+            Catch e As EmitCancelledException
+                Debug.Assert(_diagnostics.HasAnyErrors())
+            End Try
 
             _synthesizedLocalOrdinals.Free()
         End Sub
 
         Private Sub HandleReturn()
-            _builder.MarkLabel(ReturnLabel)
+            _builder.MarkLabel(s_returnLabel)
             _builder.EmitRet(True)
             _unhandledReturn = False
         End Sub
@@ -185,15 +210,15 @@ Namespace Microsoft.CodeAnalysis.VisualBasic.CodeGen
             _builder.EmitLocalStore(slot)
         End Sub
 
-        Private Sub EmitSymbolToken(symbol As FieldSymbol, syntaxNode As VisualBasicSyntaxNode)
+        Private Sub EmitSymbolToken(symbol As FieldSymbol, syntaxNode As SyntaxNode)
             _builder.EmitToken(_module.Translate(symbol, syntaxNode, _diagnostics), syntaxNode, _diagnostics)
         End Sub
 
-        Private Sub EmitSymbolToken(symbol As MethodSymbol, syntaxNode As VisualBasicSyntaxNode)
-            _builder.EmitToken(_module.Translate(symbol, syntaxNode, _diagnostics), syntaxNode, _diagnostics)
+        Private Sub EmitSymbolToken(symbol As MethodSymbol, syntaxNode As SyntaxNode, Optional encodeAsRawDefinitionToken As Boolean = False)
+            _builder.EmitToken(_module.Translate(symbol, syntaxNode, _diagnostics, needDeclaration:=encodeAsRawDefinitionToken), syntaxNode, _diagnostics, encodeAsRawDefinitionToken)
         End Sub
 
-        Private Sub EmitSymbolToken(symbol As TypeSymbol, syntaxNode As VisualBasicSyntaxNode)
+        Private Sub EmitSymbolToken(symbol As TypeSymbol, syntaxNode As SyntaxNode)
             _builder.EmitToken(_module.Translate(symbol, syntaxNode, _diagnostics), syntaxNode, _diagnostics)
         End Sub
 
@@ -242,7 +267,7 @@ Namespace Microsoft.CodeAnalysis.VisualBasic.CodeGen
                 instructionsEmitted = EmitStatementAndCountInstructions(statement)
             End If
 
-            If instructionsEmitted = 0 AndAlso syntax IsNot Nothing AndAlso _optimizations = OptimizationLevel.Debug Then
+            If instructionsEmitted = 0 AndAlso syntax IsNot Nothing AndAlso _ilEmitStyle = ILEmitStyle.Debug Then
                 ' if there was no code emitted, then emit nop 
                 ' otherwise this point could get associated with some random statement, possibly in a wrong scope
                 _builder.EmitOpCode(ILOpCode.Nop)
@@ -250,7 +275,7 @@ Namespace Microsoft.CodeAnalysis.VisualBasic.CodeGen
         End Sub
 
         Private Sub EmitSequencePointStatement(node As BoundSequencePointWithSpan)
-            Dim span = node.SequenceSpan
+            Dim span = node.Span
             If span <> Nothing AndAlso _emitPdbSequencePoints Then
                 EmitSequencePoint(node.SyntaxTree, span)
             End If
@@ -261,7 +286,7 @@ Namespace Microsoft.CodeAnalysis.VisualBasic.CodeGen
                 instructionsEmitted = EmitStatementAndCountInstructions(statement)
             End If
 
-            If instructionsEmitted = 0 AndAlso span <> Nothing AndAlso _optimizations = OptimizationLevel.Debug Then
+            If instructionsEmitted = 0 AndAlso span <> Nothing AndAlso _ilEmitStyle = ILEmitStyle.Debug Then
                 ' if there was no code emitted, then emit nop 
                 ' otherwise this point could get associated with some random statement, possibly in a wrong scope
                 _builder.EmitOpCode(ILOpCode.Nop)
@@ -286,7 +311,7 @@ Namespace Microsoft.CodeAnalysis.VisualBasic.CodeGen
             _builder.DefineHiddenSequencePoint()
         End Sub
 
-        Private Sub EmitSequencePoint(syntax As VisualBasicSyntaxNode)
+        Private Sub EmitSequencePoint(syntax As SyntaxNode)
             EmitSequencePoint(syntax.SyntaxTree, syntax.Span)
         End Sub
 

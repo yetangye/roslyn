@@ -1,46 +1,34 @@
-' Copyright (c) Microsoft.  All Rights Reserved.  Licensed under the Apache License, Version 2.0.  See License.txt in the project root for license information.
+﻿' Licensed to the .NET Foundation under one or more agreements.
+' The .NET Foundation licenses this file to you under the MIT license.
+' See the LICENSE file in the project root for more information.
 
 Imports System.Threading
 Imports Microsoft.CodeAnalysis
-Imports Microsoft.CodeAnalysis.Editor.Commands
 Imports Microsoft.CodeAnalysis.Editor.Shared.Options
 Imports Microsoft.CodeAnalysis.Editor.UnitTests
+Imports Microsoft.CodeAnalysis.Editor.UnitTests.Utilities
 Imports Microsoft.CodeAnalysis.Editor.UnitTests.Workspaces
 Imports Microsoft.CodeAnalysis.Editor.VisualBasic.EndConstructGeneration
-Imports Microsoft.CodeAnalysis.Options
 Imports Microsoft.VisualStudio.Composition
 Imports Microsoft.VisualStudio.Text
 Imports Microsoft.VisualStudio.Text.Editor
+Imports Microsoft.VisualStudio.Text.Editor.Commanding.Commands
 Imports Microsoft.VisualStudio.Text.Operations
 Imports Moq
 Imports Roslyn.Test.EditorUtilities
 
 Namespace Microsoft.CodeAnalysis.Editor.VisualBasic.UnitTests.EndConstructGeneration
-    Module EndConstructTestingHelpers
+    Friend Module EndConstructTestingHelpers
 
         Private Function CreateMockIndentationService() As ISmartIndentationService
-            Dim mock As New Mock(Of ISmartIndentationService)
+            Dim mock As New Mock(Of ISmartIndentationService)(MockBehavior.Strict)
             mock.Setup(Function(service) service.GetDesiredIndentation(It.IsAny(Of ITextView), It.IsAny(Of ITextSnapshotLine))).Returns(0)
             Return mock.Object
         End Function
 
-        <ThreadStatic>
-        Private _disabledLineCommitExportProvider As ExportProvider
-
-        Private ReadOnly Property DisabledLineCommitExportProvider As ExportProvider
-            Get
-                If _disabledLineCommitExportProvider Is Nothing Then
-                    _disabledLineCommitExportProvider = TestExportProvider.CreateExportProviderWithCSharpAndVisualBasic()
-                End If
-
-                Return _disabledLineCommitExportProvider
-            End Get
-        End Property
-
         Private Sub DisableLineCommit(workspace As Workspace)
-            ' Disable line commit
-            Dim optionsService = workspace.Services.GetService(Of IOptionService)()
-            optionsService.SetOptions(optionsService.GetOptions().WithChangedOption(FeatureOnOffOptions.PrettyListing, LanguageNames.VisualBasic, False))
+            workspace.TryApplyChanges(workspace.CurrentSolution.WithOptions(workspace.Options _
+                .WithChangedOption(FeatureOnOffOptions.PrettyListing, LanguageNames.VisualBasic, False)))
         End Sub
 
         Private Sub VerifyTypedCharApplied(doFunc As Func(Of VisualBasicEndConstructService, ITextView, ITextBuffer, Boolean),
@@ -48,9 +36,9 @@ Namespace Microsoft.CodeAnalysis.Editor.VisualBasic.UnitTests.EndConstructGenera
                                            after As String,
                                            typedChar As Char,
                                            endCaretPos As Integer())
-            Dim caretPos = before.IndexOf("$$")
+            Dim caretPos = before.IndexOf("$$", StringComparison.Ordinal)
             Dim beforeText = before.Replace("$$", "")
-            Using workspace = VisualBasicWorkspaceFactory.CreateWorkspaceFromFile(beforeText, exportProvider:=DisabledLineCommitExportProvider)
+            Using workspace = TestWorkspace.CreateVisualBasic(beforeText, composition:=EditorTestCompositions.EditorFeatures)
                 DisableLineCommit(workspace)
 
                 Dim view = workspace.Documents.First().GetTextView()
@@ -67,19 +55,19 @@ Namespace Microsoft.CodeAnalysis.Editor.VisualBasic.UnitTests.EndConstructGenera
                 Assert.Equal(after, view.TextSnapshot.GetText())
 
                 Dim actualLine As Integer
-                Dim actualCol As Integer
-                view.Caret.Position.BufferPosition.GetLineAndColumn(actualLine, actualCol)
+                Dim actualChar As Integer
+                view.Caret.Position.BufferPosition.GetLineAndCharacter(actualLine, actualChar)
                 Assert.Equal(endCaretPos(0), actualLine)
-                Assert.Equal(endCaretPos(1), actualCol)
+                Assert.Equal(endCaretPos(1), actualChar)
             End Using
         End Sub
 
         Private Sub VerifyApplied(doFunc As Func(Of VisualBasicEndConstructService, ITextView, ITextBuffer, Boolean),
-                                  before As String(),
+                                  before As String,
                                   beforeCaret As Integer(),
-                                  after As String(),
+                                  after As String,
                                   afterCaret As Integer())
-            Using workspace = VisualBasicWorkspaceFactory.CreateWorkspaceFromLines(before, exportProvider:=DisabledLineCommitExportProvider)
+            Using workspace = TestWorkspace.CreateVisualBasic(before, composition:=EditorTestCompositions.EditorFeatures)
                 DisableLineCommit(workspace)
 
                 Dim textView = workspace.Documents.First().GetTextView()
@@ -112,7 +100,7 @@ Namespace Microsoft.CodeAnalysis.Editor.VisualBasic.UnitTests.EndConstructGenera
                     afterCaretPoint = New SnapshotPoint(textView.TextSnapshot, afterLine.Start + afterCaret(1))
                 End If
 
-                Assert.Equal(afterCaretPoint, textView.GetCaretPoint(subjectBuffer).Value.Position)
+                Assert.Equal(Of Integer)(afterCaretPoint, textView.GetCaretPoint(subjectBuffer).Value.Position)
             End Using
         End Sub
 
@@ -127,9 +115,9 @@ Namespace Microsoft.CodeAnalysis.Editor.VisualBasic.UnitTests.EndConstructGenera
         End Function
 
         Private Sub VerifyNotApplied(doFunc As Func(Of VisualBasicEndConstructService, ITextView, ITextBuffer, Boolean),
-                                     text As String(),
+                                     text As String,
                                      caret As Integer())
-            Using workspace = VisualBasicWorkspaceFactory.CreateWorkspaceFromLines(text)
+            Using workspace = TestWorkspace.CreateVisualBasic(text)
                 Dim textView = workspace.Documents.First().GetTextView()
                 Dim subjectBuffer = workspace.Documents.First().GetTextBuffer()
 
@@ -155,55 +143,55 @@ Namespace Microsoft.CodeAnalysis.Editor.VisualBasic.UnitTests.EndConstructGenera
                 Assert.Equal(EditorFactory.LinesToFullText(text), textView.TextSnapshot.GetText())
 
                 ' The caret should not have moved
-                Assert.Equal(caretPosition, textView.GetCaretPoint(subjectBuffer).Value.Position)
+                Assert.Equal(Of Integer)(caretPosition, textView.GetCaretPoint(subjectBuffer).Value.Position)
             End Using
         End Sub
 
-        Public Sub VerifyStatementEndConstructApplied(before As String(), beforeCaret As Integer(), after As String(), afterCaret As Integer())
+        Public Sub VerifyStatementEndConstructApplied(before As String, beforeCaret As Integer(), after As String, afterCaret As Integer())
             VerifyApplied(Function(s, v, b) s.TryDoEndConstructForEnterKey(v, b, CancellationToken.None), before, beforeCaret, after, afterCaret)
         End Sub
 
-        Public Sub VerifyStatementEndConstructNotApplied(text As String(), caret As Integer())
+        Public Sub VerifyStatementEndConstructNotApplied(text As String, caret As Integer())
             VerifyNotApplied(Function(s, v, b) s.TryDoEndConstructForEnterKey(v, b, CancellationToken.None), text, caret)
         End Sub
 
-        Public Sub VerifyXmlElementEndConstructApplied(before As String(), beforeCaret As Integer(), after As String(), afterCaret As Integer())
+        Public Sub VerifyXmlElementEndConstructApplied(before As String, beforeCaret As Integer(), after As String, afterCaret As Integer())
             VerifyApplied(Function(s, v, b) s.TryDoXmlElementEndConstruct(v, b, Nothing), before, beforeCaret, after, afterCaret)
         End Sub
 
-        Public Sub VerifyXmlElementEndConstructNotApplied(text As String(), caret As Integer())
+        Public Sub VerifyXmlElementEndConstructNotApplied(text As String, caret As Integer())
             VerifyNotApplied(Function(s, v, b) s.TryDoXmlElementEndConstruct(v, b, Nothing), text, caret)
         End Sub
 
-        Public Sub VerifyXmlCommentEndConstructApplied(before As String(), beforeCaret As Integer(), after As String(), afterCaret As Integer())
+        Public Sub VerifyXmlCommentEndConstructApplied(before As String, beforeCaret As Integer(), after As String, afterCaret As Integer())
             VerifyApplied(Function(s, v, b) s.TryDoXmlCommentEndConstruct(v, b, Nothing), before, beforeCaret, after, afterCaret)
         End Sub
 
-        Public Sub VerifyXmlCommentEndConstructNotApplied(text As String(), caret As Integer())
+        Public Sub VerifyXmlCommentEndConstructNotApplied(text As String, caret As Integer())
             VerifyNotApplied(Function(s, v, b) s.TryDoXmlCommentEndConstruct(v, b, Nothing), text, caret)
         End Sub
 
-        Public Sub VerifyXmlCDataEndConstructApplied(before As String(), beforeCaret As Integer(), after As String(), afterCaret As Integer())
+        Public Sub VerifyXmlCDataEndConstructApplied(before As String, beforeCaret As Integer(), after As String, afterCaret As Integer())
             VerifyApplied(Function(s, v, b) s.TryDoXmlCDataEndConstruct(v, b, Nothing), before, beforeCaret, after, afterCaret)
         End Sub
 
-        Public Sub VerifyXmlCDataEndConstructNotApplied(text As String(), caret As Integer())
+        Public Sub VerifyXmlCDataEndConstructNotApplied(text As String, caret As Integer())
             VerifyNotApplied(Function(s, v, b) s.TryDoXmlCDataEndConstruct(v, b, Nothing), text, caret)
         End Sub
 
-        Public Sub VerifyXmlEmbeddedExpressionEndConstructApplied(before As String(), beforeCaret As Integer(), after As String(), afterCaret As Integer())
+        Public Sub VerifyXmlEmbeddedExpressionEndConstructApplied(before As String, beforeCaret As Integer(), after As String, afterCaret As Integer())
             VerifyApplied(Function(s, v, b) s.TryDoXmlEmbeddedExpressionEndConstruct(v, b, Nothing), before, beforeCaret, after, afterCaret)
         End Sub
 
-        Public Sub VerifyXmlEmbeddedExpressionEndConstructNotApplied(text As String(), caret As Integer())
+        Public Sub VerifyXmlEmbeddedExpressionEndConstructNotApplied(text As String, caret As Integer())
             VerifyNotApplied(Function(s, v, b) s.TryDoXmlEmbeddedExpressionEndConstruct(v, b, Nothing), text, caret)
         End Sub
 
-        Public Sub VerifyXmlProcessingInstructionEndConstructApplied(before As String(), beforeCaret As Integer(), after As String(), afterCaret As Integer())
+        Public Sub VerifyXmlProcessingInstructionEndConstructApplied(before As String, beforeCaret As Integer(), after As String, afterCaret As Integer())
             VerifyApplied(Function(s, v, b) s.TryDoXmlProcessingInstructionEndConstruct(v, b, Nothing), before, beforeCaret, after, afterCaret)
         End Sub
 
-        Public Sub VerifyXmlProcessingInstructionNotApplied(text As String(), caret As Integer())
+        Public Sub VerifyXmlProcessingInstructionNotApplied(text As String, caret As Integer())
             VerifyNotApplied(Function(s, v, b) s.TryDoXmlProcessingInstructionEndConstruct(v, b, Nothing), text, caret)
         End Sub
 
@@ -222,7 +210,7 @@ Namespace Microsoft.CodeAnalysis.Editor.VisualBasic.UnitTests.EndConstructGenera
             afterCaret As Integer())
 
             ' create separate composition
-            Using workspace = VisualBasicWorkspaceFactory.CreateWorkspaceFromLines({before}, exportProvider:=DisabledLineCommitExportProvider)
+            Using workspace = TestWorkspace.CreateVisualBasic(before, composition:=EditorTestCompositions.EditorFeatures)
                 DisableLineCommit(workspace)
 
                 Dim view = workspace.Documents.First().GetTextView()
@@ -239,7 +227,7 @@ Namespace Microsoft.CodeAnalysis.Editor.VisualBasic.UnitTests.EndConstructGenera
                                     workspace.ExportProvider.GetExportedValue(Of ITextUndoHistoryRegistry)())
 
                 Dim operations = factory.GetEditorOperations(view)
-                endConstructor.ExecuteCommand_ReturnKeyCommandHandler(New ReturnKeyCommandArgs(view, view.TextBuffer), Sub() operations.InsertNewLine())
+                endConstructor.ExecuteCommand_ReturnKeyCommandHandler(New ReturnKeyCommandArgs(view, view.TextBuffer), Sub() operations.InsertNewLine(), TestCommandExecutionContext.Create())
 
                 Assert.Equal(after, view.TextSnapshot.GetText())
 
@@ -252,7 +240,7 @@ Namespace Microsoft.CodeAnalysis.Editor.VisualBasic.UnitTests.EndConstructGenera
                 End If
 
                 Dim caretPosition = view.Caret.Position.VirtualBufferPosition
-                Assert.Equal(afterCaretPoint, If(caretPosition.IsInVirtualSpace, caretPosition.Position + caretPosition.VirtualSpaces, caretPosition.Position))
+                Assert.Equal(Of Integer)(afterCaretPoint, If(caretPosition.IsInVirtualSpace, caretPosition.Position + caretPosition.VirtualSpaces, caretPosition.Position))
             End Using
         End Sub
     End Module

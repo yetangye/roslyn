@@ -1,4 +1,6 @@
-﻿' Copyright (c) Microsoft.  All Rights Reserved.  Licensed under the Apache License, Version 2.0.  See License.txt in the project root for license information.
+﻿' Licensed to the .NET Foundation under one or more agreements.
+' The .NET Foundation licenses this file to you under the MIT license.
+' See the LICENSE file in the project root for more information.
 
 Imports System.Runtime.CompilerServices
 Imports Microsoft.CodeAnalysis.Text
@@ -15,22 +17,32 @@ Namespace Microsoft.CodeAnalysis.VisualBasic
 
         <Extension()>
         Public Function ToSyntaxTriviaList(sequence As IEnumerable(Of SyntaxTrivia)) As SyntaxTriviaList
-            Return SyntaxFactory.TriviaList(sequence.Aggregate(New List(Of SyntaxTrivia), Function(list, trivia)
-                                                                                              list.Add(trivia)
-                                                                                              Return list
-                                                                                          End Function))
-        End Function
-
-        Friend Const DefaultIndentation As String = "    "
-
-        <Extension()>
-        Public Function NormalizeWhitespace(Of TNode As SyntaxNode)(node As TNode, useDefaultCasing As Boolean, Optional indentation As String = DefaultIndentation, Optional elasticTrivia As Boolean = False) As TNode
-            Return CType(SyntaxFormatter.Format(node, indentation, elasticTrivia, useDefaultCasing), TNode)
+            Return SyntaxFactory.TriviaList(sequence)
         End Function
 
         <Extension()>
-        Public Function NormalizeWhitespace(token As SyntaxToken, Optional indentation As String = DefaultIndentation, Optional elasticTrivia As Boolean = False) As SyntaxToken
-            Return SyntaxFormatter.Format(token, indentation, elasticTrivia)
+        Public Function NormalizeWhitespace(Of TNode As SyntaxNode)(node As TNode, useDefaultCasing As Boolean, indentation As String, elasticTrivia As Boolean) As TNode
+            Return CType(SyntaxNormalizer.Normalize(node, indentation, Microsoft.CodeAnalysis.SyntaxNodeExtensions.DefaultEOL, elasticTrivia, useDefaultCasing), TNode)
+        End Function
+
+        <Extension()>
+        Public Function NormalizeWhitespace(Of TNode As SyntaxNode)(node As TNode, useDefaultCasing As Boolean, Optional indentation As String = Microsoft.CodeAnalysis.SyntaxNodeExtensions.DefaultIndentation, Optional eol As String = Microsoft.CodeAnalysis.SyntaxNodeExtensions.DefaultEOL, Optional elasticTrivia As Boolean = False) As TNode
+            Return CType(SyntaxNormalizer.Normalize(node, indentation, eol, elasticTrivia, useDefaultCasing), TNode)
+        End Function
+
+        <Extension()>
+        Public Function NormalizeWhitespace(token As SyntaxToken, indentation As String, elasticTrivia As Boolean) As SyntaxToken
+            Return SyntaxNormalizer.Normalize(token, indentation, Microsoft.CodeAnalysis.SyntaxNodeExtensions.DefaultEOL, elasticTrivia, False)
+        End Function
+
+        <Extension()>
+        Public Function NormalizeWhitespace(token As SyntaxToken, Optional indentation As String = Microsoft.CodeAnalysis.SyntaxNodeExtensions.DefaultIndentation, Optional eol As String = Microsoft.CodeAnalysis.SyntaxNodeExtensions.DefaultEOL, Optional elasticTrivia As Boolean = False, Optional useDefaultCasing As Boolean = False) As SyntaxToken
+            Return SyntaxNormalizer.Normalize(token, indentation, eol, elasticTrivia, useDefaultCasing)
+        End Function
+
+        <Extension()>
+        Public Function NormalizeWhitespace(trivia As SyntaxTriviaList, Optional indentation As String = Microsoft.CodeAnalysis.SyntaxNodeExtensions.DefaultIndentation, Optional eol As String = Microsoft.CodeAnalysis.SyntaxNodeExtensions.DefaultEOL, Optional elasticTrivia As Boolean = False, Optional useDefaultCasing As Boolean = False) As SyntaxTriviaList
+            Return SyntaxNormalizer.Normalize(trivia, indentation, eol, elasticTrivia, useDefaultCasing)
         End Function
 
         ''' <summary>
@@ -92,6 +104,26 @@ Namespace Microsoft.CodeAnalysis.VisualBasic
             Return If(simpleName.Kind = SyntaxKind.IdentifierName,
                       DirectCast(DirectCast(simpleName, IdentifierNameSyntax).WithIdentifier(identifier), SimpleNameSyntax),
                       DirectCast(DirectCast(simpleName, GenericNameSyntax).WithIdentifier(identifier), SimpleNameSyntax))
+        End Function
+
+        ''' <summary>
+        ''' Given an initializer expression infer the name of anonymous property or tuple element.
+        ''' Returns Nothing if unsuccessful
+        ''' </summary>
+        <Extension>
+        Public Function TryGetInferredMemberName(syntax As SyntaxNode) As String
+            If syntax Is Nothing Then
+                Return Nothing
+            End If
+
+            Dim expr = TryCast(syntax, ExpressionSyntax)
+            If expr Is Nothing Then
+                Return Nothing
+            End If
+
+            Dim ignore As XmlNameSyntax = Nothing
+            Dim nameToken As SyntaxToken = expr.ExtractAnonymousTypeMemberName(ignore)
+            Return If(nameToken.Kind() = SyntaxKind.IdentifierToken, nameToken.ValueText, Nothing)
         End Function
     End Module
 End Namespace

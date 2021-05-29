@@ -1,6 +1,11 @@
-﻿Imports System.Runtime.CompilerServices
+﻿' Licensed to the .NET Foundation under one or more agreements.
+' The .NET Foundation licenses this file to you under the MIT license.
+' See the LICENSE file in the project root for more information.
+
+Imports System.Runtime.CompilerServices
 Imports Microsoft.CodeAnalysis.ExpressionEvaluator
 Imports Type = Microsoft.VisualStudio.Debugger.Metadata.Type
+Imports TypeCode = Microsoft.VisualStudio.Debugger.Metadata.TypeCode
 
 Namespace Microsoft.CodeAnalysis.VisualBasic.ExpressionEvaluator
 

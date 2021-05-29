@@ -1,35 +1,30 @@
-' Copyright (c) Microsoft.  All Rights Reserved.  Licensed under the Apache License, Version 2.0.  See License.txt in the project root for license information.
-
-Imports Microsoft.CodeAnalysis.Text
-Imports Microsoft.CodeAnalysis.VisualBasic
-Imports Microsoft.CodeAnalysis.VisualBasic.Symbols
-Imports Microsoft.CodeAnalysis.VisualBasic.Syntax
-Imports Roslyn.Test.Utilities
-Imports Xunit
+﻿' Licensed to the .NET Foundation under one or more agreements.
+' The .NET Foundation licenses this file to you under the MIT license.
+' See the LICENSE file in the project root for more information.
 
 Namespace Microsoft.CodeAnalysis.Editor.VisualBasic.UnitTests.Recommendations.Declarations
     Public Class NamespaceKeywordRecommenderTests
         <Fact>
         <Trait(Traits.Feature, Traits.Features.KeywordRecommending)>
-        Public Sub NamespaceInFile()
+        Public Sub NamespaceInFileTest()
             VerifyRecommendationsContain(<File>|</File>, "Namespace")
         End Sub
 
         <Fact>
         <Trait(Traits.Feature, Traits.Features.KeywordRecommending)>
-        Public Sub NamespaceNotInMethodDeclaration()
+        Public Sub NamespaceNotInMethodDeclarationTest()
             VerifyRecommendationsMissing(<MethodBody>|</MethodBody>, "Namespace")
         End Sub
 
         <Fact>
         <Trait(Traits.Feature, Traits.Features.KeywordRecommending)>
-        Public Sub NamespaceInNamespace()
+        Public Sub NamespaceInNamespaceTest()
             VerifyRecommendationsContain(<NamespaceDeclaration>|</NamespaceDeclaration>, "Namespace")
         End Sub
 
-        <Fact, WorkItem(530727)>
+        <Fact, WorkItem(530727, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/530727")>
         <Trait(Traits.Feature, Traits.Features.KeywordRecommending)>
-        Public Sub NestedNamespaceFollowsTypeDeclaration()
+        Public Sub NestedNamespaceFollowsTypeDeclarationTest()
             Dim code =
 <File>
 Namespace N1
@@ -42,9 +37,9 @@ End Namespace
             VerifyRecommendationsContain(code, "Namespace")
         End Sub
 
-        <Fact, WorkItem(530727)>
+        <Fact, WorkItem(530727, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/530727")>
         <Trait(Traits.Feature, Traits.Features.KeywordRecommending)>
-        Public Sub NamespaceFollowsNamespace()
+        Public Sub NamespaceFollowsNamespaceTest()
             Dim code =
 <File>
 Namespace N1
@@ -57,9 +52,9 @@ End Namespace
             VerifyRecommendationsContain(code, "Namespace")
         End Sub
 
-        <Fact, WorkItem(530727)>
+        <Fact, WorkItem(530727, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/530727")>
         <Trait(Traits.Feature, Traits.Features.KeywordRecommending)>
-        Public Sub NamespaceFollowsNamespaceWithoutMatchingEnd()
+        Public Sub NamespaceFollowsNamespaceWithoutMatchingEndTest()
             Dim code =
 <File>
 Namespace N1
@@ -68,9 +63,9 @@ Namespace N1
             VerifyRecommendationsContain(code, "Namespace")
         End Sub
 
-        <Fact, WorkItem(530727)>
+        <Fact, WorkItem(530727, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/530727")>
         <Trait(Traits.Feature, Traits.Features.KeywordRecommending)>
-        Public Sub NamespaceFollowsMismatchedEnd1()
+        Public Sub NamespaceFollowsMismatchedEnd1Test()
             Dim code =
 <File>
 Namespace N1
@@ -81,9 +76,9 @@ End Namespace
             VerifyRecommendationsContain(code, "Namespace")
         End Sub
 
-        <Fact, WorkItem(530727)>
+        <Fact, WorkItem(530727, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/530727")>
         <Trait(Traits.Feature, Traits.Features.KeywordRecommending)>
-        Public Sub NamespaceFollowsMismatchedEnd2()
+        Public Sub NamespaceFollowsMismatchedEnd2Test()
             Dim code =
 <File>
 Namespace N1
@@ -93,9 +88,9 @@ End Class
             VerifyRecommendationsContain(code, "Namespace")
         End Sub
 
-        <Fact, WorkItem(530727)>
+        <Fact, WorkItem(530727, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/530727")>
         <Trait(Traits.Feature, Traits.Features.KeywordRecommending)>
-        Public Sub NamespaceFollowsMismatchedEnd3()
+        Public Sub NamespaceFollowsMismatchedEnd3Test()
             Dim code =
 <File>
 End Class
@@ -104,9 +99,9 @@ End Class
             VerifyRecommendationsContain(code, "Namespace")
         End Sub
 
-        <Fact, WorkItem(530727)>
+        <Fact, WorkItem(530727, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/530727")>
         <Trait(Traits.Feature, Traits.Features.KeywordRecommending)>
-        Public Sub NamespaceFollowsMismatchedEnd4()
+        Public Sub NamespaceFollowsMismatchedEnd4Test()
             Dim code =
 <File>
 End Class
@@ -118,7 +113,7 @@ End Namespace
 
         <Fact>
         <Trait(Traits.Feature, Traits.Features.KeywordRecommending)>
-        Public Sub NamespaceFollowsDelegateDeclaration()
+        Public Sub NamespaceFollowsDelegateDeclarationTest()
             Dim code =
 <File>
 Delegate Sub DelegateType()
@@ -129,199 +124,199 @@ Delegate Sub DelegateType()
 
         <Fact>
         <Trait(Traits.Feature, Traits.Features.KeywordRecommending)>
-        Public Sub NamespaceNotInInterface()
+        Public Sub NamespaceNotInInterfaceTest()
             VerifyRecommendationsMissing(<InterfaceDeclaration>|</InterfaceDeclaration>, "Namespace")
         End Sub
 
         <Fact>
         <Trait(Traits.Feature, Traits.Features.KeywordRecommending)>
-        Public Sub NamespaceNotInEnum()
+        Public Sub NamespaceNotInEnumTest()
             VerifyRecommendationsMissing(<EnumDeclaration>|</EnumDeclaration>, "Namespace")
         End Sub
 
         <Fact>
         <Trait(Traits.Feature, Traits.Features.KeywordRecommending)>
-        Public Sub NamespaceNotInStructure()
+        Public Sub NamespaceNotInStructureTest()
             VerifyRecommendationsMissing(<StructureDeclaration>|</StructureDeclaration>, "Namespace")
         End Sub
 
         <Fact>
         <Trait(Traits.Feature, Traits.Features.KeywordRecommending)>
-        Public Sub NamespaceNotInModule()
+        Public Sub NamespaceNotInModuleTest()
             VerifyRecommendationsMissing(<ModuleDeclaration>|</ModuleDeclaration>, "Namespace")
         End Sub
 
         <Fact>
         <Trait(Traits.Feature, Traits.Features.KeywordRecommending)>
-        Public Sub NamespaceNotAfterPartial()
+        Public Sub NamespaceNotAfterPartialTest()
             VerifyRecommendationsMissing(<File>Partial |</File>, "Namespace")
         End Sub
 
         <Fact>
         <Trait(Traits.Feature, Traits.Features.KeywordRecommending)>
-        Public Sub NamespaceNotAfterPublic()
+        Public Sub NamespaceNotAfterPublicTest()
             VerifyRecommendationsMissing(<File>Public |</File>, "Namespace")
         End Sub
 
         <Fact>
         <Trait(Traits.Feature, Traits.Features.KeywordRecommending)>
-        Public Sub NamespaceNotAfterPublicInClassDeclaration()
+        Public Sub NamespaceNotAfterPublicInClassDeclarationTest()
             VerifyRecommendationsMissing(<ClassDeclaration>Public |</ClassDeclaration>, "Namespace")
         End Sub
 
         <Fact>
         <Trait(Traits.Feature, Traits.Features.KeywordRecommending)>
-        Public Sub NamespaceNotAfterProtectedInFile()
+        Public Sub NamespaceNotAfterProtectedInFileTest()
             VerifyRecommendationsMissing(<File>Protected |</File>, "Namespace")
         End Sub
 
         <Fact>
         <Trait(Traits.Feature, Traits.Features.KeywordRecommending)>
-        Public Sub NamespaceNotAfterProtectedInClassDeclaration()
+        Public Sub NamespaceNotAfterProtectedInClassDeclarationTest()
             VerifyRecommendationsMissing(<ClassDeclaration>Protected |</ClassDeclaration>, "Namespace")
         End Sub
 
         <Fact>
         <Trait(Traits.Feature, Traits.Features.KeywordRecommending)>
-        Public Sub NamespaceNotAfterFriendInFile()
+        Public Sub NamespaceNotAfterFriendInFileTest()
             VerifyRecommendationsMissing(<File>Friend |</File>, "Namespace")
         End Sub
 
         <Fact>
         <Trait(Traits.Feature, Traits.Features.KeywordRecommending)>
-        Public Sub NamespaceNotAfterFriendInClassDeclaration()
+        Public Sub NamespaceNotAfterFriendInClassDeclarationTest()
             VerifyRecommendationsMissing(<ClassDeclaration>Friend |</ClassDeclaration>, "Namespace")
         End Sub
 
         <Fact>
         <Trait(Traits.Feature, Traits.Features.KeywordRecommending)>
-        Public Sub NamespaceNotAfterPrivateInFile()
+        Public Sub NamespaceNotAfterPrivateInFileTest()
             VerifyRecommendationsMissing(<File>Private |</File>, "Namespace")
         End Sub
 
         <Fact>
         <Trait(Traits.Feature, Traits.Features.KeywordRecommending)>
-        Public Sub NamespaceNotAfterPrivateInNestedClass()
+        Public Sub NamespaceNotAfterPrivateInNestedClassTest()
             VerifyRecommendationsMissing(<ClassDeclaration>Private |</ClassDeclaration>, "Namespace")
         End Sub
 
         <Fact>
         <Trait(Traits.Feature, Traits.Features.KeywordRecommending)>
-        Public Sub NamespaceNotAfterPrivateInNamespace()
+        Public Sub NamespaceNotAfterPrivateInNamespaceTest()
             VerifyRecommendationsMissing(<NamespaceDeclaration>Private |</NamespaceDeclaration>, "Namespace")
         End Sub
 
         <Fact>
         <Trait(Traits.Feature, Traits.Features.KeywordRecommending)>
-        Public Sub NamespaceNotAfterProtectedFriendInFile()
+        Public Sub NamespaceNotAfterProtectedFriendInFileTest()
             VerifyRecommendationsMissing(<File>Protected Friend |</File>, "Namespace")
         End Sub
 
         <Fact>
         <Trait(Traits.Feature, Traits.Features.KeywordRecommending)>
-        Public Sub NamespaceNotAfterProtectedFriendInClass()
+        Public Sub NamespaceNotAfterProtectedFriendInClassTest()
             VerifyRecommendationsMissing(<ClassDeclaration>Protected Friend |</ClassDeclaration>, "Namespace")
         End Sub
 
         <Fact>
         <Trait(Traits.Feature, Traits.Features.KeywordRecommending)>
-        Public Sub NamespaceNotAfterOverloads()
+        Public Sub NamespaceNotAfterOverloadsTest()
             VerifyRecommendationsMissing(<ClassDeclaration>Overloads |</ClassDeclaration>, "Namespace")
         End Sub
 
         <Fact>
         <Trait(Traits.Feature, Traits.Features.KeywordRecommending)>
-        Public Sub NamespaceNotAfterOverrides()
+        Public Sub NamespaceNotAfterOverridesTest()
             VerifyRecommendationsMissing(<ClassDeclaration>Overrides |</ClassDeclaration>, "Namespace")
         End Sub
 
         <Fact>
         <Trait(Traits.Feature, Traits.Features.KeywordRecommending)>
-        Public Sub NamespaceNotAfterOverridable()
+        Public Sub NamespaceNotAfterOverridableTest()
             VerifyRecommendationsMissing(<ClassDeclaration>Overridable |</ClassDeclaration>, "Namespace")
         End Sub
 
         <Fact>
         <Trait(Traits.Feature, Traits.Features.KeywordRecommending)>
-        Public Sub NamespaceNotAfterNotOverridable()
+        Public Sub NamespaceNotAfterNotOverridableTest()
             VerifyRecommendationsMissing(<ClassDeclaration>NotOverridable |</ClassDeclaration>, "Namespace")
         End Sub
 
         <Fact>
         <Trait(Traits.Feature, Traits.Features.KeywordRecommending)>
-        Public Sub NamespaceNotAfterMustOverride()
+        Public Sub NamespaceNotAfterMustOverrideTest()
             VerifyRecommendationsMissing(<ClassDeclaration>MustOverride |</ClassDeclaration>, "Namespace")
         End Sub
 
         <Fact>
         <Trait(Traits.Feature, Traits.Features.KeywordRecommending)>
-        Public Sub NamespaceNotAfterMustOverrideOverrides()
+        Public Sub NamespaceNotAfterMustOverrideOverridesTest()
             VerifyRecommendationsMissing(<ClassDeclaration>MustOverride Overrides |</ClassDeclaration>, "Namespace")
         End Sub
 
         <Fact>
         <Trait(Traits.Feature, Traits.Features.KeywordRecommending)>
-        Public Sub NamespaceNotAfterNotOverridableOverrides()
+        Public Sub NamespaceNotAfterNotOverridableOverridesTest()
             VerifyRecommendationsMissing(<ClassDeclaration>NotOverridable Overrides |</ClassDeclaration>, "Namespace")
         End Sub
 
         <Fact>
         <Trait(Traits.Feature, Traits.Features.KeywordRecommending)>
-        Public Sub NamespaceNotAfterConst()
+        Public Sub NamespaceNotAfterConstTest()
             VerifyRecommendationsMissing(<ClassDeclaration>Const |</ClassDeclaration>, "Namespace")
         End Sub
 
         <Fact>
         <Trait(Traits.Feature, Traits.Features.KeywordRecommending)>
-        Public Sub NamespaceNotAfterDefault()
+        Public Sub NamespaceNotAfterDefaultTest()
             VerifyRecommendationsMissing(<ClassDeclaration>Default |</ClassDeclaration>, "Namespace")
         End Sub
 
         <Fact>
         <Trait(Traits.Feature, Traits.Features.KeywordRecommending)>
-        Public Sub NamespaceNotAfterMustInherit()
+        Public Sub NamespaceNotAfterMustInheritTest()
             VerifyRecommendationsMissing(<ClassDeclaration>MustInherit |</ClassDeclaration>, "Namespace")
         End Sub
 
         <Fact>
         <Trait(Traits.Feature, Traits.Features.KeywordRecommending)>
-        Public Sub NamespaceNotAfterNotInheritable()
+        Public Sub NamespaceNotAfterNotInheritableTest()
             VerifyRecommendationsMissing(<ClassDeclaration>NotInheritable |</ClassDeclaration>, "Namespace")
         End Sub
 
         <Fact>
         <Trait(Traits.Feature, Traits.Features.KeywordRecommending)>
-        Public Sub NamespaceNotAfterNarrowing()
+        Public Sub NamespaceNotAfterNarrowingTest()
             VerifyRecommendationsMissing(<ClassDeclaration>Narrowing |</ClassDeclaration>, "Namespace")
         End Sub
 
         <Fact>
         <Trait(Traits.Feature, Traits.Features.KeywordRecommending)>
-        Public Sub NamespaceNotAfterWidening()
+        Public Sub NamespaceNotAfterWideningTest()
             VerifyRecommendationsMissing(<ClassDeclaration>Widening |</ClassDeclaration>, "Namespace")
         End Sub
 
         <Fact>
         <Trait(Traits.Feature, Traits.Features.KeywordRecommending)>
-        Public Sub NamespaceNotAfterReadOnly()
+        Public Sub NamespaceNotAfterReadOnlyTest()
             VerifyRecommendationsMissing(<ClassDeclaration>ReadOnly |</ClassDeclaration>, "Namespace")
         End Sub
 
         <Fact>
         <Trait(Traits.Feature, Traits.Features.KeywordRecommending)>
-        Public Sub NamespaceNotAfterWriteOnly()
+        Public Sub NamespaceNotAfterWriteOnlyTest()
             VerifyRecommendationsMissing(<ClassDeclaration>WriteOnly |</ClassDeclaration>, "Namespace")
         End Sub
 
         <Fact>
         <Trait(Traits.Feature, Traits.Features.KeywordRecommending)>
-        Public Sub NamespaceNotAfterCustom()
+        Public Sub NamespaceNotAfterCustomTest()
             VerifyRecommendationsMissing(<ClassDeclaration>Custom |</ClassDeclaration>, "Namespace")
         End Sub
 
         <Fact>
         <Trait(Traits.Feature, Traits.Features.KeywordRecommending)>
-        Public Sub NamespaceNotAfterShared()
+        Public Sub NamespaceNotAfterSharedTest()
             VerifyRecommendationsMissing(<ClassDeclaration>Shared |</ClassDeclaration>, "Namespace")
         End Sub
     End Class

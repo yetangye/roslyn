@@ -1,12 +1,12 @@
-﻿' Copyright (c) Microsoft.  All Rights Reserved.  Licensed under the Apache License, Version 2.0.  See License.txt in the project root for license information.
+﻿' Licensed to the .NET Foundation under one or more agreements.
+' The .NET Foundation licenses this file to you under the MIT license.
+' See the LICENSE file in the project root for more information.
 
 Imports System.Collections.Generic
 Imports System.Collections.Immutable
 Imports System.Runtime.CompilerServices
-Imports System.Threading
-Imports Microsoft.CodeAnalysis.Text
+Imports Microsoft.CodeAnalysis.PooledObjects
 Imports Microsoft.CodeAnalysis.VisualBasic.Symbols
-Imports Microsoft.CodeAnalysis.VisualBasic.Syntax
 
 Namespace Microsoft.CodeAnalysis.VisualBasic
 
@@ -199,7 +199,7 @@ Namespace Microsoft.CodeAnalysis.VisualBasic
     '''    a non-accessible result - this kind of result means that search continues into further scopes of lower priority for
     '''                      a viable result. An error is attached with the inaccessibility errors. Non-accessible results take priority over
     '''                      non-viable results.
-    '''    a non-viable result - a result that that means that the search continues into further scopes of lower priority for
+    '''    a non-viable result - a result that means that the search continues into further scopes of lower priority for
     '''                          a viable or non-accessible result. An error is attached with the error that indicates
     '''                          why the result is non-viable.
     '''    a bad symbol that stops further lookup -  this kind of result prevents lookup into further scopes of lower priority.
@@ -210,7 +210,7 @@ Namespace Microsoft.CodeAnalysis.VisualBasic
     ''' Occasionally, good or ambiguous results are referred to as "viable" results.
     ''' 
     ''' Multiple symbols can be represented in a single LookupResult. Multiple symbols are ONLY USED for overloadable
-    ''' entities, such an methods or properties, and represent all the symbols that overload resolution needs to consider.
+    ''' entities, such as methods or properties, and represent all the symbols that overload resolution needs to consider.
     ''' When ambiguous symbols are encountered, a single representative symbols is returned, with an attached AmbiguousSymbolDiagnostic
     ''' from which all the ambiguous symbols can be retrieved. This implies that Lookup operations that are restricted to namespaces
     ''' and/or types always create a LookupResult with 0 or 1 symbol.
@@ -222,7 +222,7 @@ Namespace Microsoft.CodeAnalysis.VisualBasic
     '''    
     '''    Dim result = LookupResult.GetInstance()
     '''  
-    '''    scope.Lookup(result, "foo")
+    '''    scope.Lookup(result, "goo")
     '''    ... use result ...
     '''         
     '''    result.Clear()
@@ -234,100 +234,100 @@ Namespace Microsoft.CodeAnalysis.VisualBasic
     Friend Class LookupResult
 
         ' The kind of result.
-        Private m_kind As LookupResultKind
+        Private _kind As LookupResultKind
 
         ' The symbol, unless the kind is empty.
-        Private m_symList As ArrayBuilder(Of Symbol)
+        Private ReadOnly _symList As ArrayBuilder(Of Symbol)
 
         ' The diagnostic. This is always set for NonAccessible and NonViable results. It may be
         ' set for viable results.
-        Private m_diagInfo As DiagnosticInfo
+        Private _diagInfo As DiagnosticInfo
 
         ' The pool used to get instances from.
-        Private m_pool As ObjectPool(Of LookupResult)
+        Private ReadOnly _pool As ObjectPool(Of LookupResult)
 
         ''''''''''''''''''''''''''''''
         ' Access routines
 
         Public ReadOnly Property Kind As LookupResultKind
             Get
-                Return m_kind
+                Return _kind
             End Get
         End Property
 
-        ' Should we stop looking further for a better result? Stop for kind EmptyAndStopLookup, WrongArityAndStopLookup, Ambigiuous, or Good.
+        ' Should we stop looking further for a better result? Stop for kind EmptyAndStopLookup, WrongArityAndStopLookup, Ambiguous, or Good.
         Public ReadOnly Property StopFurtherLookup As Boolean
             Get
-                Return m_kind >= LookupResultKind.EmptyAndStopLookup
+                Return _kind >= LookupResultKind.EmptyAndStopLookup
             End Get
         End Property
 
         ' Does it have a symbol without error.
         Public ReadOnly Property IsGood As Boolean
             Get
-                Return m_kind = LookupResultKind.Good
+                Return _kind = LookupResultKind.Good
             End Get
         End Property
 
         Public ReadOnly Property IsGoodOrAmbiguous As Boolean
             Get
-                Return m_kind = LookupResultKind.Good OrElse m_kind = LookupResultKind.Ambiguous
+                Return _kind = LookupResultKind.Good OrElse _kind = LookupResultKind.Ambiguous
             End Get
         End Property
 
         Public ReadOnly Property IsAmbiguous As Boolean
             Get
-                Return m_kind = LookupResultKind.Ambiguous
+                Return _kind = LookupResultKind.Ambiguous
             End Get
         End Property
 
         Public ReadOnly Property IsWrongArity As Boolean
             Get
-                Return m_kind = LookupResultKind.WrongArity OrElse m_kind = LookupResultKind.WrongArityAndStopLookup
+                Return _kind = LookupResultKind.WrongArity OrElse _kind = LookupResultKind.WrongArityAndStopLookup
             End Get
         End Property
 
         Public ReadOnly Property HasDiagnostic As Boolean
             Get
-                Return m_diagInfo IsNot Nothing
+                Return _diagInfo IsNot Nothing
             End Get
         End Property
 
         Public ReadOnly Property Diagnostic As DiagnosticInfo
             Get
-                Return m_diagInfo
+                Return _diagInfo
             End Get
         End Property
 
         Public ReadOnly Property HasSymbol As Boolean
             Get
-                Return m_symList.Count > 0
+                Return _symList.Count > 0
             End Get
         End Property
 
         Public ReadOnly Property HasSingleSymbol As Boolean
             Get
-                Return m_symList.Count = 1
+                Return _symList.Count = 1
             End Get
         End Property
 
         Public ReadOnly Property Symbols As ArrayBuilder(Of Symbol)
             Get
-                Return m_symList
+                Return _symList
             End Get
         End Property
 
         Public ReadOnly Property SingleSymbol As Symbol
             Get
                 Debug.Assert(HasSingleSymbol)
-                Return m_symList(0)
+                Return _symList(0)
             End Get
         End Property
 
         ''''''''''''''''''''''''''''''
         ' Creation routines
 
-        Private Shared _poolInstance As ObjectPool(Of LookupResult) = CreatePool()
+        Private Shared ReadOnly s_poolInstance As ObjectPool(Of LookupResult) = CreatePool()
 
         Private Shared Function CreatePool() As ObjectPool(Of LookupResult)
             Dim pool As ObjectPool(Of LookupResult) = Nothing
@@ -339,46 +339,46 @@ Namespace Microsoft.CodeAnalysis.VisualBasic
         Private Sub New(pool As ObjectPool(Of LookupResult))
             MyClass.New()
 
-            m_pool = pool
+            _pool = pool
         End Sub
 
         ' used by unit tests
         Friend Sub New()
-            m_kind = LookupResultKind.Empty
-            m_symList = New ArrayBuilder(Of Symbol)
-            m_diagInfo = Nothing
+            _kind = LookupResultKind.Empty
+            _symList = New ArrayBuilder(Of Symbol)
+            _diagInfo = Nothing
         End Sub
 
         Public Shared Function GetInstance() As LookupResult
-            Return _poolInstance.Allocate()
+            Return s_poolInstance.Allocate()
         End Function
 
         Public Sub Free()
             Clear()
-            If m_pool IsNot Nothing Then
-                m_pool.Free(Me)
+            If _pool IsNot Nothing Then
+                _pool.Free(Me)
             End If
         End Sub
 
         Public Sub Clear()
-            m_kind = LookupResultKind.Empty
-            m_symList.Clear()
-            m_diagInfo = Nothing
+            _kind = LookupResultKind.Empty
+            _symList.Clear()
+            _diagInfo = Nothing
         End Sub
 
         Public ReadOnly Property IsClear As Boolean
             Get
-                Return m_kind = LookupResultKind.Empty AndAlso m_symList.Count = 0 AndAlso m_diagInfo Is Nothing
+                Return _kind = LookupResultKind.Empty AndAlso _symList.Count = 0 AndAlso _diagInfo Is Nothing
             End Get
         End Property
 
         Private Sub SetFrom(kind As LookupResultKind, sym As Symbol, diagInfo As DiagnosticInfo)
-            m_kind = kind
-            m_symList.Clear()
+            _kind = kind
+            _symList.Clear()
             If sym IsNot Nothing Then
-                m_symList.Add(sym)
+                _symList.Add(sym)
             End If
-            m_diagInfo = diagInfo
+            _diagInfo = diagInfo
         End Sub
 
         ''' <summary>
@@ -392,10 +392,10 @@ Namespace Microsoft.CodeAnalysis.VisualBasic
         ''' Set current result according to another
         ''' </summary>
         Public Sub SetFrom(other As LookupResult)
-            m_kind = other.m_kind
-            m_symList.Clear()
-            m_symList.AddRange(other.m_symList)
-            m_diagInfo = other.m_diagInfo
+            _kind = other._kind
+            _symList.Clear()
+            _symList.AddRange(other._symList)
+            _diagInfo = other._diagInfo
         End Sub
 
         ''' <summary>
@@ -530,7 +530,7 @@ Namespace Microsoft.CodeAnalysis.VisualBasic
 
 
         ' Merge two results, returning the best. If there are
-        ' multiple viable results, either produce an result with both symbols if they can overload each other,
+        ' multiple viable results, either produce a result with both symbols if they can overload each other,
         ' or use the current one..
         Public Sub MergeOverloadedOrPrioritizedExtensionMethods(other As SingleLookupResult)
             Debug.Assert(Not Me.IsAmbiguous AndAlso Not other.IsAmbiguous)
@@ -538,13 +538,13 @@ Namespace Microsoft.CodeAnalysis.VisualBasic
             Debug.Assert(Not Me.HasSymbol OrElse Me.Symbols(0).IsReducedExtensionMethod())
 
             If Me.IsGood AndAlso other.IsGood Then
-                m_symList.Add(other.Symbol)
+                _symList.Add(other.Symbol)
             ElseIf other.Kind > Me.Kind Then
                 SetFrom(other)
             ElseIf Me.Kind <> LookupResultKind.Inaccessible OrElse Me.Kind > other.Kind Then
                 Return
             Else
-                m_symList.Add(other.Symbol)
+                _symList.Add(other.Symbol)
             End If
         End Sub
 
@@ -558,7 +558,7 @@ Namespace Microsoft.CodeAnalysis.VisualBasic
                 If Me.IsGood AndAlso other.IsGood Then
                     ' Two viable results. Either they can overload each other, or we need to produce an ambiguity.
                     If CanOverload(Me.Symbols(0), other.Symbols(0)) AndAlso (Not checkIfCurrentHasOverloads OrElse AllSymbolsHaveOverloads()) Then
-                        m_symList.AddRange(other.Symbols)
+                        _symList.AddRange(other.Symbols)
                     Else
                         ' They don't overload each other. Just hide.
                         Return
@@ -566,8 +566,8 @@ Namespace Microsoft.CodeAnalysis.VisualBasic
                 Else
                     Debug.Assert(Me.IsAmbiguous OrElse other.IsAmbiguous)
                     ' Stick with the current result.
-                    ' Good result from derived class shouldn't be overriden by an ambiguous result from the base class.
-                    ' Ambiguous result from derived class shouldn't be overriden by a good result from the base class.
+                    ' Good result from derived class shouldn't be overridden by an ambiguous result from the base class.
+                    ' Ambiguous result from derived class shouldn't be overridden by a good result from the base class.
                     Return
                 End If
             ElseIf other.Kind > Me.Kind Then
@@ -577,7 +577,7 @@ Namespace Microsoft.CodeAnalysis.VisualBasic
                 (checkIfCurrentHasOverloads AndAlso Not AllSymbolsHaveOverloads()) Then
                 Return
             Else
-                m_symList.AddRange(other.Symbols)
+                _symList.AddRange(other.Symbols)
             End If
         End Sub
 
@@ -598,7 +598,7 @@ Namespace Microsoft.CodeAnalysis.VisualBasic
                 If Me.IsGood AndAlso other.IsGood Then
                     ' Two viable results. Either they can overload each other, or we need to produce an ambiguity.
                     If CanOverload(Me.Symbols(0), other.Symbol) AndAlso (Not checkIfCurrentHasOverloads OrElse AllSymbolsHaveOverloads()) Then
-                        m_symList.Add(other.Symbol)
+                        _symList.Add(other.Symbol)
                     Else
                         ' They don't overload each other. Just hide.
                         Return
@@ -606,8 +606,8 @@ Namespace Microsoft.CodeAnalysis.VisualBasic
                 Else
                     Debug.Assert(Me.IsAmbiguous OrElse other.IsAmbiguous)
                     ' Stick with the current result.
-                    ' Good result from derived class shouldn't be overriden by an ambiguous result from the base class.
-                    ' Ambiguous result from derived class shouldn't be overriden by a good result from the base class.
+                    ' Good result from derived class shouldn't be overridden by an ambiguous result from the base class.
+                    ' Ambiguous result from derived class shouldn't be overridden by a good result from the base class.
                     Return
                 End If
             ElseIf other.Kind > Me.Kind Then
@@ -617,15 +617,15 @@ Namespace Microsoft.CodeAnalysis.VisualBasic
                 (checkIfCurrentHasOverloads AndAlso Not AllSymbolsHaveOverloads()) Then
                 Return
             Else
-                m_symList.Add(other.Symbol)
+                _symList.Add(other.Symbol)
             End If
         End Sub
 
         ' Merge two results, returning the best. If there are
-        ' multiple viable results, either produce an result with both symbols if they can overload each other,
+        ' multiple viable results, either produce a result with both symbols if they can overload each other,
         ' or produce an ambiguity error otherwise.
         Public Sub MergeMembersOfTheSameType(other As SingleLookupResult, imported As Boolean)
-            Debug.Assert(Not Me.HasSymbol OrElse other.Symbol Is Nothing OrElse Me.Symbols(0).ContainingType = other.Symbol.ContainingType)
+            Debug.Assert(Not Me.HasSymbol OrElse other.Symbol Is Nothing OrElse TypeSymbol.Equals(Me.Symbols(0).ContainingType, other.Symbol.ContainingType, TypeCompareKind.ConsiderEverything))
             Debug.Assert(Not other.IsAmbiguous)
 
             If Me.IsGoodOrAmbiguous AndAlso other.IsGood Then
@@ -633,11 +633,16 @@ Namespace Microsoft.CodeAnalysis.VisualBasic
                 MergeOverloadedOrAmbiguousInTheSameType(other, imported)
             ElseIf other.Kind > Me.Kind Then
                 SetFrom(other)
-            ElseIf Me.Kind <> LookupResultKind.Inaccessible OrElse Me.Kind > other.Kind OrElse
-                Not CanOverload(Me.Symbols(0), other.Symbol) Then
+            ElseIf Me.Kind <> LookupResultKind.Inaccessible OrElse Me.Kind > other.Kind Then
                 Return
+            ElseIf Not CanOverload(Me.Symbols(0), other.Symbol) Then
+                Debug.Assert(Me.Kind = LookupResultKind.Inaccessible)
+                Debug.Assert(Me.Kind = other.Kind)
+                If Me.Symbols.All(Function(candidate, otherSymbol) candidate.DeclaredAccessibility < otherSymbol.DeclaredAccessibility, other.Symbol) Then
+                    SetFrom(other)
+                End If
             Else
-                m_symList.Add(other.Symbol)
+                _symList.Add(other.Symbol)
             End If
         End Sub
 
@@ -646,7 +651,7 @@ Namespace Microsoft.CodeAnalysis.VisualBasic
 
             If Me.IsGood Then
                 If CanOverload(Me.Symbols(0), other.Symbol) Then
-                    m_symList.Add(other.Symbol)
+                    _symList.Add(other.Symbol)
                     Return
                 End If
 
@@ -657,27 +662,27 @@ Namespace Microsoft.CodeAnalysis.VisualBasic
                     Dim otherLost As Boolean = False
 
                     Dim i As Integer
-                    For i = 0 To m_symList.Count - 1
-                        Dim accessibilityCmp As Integer = CompareAccessibilityOfSymbolsConflictingInSameContainer(m_symList(i), other.Symbol)
+                    For i = 0 To _symList.Count - 1
+                        Dim accessibilityCmp As Integer = CompareAccessibilityOfSymbolsConflictingInSameContainer(_symList(i), other.Symbol)
 
                         If accessibilityCmp = 0 Then
                             ambiguous += 1
                         ElseIf accessibilityCmp < 0 Then
                             lost += 1
-                            m_symList(i) = Nothing
+                            _symList(i) = Nothing
                         Else
                             otherLost = True
                         End If
                     Next
 
-                    If lost = m_symList.Count Then
+                    If lost = _symList.Count Then
                         Debug.Assert(Not otherLost AndAlso ambiguous = 0)
                         SetFrom(other)
                         Return
                     End If
 
                     If otherLost Then
-                        Debug.Assert(lost + ambiguous < m_symList.Count)
+                        Debug.Assert(lost + ambiguous < _symList.Count)
 
                         ' Remove ambiguous from the result, because they lost as well.
                         If ambiguous > 0 Then
@@ -687,14 +692,20 @@ Namespace Microsoft.CodeAnalysis.VisualBasic
 
                         Debug.Assert(ambiguous = 0)
                     Else
-                        Debug.Assert(ambiguous = m_symList.Count - lost)
+                        Debug.Assert(ambiguous = _symList.Count - lost)
                     End If
 
                     ' Compact the array of symbols
                     CompactSymbols(lost)
-                    Debug.Assert(m_symList.Count > 0)
+                    Debug.Assert(_symList.Count > 0)
 
                     If otherLost Then
+                        Return
+                    End If
+
+                    ' As a special case, we allow conflicting enum members imported from
+                    ' metadata If they have the same value, and take the first
+                    If _symList.Count = 1 AndAlso ambiguous = 1 AndAlso AreEquivalentEnumConstants(_symList(0), other.Symbol) Then
                         Return
                     End If
                 End If
@@ -703,8 +714,8 @@ Namespace Microsoft.CodeAnalysis.VisualBasic
                 Debug.Assert(Me.IsAmbiguous)
                 ' This function guarantees that accessibility of all ambiguous symbols,
                 ' even those dropped from the list by MergeAmbiguous is the same.
-                ' So, it is sufficient to test accesibility of the only symbol we have. 
-                Dim accessibilityCmp As Integer = CompareAccessibilityOfSymbolsConflictingInSameContainer(m_symList(0), other.Symbol)
+                ' So, it is sufficient to test Accessibility of the only symbol we have. 
+                Dim accessibilityCmp As Integer = CompareAccessibilityOfSymbolsConflictingInSameContainer(_symList(0), other.Symbol)
 
                 If accessibilityCmp < 0 Then
                     SetFrom(other)
@@ -716,18 +727,28 @@ Namespace Microsoft.CodeAnalysis.VisualBasic
 
 #If DEBUG Then
             If imported Then
-                For i = 0 To m_symList.Count - 1
-                    Debug.Assert(m_symList(i).DeclaredAccessibility = other.Symbol.DeclaredAccessibility)
+                For i = 0 To _symList.Count - 1
+                    Debug.Assert(_symList(i).DeclaredAccessibility = other.Symbol.DeclaredAccessibility)
                 Next
             End If
 #End If
             ' We were unable to resolve the ambiguity
-            MergeAmbiguous(other, AmbiguousInTypeError)
+            MergeAmbiguous(other, s_ambiguousInTypeError)
         End Sub
+
+        Private Shared Function AreEquivalentEnumConstants(symbol1 As Symbol, symbol2 As Symbol) As Boolean
+            Debug.Assert(TypeSymbol.Equals(symbol1.ContainingType, symbol2.ContainingType, TypeCompareKind.ConsiderEverything))
+            If symbol1.Kind <> SymbolKind.Field OrElse symbol2.Kind <> SymbolKind.Field OrElse symbol1.ContainingType.TypeKind <> TypeKind.Enum Then
+                Return False
+            End If
+            Dim f1 = DirectCast(symbol1, FieldSymbol)
+            Dim f2 = DirectCast(symbol2, FieldSymbol)
+            Return f1.ConstantValue IsNot Nothing AndAlso f1.ConstantValue.Equals(f2.ConstantValue)
+        End Function
 
         ' Create a diagnostic for ambiguous names in the same type. This is typically not possible from source, only 
         ' from metadata.
-        Private Shared ReadOnly AmbiguousInTypeError As Func(Of ImmutableArray(Of Symbol), AmbiguousSymbolDiagnostic) =
+        Private Shared ReadOnly s_ambiguousInTypeError As Func(Of ImmutableArray(Of Symbol), AmbiguousSymbolDiagnostic) =
             Function(syms As ImmutableArray(Of Symbol)) As AmbiguousSymbolDiagnostic
                 Dim name As String = syms(0).Name
                 Dim container As Symbol = syms(0).ContainingSymbol
@@ -740,20 +761,20 @@ Namespace Microsoft.CodeAnalysis.VisualBasic
             If lost > 0 Then
                 Dim i As Integer
 
-                For i = 0 To m_symList.Count - 1
-                    If m_symList(i) Is Nothing Then
+                For i = 0 To _symList.Count - 1
+                    If _symList(i) Is Nothing Then
                         Exit For
                     End If
                 Next
 
-                Debug.Assert(i < m_symList.Count)
-                Dim left As Integer = m_symList.Count - lost
+                Debug.Assert(i < _symList.Count)
+                Dim left As Integer = _symList.Count - lost
 
                 If left > i Then
                     Dim j As Integer
-                    For j = i + 1 To m_symList.Count - 1
-                        If m_symList(j) IsNot Nothing Then
-                            m_symList(i) = m_symList(j)
+                    For j = i + 1 To _symList.Count - 1
+                        If _symList(j) IsNot Nothing Then
+                            _symList(i) = _symList(j)
                             i += 1
 
                             If i = left Then
@@ -762,22 +783,22 @@ Namespace Microsoft.CodeAnalysis.VisualBasic
                         End If
                     Next
 #If DEBUG Then
-                    For j = j + 1 To m_symList.Count - 1
-                        Debug.Assert(m_symList(j) Is Nothing)
+                    For j = j + 1 To _symList.Count - 1
+                        Debug.Assert(_symList(j) Is Nothing)
                     Next
 #End If
                 End If
                 Debug.Assert(i = left)
-                m_symList.Clip(left)
+                _symList.Clip(left)
             End If
         End Sub
 
         Private Function RemoveAmbiguousSymbols(other As Symbol, ambiguous As Integer) As Integer
             Dim i As Integer
 
-            For i = 0 To m_symList.Count - 1
-                If m_symList(i) IsNot Nothing AndAlso m_symList(i).DeclaredAccessibility = other.DeclaredAccessibility Then
-                    m_symList(i) = Nothing
+            For i = 0 To _symList.Count - 1
+                If _symList(i) IsNot Nothing AndAlso _symList(i).DeclaredAccessibility = other.DeclaredAccessibility Then
+                    _symList(i) = Nothing
                     ambiguous -= 1
 
                     If ambiguous = 0 Then
@@ -787,8 +808,8 @@ Namespace Microsoft.CodeAnalysis.VisualBasic
             Next
 
 #If DEBUG Then
-            For i = i + 1 To m_symList.Count - 1
-                Debug.Assert(m_symList(i) Is Nothing OrElse m_symList(i).DeclaredAccessibility <> other.DeclaredAccessibility)
+            For i = i + 1 To _symList.Count - 1
+                Debug.Assert(_symList(i) Is Nothing OrElse _symList(i).DeclaredAccessibility <> other.DeclaredAccessibility)
             Next
 #End If
             Return ambiguous
@@ -830,9 +851,9 @@ Namespace Microsoft.CodeAnalysis.VisualBasic
             End If
         End Function
 
-        Public Sub MergeMembersOfTheSameNamespace(other As SingleLookupResult, sourceModule As ModuleSymbol)
+        Public Sub MergeMembersOfTheSameNamespace(other As SingleLookupResult, sourceModule As ModuleSymbol, options As LookupOptions)
 
-            Dim resolution As Integer = ResolveAmbiguityInTheSameNamespace(other, sourceModule)
+            Dim resolution As Integer = ResolveAmbiguityInTheSameNamespace(other, sourceModule, options)
 
             If resolution > 0 Then
                 Return
@@ -841,42 +862,56 @@ Namespace Microsoft.CodeAnalysis.VisualBasic
                 Return
             End If
 
-            MergeAmbiguous(other, AmbiguousInNSError)
+            MergeAmbiguous(other, s_ambiguousInNSError)
         End Sub
 
-        Private Shared Function IsSymbolDeclaredInSourceModule(sym As Symbol, [module] As ModuleSymbol) As Boolean
+        Private Enum SymbolLocation
+            FromSourceModule
+            FromReferencedAssembly
+            FromCorLibrary
+        End Enum
+
+        Private Shared Function GetSymbolLocation(sym As Symbol, sourceModule As ModuleSymbol, options As LookupOptions) As SymbolLocation
             ' Dev10 pays attention to the fact that the [sym] refers to a namespace
             ' and the namespace has a declaration in source. This needs some special handling for merged namespaces.
-
             If sym.Kind = SymbolKind.Namespace Then
-                Return DirectCast(sym, NamespaceSymbol).IsDeclaredInSourceModule([module])
+                Return If(DirectCast(sym, NamespaceSymbol).IsDeclaredInSourceModule(sourceModule),
+                    SymbolLocation.FromSourceModule,
+                    SymbolLocation.FromReferencedAssembly)
             End If
 
-            Return sym.ContainingModule Is [module]
+            If sym.ContainingModule Is sourceModule Then
+                Return SymbolLocation.FromSourceModule
+            End If
+
+            If sourceModule.DeclaringCompilation.Options.IgnoreCorLibraryDuplicatedTypes Then
+                ' Ignore duplicate types from the cor library if necessary.
+                ' (Specifically the framework assemblies loaded at runtime in
+                ' the EE may contain types also available from mscorlib.dll.)
+                Dim containingAssembly = sym.ContainingAssembly
+                If containingAssembly Is containingAssembly.CorLibrary Then
+                    Return SymbolLocation.FromCorLibrary
+                End If
+            End If
+
+            Return SymbolLocation.FromReferencedAssembly
         End Function
 
         ''' <summary>
         ''' Returns: negative value - when current lost, 0 - when neither lost, > 0 - when other lost.
         ''' </summary>
-        Private Function ResolveAmbiguityInTheSameNamespace(other As SingleLookupResult, sourceModule As ModuleSymbol) As Integer
+        Private Function ResolveAmbiguityInTheSameNamespace(other As SingleLookupResult, sourceModule As ModuleSymbol, options As LookupOptions) As Integer
             Debug.Assert(Not other.IsAmbiguous)
 
             ' Symbols in source take priority over symbols in a referenced assembly.
             If other.StopFurtherLookup AndAlso
                Me.StopFurtherLookup AndAlso Me.Symbols.Count > 0 Then
 
-                Dim currentFromSource = IsSymbolDeclaredInSourceModule(other.Symbol, sourceModule)
-                Dim contenderFromSource = IsSymbolDeclaredInSourceModule(Me.Symbols(0), sourceModule)
-
-                If currentFromSource Then
-                    If Not contenderFromSource Then
-                        ' other is better
-                        Return -1
-                    End If
-
-                ElseIf contenderFromSource Then
-                    ' contender is better
-                    Return 1
+                Dim currentLocation = GetSymbolLocation(other.Symbol, sourceModule, options)
+                Dim contenderLocation = GetSymbolLocation(Me.Symbols(0), sourceModule, options)
+                Dim diff = currentLocation - contenderLocation
+                If diff <> 0 Then
+                    Return diff
                 End If
             End If
 
@@ -974,7 +1009,7 @@ Namespace Microsoft.CodeAnalysis.VisualBasic
         End Function
 
         ' Create a diagnostic for ambiguous names in a namespace
-        Private Shared AmbiguousInNSError As Func(Of ImmutableArray(Of Symbol), AmbiguousSymbolDiagnostic) =
+        Private Shared ReadOnly s_ambiguousInNSError As Func(Of ImmutableArray(Of Symbol), AmbiguousSymbolDiagnostic) =
             Function(syms As ImmutableArray(Of Symbol)) As AmbiguousSymbolDiagnostic
                 Dim container As Symbol = syms(0).ContainingSymbol
                 If container.Name.Length > 0 Then
@@ -999,8 +1034,8 @@ Namespace Microsoft.CodeAnalysis.VisualBasic
         ''' a type from a symbols and type arguments.
         ''' </summary>
         Public Sub ReplaceSymbol(newSym As Symbol)
-            m_symList.Clear()
-            m_symList.Add(newSym)
+            _symList.Clear()
+            _symList.Add(newSym)
         End Sub
 
         ' Return the lowest non-empty result kind.

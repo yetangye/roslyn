@@ -1,22 +1,17 @@
-' Copyright (c) Microsoft.  All Rights Reserved.  Licensed under the Apache License, Version 2.0.  See License.txt in the project root for license information.
+﻿' Licensed to the .NET Foundation under one or more agreements.
+' The .NET Foundation licenses this file to you under the MIT license.
+' See the LICENSE file in the project root for more information.
 
 Imports System.Xml.Linq
-Imports Microsoft.CodeAnalysis
-Imports Microsoft.CodeAnalysis.Editor.Commands
-Imports Microsoft.CodeAnalysis.Editor.UnitTests.Workspaces
-Imports Microsoft.CodeAnalysis.Editor.VisualBasic.LineCommit
-Imports Microsoft.CodeAnalysis.Text
-Imports Microsoft.VisualStudio.Text
-Imports Microsoft.VisualStudio.Text.Editor
-Imports Microsoft.VisualStudio.Text.Operations
-Imports Moq
-Imports Roslyn.Test.Utilities
+Imports Microsoft.CodeAnalysis.Editor.UnitTests.Utilities
+Imports Microsoft.VisualStudio.Text.Editor.Commanding.Commands
 
 Namespace Microsoft.CodeAnalysis.Editor.VisualBasic.UnitTests.LineCommit
+    <[UseExportProvider]>
     Public Class CommitOnEnterTests
-        <Fact>
+        <WpfFact>
         <Trait(Traits.Feature, Traits.Features.LineCommit)>
-        Public Sub CommitAfterEnterOnSimpleStatement()
+        Public Sub TestCommitAfterEnterOnSimpleStatement()
             Dim test = <Workspace>
                            <Project Language="Visual Basic" CommonReferences="true">
                                <Document>[|
@@ -28,9 +23,9 @@ imports System$$|]
             AssertCommitsStatement(test, expectCommit:=True)
         End Sub
 
-        <Fact>
+        <WpfFact>
         <Trait(Traits.Feature, Traits.Features.LineCommit)>
-        Public Sub NoCommitAfterEnterAfterQuery()
+        Public Sub TestNoCommitAfterEnterAfterQuery()
             Dim test = <Workspace>
                            <Project Language="Visual Basic" CommonReferences="true">
                                <Document>
@@ -46,10 +41,10 @@ End Class
             AssertCommitsStatement(test, expectCommit:=False)
         End Sub
 
-        <Fact>
+        <WpfFact>
         <Trait(Traits.Feature, Traits.Features.LineCommit)>
-        <WorkItem(531421)>
-        Public Sub NoCommitAfterExplicitLineContinuation()
+        <WorkItem(531421, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/531421")>
+        Public Sub TestNoCommitAfterExplicitLineContinuation()
             Dim test = <Workspace>
                            <Project Language="Visual Basic" CommonReferences="true">
                                <Document>
@@ -65,10 +60,29 @@ End Class
             AssertCommitsStatement(test, expectCommit:=False)
         End Sub
 
-        <Fact>
+        <WpfFact>
         <Trait(Traits.Feature, Traits.Features.LineCommit)>
-        <WorkItem(531421)>
-        Public Sub CommitAfterBlankLineFollowingExplicitLineContinuation()
+        <WorkItem(531421, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/531421")>
+        Public Sub TestNoCommitAfterExplicitLineContinuationCommentsAfterLineContinuation()
+            Dim test = <Workspace>
+                           <Project Language="Visual Basic" CommonReferences="true">
+                               <Document>
+Class C
+    Sub M()
+        M() _ ' Test$$
+    End Sub
+End Class
+                               </Document>
+                           </Project>
+                       </Workspace>
+
+            AssertCommitsStatement(test, expectCommit:=False)
+        End Sub
+
+        <WpfFact>
+        <Trait(Traits.Feature, Traits.Features.LineCommit)>
+        <WorkItem(531421, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/531421")>
+        Public Sub TestCommitAfterBlankLineFollowingExplicitLineContinuation()
             Dim test = <Workspace>
                            <Project Language="Visual Basic" CommonReferences="true">
                                <Document>
@@ -85,9 +99,9 @@ End Class
             AssertCommitsStatement(test, expectCommit:=True)
         End Sub
 
-        <Fact>
+        <WpfFact>
         <Trait(Traits.Feature, Traits.Features.LineCommit)>
-        Public Sub CommitAfterDeclaration()
+        Public Sub TestCommitAfterDeclaration()
             Dim test = <Workspace>
                            <Project Language="Visual Basic" CommonReferences="true">
                                <Document>[|
@@ -104,9 +118,9 @@ End Class|]
             AssertCommitsStatement(test, expectCommit:=True)
         End Sub
 
-        <Fact>
+        <WpfFact>
         <Trait(Traits.Feature, Traits.Features.LineCommit)>
-        Public Sub CommitAfterEndConstruct()
+        Public Sub TestCommitAfterEndConstruct()
             Dim test = <Workspace>
                            <Project Language="Visual Basic" CommonReferences="true">
                                <Document>[|
@@ -123,9 +137,9 @@ End Class$$|]
             AssertCommitsStatement(test, expectCommit:=True, usedSemantics:=False)
         End Sub
 
-        <Fact>
+        <WpfFact>
         <Trait(Traits.Feature, Traits.Features.LineCommit)>
-        Public Sub CommitAfterBlankLineAfterQuery()
+        Public Sub TestCommitAfterBlankLineAfterQuery()
             Dim test = <Workspace>
                            <Project Language="Visual Basic" CommonReferences="true">
                                <Document>
@@ -142,9 +156,9 @@ End Class
             AssertCommitsStatement(test, expectCommit:=True)
         End Sub
 
-        <Fact>
+        <WpfFact>
         <Trait(Traits.Feature, Traits.Features.LineCommit)>
-        Public Sub NoCommitAfterEnterAfterPartialExpression()
+        Public Sub TestNoCommitAfterEnterAfterPartialExpression()
             Dim test = <Workspace>
                            <Project Language="Visual Basic" CommonReferences="true">
                                <Document>
@@ -160,9 +174,9 @@ End Class
             AssertCommitsStatement(test, expectCommit:=False)
         End Sub
 
-        <Fact>
+        <WpfFact>
         <Trait(Traits.Feature, Traits.Features.LineCommit)>
-        Public Sub CommitAfterEnterAfterPartialExpression()
+        Public Sub TestCommitAfterEnterAfterPartialExpression()
             Dim test = <Workspace>
                            <Project Language="Visual Basic" CommonReferences="true">
                                <Document>
@@ -179,9 +193,9 @@ End Class
             AssertCommitsStatement(test, expectCommit:=True)
         End Sub
 
-        <Fact>
+        <WpfFact>
         <Trait(Traits.Feature, Traits.Features.LineCommit)>
-        Public Sub CommitAfterEnterOnBlankLine()
+        Public Sub TestCommitAfterEnterOnBlankLine()
             Dim test = <Workspace>
                            <Project Language="Visual Basic" CommonReferences="true">
                                <Document>
@@ -197,10 +211,10 @@ End Class
             AssertCommitsStatement(test, expectCommit:=True)
         End Sub
 
-        <Fact>
-        <WorkItem(539451)>
+        <WpfFact>
+        <WorkItem(539451, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/539451")>
         <Trait(Traits.Feature, Traits.Features.LineCommit)>
-        Public Sub CommitAfterColon()
+        Public Sub TestCommitAfterColon()
             Dim test = <Workspace>
                            <Project Language="Visual Basic" CommonReferences="true">
                                <Document>
@@ -216,14 +230,14 @@ End Class
             AssertCommitsStatement(test, expectCommit:=True)
         End Sub
 
-        <Fact>
-        <WorkItem(539408)>
+        <WpfFact>
+        <WorkItem(539408, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/539408")>
         <Trait(Traits.Feature, Traits.Features.LineCommit)>
-        Public Sub CommitAfterConstDirective()
+        Public Sub TestCommitAfterConstDirective()
             Dim test = <Workspace>
                            <Project Language="Visual Basic" CommonReferences="true">
                                <Document>[|
-#const foo = 42$$|]
+#const goo = 42$$|]
                                </Document>
                            </Project>
                        </Workspace>
@@ -231,10 +245,10 @@ End Class
             AssertCommitsStatement(test, expectCommit:=True)
         End Sub
 
-        <Fact>
-        <WorkItem(539408)>
+        <WpfFact>
+        <WorkItem(539408, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/539408")>
         <Trait(Traits.Feature, Traits.Features.LineCommit)>
-        Public Sub CommitAfterComment()
+        Public Sub TestCommitAfterComment()
             Dim test = <Workspace>
                            <Project Language="Visual Basic" CommonReferences="true">
                                <Document>[|
@@ -246,28 +260,28 @@ rem Hello World$$|]
             AssertCommitsStatement(test, expectCommit:=True)
         End Sub
 
-        <Fact>
-        <WorkItem(544372)>
+        <WpfFact>
+        <WorkItem(544372, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/544372")>
         <Trait(Traits.Feature, Traits.Features.LineCommit)>
         Public Sub UndoAfterCommitOnBlankLine()
-            Using testData = New CommitTestData(<Workspace>
-                                                    <Project Language="Visual Basic" CommonReferences="true">
-                                                        <Document>$$
+            Using testData = CommitTestData.Create(<Workspace>
+                                                       <Project Language="Visual Basic" CommonReferences="true">
+                                                           <Document>$$
                                                         </Document>
-                                                    </Project>
-                                                </Workspace>)
+                                                       </Project>
+                                                   </Workspace>)
 
-                testData.CommandHandler.ExecuteCommand(New ReturnKeyCommandArgs(testData.View, testData.Buffer), Sub() testData.EditorOperations.InsertNewLine())
+                testData.CommandHandler.ExecuteCommand(New ReturnKeyCommandArgs(testData.View, testData.Buffer), Sub() testData.EditorOperations.InsertNewLine(), TestCommandExecutionContext.Create())
                 testData.UndoHistory.Undo(count:=1)
 
                 Assert.Equal(0, testData.View.Caret.Position.BufferPosition.GetContainingLine().LineNumber)
             End Using
         End Sub
 
-        <Fact>
-        <WorkItem(540210)>
+        <WpfFact>
+        <WorkItem(540210, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/540210")>
         <Trait(Traits.Feature, Traits.Features.LineCommit)>
-        Public Sub CommitAfterThenTouchingThen()
+        Public Sub TestCommitAfterThenTouchingThen()
             ' Note that the source we are starting this test with is *not* syntactically correct,
             ' but by having the extra "End If" we guarantee the ending code will be as if End
             ' Construct generation happened.
@@ -288,10 +302,10 @@ End Class
             AssertCommitsStatement(test, expectCommit:=True)
         End Sub
 
-        <Fact>
-        <WorkItem(540210)>
+        <WpfFact>
+        <WorkItem(540210, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/540210")>
         <Trait(Traits.Feature, Traits.Features.LineCommit)>
-        Public Sub CommitAfterThenTouchingStatement()
+        Public Sub TestCommitAfterThenTouchingStatement()
             ' Note that the source we are starting this test with is *not* syntactically correct,
             ' but by having the extra "End If" we guarantee the ending code will be as if End
             ' Construct generation happened.
@@ -312,10 +326,10 @@ End Class
             AssertCommitsStatement(test, expectCommit:=True)
         End Sub
 
-        <Fact>
-        <WorkItem(530463)>
+        <WpfFact>
+        <WorkItem(530463, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/530463")>
         <Trait(Traits.Feature, Traits.Features.LineCommit)>
-        Public Sub CommitAfterPropertyStatement()
+        Public Sub TestCommitAfterPropertyStatement()
             Dim test = <Workspace>
                            <Project Language="Visual Basic" CommonReferences="true">
                                <Document>
@@ -335,10 +349,10 @@ End Class
             AssertCommitsStatement(test, expectCommit:=True)
         End Sub
 
-        <Fact>
-        <WorkItem(986168)>
+        <WpfFact>
+        <WorkItem(986168, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/986168")>
         <Trait(Traits.Feature, Traits.Features.LineCommit)>
-        Public Sub DontCommitInsideStringLiteral()
+        Public Sub TestDontCommitInsideStringLiteral()
             Dim test = <Workspace>
                            <Project Language="Visual Basic" CommonReferences="true">
                                <Document>
@@ -355,10 +369,10 @@ End Module
             AssertCommitsStatement(test, expectCommit:=False)
         End Sub
 
-        Private Sub AssertCommitsStatement(test As XElement, expectCommit As Boolean, Optional usedSemantics As Boolean = True)
-            Using testData = New CommitTestData(test)
+        Private Shared Sub AssertCommitsStatement(test As XElement, expectCommit As Boolean, Optional usedSemantics As Boolean = True)
+            Using testData = CommitTestData.Create(test)
                 Dim lineNumber = testData.View.Caret.Position.BufferPosition.GetContainingLine().LineNumber
-                testData.CommandHandler.ExecuteCommand(New ReturnKeyCommandArgs(testData.View, testData.Buffer), Sub() testData.EditorOperations.InsertNewLine())
+                testData.CommandHandler.ExecuteCommand(New ReturnKeyCommandArgs(testData.View, testData.Buffer), Sub() testData.EditorOperations.InsertNewLine(), TestCommandExecutionContext.Create())
                 testData.AssertHadCommit(expectCommit)
                 If expectCommit Then
                     testData.AssertUsedSemantics(usedSemantics)

@@ -1,5 +1,10 @@
-﻿// Copyright (c) Microsoft.  All Rights Reserved.  Licensed under the Apache License, Version 2.0.  See License.txt in the project root for license information.
+﻿// Licensed to the .NET Foundation under one or more agreements.
+// The .NET Foundation licenses this file to you under the MIT license.
+// See the LICENSE file in the project root for more information.
 
+#nullable disable
+
+using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
@@ -109,12 +114,12 @@ namespace CSharpSyntaxGenerator
 
         private bool IsSeparatedNodeList(string typeName)
         {
-            return typeName.StartsWith("SeparatedSyntaxList<");
+            return typeName.StartsWith("SeparatedSyntaxList<", StringComparison.Ordinal);
         }
 
         private bool IsNodeList(string typeName)
         {
-            return typeName.StartsWith("SyntaxList<");
+            return typeName.StartsWith("SyntaxList<", StringComparison.Ordinal);
         }
 
         public bool IsNodeOrNodeList(string typeName)

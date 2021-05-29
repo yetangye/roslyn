@@ -1,26 +1,27 @@
-﻿// Copyright (c) Microsoft.  All Rights Reserved.  Licensed under the Apache License, Version 2.0.  See License.txt in the project root for license information.
+﻿// Licensed to the .NET Foundation under one or more agreements.
+// The .NET Foundation licenses this file to you under the MIT license.
+// See the LICENSE file in the project root for more information.
+
+#nullable disable
 
 using System.Collections.Generic;
 using System.Collections.Immutable;
 using System.Diagnostics;
-using Microsoft.CodeAnalysis.CSharp.Emit;
 using Roslyn.Utilities;
 
 namespace Microsoft.CodeAnalysis.CSharp.Symbols
 {
-    internal class SynthesizedImplementationMethod : SynthesizedInstanceMethodSymbol
+    internal abstract class SynthesizedImplementationMethod : SynthesizedInstanceMethodSymbol
     {
         //inputs
         private readonly MethodSymbol _interfaceMethod;
         private readonly NamedTypeSymbol _implementingType;
-        private readonly bool _debuggerHidden;
         private readonly bool _generateDebugInfo;
         private readonly PropertySymbol _associatedProperty;
 
         //computed
         private readonly ImmutableArray<MethodSymbol> _explicitInterfaceImplementations;
         private readonly ImmutableArray<TypeParameterSymbol> _typeParameters;
-        private readonly TypeSymbol _returnType;
         private readonly ImmutableArray<ParameterSymbol> _parameters;
         private readonly string _name;
 
@@ -28,7 +29,6 @@ namespace Microsoft.CodeAnalysis.CSharp.Symbols
             MethodSymbol interfaceMethod,
             NamedTypeSymbol implementingType,
             string name = null,
-            bool debuggerHidden = false,
             bool generateDebugInfo = true,
             PropertySymbol associatedProperty = null)
         {
@@ -36,9 +36,7 @@ namespace Microsoft.CodeAnalysis.CSharp.Symbols
             Debug.Assert(implementingType.IsDefinition);
 
             _name = name ?? ExplicitInterfaceHelpers.GetMemberName(interfaceMethod.Name, interfaceMethod.ContainingType, aliasQualifierOpt: null);
-            _interfaceMethod = interfaceMethod;
             _implementingType = implementingType;
-            _debuggerHidden = debuggerHidden;
             _generateDebugInfo = generateDebugInfo;
             _associatedProperty = associatedProperty;
             _explicitInterfaceImplementations = ImmutableArray.Create<MethodSymbol>(interfaceMethod);
@@ -47,9 +45,8 @@ namespace Microsoft.CodeAnalysis.CSharp.Symbols
             var typeMap = interfaceMethod.ContainingType.TypeSubstitution ?? TypeMap.Empty;
             typeMap.WithAlphaRename(interfaceMethod, this, out _typeParameters);
 
-            var substitutedInterfaceMethod = interfaceMethod.ConstructIfGeneric(_typeParameters.Cast<TypeParameterSymbol, TypeSymbol>());
-            _returnType = substitutedInterfaceMethod.ReturnType;
-            _parameters = SynthesizedParameterSymbol.DeriveParameters(substitutedInterfaceMethod, this);
+            _interfaceMethod = interfaceMethod.ConstructIfGeneric(TypeArgumentsWithAnnotations);
+            _parameters = SynthesizedParameterSymbol.DeriveParameters(_interfaceMethod, this);
         }
 
         #region Delegate to interfaceMethod
@@ -74,29 +71,12 @@ namespace Microsoft.CodeAnalysis.CSharp.Symbols
             get { return _interfaceMethod.CallingConvention; }
         }
 
-        public sealed override ImmutableArray<CustomModifier> ReturnTypeCustomModifiers
+        public sealed override ImmutableArray<CustomModifier> RefCustomModifiers
         {
-            get { return _interfaceMethod.ReturnTypeCustomModifiers; }
+            get { return _interfaceMethod.RefCustomModifiers; }
         }
 
         #endregion
-
-        internal sealed override void AddSynthesizedAttributes(ModuleCompilationState compilationState, ref ArrayBuilder<SynthesizedAttributeData> attributes)
-        {
-            base.AddSynthesizedAttributes(compilationState, ref attributes);
-
-            if (_debuggerHidden)
-            {
-                var compilation = this.DeclaringCompilation;
-                AddSynthesizedAttribute(ref attributes, compilation.TrySynthesizeAttribute(WellKnownMember.System_Diagnostics_DebuggerHiddenAttribute__ctor));
-            }
-
-            if (this.ReturnType.ContainsDynamic())
-            {
-                var compilation = this.DeclaringCompilation;
-                AddSynthesizedAttribute(ref attributes, compilation.SynthesizeDynamicAttribute(this.ReturnType, this.ReturnTypeCustomModifiers.Length));
-            }
-        }
 
         internal sealed override bool GenerateDebugInfo
         {
@@ -108,15 +88,24 @@ namespace Microsoft.CodeAnalysis.CSharp.Symbols
             get { return _typeParameters; }
         }
 
-        public sealed override ImmutableArray<TypeSymbol> TypeArguments
+        public sealed override ImmutableArray<TypeWithAnnotations> TypeArgumentsWithAnnotations
         {
-            get { return _typeParameters.Cast<TypeParameterSymbol, TypeSymbol>(); }
+            get { return GetTypeParametersAsTypeArguments(); }
         }
 
-        public sealed override TypeSymbol ReturnType
+        public override RefKind RefKind
         {
-            get { return _returnType; }
+            get { return _interfaceMethod.RefKind; }
         }
+
+        public sealed override TypeWithAnnotations ReturnTypeWithAnnotations
+        {
+            get { return _interfaceMethod.ReturnTypeWithAnnotations; }
+        }
+
+        public sealed override FlowAnalysisAnnotations ReturnTypeFlowAnalysisAnnotations => FlowAnalysisAnnotations.None;
+
+        public sealed override ImmutableHashSet<string> ReturnNotNullIfParameterNotNull => ImmutableHashSet<string>.Empty;
 
         public override ImmutableArray<ParameterSymbol> Parameters
         {
@@ -167,11 +156,6 @@ namespace Microsoft.CodeAnalysis.CSharp.Symbols
         public override bool HidesBaseMethodsByName
         {
             get { return false; }
-        }
-
-        internal override LexicalSortKey GetLexicalSortKey()
-        {
-            return LexicalSortKey.NotInSource;
         }
 
         public override ImmutableArray<Location> Locations

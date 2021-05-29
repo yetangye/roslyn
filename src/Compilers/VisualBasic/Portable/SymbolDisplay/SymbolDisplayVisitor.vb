@@ -1,5 +1,8 @@
-﻿' Copyright (c) Microsoft.  All Rights Reserved.  Licensed under the Apache License, Version 2.0.  See License.txt in the project root for license information.
+﻿' Licensed to the .NET Foundation under one or more agreements.
+' The .NET Foundation licenses this file to you under the MIT license.
+' See the LICENSE file in the project root for more information.
 
+Imports Microsoft.CodeAnalysis.PooledObjects
 Imports Microsoft.CodeAnalysis.SymbolDisplay
 Imports Microsoft.CodeAnalysis.VisualBasic.Symbols
 
@@ -7,9 +10,9 @@ Imports Microsoft.CodeAnalysis.VisualBasic.Symbols
 
 Namespace Microsoft.CodeAnalysis.VisualBasic
     Partial Friend Class SymbolDisplayVisitor
-        Inherits AbstractSymbolDisplayVisitor(Of SemanticModel)
+        Inherits AbstractSymbolDisplayVisitor
 
-        Private ReadOnly escapeKeywordIdentifiers As Boolean
+        Private ReadOnly _escapeKeywordIdentifiers As Boolean
 
         ' A Symbol in VB might be a PENamedSymbolWithEmittedNamespaceName and in that case the 
         ' casing of the contained types and namespaces might differ because of merged classes/namespaces.
@@ -25,7 +28,7 @@ Namespace Microsoft.CodeAnalysis.VisualBasic
             MyBase.New(builder, format, True, semanticModelOpt, positionOpt)
             Debug.Assert(format IsNot Nothing, "Format must not be null")
 
-            Me.escapeKeywordIdentifiers = format.MiscellaneousOptions.IncludesOption(SymbolDisplayMiscellaneousOptions.EscapeKeywordIdentifiers)
+            Me._escapeKeywordIdentifiers = format.MiscellaneousOptions.IncludesOption(SymbolDisplayMiscellaneousOptions.EscapeKeywordIdentifiers)
         End Sub
 
         Private Sub New(
@@ -34,29 +37,31 @@ Namespace Microsoft.CodeAnalysis.VisualBasic
             semanticModelOpt As SemanticModel,
             positionOpt As Integer,
             escapeKeywordIdentifiers As Boolean,
-            isFirstSymbolVisited As Boolean)
+            isFirstSymbolVisited As Boolean,
+            Optional inNamespaceOrType As Boolean = False)
 
-            MyBase.New(builder, format, isFirstSymbolVisited, semanticModelOpt, positionOpt)
+            MyBase.New(builder, format, isFirstSymbolVisited, semanticModelOpt, positionOpt, inNamespaceOrType)
 
-            Me.escapeKeywordIdentifiers = escapeKeywordIdentifiers
+            Me._escapeKeywordIdentifiers = escapeKeywordIdentifiers
         End Sub
 
         ' in case the display of a symbol is different for a type that acts as a container, use this visitor
-        Protected Overrides Function MakeNotFirstVisitor() As AbstractSymbolDisplayVisitor(Of SemanticModel)
+        Protected Overrides Function MakeNotFirstVisitor(Optional inNamespaceOrType As Boolean = False) As AbstractSymbolDisplayVisitor
             Return New SymbolDisplayVisitor(
                     Me.builder,
-                        Me.format,
+                    Me.format,
                     Me.semanticModelOpt,
                     Me.positionOpt,
-                        Me.escapeKeywordIdentifiers,
-                    isFirstSymbolVisited:=False)
+                    Me._escapeKeywordIdentifiers,
+                    isFirstSymbolVisited:=False,
+                    inNamespaceOrType:=inNamespaceOrType)
         End Function
 
         Friend Function CreatePart(kind As SymbolDisplayPartKind,
                                    symbol As ISymbol,
                                    text As String,
                                    noEscaping As Boolean) As SymbolDisplayPart
-            Dim escape = (AlwaysEscape(kind, text) OrElse Not noEscaping) AndAlso escapeKeywordIdentifiers AndAlso IsEscapable(kind)
+            Dim escape = (AlwaysEscape(kind, text) OrElse Not noEscaping) AndAlso _escapeKeywordIdentifiers AndAlso IsEscapable(kind)
             Return New SymbolDisplayPart(kind, symbol, If(escape, EscapeIdentifier(text), text))
         End Function
 
@@ -181,12 +186,8 @@ Namespace Microsoft.CodeAnalysis.VisualBasic
             Dim myCaseCorrectedNSName As String = symbol.Name
             Dim myCaseCorrectedParentNSName As String = String.Empty
 
-            If Not symbol.IsGlobalNamespace AndAlso myCaseCorrectedNSName.IsEmpty() Then
-                myCaseCorrectedNSName = StringConstants.NamedSymbolErrorName
-            End If
-
             If Not emittedName.IsEmpty Then
-                Dim nsIdx = emittedName.LastIndexOf(".")
+                Dim nsIdx = emittedName.LastIndexOf("."c)
                 If nsIdx > -1 Then
                     myCaseCorrectedNSName = emittedName.Substring(nsIdx + 1)
                     myCaseCorrectedParentNSName = emittedName.Substring(0, nsIdx)
@@ -216,7 +217,7 @@ Namespace Microsoft.CodeAnalysis.VisualBasic
                 End If
 
                 If ShouldVisitNamespace(containingNamespace) Then
-                    VisitNamespace(DirectCast(containingNamespace, INamespaceSymbol), myCaseCorrectedParentNSName)
+                    VisitNamespace(containingNamespace, myCaseCorrectedParentNSName)
                     AddOperator(SyntaxKind.DotToken)
                     visitedParents = True
                 End If
@@ -243,7 +244,20 @@ Namespace Microsoft.CodeAnalysis.VisualBasic
         End Sub
 
         Public Overrides Sub VisitLocal(symbol As ILocalSymbol)
-            builder.Add(CreatePart(SymbolDisplayPartKind.LocalName, symbol, symbol.Name, False))
+            ' Locals can be synthesized by the compiler in many cases (for example the implicit 
+            ' local in a function that has the same name as the containing function).  In some 
+            ' cases the locals are anonymous (for example, a similar local in an operator).  
+            '
+            ' These anonymous locals should not be exposed through public APIs.  However, for
+            ' testing purposes we occasionally may print them out.  In this case, give them 
+            ' a reasonable name so that tests can clearly describe what these are.
+            Dim name = If(symbol.Name, "<anonymous local>")
+
+            If symbol.IsConst Then
+                builder.Add(CreatePart(SymbolDisplayPartKind.ConstantName, symbol, name, noEscaping:=False))
+            Else
+                builder.Add(CreatePart(SymbolDisplayPartKind.LocalName, symbol, name, noEscaping:=False))
+            End If
 
             If format.LocalOptions.IncludesOption(SymbolDisplayLocalOptions.IncludeType) Then
                 AddSpace()
@@ -309,7 +323,11 @@ Namespace Microsoft.CodeAnalysis.VisualBasic
                         AddKeyword(SyntaxKind.PrivateKeyword)
                     Case Accessibility.Internal
                         AddKeyword(SyntaxKind.FriendKeyword)
-                    Case Accessibility.ProtectedAndInternal, Accessibility.Protected
+                    Case Accessibility.Protected
+                        AddKeyword(SyntaxKind.ProtectedKeyword)
+                    Case Accessibility.ProtectedAndInternal
+                        AddKeyword(SyntaxKind.PrivateKeyword)
+                        AddSpace()
                         AddKeyword(SyntaxKind.ProtectedKeyword)
                     Case Accessibility.ProtectedOrInternal
                         AddKeyword(SyntaxKind.ProtectedKeyword)
@@ -340,7 +358,7 @@ Namespace Microsoft.CodeAnalysis.VisualBasic
                 (Not namedType.IsScriptClass OrElse format.CompilerInternalOptions.IncludesOption(SymbolDisplayCompilerInternalOptions.IncludeScriptType))
         End Function
 
-        Private Function IsEnumMember(symbol As ISymbol) As Boolean
+        Private Shared Function IsEnumMember(symbol As ISymbol) As Boolean
             Return _
                 symbol IsNot Nothing AndAlso
                 symbol.Kind = SymbolKind.Field AndAlso

@@ -1,146 +1,100 @@
-﻿// Copyright (c) Microsoft.  All Rights Reserved.  Licensed under the Apache License, Version 2.0.  See License.txt in the project root for license information.
+﻿// Licensed to the .NET Foundation under one or more agreements.
+// The .NET Foundation licenses this file to you under the MIT license.
+// See the LICENSE file in the project root for more information.
 
 using System;
-using System.Collections.Generic;
 using System.Collections.Immutable;
 using System.IO;
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.Diagnostics;
 using Microsoft.VisualStudio.LanguageServices.Implementation.TaskList;
-using Microsoft.VisualStudio.Shell.Interop;
 
 namespace Microsoft.VisualStudio.LanguageServices.Implementation.ProjectSystem
 {
+    // TODO: Remove. This is only needed to support Solution Explorer Analyzer node population. 
+    // Analyzers should not be loaded in devenv process (see https://github.com/dotnet/roslyn/issues/43008).
     internal sealed class VisualStudioAnalyzer : IDisposable
     {
-        private readonly string _fullPath;
-        private readonly FileChangeTracker _tracker;
-        private readonly HostDiagnosticUpdateSource _hostDiagnosticUpdateSource;
+        // Shadow copy analyzer files coming from packages to avoid locking the files in NuGet cache.
+        // NOTE: It is important that we share the same shadow copy assembly loader for all VisualStudioAnalyzer instances.
+        // This is required to ensure that shadow copied analyzer dependencies are correctly loaded.
+        private static readonly IAnalyzerAssemblyLoader s_analyzerAssemblyLoader =
+            new ShadowCopyAnalyzerAssemblyLoader(Path.Combine(Path.GetTempPath(), "VS", "AnalyzerAssemblyLoader"));
+
         private readonly ProjectId _projectId;
-        private readonly Workspace _workspace;
+        private readonly HostDiagnosticUpdateSource _hostDiagnosticUpdateSource;
         private readonly string _language;
 
-        private AnalyzerReference _analyzerReference;
-        private List<DiagnosticData> _analyzerLoadErrors;
+        // these 2 are mutable states that must be guarded under the _gate.
+        private readonly object _gate = new();
+        private AnalyzerReference? _analyzerReference;
+        private ImmutableArray<DiagnosticData> _analyzerLoadErrors = ImmutableArray<DiagnosticData>.Empty;
 
-        // These are the error codes of the compiler warnings. Keep the ids the same so that de-duplication against compiler errors
-        // works in the error list (after a build).
-        private const string WRN_AnalyzerCannotBeCreatedIdCS = "CS8032";
-        private const string WRN_AnalyzerCannotBeCreatedIdVB = "BC42376";
-        private const string WRN_NoAnalyzerInAssemblyIdCS = "CS8033";
-        private const string WRN_NoAnalyzerInAssemblyIdVB = "BC42377";
-        private const string WRN_UnableToLoadAnalyzerIdCS = "CS8034";
-        private const string WRN_UnableToLoadAnalyzerIdVB = "BC42378";
-
-        public event EventHandler UpdatedOnDisk;
-
-        public VisualStudioAnalyzer(string fullPath, IVsFileChangeEx fileChangeService, HostDiagnosticUpdateSource hostDiagnosticUpdateSource, ProjectId projectId, Workspace workspace, string language)
+        public VisualStudioAnalyzer(string fullPath, HostDiagnosticUpdateSource hostDiagnosticUpdateSource, ProjectId projectId, string language)
         {
-            _fullPath = fullPath;
-            _tracker = new FileChangeTracker(fileChangeService, fullPath);
-            _tracker.UpdatedOnDisk += OnUpdatedOnDisk;
-            _tracker.StartFileChangeListeningAsync();
-            _tracker.EnsureSubscription();
+            FullPath = fullPath;
             _hostDiagnosticUpdateSource = hostDiagnosticUpdateSource;
             _projectId = projectId;
-            _workspace = workspace;
             _language = language;
         }
 
-        public string FullPath
-        {
-            get { return _fullPath; }
-        }
+        public string FullPath { get; }
 
         public AnalyzerReference GetReference()
         {
-            if (_analyzerReference == null)
+            lock (_gate)
             {
-                if (File.Exists(_fullPath))
+                if (_analyzerReference == null)
                 {
-                    _analyzerReference = new AnalyzerFileReference(_fullPath);
-                    ((AnalyzerFileReference)_analyzerReference).AnalyzerLoadFailed += OnAnalyzerLoadError;
-                }
-                else
-                {
-                    _analyzerReference = new UnresolvedAnalyzerReference(_fullPath);
-                }
-            }
+                    // TODO: ensure the file watcher is subscribed
+                    // (tracked by https://devdiv.visualstudio.com/DevDiv/_workitems/edit/661546)
 
-            return _analyzerReference;
+                    var analyzerFileReference = new AnalyzerFileReference(FullPath, s_analyzerAssemblyLoader);
+                    analyzerFileReference.AnalyzerLoadFailed += OnAnalyzerLoadError;
+                    _analyzerReference = analyzerFileReference;
+                }
+
+                return _analyzerReference;
+            }
         }
 
         private void OnAnalyzerLoadError(object sender, AnalyzerLoadFailureEventArgs e)
         {
-            string id;
-            string message;
-            string messageFormat;
+            var data = AnalyzerHelper.CreateAnalyzerLoadFailureDiagnostic(e, FullPath, _projectId, _language);
 
-            switch (e.ErrorCode)
+            lock (_gate)
             {
-                case AnalyzerLoadFailureEventArgs.FailureErrorCode.UnableToLoadAnalyzer:
-                    id = _language == LanguageNames.CSharp ? WRN_UnableToLoadAnalyzerIdCS : WRN_UnableToLoadAnalyzerIdVB;
-                    messageFormat = ServicesVSResources.WRN_UnableToLoadAnalyzer;
-                    message = string.Format(ServicesVSResources.WRN_UnableToLoadAnalyzer, _fullPath, e.Exception.Message);
-                    break;
-                case AnalyzerLoadFailureEventArgs.FailureErrorCode.UnableToCreateAnalyzer:
-                    id = _language == LanguageNames.CSharp ? WRN_AnalyzerCannotBeCreatedIdCS : WRN_AnalyzerCannotBeCreatedIdVB;
-                    messageFormat = ServicesVSResources.WRN_AnalyzerCannotBeCreated;
-                    message = string.Format(ServicesVSResources.WRN_AnalyzerCannotBeCreated, e.TypeName, _fullPath, e.Exception.Message);
-                    break;
-                case AnalyzerLoadFailureEventArgs.FailureErrorCode.NoAnalyzers:
-                    id = _language == LanguageNames.CSharp ? WRN_NoAnalyzerInAssemblyIdCS : WRN_NoAnalyzerInAssemblyIdVB;
-                    messageFormat = ServicesVSResources.WRN_NoAnalyzerInAssembly;
-                    message = string.Format(ServicesVSResources.WRN_NoAnalyzerInAssembly, _fullPath);
-                    break;
-                case AnalyzerLoadFailureEventArgs.FailureErrorCode.None:
-                default:
-                    return;
+                _analyzerLoadErrors = _analyzerLoadErrors.Add(data);
+                _hostDiagnosticUpdateSource.UpdateDiagnosticsForProject(_projectId, this, _analyzerLoadErrors);
             }
-
-            DiagnosticData data = new DiagnosticData(
-                id,
-                ServicesVSResources.ErrorCategory,
-                message,
-                messageFormat,
-                severity: DiagnosticSeverity.Warning,
-                defaultSeverity: DiagnosticSeverity.Warning,
-                isEnabledByDefault: true,
-                warningLevel: 0,
-                customTags: ImmutableArray<string>.Empty,
-                workspace: _workspace,
-                projectId: _projectId);
-
-            _analyzerLoadErrors = _analyzerLoadErrors ?? new List<DiagnosticData>();
-            _analyzerLoadErrors.Add(data);
-
-            _hostDiagnosticUpdateSource.UpdateDiagnosticsForProject(_projectId, this, _analyzerLoadErrors);
         }
 
         public void Dispose()
         {
-            if (_analyzerReference is AnalyzerFileReference)
-            {
-                ((AnalyzerFileReference)_analyzerReference).AnalyzerLoadFailed -= OnAnalyzerLoadError;
+            ResetReferenceAndErrors(out var reference, out var loadErrors);
 
-                if (_analyzerLoadErrors != null && _analyzerLoadErrors.Count > 0)
+            if (reference is AnalyzerFileReference fileReference)
+            {
+                fileReference.AnalyzerLoadFailed -= OnAnalyzerLoadError;
+
+                if (!loadErrors.IsEmpty)
                 {
                     _hostDiagnosticUpdateSource.ClearDiagnosticsForProject(_projectId, this);
                 }
+
+                _hostDiagnosticUpdateSource.ClearAnalyzerReferenceDiagnostics(fileReference, _language, _projectId);
             }
-
-            _analyzerLoadErrors = null;
-
-            _tracker.Dispose();
-            _tracker.UpdatedOnDisk -= OnUpdatedOnDisk;
         }
 
-        private void OnUpdatedOnDisk(object sender, EventArgs e)
+        private void ResetReferenceAndErrors(out AnalyzerReference? reference, out ImmutableArray<DiagnosticData> loadErrors)
         {
-            var handler = UpdatedOnDisk;
-            if (handler != null)
+            lock (_gate)
             {
-                handler(this, EventArgs.Empty);
+                loadErrors = _analyzerLoadErrors;
+                reference = _analyzerReference;
+
+                _analyzerLoadErrors = ImmutableArray<DiagnosticData>.Empty;
+                _analyzerReference = null;
             }
         }
     }

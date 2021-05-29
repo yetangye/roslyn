@@ -1,4 +1,8 @@
-﻿// Copyright (c) Microsoft.  All Rights Reserved.  Licensed under the Apache License, Version 2.0.  See License.txt in the project root for license information.
+﻿// Licensed to the .NET Foundation under one or more agreements.
+// The .NET Foundation licenses this file to you under the MIT license.
+// See the LICENSE file in the project root for more information.
+
+#nullable disable
 
 using System;
 using System.Collections.Generic;
@@ -23,6 +27,8 @@ namespace Microsoft.CodeAnalysis.CSharp.UnitTests
         {
             get { return new AssemblyIdentity(_name); }
         }
+
+        public override Version AssemblyVersionPattern => null;
 
         internal override ImmutableArray<byte> PublicKey
         {
@@ -103,6 +109,13 @@ namespace Microsoft.CodeAnalysis.CSharp.UnitTests
         internal override NamedTypeSymbol TryLookupForwardedMetadataTypeWithCycleDetection(ref MetadataTypeName emittedName, ConsList<AssemblySymbol> visitedAssemblies)
         {
             return null;
+        }
+
+        public override AssemblyMetadata GetMetadata() => null;
+
+        internal override IEnumerable<NamedTypeSymbol> GetAllTopLevelForwardedTypes()
+        {
+            throw new NotImplementedException();
         }
     }
 }

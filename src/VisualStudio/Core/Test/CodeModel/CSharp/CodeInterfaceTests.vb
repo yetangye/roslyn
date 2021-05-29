@@ -1,6 +1,10 @@
-' Copyright (c) Microsoft.  All Rights Reserved.  Licensed under the Apache License, Version 2.0.  See License.txt in the project root for license information.
+﻿' Licensed to the .NET Foundation under one or more agreements.
+' The .NET Foundation licenses this file to you under the MIT license.
+' See the LICENSE file in the project root for more information.
 
+Imports System.Threading.Tasks
 Imports Microsoft.CodeAnalysis
+Imports Microsoft.CodeAnalysis.Test.Utilities
 Imports Roslyn.Test.Utilities
 
 Namespace Microsoft.VisualStudio.LanguageServices.UnitTests.CodeModel.CSharp
@@ -9,8 +13,8 @@ Namespace Microsoft.VisualStudio.LanguageServices.UnitTests.CodeModel.CSharp
 
 #Region "Access tests"
 
-        <ConditionalFact(GetType(x86)), Trait(Traits.Feature, Traits.Features.CodeModel)>
-        Public Sub Access1()
+        <WpfFact, Trait(Traits.Feature, Traits.Features.CodeModel)>
+        Public Sub TestAccess1()
             Dim code =
 <Code>
 interface $$I { }
@@ -19,8 +23,8 @@ interface $$I { }
             TestAccess(code, EnvDTE.vsCMAccess.vsCMAccessProject)
         End Sub
 
-        <ConditionalFact(GetType(x86)), Trait(Traits.Feature, Traits.Features.CodeModel)>
-        Public Sub Access2()
+        <WpfFact, Trait(Traits.Feature, Traits.Features.CodeModel)>
+        Public Sub TestAccess2()
             Dim code =
 <Code>
 internal interface $$I { }
@@ -29,8 +33,8 @@ internal interface $$I { }
             TestAccess(code, EnvDTE.vsCMAccess.vsCMAccessProject)
         End Sub
 
-        <ConditionalFact(GetType(x86)), Trait(Traits.Feature, Traits.Features.CodeModel)>
-        Public Sub Access3()
+        <WpfFact, Trait(Traits.Feature, Traits.Features.CodeModel)>
+        Public Sub TestAccess3()
             Dim code =
 <Code>
 public interface $$I { }
@@ -43,8 +47,8 @@ public interface $$I { }
 
 #Region "Attributes tests"
 
-        <ConditionalFact(GetType(x86)), Trait(Traits.Feature, Traits.Features.CodeModel)>
-        Public Sub Attributes1()
+        <WpfFact, Trait(Traits.Feature, Traits.Features.CodeModel)>
+        Public Sub TestAttributes1()
             Dim code =
 <Code>
 interface $$C { }
@@ -53,8 +57,8 @@ interface $$C { }
             TestAttributes(code, NoElements)
         End Sub
 
-        <ConditionalFact(GetType(x86)), Trait(Traits.Feature, Traits.Features.CodeModel)>
-        Public Sub Attributes2()
+        <WpfFact, Trait(Traits.Feature, Traits.Features.CodeModel)>
+        Public Sub TestAttributes2()
             Dim code =
 <Code>
 using System;
@@ -66,8 +70,8 @@ interface $$C { }
             TestAttributes(code, IsElement("Serializable"))
         End Sub
 
-        <ConditionalFact(GetType(x86)), Trait(Traits.Feature, Traits.Features.CodeModel)>
-        Public Sub Attributes3()
+        <WpfFact, Trait(Traits.Feature, Traits.Features.CodeModel)>
+        Public Sub TestAttributes3()
             Dim code =
 <Code>using System;
 
@@ -79,8 +83,8 @@ interface $$C { }
             TestAttributes(code, IsElement("Serializable"), IsElement("CLSCompliant"))
         End Sub
 
-        <ConditionalFact(GetType(x86)), Trait(Traits.Feature, Traits.Features.CodeModel)>
-        Public Sub Attributes4()
+        <WpfFact, Trait(Traits.Feature, Traits.Features.CodeModel)>
+        Public Sub TestAttributes4()
             Dim code =
 <Code>using System;
 
@@ -93,8 +97,8 @@ interface $$C { }
 #End Region
 
 #Region "Parts tests"
-        <ConditionalFact(GetType(x86)), Trait(Traits.Feature, Traits.Features.CodeModel)>
-        Public Sub Parts1()
+        <WpfFact, Trait(Traits.Feature, Traits.Features.CodeModel)>
+        Public Sub TestParts1()
             Dim code =
 <Code>
 interface $$I
@@ -105,8 +109,8 @@ interface $$I
             TestParts(code, 1)
         End Sub
 
-        <ConditionalFact(GetType(x86)), Trait(Traits.Feature, Traits.Features.CodeModel)>
-        Public Sub Parts2()
+        <WpfFact, Trait(Traits.Feature, Traits.Features.CodeModel)>
+        Public Sub TestParts2()
             Dim code =
 <Code>
 partial interface $$I
@@ -117,8 +121,8 @@ partial interface $$I
             TestParts(code, 1)
         End Sub
 
-        <ConditionalFact(GetType(x86)), Trait(Traits.Feature, Traits.Features.CodeModel)>
-        Public Sub Parts3()
+        <WpfFact, Trait(Traits.Feature, Traits.Features.CodeModel)>
+        Public Sub TestParts3()
             Dim code =
 <Code>
 partial interface $$I
@@ -135,13 +139,13 @@ partial interface I
 #End Region
 
 #Region "AddAttribute tests"
-        <ConditionalFact(GetType(x86)), Trait(Traits.Feature, Traits.Features.CodeModel)>
-        Public Sub AddAttribute1()
+        <WpfFact, Trait(Traits.Feature, Traits.Features.CodeModel)>
+        Public Async Function TestAddAttribute1() As Task
             Dim code =
 <Code>
 using System;
 
-interface $$C { }
+interface $$I { }
 </Code>
 
             Dim expected =
@@ -149,19 +153,19 @@ interface $$C { }
 using System;
 
 [Serializable()]
-interface C { }
+interface I { }
 </Code>
-            TestAddAttribute(code, expected, New AttributeData With {.Name = "Serializable"})
-        End Sub
+            Await TestAddAttribute(code, expected, New AttributeData With {.Name = "Serializable"})
+        End Function
 
-        <ConditionalFact(GetType(x86)), Trait(Traits.Feature, Traits.Features.CodeModel)>
-        Public Sub AddAttribute2()
+        <WpfFact, Trait(Traits.Feature, Traits.Features.CodeModel)>
+        Public Async Function TestAddAttribute2() As Task
             Dim code =
 <Code>
 using System;
 
 [Serializable]
-interface $$C { }
+interface $$I { }
 </Code>
 
             Dim expected =
@@ -170,17 +174,39 @@ using System;
 
 [Serializable]
 [CLSCompliant(true)]
-interface C { }
+interface I { }
 </Code>
-            TestAddAttribute(code, expected, New AttributeData With {.Name = "CLSCompliant", .Value = "true", .Position = 1})
-        End Sub
+            Await TestAddAttribute(code, expected, New AttributeData With {.Name = "CLSCompliant", .Value = "true", .Position = 1})
+        End Function
+
+        <WorkItem(2825, "https://github.com/dotnet/roslyn/issues/2825")>
+        <WpfFact, Trait(Traits.Feature, Traits.Features.CodeModel)>
+        Public Async Function TestAddAttribute_BelowDocComment() As Task
+            Dim code =
+<Code>
+using System;
+
+/// &lt;summary&gt;&lt;/summary&gt;
+interface $$I { }
+</Code>
+
+            Dim expected =
+<Code>
+using System;
+
+/// &lt;summary&gt;&lt;/summary&gt;
+[CLSCompliant(true)]
+interface I { }
+</Code>
+            Await TestAddAttribute(code, expected, New AttributeData With {.Name = "CLSCompliant", .Value = "true"})
+        End Function
 
 #End Region
 
 #Region "AddBase tests"
 
-        <ConditionalFact(GetType(x86)), Trait(Traits.Feature, Traits.Features.CodeModel)>
-        Public Sub AddBase1()
+        <WpfFact, Trait(Traits.Feature, Traits.Features.CodeModel)>
+        Public Async Function TestAddBase1() As Task
             Dim code =
 <Code>
 interface $$I { }
@@ -190,11 +216,11 @@ interface $$I { }
 <Code>
 interface I : B { }
 </Code>
-            TestAddBase(code, "B", Nothing, expected)
-        End Sub
+            Await TestAddBase(code, "B", Nothing, expected)
+        End Function
 
-        <ConditionalFact(GetType(x86)), Trait(Traits.Feature, Traits.Features.CodeModel)>
-        Public Sub AddBase2()
+        <WpfFact, Trait(Traits.Feature, Traits.Features.CodeModel)>
+        Public Async Function TestAddBase2() As Task
             Dim code =
 <Code>
 interface $$I : B { }
@@ -204,11 +230,11 @@ interface $$I : B { }
 <Code>
 interface I : A, B { }
 </Code>
-            TestAddBase(code, "A", Nothing, expected)
-        End Sub
+            Await TestAddBase(code, "A", Nothing, expected)
+        End Function
 
-        <ConditionalFact(GetType(x86)), Trait(Traits.Feature, Traits.Features.CodeModel)>
-        Public Sub AddBase3()
+        <WpfFact, Trait(Traits.Feature, Traits.Features.CodeModel)>
+        Public Async Function TestAddBase3() As Task
             Dim code =
 <Code>
 interface $$I : B { }
@@ -218,11 +244,11 @@ interface $$I : B { }
 <Code>
 interface I : B, A { }
 </Code>
-            TestAddBase(code, "A", Type.Missing, expected)
-        End Sub
+            Await TestAddBase(code, "A", Type.Missing, expected)
+        End Function
 
-        <ConditionalFact(GetType(x86)), Trait(Traits.Feature, Traits.Features.CodeModel)>
-        Public Sub AddBase4()
+        <WpfFact, Trait(Traits.Feature, Traits.Features.CodeModel)>
+        Public Async Function TestAddBase4() As Task
             Dim code =
 <Code>
 interface $$I : B { }
@@ -232,11 +258,11 @@ interface $$I : B { }
 <Code>
 interface I : B, A { }
 </Code>
-            TestAddBase(code, "A", -1, expected)
-        End Sub
+            Await TestAddBase(code, "A", -1, expected)
+        End Function
 
-        <ConditionalFact(GetType(x86)), Trait(Traits.Feature, Traits.Features.CodeModel)>
-        Public Sub AddBase5()
+        <WpfFact, Trait(Traits.Feature, Traits.Features.CodeModel)>
+        Public Async Function TestAddBase5() As Task
             Dim code =
 <Code>
 interface $$I : B { }
@@ -246,11 +272,11 @@ interface $$I : B { }
 <Code>
 interface I : A, B { }
 </Code>
-            TestAddBase(code, "A", 0, expected)
-        End Sub
+            Await TestAddBase(code, "A", 0, expected)
+        End Function
 
-        <ConditionalFact(GetType(x86)), Trait(Traits.Feature, Traits.Features.CodeModel)>
-        Public Sub AddBase6()
+        <WpfFact, Trait(Traits.Feature, Traits.Features.CodeModel)>
+        Public Async Function TestAddBase6() As Task
             Dim code =
 <Code>
 interface $$I
@@ -264,15 +290,15 @@ interface I : B
 {
 }
 </Code>
-            TestAddBase(code, "B", Nothing, expected)
-        End Sub
+            Await TestAddBase(code, "B", Nothing, expected)
+        End Function
 
 #End Region
 
 #Region "AddEvent tests"
 
-        <ConditionalFact(GetType(x86)), Trait(Traits.Feature, Traits.Features.CodeModel)>
-        Public Sub AddEvent1()
+        <WpfFact, Trait(Traits.Feature, Traits.Features.CodeModel)>
+        Public Async Function TestAddEvent1() As Task
             Dim code =
 <Code>
 interface $$I
@@ -288,11 +314,11 @@ interface I
 }
 </Code>
 
-            TestAddEvent(code, expected, New EventData With {.Name = "E", .FullDelegateName = "System.EventHandler"})
-        End Sub
+            Await TestAddEvent(code, expected, New EventData With {.Name = "E", .FullDelegateName = "System.EventHandler"})
+        End Function
 
-        <ConditionalFact(GetType(x86)), Trait(Traits.Feature, Traits.Features.CodeModel)>
-        Public Sub AddEvent2()
+        <WpfFact, Trait(Traits.Feature, Traits.Features.CodeModel)>
+        Public Async Function TestAddEvent2() As Task
             Dim code =
 <Code>
 interface $$I
@@ -309,15 +335,15 @@ interface I
 </Code>
 
             ' Note: C# Code Model apparently ignore CreatePropertyStyleEvent for interfaces in Dev10.
-            TestAddEvent(code, expected, New EventData With {.Name = "E", .FullDelegateName = "System.EventHandler", .CreatePropertyStyleEvent = True})
-        End Sub
+            Await TestAddEvent(code, expected, New EventData With {.Name = "E", .FullDelegateName = "System.EventHandler", .CreatePropertyStyleEvent = True})
+        End Function
 
 #End Region
 
 #Region "AddFunction tests"
 
-        <ConditionalFact(GetType(x86)), Trait(Traits.Feature, Traits.Features.CodeModel)>
-        Public Sub AddFunction1()
+        <WpfFact, Trait(Traits.Feature, Traits.Features.CodeModel)>
+        Public Async Function TestAddFunction1() As Task
             Dim code =
 <Code>
 interface $$I { }
@@ -327,19 +353,19 @@ interface $$I { }
 <Code>
 interface I
 {
-    void Foo();
+    void Goo();
 }
 </Code>
 
-            TestAddFunction(code, expected, New FunctionData With {.Name = "Foo", .Type = "void"})
-        End Sub
+            Await TestAddFunction(code, expected, New FunctionData With {.Name = "Goo", .Type = "void"})
+        End Function
 
 #End Region
 
 #Region "RemoveBase tests"
 
-        <ConditionalFact(GetType(x86)), Trait(Traits.Feature, Traits.Features.CodeModel)>
-        Public Sub RemoveBase1()
+        <WpfFact, Trait(Traits.Feature, Traits.Features.CodeModel)>
+        Public Async Function TestRemoveBase1() As Task
             Dim code =
 <Code>
 interface $$I : B { }
@@ -349,11 +375,11 @@ interface $$I : B { }
 <Code>
 interface I { }
 </Code>
-            TestRemoveBase(code, "B", expected)
-        End Sub
+            Await TestRemoveBase(code, "B", expected)
+        End Function
 
-        <ConditionalFact(GetType(x86)), Trait(Traits.Feature, Traits.Features.CodeModel)>
-        Public Sub RemoveBase2()
+        <WpfFact, Trait(Traits.Feature, Traits.Features.CodeModel)>
+        Public Async Function TestRemoveBase2() As Task
             Dim code =
 <Code>
 interface $$I : A, B { }
@@ -363,17 +389,17 @@ interface $$I : A, B { }
 <Code>
 interface I : B { }
 </Code>
-            TestRemoveBase(code, "A", expected)
-        End Sub
+            Await TestRemoveBase(code, "A", expected)
+        End Function
 
 #End Region
 
 #Region "Set Name tests"
-        <ConditionalFact(GetType(x86)), Trait(Traits.Feature, Traits.Features.CodeModel)>
-        Sub SetName1()
+        <WpfFact, Trait(Traits.Feature, Traits.Features.CodeModel)>
+        Public Async Function TestSetName1() As Task
             Dim code =
 <Code>
-interface $$Foo
+interface $$Goo
 {
 }
 </Code>
@@ -385,9 +411,21 @@ interface Bar
 }
 </Code>
 
-            TestSetName(code, expected, "Bar", NoThrow(Of String)())
-        End Sub
+            Await TestSetName(code, expected, "Bar", NoThrow(Of String)())
+        End Function
 #End Region
+
+        <WpfFact, Trait(Traits.Feature, Traits.Features.CodeModel)>
+        Public Sub TestTypeDescriptor_GetProperties()
+            Dim code =
+<Code>
+interface $$I
+{
+}
+</Code>
+
+            TestPropertyDescriptors(Of EnvDTE80.CodeInterface2)(code)
+        End Sub
 
         Protected Overrides ReadOnly Property LanguageName As String
             Get

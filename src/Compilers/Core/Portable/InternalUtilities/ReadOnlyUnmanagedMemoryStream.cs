@@ -1,4 +1,6 @@
-﻿// Copyright (c) Microsoft.  All Rights Reserved.  Licensed under the Apache License, Version 2.0.  See License.txt in the project root for license information.
+﻿// Licensed to the .NET Foundation under one or more agreements.
+// The .NET Foundation licenses this file to you under the MIT license.
+// See the LICENSE file in the project root for more information.
 
 using System;
 using System.IO;
@@ -20,7 +22,7 @@ namespace Microsoft.CodeAnalysis
             _length = length;
         }
 
-        public unsafe override int ReadByte()
+        public override unsafe int ReadByte()
         {
             if (_position == _length)
             {
@@ -107,17 +109,17 @@ namespace Microsoft.CodeAnalysis
                         break;
 
                     default:
-                        throw new ArgumentOutOfRangeException("origin");
+                        throw new ArgumentOutOfRangeException(nameof(origin));
                 }
             }
             catch (OverflowException)
             {
-                throw new ArgumentOutOfRangeException("offset");
+                throw new ArgumentOutOfRangeException(nameof(offset));
             }
 
             if (target < 0 || target >= _length)
             {
-                throw new ArgumentOutOfRangeException("offset");
+                throw new ArgumentOutOfRangeException(nameof(offset));
             }
 
             _position = (int)target;

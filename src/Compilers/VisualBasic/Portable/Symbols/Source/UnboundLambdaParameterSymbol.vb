@@ -1,4 +1,6 @@
-﻿' Copyright (c) Microsoft.  All Rights Reserved.  Licensed under the Apache License, Version 2.0.  See License.txt in the project root for license information.
+﻿' Licensed to the .NET Foundation under one or more agreements.
+' The .NET Foundation licenses this file to you under the MIT license.
+' See the LICENSE file in the project root for more information.
 
 Imports System.Collections.Generic
 Imports System.Collections.ObjectModel
@@ -15,8 +17,8 @@ Namespace Microsoft.CodeAnalysis.VisualBasic.Symbols
     Friend Class UnboundLambdaParameterSymbol
         Inherits LambdaParameterSymbol
 
-        Private ReadOnly m_IdentifierSyntax As ModifiedIdentifierSyntax
-        Private ReadOnly m_TypeSyntax As SyntaxNodeOrToken
+        Private ReadOnly _identifierSyntax As ModifiedIdentifierSyntax
+        Private ReadOnly _typeSyntax As SyntaxNodeOrToken
 
         Private Sub New(
             name As String,
@@ -29,25 +31,25 @@ Namespace Microsoft.CodeAnalysis.VisualBasic.Symbols
         )
             MyBase.New(name, ordinal, type, ((flags And SourceParameterFlags.ByRef) <> 0), location)
 
-            m_IdentifierSyntax = identifierSyntax
-            m_TypeSyntax = typeSyntax
+            _identifierSyntax = identifierSyntax
+            _typeSyntax = typeSyntax
         End Sub
 
         Public ReadOnly Property IdentifierSyntax As SyntaxToken
             Get
-                Return m_IdentifierSyntax.Identifier
+                Return _identifierSyntax.Identifier
             End Get
         End Property
 
         Public ReadOnly Property Syntax As ModifiedIdentifierSyntax
             Get
-                Return m_IdentifierSyntax
+                Return _identifierSyntax
             End Get
         End Property
 
         Public ReadOnly Property TypeSyntax As SyntaxNodeOrToken
             Get
-                Return m_TypeSyntax
+                Return _typeSyntax
             End Get
         End Property
 
@@ -63,7 +65,7 @@ Namespace Microsoft.CodeAnalysis.VisualBasic.Symbols
                                                 flags As SourceParameterFlags,
                                                 ordinal As Integer,
                                                 binder As Binder,
-                                                diagBag As DiagnosticBag) As ParameterSymbol
+                                                diagBag As BindingDiagnosticBag) As ParameterSymbol
             If (flags And SourceParameterFlags.ParamArray) <> 0 Then
                 ' 'Lambda' parameters cannot be declared 'ParamArray'.
                 Binder.ReportDiagnostic(diagBag, GetModifierToken(syntax.Modifiers, SyntaxKind.ParamArrayKeyword), ERRID.ERR_ParamArrayIllegal1, StringConstants.Lambda)

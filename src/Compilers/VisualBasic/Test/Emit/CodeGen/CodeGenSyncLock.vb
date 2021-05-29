@@ -1,4 +1,6 @@
-﻿' Copyright (c) Microsoft.  All Rights Reserved.  Licensed under the Apache License, Version 2.0.  See License.txt in the project root for license information.
+﻿' Licensed to the .NET Foundation under one or more agreements.
+' The .NET Foundation licenses this file to you under the MIT license.
+' See the LICENSE file in the project root for more information.
 
 Imports Microsoft.CodeAnalysis.Text
 Imports Microsoft.CodeAnalysis.VisualBasic.Symbols
@@ -11,7 +13,7 @@ Namespace Microsoft.CodeAnalysis.VisualBasic.UnitTests
         Inherits BasicTestBase
 
         <Fact()>
-        Sub SimpleSyncLock()
+        Public Sub SimpleSyncLock()
             Dim source =
 <compilation>
     <file name="a.vb">
@@ -66,7 +68,7 @@ Inside SyncLock.
         End Sub
 
         <Fact()>
-        Sub SimpleSyncLockOldMonitorEnter()
+        Public Sub SimpleSyncLockOldMonitorEnter()
             Dim source =
 <compilation>
     <file name="a.vb">
@@ -85,7 +87,7 @@ End Class
 </compilation>
 
             Dim allReferences As MetadataReference() = {
-                            TestReferences.NetFx.v2_0_50727.mscorlib,
+                            TestMetadata.Net20.mscorlib,
                             SystemRef,
                             MsvbRef}
 
@@ -118,7 +120,7 @@ End Class
         End Sub
 
         <Fact()>
-        Sub SimpleSyncLockTypeParameter()
+        Public Sub SimpleSyncLockTypeParameter()
             Dim source =
 <compilation>
     <file name="a.vb">
@@ -181,7 +183,7 @@ Inside SyncLock.
         End Sub
 
         <Fact()>
-        Sub SimpleSyncLockObjectType()
+        Public Sub SimpleSyncLockObjectType()
             Dim source =
 <compilation>
     <file name="a.vb">
@@ -239,7 +241,7 @@ Inside SyncLock.
         End Sub
 
         <Fact()>
-        Sub SimpleSyncLockPropertyAccess()
+        Public Sub SimpleSyncLockPropertyAccess()
             Dim source =
 <compilation>
     <file name="a.vb">
@@ -270,7 +272,7 @@ Inside SyncLock.
         End Sub
 
         <Fact()>
-        Sub SimpleSyncLockNothing()
+        Public Sub SimpleSyncLockNothing()
             Dim source =
 <compilation>
     <file name="a.vb">
@@ -319,17 +321,17 @@ End Class
         End Sub
 
         <Fact()>
-        Sub SimpleSyncLockInterface()
+        Public Sub SimpleSyncLockInterface()
             Dim source =
 <compilation>
     <file name="a.vb">
 Option Strict ON
 Module M1
     Sub Main()
-        SyncLock Foo
+        SyncLock Goo
         End SyncLock
     End Sub
-    Function Foo() As I1
+    Function Goo() As I1
         Return Nothing
     End Function
 End Module
@@ -344,7 +346,7 @@ End Interface
   .maxstack  2
   .locals init (Object V_0,
   Boolean V_1)
-  IL_0000:  call       "Function M1.Foo() As I1"
+  IL_0000:  call       "Function M1.Goo() As I1"
   IL_0005:  stloc.0
   IL_0006:  ldc.i4.0
   IL_0007:  stloc.1
@@ -369,7 +371,7 @@ End Interface
         End Sub
 
         <Fact()>
-        Sub SimpleSyncLockSharedObject()
+        Public Sub SimpleSyncLockSharedObject()
             Dim source =
 <compilation>
     <file name="a.vb">
@@ -416,7 +418,7 @@ End Class
         End Sub
 
         <Fact()>
-        Sub SimpleSyncLockDelegate()
+        Public Sub SimpleSyncLockDelegate()
             Dim source =
 <compilation>
     <file name="a.vb">
@@ -465,7 +467,7 @@ End Class
         End Sub
 
         <Fact()>
-        Sub CallMonitorExitInSyncLock()
+        Public Sub CallMonitorExitInSyncLock()
             Dim source =
 <compilation>
     <file name="a.vb">
@@ -512,14 +514,14 @@ End Class
         End Sub
 
         <Fact()>
-        Sub CallMonitorExitInSyncLock_1()
+        Public Sub CallMonitorExitInSyncLock_1()
             Dim source =
 <compilation>
     <file name="a.vb">
 Class Program
     Public Shared Sub Main(args As String())
     End Sub
-    Public Sub foo(obj As Object)
+    Public Sub goo(obj As Object)
         SyncLock obj
             System.Threading.Monitor.Exit(obj)
         End SyncLock
@@ -528,7 +530,7 @@ End Class
     </file>
 </compilation>
 
-            CompileAndVerify(source).VerifyIL("Program.foo", <![CDATA[
+            CompileAndVerify(source).VerifyIL("Program.goo", <![CDATA[
 {
   // Code size       42 (0x2a)
   .maxstack  2
@@ -564,12 +566,12 @@ End Class
         End Sub
 
         <Fact()>
-        Sub SyncLockMe()
+        Public Sub SyncLockMe()
             Dim source =
 <compilation>
     <file name="a.vb">
 Class Program
-    Sub foo()
+    Sub goo()
         SyncLock Me
         End SyncLock
     End Sub
@@ -577,7 +579,7 @@ End Class
     </file>
 </compilation>
 
-            CompileAndVerify(source).VerifyIL("Program.foo", <![CDATA[
+            CompileAndVerify(source).VerifyIL("Program.goo", <![CDATA[
 {
   // Code size       25 (0x19)
   .maxstack  2
@@ -608,12 +610,12 @@ End Class
         End Sub
 
         <Fact()>
-        Sub SyncLockString()
+        Public Sub SyncLockString()
             Dim source =
 <compilation>
     <file name="a.vb">
 Class Program
-    Sub foo()
+    Sub goo()
         SyncLock "abc"
         End SyncLock
     End Sub
@@ -621,7 +623,7 @@ End Class
     </file>
 </compilation>
 
-            CompileAndVerify(source).VerifyIL("Program.foo", <![CDATA[
+            CompileAndVerify(source).VerifyIL("Program.goo", <![CDATA[
 {
   // Code size       29 (0x1d)
   .maxstack  2
@@ -652,12 +654,12 @@ End Class
         End Sub
 
         <Fact()>
-        Sub NestedSyncLock()
+        Public Sub NestedSyncLock()
             Dim source =
 <compilation>
     <file name="a.vb">
 Public Class Program
-    Public Sub foo()
+    Public Sub goo()
         Dim syncroot As Object = New Object
         SyncLock syncroot
             SyncLock syncroot.ToString()
@@ -668,7 +670,7 @@ End Class
     </file>
 </compilation>
 
-            CompileAndVerify(source).VerifyIL("Program.foo", <![CDATA[
+            CompileAndVerify(source).VerifyIL("Program.goo", <![CDATA[
 {
   // Code size       71 (0x47)
   .maxstack  2
@@ -726,12 +728,12 @@ End Class
         End Sub
 
         <Fact()>
-        Sub NestedSyncLock_1()
+        Public Sub NestedSyncLock_1()
             Dim source =
 <compilation>
     <file name="a.vb">
 Public Class Program
-    Public Sub foo()
+    Public Sub goo()
         Dim syncroot As Object = New Object
         SyncLock syncroot
             SyncLock syncroot
@@ -742,7 +744,7 @@ End Class
     </file>
 </compilation>
 
-            CompileAndVerify(source).VerifyIL("Program.foo", <![CDATA[
+            CompileAndVerify(source).VerifyIL("Program.goo", <![CDATA[
 {
   // Code size       72 (0x48)
   .maxstack  2
@@ -801,7 +803,7 @@ End Class
         End Sub
 
         <Fact()>
-        Sub TryAndSyncLock()
+        Public Sub TryAndSyncLock()
             Dim source =
 <compilation>
     <file name="a.vb">
@@ -867,13 +869,14 @@ End Module
         End Sub
 
         <Fact()>
-        Sub TryAndSyncLock_1()
+        Public Sub TryAndSyncLock_1()
             Dim source =
 <compilation>
     <file name="a.vb">
 Module M1
     Sub Main()
         Try
+            Dim o = Nothing
         Catch
         Finally
 lab1:
@@ -891,49 +894,49 @@ End Module
   // Code size       44 (0x2c)
   .maxstack  2
   .locals init (Object V_0,
-  Boolean V_1)
+                Boolean V_1)
   .try
-{
-  .try
-{
-  IL_0000:  leave.s    IL_002a
-}
-  catch System.Exception
-{
-  IL_0002:  call       "Sub Microsoft.VisualBasic.CompilerServices.ProjectData.SetProjectError(System.Exception)"
-  IL_0007:  call       "Sub Microsoft.VisualBasic.CompilerServices.ProjectData.ClearProjectError()"
-  IL_000c:  leave.s    IL_002a
-}
-}
+  {
+    .try
+    {
+      IL_0000:  leave.s    IL_002a
+    }
+    catch System.Exception
+    {
+      IL_0002:  call       "Sub Microsoft.VisualBasic.CompilerServices.ProjectData.SetProjectError(System.Exception)"
+      IL_0007:  call       "Sub Microsoft.VisualBasic.CompilerServices.ProjectData.ClearProjectError()"
+      IL_000c:  leave.s    IL_002a
+    }
+  }
   finally
-{
-  IL_000e:  ldsfld     "String.Empty As String"
-  IL_0013:  stloc.0
-  IL_0014:  ldc.i4.0
-  IL_0015:  stloc.1
-  .try
-{
-  IL_0016:  ldloc.0
-  IL_0017:  ldloca.s   V_1
-  IL_0019:  call       "Sub System.Threading.Monitor.Enter(Object, ByRef Boolean)"
-  IL_001e:  leave.s    IL_000e
-}
-  finally
-{
-  IL_0020:  ldloc.1
-  IL_0021:  brfalse.s  IL_0029
-  IL_0023:  ldloc.0
-  IL_0024:  call       "Sub System.Threading.Monitor.Exit(Object)"
-  IL_0029:  endfinally
-}
-}
+  {
+    IL_000e:  ldsfld     "String.Empty As String"
+    IL_0013:  stloc.0
+    IL_0014:  ldc.i4.0
+    IL_0015:  stloc.1
+    .try
+    {
+      IL_0016:  ldloc.0
+      IL_0017:  ldloca.s   V_1
+      IL_0019:  call       "Sub System.Threading.Monitor.Enter(Object, ByRef Boolean)"
+      IL_001e:  leave.s    IL_000e
+    }
+    finally
+    {
+      IL_0020:  ldloc.1
+      IL_0021:  brfalse.s  IL_0029
+      IL_0023:  ldloc.0
+      IL_0024:  call       "Sub System.Threading.Monitor.Exit(Object)"
+      IL_0029:  endfinally
+    }
+  }
   IL_002a:  br.s       IL_002a
 }
 ]]>)
         End Sub
 
         <Fact()>
-        Sub JumpFormOneCaseToAnotherCase()
+        Public Sub JumpFormOneCaseToAnotherCase()
             Dim source =
 <compilation>
     <file name="a.vb">
@@ -1001,7 +1004,7 @@ End Class
         End Sub
 
         <Fact()>
-        Sub CustomerApplication()
+        Public Sub CustomerApplication()
             Dim source =
 <compilation>
     <file name="a.vb">
@@ -1010,7 +1013,7 @@ Class C
         Dim p As New D()
         Dim t As System.Threading.Thread() = New System.Threading.Thread(19) {}
         For i As Integer = 0 To 19
-            t(i) = New System.Threading.Thread(AddressOf p.foo)
+            t(i) = New System.Threading.Thread(AddressOf p.goo)
             t(i).Start()
         Next
         For i As Integer = 0 To 19
@@ -1023,7 +1026,7 @@ End Class
 Class D
     Private syncroot As New Object()
     Public s As Integer
-    Public Sub foo()
+    Public Sub goo()
         SyncLock syncroot
             For i As Integer = 0 To 49999
                 s = s + 1
@@ -1039,7 +1042,7 @@ End Class
         End Sub
 
         <Fact()>
-        Sub CustomerApplication_2()
+        Public Sub CustomerApplication_2()
             Dim source =
 <compilation>
     <file name="a.vb">
@@ -1049,7 +1052,7 @@ Class Test
         Dim p As New D()
         Dim t As System.Threading.Thread() = New System.Threading.Thread(9) {}
         For i As Integer = 0 To 4
-            t(i) = New System.Threading.Thread(AddressOf p.foo)
+            t(i) = New System.Threading.Thread(AddressOf p.goo)
             t(i).Start()
         Next
         For i As Integer = 0 To 4
@@ -1059,7 +1062,7 @@ Class Test
 End Class
 Class D
     Private syncroot As New Object()
-    Public Sub foo()
+    Public Sub goo()
         Try
             SyncLock syncroot
                 System.Console.Write("Lock")
@@ -1074,7 +1077,7 @@ End Class
     </file>
 </compilation>
 
-            CompileAndVerify(source).VerifyIL("D.foo", <![CDATA[
+            CompileAndVerify(source).VerifyIL("D.goo", <![CDATA[
 {
   // Code size       72 (0x48)
   .maxstack  2
@@ -1122,7 +1125,7 @@ End Class
         End Sub
 
         <Fact()>
-        Sub SyncLockNoCheckForSyncLockOnValueType()
+        Public Sub SyncLockNoCheckForSyncLockOnValueType()
             Dim source =
 <compilation>
     <file name="a.vb">
@@ -1168,7 +1171,7 @@ End Module
         End Sub
 
         <Fact()>
-        Sub SyncLockWithCheckForSyncLockOnValueType()
+        Public Sub SyncLockWithCheckForSyncLockOnValueType()
             Dim source =
 <compilation>
     <file name="a.vb">
@@ -1215,8 +1218,8 @@ End Module
 ]]>)
         End Sub
 
-        <Fact, WorkItem(811916, "DevDiv")>
-        Sub VBLegacyThreading_VB7FreeThreading_SyncLock_SyncLock4()
+        <Fact, WorkItem(811916, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/811916")>
+        Public Sub VBLegacyThreading_VB7FreeThreading_SyncLock_SyncLock4()
             Dim source =
 <compilation>
     <file name="a.vb">
@@ -1225,13 +1228,13 @@ Module Module1
 
     Sub Main()
         SyncLock x
-            x.foo()
+            x.goo()
         End SyncLock
     End Sub
 End Module
 
 Class T1
-    Public Sub foo()
+    Public Sub goo()
     End Sub
 End Class
     </file>
@@ -1254,7 +1257,7 @@ End Class
   IL_0009:  ldloca.s   V_1
   IL_000b:  call       "Sub System.Threading.Monitor.Enter(Object, ByRef Boolean)"
   IL_0010:  ldsfld     "Module1.x As T1"
-  IL_0015:  callvirt   "Sub T1.foo()"
+  IL_0015:  callvirt   "Sub T1.goo()"
   IL_001a:  leave.s    IL_0026
 }
   finally
@@ -1270,8 +1273,8 @@ End Class
 ]]>)
         End Sub
 
-        <Fact(), WorkItem(1106943, "DevDiv")>
-        Sub Bug1106943_01()
+        <Fact(), WorkItem(1106943, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/1106943")>
+        Public Sub Bug1106943_01()
             Dim source =
 <compilation>
     <file name="a.vb">
@@ -1289,14 +1292,14 @@ End Class
     </file>
 </compilation>
 
-            Dim compilation = CreateCompilationWithMscorlibAndVBRuntime(source, TestOptions.ReleaseExe)
+            Dim compilation = CreateCompilationWithMscorlib40AndVBRuntime(source, TestOptions.ReleaseExe)
             compilation.MakeMemberMissing(WellKnownMember.System_Threading_Monitor__Enter)
 
             CompileAndVerify(compilation, expectedOutput:="Inside SyncLock.")
         End Sub
 
-        <Fact(), WorkItem(1106943, "DevDiv")>
-        Sub Bug1106943_02()
+        <Fact(), WorkItem(1106943, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/1106943")>
+        Public Sub Bug1106943_02()
             Dim source =
 <compilation>
     <file name="a.vb">
@@ -1314,14 +1317,14 @@ End Class
     </file>
 </compilation>
 
-            Dim compilation = CreateCompilationWithMscorlibAndVBRuntime(source, TestOptions.ReleaseExe)
+            Dim compilation = CreateCompilationWithMscorlib40AndVBRuntime(source, TestOptions.ReleaseExe)
             compilation.MakeMemberMissing(WellKnownMember.System_Threading_Monitor__Enter2)
 
             CompileAndVerify(compilation, expectedOutput:="Inside SyncLock.")
         End Sub
 
-        <Fact(), WorkItem(1106943, "DevDiv")>
-        Sub Bug1106943_03()
+        <Fact(), WorkItem(1106943, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/1106943")>
+        Public Sub Bug1106943_03()
             Dim source =
 <compilation>
     <file name="a.vb">
@@ -1339,7 +1342,7 @@ End Class
     </file>
 </compilation>
 
-            Dim compilation = CreateCompilationWithMscorlibAndVBRuntime(source, TestOptions.ReleaseExe)
+            Dim compilation = CreateCompilationWithMscorlib40AndVBRuntime(source, TestOptions.ReleaseExe)
             compilation.MakeMemberMissing(WellKnownMember.System_Threading_Monitor__Enter)
             compilation.MakeMemberMissing(WellKnownMember.System_Threading_Monitor__Enter2)
 
@@ -1350,8 +1353,8 @@ BC35000: Requested operation is not available because the runtime library functi
                                                     </expected>)
         End Sub
 
-        <Fact(), WorkItem(1106943, "DevDiv")>
-        Sub Bug1106943_04()
+        <Fact(), WorkItem(1106943, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/1106943")>
+        Public Sub Bug1106943_04()
             Dim source =
 <compilation>
     <file name="a.vb">
@@ -1369,7 +1372,7 @@ End Class
     </file>
 </compilation>
 
-            Dim compilation = CreateCompilationWithMscorlibAndVBRuntime(source, TestOptions.ReleaseExe)
+            Dim compilation = CreateCompilationWithMscorlib40AndVBRuntime(source, TestOptions.ReleaseExe)
             compilation.MakeMemberMissing(WellKnownMember.System_Threading_Monitor__Exit)
 
             AssertTheseEmitDiagnostics(compilation, <expected>
@@ -1379,8 +1382,8 @@ BC35000: Requested operation is not available because the runtime library functi
                                                     </expected>)
         End Sub
 
-        <Fact(), WorkItem(1106943, "DevDiv")>
-        Sub Bug1106943_05()
+        <Fact(), WorkItem(1106943, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/1106943")>
+        Public Sub Bug1106943_05()
             Dim source =
 <compilation>
     <file name="a.vb">
@@ -1398,7 +1401,7 @@ End Class
     </file>
 </compilation>
 
-            Dim compilation = CreateCompilationWithMscorlibAndVBRuntime(source, TestOptions.ReleaseExe)
+            Dim compilation = CreateCompilationWithMscorlib40AndVBRuntime(source, TestOptions.ReleaseExe)
             compilation.MakeMemberMissing(WellKnownMember.System_Threading_Monitor__Enter)
             compilation.MakeMemberMissing(WellKnownMember.System_Threading_Monitor__Enter2)
             compilation.MakeMemberMissing(WellKnownMember.System_Threading_Monitor__Exit)
@@ -1413,8 +1416,8 @@ BC35000: Requested operation is not available because the runtime library functi
                                                     </expected>)
         End Sub
 
-        <Fact(), WorkItem(1106943, "DevDiv")>
-        Sub Bug1106943_06()
+        <Fact(), WorkItem(1106943, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/1106943")>
+        Public Sub Bug1106943_06()
             Dim source =
 <compilation>
     <file name="a.vb">
@@ -1432,7 +1435,7 @@ End Class
     </file>
 </compilation>
 
-            Dim compilation = CreateCompilationWithMscorlibAndVBRuntime(source, TestOptions.ReleaseExe)
+            Dim compilation = CreateCompilationWithMscorlib40AndVBRuntime(source, TestOptions.ReleaseExe)
             compilation.MakeTypeMissing(WellKnownType.System_Threading_Monitor)
 
             AssertTheseEmitDiagnostics(compilation, <expected>

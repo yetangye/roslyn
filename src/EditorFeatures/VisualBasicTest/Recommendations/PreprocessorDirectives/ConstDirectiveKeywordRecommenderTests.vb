@@ -1,48 +1,57 @@
-' Copyright (c) Microsoft.  All Rights Reserved.  Licensed under the Apache License, Version 2.0.  See License.txt in the project root for license information.
-
-Imports Microsoft.CodeAnalysis.Text
-Imports Microsoft.CodeAnalysis.VisualBasic
-Imports Microsoft.CodeAnalysis.VisualBasic.Symbols
-Imports Microsoft.CodeAnalysis.VisualBasic.Syntax
-Imports Roslyn.Test.Utilities
-Imports Xunit
+﻿' Licensed to the .NET Foundation under one or more agreements.
+' The .NET Foundation licenses this file to you under the MIT license.
+' See the LICENSE file in the project root for more information.
 
 Namespace Microsoft.CodeAnalysis.Editor.VisualBasic.UnitTests.Recommendations.PreprocessorDirectives
     Public Class ConstDirectiveKeywordRecommenderTests
-        <Fact>
-        <Trait(Traits.Feature, Traits.Features.KeywordRecommending)>
-        Public Sub HashConstInFile()
+        <Fact, Trait(Traits.Feature, Traits.Features.KeywordRecommending)>
+        Public Sub HashConstInFileTest()
             VerifyRecommendationsContain(<File>|</File>, "#Const")
         End Sub
 
-        <Fact>
-        <Trait(Traits.Feature, Traits.Features.KeywordRecommending)>
-        Public Sub HashConstInMethodBody()
+        <Fact, Trait(Traits.Feature, Traits.Features.KeywordRecommending)>
+        Public Sub HashConstInMethodBodyTest()
             VerifyRecommendationsContain(<MethodBody>|</MethodBody>, "#Const")
         End Sub
 
         <Fact>
         <Trait(Traits.Feature, Traits.Features.KeywordRecommending)>
-        Public Sub NotInEnumBlockMemberDeclaration()
+        Public Sub NotInEnumBlockMemberDeclarationTest()
             VerifyRecommendationsMissing(<File>
-                                             Enum foo
+                                             Enum goo
                                                  |
                                              End enum
                                          </File>, "#Const")
         End Sub
 
-        <Fact>
-        <WorkItem(544629)>
-        <Trait(Traits.Feature, Traits.Features.KeywordRecommending)>
-        Public Sub HashConstAfterSingleNonMatchingCharacter()
+        <WorkItem(544629, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/544629")>
+        <Fact, Trait(Traits.Feature, Traits.Features.KeywordRecommending)>
+        Public Sub HashConstAfterSingleNonMatchingCharacterTest()
             VerifyRecommendationsContain(<File>a|</File>, "#Const")
         End Sub
 
-        <Fact>
-        <WorkItem(544629)>
-        <Trait(Traits.Feature, Traits.Features.KeywordRecommending)>
-        Public Sub HashConstAfterPartialConstWithoutHash()
+        <WorkItem(544629, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/544629")>
+        <Fact, Trait(Traits.Feature, Traits.Features.KeywordRecommending)>
+        Public Sub HashConstAfterPartialConstWithoutHashTest()
             VerifyRecommendationsContain(<File>Con|</File>, "#Const")
+        End Sub
+
+        <WorkItem(722, "https://github.com/dotnet/roslyn/issues/722")>
+        <Fact, Trait(Traits.Feature, Traits.Features.KeywordRecommending)>
+        Public Sub NotAfterHashConstTest()
+            VerifyRecommendationsMissing(<File>#Const |</File>, "#Const")
+        End Sub
+
+        <WorkItem(6389, "https://github.com/dotnet/roslyn/issues/6389")>
+        <Fact, Trait(Traits.Feature, Traits.Features.KeywordRecommending)>
+        Public Sub NotAfterHashRegionTest()
+            VerifyRecommendationsMissing(<File>
+                                         Class C
+
+                                             #Region |
+
+                                         End Class
+                                         </File>, "#Const")
         End Sub
     End Class
 End Namespace

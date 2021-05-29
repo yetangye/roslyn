@@ -1,7 +1,10 @@
-﻿' Copyright (c) Microsoft.  All Rights Reserved.  Licensed under the Apache License, Version 2.0.  See License.txt in the project root for license information.
+﻿' Licensed to the .NET Foundation under one or more agreements.
+' The .NET Foundation licenses this file to you under the MIT license.
+' See the LICENSE file in the project root for more information.
 
 Imports System.Collections.Immutable
 Imports System.Threading
+Imports Microsoft.CodeAnalysis.PooledObjects
 Imports Microsoft.CodeAnalysis.Text
 Imports Microsoft.CodeAnalysis.VisualBasic.Symbols
 Imports Microsoft.CodeAnalysis.VisualBasic.Syntax
@@ -12,7 +15,7 @@ Namespace Microsoft.CodeAnalysis.VisualBasic.Symbols
         Inherits SynthesizedMethodBase
 
         Protected ReadOnly m_propertyOrEvent As T
-        Private m_lazyMetadataName As String
+        Private _lazyMetadataName As String
 
         Protected Sub New(container As NamedTypeSymbol, propertyOrEvent As T)
             MyBase.New(container)
@@ -27,10 +30,10 @@ Namespace Microsoft.CodeAnalysis.VisualBasic.Symbols
 
         Public Overrides ReadOnly Property MetadataName As String
             Get
-                If m_lazyMetadataName Is Nothing Then
-                    Interlocked.CompareExchange(m_lazyMetadataName, GenerateMetadataName(), Nothing)
+                If _lazyMetadataName Is Nothing Then
+                    Interlocked.CompareExchange(_lazyMetadataName, GenerateMetadataName(), Nothing)
                 End If
-                Return m_lazyMetadataName
+                Return _lazyMetadataName
             End Get
         End Property
 

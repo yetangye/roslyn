@@ -1,4 +1,6 @@
-﻿' Copyright (c) Microsoft.  All Rights Reserved.  Licensed under the Apache License, Version 2.0.  See License.txt in the project root for license information.
+﻿' Licensed to the .NET Foundation under one or more agreements.
+' The .NET Foundation licenses this file to you under the MIT license.
+' See the LICENSE file in the project root for more information.
 
 Imports System.IO
 Imports System.Text
@@ -27,19 +29,19 @@ End Class
                           </compilation>
 
             ' With InternalXmlHelper.
-            Dim compilation = CreateCompilationWithMscorlibAndReferences(sources,
+            Dim compilation = CreateCompilationWithMscorlib40AndReferences(sources,
                 references:=NoVbRuntimeReferences.Concat(XmlReferences),
                 options:=TestOptions.ReleaseDll.WithEmbedVbCoreRuntime(True))
             compilation.AssertNoErrors()
 
             ' With VBCore.
-            compilation = CreateCompilationWithMscorlibAndReferences(sources,
+            compilation = CreateCompilationWithMscorlib40AndReferences(sources,
                 references:=NoVbRuntimeReferences,
                 options:=TestOptions.ReleaseDll.WithEmbedVbCoreRuntime(True))
             compilation.AssertNoErrors()
 
             ' No embedded code.
-            compilation = CreateCompilationWithMscorlibAndReferences(sources,
+            compilation = CreateCompilationWithMscorlib40AndReferences(sources,
                 references:=NoVbRuntimeReferences,
                 options:=TestOptions.ReleaseDll)
             compilation.AssertTheseDiagnostics(<errors><![CDATA[
@@ -51,7 +53,7 @@ BC30002: Type 'Microsoft.VisualBasic.Embedded' is not defined.
 
         ' The Embedded attribute should only be available for 
         ' user-define code if vb runtime is included.
-        <WorkItem(546059, "DevDiv")>
+        <WorkItem(546059, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/546059")>
         <Fact()>
         Public Sub EmbeddedAttributeRequiresOtherEmbeddedCode2()
             Dim sources = <compilation>
@@ -64,7 +66,7 @@ End Class
                           </compilation>
 
             ' No embedded code.
-            Dim compilation = CreateCompilationWithMscorlibAndReferences(sources,
+            Dim compilation = CreateCompilationWithMscorlib40AndReferences(sources,
                 references:=NoVbRuntimeReferences.Concat({MsvbRef, SystemXmlRef, SystemXmlLinqRef}),
                 options:=TestOptions.ReleaseDll)
             compilation.AssertTheseDiagnostics(<errors><![CDATA[
@@ -76,7 +78,7 @@ BC30002: Type 'Microsoft.VisualBasic.Embedded' is not defined.
 
         ' The Embedded attribute should only be available for 
         ' user-define code if vb runtime is included.
-        <WorkItem(546059, "DevDiv")>
+        <WorkItem(546059, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/546059")>
         <Fact()>
         Public Sub EmbeddedAttributeRequiresOtherEmbeddedCode3()
             Dim sources = <compilation>
@@ -89,7 +91,7 @@ End Class
                           </compilation>
 
             ' No embedded code.
-            Dim compilation = CreateCompilationWithMscorlibAndReferences(sources,
+            Dim compilation = CreateCompilationWithMscorlib40AndReferences(sources,
                 references:=NoVbRuntimeReferences.Concat({MsvbRef, SystemXmlRef, SystemXmlLinqRef}),
                 options:=TestOptions.ReleaseDll)
             compilation.AssertTheseDiagnostics(<errors><![CDATA[
@@ -199,7 +201,7 @@ End Class
             compilationVerifier.Compilation.AssertNoErrors()
         End Sub
 
-        <WorkItem(545438, "DevDiv"), WorkItem(546887, "DevDiv")>
+        <WorkItem(545438, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/545438"), WorkItem(546887, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/546887")>
         <Fact()>
         Public Sub InternalXmlHelper_ValueProperty()
             Dim symbols = <expected>
@@ -255,7 +257,7 @@ End Class
 
         <Fact()>
         Public Sub InternalXmlHelper_Locations()
-            Dim compilation = CreateCompilationWithMscorlibAndReferences(
+            Dim compilation = CreateCompilationWithMscorlib40AndReferences(
 <compilation>
     <file name="c.vb"><![CDATA[
 Class C
@@ -275,7 +277,7 @@ End Class
         End Sub
 
         <Fact()>
-        Sub VbCore_NoSymbols()
+        Public Sub VbCore_NoSymbols()
             CompileAndVerify(
 <compilation>
     <file name="a.vb">
@@ -306,7 +308,7 @@ symbolValidator:=Sub([module])
         End Sub
 
         <Fact()>
-        Sub VbCore_SingleSymbol_SymbolInGetType()
+        Public Sub VbCore_SingleSymbol_SymbolInGetType()
             CompileAndVerify(
 <compilation>
     <file name="a.vb">
@@ -360,7 +362,7 @@ symbolValidator:=Sub([module])
         End Sub
 
         <Fact()>
-        Sub VbCore_SingleSymbol_Constants()
+        Public Sub VbCore_SingleSymbol_Constants()
             CompileAndVerify(
 <compilation>
     <file name="a.vb">
@@ -417,7 +419,7 @@ symbolValidator:=Sub([module])
         End Sub
 
         <Fact()>
-        Sub VbCore_SingleSymbol_Constants_WithVbRuntime()
+        Public Sub VbCore_SingleSymbol_Constants_WithVbRuntime()
             MyBase.CompileAndVerify(source:=
 <compilation>
     <file name="a.vb">
@@ -476,7 +478,7 @@ End Class
         End Sub
 
         <Fact()>
-        Sub VbCore_SingleSymbol_Constants_All()
+        Public Sub VbCore_SingleSymbol_Constants_All()
             CompileAndVerify(
 <compilation>
     <file name="a.vb">
@@ -518,7 +520,7 @@ symbolValidator:=Sub([module])
         End Sub
 
         <Fact()>
-        Sub VbCore_SingleSymbol_CompilerServices_EmbeddedOperators()
+        Public Sub VbCore_SingleSymbol_CompilerServices_EmbeddedOperators()
             CompileAndVerify(
 <compilation>
     <file name="a.vb">
@@ -569,7 +571,7 @@ symbolValidator:=Sub([module])
         End Sub
 
         <Fact()>
-        Sub VbCore_SingleSymbol_CompilerServices_EmbeddedOperators_CompareString()
+        Public Sub VbCore_SingleSymbol_CompilerServices_EmbeddedOperators_CompareString()
             CompileAndVerify(
 <compilation>
     <file name="a.vb">
@@ -628,7 +630,7 @@ symbolValidator:=Sub([module])
         End Sub
 
         <Fact()>
-        Sub VbCore_SingleSymbol_CompilerServices_EmbeddedOperators_CompareString2()
+        Public Sub VbCore_SingleSymbol_CompilerServices_EmbeddedOperators_CompareString2()
             CompileAndVerify(
 <compilation>
     <file name="a.vb">
@@ -638,8 +640,8 @@ Imports Microsoft.VisualBasic
 
 Class Program
     Shared Sub Main(args As String())
-        Dim x As String = "Foo"
-        Console.WriteLine(If(x = "Foo", "y", x))
+        Dim x As String = "Goo"
+        Console.WriteLine(If(x = "Goo", "y", x))
     End Sub
 End Class
     </file>
@@ -688,7 +690,7 @@ symbolValidator:=Sub([module])
         End Sub
 
         <Fact()>
-        Sub VbCore_SingleSymbol_CompilerServices_Conversions()
+        Public Sub VbCore_SingleSymbol_CompilerServices_Conversions()
             CompileAndVerify(
 <compilation>
     <file name="a.vb">
@@ -739,7 +741,7 @@ symbolValidator:=Sub([module])
         End Sub
 
         <Fact()>
-        Sub VbCore_SingleSymbol_CompilerServices_Conversions_ToBoolean_String()
+        Public Sub VbCore_SingleSymbol_CompilerServices_Conversions_ToBoolean_String()
             CompileAndVerify(
 <compilation>
     <file name="a.vb">
@@ -802,7 +804,7 @@ symbolValidator:=Sub([module])
         End Sub
 
         <Fact()>
-        Sub VbCore_SingleSymbol_CompilerServices_Conversions_ToBoolean_Object()
+        Public Sub VbCore_SingleSymbol_CompilerServices_Conversions_ToBoolean_Object()
             CompileAndVerify(
 <compilation>
     <file name="a.vb">
@@ -866,7 +868,7 @@ symbolValidator:=Sub([module])
         End Sub
 
         <Fact()>
-        Sub VbCore_SingleSymbol_CompilerServices_Conversions_ToSByte_String()
+        Public Sub VbCore_SingleSymbol_CompilerServices_Conversions_ToSByte_String()
             CompileAndVerify(
 <compilation>
     <file name="a.vb">
@@ -930,7 +932,7 @@ symbolValidator:=Sub([module])
         End Sub
 
         <Fact()>
-        Sub VbCore_SingleSymbol_CompilerServices_Conversions_ToSByte_Object()
+        Public Sub VbCore_SingleSymbol_CompilerServices_Conversions_ToSByte_Object()
             CompileAndVerify(
 <compilation>
     <file name="a.vb">
@@ -996,7 +998,7 @@ symbolValidator:=Sub([module])
         End Sub
 
         <Fact()>
-        Sub VbCore_SingleSymbol_CompilerServices_Utils_CopyArray()
+        Public Sub VbCore_SingleSymbol_CompilerServices_Utils_CopyArray()
             CompileAndVerify(
 <compilation>
     <file name="a.vb">
@@ -1050,7 +1052,7 @@ symbolValidator:=Sub([module])
         End Sub
 
         <Fact()>
-        Sub VbCore_SingleSymbol_CompilerServices_ObjectFlowControl()
+        Public Sub VbCore_SingleSymbol_CompilerServices_ObjectFlowControl()
             CompileAndVerify(
 <compilation>
     <file name="a.vb">
@@ -1102,7 +1104,7 @@ symbolValidator:=Sub([module])
         End Sub
 
         <Fact()>
-        Sub VbCore_SingleSymbol_CompilerServices_ObjectFlowControl_ForLoopControl()
+        Public Sub VbCore_SingleSymbol_CompilerServices_ObjectFlowControl_ForLoopControl()
             CompileAndVerify(
 <compilation>
     <file name="a.vb">
@@ -1157,7 +1159,7 @@ symbolValidator:=Sub([module])
         End Sub
 
         <Fact()>
-        Sub VbCore_SingleSymbol_CompilerServices_ObjectFlowControl_ForLoopControl_ForNextCheckR8()
+        Public Sub VbCore_SingleSymbol_CompilerServices_ObjectFlowControl_ForLoopControl_ForNextCheckR8()
             CompileAndVerify(
 <compilation>
     <file name="a.vb">
@@ -1213,7 +1215,7 @@ symbolValidator:=Sub([module])
         End Sub
 
         <Fact()>
-        Sub VbCore_SingleSymbol_CompilerServices_StaticLocalInitFlag()
+        Public Sub VbCore_SingleSymbol_CompilerServices_StaticLocalInitFlag()
             CompileAndVerify(
 <compilation>
     <file name="a.vb">
@@ -1266,7 +1268,7 @@ symbolValidator:=Sub([module])
         End Sub
 
         <Fact()>
-        Sub VbCore_SingleSymbol_CompilerServices_StaticLocalInitFlag_State()
+        Public Sub VbCore_SingleSymbol_CompilerServices_StaticLocalInitFlag_State()
             CompileAndVerify(
 <compilation>
     <file name="a.vb">
@@ -1321,7 +1323,7 @@ symbolValidator:=Sub([module])
         End Sub
 
         <Fact()>
-        Sub VbCore_SingleSymbol_CompilerServices_IncompleteInitialization()
+        Public Sub VbCore_SingleSymbol_CompilerServices_IncompleteInitialization()
             CompileAndVerify(
 <compilation>
     <file name="a.vb">
@@ -1373,7 +1375,7 @@ symbolValidator:=Sub([module])
         End Sub
 
         <Fact()>
-        Sub VbCore_SingleSymbol_CompilerServices_IncompleteInitialization_Throw()
+        Public Sub VbCore_SingleSymbol_CompilerServices_IncompleteInitialization_Throw()
             CompileAndVerify(
 <compilation>
     <file name="a.vb">
@@ -1437,7 +1439,7 @@ symbolValidator:=Sub([module])
         End Sub
 
         <Fact()>
-        Sub VbCore_SingleSymbol_CompilerServices_StandardModuleAttribute()
+        Public Sub VbCore_SingleSymbol_CompilerServices_StandardModuleAttribute()
             CompileAndVerify(
 <compilation>
     <file name="a.vb">
@@ -1491,7 +1493,7 @@ symbolValidator:=Sub([module])
         End Sub
 
         <Fact()>
-        Sub VbCore_SingleSymbol_CompilerServices_DesignerGeneratedAttribute()
+        Public Sub VbCore_SingleSymbol_CompilerServices_DesignerGeneratedAttribute()
             CompileAndVerify(
 <compilation>
     <file name="a.vb">
@@ -1546,7 +1548,7 @@ symbolValidator:=Sub([module])
         End Sub
 
         <Fact()>
-        Sub VbCore_SingleSymbol_CompilerServices_OptionCompareAttribute()
+        Public Sub VbCore_SingleSymbol_CompilerServices_OptionCompareAttribute()
             CompileAndVerify(
 <compilation>
     <file name="a.vb">
@@ -1599,7 +1601,7 @@ symbolValidator:=Sub([module])
         End Sub
 
         <Fact()>
-        Sub VbCore_SingleSymbol_CompilerServices_OptionTextAttribute()
+        Public Sub VbCore_SingleSymbol_CompilerServices_OptionTextAttribute()
             CompileAndVerify(
 <compilation>
     <file name="a.vb">
@@ -1654,7 +1656,7 @@ symbolValidator:=Sub([module])
         End Sub
 
         <Fact()>
-        Sub VbCore_SingleSymbol_HideModuleNameAttribute()
+        Public Sub VbCore_SingleSymbol_HideModuleNameAttribute()
             CompileAndVerify(
 <compilation>
     <file name="a.vb">
@@ -1707,8 +1709,8 @@ symbolValidator:=Sub([module])
         End Sub
 
         <Fact()>
-        <WorkItem(544511, "DevDiv")>
-        Sub VbCore_SingleSymbol_Strings_AscW_Char()
+        <WorkItem(544511, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/544511")>
+        Public Sub VbCore_SingleSymbol_Strings_AscW_Char()
             CompileAndVerify(
 <compilation>
     <file name="a.vb">
@@ -1741,7 +1743,7 @@ symbolValidator:=Sub([module])
         End Sub
 
         <Fact()>
-        Sub VbCore_SingleSymbol_Strings_ChrW_Char()
+        Public Sub VbCore_SingleSymbol_Strings_ChrW_Char()
             CompileAndVerify(
 <compilation>
     <file name="a.vb">
@@ -1799,7 +1801,7 @@ symbolValidator:=Sub([module])
         End Sub
 
         <Fact()>
-        Sub VbCore_SingleSymbol_Strings_ChrW_Char_MultipleEmits()
+        Public Sub VbCore_SingleSymbol_Strings_ChrW_Char_MultipleEmits()
             Dim compilation = CompileAndVerify(
 <compilation>
     <file name="a.vb">
@@ -1863,7 +1865,7 @@ symbolValidator:=Sub([module])
         End Sub
 
         <Fact()>
-        Sub VbCore_TypesReferencedFromAttributes()
+        Public Sub VbCore_TypesReferencedFromAttributes()
             CompileAndVerify(
 <compilation>
     <file name="a.vb">
@@ -1940,7 +1942,7 @@ symbolValidator:=Sub([module])
         End Sub
 
         <Fact()>
-        Sub VbCore_TypesReferencedFromAttributes_Array()
+        Public Sub VbCore_TypesReferencedFromAttributes_Array()
             CompileAndVerify(
 <compilation>
     <file name="a.vb">
@@ -2015,7 +2017,7 @@ symbolValidator:=Sub([module])
         End Sub
 
         <Fact()>
-        Sub VbCore_EnsurePrivateConstructorsEmitted()
+        Public Sub VbCore_EnsurePrivateConstructorsEmitted()
             CompileAndVerify(
 <compilation>
     <file name="a.vb">
@@ -2045,7 +2047,7 @@ Microsoft.VisualBasic.CompilerServices.EmbeddedOperators Void .ctor()
 Microsoft.VisualBasic.CompilerServices.Conversions Void .ctor()
 Microsoft.VisualBasic.CompilerServices.ProjectData Void .ctor()
 Microsoft.VisualBasic.CompilerServices.Utils Void .ctor()
-</output>.Value.Replace(vbLf, vbNewLine),
+</output>.Value.Replace(vbLf, Environment.NewLine),
 sourceSymbolValidator:=Sub([module]) ValidateSourceSymbols([module]),
 symbolValidator:=Sub([module])
                      ValidateSymbols([module],
@@ -2106,7 +2108,7 @@ symbolValidator:=Sub([module])
         End Sub
 
         <Fact()>
-        Sub VbCore_EmbeddedAttributeOnAssembly_NoReferences()
+        Public Sub VbCore_EmbeddedAttributeOnAssembly_NoReferences()
             CompileAndVerify(
 <compilation>
     <file name="a.vb">
@@ -2145,7 +2147,7 @@ symbolValidator:=Sub([module])
         End Sub
 
         <Fact()>
-        Sub VbCore_EmbeddedAttributeOnAssembly_References_NoDebug()
+        Public Sub VbCore_EmbeddedAttributeOnAssembly_References_NoDebug()
             CompileAndVerify(
 <compilation>
     <file name="a.vb">
@@ -2208,9 +2210,10 @@ symbolValidator:=Sub([module])
                  End Sub)
         End Sub
 
-        <Fact>
+        <ConditionalFact(GetType(NoUsedAssembliesValidation))> ' https://github.com/dotnet/roslyn/issues/40683: The test hook is blocked by this issue.
+        <WorkItem(40683, "https://github.com/dotnet/roslyn/issues/40683")>
         Public Sub VbCore_InvisibleViaInternalsVisibleTo()
-            Dim other As VisualBasicCompilation = CompilationUtils.CreateCompilationWithReferences(
+            Dim other As VisualBasicCompilation = CompilationUtils.CreateEmptyCompilationWithReferences(
     <compilation name="HasIVTToCompilationVbCore">
         <file name="a.vb"><![CDATA[
 Imports System
@@ -2233,7 +2236,7 @@ End Class
 
             CompilationUtils.AssertNoErrors(other)
 
-            Dim c As VisualBasicCompilation = CompilationUtils.CreateCompilationWithReferences(
+            Dim c As VisualBasicCompilation = CompilationUtils.CreateEmptyCompilationWithReferences(
     <compilation name="WantsIVTAccessVbCoreButCantHave">
         <file name="a.vb"><![CDATA[
 Public Class A
@@ -2259,7 +2262,7 @@ BC30002: Type 'Microsoft.VisualBasic.Strings' is not defined.
                           ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 </error>)
 
-            Dim c2 As VisualBasicCompilation = CompilationUtils.CreateCompilationWithMscorlibAndReferences(
+            Dim c2 As VisualBasicCompilation = CompilationUtils.CreateCompilationWithMscorlib40AndReferences(
     <compilation name="WantsIVTAccessVbCoreAndStillCannot">
         <file name="a.vb"><![CDATA[
 Public Class A
@@ -2286,7 +2289,7 @@ BC30002: Type 'Microsoft.VisualBasic.Strings' is not defined.
 
         <Fact>
         Public Sub VbCore_InvisibleViaInternalsVisibleTo2()
-            Dim other As VisualBasicCompilation = CompilationUtils.CreateCompilationWithReferences(
+            Dim other As VisualBasicCompilation = CompilationUtils.CreateEmptyCompilationWithReferences(
     <compilation name="VbCore_InvisibleViaInternalsVisibleTo2">
         <file name="a.vb"><![CDATA[
 Imports System
@@ -2311,7 +2314,7 @@ End Class
 
             CompilationUtils.AssertNoErrors(other)
 
-            Dim c As VisualBasicCompilation = CompilationUtils.CreateCompilationWithMscorlibAndReferences(
+            Dim c As VisualBasicCompilation = CompilationUtils.CreateCompilationWithMscorlib40AndReferences(
     <compilation name="WantsIVTAccessVbCoreAndStillCannot2">
         <file name="a.vb"><![CDATA[
 Imports System
@@ -2340,7 +2343,7 @@ BC30456: 'CopyArray' is not a member of 'Utils'.
 
         <Fact>
         Public Sub VbCore_InvisibleViaInternalsVisibleTo3()
-            Dim other As VisualBasicCompilation = CompilationUtils.CreateCompilationWithReferences(
+            Dim other As VisualBasicCompilation = CompilationUtils.CreateEmptyCompilationWithReferences(
     <compilation name="VbCore_InvisibleViaInternalsVisibleTo3">
         <file name="a.vb"><![CDATA[
 Imports System
@@ -2362,7 +2365,7 @@ End Class
 
             CompilationUtils.AssertNoErrors(other)
 
-            Dim c As VisualBasicCompilation = CompilationUtils.CreateCompilationWithMscorlibAndReferences(
+            Dim c As VisualBasicCompilation = CompilationUtils.CreateCompilationWithMscorlib40AndReferences(
     <compilation name="WantsIVTAccessVbCoreAndStillCannot3">
         <file name="a.vb"><![CDATA[
 Imports System
@@ -2391,7 +2394,7 @@ BC30451: 'ChrW' is not declared. It may be inaccessible due to its protection le
 
         <Fact>
         Public Sub VbCore_InvisibleViaInternalsVisibleTo3_ViaBinary()
-            Dim other As VisualBasicCompilation = CompilationUtils.CreateCompilationWithReferences(
+            Dim other As VisualBasicCompilation = CompilationUtils.CreateEmptyCompilationWithReferences(
     <compilation name="VbCore_InvisibleViaInternalsVisibleTo3">
         <file name="a.vb"><![CDATA[
 Imports System
@@ -2416,7 +2419,7 @@ End Class
             Dim memory As New MemoryStream()
             other.Emit(memory)
 
-            Dim c As VisualBasicCompilation = CompilationUtils.CreateCompilationWithMscorlibAndReferences(
+            Dim c As VisualBasicCompilation = CompilationUtils.CreateCompilationWithMscorlib40AndReferences(
     (<compilation name="WantsIVTAccessVbCoreAndStillCannot3">
          <file name="a.vb"><![CDATA[
 Imports System
@@ -2444,7 +2447,7 @@ BC30451: 'ChrW' is not declared. It may be inaccessible due to its protection le
 
         <Fact>
         Public Sub VbCore_EmbeddedVbCoreWithIVToAndRuntime()
-            Dim other As VisualBasicCompilation = CompilationUtils.CreateCompilationWithReferences(
+            Dim other As VisualBasicCompilation = CompilationUtils.CreateEmptyCompilationWithReferences(
     <compilation name="VbCore_EmbeddedVbCoreWithIVToAndRuntime">
         <file name="a.vb"><![CDATA[
 <Assembly: System.Runtime.CompilerServices.InternalsVisibleTo("WantsIVTAccessVbCoreAndStillCannot3")>
@@ -2493,8 +2496,8 @@ End Class
         End Sub
 
         <Fact()>
-        Sub VbCore_CompilationOptions()
-            Dim withoutVbCore As VisualBasicCompilation = CompilationUtils.CreateCompilationWithReferences(
+        Public Sub VbCore_CompilationOptions()
+            Dim withoutVbCore As VisualBasicCompilation = CompilationUtils.CreateEmptyCompilationWithReferences(
     <compilation name="VbCore_CompilationOptions1">
         <file name="a.vb"><![CDATA[
 Imports System
@@ -2534,7 +2537,7 @@ BC30451: 'ChrW' is not declared. It may be inaccessible due to its protection le
 
         End Sub
 
-        <Fact()>
+        <ConditionalFact(GetType(WindowsOnly), Reason:=ConditionalSkipReason.NativePdbRequiresDesktop)>
         Public Sub NoDebugInfoForVbCoreSymbols()
             Dim source =
 <compilation>
@@ -2551,13 +2554,11 @@ End Class
 ]]></file>
 </compilation>
 
-            Dim compilation = CreateCompilationWithMscorlibAndVBRuntime(source, TestOptions.DebugExe.WithEmbedVbCoreRuntime(True))
-            Dim actual = GetPdbXml(compilation)
-
-            Dim expected =
+            Dim compilation = CreateCompilationWithMscorlib40AndVBRuntime(source, TestOptions.DebugExe.WithEmbedVbCoreRuntime(True))
+            compilation.VerifyPdb(
 <symbols>
     <files>
-        <file id="1" name="a.vb" language="3a12d0b8-c26c-11d0-b442-00a0244a1dd2" languageVendor="994b45c4-e6e9-11d2-903f-00c04fa302a1" documentType="5a869d0b-6611-11d3-bd2a-0000f80849bd" checkSumAlgorithmId="ff1816ec-aa5e-4d10-87f7-6f4963833460" checkSum="43, DF,  2, C2, F5, 5F, 6A, CB,  8, D3, 1F, D2, 8E, 4F, FE,  A, 8F, C2, 76, D7, "/>
+        <file id="1" name="a.vb" language="VB" checksumAlgorithm="SHA1" checksum="43-DF-02-C2-F5-5F-6A-CB-08-D3-1F-D2-8E-4F-FE-0A-8F-C2-76-D7"/>
     </files>
     <entryPoint declaringType="Program" methodName="Main" parameterNames="args"/>
     <methods>
@@ -2573,9 +2574,6 @@ End Class
                 <entry offset="0x4" startLine="7" startColumn="9" endLine="7" endColumn="32" document="1"/>
                 <entry offset="0x10" startLine="8" startColumn="5" endLine="8" endColumn="12" document="1"/>
             </sequencePoints>
-            <locals>
-                <local name="ch" il_index="0" il_start="0x0" il_end="0x11" attributes="0"/>
-            </locals>
             <scope startOffset="0x0" endOffset="0x11">
                 <namespace name="System" importlevel="file"/>
                 <namespace name="Microsoft.VisualBasic" importlevel="file"/>
@@ -2584,14 +2582,12 @@ End Class
             </scope>
         </method>
     </methods>
-</symbols>
-
-            PDB.PDBTests.AssertXmlEqual(expected, actual)
+</symbols>)
         End Sub
 
         <Fact>
         Public Sub VbCoreTypeAndUserPartialTypeConflict()
-            Dim compilation1 = CompilationUtils.CreateCompilationWithMscorlibAndReferences(
+            Dim compilation1 = CompilationUtils.CreateCompilationWithMscorlib40AndReferences(
 <compilation>
     <file name="a.vb">
 Imports System
@@ -2617,7 +2613,7 @@ BC31210: class 'HideModuleNameAttribute' conflicts with a Visual Basic Runtime c
 
         <Fact>
         Public Sub VbCoreTypeAndUserTypeConflict()
-            Dim compilation1 = CompilationUtils.CreateCompilationWithMscorlibAndReferences(
+            Dim compilation1 = CompilationUtils.CreateCompilationWithMscorlib40AndReferences(
 <compilation>
     <file name="a.vb">
 Imports System
@@ -2643,7 +2639,7 @@ BC31210: class 'HideModuleNameAttribute' conflicts with a Visual Basic Runtime c
 
         <Fact>
         Public Sub VbCoreNamespaceAndUserTypeConflict()
-            Dim compilation1 = CompilationUtils.CreateCompilationWithMscorlibAndReferences(
+            Dim compilation1 = CompilationUtils.CreateCompilationWithMscorlib40AndReferences(
 <compilation>
     <file name="a.vb">
 Imports System
@@ -2669,7 +2665,7 @@ BC31210: class 'VisualBasic' conflicts with a Visual Basic Runtime namespace 'Vi
 
         <Fact>
         Public Sub VbCoreTypeAndUserNamespaceConflict()
-            Dim compilation1 = CompilationUtils.CreateCompilationWithMscorlibAndReferences(
+            Dim compilation1 = CompilationUtils.CreateCompilationWithMscorlib40AndReferences(
 <compilation>
     <file name="a.vb">
 Imports System
@@ -2695,7 +2691,7 @@ Namespace Global.Microsoft.VisualBasic.Strings
 
         <Fact>
         Public Sub VbCoreTypeAndUserNamespaceConflict2()
-            Dim compilation1 = CompilationUtils.CreateCompilationWithMscorlibAndReferences(
+            Dim compilation1 = CompilationUtils.CreateCompilationWithMscorlib40AndReferences(
 <compilation>
     <file name="a.vb">
 Imports System
@@ -2730,7 +2726,7 @@ Namespace Global.Microsoft.VisualBasic.Strings
 
         <Fact>
         Public Sub VbCoreTypeAndUserNamespaceConflict3()
-            Dim compilation1 = CompilationUtils.CreateCompilationWithMscorlibAndReferences(
+            Dim compilation1 = CompilationUtils.CreateCompilationWithMscorlib40AndReferences(
 <compilation>
     <file name="a.vb">
 Imports System
@@ -2770,7 +2766,7 @@ Namespace Global.Microsoft.VisualBasic.Strings
 </errors>)
         End Sub
 
-        <Fact>
+        <ConditionalFact(GetType(WindowsOnly), Reason:="https://github.com/dotnet/roslyn/issues/29531")>
         Public Sub VbRuntimeTypeAndUserNamespaceConflictOutsideOfVBCore()
             ' This verifies the diagnostic BC31210 scenario outsides of using VB Core which
             ' is triggered by the Embedded Attribute.  This occurs on the command line compilers
@@ -2778,7 +2774,7 @@ Namespace Global.Microsoft.VisualBasic.Strings
 
             Dim compilationOptions = TestOptions.ReleaseExe.WithGlobalImports(GlobalImport.Parse({"System", "Microsoft.VisualBasic"}))
 
-            Dim compilation1 = CompilationUtils.CreateCompilationWithMscorlibAndVBRuntimeAndReferences(
+            Dim compilation1 = CompilationUtils.CreateCompilationWithMscorlib40AndVBRuntimeAndReferences(
 <compilation>
     <file name="testa.vb">
 Imports Microsoft.VisualBasic
@@ -2796,7 +2792,7 @@ End Namespace
     </file>
 </compilation>,
             options:=compilationOptions,
-additionalRefs:={SystemCoreRef, SystemXmlLinqRef, SystemXmlRef})
+references:={SystemCoreRef, SystemXmlLinqRef, SystemXmlRef})
 
             CompilationUtils.AssertTheseDiagnostics(compilation1,
             <errors>BC30560: Error in project-level import 'Microsoft.VisualBasic' at 'Microsoft.VisualBasic' : 'VisualBasic' is ambiguous in the namespace 'Microsoft'.
@@ -2814,9 +2810,9 @@ BC31210: module 'VisualBasic' conflicts with a Visual Basic Runtime namespace 'V
 
 </errors>)
 
-            ' Remove the reference to System.XML.Linq and verify compilation behaviour that the 
+            ' Remove the reference to System.XML.Linq and verify compilation behavior that the 
             ' diagnostic is not produced.
-            compilation1 = CompilationUtils.CreateCompilationWithMscorlibAndVBRuntimeAndReferences(
+            compilation1 = CompilationUtils.CreateCompilationWithMscorlib40AndVBRuntimeAndReferences(
 <compilation>
     <file name="testa.vb">
                         Imports Microsoft.VisualBasic
@@ -2845,7 +2841,7 @@ BC31210: module 'VisualBasic' conflicts with a Visual Basic Runtime namespace 'V
 
         <Fact>
         Public Sub VbCore_IsImplicitlyDeclaredSymbols()
-            Dim compilation = CompilationUtils.CreateCompilationWithMscorlibAndReferences(
+            Dim compilation = CompilationUtils.CreateCompilationWithMscorlib40AndReferences(
 <compilation>
     <file name="a.vb">
     </file>
@@ -2875,14 +2871,14 @@ BC31210: module 'VisualBasic' conflicts with a Visual Basic Runtime namespace 'V
 
         <Fact()>
         Public Sub InternalXmlHelper_IsImplicitlyDeclaredSymbols()
-            Dim compilation = CreateCompilationWithMscorlibAndVBRuntimeAndReferences(
+            Dim compilation = CreateCompilationWithMscorlib40AndVBRuntimeAndReferences(
 <compilation>
     <file name="c.vb"><![CDATA[
 Module M
     Dim x = <x/>.<y>.Value
 End Module
     ]]></file>
-</compilation>, additionalRefs:=XmlReferences)
+</compilation>, references:=XmlReferences)
             compilation.AssertNoErrors()
             Dim type = compilation.GetTypeByMetadataName("My.InternalXmlHelper")
             AssertTypeAndItsMembersAreImplicitlyDeclared(type)
@@ -2894,8 +2890,8 @@ End Module
         <WorkItem(15925, "DevDiv_Projects/Roslyn")> <Fact>
         Public Sub VbCoreWithStaticLocals_UsingEmbedVBCore()
             'Static Locals use types contained within VB Runtime so verify with VBCore option to ensure the feature works
-            'usign VBCore which would be the case with platforms such as Phone.
-            Dim compilation As VisualBasicCompilation = CompilationUtils.CreateCompilationWithReferences(
+            'using VBCore which would be the case with platforms such as Phone.
+            Dim compilation As VisualBasicCompilation = CompilationUtils.CreateEmptyCompilationWithReferences(
       <compilation>
           <file name="a.vb">
               Imports System
@@ -2903,11 +2899,11 @@ End Module
 
         Module Module1
             Sub Main()
-                Foo()
-                Foo()
+                Goo()
+                Goo()
             End Sub
 
-            Sub Foo()
+            Sub Goo()
                 Static x as integer = 1
                 x+=1
             End Sub
@@ -2924,16 +2920,16 @@ End Module
         Public Sub VbCoreWithStaticLocals_NoRequiredTypes()
             'Static Locals use types in VB Runtime so verify with no VBRuntime we generate applicable errors about missing types.  
             'This will include types for Module as well as static locals
-            Dim compilation As VisualBasicCompilation = CompilationUtils.CreateCompilationWithReferences(
+            Dim compilation As VisualBasicCompilation = CompilationUtils.CreateEmptyCompilationWithReferences(
       <compilation>
           <file name="a.vb">
         Module Module1
             Sub Main()
-                Foo()
-                Foo()
+                Goo()
+                Goo()
             End Sub
 
-            Sub Foo()
+            Sub Goo()
                 Static x as integer = 1
                 x+=1
             End Sub
@@ -2951,7 +2947,7 @@ End Module
         Public Sub VbCoreWithStaticLocals_CorrectDefinedTypes()
             'Static Locals use types in VB Runtime so verify with no VBRuntime but appropriate types specified in Source the static
             'local scenarios should work correctly.
-            Dim compilation As VisualBasicCompilation = CompilationUtils.CreateCompilationWithReferences(
+            Dim compilation As VisualBasicCompilation = CompilationUtils.CreateEmptyCompilationWithReferences(
       <compilation>
           <file name="a.vb">
         Imports System
@@ -2959,11 +2955,11 @@ End Module
 
         Public Class Module1
             Public shared Sub Main()
-                Foo()
-                Foo()
+                Goo()
+                Goo()
             End Sub
 
-            shared Sub Foo()
+            shared Sub Goo()
                 Static x as integer = 1
                 x+=1
             End Sub
@@ -2992,18 +2988,18 @@ End Namespace
         <WorkItem(15925, "DevDiv_Projects/Roslyn")> <Fact>
         Public Sub VbCoreWithStaticLocals_IncorrectDefinedTypes()
             'Static Locals use types in VB Runtime so verify with no VBRuntime but appropriate types specified in Source the static
-            'local scenarios should work correctly buyt if we define the types incorrectly we should generate errors although we 
+            'local scenarios should work correctly but if we define the types incorrectly we should generate errors although we 
             'should not crash.
-            Dim compilation As VisualBasicCompilation = CompilationUtils.CreateCompilationWithReferences(
+            Dim compilation As VisualBasicCompilation = CompilationUtils.CreateEmptyCompilationWithReferences(
       <compilation>
           <file name="a.vb">
         Public Class Module1
             Public shared Sub Main()
-                Foo()
-                Foo()
+                Goo()
+                Goo()
             End Sub
 
-            shared Sub Foo()
+            shared Sub Goo()
                 Static x as integer = 1
                 x+=1
             End Sub
@@ -3027,8 +3023,10 @@ End Namespace
               options:=TestOptions.ReleaseDll.WithEmbedVbCoreRuntime(False))
 
             compilation.VerifyDiagnostics(
-                                    Diagnostic(ERRID.ERR_StructCantInherit, "Inherits System.Exception"),
-                                    Diagnostic(ERRID.ERR_UseOfKeywordFromStructure1, "MyBase").WithArguments("MyBase"))
+    Diagnostic(ERRID.ERR_NewInStruct, "New").WithLocation(20, 24),
+    Diagnostic(ERRID.ERR_StructCantInherit, "Inherits System.Exception").WithLocation(19, 13),
+    Diagnostic(ERRID.ERR_UseOfKeywordFromStructure1, "MyBase").WithArguments("MyBase").WithLocation(21, 17)
+                                    )
         End Sub
 
         Private Sub AssertTypeAndItsMembersAreImplicitlyDeclared(type As NamedTypeSymbol)
@@ -3064,8 +3062,8 @@ End Namespace
             Next
         End Sub
 
-        <Fact, WorkItem(544291, "DevDiv")>
-        Sub VbCoreSyncLockOnObject()
+        <Fact, WorkItem(544291, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/544291")>
+        Public Sub VbCoreSyncLockOnObject()
             CompileAndVerify(
 <compilation>
     <file name="a.vb">
@@ -3107,7 +3105,7 @@ End Module
 ]]>)
         End Sub
 
-        <Fact(), WorkItem(545772, "DevDiv")>
+        <Fact(), WorkItem(545772, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/545772")>
         Public Sub VbCoreNoStdLib()
             Dim source =
 <compilation>
@@ -3119,7 +3117,7 @@ End Module
     </file>
 </compilation>
 
-            CreateCompilationWithMscorlib(
+            CreateCompilationWithMscorlib40(
                 source,
                 options:=TestOptions.ReleaseExe.WithEmbedVbCoreRuntime(True)).
             VerifyDiagnostics(
@@ -3153,7 +3151,7 @@ End Module
 
 #Region "Symbols Validator"
 
-        Private Shared NormalizeRegex As New Regex("^(\s*)", RegexOptions.Multiline)
+        Private Shared ReadOnly s_normalizeRegex As New Regex("^(\s*)", RegexOptions.Multiline)
 
         Private Sub ValidateSourceSymbols([module] As ModuleSymbol)
             ValidateSourceSymbol([module].GlobalNamespace)
@@ -3210,7 +3208,7 @@ End Module
             expected = expected.Trim()
 
             ' normalize
-            Dim matches = NormalizeRegex.Matches(expected)
+            Dim matches = s_normalizeRegex.Matches(expected)
             Dim captures = matches(matches.Count - 1).Groups(1).Captures
             Dim indent = captures(captures.Count - 1).Value
             If indent.Length > 0 Then
@@ -3219,7 +3217,7 @@ End Module
 
             Dim actual = actualBuilder.ToString.Trim()
 
-            If expected.Replace(vbLf, vbNewLine).CompareTo(actual) <> 0 Then
+            If expected.Replace(vbLf, Environment.NewLine).CompareTo(actual) <> 0 Then
                 Console.WriteLine("Actual:")
                 Console.WriteLine(actual)
                 Console.WriteLine()
@@ -3311,17 +3309,9 @@ End Module
                                            allReferences:=NoVbRuntimeReferences,
                                            expectedOutput:=expectedOutput,
                                            sourceSymbolValidator:=sourceSymbolValidator,
-                                           validator:=Translate(validator),
+                                           validator:=validator,
                                            symbolValidator:=symbolValidator,
                                            options:=options)
-        End Function
-
-        Private Function Translate(action As Action(Of PEAssembly)) As Action(Of PEAssembly, TestEmitters)
-            If action IsNot Nothing Then
-                Return Sub(a, _omitted) action(a)
-            Else
-                Return Nothing
-            End If
         End Function
 
 #End Region

@@ -1,4 +1,6 @@
-﻿' Copyright (c) Microsoft.  All Rights Reserved.  Licensed under the Apache License, Version 2.0.  See License.txt in the project root for license information.
+﻿' Licensed to the .NET Foundation under one or more agreements.
+' The .NET Foundation licenses this file to you under the MIT license.
+' See the LICENSE file in the project root for more information.
 
 Imports System
 Imports System.Collections.Generic
@@ -7,6 +9,7 @@ Imports System.Diagnostics
 Imports System.Linq
 Imports System.Threading
 Imports Microsoft.CodeAnalysis.Collections
+Imports Microsoft.CodeAnalysis.PooledObjects
 Imports Microsoft.CodeAnalysis.Text
 Imports Microsoft.CodeAnalysis.VisualBasic.Symbols
 Imports Microsoft.CodeAnalysis.VisualBasic.Syntax
@@ -125,10 +128,10 @@ Namespace Microsoft.CodeAnalysis.VisualBasic.Symbols
             End Get
         End Property
 
-        Private Shared ReadOnly IdentityFunc As Func(Of SingleTypeDeclaration, SingleTypeDeclaration) =
+        Private Shared ReadOnly s_identityFunc As Func(Of SingleTypeDeclaration, SingleTypeDeclaration) =
             Function(t) t
 
-        Private Shared ReadOnly MergeFunc As Func(Of IEnumerable(Of SingleTypeDeclaration), MergedTypeDeclaration) =
+        Private Shared ReadOnly s_mergeFunc As Func(Of IEnumerable(Of SingleTypeDeclaration), MergedTypeDeclaration) =
             Function(g) New MergedTypeDeclaration(ImmutableArray.CreateRange(Of SingleTypeDeclaration)(g))
 
         Private Function MakeChildren() As MergedTypeDeclaration()
@@ -145,8 +148,8 @@ Namespace Microsoft.CodeAnalysis.VisualBasic.Symbols
 
         Friend Shared Function MakeMergedTypes(types As IEnumerable(Of SingleTypeDeclaration)) As IEnumerable(Of MergedTypeDeclaration)
             Return types.
-                GroupBy(IdentityFunc, SingleTypeDeclaration.EqualityComparer).
-                Select(MergeFunc)
+                GroupBy(s_identityFunc, SingleTypeDeclaration.EqualityComparer).
+                Select(s_mergeFunc)
         End Function
 
         Public Overloads ReadOnly Property Children As ImmutableArray(Of MergedTypeDeclaration)

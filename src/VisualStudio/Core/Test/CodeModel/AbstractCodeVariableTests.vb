@@ -1,5 +1,8 @@
-' Copyright (c) Microsoft.  All Rights Reserved.  Licensed under the Apache License, Version 2.0.  See License.txt in the project root for license information.
+﻿' Licensed to the .NET Foundation under one or more agreements.
+' The .NET Foundation licenses this file to you under the MIT license.
+' See the LICENSE file in the project root for more information.
 
+Imports System.Threading.Tasks
 Imports Microsoft.CodeAnalysis.Editor.UnitTests.Extensions
 
 Namespace Microsoft.VisualStudio.LanguageServices.UnitTests.CodeModel
@@ -95,56 +98,40 @@ Namespace Microsoft.VisualStudio.LanguageServices.UnitTests.CodeModel
         End Function
 
         Protected Sub TestIsConstant(code As XElement, expected As Boolean)
-            Using state = CreateCodeModelTestState(GetWorkspaceDefinition(code))
-                Dim codeElement = state.GetCodeElementAtCursor(Of EnvDTE80.CodeVariable2)()
-                Assert.NotNull(codeElement)
-
-                Assert.Equal(expected, codeElement.IsConstant)
-            End Using
+            TestElement(code,
+                Sub(codeElement)
+                    Assert.Equal(expected, codeElement.IsConstant)
+                End Sub)
         End Sub
 
-        Protected Sub TestSetIsConstant(code As XElement, expectedCode As XElement, value As Boolean)
-            TestSetIsConstant(code, expectedCode, value, NoThrow(Of Boolean)())
-        End Sub
+        Protected Async Function TestSetIsConstant(code As XElement, expectedCode As XElement, value As Boolean) As Task
+            Await TestSetIsConstant(code, expectedCode, value, NoThrow(Of Boolean)())
+        End Function
 
-        Protected Sub TestSetIsConstant(code As XElement, expectedCode As XElement, value As Boolean, action As SetterAction(Of Boolean))
-            Using state = CreateCodeModelTestState(GetWorkspaceDefinition(code))
-                Dim codeElement = state.GetCodeElementAtCursor(Of EnvDTE80.CodeVariable2)()
-                Assert.NotNull(codeElement)
-
-                action(value, Sub(v) codeElement.IsConstant = v)
-
-                Dim text = state.GetDocumentAtCursor().GetTextAsync().Result.ToString()
-
-                Assert.Equal(expectedCode.NormalizedValue.Trim(), text.Trim())
-            End Using
-        End Sub
+        Protected Async Function TestSetIsConstant(code As XElement, expectedCode As XElement, value As Boolean, action As SetterAction(Of Boolean)) As Task
+            Await TestElementUpdate(code, expectedCode,
+                Sub(codeElement)
+                    action(value, Sub(v) codeElement.IsConstant = v)
+                End Sub)
+        End Function
 
         Protected Sub TestInitExpression(code As XElement, expected As Object)
-            Using state = CreateCodeModelTestState(GetWorkspaceDefinition(code))
-                Dim codeElement = state.GetCodeElementAtCursor(Of EnvDTE80.CodeVariable2)()
-                Assert.NotNull(codeElement)
-
-                Assert.Equal(expected, codeElement.InitExpression)
-            End Using
+            TestElement(code,
+                Sub(codeElement)
+                    Assert.Equal(expected, codeElement.InitExpression)
+                End Sub)
         End Sub
 
-        Protected Sub TestSetInitExpression(code As XElement, expectedCode As XElement, value As Object)
-            TestSetInitExpression(code, expectedCode, value, NoThrow(Of Object)())
-        End Sub
+        Protected Async Function TestSetInitExpression(code As XElement, expectedCode As XElement, value As Object) As Task
+            Await TestSetInitExpression(code, expectedCode, value, NoThrow(Of Object)())
+        End Function
 
-        Protected Sub TestSetInitExpression(code As XElement, expectedCode As XElement, value As Object, action As SetterAction(Of Object))
-            Using state = CreateCodeModelTestState(GetWorkspaceDefinition(code))
-                Dim codeElement = state.GetCodeElementAtCursor(Of EnvDTE80.CodeVariable2)()
-                Assert.NotNull(codeElement)
-
-                action(value, Sub(v) codeElement.InitExpression = v)
-
-                Dim text = state.GetDocumentAtCursor().GetTextAsync().Result.ToString()
-
-                Assert.Equal(expectedCode.NormalizedValue.Trim(), text.Trim())
-            End Using
-        End Sub
+        Protected Async Function TestSetInitExpression(code As XElement, expectedCode As XElement, value As Object, action As SetterAction(Of Object)) As Task
+            Await TestElementUpdate(code, expectedCode,
+                Sub(codeElement)
+                    action(value, Sub(v) codeElement.InitExpression = v)
+                End Sub)
+        End Function
 
     End Class
 End Namespace

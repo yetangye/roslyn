@@ -1,12 +1,11 @@
-﻿' Copyright (c) Microsoft.  All Rights Reserved.  Licensed under the Apache License, Version 2.0.  See License.txt in the project root for license information.
+﻿' Licensed to the .NET Foundation under one or more agreements.
+' The .NET Foundation licenses this file to you under the MIT license.
+' See the LICENSE file in the project root for more information.
 
 Imports System.Collections.Immutable
 
 Namespace Microsoft.CodeAnalysis.VisualBasic.Symbols
 
-    ''' <summary>
-    ''' This class represents a compiler generated parameterless constructor 
-    ''' </summary>
     Friend NotInheritable Class SynthesizedSubmissionConstructorSymbol
         Inherits SynthesizedConstructorBase
 
@@ -22,7 +21,7 @@ Namespace Microsoft.CodeAnalysis.VisualBasic.Symbols
             container As NamedTypeSymbol,
             isShared As Boolean,
             binder As Binder,
-            diagnostics As DiagnosticBag
+            diagnostics As BindingDiagnosticBag
         )
             MyBase.New(syntaxReference, container, isShared, binder, diagnostics)
             Debug.Assert(container.TypeKind = TypeKind.Submission)
@@ -32,14 +31,10 @@ Namespace Microsoft.CodeAnalysis.VisualBasic.Symbols
             Dim compilation = container.DeclaringCompilation
 
             Dim submissionArrayType = compilation.CreateArrayTypeSymbol(compilation.GetSpecialType(SpecialType.System_Object))
-
-            ' resolve return type:
-            ' TODO(tomat): compilation.GetTypeByReflectionType(compilation.SubmissionReturnType, diagnostics)
-            Dim returnType As TypeSymbol = compilation.GetSpecialType(SpecialType.System_Object)
+            diagnostics.Add(submissionArrayType.GetUseSiteInfo(), NoLocation.Singleton)
 
             _parameters = ImmutableArray.Create(Of ParameterSymbol)(
-                New SynthesizedParameterSymbol(Me, submissionArrayType, 0, isByRef:=False, name:="executionState"),
-                New SynthesizedParameterSymbol(Me, returnType, 1, isByRef:=True, name:="submissionResult"))
+                New SynthesizedParameterSymbol(Me, submissionArrayType, 0, isByRef:=False, name:="submissionArray"))
         End Sub
 
         Public Overrides ReadOnly Property Parameters As ImmutableArray(Of ParameterSymbol)
@@ -48,8 +43,8 @@ Namespace Microsoft.CodeAnalysis.VisualBasic.Symbols
             End Get
         End Property
 
-        Friend Overrides Function GetBoundMethodBody(diagnostics As DiagnosticBag, Optional ByRef methodBodyBinder As Binder = Nothing) As BoundBlock
-            Dim node As VisualBasicSyntaxNode = Me.Syntax
+        Friend Overrides Function GetBoundMethodBody(compilationState As TypeCompilationState, diagnostics As BindingDiagnosticBag, Optional ByRef methodBodyBinder As Binder = Nothing) As BoundBlock
+            Dim node As SyntaxNode = Me.Syntax
             Return New BoundBlock(
                 node,
                 Nothing,
@@ -58,13 +53,12 @@ Namespace Microsoft.CodeAnalysis.VisualBasic.Symbols
         End Function
 
         Friend Shared Function MakeSubmissionInitialization(
-            syntax As VisualBasicSyntaxNode,
+            syntax As SyntaxNode,
             constructor As MethodSymbol,
             synthesizedFields As SynthesizedSubmissionFields,
-            compilation As VisualBasicCompilation,
-            diagnostics As DiagnosticBag) As ImmutableArray(Of BoundStatement)
+            compilation As VisualBasicCompilation) As ImmutableArray(Of BoundStatement)
 
-            Debug.Assert(constructor.ParameterCount = 2)
+            Debug.Assert(constructor.ParameterCount = 1)
             Dim result = New List(Of BoundStatement)()
 
             Dim submissionArrayReference = New BoundParameter(syntax, constructor.Parameters(0), isLValue:=False, type:=constructor.Parameters(0).Type)
@@ -107,7 +101,7 @@ Namespace Microsoft.CodeAnalysis.VisualBasic.Symbols
                 Dim targetSubmissionId = targetScriptType.DeclaringCompilation.GetSubmissionSlotIndex()
                 Debug.Assert(targetSubmissionId >= 0)
 
-                ' constructor.<field> = DirectCast(<submission_array>(<i>), <FieldType>);
+                ' Me.<field> = DirectCast(<submission_array>(<i>), <FieldType>);
                 result.Add(New BoundExpressionStatement(syntax,
                     New BoundAssignmentOperator(syntax,
                         New BoundFieldAccess(syntax,
@@ -133,7 +127,8 @@ Namespace Microsoft.CodeAnalysis.VisualBasic.Symbols
         End Property
 
         Friend Overrides Function CalculateLocalSyntaxOffset(localPosition As Integer, localTree As SyntaxTree) As Integer
-            Throw ExceptionUtilities.Unreachable
+            Dim containingType = DirectCast(Me.ContainingType, SourceMemberContainerTypeSymbol)
+            Return containingType.CalculateSyntaxOffsetInSynthesizedConstructor(localPosition, localTree, IsShared)
         End Function
     End Class
 End Namespace

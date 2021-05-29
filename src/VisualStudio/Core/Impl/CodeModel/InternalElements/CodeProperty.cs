@@ -1,4 +1,8 @@
-// Copyright (c) Microsoft.  All Rights Reserved.  Licensed under the Apache License, Version 2.0.  See License.txt in the project root for license information.
+﻿// Licensed to the .NET Foundation under one or more agreements.
+// The .NET Foundation licenses this file to you under the MIT license.
+// See the LICENSE file in the project root for more information.
+
+#nullable disable
 
 using System;
 using System.Collections.Immutable;
@@ -10,7 +14,7 @@ using Microsoft.VisualStudio.LanguageServices.Implementation.Utilities;
 namespace Microsoft.VisualStudio.LanguageServices.Implementation.CodeModel.InternalElements
 {
     [ComVisible(true)]
-    [ComDefaultInterface(typeof(EnvDTE.CodeProperty))]
+    [ComDefaultInterface(typeof(EnvDTE80.CodeProperty2))]
     public sealed partial class CodeProperty : AbstractCodeMember, ICodeElementContainer<CodeParameter>, ICodeElementContainer<CodeAttribute>, EnvDTE.CodeProperty, EnvDTE80.CodeProperty2
     {
         internal static EnvDTE.CodeProperty Create(
@@ -22,7 +26,7 @@ namespace Microsoft.VisualStudio.LanguageServices.Implementation.CodeModel.Inter
             var element = new CodeProperty(state, fileCodeModel, nodeKey, nodeKind);
             var result = (EnvDTE.CodeProperty)ComAggregate.CreateAggregatedObject(element);
 
-            fileCodeModel.OnElementCreated(nodeKey, (EnvDTE.CodeElement)result);
+            fileCodeModel.OnCodeElementCreated(nodeKey, (EnvDTE.CodeElement)result);
 
             return result;
         }
@@ -61,29 +65,19 @@ namespace Microsoft.VisualStudio.LanguageServices.Implementation.CodeModel.Inter
         }
 
         EnvDTE.CodeElements ICodeElementContainer<CodeParameter>.GetCollection()
-        {
-            return this.Parameters;
-        }
+            => this.Parameters;
 
         EnvDTE.CodeElements ICodeElementContainer<CodeAttribute>.GetCollection()
-        {
-            return this.Attributes;
-        }
+            => this.Attributes;
 
-        internal override ImmutableArray<IParameterSymbol> GetParameters()
-        {
-            return PropertySymbol.Parameters;
-        }
+        internal override ImmutableArray<SyntaxNode> GetParameters()
+            => ImmutableArray.CreateRange(CodeModelService.GetParameterNodes(LookupNode()));
 
         protected override object GetExtenderNames()
-        {
-            return CodeModelService.GetPropertyExtenderNames();
-        }
+            => CodeModelService.GetPropertyExtenderNames();
 
         protected override object GetExtender(string name)
-        {
-            return CodeModelService.GetPropertyExtender(name, LookupNode(), LookupSymbol());
-        }
+            => CodeModelService.GetPropertyExtender(name, LookupNode(), LookupSymbol());
 
         public override EnvDTE.vsCMElement Kind
         {
@@ -109,7 +103,7 @@ namespace Microsoft.VisualStudio.LanguageServices.Implementation.CodeModel.Inter
                     throw Exceptions.ThrowEUnexpected();
                 }
 
-                return FileCodeModel.CreateCodeElement<EnvDTE.CodeElement>(containingTypeNode);
+                return FileCodeModel.GetOrCreateCodeElement<EnvDTE.CodeElement>(containingTypeNode);
             }
         }
 
@@ -117,8 +111,7 @@ namespace Microsoft.VisualStudio.LanguageServices.Implementation.CodeModel.Inter
         {
             get
             {
-                EnvDTE.CodeClass parentClass = this.Parent as EnvDTE.CodeClass;
-                if (parentClass != null)
+                if (this.Parent is EnvDTE.CodeClass parentClass)
                 {
                     return parentClass;
                 }
@@ -144,16 +137,17 @@ namespace Microsoft.VisualStudio.LanguageServices.Implementation.CodeModel.Inter
         }
 
         private bool HasAccessorNode(MethodKind methodKind)
-        {
-            SyntaxNode accessorNode;
-            return CodeModelService.TryGetAccessorNode(LookupNode(), methodKind, out accessorNode);
-        }
+            => CodeModelService.TryGetAccessorNode(LookupNode(), methodKind, out _);
+
+        private bool IsExpressionBodiedProperty()
+            => CodeModelService.IsExpressionBodiedProperty(LookupNode());
 
         public EnvDTE.CodeFunction Getter
         {
             get
             {
-                if (!HasAccessorNode(MethodKind.PropertyGet))
+                if (!HasAccessorNode(MethodKind.PropertyGet) &&
+                    !IsExpressionBodiedProperty())
                 {
                     return null;
                 }
@@ -194,11 +188,11 @@ namespace Microsoft.VisualStudio.LanguageServices.Implementation.CodeModel.Inter
 
             set
             {
-                // The type is sometimes part of the node key, so we should be sure to reaquire
+                // The type is sometimes part of the node key, so we should be sure to reacquire
                 // it after updating it. Note that we pass trackKinds: false because it's possible
                 // that UpdateType might change the kind of a node (e.g. change a VB Sub to a Function).
 
-                UpdateNodeAndReaquireNodeKey(FileCodeModel.UpdateType, value, trackKinds: false);
+                UpdateNodeAndReacquireNodeKey(FileCodeModel.UpdateType, value, trackKinds: false);
             }
         }
 

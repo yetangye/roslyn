@@ -1,4 +1,6 @@
-﻿' Copyright (c) Microsoft.  All Rights Reserved.  Licensed under the Apache License, Version 2.0.  See License.txt in the project root for license information.
+﻿' Licensed to the .NET Foundation under one or more agreements.
+' The .NET Foundation licenses this file to you under the MIT license.
+' See the LICENSE file in the project root for more information.
 
 Imports System
 Imports System.Collections.Generic
@@ -19,7 +21,7 @@ Namespace Microsoft.CodeAnalysis.VisualBasic
     Friend Class VisualBasicControlFlowAnalysis
         Inherits ControlFlowAnalysis
 
-        Private ReadOnly context As RegionAnalysisContext
+        Private ReadOnly _context As RegionAnalysisContext
 
         Private _entryPoints As ImmutableArray(Of SyntaxNode)
         Private _exitPoints As ImmutableArray(Of SyntaxNode)
@@ -29,7 +31,7 @@ Namespace Microsoft.CodeAnalysis.VisualBasic
         Private _succeeded As Boolean?
 
         Friend Sub New(_context As RegionAnalysisContext)
-            Me.context = _context
+            Me._context = _context
         End Sub
 
         ''' <summary>
@@ -38,9 +40,9 @@ Namespace Microsoft.CodeAnalysis.VisualBasic
         Public Overrides ReadOnly Property EntryPoints As ImmutableArray(Of SyntaxNode)
             Get
                 If _entryPoints.IsDefault Then
-                    Me._succeeded = Not Me.context.Failed
-                    Dim result = If(Me.context.Failed, ImmutableArray(Of SyntaxNode).Empty,
-                                    DirectCast(EntryPointsWalker.Analyze(context.AnalysisInfo, context.RegionInfo, _succeeded), IEnumerable(Of SyntaxNode)).ToImmutableArray())
+                    Me._succeeded = Not Me._context.Failed
+                    Dim result = If(Me._context.Failed, ImmutableArray(Of SyntaxNode).Empty,
+                                    DirectCast(EntryPointsWalker.Analyze(_context.AnalysisInfo, _context.RegionInfo, _succeeded), IEnumerable(Of SyntaxNode)).ToImmutableArray())
                     ImmutableInterlocked.InterlockedCompareExchange(_entryPoints, result, Nothing)
                 End If
                 Return _entryPoints
@@ -53,8 +55,8 @@ Namespace Microsoft.CodeAnalysis.VisualBasic
         Public Overrides ReadOnly Property ExitPoints As ImmutableArray(Of SyntaxNode)
             Get
                 If _exitPoints.IsDefault Then
-                    Dim result = If(Me.context.Failed, ImmutableArray(Of SyntaxNode).Empty,
-                                    DirectCast(ExitPointsWalker.Analyze(context.AnalysisInfo, context.RegionInfo), IEnumerable(Of SyntaxNode)).ToImmutableArray())
+                    Dim result = If(Me._context.Failed, ImmutableArray(Of SyntaxNode).Empty,
+                                    DirectCast(ExitPointsWalker.Analyze(_context.AnalysisInfo, _context.RegionInfo), IEnumerable(Of SyntaxNode)).ToImmutableArray())
                     ImmutableInterlocked.InterlockedCompareExchange(_exitPoints, result, Nothing)
                 End If
                 Return _exitPoints
@@ -87,11 +89,11 @@ Namespace Microsoft.CodeAnalysis.VisualBasic
             Dim startPointIsReachable As Boolean = False
             Dim endPointIsReachable As Boolean = False
 
-            If Me.context.Failed Then
+            If Me._context.Failed Then
                 startPointIsReachable = True
                 endPointIsReachable = True
             Else
-                RegionReachableWalker.Analyze(context.AnalysisInfo, context.RegionInfo, startPointIsReachable, endPointIsReachable)
+                RegionReachableWalker.Analyze(_context.AnalysisInfo, _context.RegionInfo, startPointIsReachable, endPointIsReachable)
             End If
 
             Interlocked.CompareExchange(_regionStartPointIsReachable, startPointIsReachable, Nothing)

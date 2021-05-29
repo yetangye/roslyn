@@ -1,23 +1,18 @@
-' Copyright (c) Microsoft.  All Rights Reserved.  Licensed under the Apache License, Version 2.0.  See License.txt in the project root for license information.
-
-Imports Microsoft.CodeAnalysis.Text
-Imports Microsoft.CodeAnalysis.VisualBasic
-Imports Microsoft.CodeAnalysis.VisualBasic.Symbols
-Imports Microsoft.CodeAnalysis.VisualBasic.Syntax
-Imports Roslyn.Test.Utilities
-Imports Xunit
+﻿' Licensed to the .NET Foundation under one or more agreements.
+' The .NET Foundation licenses this file to you under the MIT license.
+' See the LICENSE file in the project root for more information.
 
 Namespace Microsoft.CodeAnalysis.Editor.VisualBasic.UnitTests.Recommendations.Statements
     Public Class FinallyKeywordRecommenderTests
         <Fact>
         <Trait(Traits.Feature, Traits.Features.KeywordRecommending)>
-        Public Sub FinallyNotInMethodBody()
+        Public Sub FinallyNotInMethodBodyTest()
             VerifyRecommendationsMissing(<MethodBody>|</MethodBody>, "Finally")
         End Sub
 
         <Fact>
         <Trait(Traits.Feature, Traits.Features.KeywordRecommending)>
-        Public Sub FinallyInTryBlock()
+        Public Sub FinallyInTryBlockTest()
             VerifyRecommendationsContain(<MethodBody>
 Try
 |
@@ -26,7 +21,7 @@ End Try</MethodBody>, "Finally")
 
         <Fact>
         <Trait(Traits.Feature, Traits.Features.KeywordRecommending)>
-        Public Sub FinallyInCatchBlock()
+        Public Sub FinallyInCatchBlockTest()
             VerifyRecommendationsContain(<MethodBody>
 Try
 Catch ex As Exception
@@ -36,7 +31,7 @@ End Try</MethodBody>, "Finally")
 
         <Fact>
         <Trait(Traits.Feature, Traits.Features.KeywordRecommending)>
-        Public Sub FinallyNotBeforeCatchBlock()
+        Public Sub FinallyNotBeforeCatchBlockTest()
             VerifyRecommendationsMissing(<MethodBody>
 Try
 |
@@ -46,12 +41,37 @@ End Try</MethodBody>, "Finally")
 
         <Fact>
         <Trait(Traits.Feature, Traits.Features.KeywordRecommending)>
-        Public Sub FinallyNotInFinallyBlock()
+        Public Sub FinallyNotInFinallyBlockTest()
             VerifyRecommendationsMissing(<MethodBody>
 Try
 Finally
 |
 End Try</MethodBody>, "Finally")
+        End Sub
+
+        <Fact>
+        <Trait(Traits.Feature, Traits.Features.KeywordRecommending)>
+        Public Sub FinallyInTryNestedInCatch1Test()
+            VerifyRecommendationsContain(<MethodBody>
+        Try
+        Catch
+            Try ' Type an 'E' on the next line
+            |
+                Throw
+            End Try</MethodBody>, "Finally")
+        End Sub
+
+        <Fact>
+        <Trait(Traits.Feature, Traits.Features.KeywordRecommending)>
+        Public Sub FinallyInTryNestedInCatch2Test()
+            VerifyRecommendationsContain(<MethodBody>
+        Try
+        Catch
+            Try ' Type an 'E' on the next line
+            Catch
+            |
+                Throw
+            End Try</MethodBody>, "Finally")
         End Sub
     End Class
 End Namespace

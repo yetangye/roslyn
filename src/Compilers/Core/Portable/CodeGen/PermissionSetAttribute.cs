@@ -1,7 +1,11 @@
-﻿// Copyright (c) Microsoft.  All Rights Reserved.  Licensed under the Apache License, Version 2.0.  See License.txt in the project root for license information.
+﻿// Licensed to the .NET Foundation under one or more agreements.
+// The .NET Foundation licenses this file to you under the MIT license.
+// See the LICENSE file in the project root for more information.
 
 using Microsoft.CodeAnalysis.Collections;
 using Microsoft.CodeAnalysis.Emit;
+using Microsoft.CodeAnalysis.PooledObjects;
+using Microsoft.CodeAnalysis.Symbols;
 using Roslyn.Utilities;
 using System;
 using System.Collections.Immutable;
@@ -21,19 +25,19 @@ namespace Microsoft.CodeAnalysis.CodeGen
     /// It involves following steps:
     /// 1) Verifying that the specified file name resolves to a valid path: This is done during binding.
     /// 2) Reading the contents of the file into a byte array.
-    /// 3) Convert each byte in the file content into two bytes containing hexa-decimal characters (see method <see cref="ConvertToHex"/>).
+    /// 3) Convert each byte in the file content into two bytes containing hexadecimal characters (see method <see cref="ConvertToHex"/>).
     /// 4) Replacing the 'File = fileName' named argument with 'Hex = hexFileContent' argument, where hexFileContent is the converted output from step 3) above.
     /// </remarks>
     internal class PermissionSetAttributeWithFileReference : Cci.ICustomAttribute
     {
         private readonly Cci.ICustomAttribute _sourceAttribute;
-        private string _resolvedPermissionSetFilePath;
-        internal static readonly string FilePropertyName = "File";
-        internal static readonly string HexPropertyName = "Hex";
+        private readonly string _resolvedPermissionSetFilePath;
+        internal const string FilePropertyName = "File";
+        internal const string HexPropertyName = "Hex";
 
         public PermissionSetAttributeWithFileReference(Cci.ICustomAttribute sourceAttribute, string resolvedPermissionSetFilePath)
         {
-            Debug.Assert(resolvedPermissionSetFilePath != null);
+            RoslynDebug.Assert(resolvedPermissionSetFilePath != null);
 
             _sourceAttribute = sourceAttribute;
             _resolvedPermissionSetFilePath = resolvedPermissionSetFilePath;
@@ -50,10 +54,8 @@ namespace Microsoft.CodeAnalysis.CodeGen
         /// <summary>
         /// A reference to the constructor that will be used to instantiate this custom attribute during execution (if the attribute is inspected via Reflection).
         /// </summary>
-        public Cci.IMethodReference Constructor(EmitContext context)
-        {
-            return _sourceAttribute.Constructor(context);
-        }
+        public Cci.IMethodReference Constructor(EmitContext context, bool reportDiagnostics)
+            => _sourceAttribute.Constructor(context, reportDiagnostics);
 
         /// <summary>
         /// Zero or more named arguments that specify values for fields and properties of the attribute.
@@ -66,7 +68,7 @@ namespace Microsoft.CodeAnalysis.CodeGen
 #if DEBUG
             // Must have exactly 1 named argument.
             var namedArgs = _sourceAttribute.GetNamedArguments(context);
-            Debug.Assert(namedArgs.Count() == 1);
+            Debug.Assert(namedArgs.Length == 1);
 
             // Named argument must be 'File' property of string type
             var fileArg = namedArgs.First();
@@ -74,12 +76,13 @@ namespace Microsoft.CodeAnalysis.CodeGen
             Debug.Assert(context.Module.IsPlatformType(fileArg.Type, Cci.PlatformType.SystemString));
 
             // Named argument value must be a non-empty string
-            Debug.Assert(fileArg.ArgumentValue is Cci.IMetadataConstant);
-            var fileName = (string)((Cci.IMetadataConstant)fileArg.ArgumentValue).Value;
+            Debug.Assert(fileArg.ArgumentValue is MetadataConstant);
+            var fileName = (string?)((MetadataConstant)fileArg.ArgumentValue).Value;
             Debug.Assert(!String.IsNullOrEmpty(fileName));
 
             // PermissionSetAttribute type must have a writable public string type property member 'Hex'
-            Debug.Assert(((INamedTypeSymbol)_sourceAttribute.GetType(context)).GetMembers(HexPropertyName).Any(
+            ISymbol iSymbol = _sourceAttribute.GetType(context).GetInternalSymbol()!.GetISymbol();
+            Debug.Assert(((INamedTypeSymbol)iSymbol).GetMembers(HexPropertyName).Any(
                 member => member.Kind == SymbolKind.Property && ((IPropertySymbol)member).Type.SpecialType == SpecialType.System_String));
 #endif
 
@@ -87,16 +90,16 @@ namespace Microsoft.CodeAnalysis.CodeGen
 
             // Read the file contents at the resolved file path into a byte array.
             // May throw PermissionSetFileReadException, which is handled in Compilation.Emit.
-            var resolver = context.ModuleBuilder.CommonCompilation.Options.XmlReferenceResolver;
+            var resolver = context.Module.CommonCompilation.Options.XmlReferenceResolver;
 
             // If the resolver isn't available we won't get here since we had to use it to resolve the path.
-            Debug.Assert(resolver != null);
+            RoslynDebug.Assert(resolver != null);
 
             try
             {
                 using (Stream stream = resolver.OpenReadChecked(_resolvedPermissionSetFilePath))
                 {
-                    // Convert the byte array contents into a string in hexa-decimal format.
+                    // Convert the byte array contents into a string in hexadecimal format.
                     hexFileContent = ConvertToHex(stream);
                 }
             }
@@ -112,7 +115,7 @@ namespace Microsoft.CodeAnalysis.CodeGen
         // internal for testing purposes.
         internal static string ConvertToHex(Stream stream)
         {
-            Debug.Assert(stream != null);
+            RoslynDebug.Assert(stream != null);
 
             var pooledStrBuilder = PooledStringBuilder.GetInstance();
             StringBuilder stringBuilder = pooledStrBuilder.Builder;
@@ -136,13 +139,7 @@ namespace Microsoft.CodeAnalysis.CodeGen
         /// <summary>
         /// The number of positional arguments.
         /// </summary>
-        public int ArgumentCount
-        {
-            get
-            {
-                return _sourceAttribute.ArgumentCount;
-            }
-        }
+        public int ArgumentCount => _sourceAttribute.ArgumentCount;
 
         /// <summary>
         /// The number of named arguments.
@@ -159,15 +156,9 @@ namespace Microsoft.CodeAnalysis.CodeGen
         /// <summary>
         /// The type of the attribute. For example System.AttributeUsageAttribute.
         /// </summary>
-        public Cci.ITypeReference GetType(EmitContext context)
-        {
-            return _sourceAttribute.GetType(context);
-        }
+        public Cci.ITypeReference GetType(EmitContext context) => _sourceAttribute.GetType(context);
 
-        public bool AllowMultiple
-        {
-            get { return _sourceAttribute.AllowMultiple; }
-        }
+        public bool AllowMultiple => _sourceAttribute.AllowMultiple;
 
         private struct HexPropertyMetadataNamedArgument : Cci.IMetadataNamedArgument
         {
@@ -206,14 +197,8 @@ namespace Microsoft.CodeAnalysis.CodeGen
             _file = file;
         }
 
-        public string FileName
-        {
-            get { return _file; }
-        }
+        public string FileName => _file;
 
-        public string PropertyName
-        {
-            get { return PermissionSetAttributeWithFileReference.FilePropertyName; }
-        }
+        public string PropertyName => PermissionSetAttributeWithFileReference.FilePropertyName;
     }
 }

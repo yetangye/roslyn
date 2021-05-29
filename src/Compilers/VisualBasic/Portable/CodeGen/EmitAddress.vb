@@ -1,11 +1,14 @@
-﻿' Copyright (c) Microsoft.  All Rights Reserved.  Licensed under the Apache License, Version 2.0.  See License.txt in the project root for license information.
+﻿' Licensed to the .NET Foundation under one or more agreements.
+' The .NET Foundation licenses this file to you under the MIT license.
+' See the LICENSE file in the project root for more information.
 
+Imports System.Reflection.Metadata
 Imports Microsoft.CodeAnalysis.CodeGen
 Imports Microsoft.CodeAnalysis.VisualBasic.Symbols
 
 Namespace Microsoft.CodeAnalysis.VisualBasic.CodeGen
 
-    Partial Class CodeGenerator
+    Partial Friend Class CodeGenerator
 
         ' VB has additional, stronger than CLR requirements on whether a reference to an item
         ' can be taken. 
@@ -70,6 +73,9 @@ Namespace Microsoft.CodeAnalysis.VisualBasic.CodeGen
                     Debug.Assert(Not expression.Type.IsReferenceType)
                     Debug.Assert(Not expression.Type.IsValueType)
 
+                Case BoundKind.ComplexConditionalAccessReceiver
+                    EmitComplexConditionalAccessReceiverAddress(DirectCast(expression, BoundComplexConditionalAccessReceiver))
+
                 Case BoundKind.Parameter
                     EmitParameterAddress(DirectCast(expression, BoundParameter))
 
@@ -95,8 +101,8 @@ Namespace Microsoft.CodeAnalysis.VisualBasic.CodeGen
                     ' rewriter should take care of Parenthesized
                     '
                     ' we do not know how to emit address of a parenthesized without context.
-                    ' when it is an argument like  foo((arg)), it must be cloned, 
-                    ' in other cases like (receiver).foo() it might not need to be...
+                    ' when it is an argument like  goo((arg)), it must be cloned, 
+                    ' in other cases like (receiver).goo() it might not need to be...
                     '
                     Debug.Assert(False, "we should not see parenthesized in EmitAddress.")
 
@@ -108,6 +114,11 @@ Namespace Microsoft.CodeAnalysis.VisualBasic.CodeGen
 
                 Case BoundKind.PseudoVariable
                     EmitPseudoVariableAddress(DirectCast(expression, BoundPseudoVariable))
+
+                Case BoundKind.Call
+                    Dim [call] = DirectCast(expression, BoundCall)
+                    Debug.Assert([call].Method.ReturnsByRef)
+                    EmitCallExpression([call], UseKind.UsedAsAddress)
 
                 Case Else
                     Throw ExceptionUtilities.UnexpectedValue(kind)
@@ -153,7 +164,7 @@ Namespace Microsoft.CodeAnalysis.VisualBasic.CodeGen
 
             ' when a sequence Is happened to be a byref receiver
             ' we may need to extend the life time of the target until we are done accessing it
-            ' {.v ; v = Foo(); v}.Bar()     // v should be released after Bar() Is over.
+            ' {.v ; v = Goo(); v}.Bar()     // v should be released after Bar() Is over.
             Dim doNotRelease As LocalSymbol = Nothing
             If (tempOpt Is Nothing) Then
                 Dim referencedLocal As BoundLocal = DigForLocal(sequence.ValueOpt)
@@ -227,8 +238,12 @@ Namespace Microsoft.CodeAnalysis.VisualBasic.CodeGen
                     Dim local = DirectCast(expression, BoundLocal).LocalSymbol
                     Return Not IsStackLocal(local) OrElse local.IsByRef
 
+                Case BoundKind.Call
+                    Dim method = DirectCast(expression, BoundCall).Method
+                    Return method.ReturnsByRef
+
                 Case BoundKind.Dup
-                    ' For a dupped locals we assume that if the dup 
+                    ' For a dupped local we assume that if the dup 
                     ' is created for byref local it does have home
                     Return DirectCast(expression, BoundDup).IsReference
 
@@ -241,7 +256,7 @@ Namespace Microsoft.CodeAnalysis.VisualBasic.CodeGen
         End Function
 
         ''' <summary>
-        ''' Special HasHome for fields. Fields have homes when they are writeable.
+        ''' Special HasHome for fields. Fields have homes when they are writable.
         ''' </summary>
         Private Function HasHome(fieldAccess As BoundFieldAccess) As Boolean
             Dim field = fieldAccess.FieldSymbol
@@ -256,7 +271,7 @@ Namespace Microsoft.CodeAnalysis.VisualBasic.CodeGen
             End If
 
             ' while readonly fields have home it is not valid to refer to it when not constructing.
-            If field.ContainingType <> Me._method.ContainingType Then
+            If Not TypeSymbol.Equals(field.ContainingType, Me._method.ContainingType, TypeCompareKind.ConsiderEverything) Then
                 Return False
             End If
 
@@ -269,11 +284,12 @@ Namespace Microsoft.CodeAnalysis.VisualBasic.CodeGen
         End Function
 
         ''' <summary>
-        ''' Checks if it is allowed to take a writeable reference to expression according to VB rules.
+        ''' Checks if it is allowed to take a writable reference to expression according to VB rules.
         ''' </summary>
         Private Function AllowedToTakeRef(expression As BoundExpression, addressKind As AddressKind) As Boolean
 
-            If expression.Kind = BoundKind.ConditionalAccessReceiverPlaceholder Then
+            If expression.Kind = BoundKind.ConditionalAccessReceiverPlaceholder OrElse
+               expression.Kind = BoundKind.ComplexConditionalAccessReceiver Then
                 Return addressKind = AddressKind.ReadOnly OrElse addressKind = AddressKind.Immutable
             End If
 
@@ -301,7 +317,7 @@ Namespace Microsoft.CodeAnalysis.VisualBasic.CodeGen
                         Return True
 
                     Case BoundKind.Dup
-                        ' If this is a Dub of ByRef local we can use the address directly 
+                        ' If this is a Dup of ByRef local we can use the address directly 
                         Return DirectCast(expression, BoundDup).IsReference
 
                     Case BoundKind.MeReference, BoundKind.MyClassReference
@@ -316,7 +332,7 @@ Namespace Microsoft.CodeAnalysis.VisualBasic.CodeGen
         End Function
 
         ''' <summary>
-        ''' Checks if it is allowed to take a writeable reference to expression according to VB rules.
+        ''' Checks if it is allowed to take a writable reference to expression according to VB rules.
         ''' </summary>
         Private Function AllowedToTakeRef(boundLocal As BoundLocal, addressKind As AddressKind) As Boolean
             Debug.Assert(addressKind <> CodeGenerator.AddressKind.Immutable, "immutable address is always ok")
@@ -375,7 +391,7 @@ Namespace Microsoft.CodeAnalysis.VisualBasic.CodeGen
                             ' can mutate field since its parent has no home and we will be dealing with a copy
                             Return True
                         Else
-                            ' this field access is readonly due to languge reasons -
+                            ' this field access is readonly due to language reasons -
                             ' most likely topmost receiver is a readonly local or a runtime const
                             Return False
                         End If
@@ -398,7 +414,7 @@ Namespace Microsoft.CodeAnalysis.VisualBasic.CodeGen
                 _builder.EmitOpCode(ILOpCode.Readonly)
             End If
 
-            If (arrayAccess.Indices.Length = 1) Then
+            If DirectCast(arrayAccess.Expression.Type, ArrayTypeSymbol).IsSZArray Then
                 _builder.EmitOpCode(ILOpCode.Ldelema)
                 EmitSymbolToken(elementType, arrayAccess.Syntax)
             Else
@@ -417,7 +433,7 @@ Namespace Microsoft.CodeAnalysis.VisualBasic.CodeGen
             End If
         End Function
 
-        Private Sub EmitStaticFieldAddress(field As FieldSymbol, syntaxNode As VisualBasicSyntaxNode)
+        Private Sub EmitStaticFieldAddress(field As FieldSymbol, syntaxNode As SyntaxNode)
             _builder.EmitOpCode(ILOpCode.Ldsflda)
             EmitSymbolToken(field, syntaxNode)
         End Sub
@@ -437,7 +453,7 @@ Namespace Microsoft.CodeAnalysis.VisualBasic.CodeGen
         ''' receiver with readonly intent. For the value types it is an address of the receiver.
         ''' 
         ''' isAccessConstrained indicates that receiver is a target of a constrained callvirt
-        ''' in such case it is unnecessary to box a receier that is typed to a type parameter
+        ''' in such case it is unnecessary to box a receiver that is typed to a type parameter
         ''' 
         ''' May introduce a temp which it will return. (otherwise returns null)
         ''' </summary>

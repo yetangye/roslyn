@@ -1,6 +1,9 @@
-﻿// Copyright (c) Microsoft.  All Rights Reserved.  Licensed under the Apache License, Version 2.0.  See License.txt in the project root for license information.
+﻿// Licensed to the .NET Foundation under one or more agreements.
+// The .NET Foundation licenses this file to you under the MIT license.
+// See the LICENSE file in the project root for more information.
 
 using System.Collections.Generic;
+using System.Collections.Immutable;
 using Microsoft.CodeAnalysis.Text;
 
 namespace Microsoft.CodeAnalysis
@@ -8,6 +11,10 @@ namespace Microsoft.CodeAnalysis
     /// <summary>
     /// Represents a .NET assembly, consisting of one or more modules.
     /// </summary>
+    /// <remarks>
+    /// This interface is reserved for implementation by its associated APIs. We reserve the right to
+    /// change it in the future.
+    /// </remarks>
     public interface IAssemblySymbol : ISymbol
     {
         /// <summary>
@@ -53,7 +60,7 @@ namespace Microsoft.CodeAnalysis
         /// </summary>
         /// <param name="fullyQualifiedMetadataName">Type name.</param>
         /// <returns>Symbol for the type or null if type cannot be found or is ambiguous. </returns>
-        INamedTypeSymbol GetTypeByMetadataName(string fullyQualifiedMetadataName);
+        INamedTypeSymbol? GetTypeByMetadataName(string fullyQualifiedMetadataName);
 
         /// <summary>
         /// Determines if the assembly might contain extension methods.
@@ -66,6 +73,18 @@ namespace Microsoft.CodeAnalysis
         /// The name should refer to a non-nested type. If type with this name is not forwarded,
         /// null is returned.
         /// </summary>
-        INamedTypeSymbol ResolveForwardedType(string fullyQualifiedMetadataName);
+        INamedTypeSymbol? ResolveForwardedType(string fullyQualifiedMetadataName);
+
+        /// <summary>
+        /// Returns type symbols for top-level (non-nested) types forwarded by this assembly.
+        /// </summary>
+        ImmutableArray<INamedTypeSymbol> GetForwardedTypes();
+
+        /// <summary>
+        /// If this symbol represents a metadata assembly returns the underlying <see cref="AssemblyMetadata"/>.
+        /// 
+        /// Otherwise, this returns <see langword="null"/>.
+        /// </summary>
+        AssemblyMetadata? GetMetadata();
     }
 }

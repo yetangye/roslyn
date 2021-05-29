@@ -1,8 +1,13 @@
-﻿// Copyright (c) Microsoft.  All Rights Reserved.  Licensed under the Apache License, Version 2.0.  See License.txt in the project root for license information.
+﻿// Licensed to the .NET Foundation under one or more agreements.
+// The .NET Foundation licenses this file to you under the MIT license.
+// See the LICENSE file in the project root for more information.
+
+#nullable disable
 
 using System;
 using System.Globalization;
 using System.Linq;
+using System.Threading;
 using Roslyn.Test.Utilities;
 using Xunit;
 
@@ -10,8 +15,6 @@ namespace Microsoft.CodeAnalysis.UnitTests
 {
     public class CommonCommandLineParserTests : TestBase
     {
-        private const int EN_US = 1033;
-
         private void VerifyCommandLineSplitter(string commandLine, string[] expected, bool removeHashComments = false)
         {
             var actual = CommandLineParser.SplitCommandLineIntoArguments(commandLine, removeHashComments).ToArray();
@@ -45,7 +48,7 @@ namespace Microsoft.CodeAnalysis.UnitTests
 
         private void VerifyRuleSetError(string source, Func<string> messageFormatter, bool locSpecific = true, params string[] otherSources)
         {
-            CultureInfo saveUICulture = System.Threading.Thread.CurrentThread.CurrentUICulture;
+            CultureInfo saveUICulture = Thread.CurrentThread.CurrentUICulture;
 
             if (locSpecific)
             {
@@ -56,7 +59,7 @@ namespace Microsoft.CodeAnalysis.UnitTests
                 }
                 else
                 {
-                    System.Threading.Thread.CurrentThread.CurrentUICulture = preferred;
+                    Thread.CurrentThread.CurrentUICulture = preferred;
                 }
             }
 
@@ -73,7 +76,7 @@ namespace Microsoft.CodeAnalysis.UnitTests
             {
                 if (locSpecific)
                 {
-                    System.Threading.Thread.CurrentThread.CurrentUICulture = saveUICulture;
+                    Thread.CurrentThread.CurrentUICulture = saveUICulture;
                 }
             }
 
@@ -85,17 +88,25 @@ namespace Microsoft.CodeAnalysis.UnitTests
         {
             VerifyCommandLineSplitter("", new string[0]);
             VerifyCommandLineSplitter("   \t   ", new string[0]);
-            VerifyCommandLineSplitter("   abc\tdef baz    quuz   ", new string[] { "abc", "def", "baz", "quuz" });
+            VerifyCommandLineSplitter("   abc\tdef baz    quuz   ", new[] { "abc", "def", "baz", "quuz" });
             VerifyCommandLineSplitter(@"  ""abc def""  fi""ddle dee de""e  ""hi there ""dude  he""llo there""  ",
                                         new string[] { @"abc def", @"fi""ddle dee de""e", @"""hi there ""dude", @"he""llo there""" });
             VerifyCommandLineSplitter(@"  ""abc def \"" baz quuz"" ""\""straw berry"" fi\""zz \""buzz fizzbuzz",
-                                        new string[] { @"abc def "" baz quuz", @"""straw berry", @"fi""zz", @"""buzz", @"fizzbuzz" });
+                                        new string[] { @"abc def \"" baz quuz", @"\""straw berry", @"fi\""zz", @"\""buzz", @"fizzbuzz" });
             VerifyCommandLineSplitter(@"  \\""abc def""  \\\""abc def"" ",
-                                        new string[] { @"\""abc def""", @"\""abc", @"def""" });
+                                        new string[] { @"\\""abc def""", @"\\\""abc", @"def"" " });
             VerifyCommandLineSplitter(@"  \\\\""abc def""  \\\\\""abc def"" ",
-                                        new string[] { @"\\""abc def""", @"\\""abc", @"def""" });
+                                        new string[] { @"\\\\""abc def""", @"\\\\\""abc", @"def"" " });
+            VerifyCommandLineSplitter(@"  \\\\""abc def""  \\\\\""abc def"" q a r ",
+                                        new string[] { @"\\\\""abc def""", @"\\\\\""abc", @"def"" q a r " });
             VerifyCommandLineSplitter(@"abc #Comment ignored",
                                         new string[] { @"abc" }, removeHashComments: true);
+            VerifyCommandLineSplitter(@"""goo bar"";""baz"" ""tree""",
+                                        new string[] { @"""goo bar"";""baz""", "tree" });
+            VerifyCommandLineSplitter(@"/reference:""a, b"" ""test""",
+                                        new string[] { @"/reference:""a, b""", "test" });
+            VerifyCommandLineSplitter(@"fo""o ba""r",
+                                        new string[] { @"fo""o ba""r" });
         }
 
         [Fact]
@@ -112,7 +123,7 @@ namespace Microsoft.CodeAnalysis.UnitTests
   </Rules>
 </RuleSet>";
 
-            VerifyRuleSetError(source, () => string.Format(CodeAnalysisResources.RuleSetSchemaViolation, "There is a duplicate key sequence 'CA1012' for the 'UniqueRuleName' key or unique identity constraint."));
+            VerifyRuleSetError(source, () => string.Format(CodeAnalysisResources.RuleSetHasDuplicateRules, "CA1012", "Error", "Warn"));
         }
 
         [Fact]
@@ -290,7 +301,7 @@ namespace Microsoft.CodeAnalysis.UnitTests
   </Rules>
 </RuleSet>
 ";
-            VerifyRuleSetError(source, () => string.Format(CodeAnalysisResources.RuleSetSchemaViolation, "The 'Action' attribute is invalid - The value 'Default' is invalid according to its datatype 'TIncludeAllAction' - The Enumeration constraint failed."));
+            VerifyRuleSetError(source, () => string.Format(CodeAnalysisResources.RuleSetBadAttributeValue, "Action", "Default"));
         }
 
         [Fact]
@@ -304,8 +315,7 @@ namespace Microsoft.CodeAnalysis.UnitTests
   </Rules>
 </RuleSet>
 ";
-            string locMessage = string.Format(CodeAnalysisResources.RuleSetSchemaViolation, "");
-            VerifyRuleSetError(source, () => string.Format(CodeAnalysisResources.RuleSetSchemaViolation, "The required attribute 'Id' is missing."));
+            VerifyRuleSetError(source, () => string.Format(CodeAnalysisResources.RuleSetMissingAttribute, "Rule", "Id"));
         }
 
         [Fact]
@@ -319,7 +329,7 @@ namespace Microsoft.CodeAnalysis.UnitTests
   </Rules>
 </RuleSet>
 ";
-            VerifyRuleSetError(source, () => string.Format(CodeAnalysisResources.RuleSetSchemaViolation, "The required attribute 'Action' is missing."));
+            VerifyRuleSetError(source, () => string.Format(CodeAnalysisResources.RuleSetMissingAttribute, "Rule", "Action"));
         }
 
         [Fact]
@@ -333,7 +343,7 @@ namespace Microsoft.CodeAnalysis.UnitTests
   </Rules>
 </RuleSet>
 ";
-            VerifyRuleSetError(source, () => string.Format(CodeAnalysisResources.RuleSetSchemaViolation, "The required attribute 'AnalyzerId' is missing."));
+            VerifyRuleSetError(source, () => string.Format(CodeAnalysisResources.RuleSetMissingAttribute, "Rules", "AnalyzerId"));
         }
 
         [Fact]
@@ -347,7 +357,7 @@ namespace Microsoft.CodeAnalysis.UnitTests
   </Rules>
 </RuleSet>
 ";
-            VerifyRuleSetError(source, () => string.Format(CodeAnalysisResources.RuleSetSchemaViolation, "The required attribute 'RuleNamespace' is missing."));
+            VerifyRuleSetError(source, () => string.Format(CodeAnalysisResources.RuleSetMissingAttribute, "Rules", "RuleNamespace"));
         }
 
         [Fact]
@@ -362,7 +372,7 @@ namespace Microsoft.CodeAnalysis.UnitTests
 </RuleSet>
 ";
 
-            VerifyRuleSetError(source, () => string.Format(CodeAnalysisResources.RuleSetSchemaViolation, "The required attribute 'ToolsVersion' is missing."));
+            VerifyRuleSetError(source, () => string.Format(CodeAnalysisResources.RuleSetMissingAttribute, "RuleSet", "ToolsVersion"));
         }
 
         [Fact]
@@ -376,7 +386,7 @@ namespace Microsoft.CodeAnalysis.UnitTests
   </Rules>
 </RuleSet>
 ";
-            VerifyRuleSetError(source, () => string.Format(CodeAnalysisResources.RuleSetSchemaViolation, "The required attribute 'Name' is missing."));
+            VerifyRuleSetError(source, () => string.Format(CodeAnalysisResources.RuleSetMissingAttribute, "RuleSet", "Name"));
         }
 
         [Fact]
@@ -396,15 +406,15 @@ namespace Microsoft.CodeAnalysis.UnitTests
 ";
             var ruleSet = ParseRuleSet(source);
             Assert.Contains("CA1012", ruleSet.SpecificDiagnosticOptions.Keys);
-            Assert.Equal(ruleSet.SpecificDiagnosticOptions["CA1012"], ReportDiagnostic.Error);
+            Assert.Equal(ReportDiagnostic.Error, ruleSet.SpecificDiagnosticOptions["CA1012"]);
             Assert.Contains("CA1013", ruleSet.SpecificDiagnosticOptions.Keys);
-            Assert.Equal(ruleSet.SpecificDiagnosticOptions["CA1013"], ReportDiagnostic.Warn);
+            Assert.Equal(ReportDiagnostic.Warn, ruleSet.SpecificDiagnosticOptions["CA1013"]);
             Assert.Contains("CA1014", ruleSet.SpecificDiagnosticOptions.Keys);
-            Assert.Equal(ruleSet.SpecificDiagnosticOptions["CA1014"], ReportDiagnostic.Suppress);
+            Assert.Equal(ReportDiagnostic.Suppress, ruleSet.SpecificDiagnosticOptions["CA1014"]);
             Assert.Contains("CA1015", ruleSet.SpecificDiagnosticOptions.Keys);
-            Assert.Equal(ruleSet.SpecificDiagnosticOptions["CA1015"], ReportDiagnostic.Info);
+            Assert.Equal(ReportDiagnostic.Info, ruleSet.SpecificDiagnosticOptions["CA1015"]);
             Assert.Contains("CA1016", ruleSet.SpecificDiagnosticOptions.Keys);
-            Assert.Equal(ruleSet.SpecificDiagnosticOptions["CA1016"], ReportDiagnostic.Hidden);
+            Assert.Equal(ReportDiagnostic.Hidden, ruleSet.SpecificDiagnosticOptions["CA1016"]);
         }
 
         [Fact]
@@ -421,7 +431,7 @@ namespace Microsoft.CodeAnalysis.UnitTests
 </RuleSet>
 ";
 
-            VerifyRuleSetError(source, () => string.Format(CodeAnalysisResources.RuleSetSchemaViolation, "The 'Action' attribute is invalid - The value 'Default' is invalid according to its datatype 'TRuleAction' - The Enumeration constraint failed."));
+            VerifyRuleSetError(source, () => string.Format(CodeAnalysisResources.RuleSetBadAttributeValue, "Action", "Default"));
         }
 
         [Fact]
@@ -429,7 +439,7 @@ namespace Microsoft.CodeAnalysis.UnitTests
         {
             string source = @"<?xml version=""1.0"" encoding=""utf-8""?>
 <RuleSet Name=""Ruleset1"" Description=""Test"" ToolsVersion=""12.0"" >
-  <Include Path=""foo.ruleset"" Action=""Default"" />
+  <Include Path=""goo.ruleset"" Action=""Default"" />
   <Rules AnalyzerId=""Microsoft.Analyzers.ManagedCodeAnalysis"" RuleNamespace=""Microsoft.Rules.Managed"">
     <Rule Id=""CA1013"" Action=""Warning"" />
   </Rules>
@@ -437,23 +447,33 @@ namespace Microsoft.CodeAnalysis.UnitTests
 ";
             var ruleSet = ParseRuleSet(source);
             Assert.True(ruleSet.Includes.Count() == 1);
-            Assert.Equal(ruleSet.Includes.First().Action, ReportDiagnostic.Default);
-            Assert.Equal(ruleSet.Includes.First().IncludePath, "foo.ruleset");
+            Assert.Equal(ReportDiagnostic.Default, ruleSet.Includes.First().Action);
+            Assert.Equal("goo.ruleset", ruleSet.Includes.First().IncludePath);
         }
 
-        [WorkItem(156)]
-        [Fact(Skip = "156")]
+#pragma warning disable CA2243 // Attribute string literals should parse correctly
+        [WorkItem(1184500, "DevDiv 1184500")]
+#pragma warning restore CA2243 // Attribute string literals should parse correctly
+        [Fact]
         public void TestRuleSetInclude1()
         {
             string source = @"<?xml version=""1.0"" encoding=""utf-8""?>
 <RuleSet Name=""Ruleset1"" Description=""Test"" ToolsVersion=""12.0"" >
-  <Include Path=""foo.ruleset"" Action=""Default"" />
+  <Include Path=""goo.ruleset"" Action=""Default"" />
   <Rules AnalyzerId=""Microsoft.Analyzers.ManagedCodeAnalysis"" RuleNamespace=""Microsoft.Rules.Managed"">
     <Rule Id=""CA1013"" Action=""Warning"" />
   </Rules>
 </RuleSet>
 ";
-            VerifyRuleSetError(source, () => string.Format(CodeAnalysisResources.InvalidRuleSetInclude, "foo.ruleset", string.Format(CodeAnalysisResources.FailedToResolveRuleSetName, "foo.ruleset")), otherSources: new string[] { "" });
+            var dir = Temp.CreateDirectory();
+            var file = dir.CreateFile("a.ruleset");
+            file.WriteAllText(source);
+
+            var ruleSet = RuleSet.LoadEffectiveRuleSetFromFile(file.Path);
+
+            Assert.Equal(ReportDiagnostic.Default, ruleSet.GeneralDiagnosticOption);
+            Assert.Contains("CA1013", ruleSet.SpecificDiagnosticOptions.Keys);
+            Assert.Equal(ReportDiagnostic.Warn, ruleSet.SpecificDiagnosticOptions["CA1013"]);
         }
 
         [Fact]
@@ -969,7 +989,7 @@ namespace Microsoft.CodeAnalysis.UnitTests
                 }
                 catch (InvalidRuleSetException e)
                 {
-                    Assert.Contains(string.Format(CodeAnalysisResources.InvalidRuleSetInclude, newFile.Path, string.Format(CodeAnalysisResources.RuleSetSchemaViolation, "")), e.Message);
+                    Assert.Contains(string.Format(CodeAnalysisResources.InvalidRuleSetInclude, newFile.Path, string.Format(CodeAnalysisResources.RuleSetBadAttributeValue, "Action", "Default")), e.Message, StringComparison.Ordinal);
                 }
             }
         }
@@ -1084,6 +1104,142 @@ namespace Microsoft.CodeAnalysis.UnitTests
             Assert.Equal(expected: file.Path, actual: includePaths[0]);
             Assert.Equal(expected: include1.Path, actual: includePaths[1]);
             Assert.Equal(expected: include2.Path, actual: includePaths[2]);
+        }
+
+        [Fact]
+        public void ParseSeparatedStrings_ExcludeSeparatorChar()
+        {
+            Assert.Equal(
+                CommandLineParser.ParseSeparatedStrings(@"a,b", new[] { ',' }, StringSplitOptions.RemoveEmptyEntries),
+                new[] { "a", "b" });
+
+            Assert.Equal(
+                CommandLineParser.ParseSeparatedStrings(@"a,,b", new[] { ',' }, StringSplitOptions.RemoveEmptyEntries),
+                new[] { "a", "b" });
+
+            Assert.Equal(
+                CommandLineParser.ParseSeparatedStrings(@"a,,b", new[] { ',' }, StringSplitOptions.None),
+                new[] { "a", "", "b" });
+        }
+
+        /// <summary>
+        /// This function considers quotes when splitting out the strings.  Ensure they are properly
+        /// preserved in the final string.
+        /// </summary>
+        [Fact]
+        public void ParseSeparatedStrings_IncludeQuotes()
+        {
+            Assert.Equal(
+                CommandLineParser.ParseSeparatedStrings(@"""a"",b", new[] { ',' }, StringSplitOptions.RemoveEmptyEntries),
+                new[] { @"""a""", "b" });
+
+            Assert.Equal(
+                CommandLineParser.ParseSeparatedStrings(@"""a,b""", new[] { ',' }, StringSplitOptions.RemoveEmptyEntries),
+                new[] { @"""a,b""" });
+
+            Assert.Equal(
+                CommandLineParser.ParseSeparatedStrings(@"""a"",""b", new[] { ',' }, StringSplitOptions.RemoveEmptyEntries),
+                new[] { @"""a""", @"""b" });
+        }
+
+        /// <summary>
+        /// This function should always preserve the slashes as they exist in the original command
+        /// line.  The only serve to decide whether quotes should count as grouping constructors
+        /// or not. 
+        /// </summary>
+        [Fact]
+        public void SplitCommandLineIntoArguments_Slashes()
+        {
+            Assert.Equal(
+                new[] { @"\\test" },
+                CommandLineParser.SplitCommandLineIntoArguments(@"\\test", removeHashComments: false));
+
+            // Even though there are an even number of slashes here that doesn't factor into the 
+            // output.  It just means the quote is a grouping construct.
+            Assert.Equal(
+                new[] { @"\\""test" },
+                CommandLineParser.SplitCommandLineIntoArguments(@"\\""test", removeHashComments: false));
+
+            Assert.Equal(
+                new[] { @"\\\""test" },
+                CommandLineParser.SplitCommandLineIntoArguments(@"\\\""test", removeHashComments: false));
+
+            Assert.Equal(
+                new[] { @"\\\test" },
+                CommandLineParser.SplitCommandLineIntoArguments(@"\\\test", removeHashComments: false));
+
+            Assert.Equal(
+                new[] { @"\\\\\test" },
+                CommandLineParser.SplitCommandLineIntoArguments(@"\\\\\test", removeHashComments: false));
+        }
+
+        /// <summary>
+        /// Quotes are used as grouping constructs unless they are escaped by an odd number of slashes.
+        /// </summary>
+        [Fact]
+        public void SplitCommandLineIntoArguments_Quotes()
+        {
+            Assert.Equal(
+                new[] { @"a", @"b" },
+                CommandLineParser.SplitCommandLineIntoArguments(@"a b", removeHashComments: false));
+
+            Assert.Equal(
+                new[] { @"a b" },
+                CommandLineParser.SplitCommandLineIntoArguments(@"""a b""", removeHashComments: false));
+
+            Assert.Equal(
+                new[] { @"a ", @"b""" },
+                CommandLineParser.SplitCommandLineIntoArguments(@"""a "" b""", removeHashComments: false));
+
+            // In this case the inner quote is escaped so it doesn't count as a real quote.  Strings which have
+            // outer quotes with no real inner quotes have the outer quotes removed. 
+            Assert.Equal(
+                new[] { @"a \"" b" },
+                CommandLineParser.SplitCommandLineIntoArguments(@"""a \"" b""", removeHashComments: false));
+
+
+            Assert.Equal(
+                new[] { @"\a", @"b" },
+                CommandLineParser.SplitCommandLineIntoArguments(@"\a b", removeHashComments: false));
+
+            // Escaped quote is not a grouping construct
+            Assert.Equal(
+                new[] { @"\""a", @"b\""" },
+                CommandLineParser.SplitCommandLineIntoArguments(@"\""a b\""", removeHashComments: false));
+
+            // Unescaped quote is a grouping construct. 
+            Assert.Equal(
+                new[] { @"\\""a b\\""" },
+                CommandLineParser.SplitCommandLineIntoArguments(@"\\""a b\\""", removeHashComments: false));
+
+            Assert.Equal(
+                new[] { @"""a""m""b""" },
+                CommandLineParser.SplitCommandLineIntoArguments(@"""a""m""b""", removeHashComments: false));
+        }
+
+        /// <summary>
+        /// Test all of the cases around slashes in the RemoveQuotes function.  
+        /// </summary>
+        /// <remarks>
+        /// It's important to remember this is testing slash behavior on the strings as they 
+        /// are passed to RemoveQuotes, not as they are passed to the command line.  Command 
+        /// line arguments have already gone through an initial round of processing.  So a
+        /// string that appears here as "\\test.cs" actually came through the command line
+        /// as \"\\test.cs\". 
+        /// </remarks>
+        [Fact]
+        public void RemoveQuotes()
+        {
+            Assert.Equal(@"\\test.cs", CommandLineParser.RemoveQuotesAndSlashes(@"\\test.cs"));
+            Assert.Equal(@"\\test.cs", CommandLineParser.RemoveQuotesAndSlashes(@"""\\test.cs"""));
+            Assert.Equal(@"\\\test.cs", CommandLineParser.RemoveQuotesAndSlashes(@"\\\test.cs"));
+            Assert.Equal(@"\\\\test.cs", CommandLineParser.RemoveQuotesAndSlashes(@"\\\\test.cs"));
+            Assert.Equal(@"\\test\a\b.cs", CommandLineParser.RemoveQuotesAndSlashes(@"\\test\a\b.cs"));
+            Assert.Equal(@"\\\\test\\a\\b.cs", CommandLineParser.RemoveQuotesAndSlashes(@"\\\\test\\a\\b.cs"));
+            Assert.Equal(@"a""b.cs", CommandLineParser.RemoveQuotesAndSlashes(@"a\""b.cs"));
+            Assert.Equal(@"a"" mid ""b.cs", CommandLineParser.RemoveQuotesAndSlashes(@"a\"" mid \""b.cs"));
+            Assert.Equal(@"a mid b.cs", CommandLineParser.RemoveQuotesAndSlashes(@"a"" mid ""b.cs"));
+            Assert.Equal(@"a.cs", CommandLineParser.RemoveQuotesAndSlashes(@"""a.cs"""));
         }
     }
 }

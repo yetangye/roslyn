@@ -1,18 +1,12 @@
-﻿' Copyright (c) Microsoft.  All Rights Reserved.  Licensed under the Apache License, Version 2.0.  See License.txt in the project root for license information.
+﻿' Licensed to the .NET Foundation under one or more agreements.
+' The .NET Foundation licenses this file to you under the MIT license.
+' See the LICENSE file in the project root for more information.
 
-Imports System.Collections.Generic
 Imports System.Collections.Immutable
-Imports System.Collections.ObjectModel
-Imports System.Linq
 Imports System.Runtime.InteropServices
-Imports System.Text
-Imports System.Threading
-Imports Microsoft.CodeAnalysis.Text
+Imports Microsoft.CodeAnalysis.PooledObjects
 Imports Microsoft.CodeAnalysis.VisualBasic
-Imports Microsoft.CodeAnalysis.VisualBasic.Symbols
 Imports Microsoft.CodeAnalysis.VisualBasic.Syntax
-Imports TypeKind = Microsoft.CodeAnalysis.TypeKind
-Imports Microsoft.CodeAnalysis.Collections
 
 Namespace Microsoft.CodeAnalysis.VisualBasic.Symbols
     Friend NotInheritable Class DeclarationTreeBuilder
@@ -23,7 +17,6 @@ Namespace Microsoft.CodeAnalysis.VisualBasic.Symbols
         Private ReadOnly _scriptClassName As String
         Private ReadOnly _isSubmission As Boolean
         Private ReadOnly _syntaxTree As SyntaxTree
-        Private _diagnostics As List(Of Diagnostic)
 
         Public Shared Function ForTree(tree As SyntaxTree, rootNamespace As ImmutableArray(Of String), scriptClassName As String, isSubmission As Boolean) As RootSingleNamespaceDeclaration
             Dim builder = New DeclarationTreeBuilder(tree, rootNamespace, scriptClassName, isSubmission)
@@ -99,23 +92,21 @@ Namespace Microsoft.CodeAnalysis.VisualBasic.Symbols
             Return children
         End Function
 
-        Private Function GetReferenceDirectives(compilationUnit As CompilationUnitSyntax) As ImmutableArray(Of ReferenceDirective)
-            Dim directiveNodes = compilationUnit.GetReferenceDirectives(Function(d) Not d.File.ContainsDiagnostics AndAlso Not String.IsNullOrEmpty(d.File.ValueText))
-
+        Private Shared Function GetReferenceDirectives(compilationUnit As CompilationUnitSyntax) As ImmutableArray(Of ReferenceDirective)
+            Dim directiveNodes = compilationUnit.GetReferenceDirectives(
+                Function(d) Not d.File.ContainsDiagnostics AndAlso Not String.IsNullOrEmpty(d.File.ValueText))
             If directiveNodes.Count = 0 Then
                 Return ImmutableArray(Of ReferenceDirective).Empty
             End If
 
-            Dim directives = New ReferenceDirective(directiveNodes.Count - 1) {}
-
-            For i = 0 To directives.Length - 1
-                directives(i) = New ReferenceDirective(directiveNodes(i).File.ValueText, directiveNodes(i).GetLocation())
+            Dim directives = ArrayBuilder(Of ReferenceDirective).GetInstance(directiveNodes.Count)
+            For Each directiveNode In directiveNodes
+                directives.Add(New ReferenceDirective(directiveNode.File.ValueText, New SourceLocation(directiveNode)))
             Next
-
-            Return directives.AsImmutableOrNull()
+            Return directives.ToImmutableAndFree()
         End Function
 
-        Private Function CreateImplicitClass(parent As VisualBasicSyntaxNode, memberNames As String(), children As ImmutableArray(Of SingleTypeDeclaration), declFlags As SingleTypeDeclaration.TypeDeclarationFlags) As SingleNamespaceOrTypeDeclaration
+        Private Function CreateImplicitClass(parent As VisualBasicSyntaxNode, memberNames As ImmutableHashSet(Of String), children As ImmutableArray(Of SingleTypeDeclaration), declFlags As SingleTypeDeclaration.TypeDeclarationFlags) As SingleNamespaceOrTypeDeclaration
             Dim parentReference = _syntaxTree.GetReference(parent)
 
             Return New SingleTypeDeclaration(
@@ -130,7 +121,7 @@ Namespace Microsoft.CodeAnalysis.VisualBasic.Symbols
                 children:=children)
         End Function
 
-        Private Function CreateScriptClass(parent As VisualBasicSyntaxNode, children As ImmutableArray(Of SingleTypeDeclaration), memberNames As String(), declFlags As SingleTypeDeclaration.TypeDeclarationFlags) As SingleNamespaceOrTypeDeclaration
+        Private Function CreateScriptClass(parent As VisualBasicSyntaxNode, children As ImmutableArray(Of SingleTypeDeclaration), memberNames As ImmutableHashSet(Of String), declFlags As SingleTypeDeclaration.TypeDeclarationFlags) As SingleNamespaceOrTypeDeclaration
             Debug.Assert(parent.Kind = SyntaxKind.CompilationUnit AndAlso _syntaxTree.Options.Kind <> SourceCodeKind.Regular)
 
             ' script class is represented by the parent node:
@@ -169,8 +160,8 @@ Namespace Microsoft.CodeAnalysis.VisualBasic.Symbols
 
             Dim syntaxRef = _syntaxTree.GetReference(node)
             Dim implicitClass As SingleNamespaceOrTypeDeclaration = Nothing
-            Dim diagnostics As ImmutableArray(Of Diagnostic)
 
+            Dim referenceDirectives As ImmutableArray(Of ReferenceDirective)
             If _syntaxTree.Options.Kind <> SourceCodeKind.Regular Then
                 Dim childrenBuilder = ArrayBuilder(Of SingleNamespaceOrTypeDeclaration).GetInstance()
                 Dim scriptChildren = ArrayBuilder(Of SingleTypeDeclaration).GetInstance()
@@ -194,14 +185,10 @@ Namespace Microsoft.CodeAnalysis.VisualBasic.Symbols
 
                 implicitClass = CreateScriptClass(node, scriptChildren.ToImmutableAndFree(), memberNames, declFlags)
                 children = childrenBuilder.ToImmutableAndFree()
-                diagnostics = Global.Microsoft.CodeAnalysis.ImmutableArrayExtensions.AsImmutableOrEmpty(Me._diagnostics)
+                referenceDirectives = GetReferenceDirectives(node)
             Else
                 children = VisitNamespaceChildren(node, node.Members, implicitClass).ToImmutableAndFree()
-
-                ' no diagnostics should be reported from a non-script tree:
-                Debug.Assert(_diagnostics Is Nothing)
-
-                diagnostics = GetMisplacedReferenceDirectivesDiagnostics(node)
+                referenceDirectives = ImmutableArray(Of ReferenceDirective).Empty
             End If
 
             ' Find children within NamespaceGlobal separately
@@ -213,8 +200,7 @@ Namespace Microsoft.CodeAnalysis.VisualBasic.Symbols
                     hasImports:=True,
                     treeNode:=_syntaxTree.GetReference(node),
                     children:=globalChildren.Concat(nonGlobal),
-                    referenceDirectives:=ImmutableArray(Of ReferenceDirective).Empty,
-                    diagnostics:=diagnostics,
+                    referenceDirectives:=referenceDirectives,
                     hasAssemblyAttributes:=node.Attributes.Any)
             Else
                 ' Project-level root namespace. All children without explicit global are children
@@ -229,8 +215,7 @@ Namespace Microsoft.CodeAnalysis.VisualBasic.Symbols
                     hasImports:=True,
                     treeNode:=_syntaxTree.GetReference(node),
                     children:=newChildren,
-                    referenceDirectives:=ImmutableArray(Of ReferenceDirective).Empty,
-                    diagnostics:=diagnostics,
+                    referenceDirectives:=referenceDirectives,
                     hasAssemblyAttributes:=node.Attributes.Any)
             End If
         End Function
@@ -264,19 +249,6 @@ Namespace Microsoft.CodeAnalysis.VisualBasic.Symbols
             nonGlobal = nonGlobalBuilder.ToImmutableAndFree()
         End Sub
 
-        Private Function GetMisplacedReferenceDirectivesDiagnostics(compilation As CompilationUnitSyntax) As ImmutableArray(Of Diagnostic)
-            ' report errors for the first #r directive - they are not allowed in regular code:
-            Dim directives = compilation.GetReferenceDirectives()
-            If directives.Count = 0 Then
-                Return ImmutableArray(Of Diagnostic).Empty
-            End If
-
-            Return ImmutableArray.Create(Of Diagnostic)(
-                New VBDiagnostic(
-                    New DiagnosticInfo(MessageProvider.Instance, DirectCast(ERRID.ERR_ReferenceDirectiveOnlyAllowedInScripts, Integer)),
-                    directives(0).GetLocation()))
-        End Function
-
         Private Function UnescapeIdentifier(identifier As String) As String
             If identifier(0) = "[" Then
                 Debug.Assert(identifier(identifier.Length - 1) = "]")
@@ -294,8 +266,8 @@ Namespace Microsoft.CodeAnalysis.VisualBasic.Symbols
             Dim ns As SingleNamespaceDeclaration = Nothing
 
             ' The compilation node will count as a location for the innermost project level
-            ' namespace.  i.e. if the project level namspace is "Foo.Bar", then each compilation unit
-            ' is a location for "Foo.Bar".  "Foo" still has no syntax location though. 
+            ' namespace.  i.e. if the project level namespace is "Goo.Bar", then each compilation unit
+            ' is a location for "Goo.Bar".  "Goo" still has no syntax location though. 
             '
             ' By doing this we ensure that top level type and namespace declarations will have
             ' symbols whose parent namespace symbol points to the parent container CompilationUnit.
@@ -332,15 +304,6 @@ Namespace Microsoft.CodeAnalysis.VisualBasic.Symbols
             Dim nsDeclSyntax As NamespaceStatementSyntax = nsBlockSyntax.NamespaceStatement
             Dim children = VisitNamespaceChildren(nsBlockSyntax, nsBlockSyntax.Members)
             Dim name As NameSyntax = nsDeclSyntax.Name
-
-            If _syntaxTree.Options.Kind = SourceCodeKind.Interactive OrElse _syntaxTree.Options.Kind = SourceCodeKind.Script Then
-                If _diagnostics Is Nothing Then
-                    _diagnostics = New List(Of Diagnostic)()
-                End If
-
-                _diagnostics.Add(New VBDiagnostic(New DiagnosticInfo(MessageProvider.Instance, ERRID.ERR_NamespaceNotAllowedInScript),
-                                                nsBlockSyntax.NamespaceStatement.NamespaceKeyword.GetLocation()))
-            End If
 
             While TypeOf name Is QualifiedNameSyntax
                 Dim dotted = DirectCast(name, QualifiedNameSyntax)
@@ -556,7 +519,7 @@ Namespace Microsoft.CodeAnalysis.VisualBasic.Symbols
                 declFlags = declFlags Or SingleTypeDeclaration.TypeDeclarationFlags.HasBaseDeclarations
             End If
 
-            Dim memberNames As String() = GetMemberNames(enumBlockSyntax, declFlags)
+            Dim memberNames = GetMemberNames(enumBlockSyntax, declFlags)
 
             Return New SingleTypeDeclaration(
                 kind:=GetKind(declarationSyntax.Kind),
@@ -586,12 +549,28 @@ Namespace Microsoft.CodeAnalysis.VisualBasic.Symbols
             Return children.ToImmutableAndFree()
         End Function
 
-        Private Function GetNonTypeMemberNames(members As SyntaxList(Of StatementSyntax), ByRef declFlags As SingleTypeDeclaration.TypeDeclarationFlags) As String()
+        ''' <summary>
+        ''' Pool of builders used to create our member name sets.  Importantly, these use 
+        ''' <see cref="CaseInsensitiveComparison.Comparer"/> so that name lookup happens in an
+        ''' appropriate manner for VB identifiers. This allows fast member name O(log(n)) even if
+        ''' the casing doesn't match.
+        ''' </summary>
+        Private Shared ReadOnly s_memberNameBuilderPool As New ObjectPool(Of ImmutableHashSet(Of String).Builder)(
+            Function() ImmutableHashSet.CreateBuilder(IdentifierComparison.Comparer))
+
+        Private Shared Function ToImmutableAndFree(builder As ImmutableHashSet(Of String).Builder) As ImmutableHashSet(Of String)
+            Dim result = builder.ToImmutable()
+            builder.Clear()
+            s_memberNameBuilderPool.Free(builder)
+            Return result
+        End Function
+
+        Private Function GetNonTypeMemberNames(members As SyntaxList(Of StatementSyntax), ByRef declFlags As SingleTypeDeclaration.TypeDeclarationFlags) As ImmutableHashSet(Of String)
             Dim anyMethodHadExtensionSyntax = False
             Dim anyMemberHasAttributes = False
             Dim anyNonTypeMembers = False
 
-            Dim results = PooledHashSet(Of String).GetInstance()
+            Dim results = s_memberNameBuilderPool.Allocate()
 
             For Each statement In members
                 Select Case statement.Kind
@@ -676,20 +655,17 @@ Namespace Microsoft.CodeAnalysis.VisualBasic.Symbols
                 declFlags = declFlags Or SingleTypeDeclaration.TypeDeclarationFlags.HasAnyNontypeMembers
             End If
 
-            Dim result = results.ToArray()
-            results.Free()
-
-            Return result
+            Return ToImmutableAndFree(results)
         End Function
 
-        Private Function GetMemberNames(enumBlockSyntax As EnumBlockSyntax, ByRef declFlags As SingleTypeDeclaration.TypeDeclarationFlags) As String()
+        Private Function GetMemberNames(enumBlockSyntax As EnumBlockSyntax, ByRef declFlags As SingleTypeDeclaration.TypeDeclarationFlags) As ImmutableHashSet(Of String)
             Dim members = enumBlockSyntax.Members
 
             If (members.Count <> 0) Then
                 declFlags = declFlags Or SingleTypeDeclaration.TypeDeclarationFlags.HasAnyNontypeMembers
             End If
 
-            Dim results As New List(Of String)()
+            Dim results = s_memberNameBuilderPool.Allocate()
             Dim anyMemberHasAttributes As Boolean = False
 
             For Each member In enumBlockSyntax.Members
@@ -708,10 +684,10 @@ Namespace Microsoft.CodeAnalysis.VisualBasic.Symbols
                 declFlags = declFlags Or SingleTypeDeclaration.TypeDeclarationFlags.AnyMemberHasAttributes
             End If
 
-            Return results.ToArray
+            Return ToImmutableAndFree(results)
         End Function
 
-        Private Sub AddMemberNames(methodDecl As MethodBaseSyntax, results As PooledHashSet(Of String))
+        Private Sub AddMemberNames(methodDecl As MethodBaseSyntax, results As ImmutableHashSet(Of String).Builder)
             Dim name = SourceMethodSymbol.GetMemberNameFromSyntax(methodDecl)
             results.Add(name)
         End Sub
@@ -731,7 +707,7 @@ Namespace Microsoft.CodeAnalysis.VisualBasic.Symbols
                 declFlags:=declFlags,
                 syntaxReference:=_syntaxTree.GetReference(node),
                 nameLocation:=_syntaxTree.GetLocation(node.Identifier.Span),
-                memberNames:=SpecializedCollections.EmptySet(Of String),
+                memberNames:=ImmutableHashSet(Of String).Empty,
                 children:=ImmutableArray(Of SingleTypeDeclaration).Empty)
         End Function
 
@@ -755,7 +731,7 @@ Namespace Microsoft.CodeAnalysis.VisualBasic.Symbols
                 declFlags:=declFlags,
                 syntaxReference:=_syntaxTree.GetReference(node),
                 nameLocation:=_syntaxTree.GetLocation(node.Identifier.Span),
-                memberNames:=SpecializedCollections.EmptySet(Of String),
+                memberNames:=ImmutableHashSet(Of String).Empty,
                 children:=ImmutableArray(Of SingleTypeDeclaration).Empty)
         End Function
 
@@ -821,7 +797,11 @@ Namespace Microsoft.CodeAnalysis.VisualBasic.Symbols
                     Case SyntaxKind.IteratorKeyword : bit = DeclarationModifiers.Iterator
 
                     Case Else
-                        Throw ExceptionUtilities.UnexpectedValue(modifier.Kind)
+                        ' It is possible to run into other tokens here, but only in error conditions.
+                        ' We are going to ignore them here.
+                        If Not modifier.GetDiagnostics().Any(Function(d) d.Severity = DiagnosticSeverity.Error) Then
+                            Throw ExceptionUtilities.UnexpectedValue(modifier.Kind)
+                        End If
                 End Select
 
                 result = result Or bit

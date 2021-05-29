@@ -1,15 +1,24 @@
-' Copyright (c) Microsoft.  All Rights Reserved.  Licensed under the Apache License, Version 2.0.  See License.txt in the project root for license information.
+﻿' Licensed to the .NET Foundation under one or more agreements.
+' The .NET Foundation licenses this file to you under the MIT license.
+' See the LICENSE file in the project root for more information.
 
+Imports Microsoft.CodeAnalysis.Remote.Testing
 Imports Microsoft.CodeAnalysis.Rename.ConflictEngine
 
 Namespace Microsoft.CodeAnalysis.Editor.UnitTests.Rename.VisualBasic
+    <[UseExportProvider]>
     Public Class ImplicitReferenceConflictTests
+        Private ReadOnly _outputHelper As Abstractions.ITestOutputHelper
 
-        <Fact>
-        <WorkItem(528966)>
-        <Trait(Traits.Feature, Traits.Features.Rename)>
-        Public Sub RenameMoveNextCausesConflictInForEach()
-            Using result = RenameEngineResult.Create(
+        Public Sub New(outputHelper As Abstractions.ITestOutputHelper)
+            _outputHelper = outputHelper
+        End Sub
+
+        <Theory>
+        <WorkItem(528966, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/528966")>
+        <CombinatorialData, Trait(Traits.Feature, Traits.Features.Rename)>
+        Public Sub RenameMoveNextCausesConflictInForEach(host As RenameTestHost)
+            Using result = RenameEngineResult.Create(_outputHelper,
                 <Workspace>
                     <Project Language="Visual Basic" CommonReferences="true">
                         <Document>
@@ -36,18 +45,17 @@ Class C
 End Class
                         </Document>
                     </Project>
-                </Workspace>, renameTo:="MovNext")
-
+                </Workspace>, host:=host, renameTo:="MovNext")
 
                 result.AssertLabeledSpansAre("foreachconflict", type:=RelatedLocationType.UnresolvedConflict)
             End Using
         End Sub
 
-        <Fact>
-        <WorkItem(528966)>
-        <Trait(Traits.Feature, Traits.Features.Rename)>
-        Public Sub RenameMoveNextToChangeCasingDoesntCauseConflictInForEach()
-            Using result = RenameEngineResult.Create(
+        <Theory>
+        <WorkItem(528966, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/528966")>
+        <CombinatorialData, Trait(Traits.Feature, Traits.Features.Rename)>
+        Public Sub RenameMoveNextToChangeCasingDoesntCauseConflictInForEach(host As RenameTestHost)
+            Using result = RenameEngineResult.Create(_outputHelper,
                 <Workspace>
                     <Project Language="Visual Basic" CommonReferences="true">
                         <Document>
@@ -74,19 +82,17 @@ Class C
 End Class
                         </Document>
                     </Project>
-                </Workspace>, renameTo:="MOVENEXT")
-
+                </Workspace>, host:=host, renameTo:="MOVENEXT")
 
             End Using
         End Sub
 
-        <Fact>
-        <WorkItem(528966)>
-        <Trait(Traits.Feature, Traits.Features.Rename)>
-        Public Sub RenameMoveNextToChangeCasingInCSDoesntCauseConflictInForEach()
-            Using result = RenameEngineResult.Create(
+        <Theory>
+        <WorkItem(528966, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/528966")>
+        <CombinatorialData, Trait(Traits.Feature, Traits.Features.Rename)>
+        Public Sub RenameMoveNextToChangeCasingInCSDoesntCauseConflictInForEach(host As RenameTestHost)
+            Using result = RenameEngineResult.Create(_outputHelper,
                 <Workspace>
-
                     <Project Language="C#" AssemblyName="Project1" CommonReferences="true">
                         <Document>
 public class B
@@ -108,7 +114,6 @@ public class C
 
                         </Document>
                     </Project>
-
                     <Project Language="Visual Basic" AssemblyName="Project2" CommonReferences="true">
                         <ProjectReference>Project1</ProjectReference>
                         <Document>
@@ -124,20 +129,17 @@ Class X
 End Class
                         </Document>
                     </Project>
-
-                </Workspace>, renameTo:="MOVENEXT")
-
+                </Workspace>, host:=host, renameTo:="MOVENEXT")
 
             End Using
         End Sub
 
-        <Fact>
-        <WorkItem(528966)>
-        <Trait(Traits.Feature, Traits.Features.Rename)>
-        Public Sub RenameMoveNextInCSCauseConflictInForEach()
-            Using result = RenameEngineResult.Create(
+        <Theory>
+        <WorkItem(528966, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/528966")>
+        <CombinatorialData, Trait(Traits.Feature, Traits.Features.Rename)>
+        Public Sub RenameMoveNextInCSCauseConflictInForEach(host As RenameTestHost)
+            Using result = RenameEngineResult.Create(_outputHelper,
                 <Workspace>
-
                     <Project Language="C#" AssemblyName="Project1" CommonReferences="true">
                         <Document>
 public class B
@@ -159,7 +161,6 @@ public class C
 
                         </Document>
                     </Project>
-
                     <Project Language="Visual Basic" AssemblyName="Project2" CommonReferences="true">
                         <ProjectReference>Project1</ProjectReference>
                         <Document>
@@ -175,9 +176,7 @@ Class X
 End Class
                         </Document>
                     </Project>
-
-                </Workspace>, renameTo:="Move")
-
+                </Workspace>, host:=host, renameTo:="Move")
 
                 result.AssertLabeledSpansAre("foreachconflict", type:=RelatedLocationType.UnresolvedConflict)
             End Using

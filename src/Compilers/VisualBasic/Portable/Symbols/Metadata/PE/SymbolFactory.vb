@@ -1,4 +1,6 @@
-﻿' Copyright (c) Microsoft.  All Rights Reserved.  Licensed under the Apache License, Version 2.0.  See License.txt in the project root for license information.
+﻿' Licensed to the .NET Foundation under one or more agreements.
+' The .NET Foundation licenses this file to you under the MIT license.
+' See the LICENSE file in the project root for more information.
 
 Imports System.Collections.Immutable
 Imports System.Diagnostics
@@ -10,25 +12,22 @@ Namespace Microsoft.CodeAnalysis.VisualBasic.Symbols.Metadata.PE
 
         Friend Shared ReadOnly Instance As New SymbolFactory()
 
-        Friend Overrides Function GetArrayTypeSymbol(moduleSymbol As PEModuleSymbol, rank As Integer, elementType As TypeSymbol) As TypeSymbol
+        Friend Overrides Function GetMDArrayTypeSymbol(
+            moduleSymbol As PEModuleSymbol,
+            rank As Integer,
+            elementType As TypeSymbol,
+            customModifiers As ImmutableArray(Of ModifierInfo(Of TypeSymbol)),
+            sizes As ImmutableArray(Of Integer),
+            lowerBounds As ImmutableArray(Of Integer)
+        ) As TypeSymbol
             If TypeOf elementType Is UnsupportedMetadataTypeSymbol Then
                 Return elementType
             End If
 
-            If rank = 1 Then
-                ' We do not support multi-dimensional arrays of rank 1, cannot distinguish
-                ' them from SZARRAY.
-                Return New UnsupportedMetadataTypeSymbol()
-            End If
-
-            Return New ArrayTypeSymbol(
+            Return ArrayTypeSymbol.CreateMDArray(
                             elementType,
-                            Nothing,
-                            rank, moduleSymbol.ContainingAssembly)
-        End Function
-
-        Friend Overrides Function GetByRefReturnTypeSymbol(moduleSymbol As PEModuleSymbol, referencedType As TypeSymbol) As TypeSymbol
-            Return GetUnsupportedMetadataTypeSymbol(moduleSymbol, Nothing) ' No special support for this scenario in VB.
+                            VisualBasicCustomModifier.Convert(customModifiers),
+                            rank, sizes, lowerBounds, moduleSymbol.ContainingAssembly)
         End Function
 
         Friend Overrides Function GetSpecialType(moduleSymbol As PEModuleSymbol, specialType As SpecialType) As TypeSymbol
@@ -47,20 +46,14 @@ Namespace Microsoft.CodeAnalysis.VisualBasic.Symbols.Metadata.PE
             Return type.PrimitiveTypeCode
         End Function
 
-        Friend Overrides Function IsVolatileModifierType(moduleSymbol As PEModuleSymbol, type As TypeSymbol) As Boolean
-            ' VB doesn't deal with Volatile fields.
-            Return False
-        End Function
-
         Friend Overrides Function GetSZArrayTypeSymbol(moduleSymbol As PEModuleSymbol, elementType As TypeSymbol, customModifiers As ImmutableArray(Of ModifierInfo(Of TypeSymbol))) As TypeSymbol
             If TypeOf elementType Is UnsupportedMetadataTypeSymbol Then
                 Return elementType
             End If
 
-            Return New ArrayTypeSymbol(
+            Return ArrayTypeSymbol.CreateSZArray(
                             elementType,
                             VisualBasicCustomModifier.Convert(customModifiers),
-                            1,
                             moduleSymbol.ContainingAssembly)
         End Function
 
@@ -75,7 +68,7 @@ Namespace Microsoft.CodeAnalysis.VisualBasic.Symbols.Metadata.PE
         Friend Overrides Function SubstituteTypeParameters(
             moduleSymbol As PEModuleSymbol,
             genericTypeDef As TypeSymbol,
-            arguments As ImmutableArray(Of TypeSymbol),
+            arguments As ImmutableArray(Of KeyValuePair(Of TypeSymbol, ImmutableArray(Of ModifierInfo(Of TypeSymbol)))),
             refersToNoPiaLocalType As ImmutableArray(Of Boolean)
         ) As TypeSymbol
 
@@ -85,8 +78,8 @@ Namespace Microsoft.CodeAnalysis.VisualBasic.Symbols.Metadata.PE
 
             ' Let's return unsupported metadata type if any argument is unsupported metadata type 
             For Each arg In arguments
-                If arg.Kind = SymbolKind.ErrorType AndAlso
-                        TypeOf arg Is UnsupportedMetadataTypeSymbol Then
+                If arg.Key.Kind = SymbolKind.ErrorType AndAlso
+                        TypeOf arg.Key Is UnsupportedMetadataTypeSymbol Then
                     Return New UnsupportedMetadataTypeSymbol()
                 End If
             Next
@@ -115,7 +108,7 @@ Namespace Microsoft.CodeAnalysis.VisualBasic.Symbols.Metadata.PE
                 For i As Integer = argumentIndex To 0 Step -1
                     If refersToNoPiaLocalType(i) OrElse
                            (Not linkedAssemblies.IsDefaultOrEmpty AndAlso
-                           MetadataDecoder.IsOrClosedOverATypeFromAssemblies(arguments(i), linkedAssemblies)) Then
+                           MetadataDecoder.IsOrClosedOverATypeFromAssemblies(arguments(i).Key, linkedAssemblies)) Then
                         noPiaIllegalGenericInstantiation = True
                         Exit For
                     End If
@@ -131,7 +124,8 @@ Namespace Microsoft.CodeAnalysis.VisualBasic.Symbols.Metadata.PE
                 Return New UnsupportedMetadataTypeSymbol()
             End If
 
-            Dim substitution As TypeSubstitution = TypeSubstitution.Create(genericTypeDef, genericParameters, arguments)
+            Dim substitution As TypeSubstitution = TypeSubstitution.Create(genericTypeDef, genericParameters,
+                                                                           arguments.SelectAsArray(Function(pair) New TypeWithModifiers(pair.Key, VisualBasicCustomModifier.Convert(pair.Value))))
 
             If substitution Is Nothing Then
                 Return genericTypeDef
@@ -151,6 +145,9 @@ Namespace Microsoft.CodeAnalysis.VisualBasic.Symbols.Metadata.PE
             Return If(namedType IsNot Nothing AndAlso namedType.IsGenericType, UnboundGenericType.Create(namedType), type)
         End Function
 
+        Friend Overrides Function MakeFunctionPointerTypeSymbol(callingConvention As Cci.CallingConvention, retAndParamTypes As ImmutableArray(Of ParamInfo(Of TypeSymbol))) As TypeSymbol
+            Return New UnsupportedMetadataTypeSymbol()
+        End Function
     End Class
 
 End Namespace

@@ -1,9 +1,13 @@
-﻿Imports Microsoft.CodeAnalysis.ExpressionEvaluator
+﻿' Licensed to the .NET Foundation under one or more agreements.
+' The .NET Foundation licenses this file to you under the MIT license.
+' See the LICENSE file in the project root for more information.
+
+Imports Microsoft.CodeAnalysis.ExpressionEvaluator
 Imports Microsoft.VisualStudio.Debugger.Clr
 Imports Microsoft.VisualStudio.Debugger.Evaluation
 Imports Xunit
 
-Namespace Microsoft.CodeAnalysis.VisualBasic.ExpressionEvaluator
+Namespace Microsoft.CodeAnalysis.VisualBasic.ExpressionEvaluator.UnitTests
 
     Public Class DebuggerTypeProxyAttributeTests
         Inherits VisualBasicResultProviderTestBase
@@ -54,7 +58,7 @@ End Class"
                        EvalResult("o", "{C}", "C", "o", DkmEvaluationResultFlags.Expandable))
                 Dim children = GetChildren(result)
                 Verify(children,
-                    EvalResult("b", "{B(Of A(Of String))}", "B(Of A(Of String))", "o.b", DkmEvaluationResultFlags.Expandable))
+                    EvalResult("b", "{B(Of A(Of String))}", "B(Of A(Of String))", "o.b", DkmEvaluationResultFlags.Expandable Or DkmEvaluationResultFlags.CanFavorite))
                 children = GetChildren(children(0))
                 Verify(children,
                     EvalResult("PG", "{A(Of String)}", "A(Of String)", "New PB(Of A(Of String))(o.b).PG", DkmEvaluationResultFlags.Expandable Or DkmEvaluationResultFlags.ReadOnly),
@@ -68,7 +72,7 @@ End Class"
                     EvalResult("Raw View", Nothing, "", "New PB(Of A(Of String))(o.b).PG, raw", DkmEvaluationResultFlags.Expandable Or DkmEvaluationResultFlags.ReadOnly, DkmEvaluationResultCategory.Data))
                 moreChildren = GetChildren(moreChildren(1))
                 Verify(moreChildren,
-                    EvalResult("F", """A""", "String", "New PB(Of A(Of String))(o.b).PG.F", DkmEvaluationResultFlags.RawString Or DkmEvaluationResultFlags.ReadOnly))
+                    EvalResult("F", """A""", "String", "(New PB(Of A(Of String))(o.b).PG).F", DkmEvaluationResultFlags.RawString Or DkmEvaluationResultFlags.ReadOnly))
             End Using
         End Sub
 

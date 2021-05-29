@@ -1,14 +1,17 @@
-' Copyright (c) Microsoft.  All Rights Reserved.  Licensed under the Apache License, Version 2.0.  See License.txt in the project root for license information.
+﻿' Licensed to the .NET Foundation under one or more agreements.
+' The .NET Foundation licenses this file to you under the MIT license.
+' See the LICENSE file in the project root for more information.
 
 Imports Microsoft.CodeAnalysis.Editor.UnitTests.Extensions
 Imports Microsoft.VisualStudio.Text.Projection
 
 Namespace Microsoft.CodeAnalysis.Editor.UnitTests.IntelliSense
+    <[UseExportProvider]>
     Public Class VisualBasicCompletionCommandHandlerTests_Projections
 
-        <Fact, Trait(Traits.Feature, Traits.Features.Completion)>
-        Public Sub TestSimpleWithJustSubjectBuffer()
-            Using state = TestState.CreateVisualBasicTestState(
+        <WpfFact, Trait(Traits.Feature, Traits.Features.Completion)>
+        Public Async Function TestSimpleWithJustSubjectBuffer() As Task
+            Using state = TestStateFactory.CreateVisualBasicTestState(
                 <Document><![CDATA[
 Option Strict Off
 Option Explicit On
@@ -32,21 +35,21 @@ End Namespace
 ]]></Document>)
 
                 state.SendTypeChars(".")
-                state.AssertCompletionSession()
+                Await state.AssertCompletionSession()
                 state.SendTypeChars("Curr")
-                state.AssertSelectedCompletionItem(displayText:="CurrentDomain")
+                Await state.AssertSelectedCompletionItem(displayText:="CurrentDomain")
                 state.SendTab()
-                Assert.Contains("__o = AppDomain.CurrentDomain", state.GetLineTextFromCaretPosition())
+                Assert.Contains("__o = AppDomain.CurrentDomain", state.GetLineTextFromCaretPosition(), StringComparison.Ordinal)
             End Using
-        End Sub
+        End Function
 
-        <Fact, Trait(Traits.Feature, Traits.Features.Completion)>
-        Public Sub TestAfterDot()
-            Using state = TestState.CreateVisualBasicTestState(
+        <WpfFact, Trait(Traits.Feature, Traits.Features.Completion)>
+        Public Async Function TestAfterDot() As Task
+            Using state = TestStateFactory.CreateVisualBasicTestState(
                 <Document><![CDATA[
 {|S2:
 Class C
-    Sub Foo()
+    Sub Goo()
         System$$
     End Sub
 End Class
@@ -56,33 +59,32 @@ End Class
                     <Document>
 {|S1: &lt;html&gt;@|}
 {|S2:|}
-                    </Document>.NormalizedValue, {subjectDocument}, LanguageNames.VisualBasic, options:=ProjectionBufferOptions.WritableLiteralSpans)
+                    </Document>.NormalizedValue, {subjectDocument}, options:=ProjectionBufferOptions.WritableLiteralSpans)
 
                 Dim topProjectionBuffer = state.Workspace.CreateProjectionBufferDocument(
                 <Document>
 {|S1:|}
 {|S2:&lt;/html&gt;|}
-                              </Document>.NormalizedValue, {firstProjection}, LanguageNames.VisualBasic, options:=ProjectionBufferOptions.WritableLiteralSpans)
-
+                              </Document>.NormalizedValue, {firstProjection}, options:=ProjectionBufferOptions.WritableLiteralSpans)
 
                 Dim view = topProjectionBuffer.GetTextView()
                 Dim buffer = subjectDocument.GetTextBuffer()
 
                 state.SendTypeCharsToSpecificViewAndBuffer(".", view, buffer)
-                state.AssertCompletionSession()
+                Await state.AssertCompletionSession(view)
 
                 state.SendTypeCharsToSpecificViewAndBuffer("Cons", view, buffer)
-                state.AssertSelectedCompletionItem(displayText:="Console")
+                Await state.AssertSelectedCompletionItem(displayText:="Console", projectionsView:=view)
             End Using
-        End Sub
+        End Function
 
-        <Fact, Trait(Traits.Feature, Traits.Features.Completion)>
-        Public Sub TestInObjectCreationExpression()
-            Using state = TestState.CreateVisualBasicTestState(
+        <WpfFact, Trait(Traits.Feature, Traits.Features.Completion)>
+        Public Async Function TestInObjectCreationExpression() As Task
+            Using state = TestStateFactory.CreateVisualBasicTestState(
                 <Document><![CDATA[
 {|S2:
 Class C
-    Sub Foo()
+    Sub Goo()
         Dim s As New$$
     End Sub
 End Class
@@ -92,24 +94,23 @@ End Class
                     <Document>
 {|S1: &lt;html&gt;@|}
 {|S2:|}
-                    </Document>.NormalizedValue, {subjectDocument}, LanguageNames.CSharp, options:=ProjectionBufferOptions.WritableLiteralSpans)
+                    </Document>.NormalizedValue, {subjectDocument}, options:=ProjectionBufferOptions.WritableLiteralSpans)
 
                 Dim topProjectionBuffer = state.Workspace.CreateProjectionBufferDocument(
                 <Document>
 {|S1:|}
 {|S2:&lt;/html&gt;|}
-                              </Document>.NormalizedValue, {firstProjection}, LanguageNames.CSharp, options:=ProjectionBufferOptions.WritableLiteralSpans)
-
+                              </Document>.NormalizedValue, {firstProjection}, options:=ProjectionBufferOptions.WritableLiteralSpans)
 
                 Dim view = topProjectionBuffer.GetTextView()
                 Dim buffer = subjectDocument.GetTextBuffer()
 
                 state.SendTypeCharsToSpecificViewAndBuffer(" ", view, buffer)
-                state.AssertCompletionSession()
+                Await state.AssertCompletionSession(view)
 
                 state.SendTypeCharsToSpecificViewAndBuffer("Str", view, buffer)
-                state.AssertSelectedCompletionItem(displayText:="String", isHardSelected:=True)
+                Await state.AssertSelectedCompletionItem(displayText:="String", isHardSelected:=True, projectionsView:=view)
             End Using
-        End Sub
+        End Function
     End Class
 End Namespace

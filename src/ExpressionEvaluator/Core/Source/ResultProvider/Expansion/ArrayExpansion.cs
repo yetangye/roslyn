@@ -1,21 +1,29 @@
-// Copyright (c) Microsoft.  All Rights Reserved.  Licensed under the Apache License, Version 2.0.  See License.txt in the project root for license information.
+﻿// Licensed to the .NET Foundation under one or more agreements.
+// The .NET Foundation licenses this file to you under the MIT license.
+// See the LICENSE file in the project root for more information.
 
-using Microsoft.VisualStudio.Debugger.Evaluation;
-using Microsoft.VisualStudio.Debugger.Evaluation.ClrCompilation;
-using System;
+#nullable disable
+
 using System.Collections.ObjectModel;
 using System.Diagnostics;
+using Microsoft.VisualStudio.Debugger.Clr;
+using Microsoft.VisualStudio.Debugger.ComponentInterfaces;
+using Microsoft.VisualStudio.Debugger.Evaluation;
+using Microsoft.VisualStudio.Debugger.Evaluation.ClrCompilation;
+using Type = Microsoft.VisualStudio.Debugger.Metadata.Type;
 
 namespace Microsoft.CodeAnalysis.ExpressionEvaluator
 {
     internal sealed class ArrayExpansion : Expansion
     {
+        private readonly TypeAndCustomInfo _elementTypeAndInfo;
         private readonly ReadOnlyCollection<int> _divisors;
         private readonly ReadOnlyCollection<int> _lowerBounds;
         private readonly int _count;
 
-        internal static ArrayExpansion CreateExpansion(ReadOnlyCollection<int> sizes, ReadOnlyCollection<int> lowerBounds)
+        internal static ArrayExpansion CreateExpansion(TypeAndCustomInfo elementTypeAndInfo, ReadOnlyCollection<int> sizes, ReadOnlyCollection<int> lowerBounds)
         {
+            Debug.Assert(elementTypeAndInfo.Type != null);
             Debug.Assert(sizes != null);
             Debug.Assert(lowerBounds != null);
             Debug.Assert(sizes.Count > 0);
@@ -26,12 +34,13 @@ namespace Microsoft.CodeAnalysis.ExpressionEvaluator
             {
                 count *= size;
             }
-            return (count > 0) ? new ArrayExpansion(sizes, lowerBounds, count) : null;
+            return (count > 0) ? new ArrayExpansion(elementTypeAndInfo, sizes, lowerBounds, count) : null;
         }
 
-        private ArrayExpansion(ReadOnlyCollection<int> sizes, ReadOnlyCollection<int> lowerBounds, int count)
+        private ArrayExpansion(TypeAndCustomInfo elementTypeAndInfo, ReadOnlyCollection<int> sizes, ReadOnlyCollection<int> lowerBounds, int count)
         {
             Debug.Assert(count > 0);
+            _elementTypeAndInfo = elementTypeAndInfo;
             _divisors = CalculateDivisors(sizes);
             _lowerBounds = lowerBounds;
             _count = count;
@@ -39,7 +48,7 @@ namespace Microsoft.CodeAnalysis.ExpressionEvaluator
 
         internal override void GetRows(
             ResultProvider resultProvider,
-            ArrayBuilder<DkmEvaluationResult> rows,
+            ArrayBuilder<EvalResult> rows,
             DkmInspectionContext inspectionContext,
             EvalResultDataItem parent,
             DkmClrValue value,
@@ -61,7 +70,7 @@ namespace Microsoft.CodeAnalysis.ExpressionEvaluator
             index += _count;
         }
 
-        private DkmEvaluationResult GetRow(
+        private EvalResult GetRow(
             ResultProvider resultProvider,
             DkmInspectionContext inspectionContext,
             DkmClrValue value,
@@ -69,26 +78,27 @@ namespace Microsoft.CodeAnalysis.ExpressionEvaluator
             EvalResultDataItem parent)
         {
             var indices = GetIndices(index);
-            var formatter = resultProvider.Formatter;
-            var name = formatter.GetArrayIndexExpression(indices);
-            var elementType = value.Type.ElementType;
-            var element = value.GetArrayElement(indices);
-            var fullName = GetFullName(parent, name, formatter);
-            var dataItem = resultProvider.CreateDataItem(
+            var fullNameProvider = resultProvider.FullNameProvider;
+            var name = fullNameProvider.GetClrArrayIndexExpression(inspectionContext, GetIndicesAsStrings(indices));
+            var element = value.GetArrayElement(indices, inspectionContext);
+            var fullName = GetFullName(inspectionContext, parent, name, fullNameProvider);
+            return resultProvider.CreateDataItem(
                 inspectionContext,
                 name,
-                typeDeclaringMember: null,
-                declaredType: elementType.GetLmrType(),
+                typeDeclaringMemberAndInfo: default(TypeAndCustomInfo),
+                declaredTypeAndInfo: _elementTypeAndInfo,
                 value: element,
-                parent: parent,
+                useDebuggerDisplay: parent != null,
                 expansionFlags: ExpansionFlags.IncludeBaseMembers,
                 childShouldParenthesize: false,
                 fullName: fullName,
                 formatSpecifiers: Formatter.NoFormatSpecifiers,
                 category: DkmEvaluationResultCategory.Other,
                 flags: element.EvalFlags,
-                evalFlags: inspectionContext.EvaluationFlags);
-            return resultProvider.GetResult(dataItem, element.Type, elementType, parent);
+                evalFlags: inspectionContext.EvaluationFlags,
+                canFavorite: false,
+                isFavorite: false,
+                supportsFavorites: true);
         }
 
         private int[] GetIndices(int index)
@@ -109,6 +119,17 @@ namespace Microsoft.CodeAnalysis.ExpressionEvaluator
             return indices;
         }
 
+        private static string[] GetIndicesAsStrings(int[] indices)
+        {
+            var n = indices.Length;
+            var strings = new string[n];
+            for (int i = 0; i < n; i++)
+            {
+                strings[i] = indices[i].ToString();
+            }
+            return strings;
+        }
+
         private static ReadOnlyCollection<int> CalculateDivisors(ReadOnlyCollection<int> sizes)
         {
             var n = sizes.Count;
@@ -126,20 +147,31 @@ namespace Microsoft.CodeAnalysis.ExpressionEvaluator
             return new ReadOnlyCollection<int>(divisors);
         }
 
-        private static string GetFullName(EvalResultDataItem parent, string name, Formatter formatter)
+        private static string GetFullName(DkmInspectionContext inspectionContext, EvalResultDataItem parent, string name, IDkmClrFullNameProvider fullNameProvider)
         {
             var parentFullName = parent.ChildFullNamePrefix;
+            if (parentFullName == null)
+            {
+                return null;
+            }
+
             if (parent.ChildShouldParenthesize)
             {
-                parentFullName = $"({parentFullName})";
+                parentFullName = parentFullName.Parenthesize();
             }
-            var parentRuntimeType = parent.Value.Type.GetLmrType();
-            if (!parent.DeclaredType.Equals(parentRuntimeType))
+            var parentRuntimeType = parent.Value.Type;
+            if (!parent.DeclaredTypeAndInfo.Type.Equals(parentRuntimeType.GetLmrType()))
             {
-                parentFullName = formatter.GetCastExpression(
+                parentFullName = fullNameProvider.GetClrCastExpression(
+                    inspectionContext,
                     parentFullName,
-                    formatter.GetTypeName(parentRuntimeType, escapeKeywordIdentifiers: true),
-                    parenthesizeEntireExpression: true);
+                    parentRuntimeType,
+                    customTypeInfo: null,
+                    castExpressionOptions: DkmClrCastExpressionOptions.ParenthesizeEntireExpression);
+                if (parentFullName == null)
+                {
+                    return null; // Contains invalid identifier.
+                }
             }
             return parentFullName + name;
         }

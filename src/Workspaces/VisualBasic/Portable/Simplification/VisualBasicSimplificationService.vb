@@ -1,4 +1,6 @@
-﻿' Copyright (c) Microsoft.  All Rights Reserved.  Licensed under the Apache License, Version 2.0.  See License.txt in the project root for license information.
+﻿' Licensed to the .NET Foundation under one or more agreements.
+' The .NET Foundation licenses this file to you under the MIT license.
+' See the LICENSE file in the project root for more information.
 
 Imports System.Collections.Immutable
 Imports System.Composition
@@ -15,8 +17,8 @@ Namespace Microsoft.CodeAnalysis.VisualBasic.Simplification
     Partial Friend Class VisualBasicSimplificationService
         Inherits AbstractSimplificationService(Of ExpressionSyntax, ExecutableStatementSyntax, CrefReferenceSyntax)
 
-        Protected Overrides Function GetReducers() As IEnumerable(Of AbstractReducer)
-            Return {
+        Private Shared ReadOnly s_reducers As ImmutableArray(Of AbstractReducer) =
+            ImmutableArray.Create(Of AbstractReducer)(
                 New VisualBasicExtensionMethodReducer(),
                 New VisualBasicCastReducer(),
                 New VisualBasicNameReducer(),
@@ -25,9 +27,14 @@ Namespace Microsoft.CodeAnalysis.VisualBasic.Simplification
                 New VisualBasicEscapingReducer(), ' order before VisualBasicMiscellaneousReducer, see RenameNewOverload test
                 New VisualBasicMiscellaneousReducer(),
                 New VisualBasicCastReducer(),
-                New VisualBasicVariableDeclaratorReducer()
-            }
-        End Function
+                New VisualBasicVariableDeclaratorReducer(),
+                New VisualBasicInferredMemberNameReducer())
+
+        <ImportingConstructor>
+        <Obsolete(MefConstruction.ImportingConstructorMessage, True)>
+        Public Sub New()
+            MyBase.New(s_reducers)
+        End Sub
 
         Public Overrides Function Expand(node As SyntaxNode, semanticModel As SemanticModel, aliasReplacementAnnotation As SyntaxAnnotation, expandInsideNode As Func(Of SyntaxNode, Boolean), expandParameter As Boolean, cancellationToken As CancellationToken) As SyntaxNode
             Using Logger.LogBlock(FunctionId.Simplifier_ExpandNode, cancellationToken)
@@ -42,41 +49,17 @@ Namespace Microsoft.CodeAnalysis.VisualBasic.Simplification
                     Return rewriter.Visit(node)
                 Else
                     Throw New ArgumentException(
-                        VBWorkspaceResources.CannotMakeExplicit,
-                        paramName:="node")
+                        VBWorkspaceResources.Only_attributes_expressions_or_statements_can_be_made_explicit,
+                        paramName:=NameOf(node))
                 End If
             End Using
         End Function
 
         Public Overrides Function Expand(token As SyntaxToken, semanticModel As SemanticModel, expandInsideNode As Func(Of SyntaxNode, Boolean), cancellationToken As CancellationToken) As SyntaxToken
             Using Logger.LogBlock(FunctionId.Simplifier_ExpandToken, cancellationToken)
-                Dim vbSemanticModel = DirectCast(semanticModel, SemanticModel)
-                Dim rewriter = New Expander(vbSemanticModel, expandInsideNode, cancellationToken)
-                Return TryEscapeIdentifierToken(rewriter.VisitToken(token), vbSemanticModel)
+                Dim rewriter = New Expander(semanticModel, expandInsideNode, cancellationToken)
+                Return TryEscapeIdentifierToken(rewriter.VisitToken(token))
             End Using
-        End Function
-
-        Public Shared Function TryEscapeIdentifierToken(identifierToken As SyntaxToken, semanticModel As SemanticModel, Optional oldIdentifierToken As SyntaxToken? = Nothing) As SyntaxToken
-            If identifierToken.Kind <> SyntaxKind.IdentifierToken OrElse identifierToken.ValueText.Length = 0 Then
-                Return identifierToken
-            End If
-
-            If identifierToken.IsBracketed Then
-                Return identifierToken
-            End If
-
-            If identifierToken.GetTypeCharacter() <> TypeCharacter.None Then
-                Return identifierToken
-            End If
-
-            Dim unescapedIdentifier = identifierToken.ValueText
-            If SyntaxFacts.GetKeywordKind(unescapedIdentifier) = SyntaxKind.None AndAlso SyntaxFacts.GetContextualKeywordKind(unescapedIdentifier) = SyntaxKind.None Then
-                Return identifierToken
-            End If
-
-            Return identifierToken.CopyAnnotationsTo(
-                        SyntaxFactory.BracketedIdentifier(identifierToken.LeadingTrivia, identifierToken.ValueText, identifierToken.TrailingTrivia) _
-                            .WithAdditionalAnnotations(Simplifier.Annotation))
         End Function
 
         Protected Overrides Function GetSpeculativeSemanticModel(ByRef nodeToSpeculate As SyntaxNode, originalSemanticModel As SemanticModel, originalNode As SyntaxNode) As SemanticModel
@@ -127,7 +110,7 @@ Namespace Microsoft.CodeAnalysis.VisualBasic.Simplification
                 nodeToSpeculate = asNewClauseNode.CopyAnnotationsTo(nodeToSpeculate)
             End If
 
-            speculativeModel = SpeculationAnalyzer.CreateSpeculativeSemanticModelForNode(originalNode, nodeToSpeculate, DirectCast(originalSemanticModel, SemanticModel))
+            speculativeModel = SpeculationAnalyzer.CreateSpeculativeSemanticModelForNode(originalNode, nodeToSpeculate, originalSemanticModel)
 
             If isAsNewClause Then
                 nodeToSpeculate = speculativeModel.SyntaxTree.GetRoot()
@@ -162,5 +145,25 @@ Namespace Microsoft.CodeAnalysis.VisualBasic.Simplification
                 TypeOf node Is VariableDeclaratorSyntax AndAlso
                 TypeOf node.Parent Is FieldDeclarationSyntax
         End Function
+
+        Private Const s_BC50000_UnusedImportsClause As String = "BC50000"
+        Private Const s_BC50001_UnusedImportsStatement As String = "BC50001"
+
+        Protected Overrides Sub GetUnusedNamespaceImports(model As SemanticModel, namespaceImports As HashSet(Of SyntaxNode), cancellationToken As CancellationToken)
+            Dim root = model.SyntaxTree.GetRoot()
+            Dim diagnostics = model.GetDiagnostics(cancellationToken:=cancellationToken)
+
+            For Each diagnostic In diagnostics
+                If diagnostic.Id = s_BC50000_UnusedImportsClause OrElse diagnostic.Id = s_BC50001_UnusedImportsStatement Then
+                    Dim node = root.FindNode(diagnostic.Location.SourceSpan)
+                    Dim statement = TryCast(node, ImportsStatementSyntax)
+                    Dim clause = TryCast(node, ImportsStatementSyntax)
+                    If statement IsNot Nothing Or clause IsNot Nothing Then
+                        namespaceImports.Add(node)
+                    End If
+                End If
+            Next
+        End Sub
+
     End Class
 End Namespace

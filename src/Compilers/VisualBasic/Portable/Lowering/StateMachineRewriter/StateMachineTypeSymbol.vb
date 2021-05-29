@@ -1,7 +1,11 @@
-﻿' Copyright (c) Microsoft.  All Rights Reserved.  Licensed under the Apache License, Version 2.0.  See License.txt in the project root for license information.
+﻿' Licensed to the .NET Foundation under one or more agreements.
+' The .NET Foundation licenses this file to you under the MIT license.
+' See the LICENSE file in the project root for more information.
 
 Imports System.Collections.Immutable
 Imports Microsoft.CodeAnalysis.CodeGen
+Imports Microsoft.CodeAnalysis.PooledObjects
+Imports Microsoft.CodeAnalysis.Symbols
 Imports Microsoft.CodeAnalysis.VisualBasic.Symbols
 
 Namespace Microsoft.CodeAnalysis.VisualBasic
@@ -9,6 +13,7 @@ Namespace Microsoft.CodeAnalysis.VisualBasic
         Inherits SynthesizedContainer
         Implements ISynthesizedMethodBodyImplementationSymbol
 
+        Private _attributes As ImmutableArray(Of VisualBasicAttributeData)
         Public ReadOnly KickoffMethod As MethodSymbol
 
         Public Sub New(slotAllocatorOpt As VariableSlotAllocator,
@@ -42,7 +47,7 @@ Namespace Microsoft.CodeAnalysis.VisualBasic
             End Get
         End Property
 
-        Public ReadOnly Property Method As IMethodSymbol Implements ISynthesizedMethodBodyImplementationSymbol.Method
+        Public ReadOnly Property Method As IMethodSymbolInternal Implements ISynthesizedMethodBodyImplementationSymbol.Method
             Get
                 Return KickoffMethod
             End Get
@@ -53,5 +58,32 @@ Namespace Microsoft.CodeAnalysis.VisualBasic
                 Return False
             End Get
         End Property
+
+        Public NotOverridable Overrides Function GetAttributes() As ImmutableArray(Of VisualBasicAttributeData)
+            If _attributes.IsDefault Then
+                Debug.Assert(MyBase.GetAttributes().Length = 0)
+
+                Dim builder As ArrayBuilder(Of VisualBasicAttributeData) = Nothing
+
+                ' Inherit some attributes from the container of the kickoff method
+                Dim kickoffType = KickoffMethod.ContainingType
+                For Each attribute In kickoffType.GetAttributes()
+                    If attribute.IsTargetAttribute(kickoffType, AttributeDescription.DebuggerNonUserCodeAttribute) OrElse
+                       attribute.IsTargetAttribute(kickoffType, AttributeDescription.DebuggerStepThroughAttribute) Then
+                        If builder Is Nothing Then
+                            builder = ArrayBuilder(Of VisualBasicAttributeData).GetInstance(2) ' only 2 different attributes are inherited at the moment
+                        End If
+
+                        builder.Add(attribute)
+                    End If
+                Next
+
+                ImmutableInterlocked.InterlockedCompareExchange(_attributes,
+                                                                If(builder Is Nothing, ImmutableArray(Of VisualBasicAttributeData).Empty, builder.ToImmutableAndFree()),
+                                                                Nothing)
+            End If
+
+            Return _attributes
+        End Function
     End Class
 End Namespace

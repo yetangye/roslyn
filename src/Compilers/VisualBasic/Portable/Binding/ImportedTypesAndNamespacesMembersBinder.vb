@@ -1,10 +1,13 @@
-﻿' Copyright (c) Microsoft.  All Rights Reserved.  Licensed under the Apache License, Version 2.0.  See License.txt in the project root for license information.
+﻿' Licensed to the .NET Foundation under one or more agreements.
+' The .NET Foundation licenses this file to you under the MIT license.
+' See the LICENSE file in the project root for more information.
 
 Imports System.Collections.Concurrent
 Imports System.Collections.Generic
 Imports System.Collections.Immutable
 Imports System.Runtime.InteropServices
 Imports System.Threading
+Imports Microsoft.CodeAnalysis.PooledObjects
 Imports Microsoft.CodeAnalysis.RuntimeMembers
 Imports Microsoft.CodeAnalysis.Text
 Imports Microsoft.CodeAnalysis.VisualBasic.Symbols
@@ -21,11 +24,11 @@ Namespace Microsoft.CodeAnalysis.VisualBasic
     Friend Class ImportedTypesAndNamespacesMembersBinder
         Inherits Binder
 
-        Private ReadOnly m_importedSymbols As ImmutableArray(Of NamespaceOrTypeAndImportsClausePosition)
+        Private ReadOnly _importedSymbols As ImmutableArray(Of NamespaceOrTypeAndImportsClausePosition)
 
         Public Sub New(containingBinder As Binder, importedSymbols As ImmutableArray(Of NamespaceOrTypeAndImportsClausePosition))
             MyBase.New(containingBinder)
-            m_importedSymbols = importedSymbols
+            _importedSymbols = importedSymbols
         End Sub
 
         Friend Overrides Sub LookupInSingleBinder(lookupResult As LookupResult,
@@ -33,7 +36,7 @@ Namespace Microsoft.CodeAnalysis.VisualBasic
                                                      arity As Integer,
                                                      options As LookupOptions,
                                                      originalBinder As Binder,
-                                                     <[In], Out> ByRef useSiteDiagnostics As HashSet(Of DiagnosticInfo))
+                                                     <[In], Out> ByRef useSiteInfo As CompoundUseSiteInfo(Of AssemblySymbol))
             Debug.Assert(lookupResult.IsClear)
 
             ' Look up the name in all imported symbols, merging and generating ambiguity errors if needed.
@@ -43,13 +46,13 @@ Namespace Microsoft.CodeAnalysis.VisualBasic
             options = options Or LookupOptions.IgnoreExtensionMethods
 
             ' First, lookup immediate members of imported types and namespaces 
-            For Each importedSym In m_importedSymbols
+            For Each importedSym In _importedSymbols
                 currentResult = LookupResult.GetInstance()
 
                 If importedSym.NamespaceOrType.IsNamespace Then
-                    originalBinder.LookupMemberImmediate(currentResult, DirectCast(importedSym.NamespaceOrType, NamespaceSymbol), name, arity, options, useSiteDiagnostics)
+                    originalBinder.LookupMemberImmediate(currentResult, DirectCast(importedSym.NamespaceOrType, NamespaceSymbol), name, arity, options, useSiteInfo)
                 Else
-                    originalBinder.LookupMember(currentResult, importedSym.NamespaceOrType, name, arity, options, useSiteDiagnostics)
+                    originalBinder.LookupMember(currentResult, importedSym.NamespaceOrType, name, arity, options, useSiteInfo)
                 End If
 
                 If currentResult.IsGoodOrAmbiguous AndAlso Not originalBinder.IsSemanticModelBinder Then
@@ -130,7 +133,7 @@ Namespace Microsoft.CodeAnalysis.VisualBasic
                                                                       originalBinder As Binder)
             Debug.Assert(methods.Count = 0)
 
-            For Each importedSym In m_importedSymbols
+            For Each importedSym In _importedSymbols
                 If importedSym.NamespaceOrType.Kind = SymbolKind.NamedType Then
                     DirectCast(importedSym.NamespaceOrType, NamedTypeSymbol).AppendProbableExtensionMethods(name, methods)
 
@@ -144,7 +147,7 @@ Namespace Microsoft.CodeAnalysis.VisualBasic
         Protected Overrides Sub AddExtensionMethodLookupSymbolsInfoInSingleBinder(nameSet As LookupSymbolsInfo,
                                                                                    options As LookupOptions,
                                                                                    originalBinder As Binder)
-            For Each importedSym In m_importedSymbols
+            For Each importedSym In _importedSymbols
                 If importedSym.NamespaceOrType.Kind = SymbolKind.NamedType Then
                     DirectCast(importedSym.NamespaceOrType, NamedTypeSymbol).AddExtensionMethodLookupSymbolsInfo(
                         nameSet, options, originalBinder)
@@ -155,7 +158,7 @@ Namespace Microsoft.CodeAnalysis.VisualBasic
         Friend Overrides Sub AddLookupSymbolsInfoInSingleBinder(nameSet As LookupSymbolsInfo,
                                                                     options As LookupOptions,
                                                                     originalBinder As Binder)
-            For Each importedSym In m_importedSymbols
+            For Each importedSym In _importedSymbols
                 originalBinder.AddMemberLookupSymbolsInfo(nameSet, importedSym.NamespaceOrType, options Or LookupOptions.IgnoreExtensionMethods)
             Next
         End Sub

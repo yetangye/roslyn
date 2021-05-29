@@ -1,4 +1,6 @@
-﻿' Copyright (c) Microsoft.  All Rights Reserved.  Licensed under the Apache License, Version 2.0.  See License.txt in the project root for license information.
+﻿' Licensed to the .NET Foundation under one or more agreements.
+' The .NET Foundation licenses this file to you under the MIT license.
+' See the LICENSE file in the project root for more information.
 
 Imports System
 Imports System.Collections.Generic
@@ -8,9 +10,8 @@ Imports Microsoft.CodeAnalysis.VisualBasic.Symbols
 Namespace Microsoft.CodeAnalysis.VisualBasic
 
     Partial Friend Class DiagnosticsPass
-        Inherits BoundTreeWalker
 
-        Private _expressionTreePlaceholders As New HashSet(Of BoundNode)(ReferenceEqualityComparer.Instance)
+        Private ReadOnly _expressionTreePlaceholders As New HashSet(Of BoundNode)(ReferenceEqualityComparer.Instance)
 
         Public Overrides Function VisitObjectCreationExpression(node As BoundObjectCreationExpression) As BoundNode
             If Me.IsInExpressionLambda Then
@@ -55,7 +56,7 @@ Namespace Microsoft.CodeAnalysis.VisualBasic
 
         Public Overrides Function VisitAnonymousTypePropertyAccess(node As BoundAnonymousTypePropertyAccess) As BoundNode
             If Me.IsInExpressionLambda Then
-                ' we do not allow anonymous objects which use one field to initalize another one
+                ' we do not allow anonymous objects which use one field to initialize another one
                 GenerateDiagnostic(ERRID.ERR_BadAnonymousTypeForExprTree, node)
             End If
 
@@ -89,7 +90,7 @@ Namespace Microsoft.CodeAnalysis.VisualBasic
                 Select Case opKind
                     Case BinaryOperatorKind.Like,
                          BinaryOperatorKind.Concatenate
-                    'Do Nothing
+                        'Do Nothing
 
                     Case Else
                         If (node.OperatorKind And BinaryOperatorKind.Lifted) <> 0 Then
@@ -124,6 +125,12 @@ Namespace Microsoft.CodeAnalysis.VisualBasic
                 Debug.Assert(initializer.Kind = BoundKind.AssignmentOperator)
                 Dim assignment = DirectCast(initializer, BoundAssignmentOperator)
                 Debug.Assert(assignment.LeftOnTheRightOpt Is Nothing)
+
+                Dim propertyAccess = TryCast(assignment.Left, BoundPropertyAccess)
+                If propertyAccess IsNot Nothing Then
+                    CheckRefReturningPropertyAccess(propertyAccess)
+                End If
+
                 Me.Visit(assignment.Right)
             Next
 
@@ -143,7 +150,13 @@ Namespace Microsoft.CodeAnalysis.VisualBasic
         End Function
 
         Public Overrides Function VisitAssignmentOperator(node As BoundAssignmentOperator) As BoundNode
-            If Me.IsInExpressionLambda Then
+            'COMPAT: old compiler used to allow assignments to properties
+            '        we will continue allowing that too
+            'NOTE:   native vbc also allows compound assignments like += but generates incorrect code.
+            '        we are not going to support += assuming that it is not likely to be used in real scenarios.
+            If Me.IsInExpressionLambda AndAlso
+                    Not (node.Left.Kind = BoundKind.PropertyAccess AndAlso node.LeftOnTheRightOpt Is Nothing) Then
+
                 ' Do not support explicit assignments
                 GenerateExpressionTreeNotSupportedDiagnostic(node)
             End If
@@ -161,7 +174,7 @@ Namespace Microsoft.CodeAnalysis.VisualBasic
 
         Public Overrides Function VisitArrayCreation(node As BoundArrayCreation) As BoundNode
             If Me.IsInExpressionLambda Then
-                If DirectCast(node.Type, ArrayTypeSymbol).Rank > 1 Then
+                If Not DirectCast(node.Type, ArrayTypeSymbol).IsSZArray Then
                     Dim initializer As BoundArrayInitialization = node.InitializerOpt
                     If initializer IsNot Nothing AndAlso Not initializer.Initializers.IsEmpty Then
                         GenerateDiagnostic(ERRID.ERR_ExprTreeNoMultiDimArrayCreation, node)
@@ -243,6 +256,10 @@ lSelect:
                 Me.Visit(node.ReceiverOpt)
             End If
 
+            If IsInExpressionLambda And method.ReturnsByRef Then
+                GenerateDiagnostic(ERRID.ERR_RefReturningCallInExpressionTree, node)
+            End If
+
             Me.VisitList(node.Arguments)
             Return Nothing
         End Function
@@ -253,9 +270,17 @@ lSelect:
                 Me.Visit(node.ReceiverOpt)
             End If
 
+            CheckRefReturningPropertyAccess(node)
+
             Me.VisitList(node.Arguments)
             Return Nothing
         End Function
+
+        Private Sub CheckRefReturningPropertyAccess(node As BoundPropertyAccess)
+            If IsInExpressionLambda AndAlso node.PropertySymbol.ReturnsByRef Then
+                GenerateDiagnostic(ERRID.ERR_RefReturningCallInExpressionTree, node)
+            End If
+        End Sub
 
         Public Overrides Function VisitEventAccess(node As BoundEventAccess) As BoundNode
             Dim [event] As EventSymbol = node.EventSymbol
@@ -298,7 +323,7 @@ lSelect:
             End If
 
             If Me.IsInExpressionLambda AndAlso (node.ConversionKind And ConversionKind.Lambda) <> 0 Then
-                VisitLambdaConversion(node.Operand, node.RelaxationLambdaOpt)
+                VisitLambdaConversion(node.Operand, DirectCast(node.ExtendedInfoOpt, BoundRelaxationLambda)?.Lambda)
             Else
                 MyBase.VisitConversion(node)
             End If

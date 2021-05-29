@@ -1,4 +1,8 @@
-﻿// Copyright (c) Microsoft.  All Rights Reserved.  Licensed under the Apache License, Version 2.0.  See License.txt in the project root for license information.
+﻿// Licensed to the .NET Foundation under one or more agreements.
+// The .NET Foundation licenses this file to you under the MIT license.
+// See the LICENSE file in the project root for more information.
+
+#nullable disable
 
 using System;
 using System.Collections.Generic;
@@ -11,7 +15,7 @@ using Roslyn.Utilities;
 
 namespace Microsoft.CodeAnalysis.CSharp.Syntax.InternalSyntax
 {
-    internal partial struct Blender
+    internal readonly partial struct Blender
     {
         private readonly Lexer _lexer;
         private readonly Cursor _oldTreeCursor;
@@ -116,7 +120,7 @@ namespace Microsoft.CodeAnalysis.CSharp.Syntax.InternalSyntax
             // max. TODO: 1 token lookahead seems a bit too optimistic. Increase if needed. 
             const int maxLookahead = 1;
 
-            // check if change is not after the end. TODO: there should be an assert somwhere about
+            // check if change is not after the end. TODO: there should be an assert somewhere about
             // changes starting at least at the End of old tree
             var lastCharIndex = oldTree.FullWidth - 1;
 

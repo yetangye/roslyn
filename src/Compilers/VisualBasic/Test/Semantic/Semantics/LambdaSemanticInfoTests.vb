@@ -1,4 +1,6 @@
-﻿' Copyright (c) Microsoft.  All Rights Reserved.  Licensed under the Apache License, Version 2.0.  See License.txt in the project root for license information.
+﻿' Licensed to the .NET Foundation under one or more agreements.
+' The .NET Foundation licenses this file to you under the MIT license.
+' See the LICENSE file in the project root for more information.
 
 Imports Microsoft.CodeAnalysis
 Imports Microsoft.CodeAnalysis.Test.Utilities
@@ -14,7 +16,7 @@ Namespace Microsoft.CodeAnalysis.VisualBasic.UnitTests
 
         <Fact>
         Public Sub Lambda1()
-            Dim compilation = CompilationUtils.CreateCompilationWithMscorlib(
+            Dim compilation = CompilationUtils.CreateCompilationWithMscorlib40(
 <compilation>
     <file name="a.vb"><![CDATA[
 Module Module1
@@ -49,7 +51,7 @@ End Module
 
         <Fact>
         Public Sub Lambda2()
-            Dim compilation = CompilationUtils.CreateCompilationWithMscorlib(
+            Dim compilation = CompilationUtils.CreateCompilationWithMscorlib40(
 <compilation>
     <file name="a.vb"><![CDATA[
 Module Module1
@@ -82,7 +84,7 @@ End Module
 
         <Fact>
         Public Sub Lambda3()
-            Dim compilation = CompilationUtils.CreateCompilationWithMscorlib(
+            Dim compilation = CompilationUtils.CreateCompilationWithMscorlib40(
 <compilation>
     <file name="a.vb"><![CDATA[
 Module Module1
@@ -117,7 +119,7 @@ End Module
 
         <Fact>
         Public Sub Lambda4()
-            Dim compilation = CompilationUtils.CreateCompilationWithMscorlib(
+            Dim compilation = CompilationUtils.CreateCompilationWithMscorlib40(
 <compilation>
     <file name="a.vb"><![CDATA[
 Module Module1
@@ -150,7 +152,7 @@ End Module
 
         <Fact>
         Public Sub Lambda5()
-            Dim compilation = CompilationUtils.CreateCompilationWithMscorlib(
+            Dim compilation = CompilationUtils.CreateCompilationWithMscorlib40(
 <compilation name="GetSemanticInfo">
     <file name="a.vb">
 Module Module1
@@ -188,7 +190,7 @@ End Module
 
         <Fact>
         Public Sub Lambda6()
-            Dim compilation = CompilationUtils.CreateCompilationWithMscorlib(
+            Dim compilation = CompilationUtils.CreateCompilationWithMscorlib40(
 <compilation>
     <file name="a.vb"><![CDATA[
 Module Module1
@@ -226,7 +228,7 @@ End Module
 
         <Fact>
         Public Sub Lambda7()
-            Dim compilation = CompilationUtils.CreateCompilationWithMscorlib(
+            Dim compilation = CompilationUtils.CreateCompilationWithMscorlib40(
 <compilation>
     <file name="a.vb"><![CDATA[
 Module Module1
@@ -262,7 +264,7 @@ End Module
 
         <Fact>
         Public Sub Lambda8()
-            Dim compilation = CompilationUtils.CreateCompilationWithMscorlib(
+            Dim compilation = CompilationUtils.CreateCompilationWithMscorlib40(
 <compilation>
     <file name="a.vb"><![CDATA[
 Module Module1
@@ -298,7 +300,7 @@ End Module
 
         <Fact>
         Public Sub Lambda9()
-            Dim compilation = CompilationUtils.CreateCompilationWithMscorlib(
+            Dim compilation = CompilationUtils.CreateCompilationWithMscorlib40(
 <compilation>
     <file name="a.vb"><![CDATA[
 Module Module1
@@ -337,7 +339,7 @@ End Module
 
         <Fact>
         Public Sub Lambda10()
-            Dim compilation = CompilationUtils.CreateCompilationWithMscorlib(
+            Dim compilation = CompilationUtils.CreateCompilationWithMscorlib40(
 <compilation>
     <file name="a.vb"><![CDATA[
 Module Module1
@@ -373,7 +375,7 @@ End Module
 
         <Fact>
         Public Sub Lambda11()
-            Dim compilation = CompilationUtils.CreateCompilationWithMscorlib(
+            Dim compilation = CompilationUtils.CreateCompilationWithMscorlib40(
 <compilation>
     <file name="a.vb"><![CDATA[
 Module Module1
@@ -413,7 +415,7 @@ End Module
 
         <Fact>
         Public Sub Lambda12()
-            Dim compilation = CompilationUtils.CreateCompilationWithMscorlib(
+            Dim compilation = CompilationUtils.CreateCompilationWithMscorlib40(
 <compilation>
     <file name="a.vb"><![CDATA[
 Module Module1
@@ -454,7 +456,7 @@ End Module
 
         <Fact>
         Public Sub Lambda13()
-            Dim compilation = CompilationUtils.CreateCompilationWithMscorlib(
+            Dim compilation = CompilationUtils.CreateCompilationWithMscorlib40(
 <compilation name="GetSemanticInfo">
     <file name="a.vb">
 Module Module1
@@ -489,7 +491,7 @@ End Module
 
         <Fact>
         Public Sub Lambda14()
-            Dim compilation = CompilationUtils.CreateCompilationWithMscorlib(
+            Dim compilation = CompilationUtils.CreateCompilationWithMscorlib40(
 <compilation>
     <file name="a.vb"><![CDATA[
 Module Module1
@@ -519,7 +521,7 @@ End Module
 
         <Fact>
         Public Sub Bug8643()
-            Dim compilation = CompilationUtils.CreateCompilationWithMscorlib(
+            Dim compilation = CompilationUtils.CreateCompilationWithMscorlib40(
 <compilation>
     <file name="a.vb"><![CDATA[
 Imports System
@@ -556,7 +558,7 @@ End Module
 
         <Fact>
         Public Sub Bug8522()
-            Dim compilation = CompilationUtils.CreateCompilationWithMscorlib(
+            Dim compilation = CompilationUtils.CreateCompilationWithMscorlib40(
 <compilation>
     <file name="a.vb"><![CDATA[
 Class A
@@ -596,7 +598,7 @@ End Module
         <WorkItem(9805, "DevDiv_Projects/Roslyn")>
         <Fact>
         Public Sub LambdaInWhileStatement()
-            Dim compilation = CreateCompilationWithMscorlib(
+            Dim compilation = CreateCompilationWithMscorlib40(
 <compilation>
     <file name="a.vb"><![CDATA[
 Module Test
@@ -618,7 +620,7 @@ End Module
 
         <Fact>
         Public Sub SingleLineLambdaWithDimStatement()
-            Dim compilation = CreateCompilationWithMscorlib(
+            Dim compilation = CreateCompilationWithMscorlib40(
 <compilation>
     <file name="a.vb"><![CDATA[
 Module Test
@@ -639,10 +641,10 @@ End Module
             Assert.Equal("System.Int32", symbol.Type.ToTestDisplayString())
         End Sub
 
-        <Fact, WorkItem(544647, "DevDiv")>
+        <Fact, WorkItem(544647, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/544647")>
         Public Sub InvokeGenericOverloadedMethod()
 
-            Dim compilation = CreateCompilationWithMscorlibAndVBRuntimeAndReferences(
+            Dim compilation = CreateCompilationWithMscorlib40AndVBRuntimeAndReferences(
     <compilation name="InstantiatingNamespace">
         <file name="a.vb">
 Imports System
@@ -665,7 +667,7 @@ Module M
 
 End Module
     </file>
-    </compilation>, additionalRefs:={SystemCoreRef})
+    </compilation>, references:={SystemCoreRef})
 
             Dim tree = compilation.SyntaxTrees(0)
             Dim model = compilation.GetSemanticModel(tree)
@@ -678,9 +680,9 @@ End Module
             Assert.NotNull(info.Symbol)
         End Sub
 
-        <Fact, WorkItem(566495, "DevDiv")>
+        <Fact, WorkItem(566495, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/566495")>
         Public Sub Bug566495()
-            Dim compilation = CompilationUtils.CreateCompilationWithMscorlibAndVBRuntimeAndReferences(
+            Dim compilation = CompilationUtils.CreateCompilationWithMscorlib40AndVBRuntimeAndReferences(
         <compilation>
             <file name="a.vb"><![CDATA[
         Imports System.Linq
@@ -689,10 +691,10 @@ End Module
 
         Module Program
             Sub Main()
-                Dim L As New List(Of Foo)
+                Dim L As New List(Of Goo)
 
                 For i As Integer = 1 To 10
-                    Dim F As New Foo
+                    Dim F As New Goo
                     F.Id = i
                     F.Name = "some text"
                     L.Add(F)
@@ -703,7 +705,7 @@ End Module
                           End Function).ToList 
             End Sub
 
-            Public Class Foo
+            Public Class Goo
                 Public Property Name As String
                 Public Property Id As Integer
             End Class
@@ -713,7 +715,7 @@ End Module
 
             AssertTheseDiagnostics(compilation,
 <expected>
-BC36646: Data type(s) of the type parameter(s) in extension method 'Public Function Zip(Of TSecond, TResult)(second As IEnumerable(Of TSecond), resultSelector As Func(Of Program.Foo, TSecond, TResult)) As IEnumerable(Of TResult)' defined in 'Enumerable' cannot be inferred from these arguments. Specifying the data type(s) explicitly might correct this error.
+BC36646: Data type(s) of the type parameter(s) in extension method 'Public Function Zip(Of TSecond, TResult)(second As IEnumerable(Of TSecond), resultSelector As Func(Of Program.Goo, TSecond, TResult)) As IEnumerable(Of TResult)' defined in 'Enumerable' cannot be inferred from these arguments. Specifying the data type(s) explicitly might correct this error.
         Dim L2 = L.Zip(L, Function(x, y) 
                    ~~~
 BC30203: Identifier expected.
@@ -723,13 +725,13 @@ BC30203: Identifier expected.
 
             Dim semanticInfo = CompilationUtils.GetSemanticInfoSummary(Of IdentifierNameSyntax)(compilation, "a.vb")
 
-            Assert.Equal("Program.Foo", semanticInfo.Type.ToTestDisplayString())
+            Assert.Equal("Program.Goo", semanticInfo.Type.ToTestDisplayString())
             Assert.Equal(TypeKind.Class, semanticInfo.Type.TypeKind)
-            Assert.Equal("Program.Foo", semanticInfo.ConvertedType.ToTestDisplayString())
+            Assert.Equal("Program.Goo", semanticInfo.ConvertedType.ToTestDisplayString())
             Assert.Equal(TypeKind.Class, semanticInfo.ConvertedType.TypeKind)
             Assert.Equal(ConversionKind.Identity, semanticInfo.ImplicitConversion.Kind)
 
-            Assert.Equal("x As Program.Foo", semanticInfo.Symbol.ToTestDisplayString())
+            Assert.Equal("x As Program.Goo", semanticInfo.Symbol.ToTestDisplayString())
             Assert.Equal(SymbolKind.Parameter, semanticInfo.Symbol.Kind)
             Assert.Equal(0, semanticInfo.CandidateSymbols.Length)
 
@@ -738,10 +740,10 @@ BC30203: Identifier expected.
             Assert.False(semanticInfo.ConstantValue.HasValue)
         End Sub
 
-        <Fact, WorkItem(960755, "DevDiv")>
+        <Fact, WorkItem(960755, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/960755")>
         Public Sub Bug960755_01()
 
-            Dim compilation = CreateCompilationWithMscorlibAndVBRuntime(
+            Dim compilation = CreateCompilationWithMscorlib40AndVBRuntime(
     <compilation name="InstantiatingNamespace">
         <file name="a.vb">
 Imports System.Collections.Generic
@@ -765,10 +767,10 @@ End Class
             Assert.Equal(CandidateReason.OverloadResolutionFailure, symbolInfo.CandidateReason)
         End Sub
 
-        <Fact, WorkItem(960755, "DevDiv")>
+        <Fact, WorkItem(960755, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/960755")>
         Public Sub Bug960755_02()
 
-            Dim compilation = CreateCompilationWithMscorlibAndVBRuntime(
+            Dim compilation = CreateCompilationWithMscorlib40AndVBRuntime(
     <compilation name="InstantiatingNamespace">
         <file name="a.vb">
 Imports System.Collections.Generic
@@ -791,10 +793,10 @@ End Class
             Assert.Equal(CandidateReason.OverloadResolutionFailure, symbolInfo.CandidateReason)
         End Sub
 
-        <Fact, WorkItem(960755, "DevDiv")>
+        <Fact, WorkItem(960755, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/960755")>
         Public Sub Bug960755_03()
 
-            Dim compilation = CreateCompilationWithMscorlibAndVBRuntime(
+            Dim compilation = CreateCompilationWithMscorlib40AndVBRuntime(
     <compilation name="InstantiatingNamespace">
         <file name="a.vb">
 Imports System.Collections.Generic
@@ -819,6 +821,235 @@ End Class
             Assert.Equal("Sub System.Collections.Generic.ICollection(Of C).Add(item As C)", symbolInfo.Symbol.ToTestDisplayString())
             Assert.Equal(0, symbolInfo.CandidateSymbols.Length)
             Assert.Equal(CandidateReason.None, symbolInfo.CandidateReason)
+        End Sub
+
+        <Fact, WorkItem(1179899, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/1179899")>
+        Public Sub ParameterReference_01()
+
+            Dim compilation = CreateCompilationWithMscorlib40AndVBRuntime(
+    <compilation name="InstantiatingNamespace">
+        <file name="a.vb">
+Imports System
+
+Class Program
+    Shared Sub Main(args As String())
+    End Sub
+
+    Function stuff() As Func(Of Program, String)
+        Return Function(a) a.
+    End Function
+
+End Class
+    </file>
+    </compilation>)
+
+            compilation.AssertTheseDiagnostics(<expected>
+BC30203: Identifier expected.
+        Return Function(a) a.
+                             ~
+                                               </expected>)
+
+            Dim tree = compilation.SyntaxTrees.Single()
+            Dim node = tree.GetRoot().DescendantNodes().OfType(Of IdentifierNameSyntax)().Where(Function(id) id.Identifier.ValueText = "a").Single()
+
+            Assert.Equal("a.", node.Parent.ToString())
+
+            Dim semanticModel = compilation.GetSemanticModel(tree)
+            Dim symbolInfo = semanticModel.GetSymbolInfo(node)
+
+            Assert.Equal("a As Program", symbolInfo.Symbol.ToTestDisplayString())
+        End Sub
+
+        <Fact, WorkItem(1179899, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/1179899")>
+        Public Sub ParameterReference_02()
+
+            Dim compilation = CreateCompilationWithMscorlib40AndVBRuntime(
+    <compilation name="InstantiatingNamespace">
+        <file name="a.vb">
+Imports System
+
+Class Program
+    Shared Sub Main(args As String())
+    End Sub
+
+    Sub stuff()
+        M1(Function(a) a.)
+    End Sub
+
+    Sub M1(l as Func(Of Program, String))
+    End Sub
+End Class
+    </file>
+    </compilation>)
+
+            compilation.AssertTheseDiagnostics(<expected>
+BC30203: Identifier expected.
+        M1(Function(a) a.)
+                         ~
+                                               </expected>)
+
+            Dim tree = compilation.SyntaxTrees.Single()
+            Dim node = tree.GetRoot().DescendantNodes().OfType(Of IdentifierNameSyntax)().Where(Function(id) id.Identifier.ValueText = "a").Single()
+
+            Assert.Equal("a.", node.Parent.ToString())
+
+            Dim semanticModel = compilation.GetSemanticModel(tree)
+            Dim symbolInfo = semanticModel.GetSymbolInfo(node)
+
+            Assert.Equal("a As Program", symbolInfo.Symbol.ToTestDisplayString())
+        End Sub
+
+        <Fact, WorkItem(1179899, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/1179899")>
+        Public Sub ParameterReference_03()
+
+            Dim compilation = CreateCompilationWithMscorlib40AndVBRuntime(
+    <compilation name="InstantiatingNamespace">
+        <file name="a.vb">
+Imports System
+
+Class Program
+    Shared Sub Main(args As String())
+    End Sub
+
+    Sub stuff()
+        Dim l as Func(Of Program, String) = Function(a) a.
+    End Sub
+End Class
+    </file>
+    </compilation>)
+
+            compilation.AssertTheseDiagnostics(<expected>
+BC30203: Identifier expected.
+        Dim l as Func(Of Program, String) = Function(a) a.
+                                                          ~
+                                               </expected>)
+
+            Dim tree = compilation.SyntaxTrees.Single()
+            Dim node = tree.GetRoot().DescendantNodes().OfType(Of IdentifierNameSyntax)().Where(Function(id) id.Identifier.ValueText = "a").Single()
+
+            Assert.Equal("a.", node.Parent.ToString().Trim())
+
+            Dim semanticModel = compilation.GetSemanticModel(tree)
+            Dim symbolInfo = semanticModel.GetSymbolInfo(node)
+
+            Assert.Equal("a As Program", symbolInfo.Symbol.ToTestDisplayString())
+        End Sub
+
+        <Fact, WorkItem(1179899, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/1179899")>
+        Public Sub ParameterReference_04()
+
+            Dim compilation = CreateCompilationWithMscorlib40AndVBRuntime(
+    <compilation name="InstantiatingNamespace">
+        <file name="a.vb">
+Imports System
+
+Class Program
+    Shared Sub Main(args As String())
+    End Sub
+
+    Sub stuff()
+        Dim l = CType(Function(a) a. , Func(Of Program, String))
+    End Sub
+End Class
+    </file>
+    </compilation>)
+
+            compilation.AssertTheseDiagnostics(<expected>
+BC30203: Identifier expected.
+        Dim l = CType(Function(a) a. , Func(Of Program, String))
+                                     ~
+                                               </expected>)
+
+            Dim tree = compilation.SyntaxTrees.Single()
+            Dim node = tree.GetRoot().DescendantNodes().OfType(Of IdentifierNameSyntax)().Where(Function(id) id.Identifier.ValueText = "a").Single()
+
+            Assert.Equal("a.", node.Parent.ToString().Trim())
+
+            Dim semanticModel = compilation.GetSemanticModel(tree)
+            Dim symbolInfo = semanticModel.GetSymbolInfo(node)
+
+            Assert.Equal("a As Program", symbolInfo.Symbol.ToTestDisplayString())
+        End Sub
+
+        <WorkItem(35096, "https://github.com/dotnet/roslyn/issues/35096")>
+        <Fact()>
+        Public Sub ThenIncludeSecondArgumentAndMultiArgumentLambdaWithNoLambdaOverlap()
+            Dim compilation = CreateCompilationWithMscorlib40AndVBRuntimeAndReferences(
+<compilation name="ThenIncludeIntellisenseBugNamespace">
+    <file name="a.vb"><![CDATA[
+Imports System                       
+Imports System.Collections.Generic
+Imports System.Linq
+Imports System.Linq.Expressions
+
+Namespace ThenIncludeIntellisenseBug
+
+    Class Program
+        Shared Sub Main(args As String())
+            Dim registrations = New List(Of Registration)().AsQueryable()
+            Dim reg = registrations.Include(Function(r) r.Activities).ThenInclude(0, Function(a, b, c) c.F)
+        End Sub
+    End Class
+
+    Friend Class Registration
+        Public Property Activities As ICollection(Of Activity)
+    End Class
+
+    Public Class Activity
+        Public Property Task As Task
+    End Class
+
+    Public Class Task
+        Public Property Name As String
+    End Class
+
+    Public Interface IIncludableQueryable(Of Out TEntity, Out TProperty)
+        Inherits IQueryable(Of TEntity)
+    End Interface
+
+    Public Module EntityFrameworkQueryableExtensions
+        <System.Runtime.CompilerServices.Extension>
+        Public Function Include(Of TEntity, TProperty)(
+                source As IQueryable(Of TEntity), 
+                navigationPropertyPath As Expression(Of Func(Of TEntity, TProperty))) As IIncludableQueryable(Of TEntity, TProperty)
+            Return Nothing
+        End Function
+
+        <System.Runtime.CompilerServices.Extension>
+        Public Function ThenInclude(Of TEntity, TPreviousProperty, TProperty)(
+                source As IIncludableQueryable(Of TEntity, ICollection(Of TPreviousProperty)),
+                a as Integer,
+                navigationPropertyPath As Expression(Of Func(Of string, TPreviousProperty, TProperty))) As IIncludableQueryable(Of TEntity, TProperty)
+            Return Nothing
+        End Function
+
+        <System.Runtime.CompilerServices.Extension>
+        Public Function ThenInclude(Of TEntity, TPreviousProperty, TProperty)(
+                source As IIncludableQueryable(Of TEntity, TPreviousProperty),
+                a as Integer,
+                navigationPropertyPath As Expression(Of Func(Of string, string, TPreviousProperty, TProperty))) As IIncludableQueryable(Of TEntity, TProperty)
+            Return Nothing
+        End Function
+
+    End Module
+End Namespace"
+    ]]></file>
+</compilation>, references:={TestMetadata.Net40.SystemCore})
+
+            Dim tree = compilation.SyntaxTrees(0)
+            Dim model = compilation.GetSemanticModel(tree)
+
+            Dim node = tree.GetCompilationUnitRoot().DescendantNodes().OfType(Of InvocationExpressionSyntax)().ToArray()(1)
+            Assert.Equal("registrations.Include(Function(r) r.Activities).ThenInclude(0, Function(a, b, c) c.F)", node.ToString())
+
+            Dim info = model.GetSymbolInfo(node)
+            Assert.Equal(2, info.CandidateSymbols.Length)
+            Assert.Equal("Public Function ThenInclude(Of TProperty)(a As Integer, navigationPropertyPath As " +
+                         "System.Linq.Expressions.Expression(Of System.Func(Of String, ThenIncludeIntellisenseBug.Activity, TProperty))) As " +
+                         "ThenIncludeIntellisenseBug.IIncludableQueryable(Of ThenIncludeIntellisenseBug.Registration, TProperty)", info.CandidateSymbols(0).ToString())
+            Assert.Equal("Public Function ThenInclude(Of TProperty)(a As Integer, navigationPropertyPath As " +
+                         "System.Linq.Expressions.Expression(Of System.Func(Of String, String, System.Collections.Generic.ICollection(Of ThenIncludeIntellisenseBug.Activity), TProperty))) As " +
+                         "ThenIncludeIntellisenseBug.IIncludableQueryable(Of ThenIncludeIntellisenseBug.Registration, TProperty)", info.CandidateSymbols(1).ToString())
         End Sub
 
     End Class

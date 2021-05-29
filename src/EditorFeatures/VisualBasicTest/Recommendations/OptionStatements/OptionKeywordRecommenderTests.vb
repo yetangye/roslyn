@@ -1,23 +1,18 @@
-' Copyright (c) Microsoft.  All Rights Reserved.  Licensed under the Apache License, Version 2.0.  See License.txt in the project root for license information.
-
-Imports Microsoft.CodeAnalysis.Text
-Imports Microsoft.CodeAnalysis.VisualBasic
-Imports Microsoft.CodeAnalysis.VisualBasic.Symbols
-Imports Microsoft.CodeAnalysis.VisualBasic.Syntax
-Imports Roslyn.Test.Utilities
-Imports Xunit
+﻿' Licensed to the .NET Foundation under one or more agreements.
+' The .NET Foundation licenses this file to you under the MIT license.
+' See the LICENSE file in the project root for more information.
 
 Namespace Microsoft.CodeAnalysis.Editor.VisualBasic.UnitTests.Recommendations.OptionStatements
     Public Class OptionKeywordRecommenderTests
         <Fact>
         <Trait(Traits.Feature, Traits.Features.KeywordRecommending)>
-        Public Sub OptionInBlankFile()
+        Public Sub OptionInBlankFileTest()
             VerifyRecommendationsContain(<File>|</File>, "Option")
         End Sub
 
         <Fact>
         <Trait(Traits.Feature, Traits.Features.KeywordRecommending)>
-        Public Sub OptionAfterAnotherOptionStatement()
+        Public Sub OptionAfterAnotherOptionStatementTest()
             VerifyRecommendationsContain(<File>
 Option Strict On
 |</File>, "Option")
@@ -25,7 +20,7 @@ Option Strict On
 
         <Fact>
         <Trait(Traits.Feature, Traits.Features.KeywordRecommending)>
-        Public Sub OptionAfterBlankLine()
+        Public Sub OptionAfterBlankLineTest()
             VerifyRecommendationsContain(<File>
 Option Strict On
 
@@ -34,25 +29,25 @@ Option Strict On
 
         <Fact>
         <Trait(Traits.Feature, Traits.Features.KeywordRecommending)>
-        Public Sub OptionNotAfterImports()
+        Public Sub OptionNotAfterImportsTest()
             VerifyRecommendationsMissing(<File>
-Imports Foo
+Imports Goo
 |</File>, "Option")
         End Sub
 
         <Fact>
         <Trait(Traits.Feature, Traits.Features.KeywordRecommending)>
-        Public Sub OptionNotAfterType()
+        Public Sub OptionNotAfterTypeTest()
             VerifyRecommendationsMissing(<File>
-Class Foo
+Class Goo
 End Class
 |</File>, "Option")
         End Sub
 
-        <WorkItem(543008)>
+        <WorkItem(543008, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/543008")>
         <Fact>
         <Trait(Traits.Feature, Traits.Features.KeywordRecommending)>
-        Public Sub OptionNotAfterRegionKeyword()
+        Public Sub OptionNotAfterRegionKeywordTest()
             VerifyRecommendationsMissing(<File>
 #Region |
 </File>, "Option")

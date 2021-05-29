@@ -1,12 +1,15 @@
-' Copyright (c) Microsoft.  All Rights Reserved.  Licensed under the Apache License, Version 2.0.  See License.txt in the project root for license information.
+﻿' Licensed to the .NET Foundation under one or more agreements.
+' The .NET Foundation licenses this file to you under the MIT license.
+' See the LICENSE file in the project root for more information.
 
+Imports Microsoft.CodeAnalysis.Test.Utilities
 Imports Roslyn.Test.Utilities
 
 Namespace Microsoft.VisualStudio.LanguageServices.UnitTests.CodeModel.MethodXML
     Partial Public Class MethodXMLTests
 
-        <ConditionalFact(GetType(x86)), Trait(Traits.Feature, Traits.Features.CodeModelMethodXml)>
-        Public Sub VBInvocations_InvocationWithoutMe()
+        <WpfFact, Trait(Traits.Feature, Traits.Features.CodeModelMethodXml)>
+        Public Sub TestVBInvocations_InvocationWithoutMe()
             Dim definition =
 <Workspace>
     <Project Language="Visual Basic" CommonReferences="true">
@@ -14,10 +17,10 @@ Namespace Microsoft.VisualStudio.LanguageServices.UnitTests.CodeModel.MethodXML
         <Document>
 Public Class Class1
     $$Sub M()
-        Foo()
+        Goo()
     End Sub
 
-    Sub Foo()
+    Sub Goo()
     End Sub
 End Class
         </Document>
@@ -34,7 +37,7 @@ End Class
                         <Expression>
                             <ThisReference/>
                         </Expression>
-                        <Name>Foo</Name>
+                        <Name>Goo</Name>
                     </NameRef>
                 </Expression>
             </MethodCall>
@@ -45,8 +48,8 @@ End Class
             Test(definition, expected)
         End Sub
 
-        <ConditionalFact(GetType(x86)), Trait(Traits.Feature, Traits.Features.CodeModelMethodXml)>
-        Public Sub VBInvocations_InvocationWithMe()
+        <WpfFact, Trait(Traits.Feature, Traits.Features.CodeModelMethodXml)>
+        Public Sub TestVBInvocations_InvocationWithMe()
             Dim definition =
 <Workspace>
     <Project Language="Visual Basic" CommonReferences="true">
@@ -54,10 +57,10 @@ End Class
         <Document>
 Public Class Class1
     $$Sub M()
-        Me.Foo()
+        Me.Goo()
     End Sub
 
-    Sub Foo()
+    Sub Goo()
     End Sub
 End Class
         </Document>
@@ -74,7 +77,7 @@ End Class
                         <Expression>
                             <ThisReference/>
                         </Expression>
-                        <Name>Foo</Name>
+                        <Name>Goo</Name>
                     </NameRef>
                 </Expression>
             </MethodCall>
@@ -85,8 +88,8 @@ End Class
             Test(definition, expected)
         End Sub
 
-        <ConditionalFact(GetType(x86)), Trait(Traits.Feature, Traits.Features.CodeModelMethodXml)>
-        Public Sub VBInvocations_WithArrayInitializer1()
+        <WpfFact, Trait(Traits.Feature, Traits.Features.CodeModelMethodXml)>
+        Public Sub TestVBInvocations_WithArrayInitializer1()
             Dim definition =
 <Workspace>
     <Project Language="Visual Basic" CommonReferences="true">
@@ -94,7 +97,7 @@ End Class
         <Document>
 Public Class C
     $$Sub M()
-        Me.list.AddRange(New String() { "foo", "bar", "baz" })
+        Me.list.AddRange(New String() { "goo", "bar", "baz" })
     End Sub
 
     Dim list As System.Collections.ArrayList
@@ -136,7 +139,7 @@ End Class
                             </Bound>
                             <Expression>
                                 <Literal>
-                                    <String>foo</String>
+                                    <String>goo</String>
                                 </Literal>
                             </Expression>
                             <Expression>
@@ -160,8 +163,8 @@ End Class
             Test(definition, expected)
         End Sub
 
-        <ConditionalFact(GetType(x86)), Trait(Traits.Feature, Traits.Features.CodeModelMethodXml)>
-        Public Sub VBInvocations_InvokeOnCast()
+        <WpfFact, Trait(Traits.Feature, Traits.Features.CodeModelMethodXml)>
+        Public Sub TestVBInvocations_InvokeOnCast()
             Dim definition =
 <Workspace>
     <Project Language="Visual Basic" CommonReferences="true">
@@ -230,8 +233,8 @@ End Class
             Test(definition, expected)
         End Sub
 
-        <ConditionalFact(GetType(x86)), Trait(Traits.Feature, Traits.Features.CodeModelMethodXml)>
-        Public Sub VBInvocations_InvokeFixInCast()
+        <WpfFact, Trait(Traits.Feature, Traits.Features.CodeModelMethodXml)>
+        Public Sub TestVBInvocations_InvokeFixInCast()
             Dim definition =
 <Workspace>
     <Project Language="Visual Basic" CommonReferences="true">
@@ -284,9 +287,9 @@ End Class
             Test(definition, expected)
         End Sub
 
-        <WorkItem(870422)>
-        <ConditionalFact(GetType(x86)), Trait(Traits.Feature, Traits.Features.CodeModelMethodXml)>
-        Public Sub VBAssignments_MethodCallWithoutTypeQualification()
+        <WorkItem(870422, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/870422")>
+        <WpfFact, Trait(Traits.Feature, Traits.Features.CodeModelMethodXml)>
+        Public Sub TestVBAssignments_MethodCallWithoutTypeQualification()
             Dim definition =
 <Workspace>
     <Project Language="Visual Basic" CommonReferences="true">

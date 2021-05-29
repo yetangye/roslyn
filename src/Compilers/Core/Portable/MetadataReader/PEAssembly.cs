@@ -1,4 +1,8 @@
-﻿// Copyright (c) Microsoft.  All Rights Reserved.  Licensed under the Apache License, Version 2.0.  See License.txt in the project root for license information.
+﻿// Licensed to the .NET Foundation under one or more agreements.
+// The .NET Foundation licenses this file to you under the MIT license.
+// See the LICENSE file in the project root for more information.
+
+#nullable disable
 
 using System;
 using System.Collections.Generic;
@@ -6,6 +10,7 @@ using System.Collections.Immutable;
 using System.Linq;
 using System.Reflection.Metadata;
 using System.Threading;
+using Microsoft.CodeAnalysis.PooledObjects;
 using Roslyn.Utilities;
 using System.Diagnostics;
 
@@ -40,7 +45,10 @@ namespace Microsoft.CodeAnalysis
 
         private ThreeState _lazyDeclaresTheObjectClass;
 
-        // We need to store reference for to keep the metadata alive while symbols have reference to PEAssembly.
+        /// <summary>
+        /// We need to store reference to the assembly metadata to keep the metadata alive while 
+        /// symbols have reference to PEAssembly.
+        /// </summary>
         private readonly AssemblyMetadata _owner;
 
         //Maps from simple name to list of public keys. If an IVT attribute specifies no public
@@ -71,11 +79,11 @@ namespace Microsoft.CodeAnalysis
             _owner = owner;
         }
 
-        internal Handle Handle
+        internal EntityHandle Handle
         {
             get
             {
-                return Handle.AssemblyDefinition;
+                return EntityHandle.AssemblyDefinition;
             }
         }
 
@@ -167,17 +175,14 @@ namespace Microsoft.CodeAnalysis
             {
                 if (_lazyDeclaresTheObjectClass == ThreeState.Unknown)
                 {
-                    if (!_modules[0].FindSystemObjectTypeDef().IsNil)
-                    {
-                        _lazyDeclaresTheObjectClass = ThreeState.True;
-                        return true;
-                    }
-
-                    _lazyDeclaresTheObjectClass = ThreeState.False;
+                    var value = _modules[0].MetadataReader.DeclaresTheObjectClass();
+                    _lazyDeclaresTheObjectClass = value.ToThreeState();
                 }
 
                 return _lazyDeclaresTheObjectClass == ThreeState.True;
             }
         }
+
+        public AssemblyMetadata GetNonDisposableMetadata() => _owner.Copy();
     }
 }

@@ -1,4 +1,8 @@
-﻿// Copyright (c) Microsoft.  All Rights Reserved.  Licensed under the Apache License, Version 2.0.  See License.txt in the project root for license information.
+﻿// Licensed to the .NET Foundation under one or more agreements.
+// The .NET Foundation licenses this file to you under the MIT license.
+// See the LICENSE file in the project root for more information.
+
+#nullable disable
 
 using Microsoft.CodeAnalysis.CSharp.Symbols;
 
@@ -19,8 +23,8 @@ namespace Microsoft.CodeAnalysis.CSharp
             try
             {
                 walker.Analyze(ref badRegion, diagnostics);
-                startPointIsReachable = badRegion || walker._reginStartPointIsReachable.GetValueOrDefault(true);
-                endPointIsReachable = badRegion || walker._reginEndPointIsReachable.GetValueOrDefault(walker.State.Alive);
+                startPointIsReachable = badRegion || walker._regionStartPointIsReachable.GetValueOrDefault(true);
+                endPointIsReachable = badRegion || walker._regionEndPointIsReachable.GetValueOrDefault(walker.State.Alive);
             }
             finally
             {
@@ -29,8 +33,8 @@ namespace Microsoft.CodeAnalysis.CSharp
             }
         }
 
-        private bool? _reginStartPointIsReachable;
-        private bool? _reginEndPointIsReachable;
+        private bool? _regionStartPointIsReachable;
+        private bool? _regionEndPointIsReachable;
 
         private RegionReachableWalker(CSharpCompilation compilation, Symbol member, BoundNode node, BoundNode firstInRegion, BoundNode lastInRegion)
             : base(compilation, member, node, firstInRegion, lastInRegion)
@@ -39,13 +43,13 @@ namespace Microsoft.CodeAnalysis.CSharp
 
         protected override void EnterRegion()
         {
-            _reginStartPointIsReachable = this.State.Alive;
+            _regionStartPointIsReachable = this.State.Alive;
             base.EnterRegion();
         }
 
-        override protected void LeaveRegion()
+        protected override void LeaveRegion()
         {
-            _reginEndPointIsReachable = this.State.Alive;
+            _regionEndPointIsReachable = this.State.Alive;
             base.LeaveRegion();
         }
     }

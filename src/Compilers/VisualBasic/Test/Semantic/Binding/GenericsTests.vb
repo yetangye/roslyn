@@ -1,4 +1,6 @@
-﻿' Copyright (c) Microsoft.  All Rights Reserved.  Licensed under the Apache License, Version 2.0.  See License.txt in the project root for license information.
+﻿' Licensed to the .NET Foundation under one or more agreements.
+' The .NET Foundation licenses this file to you under the MIT license.
+' See the LICENSE file in the project root for more information.
 
 Imports Microsoft.CodeAnalysis
 Imports Microsoft.CodeAnalysis.VisualBasic
@@ -9,12 +11,12 @@ Namespace Microsoft.CodeAnalysis.VisualBasic.UnitTests
     Public Class GenericsTests
         Inherits BasicTestBase
 
-        <WorkItem(543690, "DevDiv")>
-        <WorkItem(543690, "DevDiv")>
+        <WorkItem(543690, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/543690")>
+        <WorkItem(543690, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/543690")>
         <Fact()>
         Public Sub WrongNumberOfGenericArgumentsTest()
 
-            Dim compilation = CompilationUtils.CreateCompilationWithMscorlibAndVBRuntime(
+            Dim compilation = CompilationUtils.CreateCompilationWithMscorlib40AndVBRuntime(
     <compilation name="WrongNumberOfGenericArguments">
         <file name="a.vb">
 Namespace GenArity200
@@ -49,13 +51,13 @@ BC32042: Too few type arguments to 'vbCls5(Of UInteger()()).vbStrA(Of X, Y)'.
 
         End Sub
 
-        <WorkItem(543706, "DevDiv")>
+        <WorkItem(543706, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/543706")>
         <Fact()>
         Public Sub TestNestedGenericTypeInference()
             Dim vbCompilation = CreateVisualBasicCompilation("TestNestedGenericTypeInference",
             <![CDATA[Imports System
         Public Module Program
-            Sub foo(Of U, T)(ByVal x As cls1(Of U).cls2(Of T))
+            Sub goo(Of U, T)(ByVal x As cls1(Of U).cls2(Of T))
                 Console.WriteLine(GetType(U).ToString())
                 Console.WriteLine(GetType(T).ToString())
             End Sub
@@ -66,7 +68,7 @@ BC32042: Too few type arguments to 'vbCls5(Of UInteger()()).vbStrA(Of X, Y)'.
 
             Sub Main()
                 Dim x = New cls1(Of Integer).cls2(Of Long)
-                foo(x)
+                goo(x)
             End Sub
         End Module]]>,
                 compilationOptions:=New VisualBasicCompilationOptions(OutputKind.ConsoleApplication))
@@ -75,10 +77,10 @@ BC32042: Too few type arguments to 'vbCls5(Of UInteger()()).vbStrA(Of X, Y)'.
 System.Int64]]>).VerifyDiagnostics()
         End Sub
 
-        <WorkItem(543783, "DevDiv")>
+        <WorkItem(543783, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/543783")>
         <Fact()>
         Public Sub ImportNestedGenericTypeWithErrors()
-            Dim compilation = CreateCompilationWithMscorlibAndVBRuntime(
+            Dim compilation = CreateCompilationWithMscorlib40AndVBRuntime(
     <compilation>
         <file name="a.vb"><![CDATA[
 Imports GenImpClassOpenErrors.GenClassA(Of String).GenClassB.GenClassC(Of String)
@@ -104,10 +106,10 @@ Imports GenImpClassOpenErrors.GenClassA(Of String).GenClassB.GenClassC(Of String
 </expected>)
         End Sub
 
-        <WorkItem(543850, "DevDiv")>
+        <WorkItem(543850, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/543850")>
         <Fact()>
         Public Sub ConflictingNakedConstraint()
-            Dim compilation = CreateCompilationWithMscorlibAndVBRuntime(
+            Dim compilation = CreateCompilationWithMscorlib40AndVBRuntime(
     <compilation>
         <file name="a.vb">
 Module Program
@@ -140,7 +142,7 @@ BC32110: Constraint 'Class c3' conflicts with the indirect constraint 'Class c2'
         <WorkItem(11887, "DevDiv_Projects/Roslyn")>
         <Fact()>
         Public Sub WideningNullableConversion()
-            Dim compilation = CreateCompilationWithMscorlibAndVBRuntime(
+            Dim compilation = CreateCompilationWithMscorlib40AndVBRuntime(
     <compilation>
         <file name="a.vb">
 Imports System
@@ -158,10 +160,10 @@ End Module
             compilation.VerifyDiagnostics()
         End Sub
 
-        <WorkItem(543900, "DevDiv")>
+        <WorkItem(543900, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/543900")>
         <Fact()>
         Public Sub NarrowingConversionNoReturn()
-            Dim compilation = CreateCompilationWithMscorlibAndVBRuntime(
+            Dim compilation = CreateCompilationWithMscorlib40AndVBRuntime(
     <compilation>
         <file name="a.vb">
 Imports System
@@ -180,10 +182,10 @@ End Namespace
             compilation.VerifyDiagnostics()
         End Sub
 
-        <WorkItem(543900, "DevDiv")>
+        <WorkItem(543900, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/543900")>
         <Fact()>
         Public Sub NarrowingConversionNoReturn2()
-            Dim compilation = CreateCompilationWithMscorlibAndVBRuntime(
+            Dim compilation = CreateCompilationWithMscorlib40AndVBRuntime(
     <compilation>
         <file name="a.vb">
 Imports System
@@ -202,10 +204,10 @@ End Namespace
             compilation.AssertNoDiagnostics()
         End Sub
 
-        <WorkItem(543902, "DevDiv")>
+        <WorkItem(543902, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/543902")>
         <Fact()>
         Public Sub ConversionOperatorShouldBePublic()
-            Dim compilation = CreateCompilationWithMscorlibAndVBRuntime(
+            Dim compilation = CreateCompilationWithMscorlib40AndVBRuntime(
     <compilation>
         <file name="a.vb">
 Namespace Program
@@ -224,15 +226,15 @@ End Namespace
             compilation.VerifyDiagnostics(Diagnostic(ERRID.ERR_UndefinedType1, "CScen5b").WithArguments("CScen5b"))
         End Sub
 
-        <Fact(), WorkItem(529249, "DevDiv")>
+        <Fact(), WorkItem(529249, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/529249")>
         Public Sub ArrayOfRuntimeArgumentHandle()
-            Dim compilation = CreateCompilationWithMscorlibAndVBRuntime(
+            Dim compilation = CreateCompilationWithMscorlib40AndVBRuntime(
     <compilation>
         <file name="a.vb">
 Imports System
 
 Module Program
-    Sub foo(ByRef x As RuntimeArgumentHandle())
+    Sub goo(ByRef x As RuntimeArgumentHandle())
         ReDim x(100)
     End Sub
 End Module
@@ -243,10 +245,10 @@ End Module
             compilation.VerifyDiagnostics(Diagnostic(ERRID.ERR_RestrictedType1, "RuntimeArgumentHandle()").WithArguments("System.RuntimeArgumentHandle"))
         End Sub
 
-        <WorkItem(543909, "DevDiv")>
+        <WorkItem(543909, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/543909")>
         <Fact()>
         Public Sub StructureContainsItself()
-            Dim compilation = CreateCompilationWithMscorlibAndVBRuntime(
+            Dim compilation = CreateCompilationWithMscorlib40AndVBRuntime(
     <compilation>
         <file name="a.vb">
 Imports System
@@ -263,15 +265,15 @@ End Namespace
             )
 
             compilation.VerifyDiagnostics(Diagnostic(ERRID.ERR_RecordCycle2, "enumerator").WithArguments("s2",
-                                                                                                          vbCrLf &
-            "    's2' contains 'List(Of s2).Enumerator' (variable 'enumerator')." & vbCrLf &
+                                                                                                          Environment.NewLine &
+            "    's2' contains 'List(Of s2).Enumerator' (variable 'enumerator')." & Environment.NewLine &
             "    'List(Of s2).Enumerator' contains 's2' (variable 'current')."))
         End Sub
 
-        <WorkItem(543921, "DevDiv")>
+        <WorkItem(543921, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/543921")>
         <Fact()>
         Public Sub GenericConstraintInheritanceWithEvent()
-            Dim compilation = CreateCompilationWithMscorlibAndVBRuntime(
+            Dim compilation = CreateCompilationWithMscorlib40AndVBRuntime(
     <compilation>
         <file name="a.vb">
 Namespace GenClass7105
@@ -313,7 +315,7 @@ Namespace GenClass7105
     Class Cls1a(Of T1 As {I1, Class}, T2 As T1)
         Public WithEvents x1 As T1
         'This error is actually correct now as the Class Constraint Change which was made. Class can be a Class (OR INTERFACE) on a structure.
-        'This testcase has changed to reflect the new behaviour and this constraint change will also be caught.
+        'This testcase has changed to reflect the new behavior and this constraint change will also be caught.
 
         'COMPILEERROR: BC30413, "T2"
         Public WithEvents x2 As T2
@@ -333,10 +335,10 @@ End Namespace
             compilation.VerifyDiagnostics(Diagnostic(ERRID.ERR_WithEventsAsStruct, "x2"))
         End Sub
 
-        <WorkItem(529287, "DevDiv")>
+        <WorkItem(529287, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/529287")>
         <Fact()>
         Public Sub ProtectedMemberGenericClass()
-            Dim compilation = CreateCompilationWithMscorlibAndVBRuntime(
+            Dim compilation = CreateCompilationWithMscorlib40AndVBRuntime(
     <compilation>
         <file name="a.vb">
 Public Class c1(Of T)
@@ -352,7 +354,7 @@ End Class
             compilation.VerifyDiagnostics()
         End Sub
 
-        <WorkItem(544122, "DevDiv")>
+        <WorkItem(544122, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/544122")>
         <Fact()>
         Public Sub BoxAlreadyBoxed()
             Dim compilation = CompileAndVerify(
@@ -378,7 +380,7 @@ End Module
             )
         End Sub
 
-        <WorkItem(531075, "DevDiv")>
+        <WorkItem(531075, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/531075")>
         <Fact()>
         Public Sub Bug17530()
             Dim vbCompilation = CreateVisualBasicCompilation("Bug17530",

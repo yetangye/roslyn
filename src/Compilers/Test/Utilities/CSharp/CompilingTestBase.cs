@@ -1,18 +1,18 @@
-// Copyright (c) Microsoft.  All Rights Reserved.  Licensed under the Apache License, Version 2.0.  See License.txt in the project root for license information.
+﻿// Licensed to the .NET Foundation under one or more agreements.
+// The .NET Foundation licenses this file to you under the MIT license.
+// See the LICENSE file in the project root for more information.
+
+#nullable disable
 
 using System;
 using System.Collections.Generic;
 using System.Linq;
-using System.Text;
-using Microsoft.CodeAnalysis.CodeGen;
 using Microsoft.CodeAnalysis.CSharp.Emit;
 using Microsoft.CodeAnalysis.CSharp.Symbols;
 using Microsoft.CodeAnalysis.CSharp.Syntax;
 using Microsoft.CodeAnalysis.CSharp.Test.Utilities;
 using Microsoft.CodeAnalysis.Emit;
-using Microsoft.CodeAnalysis.Test.Utilities;
 using Roslyn.Test.Utilities;
-using Xunit;
 
 namespace Microsoft.CodeAnalysis.CSharp.UnitTests
 {
@@ -24,60 +24,23 @@ namespace Microsoft.CodeAnalysis.CSharp.UnitTests
 
         internal static BoundBlock ParseAndBindMethodBody(string program, string typeName = DefaultTypeName, string methodName = DefaultMethodName)
         {
-            var body = ParseAndBindMethodBody(program, false, typeName, methodName);
-            return (BoundBlock)body;
-        }
-
-        internal static BoundStatement ParseAndBindMethodBody(string program, bool lower, string typeName = DefaultTypeName, string methodName = DefaultMethodName)
-        {
-            var compilation = CreateCompilationWithMscorlib(program);
+            var compilation = CreateCompilation(program);
             var method = (MethodSymbol)compilation.GlobalNamespace.GetTypeMembers(typeName).Single().GetMembers(methodName).Single();
+
+            // Provide an Emit.Module so that the lowering passes will be run
+            var module = new PEAssemblyBuilder(
+                (SourceAssemblySymbol)compilation.Assembly,
+                emitOptions: EmitOptions.Default,
+                outputKind: OutputKind.ConsoleApplication,
+                serializationProperties: GetDefaultModulePropertiesForSerialization(),
+                manifestResources: Enumerable.Empty<ResourceDescription>());
+
+            TypeCompilationState compilationState = new TypeCompilationState(method.ContainingType, compilation, module);
+
             var diagnostics = DiagnosticBag.GetInstance();
-            try
-            {
-                // Provide an Emit.Module so that the lowering passes will be run
-                var module = new PEAssemblyBuilder(
-                    (SourceAssemblySymbol)compilation.Assembly,
-                    EmitOptions.Default,
-                    OutputKind.ConsoleApplication,
-                    GetDefaultModulePropertiesForSerialization(),
-                    Enumerable.Empty<ResourceDescription>(),
-                    assemblySymbolMapper: null);
-
-                TypeCompilationState compilationState = new TypeCompilationState(method.ContainingType, compilation, module);
-
-                var block = MethodCompiler.BindMethodBody(method, compilationState, diagnostics);
-                if ((block == null) || !lower)
-                {
-                    return block;
-                }
-
-                StateMachineTypeSymbol stateMachineTypeOpt;
-                VariableSlotAllocator lazyVariableSlotAllocator = null;
-                var lambdaDebugInfoBuilder = ArrayBuilder<LambdaDebugInfo>.GetInstance();
-                var closureDebugInfoBuilder = ArrayBuilder<ClosureDebugInfo>.GetInstance();
-
-                var body = MethodCompiler.LowerBodyOrInitializer(
-                    method: method,
-                    methodOrdinal: 0,
-                    body: block,
-                    previousSubmissionFields: null,
-                    compilationState: compilationState,
-                    diagnostics: diagnostics,
-                    lazyVariableSlotAllocator: ref lazyVariableSlotAllocator,
-                    lambdaDebugInfoBuilder: lambdaDebugInfoBuilder,
-                    closureDebugInfoBuilder: closureDebugInfoBuilder,
-                    stateMachineTypeOpt: out stateMachineTypeOpt);
-
-                lambdaDebugInfoBuilder.Free();
-                closureDebugInfoBuilder.Free();
-
-                return body;
-            }
-            finally
-            {
-                diagnostics.Free();
-            }
+            var block = MethodCompiler.BindMethodBody(method, compilationState, new BindingDiagnosticBag(diagnostics));
+            diagnostics.Free();
+            return block;
         }
 
         public static string DumpDiagnostic(Diagnostic diagnostic)
@@ -87,45 +50,19 @@ namespace Microsoft.CodeAnalysis.CSharp.UnitTests
                 DiagnosticFormatter.Instance.Format(diagnostic.WithLocation(Location.None), EnsureEnglishUICulture.PreferredOrNull));
         }
 
+        [Obsolete("Use VerifyDiagnostics", true)]
         public static void TestDiagnostics(IEnumerable<Diagnostic> diagnostics, params string[] diagStrings)
         {
             AssertEx.SetEqual(diagStrings, diagnostics.Select(DumpDiagnostic));
         }
 
         // Do a full compilation and check all the errors.
+        [Obsolete("Use VerifyDiagnostics", true)]
         public void TestAllErrors(string code, params string[] errors)
         {
-            var compilation = CreateCompilationWithMscorlib(code);
+            var compilation = CreateCompilation(code);
             var diagnostics = compilation.GetDiagnostics();
             AssertEx.SetEqual(errors, diagnostics.Select(DumpDiagnostic));
-        }
-
-        // Tests just the errors found while binding method M in class C.
-        public void TestErrors(string code, params string[] errors)
-        {
-            var compilation = CreateCompilationWithMscorlib(code);
-            var method = (SourceMethodSymbol)compilation.GlobalNamespace.GetTypeMembers("C").Single().GetMembers("M").Single();
-            var factory = compilation.GetBinderFactory(method.SyntaxTree);
-            var bodyBlock = (BlockSyntax)method.BodySyntax;
-            var parameterBinderContext = factory.GetBinder(bodyBlock);
-            var binder = new ExecutableCodeBinder(bodyBlock.Parent, method, parameterBinderContext);
-            var diagnostics = new DiagnosticBag();
-            var block = (BoundBlock)binder.BindStatement(bodyBlock, diagnostics);
-            AssertEx.SetEqual(errors, diagnostics.AsEnumerable().Select(DumpDiagnostic));
-        }
-
-        public void TestWarnings(string code, params string[] expectedWarnings)
-        {
-            var compilation = CreateCompilationWithMscorlib(code);
-            var method = (SourceMethodSymbol)compilation.GlobalNamespace.GetTypeMembers("C").Single().GetMembers("M").Single();
-            var factory = compilation.GetBinderFactory(method.SyntaxTree);
-            var bodyBlock = (BlockSyntax)method.BodySyntax;
-            var parameterBinderContext = factory.GetBinder(bodyBlock);
-            var binder = new ExecutableCodeBinder(bodyBlock.Parent, method, parameterBinderContext);
-            var block = (BoundBlock)binder.BindStatement(bodyBlock, new DiagnosticBag());
-            var actualWarnings = new DiagnosticBag();
-            DiagnosticsPass.IssueDiagnostics(compilation, block, actualWarnings, method);
-            AssertEx.SetEqual(expectedWarnings, actualWarnings.AsEnumerable().Select(DumpDiagnostic));
         }
 
         public const string LINQ =

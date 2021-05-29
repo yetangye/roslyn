@@ -1,23 +1,18 @@
-' Copyright (c) Microsoft.  All Rights Reserved.  Licensed under the Apache License, Version 2.0.  See License.txt in the project root for license information.
-
-Imports Microsoft.CodeAnalysis.Text
-Imports Microsoft.CodeAnalysis.VisualBasic
-Imports Microsoft.CodeAnalysis.VisualBasic.Symbols
-Imports Microsoft.CodeAnalysis.VisualBasic.Syntax
-Imports Roslyn.Test.Utilities
-Imports Xunit
+﻿' Licensed to the .NET Foundation under one or more agreements.
+' The .NET Foundation licenses this file to you under the MIT license.
+' See the LICENSE file in the project root for more information.
 
 Namespace Microsoft.CodeAnalysis.Editor.VisualBasic.UnitTests.Recommendations.ImportsKeywordRecommender
     Public Class OptionKeywordRecommenderTests
         <Fact>
         <Trait(Traits.Feature, Traits.Features.KeywordRecommending)>
-        Public Sub ImportsInBlankFile()
+        Public Sub ImportsInBlankFileTest()
             VerifyRecommendationsContain(<File>|</File>, "Imports")
         End Sub
 
         <Fact>
         <Trait(Traits.Feature, Traits.Features.KeywordRecommending)>
-        Public Sub ImportsAfterAnotherImportsStatement()
+        Public Sub ImportsAfterAnotherImportsStatementTest()
             VerifyRecommendationsContain(<File>
 Imports Bar
 |</File>, "Imports")
@@ -25,7 +20,7 @@ Imports Bar
 
         <Fact>
         <Trait(Traits.Feature, Traits.Features.KeywordRecommending)>
-        Public Sub ImportsAfterXmlImports()
+        Public Sub ImportsAfterXmlImportsTest()
             VerifyRecommendationsContain(<File>
 Imports &lt;xmlns:test="http://tempuri.org"&gt;
 |</File>, "Imports")
@@ -33,7 +28,7 @@ Imports &lt;xmlns:test="http://tempuri.org"&gt;
 
         <Fact>
         <Trait(Traits.Feature, Traits.Features.KeywordRecommending)>
-        Public Sub ImportsAfterBlankLineAfterImports()
+        Public Sub ImportsAfterBlankLineAfterImportsTest()
             VerifyRecommendationsContain(<File>
 Imports Bar
 
@@ -42,7 +37,7 @@ Imports Bar
 
         <Fact>
         <Trait(Traits.Feature, Traits.Features.KeywordRecommending)>
-        Public Sub ImportsAfterBlankLineAfterXmlImports()
+        Public Sub ImportsAfterBlankLineAfterXmlImportsTest()
             VerifyRecommendationsContain(<File>
 Imports &lt;xmlns:test="http://tempuri.org"&gt;
 
@@ -51,7 +46,7 @@ Imports &lt;xmlns:test="http://tempuri.org"&gt;
 
         <Fact>
         <Trait(Traits.Feature, Traits.Features.KeywordRecommending)>
-        Public Sub ImportsAfterOptionStatement()
+        Public Sub ImportsAfterOptionStatementTest()
             VerifyRecommendationsContain(<File>
 Option Strict On
 |</File>, "Imports")
@@ -59,7 +54,7 @@ Option Strict On
 
         <Fact>
         <Trait(Traits.Feature, Traits.Features.KeywordRecommending)>
-        Public Sub ImportsAfterBlankLineAfterOptionStatement()
+        Public Sub ImportsAfterBlankLineAfterOptionStatementTest()
             VerifyRecommendationsContain(<File>
 Option Strict On
 
@@ -68,7 +63,7 @@ Option Strict On
 
         <Fact>
         <Trait(Traits.Feature, Traits.Features.KeywordRecommending)>
-        Public Sub ImportsNotBeforeOptionStatement()
+        Public Sub ImportsNotBeforeOptionStatementTest()
             VerifyRecommendationsMissing(<File>
 |
 Option Strict On
@@ -77,9 +72,9 @@ Option Strict On
 
         <Fact>
         <Trait(Traits.Feature, Traits.Features.KeywordRecommending)>
-        Public Sub ImportsNotAfterType()
+        Public Sub ImportsNotAfterTypeTest()
             VerifyRecommendationsMissing(<File>
-Class Foo
+Class Goo
 End Class
 |</File>, "Imports")
         End Sub

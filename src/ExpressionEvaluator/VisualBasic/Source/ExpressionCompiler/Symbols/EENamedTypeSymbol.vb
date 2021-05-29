@@ -1,4 +1,8 @@
-﻿Imports System.Collections.Immutable
+﻿' Licensed to the .NET Foundation under one or more agreements.
+' The .NET Foundation licenses this file to you under the MIT license.
+' See the LICENSE file in the project root for more information.
+
+Imports System.Collections.Immutable
 Imports System.Runtime.InteropServices
 Imports System.Threading
 Imports Microsoft.Cci
@@ -18,12 +22,6 @@ Namespace Microsoft.CodeAnalysis.VisualBasic.ExpressionEvaluator
         Private ReadOnly _syntax As VisualBasicSyntaxNode
         Private ReadOnly _typeParameters As ImmutableArray(Of TypeParameterSymbol)
         Private ReadOnly _methods As ImmutableArray(Of MethodSymbol)
-
-        Private _lazySynthesizedMethods As Dictionary(Of String, PlaceholderMethodSymbol)
-
-#If DEBUG Then
-        Private _sealed As Boolean
-#End If
 
         Friend Sub New(
             container As NamespaceSymbol,
@@ -48,6 +46,7 @@ Namespace Microsoft.CodeAnalysis.VisualBasic.ExpressionEvaluator
             sourceTypeParameters As ImmutableArray(Of TypeParameterSymbol),
             getTypeParameters As Func(Of NamedTypeSymbol, EENamedTypeSymbol, ImmutableArray(Of TypeParameterSymbol)))
 
+            Debug.Assert(syntax IsNot Nothing)
             _container = container
             _baseType = baseType
             _syntax = syntax
@@ -109,18 +108,8 @@ Namespace Microsoft.CodeAnalysis.VisualBasic.ExpressionEvaluator
             Return SpecializedCollections.EmptyEnumerable(Of FieldSymbol)()
         End Function
 
-        Friend Overrides Iterator Function GetMethodsToEmit() As IEnumerable(Of MethodSymbol)
-            For Each method In _methods
-                Yield method
-            Next
-#If DEBUG Then
-            _sealed = True
-#End If
-            If _lazySynthesizedMethods IsNot Nothing Then
-                For Each method In _lazySynthesizedMethods.Values
-                    Yield method
-                Next
-            End If
+        Friend Overrides Function GetMethodsToEmit() As IEnumerable(Of MethodSymbol)
+            Return _methods
         End Function
 
         Friend Overrides Function GetInterfacesToEmit() As IEnumerable(Of NamedTypeSymbol)
@@ -180,9 +169,9 @@ Namespace Microsoft.CodeAnalysis.VisualBasic.ExpressionEvaluator
         End Function
 
         Public Overrides Function GetMembers(name As String) As ImmutableArray(Of Symbol)
-            ' Shoudl not be requesting generated members by name other than constructors.
+            ' Should not be requesting generated members by name other than constructors.
             Debug.Assert(name = WellKnownMemberNames.InstanceConstructorName OrElse name = WellKnownMemberNames.StaticConstructorName)
-            Return GetMembers().WhereAsArray(Function(m) m.Name = name)
+            Return GetMembers().WhereAsArray(Function(member, name_) member.Name = name_, name)
         End Function
 
         Public Overrides Function GetTypeMembers() As ImmutableArray(Of NamedTypeSymbol)
@@ -227,7 +216,7 @@ Namespace Microsoft.CodeAnalysis.VisualBasic.ExpressionEvaluator
             End Get
         End Property
 
-        Friend Overrides ReadOnly Property IsSerializable As Boolean
+        Public Overrides ReadOnly Property IsSerializable As Boolean
             Get
                 Return False
             End Get
@@ -307,19 +296,19 @@ Namespace Microsoft.CodeAnalysis.VisualBasic.ExpressionEvaluator
             End Get
         End Property
 
-        Friend Overrides Function MakeAcyclicBaseType(diagnostics As DiagnosticBag) As NamedTypeSymbol
+        Friend Overrides Function MakeAcyclicBaseType(diagnostics As BindingDiagnosticBag) As NamedTypeSymbol
             Return _baseType
         End Function
 
-        Friend Overrides Function MakeDeclaredBase(basesBeingResolved As ConsList(Of Symbol), diagnostics As DiagnosticBag) As NamedTypeSymbol
+        Friend Overrides Function MakeDeclaredBase(basesBeingResolved As BasesBeingResolved, diagnostics As BindingDiagnosticBag) As NamedTypeSymbol
             Return _baseType
         End Function
 
-        Friend Overrides Function MakeAcyclicInterfaces(diagnostics As DiagnosticBag) As ImmutableArray(Of NamedTypeSymbol)
+        Friend Overrides Function MakeAcyclicInterfaces(diagnostics As BindingDiagnosticBag) As ImmutableArray(Of NamedTypeSymbol)
             Return ImmutableArray(Of NamedTypeSymbol).Empty
         End Function
 
-        Friend Overrides Function MakeDeclaredInterfaces(basesBeingResolved As ConsList(Of Symbol), diagnostics As DiagnosticBag) As ImmutableArray(Of NamedTypeSymbol)
+        Friend Overrides Function MakeDeclaredInterfaces(basesBeingResolved As BasesBeingResolved, diagnostics As BindingDiagnosticBag) As ImmutableArray(Of NamedTypeSymbol)
             Return ImmutableArray(Of NamedTypeSymbol).Empty
         End Function
 
@@ -335,7 +324,13 @@ Namespace Microsoft.CodeAnalysis.VisualBasic.ExpressionEvaluator
             End Get
         End Property
 
-        Friend Overrides ReadOnly Property HasEmbeddedAttribute As Boolean
+        Friend Overrides ReadOnly Property HasCodeAnalysisEmbeddedAttribute As Boolean
+            Get
+                Return False
+            End Get
+        End Property
+
+        Friend Overrides ReadOnly Property HasVisualBasicEmbeddedAttribute As Boolean
             Get
                 Return False
             End Get
@@ -357,28 +352,8 @@ Namespace Microsoft.CodeAnalysis.VisualBasic.ExpressionEvaluator
             Throw ExceptionUtilities.Unreachable
         End Sub
 
-        Friend Overrides Function InternalSubstituteTypeParameters(substitution As TypeSubstitution) As TypeSymbol
+        Friend Overrides Function InternalSubstituteTypeParameters(substitution As TypeSubstitution) As TypeWithModifiers
             Throw ExceptionUtilities.Unreachable
-        End Function
-
-        Friend Delegate Function CreateSynthesizedMethod(container As EENamedTypeSymbol, methodName As String, syntax As VisualBasicSyntaxNode) As PlaceholderMethodSymbol
-
-        ' Not thread-safe
-        Friend Function GetOrAddSynthesizedMethod(methodName As String, factory As CreateSynthesizedMethod) As PlaceholderMethodSymbol
-#If DEBUG Then
-            Debug.Assert(Not _sealed)
-#End If
-            If _lazySynthesizedMethods Is Nothing Then
-                _lazySynthesizedMethods = New Dictionary(Of String, PlaceholderMethodSymbol)()
-            End If
-            Dim method As PlaceholderMethodSymbol = Nothing
-            If Not _lazySynthesizedMethods.TryGetValue(methodName, method) Then
-                method = factory(Me, methodName, _syntax)
-                Debug.Assert(method IsNot Nothing)
-                Debug.Assert(method.Name = methodName)
-                _lazySynthesizedMethods.Add(methodName, method)
-            End If
-            Return method
         End Function
 
         <Conditional("DEBUG")>
@@ -390,6 +365,9 @@ Namespace Microsoft.CodeAnalysis.VisualBasic.ExpressionEvaluator
             Next
         End Sub
 
+        Friend Overrides Function GetSynthesizedWithEventsOverrides() As IEnumerable(Of PropertySymbol)
+            Return SpecializedCollections.EmptyEnumerable(Of PropertySymbol)()
+        End Function
     End Class
 
 End Namespace

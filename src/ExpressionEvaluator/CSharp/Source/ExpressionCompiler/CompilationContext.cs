@@ -1,18 +1,23 @@
-// Copyright (c) Microsoft.  All Rights Reserved.  Licensed under the Apache License, Version 2.0.  See License.txt in the project root for license information.
+﻿// Licensed to the .NET Foundation under one or more agreements.
+// The .NET Foundation licenses this file to you under the MIT license.
+// See the LICENSE file in the project root for more information.
 
-using Microsoft.CodeAnalysis.Collections;
+using Microsoft.CodeAnalysis.CodeGen;
 using Microsoft.CodeAnalysis.CSharp.Symbols;
 using Microsoft.CodeAnalysis.CSharp.Symbols.Metadata.PE;
 using Microsoft.CodeAnalysis.CSharp.Syntax;
+using Microsoft.CodeAnalysis.Debugging;
 using Microsoft.CodeAnalysis.Emit;
 using Microsoft.CodeAnalysis.ExpressionEvaluator;
+using Microsoft.CodeAnalysis.PooledObjects;
+using Microsoft.VisualStudio.Debugger.Clr;
 using Microsoft.VisualStudio.Debugger.Evaluation.ClrCompilation;
-using Microsoft.VisualStudio.SymReaderInterop;
 using Roslyn.Utilities;
 using System;
 using System.Collections.Generic;
 using System.Collections.Immutable;
 using System.Diagnostics;
+using System.Diagnostics.CodeAnalysis;
 using System.Linq;
 using System.Threading;
 
@@ -20,79 +25,59 @@ namespace Microsoft.CodeAnalysis.CSharp.ExpressionEvaluator
 {
     internal sealed class CompilationContext
     {
-        private static readonly SymbolDisplayFormat s_fullNameFormat =
-            new SymbolDisplayFormat(
-                globalNamespaceStyle: SymbolDisplayGlobalNamespaceStyle.Omitted,
-                typeQualificationStyle: SymbolDisplayTypeQualificationStyle.NameAndContainingTypesAndNamespaces,
-                genericsOptions: SymbolDisplayGenericsOptions.IncludeTypeParameters,
-                miscellaneousOptions:
-                    SymbolDisplayMiscellaneousOptions.EscapeKeywordIdentifiers |
-                    SymbolDisplayMiscellaneousOptions.UseSpecialTypes);
-
         internal readonly CSharpCompilation Compilation;
         internal readonly Binder NamespaceBinder; // Internal for test purposes.
 
-        private readonly MetadataDecoder _metadataDecoder;
         private readonly MethodSymbol _currentFrame;
         private readonly ImmutableArray<LocalSymbol> _locals;
         private readonly ImmutableDictionary<string, DisplayClassVariable> _displayClassVariables;
-        private readonly ImmutableHashSet<string> _hoistedParameterNames;
+        private readonly ImmutableArray<string> _sourceMethodParametersInOrder;
         private readonly ImmutableArray<LocalSymbol> _localsForBinding;
-        private readonly CSharpSyntaxNode _syntax;
         private readonly bool _methodNotType;
 
         /// <summary>
         /// Create a context to compile expressions within a method scope.
-        /// Include imports if <paramref name="importStringGroups"/> is set.
         /// </summary>
         internal CompilationContext(
             CSharpCompilation compilation,
-            MetadataDecoder metadataDecoder,
             MethodSymbol currentFrame,
+            MethodSymbol? currentSourceMethod,
             ImmutableArray<LocalSymbol> locals,
-            ImmutableSortedSet<int> inScopeHoistedLocalIndices,
-            ImmutableArray<ImmutableArray<string>> importStringGroups,
-            ImmutableArray<string> externAliasStrings,
-            CSharpSyntaxNode syntax)
+            ImmutableSortedSet<int> inScopeHoistedLocalSlots,
+            MethodDebugInfo<TypeSymbol, LocalSymbol> methodDebugInfo)
         {
-            Debug.Assert((syntax == null) || (syntax is ExpressionSyntax) || (syntax is LocalDeclarationStatementSyntax));
-            Debug.Assert(importStringGroups.IsDefault == externAliasStrings.IsDefault);
-
-            // TODO: syntax.SyntaxTree should probably be added to the compilation,
-            // but it isn't rooted by a CompilationUnitSyntax so it doesn't work (yet).
             _currentFrame = currentFrame;
-            _syntax = syntax;
             _methodNotType = !locals.IsDefault;
 
             // NOTE: Since this is done within CompilationContext, it will not be cached.
             // CONSIDER: The values should be the same everywhere in the module, so they
             // could be cached.  
             // (Catch: what happens in a type context without a method def?)
-            this.Compilation = GetCompilationWithExternAliases(compilation, externAliasStrings);
-            _metadataDecoder = metadataDecoder;
+            Compilation = GetCompilationWithExternAliases(compilation, methodDebugInfo.ExternAliasRecords);
 
             // Each expression compile should use a unique compilation
             // to ensure expression-specific synthesized members can be
             // added (anonymous types, for instance).
-            Debug.Assert(this.Compilation != compilation);
+            Debug.Assert(Compilation != compilation);
 
-            this.NamespaceBinder = CreateBinderChain(
-                this.Compilation,
+            NamespaceBinder = CreateBinderChain(
+                Compilation,
                 currentFrame.ContainingNamespace,
-                importStringGroups,
-                _metadataDecoder);
+                methodDebugInfo.ImportRecordGroups);
 
             if (_methodNotType)
             {
                 _locals = locals;
-                ImmutableArray<string> displayClassVariableNamesInOrder;
+                _sourceMethodParametersInOrder = GetSourceMethodParametersInOrder(currentFrame, currentSourceMethod);
+
                 GetDisplayClassVariables(
                     currentFrame,
                     _locals,
-                    inScopeHoistedLocalIndices,
-                    out displayClassVariableNamesInOrder,
-                    out _displayClassVariables,
-                    out _hoistedParameterNames);
+                    inScopeHoistedLocalSlots,
+                    _sourceMethodParametersInOrder,
+                    out var displayClassVariableNamesInOrder,
+                    out _displayClassVariables);
+
                 Debug.Assert(displayClassVariableNamesInOrder.Length == _displayClassVariables.Count);
                 _localsForBinding = GetLocalsForBinding(_locals, displayClassVariableNamesInOrder, _displayClassVariables);
             }
@@ -105,176 +90,207 @@ namespace Microsoft.CodeAnalysis.CSharp.ExpressionEvaluator
 
             // Assert that the cheap check for "this" is equivalent to the expensive check for "this".
             Debug.Assert(
-                _displayClassVariables.ContainsKey(GeneratedNames.ThisProxyFieldName()) ==
+                (GetThisProxy(_displayClassVariables) != null) ==
                 _displayClassVariables.Values.Any(v => v.Kind == DisplayClassVariableKind.This));
         }
 
-        internal CommonPEModuleBuilder CompileExpression(
-            InspectionContext inspectionContext,
-            string typeName,
+        internal bool TryCompileExpressions(
+            ImmutableArray<CSharpSyntaxNode> syntaxNodes,
+            string typeNameBase,
             string methodName,
-            Microsoft.CodeAnalysis.CodeGen.CompilationTestData testData,
             DiagnosticBag diagnostics,
-            out ResultProperties resultProperties)
+            [NotNullWhen(true)] out CommonPEModuleBuilder? module)
         {
-            Debug.Assert(inspectionContext != null);
+            // Create a separate synthesized type for each evaluation method.
+            // (Necessary for VB in particular since the EENamedTypeSymbol.Locations
+            // is tied to the expression syntax in VB.)
+            var synthesizedTypes = syntaxNodes.SelectAsArray(
+                (syntax, i, _) => (NamedTypeSymbol)CreateSynthesizedType(syntax, typeNameBase + i, methodName, ImmutableArray<Alias>.Empty),
+                arg: (object?)null);
 
-            var properties = default(ResultProperties);
-            var objectType = this.Compilation.GetSpecialType(SpecialType.System_Object);
-            var synthesizedType = new EENamedTypeSymbol(
-                this.Compilation.SourceModule.GlobalNamespace,
-                objectType,
-                _syntax,
-                _currentFrame,
-                typeName,
-                methodName,
-                this,
-                (method, diags) =>
-                {
-                    var hasDisplayClassThis = _displayClassVariables.ContainsKey(GeneratedNames.ThisProxyFieldName());
-                    var binder = ExtendBinderChain(
-                        inspectionContext,
-                        this.Compilation,
-                        _metadataDecoder,
-                        _syntax,
-                        method,
-                        this.NamespaceBinder,
-                        hasDisplayClassThis,
-                        _methodNotType);
-                    var statementSyntax = _syntax as StatementSyntax;
-                    return (statementSyntax == null) ?
-                        BindExpression(binder, (ExpressionSyntax)_syntax, diags, out properties) :
-                        BindStatement(binder, statementSyntax, diags, out properties);
-                });
+            if (synthesizedTypes.Length == 0)
+            {
+                module = null;
+                return false;
+            }
 
-            var module = CreateModuleBuilder(
-                this.Compilation,
-                synthesizedType.Methods,
-                additionalTypes: ImmutableArray.Create((NamedTypeSymbol)synthesizedType),
-                testData: testData,
+            module = CreateModuleBuilder(
+                Compilation,
+                additionalTypes: synthesizedTypes,
+                testData: null,
                 diagnostics: diagnostics);
 
-            Debug.Assert(module != null);
-
-            this.Compilation.Compile(
+            Compilation.Compile(
                 module,
-                win32Resources: null,
-                xmlDocStream: null,
-                generateDebugInfo: false,
+                emittingPdb: false,
                 diagnostics: diagnostics,
                 filterOpt: null,
-                cancellationToken: CancellationToken.None);
+                CancellationToken.None);
+
+            return !diagnostics.HasAnyErrors();
+        }
+
+        internal bool TryCompileExpression(
+            CSharpSyntaxNode syntax,
+            string typeName,
+            string methodName,
+            ImmutableArray<Alias> aliases,
+            CompilationTestData? testData,
+            DiagnosticBag diagnostics,
+            [NotNullWhen(true)] out CommonPEModuleBuilder? module,
+            [NotNullWhen(true)] out EEMethodSymbol? synthesizedMethod)
+        {
+            var synthesizedType = CreateSynthesizedType(syntax, typeName, methodName, aliases);
+
+            module = CreateModuleBuilder(
+                Compilation,
+                additionalTypes: ImmutableArray.Create((NamedTypeSymbol)synthesizedType),
+                testData,
+                diagnostics);
+
+            Compilation.Compile(
+                module,
+                emittingPdb: false,
+                diagnostics,
+                filterOpt: null,
+                CancellationToken.None);
 
             if (diagnostics.HasAnyErrors())
             {
-                resultProperties = default(ResultProperties);
-                return null;
+                module = null;
+                synthesizedMethod = null;
+                return false;
             }
 
-            // Should be no name mangling since the caller provided explicit names.
-            Debug.Assert(synthesizedType.MetadataName == typeName);
-            Debug.Assert(synthesizedType.GetMembers()[0].MetadataName == methodName);
-
-            resultProperties = properties;
-            return module;
+            synthesizedMethod = GetSynthesizedMethod(synthesizedType);
+            return true;
         }
 
-        internal CommonPEModuleBuilder CompileAssignment(
-            InspectionContext inspectionContext,
+        private EENamedTypeSymbol CreateSynthesizedType(
+            CSharpSyntaxNode syntax,
             string typeName,
             string methodName,
-            Microsoft.CodeAnalysis.CodeGen.CompilationTestData testData,
-            DiagnosticBag diagnostics,
-            out ResultProperties resultProperties)
+            ImmutableArray<Alias> aliases)
         {
-            Debug.Assert(inspectionContext != null);
-
-            var objectType = this.Compilation.GetSpecialType(SpecialType.System_Object);
+            var objectType = Compilation.GetSpecialType(SpecialType.System_Object);
             var synthesizedType = new EENamedTypeSymbol(
                 Compilation.SourceModule.GlobalNamespace,
                 objectType,
-                _syntax,
+                syntax,
                 _currentFrame,
                 typeName,
                 methodName,
                 this,
-                (method, diags) =>
+                (EEMethodSymbol method, DiagnosticBag diags, out ImmutableArray<LocalSymbol> declaredLocals, out ResultProperties properties) =>
                 {
-                    var hasDisplayClassThis = _displayClassVariables.ContainsKey(GeneratedNames.ThisProxyFieldName());
+                    var hasDisplayClassThis = GetThisProxy(_displayClassVariables) != null;
                     var binder = ExtendBinderChain(
-                        inspectionContext,
-                        this.Compilation,
-                        _metadataDecoder,
-                        _syntax,
+                        syntax,
+                        aliases,
                         method,
-                        this.NamespaceBinder,
+                        NamespaceBinder,
                         hasDisplayClassThis,
-                        methodNotType: true);
-                    return BindAssignment(binder, (ExpressionSyntax)_syntax, diags);
+                        _methodNotType,
+                        out declaredLocals);
+
+                    return (syntax is StatementSyntax statementSyntax) ?
+                        BindStatement(binder, statementSyntax, diags, out properties) :
+                        BindExpression(binder, (ExpressionSyntax)syntax, diags, out properties);
                 });
 
-            var module = CreateModuleBuilder(
-                this.Compilation,
-                synthesizedType.Methods,
+            return synthesizedType;
+        }
+
+        internal bool TryCompileAssignment(
+            ExpressionSyntax syntax,
+            string typeName,
+            string methodName,
+            ImmutableArray<Alias> aliases,
+            CompilationTestData? testData,
+            DiagnosticBag diagnostics,
+            [NotNullWhen(true)] out CommonPEModuleBuilder? module,
+            [NotNullWhen(true)] out EEMethodSymbol? synthesizedMethod)
+        {
+            var objectType = Compilation.GetSpecialType(SpecialType.System_Object);
+            var synthesizedType = new EENamedTypeSymbol(
+                Compilation.SourceModule.GlobalNamespace,
+                objectType,
+                syntax,
+                _currentFrame,
+                typeName,
+                methodName,
+                this,
+                (EEMethodSymbol method, DiagnosticBag diags, out ImmutableArray<LocalSymbol> declaredLocals, out ResultProperties properties) =>
+                {
+                    var hasDisplayClassThis = GetThisProxy(_displayClassVariables) != null;
+                    var binder = ExtendBinderChain(
+                        syntax,
+                        aliases,
+                        method,
+                        NamespaceBinder,
+                        hasDisplayClassThis,
+                        methodNotType: true,
+                        out declaredLocals);
+
+                    properties = new ResultProperties(DkmClrCompilationResultFlags.PotentialSideEffect);
+                    return BindAssignment(binder, syntax, diags);
+                });
+
+            module = CreateModuleBuilder(
+                Compilation,
                 additionalTypes: ImmutableArray.Create((NamedTypeSymbol)synthesizedType),
-                testData: testData,
-                diagnostics: diagnostics);
+                testData,
+                diagnostics);
 
-            Debug.Assert(module != null);
-
-            this.Compilation.Compile(
+            Compilation.Compile(
                 module,
-                win32Resources: null,
-                xmlDocStream: null,
-                generateDebugInfo: false,
-                diagnostics: diagnostics,
+                emittingPdb: false,
+                diagnostics,
                 filterOpt: null,
-                cancellationToken: CancellationToken.None);
+                CancellationToken.None);
 
             if (diagnostics.HasAnyErrors())
             {
-                resultProperties = default(ResultProperties);
-                return null;
+                module = null;
+                synthesizedMethod = null;
+                return false;
             }
 
-            // Should be no name mangling since the caller provided explicit names.
-            Debug.Assert(synthesizedType.MetadataName == typeName);
-            Debug.Assert(synthesizedType.GetMembers()[0].MetadataName == methodName);
-
-            resultProperties = new ResultProperties(DkmClrCompilationResultFlags.PotentialSideEffect);
-            return module;
+            synthesizedMethod = GetSynthesizedMethod(synthesizedType);
+            return true;
         }
+
+        private static EEMethodSymbol GetSynthesizedMethod(EENamedTypeSymbol synthesizedType)
+            => (EEMethodSymbol)synthesizedType.Methods[0];
 
         private static string GetNextMethodName(ArrayBuilder<MethodSymbol> builder)
-        {
-            return string.Format("<>m{0}", builder.Count);
-        }
+            => "<>m" + builder.Count;
 
         /// <summary>
         /// Generate a class containing methods that represent
         /// the set of arguments and locals at the current scope.
         /// </summary>
-        internal CommonPEModuleBuilder CompileGetLocals(
+        internal CommonPEModuleBuilder? CompileGetLocals(
             string typeName,
             ArrayBuilder<LocalAndMethod> localBuilder,
             bool argumentsOnly,
-            Microsoft.CodeAnalysis.CodeGen.CompilationTestData testData,
+            ImmutableArray<Alias> aliases,
+            CompilationTestData? testData,
             DiagnosticBag diagnostics)
         {
-            var objectType = this.Compilation.GetSpecialType(SpecialType.System_Object);
+            var objectType = Compilation.GetSpecialType(SpecialType.System_Object);
             var allTypeParameters = _currentFrame.GetAllTypeParameters();
             var additionalTypes = ArrayBuilder<NamedTypeSymbol>.GetInstance();
 
-            EENamedTypeSymbol typeVariablesType = null;
-            if (!argumentsOnly && (allTypeParameters.Length > 0))
+            EENamedTypeSymbol? typeVariablesType = null;
+            if (!argumentsOnly && allTypeParameters.Length > 0)
             {
                 // Generate a generic type with matching type parameters.
                 // A null instance of the type will be used to represent the
                 // "Type variables" local.
                 typeVariablesType = new EENamedTypeSymbol(
-                    this.Compilation.SourceModule.GlobalNamespace,
+                    Compilation.SourceModule.GlobalNamespace,
                     objectType,
-                    _syntax,
                     _currentFrame,
                     ExpressionCompilerConstants.TypeVariablesClassName,
                     (m, t) => ImmutableArray.Create<MethodSymbol>(new EEConstructorSymbol(t)),
@@ -284,9 +300,8 @@ namespace Microsoft.CodeAnalysis.CSharp.ExpressionEvaluator
             }
 
             var synthesizedType = new EENamedTypeSymbol(
-                this.Compilation.SourceModule.GlobalNamespace,
+                Compilation.SourceModule.GlobalNamespace,
                 objectType,
-                _syntax,
                 _currentFrame,
                 typeName,
                 (m, container) =>
@@ -295,130 +310,217 @@ namespace Microsoft.CodeAnalysis.CSharp.ExpressionEvaluator
 
                     if (!argumentsOnly)
                     {
+                        // Pseudo-variables: $exception, $ReturnValue, etc.
+                        if (aliases.Length > 0)
+                        {
+                            var sourceAssembly = Compilation.SourceAssembly;
+                            var typeNameDecoder = new EETypeNameDecoder(Compilation, (PEModuleSymbol)_currentFrame.ContainingModule);
+                            foreach (var alias in aliases)
+                            {
+                                if (alias.IsReturnValueWithoutIndex())
+                                {
+                                    Debug.Assert(aliases.Count(a => a.Kind == DkmClrAliasKind.ReturnValue) > 1);
+                                    continue;
+                                }
+
+                                var local = PlaceholderLocalSymbol.Create(
+                                    typeNameDecoder,
+                                    _currentFrame,
+                                    sourceAssembly,
+                                    alias);
+
+                                // Skip pseudo-variables with errors.
+                                if (local.HasUseSiteError)
+                                {
+                                    continue;
+                                }
+
+                                var methodName = GetNextMethodName(methodBuilder);
+                                var syntax = SyntaxFactory.IdentifierName(SyntaxFactory.MissingToken(SyntaxKind.IdentifierToken));
+                                var aliasMethod = CreateMethod(
+                                    container,
+                                    methodName,
+                                    syntax,
+                                    (EEMethodSymbol method, DiagnosticBag diags, out ImmutableArray<LocalSymbol> declaredLocals, out ResultProperties properties) =>
+                                    {
+                                        declaredLocals = ImmutableArray<LocalSymbol>.Empty;
+                                        var expression = new BoundLocal(syntax, local, constantValueOpt: null, type: local.Type);
+                                        properties = default;
+                                        return new BoundReturnStatement(syntax, RefKind.None, expression) { WasCompilerGenerated = true };
+                                    });
+                                var flags = local.IsWritableVariable ? DkmClrCompilationResultFlags.None : DkmClrCompilationResultFlags.ReadOnlyResult;
+                                localBuilder.Add(MakeLocalAndMethod(local, aliasMethod, flags));
+                                methodBuilder.Add(aliasMethod);
+                            }
+                        }
+
                         // "this" for non-static methods that are not display class methods or
                         // display class methods where the display class contains "<>4__this".
-                        if (!m.IsStatic && (!IsDisplayClassType(m.ContainingType) || _displayClassVariables.ContainsKey(GeneratedNames.ThisProxyFieldName())))
+                        if (!m.IsStatic && !IsDisplayClassType(m.ContainingType) ||
+                            GetThisProxy(_displayClassVariables) != null)
                         {
                             var methodName = GetNextMethodName(methodBuilder);
-                            var method = this.GetThisMethod(container, methodName);
-                            localBuilder.Add(new LocalAndMethod("this", methodName, DkmClrCompilationResultFlags.None)); // Note: writable in dev11.
+                            var method = GetThisMethod(container, methodName);
+                            localBuilder.Add(new CSharpLocalAndMethod("this", "this", method, DkmClrCompilationResultFlags.None)); // Note: writable in dev11.
                             methodBuilder.Add(method);
                         }
                     }
 
-                    // Hoisted method parameters (represented as locals in the EE).
-                    int ordinal = 0;
-                    if (!_hoistedParameterNames.IsEmpty)
-                    {
-                        foreach (var local in _localsForBinding)
-                        {
-                            // Since we are showing hoisted method parameters first, the parameters may appear out of order
-                            // in the Locals window if only some of the parameters are hoisted.  This is consistent with the
-                            // behavior of the old EE.
-                            var localName = local.Name;
-                            if (_hoistedParameterNames.Contains(local.Name))
-                            {
-                                AppendLocalAndMethod(localBuilder, methodBuilder, localName, this.GetLocalMethod, container, ordinal, GetLocalResultFlags(local));
-                            }
-                            ordinal++;
-                        }
-                    }
+                    var itemsAdded = PooledHashSet<string>.GetInstance();
 
-                    // Method parameters (except those that have been hoisted).
-                    ordinal = m.IsStatic ? 0 : 1;
+                    // Method parameters
+                    int parameterIndex = m.IsStatic ? 0 : 1;
                     foreach (var parameter in m.Parameters)
                     {
                         var parameterName = parameter.Name;
-                        if (!_hoistedParameterNames.Contains(parameterName))
+                        if (GeneratedNames.GetKind(parameterName) == GeneratedNameKind.None &&
+                            !IsDisplayClassParameter(parameter))
                         {
-                            AppendLocalAndMethod(localBuilder, methodBuilder, parameterName, this.GetParameterMethod, container, ordinal, DkmClrCompilationResultFlags.None);
+                            itemsAdded.Add(parameterName);
+                            AppendParameterAndMethod(localBuilder, methodBuilder, parameter, container, parameterIndex);
                         }
-                        ordinal++;
+
+                        parameterIndex++;
+                    }
+
+                    // In case of iterator or async state machine, the 'm' method has no parameters
+                    // but the source method can have parameters to iterate over.
+                    if (itemsAdded.Count == 0 && _sourceMethodParametersInOrder.Length != 0)
+                    {
+                        var localsDictionary = PooledDictionary<string, (LocalSymbol, int)>.GetInstance();
+                        int localIndex = 0;
+                        foreach (var local in _localsForBinding)
+                        {
+                            localsDictionary.Add(local.Name, (local, localIndex));
+                            localIndex++;
+                        }
+
+                        foreach (var argumentName in _sourceMethodParametersInOrder)
+                        {
+                            (LocalSymbol local, int localIndex) localSymbolAndIndex;
+                            if (localsDictionary.TryGetValue(argumentName, out localSymbolAndIndex))
+                            {
+                                itemsAdded.Add(argumentName);
+                                var local = localSymbolAndIndex.local;
+                                AppendLocalAndMethod(localBuilder, methodBuilder, local, container, localSymbolAndIndex.localIndex, GetLocalResultFlags(local));
+                            }
+                        }
+
+                        localsDictionary.Free();
                     }
 
                     if (!argumentsOnly)
                     {
-                        // Locals.
-                        ordinal = 0;
+                        // Locals which were not added as parameters or parameters of the source method.
+                        int localIndex = 0;
                         foreach (var local in _localsForBinding)
                         {
-                            var localName = local.Name;
-                            if (!_hoistedParameterNames.Contains(localName))
+                            if (!itemsAdded.Contains(local.Name))
                             {
-                                AppendLocalAndMethod(localBuilder, methodBuilder, localName, this.GetLocalMethod, container, ordinal, GetLocalResultFlags(local));
+                                AppendLocalAndMethod(localBuilder, methodBuilder, local, container, localIndex, GetLocalResultFlags(local));
                             }
-                            ordinal++;
+
+                            localIndex++;
                         }
 
                         // "Type variables".
-                        if ((object)typeVariablesType != null)
+                        if (typeVariablesType is object)
                         {
                             var methodName = GetNextMethodName(methodBuilder);
                             var returnType = typeVariablesType.Construct(allTypeParameters.Cast<TypeParameterSymbol, TypeSymbol>());
-                            var method = this.GetTypeVariablesMethod(container, methodName, returnType);
-                            localBuilder.Add(new LocalAndMethod(ExpressionCompilerConstants.TypeVariablesLocalName, methodName, DkmClrCompilationResultFlags.ReadOnlyResult));
+                            var method = GetTypeVariablesMethod(container, methodName, returnType);
+                            localBuilder.Add(new CSharpLocalAndMethod(
+                                ExpressionCompilerConstants.TypeVariablesLocalName,
+                                ExpressionCompilerConstants.TypeVariablesLocalName,
+                                method,
+                                DkmClrCompilationResultFlags.ReadOnlyResult));
                             methodBuilder.Add(method);
                         }
                     }
 
+                    itemsAdded.Free();
                     return methodBuilder.ToImmutableAndFree();
                 });
 
             additionalTypes.Add(synthesizedType);
 
             var module = CreateModuleBuilder(
-                this.Compilation,
-                synthesizedType.Methods,
-                additionalTypes: additionalTypes.ToImmutableAndFree(),
-                testData: testData,
-                diagnostics: diagnostics);
+                Compilation,
+                additionalTypes.ToImmutableAndFree(),
+                testData,
+                diagnostics);
 
-            Debug.Assert(module != null);
+            RoslynDebug.AssertNotNull(module);
 
-            this.Compilation.Compile(
+            Compilation.Compile(
                 module,
-                win32Resources: null,
-                xmlDocStream: null,
-                generateDebugInfo: false,
-                diagnostics: diagnostics,
+                emittingPdb: false,
+                diagnostics,
                 filterOpt: null,
-                cancellationToken: CancellationToken.None);
+                CancellationToken.None);
 
             return diagnostics.HasAnyErrors() ? null : module;
         }
 
-        private static void AppendLocalAndMethod(
+        private void AppendLocalAndMethod(
             ArrayBuilder<LocalAndMethod> localBuilder,
             ArrayBuilder<MethodSymbol> methodBuilder,
-            string name,
-            Func<EENamedTypeSymbol, string, string, int, MethodSymbol> getMethod,
+            LocalSymbol local,
             EENamedTypeSymbol container,
-            int ordinal,
+            int localIndex,
             DkmClrCompilationResultFlags resultFlags)
+        {
+            var methodName = GetNextMethodName(methodBuilder);
+            var method = GetLocalMethod(container, methodName, local.Name, localIndex);
+            localBuilder.Add(MakeLocalAndMethod(local, method, resultFlags));
+            methodBuilder.Add(method);
+        }
+
+        private void AppendParameterAndMethod(
+            ArrayBuilder<LocalAndMethod> localBuilder,
+            ArrayBuilder<MethodSymbol> methodBuilder,
+            ParameterSymbol parameter,
+            EENamedTypeSymbol container,
+            int parameterIndex)
         {
             // Note: The native EE doesn't do this, but if we don't escape keyword identifiers,
             // the ResultProvider needs to be able to disambiguate cases like "this" and "@this",
             // which it can't do correctly without semantic information.
-            name = SyntaxHelpers.EscapeKeywordIdentifiers(name);
+            var name = SyntaxHelpers.EscapeKeywordIdentifiers(parameter.Name);
             var methodName = GetNextMethodName(methodBuilder);
-            var method = getMethod(container, methodName, name, ordinal);
-            localBuilder.Add(new LocalAndMethod(name, methodName, resultFlags));
+            var method = GetParameterMethod(container, methodName, name, parameterIndex);
+            localBuilder.Add(new CSharpLocalAndMethod(name, name, method, DkmClrCompilationResultFlags.None));
             methodBuilder.Add(method);
+        }
+
+        private static LocalAndMethod MakeLocalAndMethod(LocalSymbol local, MethodSymbol method, DkmClrCompilationResultFlags flags)
+        {
+            // Note: The native EE doesn't do this, but if we don't escape keyword identifiers,
+            // the ResultProvider needs to be able to disambiguate cases like "this" and "@this",
+            // which it can't do correctly without semantic information.
+            var escapedName = SyntaxHelpers.EscapeKeywordIdentifiers(local.Name);
+            var displayName = (local as PlaceholderLocalSymbol)?.DisplayName ?? escapedName;
+            return new CSharpLocalAndMethod(escapedName, displayName, method, flags);
         }
 
         private static EEAssemblyBuilder CreateModuleBuilder(
             CSharpCompilation compilation,
-            ImmutableArray<MethodSymbol> methods,
             ImmutableArray<NamedTypeSymbol> additionalTypes,
-            Microsoft.CodeAnalysis.CodeGen.CompilationTestData testData,
+            CompilationTestData? testData,
             DiagnosticBag diagnostics)
         {
             // Each assembly must have a unique name.
             var emitOptions = new EmitOptions(outputNameOverride: ExpressionCompilerUtilities.GenerateUniqueName());
 
-            string runtimeMetadataVersion = compilation.GetRuntimeMetadataVersion(emitOptions, diagnostics);
+            string? runtimeMetadataVersion = compilation.GetRuntimeMetadataVersion(emitOptions, diagnostics);
             var serializationProperties = compilation.ConstructModuleSerializationProperties(emitOptions, runtimeMetadataVersion);
-            return new EEAssemblyBuilder(compilation.SourceAssembly, emitOptions, methods, serializationProperties, additionalTypes, testData);
+            return new EEAssemblyBuilder(
+                compilation.SourceAssembly,
+                emitOptions,
+                serializationProperties,
+                additionalTypes,
+                contextType => GetNonDisplayClassContainer(((EENamedTypeSymbol)contextType).SubstitutedSourceType),
+                testData);
         }
 
         internal EEMethodSymbol CreateMethod(
@@ -438,81 +540,102 @@ namespace Microsoft.CodeAnalysis.CSharp.ExpressionEvaluator
                 generateMethodBody);
         }
 
-        private EEMethodSymbol GetLocalMethod(EENamedTypeSymbol container, string methodName, string localName, int index)
+        private EEMethodSymbol GetLocalMethod(EENamedTypeSymbol container, string methodName, string localName, int localIndex)
         {
             var syntax = SyntaxFactory.IdentifierName(localName);
-            return this.CreateMethod(container, methodName, syntax, (method, diagnostics) =>
+            return CreateMethod(container, methodName, syntax, (EEMethodSymbol method, DiagnosticBag diagnostics, out ImmutableArray<LocalSymbol> declaredLocals, out ResultProperties properties) =>
             {
-                var local = method.LocalsForBinding[index];
-                var expression = new BoundLocal(syntax, local, constantValueOpt: local.GetConstantValue(null, null, diagnostics), type: local.Type) { WasCompilerGenerated = true };
-                return new BoundReturnStatement(syntax, expression) { WasCompilerGenerated = true };
+                declaredLocals = ImmutableArray<LocalSymbol>.Empty;
+                var local = method.LocalsForBinding[localIndex];
+                var expression = new BoundLocal(syntax, local, constantValueOpt: local.GetConstantValue(null, null, new BindingDiagnosticBag(diagnostics)), type: local.Type);
+                properties = default;
+                return new BoundReturnStatement(syntax, RefKind.None, expression) { WasCompilerGenerated = true };
             });
         }
 
-        private EEMethodSymbol GetParameterMethod(EENamedTypeSymbol container, string methodName, string parameterName, int ordinal)
+        private EEMethodSymbol GetParameterMethod(EENamedTypeSymbol container, string methodName, string parameterName, int parameterIndex)
         {
             var syntax = SyntaxFactory.IdentifierName(parameterName);
-            return this.CreateMethod(container, methodName, syntax, (method, diagnostics) =>
+            return CreateMethod(container, methodName, syntax, (EEMethodSymbol method, DiagnosticBag diagnostics, out ImmutableArray<LocalSymbol> declaredLocals, out ResultProperties properties) =>
             {
-                var parameter = method.Parameters[ordinal];
-                var expression = new BoundParameter(syntax, parameter) { WasCompilerGenerated = true };
-                return new BoundReturnStatement(syntax, expression) { WasCompilerGenerated = true };
+                declaredLocals = ImmutableArray<LocalSymbol>.Empty;
+                var parameter = method.Parameters[parameterIndex];
+                var expression = new BoundParameter(syntax, parameter);
+                properties = default;
+                return new BoundReturnStatement(syntax, RefKind.None, expression) { WasCompilerGenerated = true };
             });
         }
 
         private EEMethodSymbol GetThisMethod(EENamedTypeSymbol container, string methodName)
         {
             var syntax = SyntaxFactory.ThisExpression();
-            return this.CreateMethod(container, methodName, syntax, (method, diagnostics) =>
+            return CreateMethod(container, methodName, syntax, (EEMethodSymbol method, DiagnosticBag diagnostics, out ImmutableArray<LocalSymbol> declaredLocals, out ResultProperties properties) =>
             {
-                var expression = new BoundThisReference(syntax, GetNonDisplayClassContainer(container.SubstitutedSourceType)) { WasCompilerGenerated = true };
-                return new BoundReturnStatement(syntax, expression) { WasCompilerGenerated = true };
+                declaredLocals = ImmutableArray<LocalSymbol>.Empty;
+                var expression = new BoundThisReference(syntax, GetNonDisplayClassContainer(container.SubstitutedSourceType));
+                properties = default;
+                return new BoundReturnStatement(syntax, RefKind.None, expression) { WasCompilerGenerated = true };
             });
         }
 
         private EEMethodSymbol GetTypeVariablesMethod(EENamedTypeSymbol container, string methodName, NamedTypeSymbol typeVariablesType)
         {
-            var syntax = SyntaxFactory.IdentifierName("");
-            return this.CreateMethod(container, methodName, syntax, (method, diagnostics) =>
+            var syntax = SyntaxFactory.IdentifierName(SyntaxFactory.MissingToken(SyntaxKind.IdentifierToken));
+            return CreateMethod(container, methodName, syntax, (EEMethodSymbol method, DiagnosticBag diagnostics, out ImmutableArray<LocalSymbol> declaredLocals, out ResultProperties properties) =>
             {
+                declaredLocals = ImmutableArray<LocalSymbol>.Empty;
                 var type = method.TypeMap.SubstituteNamedType(typeVariablesType);
-                var expression = new BoundObjectCreationExpression(syntax, type.InstanceConstructors[0]) { WasCompilerGenerated = true };
-                var statement = new BoundReturnStatement(syntax, expression) { WasCompilerGenerated = true };
+                var expression = new BoundObjectCreationExpression(syntax, type.InstanceConstructors[0]);
+                var statement = new BoundReturnStatement(syntax, RefKind.None, expression) { WasCompilerGenerated = true };
+                properties = default;
                 return statement;
             });
         }
 
-        private static BoundStatement BindExpression(Binder binder, ExpressionSyntax syntax, DiagnosticBag diagnostics, out ResultProperties resultProperties)
+        private static BoundStatement? BindExpression(Binder binder, ExpressionSyntax syntax, DiagnosticBag diagnostics, out ResultProperties resultProperties)
         {
             var flags = DkmClrCompilationResultFlags.None;
+            var bindingDiagnostics = new BindingDiagnosticBag(diagnostics);
 
             // In addition to C# expressions, the native EE also supports
             // type names which are bound to a representation of the type
             // (but not System.Type) that the user can expand to see the
             // base type. Instead, we only allow valid C# expressions.
-            var expression = binder.BindValue(syntax, diagnostics, Binder.BindValueKind.RValue);
+            var expression = IsDeconstruction(syntax)
+                ? binder.BindDeconstruction((AssignmentExpressionSyntax)syntax, bindingDiagnostics, resultIsUsedOverride: true)
+                : binder.BindRValueWithoutTargetType(syntax, bindingDiagnostics);
             if (diagnostics.HasAnyErrors())
             {
-                resultProperties = default(ResultProperties);
+                resultProperties = default;
                 return null;
             }
 
-            if (MayHaveSideEffectsVisitor.MayHaveSideEffects(expression))
+            try
             {
-                flags |= DkmClrCompilationResultFlags.PotentialSideEffect;
+                if (MayHaveSideEffectsVisitor.MayHaveSideEffects(expression))
+                {
+                    flags |= DkmClrCompilationResultFlags.PotentialSideEffect;
+                }
+            }
+            catch (BoundTreeVisitor.CancelledByStackGuardException ex)
+            {
+                ex.AddAnError(diagnostics);
+                resultProperties = default;
+                return null;
             }
 
             var expressionType = expression.Type;
-            if ((object)expressionType == null)
+            if (expressionType is null)
             {
                 expression = binder.CreateReturnConversion(
                     syntax,
-                    diagnostics,
+                    bindingDiagnostics,
                     expression,
+                    RefKind.None,
                     binder.Compilation.GetSpecialType(SpecialType.System_Object));
                 if (diagnostics.HasAnyErrors())
                 {
-                    resultProperties = default(ResultProperties);
+                    resultProperties = default;
                     return null;
                 }
             }
@@ -534,31 +657,35 @@ namespace Microsoft.CodeAnalysis.CSharp.ExpressionEvaluator
             }
 
             resultProperties = expression.ExpressionSymbol.GetResultProperties(flags, expression.ConstantValue != null);
-            return new BoundReturnStatement(syntax, expression) { WasCompilerGenerated = true };
+            return new BoundReturnStatement(syntax, RefKind.None, expression) { WasCompilerGenerated = true };
+        }
+
+        private static bool IsDeconstruction(ExpressionSyntax syntax)
+        {
+            if (syntax.Kind() != SyntaxKind.SimpleAssignmentExpression)
+            {
+                return false;
+            }
+
+            var node = (AssignmentExpressionSyntax)syntax;
+            return node.Left.Kind() == SyntaxKind.TupleExpression || node.Left.Kind() == SyntaxKind.DeclarationExpression;
         }
 
         private static BoundStatement BindStatement(Binder binder, StatementSyntax syntax, DiagnosticBag diagnostics, out ResultProperties properties)
         {
             properties = new ResultProperties(DkmClrCompilationResultFlags.PotentialSideEffect | DkmClrCompilationResultFlags.ReadOnlyResult);
-            return binder.BindStatement(syntax, diagnostics);
+            return binder.BindStatement(syntax, new BindingDiagnosticBag(diagnostics));
         }
 
         private static bool IsAssignableExpression(Binder binder, BoundExpression expression)
         {
-            // NOTE: Surprisingly, binder.CheckValueKind will return true (!) for readonly fields 
-            // in contexts where they cannot be assigned - it simply reports a diagnostic.
-            // Presumably, this is done to avoid producing a confusing error message about the
-            // field not being an lvalue.
-            var diagnostics = DiagnosticBag.GetInstance();
-            var result = binder.CheckValueKind(expression, Binder.BindValueKind.Assignment, diagnostics) &&
-                !diagnostics.HasAnyErrors();
-            diagnostics.Free();
+            var result = binder.CheckValueKind(expression.Syntax, expression, Binder.BindValueKind.Assignable, checkingReceiver: false, BindingDiagnosticBag.Discarded);
             return result;
         }
 
-        private static BoundStatement BindAssignment(Binder binder, ExpressionSyntax syntax, DiagnosticBag diagnostics)
+        private static BoundStatement? BindAssignment(Binder binder, ExpressionSyntax syntax, DiagnosticBag diagnostics)
         {
-            var expression = binder.BindValue(syntax, diagnostics, Binder.BindValueKind.RValue);
+            var expression = binder.BindValue(syntax, new BindingDiagnosticBag(diagnostics), Binder.BindValueKind.RValue);
             if (diagnostics.HasAnyErrors())
             {
                 return null;
@@ -570,25 +697,18 @@ namespace Microsoft.CodeAnalysis.CSharp.ExpressionEvaluator
         private static Binder CreateBinderChain(
             CSharpCompilation compilation,
             NamespaceSymbol @namespace,
-            ImmutableArray<ImmutableArray<string>> importStringGroups,
-            MetadataDecoder metadataDecoder)
+            ImmutableArray<ImmutableArray<ImportRecord>> importRecordGroups)
         {
             var stack = ArrayBuilder<string>.GetInstance();
-            while ((object)@namespace != null)
+            while (@namespace is object)
             {
                 stack.Push(@namespace.Name);
                 @namespace = @namespace.ContainingNamespace;
             }
 
-            var binder = (new BuckStopsHereBinder(compilation)).WithAdditionalFlags(
-                BinderFlags.SuppressObsoleteChecks |
-                BinderFlags.SuppressAccessChecks |
-                BinderFlags.UnsafeRegion |
-                BinderFlags.UncheckedRegion |
-                BinderFlags.AllowManagedAddressOf |
-                BinderFlags.AllowAwaitInUnsafeContext);
-            var hasImports = !importStringGroups.IsDefault;
-            var numImportStringGroups = hasImports ? importStringGroups.Length : 0;
+            Binder binder = new BuckStopsHereBinder(compilation);
+            var hasImports = !importRecordGroups.IsDefaultOrEmpty;
+            var numImportStringGroups = hasImports ? importRecordGroups.Length : 0;
             var currentStringGroup = numImportStringGroups - 1;
 
             // PERF: We used to call compilation.GetCompilationNamespace on every iteration,
@@ -605,25 +725,24 @@ namespace Microsoft.CodeAnalysis.CSharp.ExpressionEvaluator
                     // We're re-getting the namespace, rather than using the one containing
                     // the current frame method, because we want the merged namespace.
                     @namespace = @namespace.GetNestedNamespace(namespaceName);
-                    Debug.Assert((object)@namespace != null,
-                        "We worked backwards from symbols to names, but no symbol exists for name '" + namespaceName + "'");
+                    RoslynDebug.AssertNotNull(@namespace);
                 }
                 else
                 {
-                    Debug.Assert((object)@namespace == (object)compilation.GlobalNamespace);
+                    Debug.Assert((object)@namespace == compilation.GlobalNamespace);
                 }
 
-                Imports imports = null;
+                Imports? imports = null;
                 if (hasImports)
                 {
                     if (currentStringGroup < 0)
                     {
-                        Debug.WriteLine("No import string group for namespace '{0}'", @namespace);
+                        Debug.WriteLine($"No import string group for namespace '{@namespace}'");
                         break;
                     }
 
                     var importsBinder = new InContainerBinder(@namespace, binder);
-                    imports = BuildImports(compilation, importStringGroups[currentStringGroup], importsBinder, metadataDecoder);
+                    imports = BuildImports(compilation, importRecordGroups[currentStringGroup], importsBinder);
                     currentStringGroup--;
                 }
 
@@ -636,74 +755,50 @@ namespace Microsoft.CodeAnalysis.CSharp.ExpressionEvaluator
             {
                 // CONSIDER: We could lump these into the outermost namespace.  It's probably not worthwhile since
                 // the usings are already for the wrong method.
-                Debug.WriteLine("Found {0} import string groups without corresponding namespaces", currentStringGroup + 1);
+                Debug.WriteLine($"Found {currentStringGroup + 1} import string groups without corresponding namespaces");
             }
 
             return binder;
         }
 
-        private static CSharpCompilation GetCompilationWithExternAliases(CSharpCompilation compilation, ImmutableArray<string> externAliasStrings)
+        private static CSharpCompilation GetCompilationWithExternAliases(CSharpCompilation compilation, ImmutableArray<ExternAliasRecord> externAliasRecords)
         {
-            if (externAliasStrings.IsDefaultOrEmpty)
+            if (externAliasRecords.IsDefaultOrEmpty)
             {
                 return compilation.Clone();
             }
 
             var updatedReferences = ArrayBuilder<MetadataReference>.GetInstance();
-            var assemblyIdentities = ArrayBuilder<AssemblyIdentity>.GetInstance();
+            var assembliesAndModulesBuilder = ArrayBuilder<Symbol>.GetInstance();
             foreach (var reference in compilation.References)
             {
-                var identity = reference.Properties.Kind == MetadataImageKind.Assembly
-                    ? ((AssemblySymbol)compilation.GetAssemblyOrModuleSymbol(reference)).Identity
-                    : null;
-                assemblyIdentities.Add(identity);
                 updatedReferences.Add(reference);
+                assembliesAndModulesBuilder.Add(compilation.GetAssemblyOrModuleSymbol(reference)!);
             }
-            Debug.Assert(assemblyIdentities.Count == updatedReferences.Count);
+            Debug.Assert(assembliesAndModulesBuilder.Count == updatedReferences.Count);
 
-            var comparer = compilation.Options.AssemblyIdentityComparer;
-            var numAssemblies = assemblyIdentities.Count;
+            var assembliesAndModules = assembliesAndModulesBuilder.ToImmutableAndFree();
 
-            foreach (var externAliasString in externAliasStrings)
+            foreach (var externAliasRecord in externAliasRecords)
             {
-                string alias;
-                string externAlias;
-                string target;
-                ImportTargetKind kind;
-                if (!CustomDebugInfoReader.TryParseCSharpImportString(externAliasString, out alias, out externAlias, out target, out kind))
+                var targetAssembly = externAliasRecord.TargetAssembly as AssemblySymbol;
+                int index;
+                if (targetAssembly != null)
                 {
-                    Debug.WriteLine("Unable to parse extern alias '{0}'", (object)externAliasString);
-                    continue;
+                    index = assembliesAndModules.IndexOf(targetAssembly);
                 }
-
-                Debug.Assert(kind == ImportTargetKind.Assembly, "Programmer error: How did a non-assembly get in the extern alias list?");
-                Debug.Assert(alias == null); // Not used.
-                Debug.Assert(externAlias != null); // Name of the extern alias.
-                Debug.Assert(target != null); // Name of the target assembly.
-
-                AssemblyIdentity targetIdentity;
-                if (!AssemblyIdentity.TryParseDisplayName(target, out targetIdentity))
+                else
                 {
-                    Debug.WriteLine("Unable to parse target of extern alias '{0}'", (object)externAliasString);
-                    continue;
-                }
-
-                int index = -1;
-                for (int i = 0; i < numAssemblies; i++)
-                {
-                    var candidateIdentity = assemblyIdentities[i];
-                    if (candidateIdentity != null && comparer.ReferenceMatchesDefinition(targetIdentity, candidateIdentity))
-                    {
-                        index = i;
-                        break;
-                    }
+                    index = IndexOfMatchingAssembly((AssemblyIdentity)externAliasRecord.TargetAssembly, assembliesAndModules, compilation.Options.AssemblyIdentityComparer);
                 }
 
                 if (index < 0)
                 {
-                    Debug.WriteLine("Unable to find corresponding assembly reference for extern alias '{0}'", (object)externAliasString);
+                    Debug.WriteLine($"Unable to find corresponding assembly reference for extern alias '{externAliasRecord}'");
                     continue;
                 }
+
+                var externAlias = externAliasRecord.Alias;
 
                 var assemblyReference = updatedReferences[index];
                 var oldAliases = assemblyReference.Properties.Aliases;
@@ -727,27 +822,38 @@ namespace Microsoft.CodeAnalysis.CSharp.ExpressionEvaluator
 
             compilation = compilation.WithReferences(updatedReferences);
 
-            assemblyIdentities.Free();
             updatedReferences.Free();
 
             return compilation;
         }
 
+        private static int IndexOfMatchingAssembly(AssemblyIdentity referenceIdentity, ImmutableArray<Symbol> assembliesAndModules, AssemblyIdentityComparer assemblyIdentityComparer)
+        {
+            for (int i = 0; i < assembliesAndModules.Length; i++)
+            {
+                if (assembliesAndModules[i] is AssemblySymbol assembly && assemblyIdentityComparer.ReferenceMatchesDefinition(referenceIdentity, assembly.Identity))
+                {
+                    return i;
+                }
+            }
+
+            return -1;
+        }
+
         private static Binder ExtendBinderChain(
-            InspectionContext inspectionContext,
-            CSharpCompilation compilation,
-            MetadataDecoder metadataDecoder,
             CSharpSyntaxNode syntax,
+            ImmutableArray<Alias> aliases,
             EEMethodSymbol method,
             Binder binder,
             bool hasDisplayClassThis,
-            bool methodNotType)
+            bool methodNotType,
+            out ImmutableArray<LocalSymbol> declaredLocals)
         {
             var substitutedSourceMethod = GetSubstitutedSourceMethod(method.SubstitutedSourceMethod, hasDisplayClassThis);
             var substitutedSourceType = substitutedSourceMethod.ContainingType;
 
             var stack = ArrayBuilder<NamedTypeSymbol>.GetInstance();
-            for (var type = substitutedSourceType; (object)type != null; type = type.ContainingType)
+            for (var type = substitutedSourceType; type is object; type = type.ContainingType)
             {
                 stack.Add(type);
             }
@@ -759,7 +865,7 @@ namespace Microsoft.CodeAnalysis.CSharp.ExpressionEvaluator
                 binder = new InContainerBinder(substitutedSourceType, binder);
                 if (substitutedSourceType.Arity > 0)
                 {
-                    binder = new WithTypeArgumentsBinder(substitutedSourceType.TypeArguments, binder);
+                    binder = new WithTypeArgumentsBinder(substitutedSourceType.TypeArgumentsWithAnnotationsNoUseSiteDiagnostics, binder);
                 }
             }
 
@@ -767,13 +873,20 @@ namespace Microsoft.CodeAnalysis.CSharp.ExpressionEvaluator
 
             if (substitutedSourceMethod.Arity > 0)
             {
-                binder = new WithTypeArgumentsBinder(substitutedSourceMethod.TypeArguments, binder);
+                binder = new WithTypeArgumentsBinder(substitutedSourceMethod.TypeArgumentsWithAnnotations, binder);
             }
 
+            // Method locals and parameters shadow pseudo-variables.
+            // That is why we place PlaceholderLocalBinder and ExecutableCodeBinder before EEMethodBinder.
             if (methodNotType)
             {
-                // Method locals and parameters shadow pseudo-variables.
-                binder = new PlaceholderLocalBinder(inspectionContext, new EETypeNameDecoder(compilation, metadataDecoder.ModuleSymbol), syntax, method, binder);
+                var typeNameDecoder = new EETypeNameDecoder(binder.Compilation, (PEModuleSymbol)substitutedSourceMethod.ContainingModule);
+                binder = new PlaceholderLocalBinder(
+                    syntax,
+                    aliases,
+                    method,
+                    typeNameDecoder,
+                    binder);
             }
 
             binder = new EEMethodBinder(method, substitutedSourceMethod, binder);
@@ -783,44 +896,57 @@ namespace Microsoft.CodeAnalysis.CSharp.ExpressionEvaluator
                 binder = new SimpleLocalScopeBinder(method.LocalsForBinding, binder);
             }
 
-            return binder;
+            Binder? actualRootBinder = null;
+            SyntaxNode? declaredLocalsScopeDesignator = null;
+
+            var executableBinder = new ExecutableCodeBinder(syntax, substitutedSourceMethod, binder,
+                (rootBinder, declaredLocalsScopeDesignatorOpt) =>
+                {
+                    actualRootBinder = rootBinder;
+                    declaredLocalsScopeDesignator = declaredLocalsScopeDesignatorOpt;
+                });
+
+            // We just need to trigger the process of building the binder map
+            // so that the lambda above was executed.
+            executableBinder.GetBinder(syntax);
+
+            RoslynDebug.AssertNotNull(actualRootBinder);
+
+            if (declaredLocalsScopeDesignator != null)
+            {
+                declaredLocals = actualRootBinder.GetDeclaredLocalsForScope(declaredLocalsScopeDesignator);
+            }
+            else
+            {
+                declaredLocals = ImmutableArray<LocalSymbol>.Empty;
+            }
+
+            return actualRootBinder;
         }
 
-        private static Imports BuildImports(CSharpCompilation compilation, ImmutableArray<string> importStrings, InContainerBinder binder, MetadataDecoder metadataDecoder)
+        private static Imports BuildImports(CSharpCompilation compilation, ImmutableArray<ImportRecord> importRecords, InContainerBinder binder)
         {
             // We make a first pass to extract all of the extern aliases because other imports may depend on them.
             var externsBuilder = ArrayBuilder<AliasAndExternAliasDirective>.GetInstance();
-            foreach (var importString in importStrings)
+            foreach (var importRecord in importRecords)
             {
-                string alias;
-                string externAlias;
-                string target;
-                ImportTargetKind kind;
-                if (!CustomDebugInfoReader.TryParseCSharpImportString(importString, out alias, out externAlias, out target, out kind))
-                {
-                    Debug.WriteLine("Unable to parse import string '{0}'", (object)importString);
-                    continue;
-                }
-                else if (kind != ImportTargetKind.Assembly)
+                if (importRecord.TargetKind != ImportTargetKind.Assembly)
                 {
                     continue;
                 }
 
-                Debug.Assert(alias == null);
-                Debug.Assert(externAlias != null);
-                Debug.Assert(target == null);
+                var alias = importRecord.Alias;
+                RoslynDebug.AssertNotNull(alias);
 
-                NameSyntax aliasNameSyntax;
-                if (!SyntaxHelpers.TryParseDottedName(externAlias, out aliasNameSyntax) || aliasNameSyntax.Kind() != SyntaxKind.IdentifierName)
+                if (!TryParseIdentifierNameSyntax(alias, out var aliasNameSyntax))
                 {
-                    Debug.WriteLine("Import string '{0}' has syntactically invalid extern alias '{1}'", importString, externAlias);
+                    Debug.WriteLine($"Import record '{importRecord}' has syntactically invalid extern alias '{alias}'");
                     continue;
                 }
 
-                var aliasToken = ((IdentifierNameSyntax)aliasNameSyntax).Identifier;
-                var externAliasSyntax = SyntaxFactory.ExternAliasDirective(aliasToken);
+                var externAliasSyntax = SyntaxFactory.ExternAliasDirective(aliasNameSyntax.Identifier);
                 var aliasSymbol = new AliasSymbol(binder, externAliasSyntax); // Binder is only used to access compilation.
-                externsBuilder.Add(new AliasAndExternAliasDirective(aliasSymbol, externAliasSyntax));
+                externsBuilder.Add(new AliasAndExternAliasDirective(aliasSymbol, externAliasDirective: null)); // We have one, but we pass null for consistency.
             }
 
             var externs = externsBuilder.ToImmutableAndFree();
@@ -833,155 +959,173 @@ namespace Microsoft.CodeAnalysis.CSharp.ExpressionEvaluator
                 binder = new InContainerBinder(
                     binder.Container,
                     binder,
-                    Imports.FromCustomDebugInfo(binder.Compilation, new Dictionary<string, AliasAndUsingDirective>(), ImmutableArray<NamespaceOrTypeAndUsingDirective>.Empty, externs));
+                    Imports.FromCustomDebugInfo(binder.Compilation, ImmutableDictionary<string, AliasAndUsingDirective>.Empty, ImmutableArray<NamespaceOrTypeAndUsingDirective>.Empty, externs));
             }
 
-            var usingAliases = new Dictionary<string, AliasAndUsingDirective>();
+            var usingAliases = ImmutableDictionary.CreateBuilder<string, AliasAndUsingDirective>();
             var usingsBuilder = ArrayBuilder<NamespaceOrTypeAndUsingDirective>.GetInstance();
 
-            foreach (var importString in importStrings)
+            foreach (var importRecord in importRecords)
             {
-                string alias;
-                string externAlias;
-                string target;
-                ImportTargetKind kind;
-                if (!CustomDebugInfoReader.TryParseCSharpImportString(importString, out alias, out externAlias, out target, out kind))
-                {
-                    Debug.WriteLine("Unable to parse import string '{0}'", (object)importString);
-                    continue;
-                }
-
-                switch (kind)
+                switch (importRecord.TargetKind)
                 {
                     case ImportTargetKind.Type:
                         {
-                            Debug.Assert(target != null, string.Format("Type import string '{0}' has no target", importString));
-                            Debug.Assert(externAlias == null, string.Format("Type import string '{0}' has an extern alias (should be folded into target)", importString));
+                            var typeSymbol = (TypeSymbol?)importRecord.TargetType;
+                            RoslynDebug.AssertNotNull(typeSymbol);
 
-                            TypeSymbol typeSymbol = metadataDecoder.GetTypeSymbolForSerializedType(target);
-                            Debug.Assert((object)typeSymbol != null);
                             if (typeSymbol.IsErrorType())
                             {
                                 // Type is unrecognized. The import may have been
                                 // valid in the original source but unnecessary.
                                 continue; // Don't add anything for this import.
                             }
-                            else if (alias == null && !typeSymbol.IsStatic)
+                            else if (importRecord.Alias == null && !typeSymbol.IsStatic)
                             {
                                 // Only static types can be directly imported.
                                 continue;
                             }
 
-                            NameSyntax typeSyntax = SyntaxFactory.ParseName(typeSymbol.ToDisplayString(s_fullNameFormat));
-                            if (!TryAddImport(alias, typeSyntax, typeSymbol, usingsBuilder, usingAliases, binder, importString))
+                            if (!TryAddImport(importRecord.Alias, typeSymbol, usingsBuilder, usingAliases, binder, importRecord))
                             {
                                 continue;
                             }
 
                             break;
                         }
+
                     case ImportTargetKind.Namespace:
                         {
-                            Debug.Assert(target != null, string.Format("Namespace import string '{0}' has no target", importString));
+                            var namespaceName = importRecord.TargetString;
+                            RoslynDebug.AssertNotNull(namespaceName);
 
-                            NameSyntax targetSyntax;
-                            if (!SyntaxHelpers.TryParseDottedName(target, out targetSyntax))
+                            if (!SyntaxHelpers.TryParseDottedName(namespaceName, out _))
                             {
                                 // DevDiv #999086: Some previous version of VS apparently generated type aliases as "UA{alias} T{alias-qualified type name}". 
                                 // Neither Roslyn nor Dev12 parses such imports.  However, Roslyn discards them, rather than interpreting them as "UA{alias}"
                                 // (which will rarely work and never be correct).
-                                Debug.WriteLine("Import string '{0}' has syntactically invalid target '{1}'", importString, target);
+                                Debug.WriteLine($"Import record '{importRecord}' has syntactically invalid target '{importRecord.TargetString}'");
                                 continue;
                             }
 
-                            if (externAlias != null)
+                            NamespaceSymbol globalNamespace;
+                            var targetAssembly = (AssemblySymbol?)importRecord.TargetAssembly;
+
+                            if (targetAssembly is object)
                             {
-                                IdentifierNameSyntax externAliasSyntax;
-                                if (!TryParseIdentifierNameSyntax(externAlias, out externAliasSyntax))
+                                if (targetAssembly.IsMissing)
                                 {
-                                    Debug.WriteLine("Import string '{0}' has syntactically invalid extern alias '{1}'", importString, externAlias);
+                                    Debug.WriteLine($"Import record '{importRecord}' has invalid assembly reference '{targetAssembly.Identity}'");
                                     continue;
                                 }
 
-                                // This is the case that requires the binder to already know about extern aliases.
-                                targetSyntax = SyntaxHelpers.PrependExternAlias(externAliasSyntax, targetSyntax);
+                                globalNamespace = targetAssembly.GlobalNamespace;
+                            }
+                            else if (importRecord.TargetAssemblyAlias != null)
+                            {
+                                if (!TryParseIdentifierNameSyntax(importRecord.TargetAssemblyAlias, out var externAliasSyntax))
+                                {
+                                    Debug.WriteLine($"Import record '{importRecord}' has syntactically invalid extern alias '{importRecord.TargetAssemblyAlias}'");
+                                    continue;
+                                }
+
+                                var aliasSymbol = (AliasSymbol)binder.BindNamespaceAliasSymbol(externAliasSyntax, BindingDiagnosticBag.Discarded);
+
+                                if (aliasSymbol is null)
+                                {
+                                    Debug.WriteLine($"Import record '{importRecord}' requires unknown extern alias '{importRecord.TargetAssemblyAlias}'");
+                                    continue;
+                                }
+
+                                globalNamespace = (NamespaceSymbol)aliasSymbol.Target;
+                            }
+                            else
+                            {
+                                globalNamespace = compilation.GlobalNamespace;
                             }
 
-                            var unusedDiagnostics = DiagnosticBag.GetInstance();
-                            var namespaceSymbol = binder.BindNamespaceOrType(targetSyntax, unusedDiagnostics).ExpressionSymbol as NamespaceSymbol;
-                            unusedDiagnostics.Free();
-                            if ((object)namespaceSymbol == null)
+                            var namespaceSymbol = BindNamespace(namespaceName, globalNamespace);
+
+                            if (namespaceSymbol is null)
                             {
                                 // Namespace is unrecognized. The import may have been
                                 // valid in the original source but unnecessary.
                                 continue; // Don't add anything for this import.
                             }
 
-                            if (!TryAddImport(alias, targetSyntax, namespaceSymbol, usingsBuilder, usingAliases, binder, importString))
+                            if (!TryAddImport(importRecord.Alias, namespaceSymbol, usingsBuilder, usingAliases, binder, importRecord))
                             {
                                 continue;
                             }
 
                             break;
                         }
+
                     case ImportTargetKind.Assembly:
-                        {
-                            // Handled in first pass (above).
-                            break;
-                        }
+                        // Handled in first pass (above).
+                        break;
+
                     default:
-                        {
-                            throw ExceptionUtilities.UnexpectedValue(kind);
-                        }
+                        throw ExceptionUtilities.UnexpectedValue(importRecord.TargetKind);
                 }
             }
 
-            return Imports.FromCustomDebugInfo(binder.Compilation, usingAliases, usingsBuilder.ToImmutableAndFree(), externs);
+            return Imports.FromCustomDebugInfo(binder.Compilation, usingAliases.ToImmutableDictionary(), usingsBuilder.ToImmutableAndFree(), externs);
+        }
+
+        private static NamespaceSymbol? BindNamespace(string namespaceName, NamespaceSymbol globalNamespace)
+        {
+            NamespaceSymbol? namespaceSymbol = globalNamespace;
+            foreach (var name in namespaceName.Split('.'))
+            {
+                var members = namespaceSymbol.GetMembers(name);
+                namespaceSymbol = (members.Length == 1) ? members[0] as NamespaceSymbol : null;
+
+                if (namespaceSymbol is null)
+                {
+                    break;
+                }
+            }
+
+            return namespaceSymbol;
         }
 
         private static bool TryAddImport(
-            string alias,
-            NameSyntax targetSyntax,
+            string? alias,
             NamespaceOrTypeSymbol targetSymbol,
             ArrayBuilder<NamespaceOrTypeAndUsingDirective> usingsBuilder,
-            Dictionary<string, AliasAndUsingDirective> usingAliases,
+            ImmutableDictionary<string, AliasAndUsingDirective>.Builder usingAliases,
             InContainerBinder binder,
-            string importString)
+            ImportRecord importRecord)
         {
             if (alias == null)
             {
-                var usingSyntax = SyntaxFactory.UsingDirective(targetSyntax);
-                usingsBuilder.Add(new NamespaceOrTypeAndUsingDirective(targetSymbol, usingSyntax));
+                usingsBuilder.Add(new NamespaceOrTypeAndUsingDirective(targetSymbol, usingDirective: null, dependencies: default));
             }
             else
             {
-                IdentifierNameSyntax aliasSyntax;
-                if (!TryParseIdentifierNameSyntax(alias, out aliasSyntax))
+                if (!TryParseIdentifierNameSyntax(alias, out var aliasSyntax))
                 {
-                    Debug.WriteLine("Import string '{0}' has syntactically invalid alias '{1}'", importString, alias);
+                    Debug.WriteLine($"Import record '{importRecord}' has syntactically invalid alias '{alias}'");
                     return false;
                 }
 
-                var usingSyntax = SyntaxFactory.UsingDirective(SyntaxFactory.NameEquals(aliasSyntax), targetSyntax);
                 var aliasSymbol = AliasSymbol.CreateCustomDebugInfoAlias(targetSymbol, aliasSyntax.Identifier, binder);
-                usingAliases.Add(alias, new AliasAndUsingDirective(aliasSymbol, usingSyntax));
+                usingAliases.Add(alias, new AliasAndUsingDirective(aliasSymbol, usingDirective: null));
             }
 
             return true;
         }
 
-        private static bool TryParseIdentifierNameSyntax(string name, out IdentifierNameSyntax syntax)
+        private static bool TryParseIdentifierNameSyntax(string name, [NotNullWhen(true)] out IdentifierNameSyntax? syntax)
         {
-            Debug.Assert(name != null);
-
             if (name == MetadataReferenceProperties.GlobalAlias)
             {
                 syntax = SyntaxFactory.IdentifierName(SyntaxFactory.Token(SyntaxKind.GlobalKeyword));
                 return true;
             }
 
-            NameSyntax nameSyntax;
-            if (!SyntaxHelpers.TryParseDottedName(name, out nameSyntax) || nameSyntax.Kind() != SyntaxKind.IdentifierName)
+            if (!SyntaxHelpers.TryParseDottedName(name, out var nameSyntax) || nameSyntax.Kind() != SyntaxKind.IdentifierName)
             {
                 syntax = null;
                 return false;
@@ -993,7 +1137,7 @@ namespace Microsoft.CodeAnalysis.CSharp.ExpressionEvaluator
 
         internal CommonMessageProvider MessageProvider
         {
-            get { return this.Compilation.MessageProvider; }
+            get { return Compilation.MessageProvider; }
         }
 
         private static DkmClrCompilationResultFlags GetLocalResultFlags(LocalSymbol local)
@@ -1052,6 +1196,51 @@ namespace Microsoft.CodeAnalysis.CSharp.ExpressionEvaluator
             return builder.ToImmutableAndFree();
         }
 
+        private static ImmutableArray<string> GetSourceMethodParametersInOrder(
+            MethodSymbol method,
+            MethodSymbol? sourceMethod)
+        {
+            var containingType = method.ContainingType;
+            bool isIteratorOrAsyncMethod = IsDisplayClassType(containingType) &&
+                GeneratedNames.GetKind(containingType.Name) == GeneratedNameKind.StateMachineType;
+
+            var parameterNamesInOrder = ArrayBuilder<string>.GetInstance();
+            // For version before .NET 4.5, we cannot find the sourceMethod properly:
+            // The source method coincides with the original method in the case.
+            // Therefore, for iterators and async state machines, we have to get parameters from the containingType.
+            // This does not guarantee the proper order of parameters.
+            if (isIteratorOrAsyncMethod && method == sourceMethod)
+            {
+                Debug.Assert(IsDisplayClassType(containingType));
+                foreach (var member in containingType.GetMembers())
+                {
+                    if (member.Kind != SymbolKind.Field)
+                    {
+                        continue;
+                    }
+
+                    var field = (FieldSymbol)member;
+                    var fieldName = field.Name;
+                    if (GeneratedNames.GetKind(fieldName) == GeneratedNameKind.None)
+                    {
+                        parameterNamesInOrder.Add(fieldName);
+                    }
+                }
+            }
+            else
+            {
+                if (sourceMethod is object)
+                {
+                    foreach (var p in sourceMethod.Parameters)
+                    {
+                        parameterNamesInOrder.Add(p.Name);
+                    }
+                }
+            }
+
+            return parameterNamesInOrder.ToImmutableAndFree();
+        }
+
         /// <summary>
         /// Return a mapping of captured variables (parameters, locals, and
         /// "this") to locals. The mapping is needed to expose the original
@@ -1060,176 +1249,181 @@ namespace Microsoft.CodeAnalysis.CSharp.ExpressionEvaluator
         private static void GetDisplayClassVariables(
             MethodSymbol method,
             ImmutableArray<LocalSymbol> locals,
-            ImmutableSortedSet<int> inScopeHoistedLocalIndices,
+            ImmutableSortedSet<int> inScopeHoistedLocalSlots,
+            ImmutableArray<string> parameterNamesInOrder,
             out ImmutableArray<string> displayClassVariableNamesInOrder,
-            out ImmutableDictionary<string, DisplayClassVariable> displayClassVariables,
-            out ImmutableHashSet<string> hoistedParameterNames)
+            out ImmutableDictionary<string, DisplayClassVariable> displayClassVariables)
         {
-            // Calculated the shortest paths from locals to instances of display
+            // Calculate the shortest paths from locals to instances of display
             // classes. There should not be two instances of the same display
             // class immediately within any particular method.
-            var displayClassTypes = PooledHashSet<NamedTypeSymbol>.GetInstance();
             var displayClassInstances = ArrayBuilder<DisplayClassInstanceAndFields>.GetInstance();
 
+            foreach (var parameter in method.Parameters)
+            {
+                if (GeneratedNames.GetKind(parameter.Name) == GeneratedNameKind.TransparentIdentifier ||
+                    IsDisplayClassParameter(parameter))
+                {
+                    var instance = new DisplayClassInstanceFromParameter(parameter);
+                    displayClassInstances.Add(new DisplayClassInstanceAndFields(instance));
+                }
+            }
+
+            if (IsDisplayClassType(method.ContainingType) && !method.IsStatic)
+            {
+                // Add "this" display class instance.
+                var instance = new DisplayClassInstanceFromParameter(method.ThisParameter);
+                displayClassInstances.Add(new DisplayClassInstanceAndFields(instance));
+            }
+
+            var displayClassTypes = PooledHashSet<TypeSymbol>.GetInstance();
+            foreach (var instance in displayClassInstances)
+            {
+                displayClassTypes.Add(instance.Instance.Type);
+            }
+
+            // Find any additional display class instances.
+            GetAdditionalDisplayClassInstances(displayClassTypes, displayClassInstances, startIndex: 0);
+
             // Add any display class instances from locals (these will contain any hoisted locals).
+            // Locals are only added after finding all display class instances reachable from
+            // parameters because locals may be null (temporary locals in async state machine
+            // for instance) so we prefer parameters to locals.
+            int startIndex = displayClassInstances.Count;
             foreach (var local in locals)
             {
                 var name = local.Name;
-                if ((name != null) && (GeneratedNames.GetKind(name) == GeneratedNameKind.DisplayClassLocalOrField))
+                if (name != null && GeneratedNames.GetKind(name) == GeneratedNameKind.DisplayClassLocalOrField)
                 {
-                    var instance = new DisplayClassInstanceFromLocal((EELocalSymbol)local);
-                    displayClassTypes.Add(instance.Type);
-                    displayClassInstances.Add(new DisplayClassInstanceAndFields(instance));
+                    var localType = local.Type;
+                    if (localType is object && displayClassTypes.Add(localType))
+                    {
+                        var instance = new DisplayClassInstanceFromLocal((EELocalSymbol)local);
+                        displayClassInstances.Add(new DisplayClassInstanceAndFields(instance));
+                    }
                 }
             }
+            GetAdditionalDisplayClassInstances(displayClassTypes, displayClassInstances, startIndex);
 
-            var containingType = method.ContainingType;
-            bool isIteratorOrAsyncMethod = false;
-            if (IsDisplayClassType(containingType))
-            {
-                if (!method.IsStatic)
-                {
-                    // Add "this" display class instance.
-                    var instance = new DisplayClassInstanceFromThis(method.ThisParameter);
-                    displayClassTypes.Add(instance.Type);
-                    displayClassInstances.Add(new DisplayClassInstanceAndFields(instance));
-                }
-
-                isIteratorOrAsyncMethod = GeneratedNames.GetKind(containingType.Name) == GeneratedNameKind.StateMachineType;
-            }
+            displayClassTypes.Free();
 
             if (displayClassInstances.Any())
             {
-                // Find any additional display class instances breadth first.
-                for (int depth = 0; GetDisplayClassInstances(displayClassTypes, displayClassInstances, depth) > 0; depth++)
+                var parameterNames = PooledHashSet<string>.GetInstance();
+                foreach (var name in parameterNamesInOrder)
                 {
+                    parameterNames.Add(name);
                 }
 
                 // The locals are the set of all fields from the display classes.
                 var displayClassVariableNamesInOrderBuilder = ArrayBuilder<string>.GetInstance();
                 var displayClassVariablesBuilder = PooledDictionary<string, DisplayClassVariable>.GetInstance();
 
-                var parameterNames = PooledHashSet<string>.GetInstance();
-                if (isIteratorOrAsyncMethod)
-                {
-                    Debug.Assert(IsDisplayClassType(containingType));
-
-                    foreach (var field in containingType.GetMembers().OfType<FieldSymbol>())
-                    {
-                        // All iterator and async state machine fields (including hoisted locals) have mangled names, except
-                        // for hoisted parameters (whose field names are always the same as the original source parameters).
-                        var fieldName = field.Name;
-                        if (GeneratedNames.GetKind(fieldName) == GeneratedNameKind.None)
-                        {
-                            parameterNames.Add(fieldName);
-                        }
-                    }
-                }
-                else
-                {
-                    foreach (var p in method.Parameters)
-                    {
-                        parameterNames.Add(p.Name);
-                    }
-                }
-
-                var pooledHoistedParameterNames = PooledHashSet<string>.GetInstance();
                 foreach (var instance in displayClassInstances)
                 {
                     GetDisplayClassVariables(
                         displayClassVariableNamesInOrderBuilder,
                         displayClassVariablesBuilder,
                         parameterNames,
-                        inScopeHoistedLocalIndices,
-                        instance,
-                        pooledHoistedParameterNames);
+                        inScopeHoistedLocalSlots,
+                        instance);
                 }
-
-                hoistedParameterNames = pooledHoistedParameterNames.ToImmutableHashSet<string>();
-                pooledHoistedParameterNames.Free();
-                parameterNames.Free();
 
                 displayClassVariableNamesInOrder = displayClassVariableNamesInOrderBuilder.ToImmutableAndFree();
                 displayClassVariables = displayClassVariablesBuilder.ToImmutableDictionary();
                 displayClassVariablesBuilder.Free();
+                parameterNames.Free();
             }
             else
             {
-                hoistedParameterNames = ImmutableHashSet<string>.Empty;
                 displayClassVariableNamesInOrder = ImmutableArray<string>.Empty;
                 displayClassVariables = ImmutableDictionary<string, DisplayClassVariable>.Empty;
             }
 
-            displayClassTypes.Free();
             displayClassInstances.Free();
         }
 
-        /// <summary>
-        /// Return the set of display class instances that can be reached
-        /// from the given local. A particular display class may be reachable
-        /// from multiple locals. In those cases, the instance from the
-        /// shortest path (fewest intermediate fields) is returned.
-        /// </summary>
-        private static int GetDisplayClassInstances(
-            HashSet<NamedTypeSymbol> displayClassTypes,
+        private static void GetAdditionalDisplayClassInstances(
+            HashSet<TypeSymbol> displayClassTypes,
             ArrayBuilder<DisplayClassInstanceAndFields> displayClassInstances,
-            int depth)
+            int startIndex)
         {
-            Debug.Assert(displayClassInstances.All(p => p.Depth <= depth));
-
-            var atDepth = ArrayBuilder<DisplayClassInstanceAndFields>.GetInstance();
-            atDepth.AddRange(displayClassInstances.Where(p => p.Depth == depth));
-            Debug.Assert(atDepth.Count > 0);
-
-            int n = 0;
-            foreach (var instance in atDepth)
+            // Find any additional display class instances breadth first.
+            for (int i = startIndex; i < displayClassInstances.Count; i++)
             {
-                n += GetDisplayClassInstances(displayClassTypes, displayClassInstances, instance);
+                GetDisplayClassInstances(displayClassTypes, displayClassInstances, displayClassInstances[i]);
             }
-
-            atDepth.Free();
-            return n;
         }
 
-        private static int GetDisplayClassInstances(
-            HashSet<NamedTypeSymbol> displayClassTypes,
+        private static void GetDisplayClassInstances(
+            HashSet<TypeSymbol> displayClassTypes,
             ArrayBuilder<DisplayClassInstanceAndFields> displayClassInstances,
             DisplayClassInstanceAndFields instance)
         {
             // Display class instance. The display class fields are variables.
-            int n = 0;
             foreach (var member in instance.Type.GetMembers())
             {
                 if (member.Kind != SymbolKind.Field)
                 {
                     continue;
                 }
+
                 var field = (FieldSymbol)member;
                 var fieldType = field.Type;
-                var fieldKind = GeneratedNames.GetKind(field.Name);
-                if (fieldKind == GeneratedNameKind.DisplayClassLocalOrField ||
-                    (fieldKind == GeneratedNameKind.ThisProxyField && GeneratedNames.GetKind(fieldType.Name) == GeneratedNameKind.LambdaDisplayClass)) // Async lambda case.
+                var fieldName = field.Name;
+                TryParseGeneratedName(fieldName, out var fieldKind, out var part);
+
+                switch (fieldKind)
                 {
-                    Debug.Assert(!field.IsStatic);
-                    // A local that is itself a display class instance.
-                    if (displayClassTypes.Add((NamedTypeSymbol)fieldType))
-                    {
-                        var other = instance.FromField(field);
-                        displayClassInstances.Add(other);
-                        n++;
-                    }
+                    case GeneratedNameKind.DisplayClassLocalOrField:
+                    case GeneratedNameKind.TransparentIdentifier:
+                        break;
+                    case GeneratedNameKind.AnonymousTypeField:
+                        if (GeneratedNames.GetKind(part) != GeneratedNameKind.TransparentIdentifier)
+                        {
+                            continue;
+                        }
+                        break;
+                    case GeneratedNameKind.ThisProxyField:
+                        if (GeneratedNames.GetKind(fieldType.Name) != GeneratedNameKind.LambdaDisplayClass)
+                        {
+                            continue;
+                        }
+                        // Async lambda case.
+                        break;
+                    default:
+                        continue;
+                }
+
+                Debug.Assert(!field.IsStatic);
+
+                // A hoisted local that is itself a display class instance.
+                if (displayClassTypes.Add(fieldType))
+                {
+                    var other = instance.FromField(field);
+                    displayClassInstances.Add(other);
                 }
             }
-            return n;
+        }
+
+        /// <summary>
+        /// Returns true if the parameter is a synthesized parameter representing
+        /// a display class instance (used to pass hoisted symbols to local functions).
+        /// </summary>
+        private static bool IsDisplayClassParameter(ParameterSymbol parameter)
+        {
+            var type = parameter.Type;
+            var result = type.Kind == SymbolKind.NamedType && IsDisplayClassType((NamedTypeSymbol)type);
+            Debug.Assert(!result || parameter.MetadataName == "");
+            return result;
         }
 
         private static void GetDisplayClassVariables(
             ArrayBuilder<string> displayClassVariableNamesInOrderBuilder,
             Dictionary<string, DisplayClassVariable> displayClassVariablesBuilder,
             HashSet<string> parameterNames,
-            ImmutableSortedSet<int> inScopeHoistedLocalIndices,
-            DisplayClassInstanceAndFields instance,
-            HashSet<string> hoistedParameterNames)
+            ImmutableSortedSet<int> inScopeHoistedLocalSlots,
+            DisplayClassInstanceAndFields instance)
         {
             // Display class instance. The display class fields are variables.
             foreach (var member in instance.Type.GetMembers())
@@ -1242,53 +1436,62 @@ namespace Microsoft.CodeAnalysis.CSharp.ExpressionEvaluator
                 var field = (FieldSymbol)member;
                 var fieldName = field.Name;
 
+REPARSE:
+
                 DisplayClassVariableKind variableKind;
                 string variableName;
-                GeneratedNameKind fieldKind;
-                int openBracketOffset;
-                int closeBracketOffset;
-                GeneratedNames.TryParseGeneratedName(fieldName, out fieldKind, out openBracketOffset, out closeBracketOffset);
+                TryParseGeneratedName(fieldName, out var fieldKind, out var part);
 
                 switch (fieldKind)
                 {
+                    case GeneratedNameKind.AnonymousTypeField:
+                        RoslynDebug.AssertNotNull(part);
+                        Debug.Assert(fieldName == field.Name); // This only happens once.
+
+                        fieldName = part;
+                        goto REPARSE;
+
+                    case GeneratedNameKind.TransparentIdentifier:
+                        // A transparent identifier (field) in an anonymous type synthesized for a transparent identifier.
+                        Debug.Assert(!field.IsStatic);
+                        continue;
+
                     case GeneratedNameKind.DisplayClassLocalOrField:
                         // A local that is itself a display class instance.
                         Debug.Assert(!field.IsStatic);
                         continue;
+
                     case GeneratedNameKind.HoistedLocalField:
+                        RoslynDebug.AssertNotNull(part);
+
                         // Filter out hoisted locals that are known to be out-of-scope at the current IL offset.
                         // Hoisted locals with invalid indices will be included since more information is better
                         // than less in error scenarios.
-                        int slotIndex;
-                        if (GeneratedNames.TryParseSlotIndex(fieldName, out slotIndex) && !inScopeHoistedLocalIndices.Contains(slotIndex))
+                        if (GeneratedNames.TryParseSlotIndex(fieldName, out int slotIndex) &&
+                            !inScopeHoistedLocalSlots.Contains(slotIndex))
                         {
                             continue;
                         }
 
-                        variableName = fieldName.Substring(openBracketOffset + 1, closeBracketOffset - openBracketOffset - 1);
+                        variableName = part;
                         variableKind = DisplayClassVariableKind.Local;
                         Debug.Assert(!field.IsStatic);
                         break;
+
                     case GeneratedNameKind.ThisProxyField:
                         // A reference to "this".
-                        variableName = fieldName;
+                        variableName = ""; // Should not be referenced by name.
                         variableKind = DisplayClassVariableKind.This;
                         Debug.Assert(!field.IsStatic);
                         break;
+
                     case GeneratedNameKind.None:
                         // A reference to a parameter or local.
                         variableName = fieldName;
-                        if (parameterNames.Contains(variableName))
-                        {
-                            variableKind = DisplayClassVariableKind.Parameter;
-                            hoistedParameterNames.Add(variableName);
-                        }
-                        else
-                        {
-                            variableKind = DisplayClassVariableKind.Local;
-                        }
+                        variableKind = parameterNames.Contains(variableName) ? DisplayClassVariableKind.Parameter : DisplayClassVariableKind.Local;
                         Debug.Assert(!field.IsStatic);
                         break;
+
                     default:
                         continue;
                 }
@@ -1298,8 +1501,22 @@ namespace Microsoft.CodeAnalysis.CSharp.ExpressionEvaluator
                     // Only expecting duplicates for async state machine
                     // fields (that should be at the top-level).
                     Debug.Assert(displayClassVariablesBuilder[variableName].DisplayClassFields.Count() == 1);
-                    Debug.Assert(instance.Fields.Count() >= 1); // greater depth
-                    Debug.Assert(variableKind == DisplayClassVariableKind.Parameter);
+
+                    if (!instance.Fields.Any())
+                    {
+                        // Prefer parameters over locals.
+                        Debug.Assert(instance.Instance is DisplayClassInstanceFromLocal);
+                    }
+                    else
+                    {
+                        Debug.Assert(instance.Fields.Count() >= 1); // greater depth
+                        Debug.Assert(variableKind == DisplayClassVariableKind.Parameter || variableKind == DisplayClassVariableKind.This);
+
+                        if (variableKind == DisplayClassVariableKind.Parameter && GeneratedNames.GetKind(instance.Type.Name) == GeneratedNameKind.LambdaDisplayClass)
+                        {
+                            displayClassVariablesBuilder[variableName] = instance.ToVariable(variableName, variableKind, field);
+                        }
+                    }
                 }
                 else if (variableKind != DisplayClassVariableKind.This || GeneratedNames.GetKind(instance.Type.ContainingType.Name) != GeneratedNameKind.LambdaDisplayClass)
                 {
@@ -1311,16 +1528,38 @@ namespace Microsoft.CodeAnalysis.CSharp.ExpressionEvaluator
             }
         }
 
-        private static bool IsDisplayClassType(NamedTypeSymbol type)
+        private static void TryParseGeneratedName(string name, out GeneratedNameKind kind, out string? part)
+        {
+            _ = GeneratedNames.TryParseGeneratedName(name, out kind, out int openBracketOffset, out int closeBracketOffset);
+            switch (kind)
+            {
+                case GeneratedNameKind.AnonymousTypeField:
+                case GeneratedNameKind.HoistedLocalField:
+                    part = name.Substring(openBracketOffset + 1, closeBracketOffset - openBracketOffset - 1);
+                    break;
+
+                default:
+                    part = null;
+                    break;
+            }
+        }
+
+        private static bool IsDisplayClassType(TypeSymbol type)
         {
             switch (GeneratedNames.GetKind(type.Name))
             {
                 case GeneratedNameKind.LambdaDisplayClass:
                 case GeneratedNameKind.StateMachineType:
                     return true;
+
                 default:
                     return false;
             }
+        }
+
+        internal static DisplayClassVariable GetThisProxy(ImmutableDictionary<string, DisplayClassVariable> displayClassVariables)
+        {
+            return displayClassVariables.Values.FirstOrDefault(v => v.Kind == DisplayClassVariableKind.This);
         }
 
         private static NamedTypeSymbol GetNonDisplayClassContainer(NamedTypeSymbol type)
@@ -1331,9 +1570,8 @@ namespace Microsoft.CodeAnalysis.CSharp.ExpressionEvaluator
             //    so we may have to walk out more than one level.
             while (IsDisplayClassType(type))
             {
-                type = type.ContainingType;
+                type = type.ContainingType!;
             }
-            Debug.Assert((object)type != null);
 
             return type;
         }
@@ -1345,7 +1583,7 @@ namespace Microsoft.CodeAnalysis.CSharp.ExpressionEvaluator
         /// The symbol of the method that is currently on top of the callstack, with
         /// EE type parameters substituted in place of the original type parameters.
         /// </param>
-        /// <param name="hasDisplayClassThis">
+        /// <param name="sourceMethodMustBeInstance">
         /// True if "this" is available via a display class in the current context.
         /// </param>
         /// <returns>
@@ -1369,64 +1607,62 @@ namespace Microsoft.CodeAnalysis.CSharp.ExpressionEvaluator
         /// </remarks>
         internal static MethodSymbol GetSubstitutedSourceMethod(
             MethodSymbol candidateSubstitutedSourceMethod,
-            bool hasDisplayClassThis)
+            bool sourceMethodMustBeInstance)
         {
             var candidateSubstitutedSourceType = candidateSubstitutedSourceMethod.ContainingType;
 
             string desiredMethodName;
             if (GeneratedNames.TryParseSourceMethodNameFromGeneratedName(candidateSubstitutedSourceType.Name, GeneratedNameKind.StateMachineType, out desiredMethodName) ||
-                GeneratedNames.TryParseSourceMethodNameFromGeneratedName(candidateSubstitutedSourceMethod.Name, GeneratedNameKind.LambdaMethod, out desiredMethodName))
+                GeneratedNames.TryParseSourceMethodNameFromGeneratedName(candidateSubstitutedSourceMethod.Name, GeneratedNameKind.LambdaMethod, out desiredMethodName) ||
+                GeneratedNames.TryParseSourceMethodNameFromGeneratedName(candidateSubstitutedSourceMethod.Name, GeneratedNameKind.LocalFunction, out desiredMethodName))
             {
                 // We could be in the MoveNext method of an async lambda.
                 string tempMethodName;
-                if (GeneratedNames.TryParseSourceMethodNameFromGeneratedName(desiredMethodName, GeneratedNameKind.LambdaMethod, out tempMethodName))
+                if (GeneratedNames.TryParseSourceMethodNameFromGeneratedName(desiredMethodName, GeneratedNameKind.LambdaMethod, out tempMethodName) ||
+                    GeneratedNames.TryParseSourceMethodNameFromGeneratedName(desiredMethodName, GeneratedNameKind.LocalFunction, out tempMethodName))
                 {
                     desiredMethodName = tempMethodName;
+
                     var containing = candidateSubstitutedSourceType.ContainingType;
-                    Debug.Assert((object)containing != null);
+                    RoslynDebug.AssertNotNull(containing);
+
                     if (GeneratedNames.GetKind(containing.Name) == GeneratedNameKind.LambdaDisplayClass)
                     {
                         candidateSubstitutedSourceType = containing;
-                        hasDisplayClassThis = candidateSubstitutedSourceType.MemberNames.Select(GeneratedNames.GetKind).Contains(GeneratedNameKind.ThisProxyField);
+                        sourceMethodMustBeInstance = candidateSubstitutedSourceType.MemberNames.Select(GeneratedNames.GetKind).Contains(GeneratedNameKind.ThisProxyField);
                     }
                 }
 
                 var desiredTypeParameters = candidateSubstitutedSourceType.OriginalDefinition.TypeParameters;
-
-                // We need to use a ThreeState, rather than a bool, because we can't distinguish between
-                // a roslyn lambda that only captures "this" and a dev12 lambda that captures nothing
-                // (neither introduces a display class).  This is unnecessary in the state machine case,
-                // because then "this" is hoisted unconditionally.
-                var isDesiredMethodStatic = hasDisplayClassThis
-                    ? ThreeState.False
-                    : (GeneratedNames.GetKind(candidateSubstitutedSourceType.Name) == GeneratedNameKind.StateMachineType)
-                        ? ThreeState.True
-                        : ThreeState.Unknown;
 
                 // Type containing the original iterator, async, or lambda-containing method.
                 var substitutedSourceType = GetNonDisplayClassContainer(candidateSubstitutedSourceType);
 
                 foreach (var candidateMethod in substitutedSourceType.GetMembers().OfType<MethodSymbol>())
                 {
-                    if (IsViableSourceMethod(candidateMethod, desiredMethodName, desiredTypeParameters, isDesiredMethodStatic))
+                    if (IsViableSourceMethod(candidateMethod, desiredMethodName, desiredTypeParameters, sourceMethodMustBeInstance))
                     {
                         return desiredTypeParameters.Length == 0
                             ? candidateMethod
-                            : candidateMethod.Construct(candidateSubstitutedSourceType.TypeArguments);
+                            : candidateMethod.Construct(candidateSubstitutedSourceType.TypeArgumentsWithAnnotationsNoUseSiteDiagnostics);
                     }
                 }
 
-                Debug.Assert(false, "Why didn't we find a substituted source method for " + candidateSubstitutedSourceMethod + "?");
+                Debug.Fail("Why didn't we find a substituted source method for " + candidateSubstitutedSourceMethod + "?");
             }
 
             return candidateSubstitutedSourceMethod;
         }
 
-        private static bool IsViableSourceMethod(MethodSymbol candidateMethod, string desiredMethodName, ImmutableArray<TypeParameterSymbol> desiredTypeParameters, ThreeState isDesiredMethodStatic)
+        private static bool IsViableSourceMethod(
+            MethodSymbol candidateMethod,
+            string desiredMethodName,
+            ImmutableArray<TypeParameterSymbol> desiredTypeParameters,
+            bool desiredMethodMustBeInstance)
         {
             return
                 !candidateMethod.IsAbstract &&
-                (isDesiredMethodStatic == ThreeState.Unknown || isDesiredMethodStatic.Value() == candidateMethod.IsStatic) &&
+                !(desiredMethodMustBeInstance && candidateMethod.IsStatic) &&
                 candidateMethod.Name == desiredMethodName &&
                 HaveSameConstraints(candidateMethod.TypeParameters, desiredTypeParameters);
         }
@@ -1438,7 +1674,8 @@ namespace Microsoft.CodeAnalysis.CSharp.ExpressionEvaluator
             {
                 return false;
             }
-            else if (arity == 0)
+
+            if (arity == 0)
             {
                 return true;
             }
@@ -1450,42 +1687,46 @@ namespace Microsoft.CodeAnalysis.CSharp.ExpressionEvaluator
             return MemberSignatureComparer.HaveSameConstraints(candidateTypeParameters, candidateTypeMap, desiredTypeParameters, desiredTypeMap);
         }
 
-        private struct DisplayClassInstanceAndFields
+        [DebuggerDisplay("{GetDebuggerDisplay(), nq}")]
+        private readonly struct DisplayClassInstanceAndFields
         {
             internal readonly DisplayClassInstance Instance;
             internal readonly ConsList<FieldSymbol> Fields;
 
-            internal DisplayClassInstanceAndFields(DisplayClassInstance instance) :
-                this(instance, ConsList<FieldSymbol>.Empty)
+            internal DisplayClassInstanceAndFields(DisplayClassInstance instance)
+                : this(instance, ConsList<FieldSymbol>.Empty)
             {
-                Debug.Assert(IsDisplayClassType(instance.Type));
+                Debug.Assert(IsDisplayClassType(instance.Type) ||
+                    GeneratedNames.GetKind(instance.Type.Name) == GeneratedNameKind.AnonymousType);
             }
 
             private DisplayClassInstanceAndFields(DisplayClassInstance instance, ConsList<FieldSymbol> fields)
             {
-                this.Instance = instance;
-                this.Fields = fields;
+                Instance = instance;
+                Fields = fields;
             }
 
-            internal NamedTypeSymbol Type
-            {
-                get { return this.Fields.Any() ? (NamedTypeSymbol)this.Fields.Head.Type : this.Instance.Type; }
-            }
+            internal TypeSymbol Type
+                => Fields.Any() ? Fields.Head.Type : Instance.Type;
 
             internal int Depth
-            {
-                get { return this.Fields.Count(); }
-            }
+                => Fields.Count();
 
             internal DisplayClassInstanceAndFields FromField(FieldSymbol field)
             {
-                Debug.Assert(IsDisplayClassType((NamedTypeSymbol)field.Type));
-                return new DisplayClassInstanceAndFields(this.Instance, this.Fields.Prepend(field));
+                Debug.Assert(IsDisplayClassType(field.Type) ||
+                    GeneratedNames.GetKind(field.Type.Name) == GeneratedNameKind.AnonymousType);
+                return new DisplayClassInstanceAndFields(Instance, Fields.Prepend(field));
             }
 
             internal DisplayClassVariable ToVariable(string name, DisplayClassVariableKind kind, FieldSymbol field)
             {
-                return new DisplayClassVariable(name, kind, this.Instance, this.Fields.Prepend(field));
+                return new DisplayClassVariable(name, kind, Instance, Fields.Prepend(field));
+            }
+
+            private string GetDebuggerDisplay()
+            {
+                return Instance.GetDebuggerDisplay(Fields);
             }
         }
     }

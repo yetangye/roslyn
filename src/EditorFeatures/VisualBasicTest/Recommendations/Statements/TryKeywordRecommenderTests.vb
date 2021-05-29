@@ -1,16 +1,17 @@
-' Copyright (c) Microsoft.  All Rights Reserved.  Licensed under the Apache License, Version 2.0.  See License.txt in the project root for license information.
+﻿' Licensed to the .NET Foundation under one or more agreements.
+' The .NET Foundation licenses this file to you under the MIT license.
+' See the LICENSE file in the project root for more information.
 
-Imports Microsoft.CodeAnalysis.Text
 Namespace Microsoft.CodeAnalysis.Editor.VisualBasic.UnitTests.Recommendations.Statements
     Public Class TryKeywordRecommenderTests
 
         <Fact, Trait(Traits.Feature, Traits.Features.KeywordRecommending)>
-        Public Sub TryInMethodBody()
+        Public Sub TryInMethodBodyTest()
             VerifyRecommendationsContain(<MethodBody>|</MethodBody>, "Try")
         End Sub
 
         <Fact, Trait(Traits.Feature, Traits.Features.KeywordRecommending)>
-        Public Sub TryInMultiLineLambda()
+        Public Sub TryInMultiLineLambdaTest()
             VerifyRecommendationsContain(<ClassDeclaration>
 Private _member = Sub()
 |
@@ -20,21 +21,21 @@ End Sub
         End Sub
 
         <Fact, Trait(Traits.Feature, Traits.Features.KeywordRecommending)>
-        Public Sub TryInSingleLineLambda()
+        Public Sub TryInSingleLineLambdaTest()
             VerifyRecommendationsMissing(<ClassDeclaration>
 Private _member = Sub() |
                                          </ClassDeclaration>, "Try")
         End Sub
 
         <Fact, Trait(Traits.Feature, Traits.Features.KeywordRecommending)>
-        Public Sub TryInSingleLineFunctionLambda()
+        Public Sub TryInSingleLineFunctionLambdaTest()
             VerifyRecommendationsMissing(<ClassDeclaration>
 Private _member = Function() |
                                          </ClassDeclaration>, "Try")
         End Sub
 
         <Fact, Trait(Traits.Feature, Traits.Features.KeywordRecommending)>
-        Public Sub AfterExitInTryBlock()
+        Public Sub AfterExitInTryBlockTest()
             Dim code =
 <MethodBody>
 Try
@@ -45,7 +46,7 @@ Try
         End Sub
 
         <Fact, Trait(Traits.Feature, Traits.Features.KeywordRecommending)>
-        Public Sub NotAfterExitInFinallyBlock()
+        Public Sub NotAfterExitInFinallyBlockTest()
             Dim code =
 <MethodBody>
 Try
@@ -57,7 +58,7 @@ Finally
         End Sub
 
         <Fact, Trait(Traits.Feature, Traits.Features.KeywordRecommending)>
-        Public Sub AfterExitInCatchBlock()
+        Public Sub AfterExitInCatchBlockTest()
             Dim code =
 <MethodBody>
 Try
@@ -67,6 +68,5 @@ Catch
 
             VerifyRecommendationsContain(code, "Try")
         End Sub
-
     End Class
 End Namespace

@@ -1,11 +1,12 @@
-﻿// Copyright (c) Microsoft.  All Rights Reserved.  Licensed under the Apache License, Version 2.0.  See License.txt in the project root for license information.
+﻿// Licensed to the .NET Foundation under one or more agreements.
+// The .NET Foundation licenses this file to you under the MIT license.
+// See the LICENSE file in the project root for more information.
+
+#nullable disable
 
 using System;
-using Microsoft.CodeAnalysis.CSharp.Symbols;
-using Microsoft.CodeAnalysis.CSharp.Syntax;
+using System.Globalization;
 using Microsoft.CodeAnalysis.CSharp.Test.Utilities;
-using Microsoft.CodeAnalysis.CSharp.UnitTests.Emit;
-using Microsoft.CodeAnalysis.Text;
 using Roslyn.Test.Utilities;
 using Xunit;
 
@@ -111,6 +112,7 @@ class C
         }
 
         [Fact]
+        [WorkItem(32576, "https://github.com/dotnet/roslyn/issues/32576")]
         public void TestIncrementDecimal()
         {
             TestIncrementCompilationAndOutput<decimal>(-1, 0);
@@ -826,7 +828,7 @@ class C
 ");
         }
 
-        [WorkItem(540718, "DevDiv")]
+        [WorkItem(540718, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/540718")]
         [Fact]
         public void GenConditionalBranchTempForInc()
         {
@@ -860,7 +862,7 @@ class Test
                 );
         }
 
-        [WorkItem(540718, "DevDiv")]
+        [WorkItem(540718, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/540718")]
         [Fact]
         public void IncrementField()
         {
@@ -909,7 +911,7 @@ class Test
                 );
         }
 
-        [WorkItem(540723, "DevDiv")]
+        [WorkItem(540723, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/540723")]
         [Fact]
         public void MissingIncInFinallyBlock()
         {
@@ -930,7 +932,7 @@ class My
             CompileAndVerify(source, expectedOutput: "1");
         }
 
-        [WorkItem(540810, "DevDiv")]
+        [WorkItem(540810, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/540810")]
         [Fact]
         public void NestedIncrement()
         {
@@ -951,7 +953,7 @@ class My
             CompileAndVerify(source, expectedOutput: "11");
         }
 
-        [WorkItem(540810, "DevDiv")]
+        [WorkItem(540810, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/540810")]
         [Fact]
         public void IncrementSideEffects()
         {
@@ -1001,13 +1003,14 @@ Zero
             Type type = typeof(T);
             Assert.True(type.IsPrimitive || type == typeof(decimal), string.Format("Type {0} is neither primitive nor decimal", type));
 
-            string source = string.Format(NUMERIC_INCREMENT_TEMPLATE, type.FullName, value, valuePlusOne);
-            string expectedOutput = string.Format(NUMERIC_OUTPUT_TEMPLATE, value, valuePlusOne);
+            // Explicitly provide InvariantCulture to use the proper C# decimal separator '.' in the source regardless of the current culture
+            string source = string.Format(CultureInfo.InvariantCulture, NUMERIC_INCREMENT_TEMPLATE, type.FullName, value, valuePlusOne);
+            string expectedOutput = string.Format(CultureInfo.InvariantCulture, NUMERIC_OUTPUT_TEMPLATE, value, valuePlusOne);
 
             CompileAndVerify(source, expectedOutput: expectedOutput);
         }
 
-        [WorkItem(720742, "DevDiv")]
+        [WorkItem(720742, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/720742")]
         [Fact]
         public void IncrementRefVal()
         {

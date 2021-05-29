@@ -1,10 +1,17 @@
-// Copyright (c) Microsoft.  All Rights Reserved.  Licensed under the Apache License, Version 2.0.  See License.txt in the project root for license information.
+﻿// Licensed to the .NET Foundation under one or more agreements.
+// The .NET Foundation licenses this file to you under the MIT license.
+// See the LICENSE file in the project root for more information.
+
+#nullable disable
 
 using System;
 using System.Diagnostics;
 using System.Diagnostics.CodeAnalysis;
 using System.Threading;
+using System.Xml;
+using System.Xml.Linq;
 using Microsoft.CodeAnalysis;
+using Microsoft.CodeAnalysis.Shared.Extensions;
 using Microsoft.VisualStudio.LanguageServices.Implementation.CodeModel.Collections;
 using Microsoft.VisualStudio.LanguageServices.Implementation.Utilities;
 
@@ -50,19 +57,64 @@ namespace Microsoft.VisualStudio.LanguageServices.Implementation.CodeModel.Exter
         }
 
         protected virtual EnvDTE.vsCMAccess GetAccess()
+            => CodeModelService.GetAccess(LookupSymbol());
+
+        private static bool TryParseDocCommentXml(string text, out XElement xml)
         {
-            return CodeModelService.GetAccess(LookupSymbol());
+            try
+            {
+                xml = XElement.Parse(text);
+                return true;
+            }
+            catch (XmlException)
+            {
+                xml = null;
+                return false;
+            }
         }
 
         protected virtual string GetDocComment()
         {
-            throw new NotImplementedException();
+            var symbol = LookupSymbol();
+
+            if (symbol == null)
+            {
+                throw Exceptions.ThrowEFail();
+            }
+
+            var documentationCommentXml = symbol.OriginalDefinition.GetDocumentationCommentXml();
+            if (string.IsNullOrWhiteSpace(documentationCommentXml))
+            {
+                return string.Empty;
+            }
+
+            if (!TryParseDocCommentXml(documentationCommentXml, out var xml))
+            {
+                // If we failed to parse, maybe it was because the XML fragment represents multiple elements.
+                // Try surrounding with <doc></doc> and parse again.
+
+                if (!TryParseDocCommentXml($"<doc>{documentationCommentXml}</doc>", out xml))
+                {
+                    return string.Empty;
+                }
+            }
+
+            // Surround with <doc> element. Or replace <member> element with <doc>, if it exists.
+            if (xml.Name == "member")
+            {
+                xml.Name = "doc";
+                xml.RemoveAttributes();
+            }
+            else if (xml.Name != "doc")
+            {
+                xml = new XElement("doc", xml);
+            }
+
+            return xml.ToString();
         }
 
         protected virtual string GetFullName()
-        {
-            return CodeModelService.GetFullName(LookupSymbol());
-        }
+            => CodeModelService.GetExternalSymbolFullName(LookupSymbol());
 
         protected virtual bool GetIsShared()
         {
@@ -71,10 +123,7 @@ namespace Microsoft.VisualStudio.LanguageServices.Implementation.CodeModel.Exter
         }
 
         protected virtual string GetName()
-        {
-            var symbol = LookupSymbol();
-            return symbol.Name;
-        }
+            => CodeModelService.GetExternalSymbolName(LookupSymbol());
 
         protected virtual object GetParent()
         {
@@ -123,14 +172,10 @@ namespace Microsoft.VisualStudio.LanguageServices.Implementation.CodeModel.Exter
         }
 
         EnvDTE.CodeElements ICodeElementContainer<AbstractExternalCodeElement>.GetCollection()
-        {
-            return Children;
-        }
+            => Children;
 
         protected virtual EnvDTE.CodeElements GetCollection()
-        {
-            return GetCollection<AbstractExternalCodeElement>(this.Parent);
-        }
+            => GetCollection<AbstractExternalCodeElement>(this.Parent);
 
         public EnvDTE.CodeElements Collection
         {
@@ -192,14 +237,10 @@ namespace Microsoft.VisualStudio.LanguageServices.Implementation.CodeModel.Exter
         }
 
         public EnvDTE.TextPoint GetEndPoint(EnvDTE.vsCMPart part)
-        {
-            throw Exceptions.ThrowEFail();
-        }
+            => throw Exceptions.ThrowEFail();
 
         public EnvDTE.TextPoint GetStartPoint(EnvDTE.vsCMPart part)
-        {
-            throw Exceptions.ThrowEFail();
-        }
+            => throw Exceptions.ThrowEFail();
 
         public EnvDTE.vsCMInfoLocation InfoLocation
         {
@@ -242,9 +283,7 @@ namespace Microsoft.VisualStudio.LanguageServices.Implementation.CodeModel.Exter
         }
 
         protected virtual object GetExtenderNames()
-        {
-            throw Exceptions.ThrowENotImpl();
-        }
+            => throw Exceptions.ThrowENotImpl();
 
         public object ExtenderNames
         {
@@ -252,45 +291,32 @@ namespace Microsoft.VisualStudio.LanguageServices.Implementation.CodeModel.Exter
         }
 
         protected virtual object GetExtender(string name)
-        {
-            throw Exceptions.ThrowENotImpl();
-        }
+            => throw Exceptions.ThrowENotImpl();
 
-        [SuppressMessage("Microsoft.StyleCop.CSharp.NamingRules", "SA1300:ElementMustBeginWithUpperCaseLetter", Justification = "Required by interface")]
         public object get_Extender(string extenderName)
-        {
-            return GetExtender(extenderName);
-        }
+            => GetExtender(extenderName);
 
         public string ElementID
         {
             get { throw new NotImplementedException(); }
         }
 
+#pragma warning disable IDE0060 // Remove unused parameter - Implements interface methods for sub-types.
         public EnvDTE.CodeAttribute AddAttribute(string name, string value, object position)
-        {
-            throw Exceptions.ThrowEFail();
-        }
+            => throw Exceptions.ThrowEFail();
 
         public EnvDTE.CodeParameter AddParameter(string name, object type, object position)
-        {
-            throw Exceptions.ThrowEFail();
-        }
+            => throw Exceptions.ThrowEFail();
 
         public void RenameSymbol(string newName)
-        {
-            throw Exceptions.ThrowEFail();
-        }
+            => throw Exceptions.ThrowEFail();
 
         public void RemoveParameter(object element)
-        {
-            throw Exceptions.ThrowEFail();
-        }
+            => throw Exceptions.ThrowEFail();
 
         [SuppressMessage("Microsoft.StyleCop.CSharp.NamingRules", "SA1300:ElementMustBeginWithUpperCaseLetter", Justification = "Required by interface")]
         public string get_Prototype(int flags = 0)
-        {
-            return CodeModelService.GetPrototype(null, LookupSymbol(), (PrototypeFlags)flags);
-        }
+            => CodeModelService.GetPrototype(null, LookupSymbol(), (PrototypeFlags)flags);
+#pragma warning restore IDE0060 // Remove unused parameter
     }
 }

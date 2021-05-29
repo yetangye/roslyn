@@ -1,18 +1,23 @@
-﻿// Copyright (c) Microsoft.  All Rights Reserved.  Licensed under the Apache License, Version 2.0.  See License.txt in the project root for license information.
+﻿// Licensed to the .NET Foundation under one or more agreements.
+// The .NET Foundation licenses this file to you under the MIT license.
+// See the LICENSE file in the project root for more information.
+
+#nullable disable
 
 using System.Collections.Immutable;
 using System.Collections.Generic;
 using System.Diagnostics;
 using Microsoft.CodeAnalysis.CSharp.Syntax;
+using Microsoft.CodeAnalysis.PooledObjects;
 
 namespace Microsoft.CodeAnalysis.CSharp.Symbols
 {
     internal sealed class EvaluatedConstant
     {
         public readonly ConstantValue Value;
-        public readonly ImmutableArray<Diagnostic> Diagnostics;
+        public readonly ImmutableBindingDiagnostic<AssemblySymbol> Diagnostics;
 
-        public EvaluatedConstant(ConstantValue value, ImmutableArray<Diagnostic> diagnostics)
+        public EvaluatedConstant(ConstantValue value, ImmutableBindingDiagnostic<AssemblySymbol> diagnostics)
         {
             this.Value = value;
             this.Diagnostics = diagnostics.NullToEmpty();
@@ -26,7 +31,7 @@ namespace Microsoft.CodeAnalysis.CSharp.Symbols
             EqualsValueClauseSyntax equalsValueNode,
             HashSet<SourceFieldSymbolWithSyntaxReference> dependencies,
             bool earlyDecodingWellKnownAttributes,
-            DiagnosticBag diagnostics)
+            BindingDiagnosticBag diagnostics)
         {
             var compilation = symbol.DeclaringCompilation;
             var binderFactory = compilation.GetBinderFactory((SyntaxTree)symbol.Locations[0].SourceTree);
@@ -36,31 +41,53 @@ namespace Microsoft.CodeAnalysis.CSharp.Symbols
                 binder = new EarlyWellKnownAttributeBinder(binder);
             }
             var inProgressBinder = new ConstantFieldsInProgressBinder(new ConstantFieldsInProgress(symbol, dependencies), binder);
-            var boundValue = BindFieldOrEnumInitializer(inProgressBinder, symbol, equalsValueNode, diagnostics);
+            BoundFieldEqualsValue boundValue = BindFieldOrEnumInitializer(inProgressBinder, symbol, equalsValueNode, diagnostics);
             var initValueNodeLocation = equalsValueNode.Value.Location;
 
-            var value = GetAndValidateConstantValue(boundValue, symbol, symbol.Type, initValueNodeLocation, diagnostics);
+            var value = GetAndValidateConstantValue(boundValue.Value, symbol, symbol.Type, initValueNodeLocation, diagnostics);
             Debug.Assert(value != null);
 
             return value;
         }
 
-        private static BoundExpression BindFieldOrEnumInitializer(
+        private static BoundFieldEqualsValue BindFieldOrEnumInitializer(
             Binder binder,
             FieldSymbol fieldSymbol,
             EqualsValueClauseSyntax initializer,
-            DiagnosticBag diagnostics)
+            BindingDiagnosticBag diagnostics)
         {
             var enumConstant = fieldSymbol as SourceEnumConstantSymbol;
-            var collisionDetector = new LocalScopeBinder(binder);
+            Binder collisionDetector = new LocalScopeBinder(binder);
+            collisionDetector = new ExecutableCodeBinder(initializer, fieldSymbol, collisionDetector);
+            BoundFieldEqualsValue result;
+
             if ((object)enumConstant != null)
             {
-                return collisionDetector.BindEnumConstantInitializer(enumConstant, initializer.Value, diagnostics);
+                result = collisionDetector.BindEnumConstantInitializer(enumConstant, initializer, diagnostics);
             }
             else
             {
-                return collisionDetector.BindVariableOrAutoPropInitializer(initializer, fieldSymbol.Type, diagnostics);
+                result = collisionDetector.BindFieldInitializer(fieldSymbol, initializer, diagnostics);
             }
+
+            return result;
+        }
+
+        internal static string UnescapeInterpolatedStringLiteral(string s)
+        {
+            var builder = PooledStringBuilder.GetInstance();
+            var stringBuilder = builder.Builder;
+            int formatLength = s.Length;
+            for (int i = 0; i < formatLength; i++)
+            {
+                char c = s[i];
+                stringBuilder.Append(c);
+                if ((c == '{' || c == '}') && (i + 1) < formatLength && s[i + 1] == c)
+                {
+                    i++;
+                }
+            }
+            return builder.ToStringAndFree();
         }
 
         internal static ConstantValue GetAndValidateConstantValue(
@@ -68,9 +95,10 @@ namespace Microsoft.CodeAnalysis.CSharp.Symbols
             Symbol thisSymbol,
             TypeSymbol typeSymbol,
             Location initValueNodeLocation,
-            DiagnosticBag diagnostics)
+            BindingDiagnosticBag diagnostics)
         {
             var value = ConstantValue.Bad;
+            CheckLangVersionForConstantValue(boundValue, diagnostics);
             if (!boundValue.HasAnyErrors)
             {
                 if (typeSymbol.TypeKind == TypeKind.TypeParameter)
@@ -131,31 +159,28 @@ namespace Microsoft.CodeAnalysis.CSharp.Symbols
             return value;
         }
 
-        internal struct DecimalValue
+        private sealed class CheckConstantInterpolatedStringValidity : BoundTreeWalkerWithStackGuardWithoutRecursionOnTheLeftOfBinaryOperator
         {
-            internal readonly uint Low;
-            internal readonly uint Mid;
-            internal readonly uint High;
-            internal readonly byte Scale;
-            internal readonly bool IsNegative;
+            internal readonly BindingDiagnosticBag diagnostics;
 
-            public DecimalValue(decimal value)
+            public CheckConstantInterpolatedStringValidity(BindingDiagnosticBag diagnostics)
             {
-                int[] bits = System.Decimal.GetBits(value);
+                this.diagnostics = diagnostics;
+            }
 
-                // The return value is a four-element array of 32-bit signed integers.
-                // The first, second, and third elements of the returned array contain the low, middle, and high 32 bits of the 96-bit integer number.
-                Low = unchecked((uint)bits[0]);
-                Mid = unchecked((uint)bits[1]);
-                High = unchecked((uint)bits[2]);
+            public override BoundNode VisitInterpolatedString(BoundInterpolatedString node)
+            {
+                Binder.CheckFeatureAvailability(node.Syntax, MessageID.IDS_FeatureConstantInterpolatedStrings, diagnostics);
+                return null;
+            }
+        }
 
-                // The fourth element of the returned array contains the scale factor and sign. It consists of the following parts:
-                // Bits 0 to 15, the lower word, are unused and must be zero.
-                // Bits 16 to 23 must contain an exponent between 0 and 28, which indicates the power of 10 to divide the integer number.
-                // Bits 24 to 30 are unused and must be zero.
-                // Bit 31 contains the sign; 0 meaning positive, and 1 meaning negative.
-                Scale = (byte)((bits[3] & 0xFF0000) >> 16);
-                IsNegative = ((bits[3] & 0x80000000) != 0);
+        internal static void CheckLangVersionForConstantValue(BoundExpression expression, BindingDiagnosticBag diagnostics)
+        {
+            if (!(expression.Type is null) && expression.Type.IsStringType())
+            {
+                var visitor = new CheckConstantInterpolatedStringValidity(diagnostics);
+                visitor.Visit(expression);
             }
         }
     }

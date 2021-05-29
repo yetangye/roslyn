@@ -1,4 +1,6 @@
-﻿// Copyright (c) Microsoft.  All Rights Reserved.  Licensed under the Apache License, Version 2.0.  See License.txt in the project root for license information.
+﻿// Licensed to the .NET Foundation under one or more agreements.
+// The .NET Foundation licenses this file to you under the MIT license.
+// See the LICENSE file in the project root for more information.
 
 using System;
 using System.Collections.Generic;
@@ -7,7 +9,7 @@ using System.Diagnostics;
 using System.IO;
 using System.Reflection.Metadata;
 using System.Reflection.PortableExecutable;
-using Microsoft.CodeAnalysis.InternalUtilities;
+using Roslyn.Utilities;
 
 namespace Microsoft.CodeAnalysis
 {
@@ -22,20 +24,20 @@ namespace Microsoft.CodeAnalysis
         private readonly PEModule _module;
 
         private ModuleMetadata(PEReader peReader)
-            : base(isImageOwner: true)
+            : base(isImageOwner: true, id: MetadataId.CreateNewId())
         {
-            _module = new PEModule(peReader: peReader, metadataOpt: IntPtr.Zero, metadataSizeOpt: 0);
+            _module = new PEModule(this, peReader: peReader, metadataOpt: IntPtr.Zero, metadataSizeOpt: 0, includeEmbeddedInteropTypes: false, ignoreAssemblyRefs: false);
         }
 
-        private ModuleMetadata(IntPtr metadata, int size, bool includeEmbeddedInteropTypes)
-            : base(isImageOwner: true)
+        private ModuleMetadata(IntPtr metadata, int size, bool includeEmbeddedInteropTypes, bool ignoreAssemblyRefs)
+            : base(isImageOwner: true, id: MetadataId.CreateNewId())
         {
-            _module = new PEModule(peReader: null, metadataOpt: metadata, metadataSizeOpt: size, includeEmbeddedInteropTypes: includeEmbeddedInteropTypes);
+            _module = new PEModule(this, peReader: null, metadataOpt: metadata, metadataSizeOpt: size, includeEmbeddedInteropTypes: includeEmbeddedInteropTypes, ignoreAssemblyRefs: ignoreAssemblyRefs);
         }
 
         // creates a copy
         private ModuleMetadata(ModuleMetadata metadata)
-            : base(isImageOwner: false)
+            : base(isImageOwner: false, id: metadata.Id)
         {
             _module = metadata.Module;
         }
@@ -60,14 +62,14 @@ namespace Microsoft.CodeAnalysis
                 throw new ArgumentOutOfRangeException(CodeAnalysisResources.SizeHasToBePositive, nameof(size));
             }
 
-            return new ModuleMetadata(metadata, size, includeEmbeddedInteropTypes: false);
+            return new ModuleMetadata(metadata, size, includeEmbeddedInteropTypes: false, ignoreAssemblyRefs: false);
         }
 
-        internal static ModuleMetadata CreateFromMetadata(IntPtr metadata, int size, bool includeEmbeddedInteropTypes)
+        internal static ModuleMetadata CreateFromMetadata(IntPtr metadata, int size, bool includeEmbeddedInteropTypes, bool ignoreAssemblyRefs = false)
         {
             Debug.Assert(metadata != IntPtr.Zero);
             Debug.Assert(size > 0);
-            return new ModuleMetadata(metadata, size, includeEmbeddedInteropTypes);
+            return new ModuleMetadata(metadata, size, includeEmbeddedInteropTypes, ignoreAssemblyRefs);
         }
 
         /// <summary>
@@ -167,6 +169,13 @@ namespace Microsoft.CodeAnalysis
                 throw new ArgumentException(CodeAnalysisResources.StreamMustSupportReadAndSeek, nameof(peStream));
             }
 
+            // Workaround of issue https://github.com/dotnet/corefx/issues/1815: 
+            if (peStream.Length == 0 && (options & PEStreamOptions.PrefetchEntireImage) != 0 && (options & PEStreamOptions.PrefetchMetadata) != 0)
+            {
+                // throws BadImageFormatException:
+                new PEHeaders(peStream);
+            }
+
             // ownership of the stream is passed on PEReader:
             return new ModuleMetadata(new PEReader(peStream, options));
         }
@@ -186,7 +195,7 @@ namespace Microsoft.CodeAnalysis
         /// <exception cref="NotSupportedException">Reading from a file path is not supported by the platform.</exception>
         public static ModuleMetadata CreateFromFile(string path)
         {
-            return CreateFromStream(FileStreamLightUp.OpenFileStream(path));
+            return CreateFromStream(FileUtilities.OpenFileStream(path));
         }
 
         /// <summary>
@@ -222,7 +231,10 @@ namespace Microsoft.CodeAnalysis
             }
         }
 
-        internal bool IsDisposed
+        /// <summary>
+        /// True if the module has been disposed.
+        /// </summary>
+        public bool IsDisposed
         {
             get { return _isDisposed || _module.IsDisposed; }
         }
@@ -283,10 +295,9 @@ namespace Microsoft.CodeAnalysis
         /// </summary>
         /// <exception cref="ObjectDisposedException">Module has been disposed.</exception>
         /// <exception cref="BadImageFormatException">When an invalid module name is encountered.</exception>
-        internal MetadataReader MetadataReader
-        {
-            get { return Module.MetadataReader; }
-        }
+        public MetadataReader GetMetadataReader() => MetadataReader;
+
+        internal MetadataReader MetadataReader => Module.MetadataReader;
 
         /// <summary>
         /// Creates a reference to the module metadata.
@@ -295,7 +306,7 @@ namespace Microsoft.CodeAnalysis
         /// <param name="filePath">Path describing the location of the metadata, or null if the metadata have no location.</param>
         /// <param name="display">Display string used in error messages to identity the reference.</param>
         /// <returns>A reference to the module metadata.</returns>
-        public PortableExecutableReference GetReference(DocumentationProvider documentation = null, string filePath = null, string display = null)
+        public PortableExecutableReference GetReference(DocumentationProvider? documentation = null, string? filePath = null, string? display = null)
         {
             return new MetadataImageReference(this, MetadataReferenceProperties.Module, documentation, filePath, display);
         }

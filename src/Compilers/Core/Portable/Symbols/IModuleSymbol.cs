@@ -1,4 +1,6 @@
-﻿// Copyright (c) Microsoft.  All Rights Reserved.  Licensed under the Apache License, Version 2.0.  See License.txt in the project root for license information.
+﻿// Licensed to the .NET Foundation under one or more agreements.
+// The .NET Foundation licenses this file to you under the MIT license.
+// See the LICENSE file in the project root for more information.
 
 using Microsoft.CodeAnalysis.Text;
 using System.Collections.Immutable;
@@ -8,6 +10,10 @@ namespace Microsoft.CodeAnalysis
     /// <summary>
     /// Represents a module within an assembly. Every assembly contains one or more modules.
     /// </summary>
+    /// <remarks>
+    /// This interface is reserved for implementation by its associated APIs. We reserve the right to
+    /// change it in the future.
+    /// </remarks>
     public interface IModuleSymbol : ISymbol
     {
         /// <summary>
@@ -19,7 +25,7 @@ namespace Microsoft.CodeAnalysis
         /// <summary>
         /// Given a namespace symbol, returns the corresponding module specific namespace symbol
         /// </summary>
-        INamespaceSymbol GetModuleNamespace(INamespaceSymbol namespaceSymbol);
+        INamespaceSymbol? GetModuleNamespace(INamespaceSymbol namespaceSymbol);
 
         /// <summary>
         /// Returns an array of assembly identities for assemblies referenced by this module.
@@ -34,5 +40,12 @@ namespace Microsoft.CodeAnalysis
         /// from ReferencedAssemblySymbols correspond to each other.
         /// </summary>
         ImmutableArray<IAssemblySymbol> ReferencedAssemblySymbols { get; }
+
+        /// <summary>
+        /// If this symbol represents a metadata module returns the underlying <see cref="ModuleMetadata"/>.
+        /// 
+        /// Otherwise, this returns <see langword="null"/>.
+        /// </summary>
+        ModuleMetadata? GetMetadata();
     }
 }

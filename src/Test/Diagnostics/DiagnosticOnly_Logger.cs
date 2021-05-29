@@ -1,3 +1,9 @@
+﻿// Licensed to the .NET Foundation under one or more agreements.
+// The .NET Foundation licenses this file to you under the MIT license.
+// See the LICENSE file in the project root for more information.
+
+#nullable disable
+
 using System;
 using System.Diagnostics.Tracing;
 using System.Linq;
@@ -40,7 +46,7 @@ namespace Roslyn.Hosting.Diagnostics
         /// <summary>
         /// let one such as ETA to set logger for the service layer
         /// </summary>
-        internal static void SetLogger(IOptionService optionsService, string loggerName)
+        internal static void SetLogger(IGlobalOptionService optionsService, string loggerName)
         {
             if (loggerName == null)
             {
@@ -48,20 +54,6 @@ namespace Roslyn.Hosting.Diagnostics
             }
 
             Logger.SetLogger(GetLogger(optionsService, loggerName));
-        }
-
-        /// <summary>
-        /// let ones such as Perf setup to share loggingChecker func
-        /// </summary>
-        internal static Func<FunctionId, bool> GetLoggingChecker(IOptionService optionsService)
-        {
-            var functionIds = Enum.GetValues(typeof(FunctionId)).Cast<FunctionId>();
-            var functionIdOptions = functionIds.ToDictionary(
-                id => id, id => optionsService.GetOption(FunctionIdOptions.GetOption(id)));
-
-            Func<FunctionId, bool> loggingChecker = (functionId) => functionIdOptions[functionId];
-
-            return loggingChecker;
         }
 
         /// <summary>
@@ -102,14 +94,14 @@ namespace Roslyn.Hosting.Diagnostics
             return (FunctionId)Enum.Parse(typeof(FunctionId), functionId);
         }
 
-        private static ILogger GetLogger(IOptionService optionsService, string loggerName)
+        private static ILogger GetLogger(IGlobalOptionService optionsService, string loggerName)
         {
             switch (loggerName)
             {
                 case "EtwLogger":
-                    return new EtwLogger(GetLoggingChecker(optionsService));
+                    return new EtwLogger(optionsService);
                 case "TraceLogger":
-                    return new TraceLogger(GetLoggingChecker(optionsService));
+                    return new TraceLogger(Logger.GetLoggingChecker(optionsService));
                 default:
                     return EmptyLogger.Instance;
             }

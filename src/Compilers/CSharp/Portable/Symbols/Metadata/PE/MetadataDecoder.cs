@@ -1,4 +1,8 @@
-﻿// Copyright (c) Microsoft.  All Rights Reserved.  Licensed under the Apache License, Version 2.0.  See License.txt in the project root for license information.
+﻿// Licensed to the .NET Foundation under one or more agreements.
+// The .NET Foundation licenses this file to you under the MIT license.
+// See the LICENSE file in the project root for more information.
+
+#nullable disable
 
 using System;
 using System.Collections.Concurrent;
@@ -125,8 +129,20 @@ namespace Microsoft.CodeAnalysis.CSharp.Symbols.Metadata.PE
             int referencedAssemblyIndex,
             ref MetadataTypeName emittedName)
         {
-            AssemblySymbol assembly = moduleSymbol.GetReferencedAssemblySymbols()[referencedAssemblyIndex];
-            return assembly.LookupTopLevelMetadataType(ref emittedName, digThroughForwardedTypes: true);
+            var assembly = moduleSymbol.GetReferencedAssemblySymbol(referencedAssemblyIndex);
+            if ((object)assembly == null)
+            {
+                return new UnsupportedMetadataTypeSymbol();
+            }
+
+            try
+            {
+                return assembly.LookupTopLevelMetadataType(ref emittedName, digThroughForwardedTypes: true);
+            }
+            catch (Exception e) when (FatalError.ReportAndPropagate(e)) // Trying to get more useful Watson dumps.
+            {
+                throw ExceptionUtilities.Unreachable;
+            }
         }
 
         /// <summary>
@@ -168,10 +184,13 @@ namespace Microsoft.CodeAnalysis.CSharp.Symbols.Metadata.PE
 
         protected override int GetIndexOfReferencedAssembly(AssemblyIdentity identity)
         {
-            var assemblies = this.moduleSymbol.GetReferencedAssemblySymbols();
+            // Go through all assemblies referenced by the current module and
+            // find the one which *exactly* matches the given identity.
+            // No unification will be performed
+            var assemblies = this.moduleSymbol.GetReferencedAssemblies();
             for (int i = 0; i < assemblies.Length; i++)
             {
-                if (identity.Equals(assemblies[i].Identity))
+                if (identity.Equals(assemblies[i]))
                 {
                     return i;
                 }
@@ -202,7 +221,6 @@ namespace Microsoft.CodeAnalysis.CSharp.Symbols.Metadata.PE
                 case SymbolKind.ErrorType:
                     goto case SymbolKind.NamedType;
                 case SymbolKind.NamedType:
-
                     var namedType = (NamedTypeSymbol)symbol;
                     AssemblySymbol containingAssembly = symbol.OriginalDefinition.ContainingAssembly;
                     int i;
@@ -220,12 +238,12 @@ namespace Microsoft.CodeAnalysis.CSharp.Symbols.Metadata.PE
 
                     do
                     {
-                        var arguments = namedType.TypeArgumentsNoUseSiteDiagnostics;
+                        var arguments = namedType.TypeArgumentsWithAnnotationsNoUseSiteDiagnostics;
                         int count = arguments.Length;
 
                         for (i = 0; i < count; i++)
                         {
-                            if (IsOrClosedOverATypeFromAssemblies(arguments[i], assemblies))
+                            if (IsOrClosedOverATypeFromAssemblies(arguments[i].Type, assemblies))
                             {
                                 return true;
                             }
@@ -258,7 +276,7 @@ namespace Microsoft.CodeAnalysis.CSharp.Symbols.Metadata.PE
 
                 if (!isInterface)
                 {
-                    Handle baseToken = Module.GetBaseTypeOfTypeOrThrow(typeDef);
+                    EntityHandle baseToken = Module.GetBaseTypeOfTypeOrThrow(typeDef);
 
                     if (!baseToken.IsNil)
                     {
@@ -388,7 +406,8 @@ namespace Microsoft.CodeAnalysis.CSharp.Symbols.Metadata.PE
 
                         // Let's use a trick. To make sure the kind is the same, make sure
                         // base type is the same.
-                        if (!ReferenceEquals(baseType, candidate.BaseTypeNoUseSiteDiagnostics))
+                        SpecialType baseSpecialType = (candidate.BaseTypeNoUseSiteDiagnostics?.SpecialType ?? SpecialType.None);
+                        if (baseSpecialType == SpecialType.None || baseSpecialType != (baseType?.SpecialType ?? SpecialType.None))
                         {
                             continue;
                         }
@@ -487,22 +506,34 @@ namespace Microsoft.CodeAnalysis.CSharp.Symbols.Metadata.PE
         {
             TypeSymbol targetTypeSymbol = GetMemberRefTypeSymbol(memberRef);
 
+            if (targetTypeSymbol is null)
+            {
+                return null;
+            }
+
+            Debug.Assert(!targetTypeSymbol.IsTupleType);
+
             if ((object)scope != null)
             {
                 Debug.Assert(scope.Kind == SymbolKind.NamedType || scope.Kind == SymbolKind.ErrorType);
 
                 // We only want to consider members that are at or above "scope" in the type hierarchy.
-                HashSet<DiagnosticInfo> useSiteDiagnostics = null;
-                if (scope != targetTypeSymbol &&
+                var discardedUseSiteInfo = CompoundUseSiteInfo<AssemblySymbol>.Discarded;
+                if (!TypeSymbol.Equals(scope, targetTypeSymbol, TypeCompareKind.ConsiderEverything2) &&
                     !(targetTypeSymbol.IsInterfaceType()
-                        ? scope.AllInterfacesNoUseSiteDiagnostics.Contains((NamedTypeSymbol)targetTypeSymbol)
-                        : scope.IsDerivedFrom(targetTypeSymbol, ignoreDynamic: false, useSiteDiagnostics: ref useSiteDiagnostics)))
+                        ? scope.AllInterfacesNoUseSiteDiagnostics.IndexOf((NamedTypeSymbol)targetTypeSymbol, 0, SymbolEqualityComparer.CLRSignature) != -1
+                        : scope.IsDerivedFrom(targetTypeSymbol, TypeCompareKind.CLRSignatureCompareOptions, useSiteInfo: ref discardedUseSiteInfo)))
                 {
                     return null;
                 }
             }
 
-            // We're going to use a special decoder that can generate useable symbols for type parameters without full context.
+            if (!targetTypeSymbol.IsTupleType)
+            {
+                targetTypeSymbol = TupleTypeDecoder.DecodeTupleTypesIfApplicable(targetTypeSymbol, elementNames: default);
+            }
+
+            // We're going to use a special decoder that can generate usable symbols for type parameters without full context.
             // (We're not just using a different type - we're also changing the type context.)
             var memberRefDecoder = new MemberRefMetadataDecoder(moduleSymbol, targetTypeSymbol);
 

@@ -1,4 +1,6 @@
-﻿' Copyright (c) Microsoft.  All Rights Reserved.  Licensed under the Apache License, Version 2.0.  See License.txt in the project root for license information.
+﻿' Licensed to the .NET Foundation under one or more agreements.
+' The .NET Foundation licenses this file to you under the MIT license.
+' See the LICENSE file in the project root for more information.
 
 Imports System.Collections.Immutable
 Imports System.Diagnostics
@@ -11,24 +13,24 @@ Imports TypeKind = Microsoft.CodeAnalysis.TypeKind
 Namespace Microsoft.CodeAnalysis.VisualBasic
     Partial Friend NotInheritable Class LocalRewriter
         Public Overrides Function VisitLateAddressOfOperator(node As BoundLateAddressOfOperator) As BoundNode
-            If inExpressionLambda Then
+            If _inExpressionLambda Then
                 ' just preserve the node to report an error in ExpressionLambdaRewriter
                 Return MyBase.VisitLateAddressOfOperator(node)
             End If
 
             Dim targetType = DirectCast(node.Type, NamedTypeSymbol)
-            Dim lambda = BuildDelegateRelaxationLambda(node.Syntax, targetType, node.MemberAccess, node.Binder, Me.diagnostics)
+            Dim lambda = BuildDelegateRelaxationLambda(node.Syntax, targetType, node.MemberAccess, node.Binder, Me._diagnostics)
 
             Return Me.VisitExpressionNode(lambda)
         End Function
 
 
         Private Shared Function BuildDelegateRelaxationLambda(
-                syntaxNode As VisualBasicSyntaxNode,
+                syntaxNode As SyntaxNode,
                 targetType As NamedTypeSymbol,
                 boundMember As BoundLateMemberAccess,
                 binder As Binder,
-                diagnostics As DiagnosticBag
+                diagnostics As BindingDiagnosticBag
             ) As BoundExpression
 
             Dim delegateInvoke = targetType.DelegateInvokeMethod
@@ -69,7 +71,7 @@ Namespace Microsoft.CodeAnalysis.VisualBasic
             ' These parameters will be used in the method invocation as passed parameters.
             Dim lambdaBoundParameters(invokeParameterCount - 1) As BoundExpression
 
-            For parameterIndex = 0 To lambdaSymbolParameters.Count - 1
+            For parameterIndex = 0 To lambdaSymbolParameters.Length - 1
                 Dim lambdaSymbolParameter = lambdaSymbolParameters(parameterIndex)
                 Dim boundParameter = New BoundParameter(syntaxNode,
                                                         lambdaSymbolParameter,
@@ -136,7 +138,7 @@ Namespace Microsoft.CodeAnalysis.VisualBasic
             Dim boundLambda = New BoundLambda(syntaxNode,
                                           lambdaSymbol,
                                           lambdaBody,
-                                          ImmutableArray(Of Diagnostic).Empty,
+                                          ImmutableBindingDiagnostic(Of AssemblySymbol).Empty,
                                           Nothing,
                                           ConversionKind.DelegateRelaxationLevelWidening,
                                           MethodConversionKind.Identity)

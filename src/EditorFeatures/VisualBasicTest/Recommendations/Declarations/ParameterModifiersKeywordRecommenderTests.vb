@@ -1,167 +1,162 @@
-' Copyright (c) Microsoft.  All Rights Reserved.  Licensed under the Apache License, Version 2.0.  See License.txt in the project root for license information.
-
-Imports Microsoft.CodeAnalysis.Text
-Imports Microsoft.CodeAnalysis.VisualBasic
-Imports Microsoft.CodeAnalysis.VisualBasic.Symbols
-Imports Microsoft.CodeAnalysis.VisualBasic.Syntax
-Imports Roslyn.Test.Utilities
-Imports Xunit
+﻿' Licensed to the .NET Foundation under one or more agreements.
+' The .NET Foundation licenses this file to you under the MIT license.
+' See the LICENSE file in the project root for more information.
 
 Namespace Microsoft.CodeAnalysis.Editor.VisualBasic.UnitTests.Recommendations.Declarations
     Public Class ParameterModifiersKeywordRecommenderTests
 
         <Fact, Trait(Traits.Feature, Traits.Features.KeywordRecommending)>
-        Public Sub AllRecommendationsForFirstParameter()
-            VerifyRecommendationsContain(<ClassDeclaration>Sub Foo(|</ClassDeclaration>, "ByVal", "ByRef", "Optional", "ParamArray")
+        Public Sub AllRecommendationsForFirstParameterTest()
+            VerifyRecommendationsContain(<ClassDeclaration>Sub Goo(|</ClassDeclaration>, "ByVal", "ByRef", "Optional", "ParamArray")
         End Sub
 
         <Fact, Trait(Traits.Feature, Traits.Features.KeywordRecommending)>
-        Public Sub AllRecommendationsForSecondParameterAfterByRefFirst()
-            VerifyRecommendationsContain(<ClassDeclaration>Sub Foo(ByRef first As Integer, |</ClassDeclaration>, "ByVal", "ByRef", "Optional", "ParamArray")
+        Public Sub AllRecommendationsForSecondParameterAfterByRefFirstTest()
+            VerifyRecommendationsContain(<ClassDeclaration>Sub Goo(ByRef first As Integer, |</ClassDeclaration>, "ByVal", "ByRef", "Optional", "ParamArray")
         End Sub
 
         <Fact, Trait(Traits.Feature, Traits.Features.KeywordRecommending)>
-        Public Sub AllRecommendationsForSecondParameterAfterByValFirst()
-            VerifyRecommendationsContain(<ClassDeclaration>Sub Foo(ByVal first As Integer, |</ClassDeclaration>, "ByVal", "ByRef", "Optional", "ParamArray")
+        Public Sub AllRecommendationsForSecondParameterAfterByValFirstTest()
+            VerifyRecommendationsContain(<ClassDeclaration>Sub Goo(ByVal first As Integer, |</ClassDeclaration>, "ByVal", "ByRef", "Optional", "ParamArray")
         End Sub
 
         <Fact, Trait(Traits.Feature, Traits.Features.KeywordRecommending)>
-        Public Sub AllRecommendationsForFirstParameterAfterGenericParams()
-            VerifyRecommendationsAreExactly(<ClassDeclaration>Sub Foo(Of T)(|</ClassDeclaration>, "ByVal", "ByRef", "Optional", "ParamArray")
+        Public Sub AllRecommendationsForFirstParameterAfterGenericParamsTest()
+            VerifyRecommendationsAreExactly(<ClassDeclaration>Sub Goo(Of T)(|</ClassDeclaration>, "ByVal", "ByRef", "Optional", "ParamArray")
         End Sub
 
         <Fact, Trait(Traits.Feature, Traits.Features.KeywordRecommending)>
-        Public Sub ByValAndByRefAfterOptional()
-            VerifyRecommendationsAreExactly(<ClassDeclaration>Sub Foo(Optional |</ClassDeclaration>, "ByVal", "ByRef")
+        Public Sub ByValAndByRefAfterOptionalTest()
+            VerifyRecommendationsAreExactly(<ClassDeclaration>Sub Goo(Optional |</ClassDeclaration>, "ByVal", "ByRef")
         End Sub
 
         <Fact, Trait(Traits.Feature, Traits.Features.KeywordRecommending)>
-        Public Sub NothingAfterOptionalByVal()
-            VerifyRecommendationsAreExactly(<ClassDeclaration>Sub Foo(Optional ByVal |</ClassDeclaration>, {})
+        Public Sub NothingAfterOptionalByValTest()
+            VerifyRecommendationsAreExactly(<ClassDeclaration>Sub Goo(Optional ByVal |</ClassDeclaration>, {})
         End Sub
 
         <Fact, Trait(Traits.Feature, Traits.Features.KeywordRecommending)>
-        Public Sub NothingAfterByRefOptional()
-            VerifyRecommendationsAreExactly(<ClassDeclaration>Sub Foo(ByRef Optional |</ClassDeclaration>, {})
+        Public Sub NothingAfterByRefOptionalTest()
+            VerifyRecommendationsAreExactly(<ClassDeclaration>Sub Goo(ByRef Optional |</ClassDeclaration>, {})
         End Sub
 
         <Fact, Trait(Traits.Feature, Traits.Features.KeywordRecommending)>
-        Public Sub NothingAfterByValOptional()
-            VerifyRecommendationsAreExactly(<ClassDeclaration>Sub Foo(ByVal Optional |</ClassDeclaration>, {})
+        Public Sub NothingAfterByValOptionalTest()
+            VerifyRecommendationsAreExactly(<ClassDeclaration>Sub Goo(ByVal Optional |</ClassDeclaration>, {})
         End Sub
 
         <Fact, Trait(Traits.Feature, Traits.Features.KeywordRecommending)>
-        Public Sub NothingAfterOptionalByRef()
-            VerifyRecommendationsAreExactly(<ClassDeclaration>Sub Foo(Optional ByRef |</ClassDeclaration>, {})
+        Public Sub NothingAfterOptionalByRefTest()
+            VerifyRecommendationsAreExactly(<ClassDeclaration>Sub Goo(Optional ByRef |</ClassDeclaration>, {})
         End Sub
 
         <Fact, Trait(Traits.Feature, Traits.Features.KeywordRecommending)>
-        Public Sub ByValAfterParamArray()
-            VerifyRecommendationsAreExactly(<ClassDeclaration>Sub Foo(ParamArray |</ClassDeclaration>, "ByVal")
+        Public Sub ByValAfterParamArrayTest()
+            VerifyRecommendationsAreExactly(<ClassDeclaration>Sub Goo(ParamArray |</ClassDeclaration>, "ByVal")
         End Sub
 
         <Fact, Trait(Traits.Feature, Traits.Features.KeywordRecommending)>
-        Public Sub NothingAfterPreviousParamArray()
-            VerifyRecommendationsAreExactly(<ClassDeclaration>Sub Foo(ParamArray arg1 As Integer(), |</ClassDeclaration>, {})
+        Public Sub NothingAfterPreviousParamArrayTest()
+            VerifyRecommendationsAreExactly(<ClassDeclaration>Sub Goo(ParamArray arg1 As Integer(), |</ClassDeclaration>, {})
         End Sub
 
         <Fact, Trait(Traits.Feature, Traits.Features.KeywordRecommending)>
-        Public Sub OptionalRecommendedAfterPreviousOptional()
-            VerifyRecommendationsAreExactly(<ClassDeclaration>Sub Foo(Optional arg1 = 2, |</ClassDeclaration>, "Optional")
+        Public Sub OptionalRecommendedAfterPreviousOptionalTest()
+            VerifyRecommendationsAreExactly(<ClassDeclaration>Sub Goo(Optional arg1 = 2, |</ClassDeclaration>, "Optional")
         End Sub
 
         <Fact, Trait(Traits.Feature, Traits.Features.KeywordRecommending)>
-        Public Sub NoByRefByValOrParamArrayAfterByVal()
-            VerifyRecommendationsMissing(<ClassDeclaration>Sub Foo(ByVal |, |</ClassDeclaration>, "ByVal", "ByRef", "ParamArray")
+        Public Sub NoByRefByValOrParamArrayAfterByValTest()
+            VerifyRecommendationsMissing(<ClassDeclaration>Sub Goo(ByVal |, |</ClassDeclaration>, "ByVal", "ByRef", "ParamArray")
         End Sub
 
         <Fact, Trait(Traits.Feature, Traits.Features.KeywordRecommending)>
-        Public Sub NoByRefByValAfterByRef()
-            VerifyRecommendationsMissing(<ClassDeclaration>Sub Foo(ByRef |, |</ClassDeclaration>, "ByVal", "ByRef")
+        Public Sub NoByRefByValAfterByRefTest()
+            VerifyRecommendationsMissing(<ClassDeclaration>Sub Goo(ByRef |, |</ClassDeclaration>, "ByVal", "ByRef")
         End Sub
 
         <Fact, Trait(Traits.Feature, Traits.Features.KeywordRecommending)>
-        Public Sub AllAppropriateInPropertyParameters()
-            VerifyRecommendationsAreExactly(<ClassDeclaration>Property Foo(| As Integer</ClassDeclaration>, "ByVal", "Optional", "ParamArray")
+        Public Sub AllAppropriateInPropertyParametersTest()
+            VerifyRecommendationsAreExactly(<ClassDeclaration>Property Goo(| As Integer</ClassDeclaration>, "ByVal", "Optional", "ParamArray")
         End Sub
 
         <Fact, Trait(Traits.Feature, Traits.Features.KeywordRecommending)>
-        Public Sub AllInExternalMethodDeclaration()
-            VerifyRecommendationsAreExactly(<ClassDeclaration>Declare Sub Foo Lib "foo.dll" (|</ClassDeclaration>, "ByVal", "ByRef", "Optional", "ParamArray")
+        Public Sub AllInExternalMethodDeclarationTest()
+            VerifyRecommendationsAreExactly(<ClassDeclaration>Declare Sub Goo Lib "goo.dll" (|</ClassDeclaration>, "ByVal", "ByRef", "Optional", "ParamArray")
         End Sub
 
         <Fact, Trait(Traits.Feature, Traits.Features.KeywordRecommending)>
-        Public Sub AllInExternalDelegateDeclaration()
-            VerifyRecommendationsContain(<ClassDeclaration>Delegate Sub Foo(|</ClassDeclaration>, "ByVal", "ByRef")
+        Public Sub AllInExternalDelegateDeclarationTest()
+            VerifyRecommendationsContain(<ClassDeclaration>Delegate Sub Goo(|</ClassDeclaration>, "ByVal", "ByRef")
         End Sub
 
         <Fact, Trait(Traits.Feature, Traits.Features.KeywordRecommending)>
-        Public Sub AllRecommendationsForSubLambda()
+        Public Sub AllRecommendationsForSubLambdaTest()
             VerifyRecommendationsAreExactly(<MethodBody>Dim x = Sub(|</MethodBody>, "ByVal", "ByRef")
         End Sub
 
         <Fact>
         <Trait(Traits.Feature, Traits.Features.KeywordRecommending)>
-        Public Sub NothingAfterByValInSubLambda()
+        Public Sub NothingAfterByValInSubLambdaTest()
             VerifyRecommendationsAreExactly(<MethodBody>Dim x = Sub(ByVal |</MethodBody>, {})
         End Sub
 
         <Fact, Trait(Traits.Feature, Traits.Features.KeywordRecommending)>
-        Public Sub NothingAfterByRefInSubLambda()
+        Public Sub NothingAfterByRefInSubLambdaTest()
             VerifyRecommendationsAreExactly(<MethodBody>Dim x = Sub(ByRef |</MethodBody>, {})
         End Sub
 
         <Fact, Trait(Traits.Feature, Traits.Features.KeywordRecommending)>
-        Public Sub AllRecommendationsForFunctionLambda()
+        Public Sub AllRecommendationsForFunctionLambdaTest()
             VerifyRecommendationsAreExactly(<MethodBody>Dim x = Function(|</MethodBody>, "ByVal", "ByRef")
         End Sub
 
         <Fact, Trait(Traits.Feature, Traits.Features.KeywordRecommending)>
-        Public Sub AllRecommendationsForEvent()
+        Public Sub AllRecommendationsForEventTest()
             VerifyRecommendationsAreExactly(<ClassDeclaration>Event MyEvent(|</ClassDeclaration>, "ByVal", "ByRef")
         End Sub
 
         <Fact, Trait(Traits.Feature, Traits.Features.KeywordRecommending)>
-        Public Sub NothingAfterByValInFunctionLambda()
+        Public Sub NothingAfterByValInFunctionLambdaTest()
             VerifyRecommendationsAreExactly(<MethodBody>Dim x = Function(ByVal |</MethodBody>, {})
         End Sub
 
         <Fact, Trait(Traits.Feature, Traits.Features.KeywordRecommending)>
-        Public Sub NothingAfterByRefInFunctionLambda()
+        Public Sub NothingAfterByRefInFunctionLambdaTest()
             VerifyRecommendationsAreExactly(<MethodBody>Dim x = Function(ByRef |</MethodBody>, {})
         End Sub
 
         <Fact, Trait(Traits.Feature, Traits.Features.KeywordRecommending)>
-        Public Sub OnlyByValForFirstParameterOfOperator()
+        Public Sub OnlyByValForFirstParameterOfOperatorTest()
             VerifyRecommendationsAreExactly(<ClassDeclaration>Shared Operator &amp;(|</ClassDeclaration>, "ByVal")
         End Sub
 
         <Fact, Trait(Traits.Feature, Traits.Features.KeywordRecommending)>
-        Public Sub OnlyByValForSecondParameterOfOperator()
+        Public Sub OnlyByValForSecondParameterOfOperatorTest()
             VerifyRecommendationsAreExactly(<ClassDeclaration>Shared Operator &amp;(i As Integer, |</ClassDeclaration>, "ByVal")
         End Sub
 
-        <WorkItem(529209)>
+        <WorkItem(529209, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/529209")>
         <Fact, Trait(Traits.Feature, Traits.Features.KeywordRecommending)>
-        Public Sub OnlyByValForPropertyAccessor()
+        Public Sub OnlyByValForPropertyAccessorTest()
             VerifyRecommendationsAreExactly(<PropertyDeclaration>Set(| value As String)</PropertyDeclaration>, "ByVal")
         End Sub
 
-        <WorkItem(529209)>
+        <WorkItem(529209, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/529209")>
         <Fact, Trait(Traits.Feature, Traits.Features.KeywordRecommending)>
-        Public Sub OnlyByValForAddHandlerAccessor()
+        Public Sub OnlyByValForAddHandlerAccessorTest()
             VerifyRecommendationsAreExactly(<CustomEventDeclaration>AddHandler(| value As EventHandler)</CustomEventDeclaration>, "ByVal")
         End Sub
 
-        <WorkItem(529209)>
+        <WorkItem(529209, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/529209")>
         <Fact, Trait(Traits.Feature, Traits.Features.KeywordRecommending)>
-        Public Sub OnlyByValForRemoveHandlerAccessor()
+        Public Sub OnlyByValForRemoveHandlerAccessorTest()
             VerifyRecommendationsAreExactly(<CustomEventDeclaration>RemoveHandler(| value As EventHandler)</CustomEventDeclaration>, "ByVal")
         End Sub
 
-        <WorkItem(529209)>
+        <WorkItem(529209, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/529209")>
         <Fact, Trait(Traits.Feature, Traits.Features.KeywordRecommending)>
-        Public Sub OnlyByValForRemoveHandlerWhenAllAccessorsPresent()
+        Public Sub OnlyByValForRemoveHandlerWhenAllAccessorsPresentTest()
             Dim code =
 <File>
 Class C
@@ -178,15 +173,15 @@ End Class
             VerifyRecommendationsAreExactly(code, "ByVal")
         End Sub
 
-        <WorkItem(529209)>
+        <WorkItem(529209, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/529209")>
         <Fact, Trait(Traits.Feature, Traits.Features.KeywordRecommending)>
-        Public Sub OnlyByValForRaiseEventHandlerAccessor()
+        Public Sub OnlyByValForRaiseEventHandlerAccessorTest()
             VerifyRecommendationsAreExactly(<CustomEventDeclaration>RaiseEvent(| sender As Object, e As EventArgs)</CustomEventDeclaration>, "ByVal")
         End Sub
 
-        <WorkItem(529209)>
+        <WorkItem(529209, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/529209")>
         <Fact, Trait(Traits.Feature, Traits.Features.KeywordRecommending)>
-        Public Sub OnlyByValForRaiseEventHandlerWhenAllAccessorsPresent()
+        Public Sub OnlyByValForRaiseEventHandlerWhenAllAccessorsPresentTest()
             Dim code =
 <File>
 Class C
@@ -203,11 +198,11 @@ End Class
             VerifyRecommendationsAreExactly(code, "ByVal")
         End Sub
 
-        <WorkItem(530953)>
+        <WorkItem(530953, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/530953")>
         <Fact, Trait(Traits.Feature, Traits.Features.KeywordRecommending)>
-        Public Sub AfterLineContinuation()
+        Public Sub AfterLineContinuationTest()
             VerifyRecommendationsContain(
-<ClassDeclaration>Sub Foo(
+<ClassDeclaration>Sub Goo(
 |</ClassDeclaration>, "ByVal", "ByRef", "Optional", "ParamArray")
         End Sub
     End Class

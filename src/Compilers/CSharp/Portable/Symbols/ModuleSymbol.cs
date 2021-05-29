@@ -1,4 +1,8 @@
-﻿// Copyright (c) Microsoft.  All Rights Reserved.  Licensed under the Apache License, Version 2.0.  See License.txt in the project root for license information.
+﻿// Licensed to the .NET Foundation under one or more agreements.
+// The .NET Foundation licenses this file to you under the MIT license.
+// See the LICENSE file in the project root for more information.
+
+#nullable disable
 
 using System;
 using System.Collections.Generic;
@@ -6,6 +10,7 @@ using System.Collections.Immutable;
 using System.Reflection;
 using System.Reflection.PortableExecutable;
 using System.Runtime.InteropServices;
+using Microsoft.CodeAnalysis.Symbols;
 using Roslyn.Utilities;
 
 namespace Microsoft.CodeAnalysis.CSharp.Symbols
@@ -13,7 +18,7 @@ namespace Microsoft.CodeAnalysis.CSharp.Symbols
     /// <summary>
     /// Represents a module within an assembly. Every assembly contains one or more modules.
     /// </summary>
-    internal abstract class ModuleSymbol : Symbol, IModuleSymbol
+    internal abstract class ModuleSymbol : Symbol, IModuleSymbolInternal
     {
         // !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
         // Changes to the public interface of this class should remain synchronized with the VB version.
@@ -239,11 +244,30 @@ namespace Microsoft.CodeAnalysis.CSharp.Symbols
         /// by this module. Items at the same position from GetReferencedAssemblies and 
         /// from GetReferencedAssemblySymbols should correspond to each other. If reference is 
         /// not resolved by compiler, GetReferencedAssemblySymbols returns MissingAssemblySymbol in the
-        /// correspnding item.
+        /// corresponding item.
         /// 
         /// The array and its content is provided by ReferenceManager and must not be modified.
         /// </summary>
         internal abstract ImmutableArray<AssemblySymbol> GetReferencedAssemblySymbols(); // TODO: Remove this method and make ReferencedAssemblySymbols property abstract instead.
+
+        internal AssemblySymbol GetReferencedAssemblySymbol(int referencedAssemblyIndex)
+        {
+            var referencedAssemblies = GetReferencedAssemblySymbols();
+            if (referencedAssemblyIndex < referencedAssemblies.Length)
+            {
+                return referencedAssemblies[referencedAssemblyIndex];
+            }
+
+            // This module must be a corlib where the original metadata contains assembly
+            // references (see https://github.com/dotnet/roslyn/issues/13275).
+            var assembly = ContainingAssembly;
+            if ((object)assembly != assembly.CorLibrary)
+            {
+                throw new ArgumentOutOfRangeException(nameof(referencedAssemblyIndex));
+            }
+
+            return null;
+        }
 
         /// <summary>
         /// A helper method for ReferenceManager to set assembly identities for assemblies 
@@ -318,7 +342,7 @@ namespace Microsoft.CodeAnalysis.CSharp.Symbols
         {
             if (namespaceSymbol == null)
             {
-                throw new ArgumentNullException("namespaceSymbol");
+                throw new ArgumentNullException(nameof(namespaceSymbol));
             }
 
             var moduleNs = namespaceSymbol as NamespaceSymbol;
@@ -343,40 +367,18 @@ namespace Microsoft.CodeAnalysis.CSharp.Symbols
             }
         }
 
-        #region IModuleSymbol Members
+        public abstract bool AreLocalsZeroed { get; }
 
-        INamespaceSymbol IModuleSymbol.GlobalNamespace
+        /// <summary>
+        /// If this symbol represents a metadata module returns the underlying <see cref="ModuleMetadata"/>.
+        /// 
+        /// Otherwise, this returns <see langword="null"/>.
+        /// </summary>
+        public abstract ModuleMetadata GetMetadata();
+
+        protected override ISymbol CreateISymbol()
         {
-            get { return this.GlobalNamespace; }
+            return new PublicModel.ModuleSymbol(this);
         }
-
-        INamespaceSymbol IModuleSymbol.GetModuleNamespace(INamespaceSymbol namespaceSymbol)
-        {
-            return this.GetModuleNamespace(namespaceSymbol);
-        }
-
-        ImmutableArray<IAssemblySymbol> IModuleSymbol.ReferencedAssemblySymbols
-        {
-            get
-            {
-                return ImmutableArray.Create<IAssemblySymbol, AssemblySymbol>(ReferencedAssemblySymbols);
-            }
-        }
-
-        #endregion
-
-        #region ISymbol Members
-
-        public override void Accept(SymbolVisitor visitor)
-        {
-            visitor.VisitModule(this);
-        }
-
-        public override TResult Accept<TResult>(SymbolVisitor<TResult> visitor)
-        {
-            return visitor.VisitModule(this);
-        }
-
-        #endregion
     }
 }

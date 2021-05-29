@@ -117,7 +117,7 @@
   <resheader name="writer">
     <value>System.Resources.ResXResourceWriter, System.Windows.Forms, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b77a5c561934e089</value>
   </resheader>
-  <data name="StackOverflowWhileEvaluat" xml:space="preserve">
+  <data name="StackOverflowWhileEvaluating" xml:space="preserve">
     <value>!&lt;Stack overflow while evaluating object&gt;</value>
   </data>
   <data name="CantAssignTo" xml:space="preserve">
@@ -129,14 +129,8 @@
   <data name="DisplayNameOrPathCannotBe" xml:space="preserve">
     <value>Display name or path cannot be empty.</value>
   </data>
-  <data name="AssemblyNotFound" xml:space="preserve">
-    <value>Assembly not found.</value>
-  </data>
   <data name="AbsolutePathExpected" xml:space="preserve">
     <value>Absolute path expected</value>
-  </data>
-  <data name="ExecutionStateFrozen" xml:space="preserve">
-    <value>Execution state is frozen and cannot be modified.</value>
   </data>
   <data name="GlobalsNotAssignable" xml:space="preserve">
     <value>The globals of type '{0}' is not assignable to '{1}'</value>
@@ -149,5 +143,51 @@
   </data>
   <data name="InvalidCharactersInAssemblyName" xml:space="preserve">
     <value>Invalid characters in assemblyName</value>
+  </data>
+  <data name="ScriptRequiresGlobalVariables" xml:space="preserve">
+    <value>The script requires access to global variables but none were given</value>
+  </data>
+  <data name="GlobalVariablesWithoutGlobalType" xml:space="preserve">
+    <value>Global variables passed to a script without a global type</value>
+  </data>
+  <data name="PlusAdditionalError" xml:space="preserve">
+    <value>+ additional {0} error</value>
+  </data>
+  <data name="PlusAdditionalErrors" xml:space="preserve">
+    <value>+ additional {0} errors</value>
+  </data>
+  <data name="AtFileLine" xml:space="preserve">
+    <value> at {0} : {1}</value>
+  </data>
+  <data name="CannotSetReadOnlyVariable" xml:space="preserve">
+    <value>Cannot set a read-only variable</value>
+  </data>
+  <data name="CannotSetConstantVariable" xml:space="preserve">
+    <value>Cannot set a constant variable</value>
+  </data>
+  <data name="HelpPrompt" xml:space="preserve">
+    <value>Type "#help" for more information.</value>
+  </data>
+  <data name="HelpText" xml:space="preserve">
+    <value>Keyboard shortcuts:
+  Enter         If the current submission appears to be complete, evaluate it.  Otherwise, insert a new line.
+  Escape        Clear the current submission.
+  UpArrow       Replace the current submission with a previous submission.
+  DownArrow     Replace the current submission with a subsequent submission (after having previously navigated backwards).
+  Ctrl-C        Exit the REPL.
+REPL commands:
+  #help         Display help on available commands and key bindings.
+Script directives:
+  #r            Add a metadata reference to specified assembly and all its dependencies, e.g. #r "myLib.dll".
+  #load         Load specified script file and execute it, e.g. #load "myScript.csx".</value>
+  </data>
+  <data name="AssemblyAlreadyLoaded" xml:space="preserve">
+    <value>Assembly '{0}, Version={1}' has already been loaded from '{2}'. A different assembly with the same name and version can't be loaded: '{3}'.</value>
+  </data>
+  <data name="AssemblyAlreadyLoadedNotSigned" xml:space="preserve">
+    <value>Assembly '{0}' has already been loaded from '{1}'. A different assembly with the same name can't be loaded unless it's signed: '{2}'.</value>
+  </data>
+  <data name="CannotSetLanguageSpecificOption" xml:space="preserve">
+    <value>Cannot set {0} specific option {1} because the options were already configured for a different language.</value>
   </data>
 </root>

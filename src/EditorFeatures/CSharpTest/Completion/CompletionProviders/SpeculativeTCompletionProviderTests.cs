@@ -1,7 +1,14 @@
-﻿// Copyright (c) Microsoft.  All Rights Reserved.  Licensed under the Apache License, Version 2.0.  See License.txt in the project root for license information.
+﻿// Licensed to the .NET Foundation under one or more agreements.
+// The .NET Foundation licenses this file to you under the MIT license.
+// See the LICENSE file in the project root for more information.
 
-using Microsoft.CodeAnalysis.Completion.Providers;
+#nullable disable
+
+using System;
+using System.Threading.Tasks;
+using Microsoft.CodeAnalysis.Completion;
 using Microsoft.CodeAnalysis.CSharp.Completion.Providers;
+using Microsoft.CodeAnalysis.Test.Utilities;
 using Roslyn.Test.Utilities;
 using Xunit;
 
@@ -9,32 +16,41 @@ namespace Microsoft.CodeAnalysis.Editor.CSharp.UnitTests.Completion.CompletionPr
 {
     public class SpeculativeTCompletionProviderTests : AbstractCSharpCompletionProviderTests
     {
-        internal override ICompletionProvider CreateCompletionProvider()
-        {
-            return new SpeculativeTCompletionProvider();
-        }
+        internal override Type GetCompletionProviderType()
+            => typeof(SpeculativeTCompletionProvider);
 
         [Fact, Trait(Traits.Feature, Traits.Features.Completion)]
-        public void IsCommitCharacterTest()
+        public async Task IsCommitCharacterTest()
         {
-            TestCommonIsCommitCharacter();
+            const string markup = @"
+class C
+{
+    $$
+}";
+
+            await VerifyCommonCommitCharactersAsync(markup, textTypedSoFar: "");
         }
 
         [Fact, Trait(Traits.Feature, Traits.Features.Completion)]
         public void IsTextualTriggerCharacterTest()
+            => TestCommonIsTextualTriggerCharacter();
+
+        [Fact, Trait(Traits.Feature, Traits.Features.Completion)]
+        public async Task SendEnterThroughToEditorTest()
         {
-            TestCommonIsTextualTriggerCharacter();
+            const string markup = @"
+class C
+{
+    $$
+}";
+
+            await VerifySendEnterThroughToEnterAsync(markup, "T", sendThroughEnterOption: EnterKeyRule.Never, expected: false);
+            await VerifySendEnterThroughToEnterAsync(markup, "T", sendThroughEnterOption: EnterKeyRule.AfterFullyTypedWord, expected: true);
+            await VerifySendEnterThroughToEnterAsync(markup, "T", sendThroughEnterOption: EnterKeyRule.Always, expected: true);
         }
 
         [Fact, Trait(Traits.Feature, Traits.Features.Completion)]
-        public void SendEnterThroughToEditorTest()
-        {
-            VerifySendEnterThroughToEnter("T", "T", sendThroughEnterEnabled: false, expected: false);
-            VerifySendEnterThroughToEnter("T", "T", sendThroughEnterEnabled: true, expected: true);
-        }
-
-        [Fact, Trait(Traits.Feature, Traits.Features.Completion)]
-        public void InClass()
+        public async Task InClass()
         {
             var markup = @"
 class C
@@ -42,11 +58,11 @@ class C
     $$
 }";
 
-            VerifyItemExists(markup, "T");
+            await VerifyItemExistsAsync(markup, "T");
         }
 
         [Fact, Trait(Traits.Feature, Traits.Features.Completion)]
-        public void InInterface()
+        public async Task InInterface()
         {
             var markup = @"
 interface I
@@ -54,11 +70,11 @@ interface I
     $$
 }";
 
-            VerifyItemExists(markup, "T");
+            await VerifyItemExistsAsync(markup, "T");
         }
 
         [Fact, Trait(Traits.Feature, Traits.Features.Completion)]
-        public void InStruct()
+        public async Task InStruct()
         {
             var markup = @"
 struct S
@@ -66,11 +82,11 @@ struct S
     $$
 }";
 
-            VerifyItemExists(markup, "T");
+            await VerifyItemExistsAsync(markup, "T");
         }
 
         [Fact, Trait(Traits.Feature, Traits.Features.Completion)]
-        public void NotInNamespace()
+        public async Task NotInNamespace()
         {
             var markup = @"
 namespace N
@@ -78,11 +94,11 @@ namespace N
     $$
 }";
 
-            VerifyItemIsAbsent(markup, "T");
+            await VerifyItemIsAbsentAsync(markup, "T");
         }
 
         [Fact, Trait(Traits.Feature, Traits.Features.Completion)]
-        public void NotInEnum()
+        public async Task NotInEnum()
         {
             var markup = @"
 enum E
@@ -90,11 +106,11 @@ enum E
     $$
 }";
 
-            VerifyItemIsAbsent(markup, "T");
+            await VerifyItemIsAbsentAsync(markup, "T");
         }
 
         [Fact, Trait(Traits.Feature, Traits.Features.Completion)]
-        public void AfterDelegate()
+        public async Task AfterDelegate()
         {
             var markup = @"
 class C
@@ -102,11 +118,11 @@ class C
     delegate $$
 }";
 
-            VerifyItemExists(markup, "T");
+            await VerifyItemExistsAsync(markup, "T");
         }
 
         [Fact, Trait(Traits.Feature, Traits.Features.Completion)]
-        public void NotAfterVoid()
+        public async Task NotAfterVoid()
         {
             var markup = @"
 class C
@@ -114,11 +130,11 @@ class C
     void $$
 }";
 
-            VerifyItemIsAbsent(markup, "T");
+            await VerifyItemIsAbsentAsync(markup, "T");
         }
 
         [Fact, Trait(Traits.Feature, Traits.Features.Completion)]
-        public void NotAfterInt()
+        public async Task NotAfterInt()
         {
             var markup = @"
 class C
@@ -126,11 +142,11 @@ class C
     int $$
 }";
 
-            VerifyItemIsAbsent(markup, "T");
+            await VerifyItemIsAbsentAsync(markup, "T");
         }
 
         [Fact, Trait(Traits.Feature, Traits.Features.Completion)]
-        public void InGeneric()
+        public async Task InGeneric()
         {
             var markup = @"
 using System;
@@ -139,11 +155,593 @@ class C
     Func<$$
 }";
 
-            VerifyItemExists(markup, "T");
+            await VerifyItemExistsAsync(markup, "T");
         }
 
         [Fact, Trait(Traits.Feature, Traits.Features.Completion)]
-        public void InNestedGeneric1()
+        [WorkItem(37224, "https://github.com/dotnet/roslyn/issues/37224")]
+        public async Task InRef0()
+        {
+            var markup = @"
+using System;
+class C
+{
+    ref $$
+}";
+
+            await VerifyItemExistsAsync(markup, "T");
+        }
+
+        [Fact, Trait(Traits.Feature, Traits.Features.Completion)]
+        [WorkItem(37224, "https://github.com/dotnet/roslyn/issues/37224")]
+        public async Task InRef1()
+        {
+            var markup = @"
+using System;
+class C
+{
+    ref T$$
+}";
+
+            await VerifyItemExistsAsync(markup, "T");
+        }
+
+        [Fact, Trait(Traits.Feature, Traits.Features.Completion)]
+        [WorkItem(37224, "https://github.com/dotnet/roslyn/issues/37224")]
+        public async Task InRefGeneric0()
+        {
+            var markup = @"
+using System;
+class C
+{
+    ref Func<$$
+}";
+
+            await VerifyItemExistsAsync(markup, "T");
+        }
+
+        [Fact, Trait(Traits.Feature, Traits.Features.Completion)]
+        [WorkItem(37224, "https://github.com/dotnet/roslyn/issues/37224")]
+        public async Task InRefGeneric1()
+        {
+            var markup = @"
+using System;
+class C
+{
+    ref Func<$$>
+}";
+
+            await VerifyItemExistsAsync(markup, "T");
+        }
+
+        [Fact, Trait(Traits.Feature, Traits.Features.Completion)]
+        [WorkItem(37224, "https://github.com/dotnet/roslyn/issues/37224")]
+        public async Task InRefGeneric2()
+        {
+            var markup = @"
+using System;
+class C
+{
+    ref Func<T$$>
+}";
+
+            await VerifyItemExistsAsync(markup, "T");
+        }
+
+        [Fact, Trait(Traits.Feature, Traits.Features.Completion)]
+        [WorkItem(37224, "https://github.com/dotnet/roslyn/issues/37224")]
+        public async Task InRefGeneric3()
+        {
+            var markup = @"
+using System;
+class C
+{
+    ref Func<int, $$
+}";
+
+            await VerifyItemExistsAsync(markup, "T");
+        }
+
+        [Fact, Trait(Traits.Feature, Traits.Features.Completion)]
+        [WorkItem(37224, "https://github.com/dotnet/roslyn/issues/37224")]
+        public async Task InRefReadonlyGeneric()
+        {
+            var markup = @"
+using System;
+class C
+{
+    ref readonly Func<$$
+}";
+
+            await VerifyItemExistsAsync(markup, "T");
+        }
+
+        [Fact, Trait(Traits.Feature, Traits.Features.Completion)]
+        [WorkItem(37268, "https://github.com/dotnet/roslyn/issues/37268")]
+        public async Task InQualifiedGeneric0()
+        {
+            var markup = @"
+using System;
+class C
+{
+    System.Func<$$
+}";
+
+            await VerifyItemExistsAsync(markup, "T");
+        }
+
+        [Fact, Trait(Traits.Feature, Traits.Features.Completion)]
+        [WorkItem(37268, "https://github.com/dotnet/roslyn/issues/37268")]
+        public async Task InQualifiedGeneric1()
+        {
+            var markup = @"
+using System;
+class C
+{
+    System.Collections.Generic.List<$$
+}";
+
+            await VerifyItemExistsAsync(markup, "T");
+        }
+
+        [Fact, Trait(Traits.Feature, Traits.Features.Completion)]
+        [WorkItem(37224, "https://github.com/dotnet/roslyn/issues/37224")]
+        [WorkItem(37268, "https://github.com/dotnet/roslyn/issues/37268")]
+        public async Task InRefAndQualifiedGeneric0()
+        {
+            var markup = @"
+using System;
+class C
+{
+    ref System.Func<$$
+}";
+
+            await VerifyItemExistsAsync(markup, "T");
+        }
+
+        [Fact, Trait(Traits.Feature, Traits.Features.Completion)]
+        [WorkItem(37224, "https://github.com/dotnet/roslyn/issues/37224")]
+        [WorkItem(37268, "https://github.com/dotnet/roslyn/issues/37268")]
+        public async Task InRefAndQualifiedGeneric1()
+        {
+            var markup = @"
+using System;
+class C
+{
+    internal ref System.Func<int,$$
+}";
+
+            await VerifyItemExistsAsync(markup, "T");
+        }
+
+        [Fact, Trait(Traits.Feature, Traits.Features.Completion)]
+        [WorkItem(37224, "https://github.com/dotnet/roslyn/issues/37224")]
+        [WorkItem(37268, "https://github.com/dotnet/roslyn/issues/37268")]
+        public async Task InRefAndQualifiedNestedGeneric0()
+        {
+            var markup = @"
+using System;
+class C
+{
+    partial ref System.Func<Func<$$
+}";
+
+            await VerifyItemExistsAsync(markup, "T");
+        }
+
+        [Fact, Trait(Traits.Feature, Traits.Features.Completion)]
+        [WorkItem(37224, "https://github.com/dotnet/roslyn/issues/37224")]
+        [WorkItem(37268, "https://github.com/dotnet/roslyn/issues/37268")]
+        public async Task InRefAndQualifiedNestedGeneric1()
+        {
+            var markup = @"
+using System;
+class C
+{
+    private ref Func<System.Func<int,$$
+}";
+
+            await VerifyItemExistsAsync(markup, "T");
+        }
+
+        [Fact, Trait(Traits.Feature, Traits.Features.Completion)]
+        [WorkItem(37224, "https://github.com/dotnet/roslyn/issues/37224")]
+        [WorkItem(37268, "https://github.com/dotnet/roslyn/issues/37268")]
+        public async Task InRefAndQualifiedNestedGeneric2()
+        {
+            var markup = @"
+using System;
+class C
+{
+    public ref Func<int, System.Func<int,$$
+}";
+
+            await VerifyItemExistsAsync(markup, "T");
+        }
+
+        [Fact, Trait(Traits.Feature, Traits.Features.Completion)]
+        [WorkItem(37224, "https://github.com/dotnet/roslyn/issues/37224")]
+        [WorkItem(37268, "https://github.com/dotnet/roslyn/issues/37268")]
+        public async Task InRefAndQualifiedNestedGeneric3()
+        {
+            var markup = @"
+using System;
+class C
+{
+    private protected ref Func<int, System.Func<$$
+}";
+
+            await VerifyItemExistsAsync(markup, "T");
+        }
+
+        [Fact, Trait(Traits.Feature, Traits.Features.Completion)]
+        [WorkItem(37361, "https://github.com/dotnet/roslyn/issues/37361")]
+        public async Task InTuple0()
+        {
+            var markup = @"
+using System;
+class C
+{
+    protected ($$
+}";
+
+            await VerifyItemExistsAsync(markup, "T");
+        }
+
+        [Fact, Trait(Traits.Feature, Traits.Features.Completion)]
+        [WorkItem(37361, "https://github.com/dotnet/roslyn/issues/37361")]
+        public async Task TupleInMethod0()
+        {
+            var markup = @"
+using System;
+class C
+{
+    void M()
+    {
+        ($$
+    }
+}";
+
+            await VerifyItemExistsAsync(markup, "T");
+        }
+
+        [Fact, Trait(Traits.Feature, Traits.Features.Completion)]
+        [WorkItem(37361, "https://github.com/dotnet/roslyn/issues/37361")]
+        public async Task TupleInMethod1()
+        {
+            var markup = @"
+using System;
+class C
+{
+    void M()
+    {
+        var a = 0;
+        ($$
+    }
+}";
+
+            await VerifyItemExistsAsync(markup, "T");
+        }
+
+        [Fact, Trait(Traits.Feature, Traits.Features.Completion)]
+        [WorkItem(37361, "https://github.com/dotnet/roslyn/issues/37361")]
+        public async Task TupleInMethod2()
+        {
+            var markup = @"
+using System;
+class C
+{
+    void M()
+    {
+        ($$)
+    }
+}";
+            await VerifyItemExistsAsync(markup, "T");
+        }
+
+        [Fact, Trait(Traits.Feature, Traits.Features.Completion)]
+        [WorkItem(37361, "https://github.com/dotnet/roslyn/issues/37361")]
+        public async Task TupleInMethod3()
+        {
+            var markup = @"
+using System;
+class C
+{
+    void M()
+    {
+        var a = 0;
+
+        (T$$)
+
+        a = 1;
+    }
+}";
+
+            await VerifyItemExistsAsync(markup, "T");
+        }
+
+        [Fact, Trait(Traits.Feature, Traits.Features.Completion)]
+        [WorkItem(37361, "https://github.com/dotnet/roslyn/issues/37361")]
+        public async Task InTupleNot0()
+        {
+            var markup = @"
+using System;
+class C
+{
+    protected sealed (int $$
+}";
+
+            await VerifyItemIsAbsentAsync(markup, "T");
+        }
+
+        [Fact, Trait(Traits.Feature, Traits.Features.Completion)]
+        [WorkItem(37361, "https://github.com/dotnet/roslyn/issues/37361")]
+        public async Task InTuple1()
+        {
+            var markup = @"
+using System;
+class C
+{
+    sealed (int, $$
+}";
+
+            await VerifyItemExistsAsync(markup, "T");
+        }
+
+        [Fact, Trait(Traits.Feature, Traits.Features.Completion)]
+        [WorkItem(37361, "https://github.com/dotnet/roslyn/issues/37361")]
+        public async Task InTupleNot1()
+        {
+            var markup = @"
+using System;
+class C
+{
+    virtual (int x, C $$
+}";
+
+            await VerifyItemIsAbsentAsync(markup, "T");
+        }
+
+        [Fact, Trait(Traits.Feature, Traits.Features.Completion)]
+        [WorkItem(37361, "https://github.com/dotnet/roslyn/issues/37361")]
+        public async Task InTupleGeneric0()
+        {
+            var markup = @"
+using System;
+class C
+{
+    (Func<$$
+}";
+
+            await VerifyItemExistsAsync(markup, "T");
+        }
+
+        [Fact, Trait(Traits.Feature, Traits.Features.Completion)]
+        [WorkItem(37361, "https://github.com/dotnet/roslyn/issues/37361")]
+        public async Task InTupleGeneric1()
+        {
+            var markup = @"
+using System;
+class C
+{
+    (int, Func<$$
+}";
+
+            await VerifyItemExistsAsync(markup, "T");
+        }
+
+        [Fact, Trait(Traits.Feature, Traits.Features.Completion)]
+        [WorkItem(37361, "https://github.com/dotnet/roslyn/issues/37361")]
+        public async Task InTupleGeneric2()
+        {
+            var markup = @"
+using System;
+class C
+{
+    (int, Func<int, $$
+}";
+
+            await VerifyItemExistsAsync(markup, "T");
+        }
+
+        [Fact, Trait(Traits.Feature, Traits.Features.Completion)]
+        [WorkItem(37361, "https://github.com/dotnet/roslyn/issues/37361")]
+        public async Task InGenericTuple0()
+        {
+            var markup = @"
+using System;
+class C
+{
+    Func<($$
+}";
+
+            await VerifyItemExistsAsync(markup, "T");
+        }
+
+        [Fact, Trait(Traits.Feature, Traits.Features.Completion)]
+        [WorkItem(37361, "https://github.com/dotnet/roslyn/issues/37361")]
+        public async Task InGenericTuple1()
+        {
+            var markup = @"
+using System;
+class C
+{
+    Func<int, ($$
+}";
+
+            await VerifyItemExistsAsync(markup, "T");
+        }
+
+        [Fact, Trait(Traits.Feature, Traits.Features.Completion)]
+        [WorkItem(37361, "https://github.com/dotnet/roslyn/issues/37361")]
+        public async Task InGenericTuple1Not()
+        {
+            var markup = @"
+using System;
+class C
+{
+    Func<int, (T $$
+}";
+
+            await VerifyItemIsAbsentAsync(markup, "T");
+        }
+
+        [Fact, Trait(Traits.Feature, Traits.Features.Completion)]
+        [WorkItem(37361, "https://github.com/dotnet/roslyn/issues/37361")]
+        public async Task InGenericTuple2()
+        {
+            var markup = @"
+using System;
+class C
+{
+    Func<(int, $$
+}";
+
+            await VerifyItemExistsAsync(markup, "T");
+        }
+
+        [Fact, Trait(Traits.Feature, Traits.Features.Completion)]
+        [WorkItem(37361, "https://github.com/dotnet/roslyn/issues/37361")]
+        public async Task InGenericTuple2Not()
+        {
+            var markup = @"
+using System;
+class C
+{
+    Func<(C c, int $$
+}";
+
+            await VerifyItemIsAbsentAsync(markup, "T");
+        }
+
+        [Fact, Trait(Traits.Feature, Traits.Features.Completion)]
+        [WorkItem(37361, "https://github.com/dotnet/roslyn/issues/37361")]
+        public async Task InGenericTuple3()
+        {
+            var markup = @"
+using System;
+class C
+{
+    Func<int, (int,$$
+}";
+
+            await VerifyItemExistsAsync(markup, "T");
+        }
+
+        [Fact, Trait(Traits.Feature, Traits.Features.Completion)]
+        [WorkItem(37361, "https://github.com/dotnet/roslyn/issues/37361")]
+        public async Task InGenericTuple3Not()
+        {
+            var markup = @"
+using System;
+class C
+{
+    Func<C, (int, C $$
+}";
+
+            await VerifyItemIsAbsentAsync(markup, "T");
+        }
+
+        [Fact, Trait(Traits.Feature, Traits.Features.Completion)]
+        [WorkItem(37361, "https://github.com/dotnet/roslyn/issues/37361")]
+        public async Task InRefTupleQualifiedNestedGeneric0()
+        {
+            var markup = @"
+using System;
+class C
+{
+    ref (Func<System.Func<int,$$
+}";
+
+            await VerifyItemExistsAsync(markup, "T");
+        }
+
+        [Fact, Trait(Traits.Feature, Traits.Features.Completion)]
+        [WorkItem(37361, "https://github.com/dotnet/roslyn/issues/37361")]
+        public async Task InRefTupleQualifiedNestedGeneric1()
+        {
+            var markup = @"
+using System;
+class C
+{
+    ref (C c, Func<System.Func<int,$$
+}";
+
+            await VerifyItemExistsAsync(markup, "T");
+        }
+
+        [Fact, Trait(Traits.Feature, Traits.Features.Completion)]
+        [WorkItem(37361, "https://github.com/dotnet/roslyn/issues/37361")]
+        public async Task InRefTupleQualifiedNestedGeneric2()
+        {
+            var markup = @"
+using System;
+class C
+{
+    ref (C c, Func<int, System.Func<(int,T$$
+}";
+
+            await VerifyItemExistsAsync(markup, "T");
+        }
+
+        [Fact, Trait(Traits.Feature, Traits.Features.Completion)]
+        [WorkItem(37361, "https://github.com/dotnet/roslyn/issues/37361")]
+        public async Task InRefTupleQualifiedNestedGeneric3()
+        {
+            var markup = @"
+using System;
+class C
+{
+    ref (C c, System.Func<Func<int,(T$$
+}";
+
+            await VerifyItemExistsAsync(markup, "T");
+        }
+
+        [Fact, Trait(Traits.Feature, Traits.Features.Completion)]
+        [WorkItem(37361, "https://github.com/dotnet/roslyn/issues/37361")]
+        public async Task InRefTupleQualifiedNestedGeneric4()
+        {
+            var markup = @"
+using System;
+class C
+{
+    ref (System.Func<(int,C), (Func<int,T$$
+}";
+
+            await VerifyItemExistsAsync(markup, "T");
+        }
+
+        [Fact, Trait(Traits.Feature, Traits.Features.Completion)]
+        [WorkItem(37361, "https://github.com/dotnet/roslyn/issues/37361")]
+        public async Task InRefTupleQualifiedNestedGeneric5()
+        {
+            var markup = @"
+using System;
+class C
+{
+    ref readonly (System.Func<(int, (C, (Func<int,T$$
+}";
+
+            await VerifyItemExistsAsync(markup, "T");
+        }
+
+        [Fact, Trait(Traits.Feature, Traits.Features.Completion)]
+        [WorkItem(37361, "https://github.com/dotnet/roslyn/issues/37361")]
+        public async Task InRefTupleQualifiedNestedGeneric6()
+        {
+            var markup = @"
+using System;
+class C
+{
+    ref readonly (System.Collections.Generic.List<(int, (C, (Func<int,T$$
+}";
+
+            await VerifyItemExistsAsync(markup, "T");
+        }
+
+        [Fact, Trait(Traits.Feature, Traits.Features.Completion)]
+        public async Task InNestedGeneric1()
         {
             var markup = @"
 using System;
@@ -152,11 +750,11 @@ class C
     Func<Func<$$
 }";
 
-            VerifyItemExists(markup, "T");
+            await VerifyItemExistsAsync(markup, "T");
         }
 
         [Fact, Trait(Traits.Feature, Traits.Features.Completion)]
-        public void InNestedGeneric2()
+        public async Task InNestedGeneric2()
         {
             var markup = @"
 using System;
@@ -165,68 +763,68 @@ class C
     Func<Func<int,$$
 }";
 
-            VerifyItemExists(markup, "T");
+            await VerifyItemExistsAsync(markup, "T");
         }
 
         [Fact, Trait(Traits.Feature, Traits.Features.Completion)]
-        public void InScript()
+        public async Task InScript()
         {
             var markup = @"$$";
 
-            VerifyItemExists(markup, "T", expectedDescriptionOrNull: null, sourceCodeKind: SourceCodeKind.Script);
+            await VerifyItemExistsAsync(markup, "T", expectedDescriptionOrNull: null, sourceCodeKind: SourceCodeKind.Script);
         }
 
         [Fact, Trait(Traits.Feature, Traits.Features.Completion)]
-        public void NotAfterVoidInScript()
+        public async Task NotAfterVoidInScript()
         {
             var markup = @"void $$";
 
-            VerifyItemIsAbsent(markup, "T", expectedDescriptionOrNull: null, sourceCodeKind: SourceCodeKind.Script);
+            await VerifyItemIsAbsentAsync(markup, "T", expectedDescriptionOrNull: null, sourceCodeKind: SourceCodeKind.Script);
         }
 
         [Fact, Trait(Traits.Feature, Traits.Features.Completion)]
-        public void NotAfterIntInScript()
+        public async Task NotAfterIntInScript()
         {
             var markup = @"int $$";
 
-            VerifyItemIsAbsent(markup, "T", expectedDescriptionOrNull: null, sourceCodeKind: SourceCodeKind.Script);
+            await VerifyItemIsAbsentAsync(markup, "T", expectedDescriptionOrNull: null, sourceCodeKind: SourceCodeKind.Script);
         }
 
         [Fact, Trait(Traits.Feature, Traits.Features.Completion)]
-        public void InGenericInScript()
+        public async Task InGenericInScript()
         {
             var markup = @"
 using System;
 Func<$$
 ";
 
-            VerifyItemExists(markup, "T", expectedDescriptionOrNull: null, sourceCodeKind: SourceCodeKind.Script);
+            await VerifyItemExistsAsync(markup, "T", expectedDescriptionOrNull: null, sourceCodeKind: SourceCodeKind.Script);
         }
 
         [Fact, Trait(Traits.Feature, Traits.Features.Completion)]
-        public void InNestedGenericInScript1()
+        public async Task InNestedGenericInScript1()
         {
             var markup = @"
 using System;
 Func<Func<$$
 ";
 
-            VerifyItemExists(markup, "T", expectedDescriptionOrNull: null, sourceCodeKind: SourceCodeKind.Script);
+            await VerifyItemExistsAsync(markup, "T", expectedDescriptionOrNull: null, sourceCodeKind: SourceCodeKind.Script);
         }
 
         [Fact, Trait(Traits.Feature, Traits.Features.Completion)]
-        public void InNestedGenericInScript2()
+        public async Task InNestedGenericInScript2()
         {
             var markup = @"
 using System;
 Func<Func<int,$$
 ";
 
-            VerifyItemExists(markup, "T", expectedDescriptionOrNull: null, sourceCodeKind: SourceCodeKind.Script);
+            await VerifyItemExistsAsync(markup, "T", expectedDescriptionOrNull: null, sourceCodeKind: SourceCodeKind.Script);
         }
 
         [Fact, Trait(Traits.Feature, Traits.Features.Completion)]
-        public void NotInComment()
+        public async Task NotInComment()
         {
             var markup = @"
 class C
@@ -234,11 +832,11 @@ class C
     // $$
 }";
 
-            VerifyItemIsAbsent(markup, "T");
+            await VerifyItemIsAbsentAsync(markup, "T");
         }
 
         [Fact, Trait(Traits.Feature, Traits.Features.Completion)]
-        public void NotInXmlDocComment()
+        public async Task NotInXmlDocComment()
         {
             var markup = @"
 class C
@@ -246,14 +844,14 @@ class C
     /// <summary>
     /// $$
     /// </summary>
-    void Foo() { }
+    void Goo() { }
 }";
 
-            VerifyItemIsAbsent(markup, "T");
+            await VerifyItemIsAbsentAsync(markup, "T");
         }
 
         [Fact, Trait(Traits.Feature, Traits.Features.Completion)]
-        public void AfterAsyncTask()
+        public async Task AfterAsyncTask()
         {
             var markup = @"
 using System.Threading.Tasks;
@@ -262,11 +860,11 @@ class Program
     async Task<$$
 }";
 
-            VerifyItemExists(markup, "T");
+            await VerifyItemExistsAsync(markup, "T");
         }
 
         [Fact, Trait(Traits.Feature, Traits.Features.Completion)]
-        public void NotAfterAsync()
+        public async Task OkAfterAsync()
         {
             var markup = @"
 using System.Threading.Tasks;
@@ -275,25 +873,25 @@ class Program
     async $$
 }";
 
-            VerifyItemIsAbsent(markup, "T");
+            await VerifyItemExistsAsync(markup, "T");
         }
 
-        [WorkItem(968256)]
+        [WorkItem(968256, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/968256")]
         [Fact, Trait(Traits.Feature, Traits.Features.KeywordRecommending)]
-        public void UnionOfItemsFromBothContexts()
+        public async Task UnionOfItemsFromBothContexts()
         {
             var markup = @"<Workspace>
-    <Project Language=""C#"" CommonReferences=""true"" AssemblyName=""Proj1"" PreprocessorSymbols=""FOO"">
+    <Project Language=""C#"" CommonReferences=""true"" AssemblyName=""Proj1"" PreprocessorSymbols=""GOO"">
         <Document FilePath=""CurrentDocument.cs""><![CDATA[
 class C
 {
-#if FOO
-    void foo() {
+#if GOO
+    void goo() {
 #endif
 
 $$
 
-#if FOO
+#if GOO
     }
 #endif
 }
@@ -304,12 +902,12 @@ $$
         <Document IsLinkFile=""true"" LinkAssemblyName=""Proj1"" LinkFilePath=""CurrentDocument.cs""/>
     </Project>
 </Workspace>";
-            VerifyItemInLinkedFiles(markup, "T", null);
+            await VerifyItemInLinkedFilesAsync(markup, "T", null);
         }
 
-        [WorkItem(1020654)]
+        [WorkItem(1020654, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/1020654")]
         [Fact, Trait(Traits.Feature, Traits.Features.Completion)]
-        public void AfterAsyncTaskWithBraceCompletion()
+        public async Task AfterAsyncTaskWithBraceCompletion()
         {
             var markup = @"
 using System.Threading.Tasks;
@@ -318,7 +916,53 @@ class Program
     async Task<$$>
 }";
 
-            VerifyItemExists(markup, "T");
+            await VerifyItemExistsAsync(markup, "T");
+        }
+
+        [WorkItem(13480, "https://github.com/dotnet/roslyn/issues/13480")]
+        [Fact]
+        [CompilerTrait(CompilerFeature.LocalFunctions)]
+        public async Task LocalFunctionReturnType()
+        {
+            var markup = @"
+class C
+{
+    public void M()
+    {
+        $$
+    }
+}";
+            await VerifyItemExistsAsync(markup, "T");
+        }
+
+        [Fact(Skip = "https://github.com/dotnet/roslyn/issues/14525")]
+        [CompilerTrait(CompilerFeature.LocalFunctions)]
+        public async Task LocalFunctionAfterAyncTask()
+        {
+            var markup = @"
+class C
+{
+    public void M()
+    {
+        async Task<$$>
+    }
+}";
+            await VerifyItemExistsAsync(markup, "T");
+        }
+
+        [Fact(Skip = "https://github.com/dotnet/roslyn/issues/14525")]
+        [CompilerTrait(CompilerFeature.LocalFunctions)]
+        public async Task LocalFunctionAfterAsync()
+        {
+            var markup = @"
+class C
+{
+    public void M()
+    {
+        async $$
+    }
+}";
+            await VerifyItemExistsAsync(markup, "T");
         }
     }
 }

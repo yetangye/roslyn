@@ -1,7 +1,10 @@
-﻿' Copyright (c) Microsoft.  All Rights Reserved.  Licensed under the Apache License, Version 2.0.  See License.txt in the project root for license information.
+﻿' Licensed to the .NET Foundation under one or more agreements.
+' The .NET Foundation licenses this file to you under the MIT license.
+' See the LICENSE file in the project root for more information.
 
 Imports System.Collections.Immutable
-Imports Microsoft.CodeAnalysis
+Imports System.Threading
+Imports System.Runtime.InteropServices
 Imports Microsoft.CodeAnalysis.VisualBasic
 
 Namespace Microsoft.CodeAnalysis.VisualBasic
@@ -9,7 +12,7 @@ Namespace Microsoft.CodeAnalysis.VisualBasic
     ''' Applies Visual Basic-specific modification and filtering of <see cref="Diagnostic"/>s.
     ''' </summary>
     Friend Class VisualBasicDiagnosticFilter
-        Private Shared ReadOnly AlinkWarnings As ERRID() = {ERRID.WRN_ConflictingMachineAssembly,
+        Private Shared ReadOnly s_alinkWarnings As ERRID() = {ERRID.WRN_ConflictingMachineAssembly,
                                                             ERRID.WRN_RefCultureMismatch,
                                                             ERRID.WRN_InvalidVersionFormat}
 
@@ -22,7 +25,13 @@ Namespace Microsoft.CodeAnalysis.VisualBasic
         ''' <param name="generalDiagnosticOption">How warning diagnostics should be reported</param>
         ''' <param name="specificDiagnosticOptions">How specific diagnostics should be reported</param>
         ''' <returns>A diagnostic updated to reflect the options, or null if it has been filtered out</returns>
-        Public Shared Function Filter(diagnostic As Diagnostic, generalDiagnosticOption As ReportDiagnostic, specificDiagnosticOptions As IDictionary(Of String, ReportDiagnostic)) As Diagnostic
+        Public Shared Function Filter(
+            diagnostic As Diagnostic,
+            generalDiagnosticOption As ReportDiagnostic,
+            specificDiagnosticOptions As IDictionary(Of String, ReportDiagnostic),
+            syntaxTreeOptions As SyntaxTreeOptionsProvider,
+            cancellationToken As CancellationToken) As Diagnostic
+
             ' Diagnostic ids must be processed in case-insensitive fashion in VB.
             Dim caseInsensitiveSpecificDiagnosticOptions =
             ImmutableDictionary.Create(Of String, ReportDiagnostic)(CaseInsensitiveComparison.Comparer).AddRange(specificDiagnosticOptions)
@@ -35,7 +44,13 @@ Namespace Microsoft.CodeAnalysis.VisualBasic
 
             ' If diagnostic is not configurable, keep it as it is.
             If diagnostic.IsNotConfigurable Then
-                Return diagnostic
+                If diagnostic.IsEnabledByDefault Then
+                    ' Enabled NotConfigurable should always be reported as it is.
+                    Return diagnostic
+                Else
+                    ' Disabled NotConfigurable should never be reported.
+                    Return Nothing
+                End If
             End If
 
             ' In the native compiler, all warnings originating from alink.dll were issued
@@ -48,28 +63,112 @@ Namespace Microsoft.CodeAnalysis.VisualBasic
             ' We don't permit configuring 1607 and independently configuring the new warnings.
 
             Dim report As ReportDiagnostic
+            Dim hasSourceSuppression As Boolean = False
 
-            If (AlinkWarnings.Contains(CType(diagnostic.Code, ERRID)) AndAlso
+            If (s_alinkWarnings.Contains(CType(diagnostic.Code, ERRID)) AndAlso
                 caseInsensitiveSpecificDiagnosticOptions.Keys.Contains(VisualBasic.MessageProvider.Instance.GetIdForErrorCode(ERRID.WRN_AssemblyGeneration1))) Then
                 report = GetDiagnosticReport(VisualBasic.MessageProvider.Instance.GetSeverity(ERRID.WRN_AssemblyGeneration1),
-                diagnostic.IsEnabledByDefault,
-                VisualBasic.MessageProvider.Instance.GetIdForErrorCode(ERRID.WRN_AssemblyGeneration1),
-                diagnostic.Location,
-                diagnostic.Category,
-                generalDiagnosticOption,
-                caseInsensitiveSpecificDiagnosticOptions)
+                    diagnostic.IsEnabledByDefault,
+                    VisualBasic.MessageProvider.Instance.GetIdForErrorCode(ERRID.WRN_AssemblyGeneration1),
+                    diagnostic.Location,
+                    diagnostic.Category,
+                    generalDiagnosticOption,
+                    caseInsensitiveSpecificDiagnosticOptions,
+                    syntaxTreeOptions,
+                    cancellationToken,
+                    hasSourceSuppression)
             Else
-                report = GetDiagnosticReport(diagnostic.Severity, diagnostic.IsEnabledByDefault, diagnostic.Id, diagnostic.Location, diagnostic.Category, generalDiagnosticOption, caseInsensitiveSpecificDiagnosticOptions)
+                report = GetDiagnosticReport(
+                    diagnostic.Severity,
+                    diagnostic.IsEnabledByDefault,
+                    diagnostic.Id,
+                    diagnostic.Location,
+                    diagnostic.Category,
+                    generalDiagnosticOption,
+                    caseInsensitiveSpecificDiagnosticOptions,
+                    syntaxTreeOptions,
+                    cancellationToken,
+                    hasSourceSuppression)
+            End If
+
+            If hasSourceSuppression Then
+                diagnostic = diagnostic.WithIsSuppressed(True)
             End If
 
             Return diagnostic.WithReportDiagnostic(report)
         End Function
 
-        ' If you update this method, also consider updating DiagnosticItemSource.GetEffectiveSeverity.
-        Friend Shared Function GetDiagnosticReport(severity As DiagnosticSeverity, isEnabledByDefault As Boolean, id As String, location As Location, category As String, generalDiagnosticOption As ReportDiagnostic, caseInsensitiveSpecificDiagnosticOptions As IDictionary(Of String, ReportDiagnostic)) As ReportDiagnostic
-            ' Read options (e.g., /nowarn or /warnaserror)
-            Dim report As ReportDiagnostic = ReportDiagnostic.Default
-            Dim isSpecified = caseInsensitiveSpecificDiagnosticOptions.TryGetValue(id, report)
+        ''' <summary>
+        ''' Take a warning And return the final disposition of the given warning,
+        ''' based on both command line options And pragmas. The diagnostic options
+        ''' have precedence in the following order:
+        '''     1. Warning level
+        '''     2. Command line options (/nowarn, /warnaserror)
+        '''     3. Editor config options (syntax tree level)
+        '''     4. Global analyzer config options (compilation level)
+        '''     5. Global warning level
+        '''
+        ''' Global overrides are complicated. Global options never override suppression.
+        ''' Even if you have generalDiagnosticOption = ReportDiagnostic.Error, a
+        ''' suppressed diagnostic will not turn into an error. However, general diagnostic options
+        ''' do override warnings and infos into suppressions, i.e. if you had a syntaxtree option
+        ''' to turn a diagnostic into a warning, and the global option was Suppress, the diagnostic
+        ''' would be suppressed.
+        '''
+        ''' Pragmas are considered separately. If a diagnostic would not otherwise
+        ''' be suppressed, but is suppressed by a pragma,
+        ''' <paramref name="hasDisableDirectiveSuppression"/>
+        ''' is true but the diagnostic is not reported as suppressed.
+        ''' </summary> 
+        Friend Shared Function GetDiagnosticReport(severity As DiagnosticSeverity,
+                                                   isEnabledByDefault As Boolean,
+                                                   id As String,
+                                                   location As Location,
+                                                   category As String,
+                                                   generalDiagnosticOption As ReportDiagnostic,
+                                                   caseInsensitiveSpecificDiagnosticOptions As IDictionary(Of String, ReportDiagnostic),
+                                                   syntaxTreeOptions As SyntaxTreeOptionsProvider,
+                                                   cancellationToken As CancellationToken,
+                                                   <Out> ByRef hasDisableDirectiveSuppression As Boolean) As ReportDiagnostic
+            hasDisableDirectiveSuppression = False
+
+            Dim report As ReportDiagnostic
+            Dim tree = location?.SourceTree
+            Dim isSpecified As Boolean = False
+            Dim specifiedWarnAsErrorMinus As Boolean = False
+
+            ' Global options depend on other options, so calculate those first
+            If caseInsensitiveSpecificDiagnosticOptions.TryGetValue(id, report) Then
+                ' 2. Command line options (/nowarn, /warnaserror)
+                isSpecified = True
+
+                ' 'ReportDiagnostic.Default' is added to SpecificDiagnosticOptions for "/warnaserror-:DiagnosticId",
+                If report = ReportDiagnostic.Default Then
+                    specifiedWarnAsErrorMinus = True
+                End If
+            End If
+
+            ' Apply syntax tree options, if applicable.
+            If syntaxTreeOptions IsNot Nothing AndAlso
+               (Not isSpecified OrElse specifiedWarnAsErrorMinus) Then
+
+                ' 3. Editor config options (syntax tree level)
+                ' 4. Global analyzer config options (compilation level)
+                ' Do not apply config options if it is bumping a warning to an error and "/warnaserror-:DiagnosticId" was specified on the command line.
+                Dim reportFromSyntaxTreeOptions As ReportDiagnostic
+                If ((tree IsNot Nothing AndAlso syntaxTreeOptions.TryGetDiagnosticValue(tree, id, cancellationToken, reportFromSyntaxTreeOptions)) OrElse
+                     syntaxTreeOptions.TryGetGlobalDiagnosticValue(id, cancellationToken, reportFromSyntaxTreeOptions)) AndAlso
+                    Not (specifiedWarnAsErrorMinus AndAlso severity = DiagnosticSeverity.Warning AndAlso reportFromSyntaxTreeOptions = ReportDiagnostic.Error) Then
+                    isSpecified = True
+                    report = reportFromSyntaxTreeOptions
+
+                    ' '/warnaserror' should promote warnings configured in analyzer config to error.
+                    If Not specifiedWarnAsErrorMinus AndAlso report = ReportDiagnostic.Warn AndAlso generalDiagnosticOption = ReportDiagnostic.Error Then
+                        report = ReportDiagnostic.Error
+                    End If
+                End If
+            End If
+
             If Not isSpecified Then
                 report = If(isEnabledByDefault, ReportDiagnostic.Default, ReportDiagnostic.Suppress)
             End If
@@ -81,16 +180,19 @@ Namespace Microsoft.CodeAnalysis.VisualBasic
 
             ' If location is available, check warning directive state.
             If location IsNot Nothing AndAlso location.SourceTree IsNot Nothing AndAlso
-           location.SourceTree.GetWarningState(id, location.SourceSpan.Start) = ReportDiagnostic.Suppress Then
-                Return ReportDiagnostic.Suppress
+                location.SourceTree.GetWarningState(id, location.SourceSpan.Start) = ReportDiagnostic.Suppress Then
+                hasDisableDirectiveSuppression = True
             End If
+
+            ' 1. Global options
+            ' If present, they override previous options
 
             ' check options (/nowarn)
             ' When doing suppress-all-warnings, don't lower severity for anything other than warning and info.
             ' We shouldn't suppress hidden diagnostics here because then features that use hidden diagnostics to
             ' display light bulb would stop working if someone has suppress-all-warnings (/nowarn) specified in their project.
             If generalDiagnosticOption = ReportDiagnostic.Suppress AndAlso
-            (severity = DiagnosticSeverity.Warning OrElse severity = DiagnosticSeverity.Info) Then
+                (severity = DiagnosticSeverity.Warning OrElse severity = DiagnosticSeverity.Info) Then
                 Return ReportDiagnostic.Suppress
             End If
 
@@ -106,7 +208,6 @@ Namespace Microsoft.CodeAnalysis.VisualBasic
             End If
 
             Return report
-
         End Function
     End Class
 End Namespace

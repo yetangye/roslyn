@@ -1,7 +1,16 @@
-// Copyright (c) Microsoft.  All Rights Reserved.  Licensed under the Apache License, Version 2.0.  See License.txt in the project root for license information.
+﻿// Licensed to the .NET Foundation under one or more agreements.
+// The .NET Foundation licenses this file to you under the MIT license.
+// See the LICENSE file in the project root for more information.
+
+#nullable disable
 
 using System;
+using System.Collections.Immutable;
+using System.Diagnostics;
+using System.Reflection;
+using System.Runtime.CompilerServices;
 using System.Threading;
+using System.Threading.Tasks;
 using Roslyn.Utilities;
 
 namespace Microsoft.CodeAnalysis.Scripting
@@ -9,7 +18,7 @@ namespace Microsoft.CodeAnalysis.Scripting
     /// <summary>
     /// Represents the submission states and globals that get passed to a script entry point when run.
     /// </summary>
-    internal class ScriptExecutionState
+    internal sealed class ScriptExecutionState
     {
         private object[] _submissionStates;
         private int _count;
@@ -49,41 +58,119 @@ namespace Microsoft.CodeAnalysis.Scripting
             }
         }
 
-        public int Count
+        public int SubmissionStateCount => _count;
+
+        public object GetSubmissionState(int index)
         {
-            get { return _count; }
+            Debug.Assert(index >= 0 && index < _count);
+            return _submissionStates[index];
         }
 
-        public object this[int index]
+        internal async Task<TResult> RunSubmissionsAsync<TResult>(
+            ImmutableArray<Func<object[], Task>> precedingExecutors,
+            Func<object[], Task> currentExecutor,
+            StrongBox<Exception> exceptionHolderOpt,
+            Func<Exception, bool> catchExceptionOpt,
+            CancellationToken cancellationToken)
         {
-            get { return _submissionStates[index]; }
-        }
+            Debug.Assert(_frozen == 0);
+            Debug.Assert((exceptionHolderOpt != null) == (catchExceptionOpt != null));
 
-        /// <summary>
-        /// Run's the submission with this state. Submission's state get added to this as a side-effect.
-        /// </summary>
-        public object RunSubmission(Func<object[], object> submissionRunner)
-        {
-            if (_frozen != 0)
+            // Each executor points to a <Factory> method of the Submission class.
+            // The method creates an instance of the Submission class passing the submission states to its constructor.
+            // The consturctor initializes the links between submissions and stores the Submission instance to 
+            // a slot in submission states that corresponds to the submission.
+            // The <Factory> method then calls the <Initialize> method that consists of top-level script code statements.
+
+            int executorIndex = 0;
+            try
             {
-                throw new InvalidOperationException(ScriptingResources.ExecutionStateFrozen);
-            }
+                while (executorIndex < precedingExecutors.Length)
+                {
+                    cancellationToken.ThrowIfCancellationRequested();
 
+                    EnsureStateCapacity();
+
+                    try
+                    {
+                        await precedingExecutors[executorIndex++](_submissionStates).ConfigureAwait(continueOnCapturedContext: false);
+                    }
+                    finally
+                    {
+                        // The submission constructor always runs into completion (unless we emitted bad code).
+                        // We need to advance the counter to reflect the updates to submission states done in the constructor.
+                        AdvanceStateCounter();
+                    }
+                }
+
+                cancellationToken.ThrowIfCancellationRequested();
+
+                TResult result;
+                EnsureStateCapacity();
+
+                try
+                {
+                    executorIndex++;
+                    result = await ((Task<TResult>)currentExecutor(_submissionStates)).ConfigureAwait(continueOnCapturedContext: false);
+                }
+                finally
+                {
+                    // The submission constructor always runs into completion (unless we emitted bad code).
+                    // We need to advance the counter to reflect the updates to submission states done in the constructor.
+                    AdvanceStateCounter();
+                }
+
+                return result;
+            }
+            catch (Exception exception) when (catchExceptionOpt?.Invoke(exception) == true)
+            {
+                // The following code creates instances of all submissions without executing the user code.
+                // The constructors don't contain any user code.
+                var submissionCtorArgs = new object[] { null };
+
+                while (executorIndex < precedingExecutors.Length)
+                {
+                    EnsureStateCapacity();
+
+                    // update the value since the array might have been resized:
+                    submissionCtorArgs[0] = _submissionStates;
+
+                    Activator.CreateInstance(precedingExecutors[executorIndex++].GetMethodInfo().DeclaringType, submissionCtorArgs);
+                    AdvanceStateCounter();
+                }
+
+                if (executorIndex == precedingExecutors.Length)
+                {
+                    EnsureStateCapacity();
+
+                    // update the value since the array might have been resized:
+                    submissionCtorArgs[0] = _submissionStates;
+
+                    Activator.CreateInstance(currentExecutor.GetMethodInfo().DeclaringType, submissionCtorArgs);
+                    AdvanceStateCounter();
+                }
+
+                exceptionHolderOpt.Value = exception;
+                return default(TResult);
+            }
+        }
+
+        private void EnsureStateCapacity()
+        {
             // make sure there is enough free space for the submission to add its state
             if (_count >= _submissionStates.Length)
             {
-                Array.Resize(ref _submissionStates, Math.Max(_count + 1, _submissionStates.Length * 2));
+                Array.Resize(ref _submissionStates, Math.Max(_count, _submissionStates.Length * 2));
             }
+        }
 
-            var result = submissionRunner(_submissionStates);
-
+        private void AdvanceStateCounter()
+        {
             // check to see if state was added (submissions that don't make declarations don't add state)
             if (_submissionStates[_count] != null)
             {
                 _count++;
             }
-
-            return result;
         }
     }
 }

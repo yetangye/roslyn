@@ -1,11 +1,14 @@
-// Copyright (c) Microsoft.  All Rights Reserved.  Licensed under the Apache License, Version 2.0.  See License.txt in the project root for license information.
+﻿// Licensed to the .NET Foundation under one or more agreements.
+// The .NET Foundation licenses this file to you under the MIT license.
+// See the LICENSE file in the project root for more information.
+
+#nullable disable
 
 using System.Collections.ObjectModel;
 using System.Diagnostics;
 using Microsoft.VisualStudio.Debugger;
 using Microsoft.VisualStudio.Debugger.Evaluation;
 using Microsoft.VisualStudio.Debugger.Evaluation.ClrCompilation;
-using Type = Microsoft.VisualStudio.Debugger.Metadata.Type;
 
 namespace Microsoft.CodeAnalysis.ExpressionEvaluator
 {
@@ -21,13 +24,78 @@ namespace Microsoft.CodeAnalysis.ExpressionEvaluator
     /// </remarks>
     internal sealed class EvalResultDataItem : DkmDataItem
     {
-        /// <summary>
-        /// May be null for synthesized nodes like "Results View", etc.
-        /// </summary>
-        public readonly string NameOpt;
-        public readonly Type TypeDeclaringMember;
-        public readonly Type DeclaredType;
+        public readonly string Name;
+        public readonly TypeAndCustomInfo DeclaredTypeAndInfo;
         public readonly DkmClrValue Value;
+        public readonly Expansion Expansion;
+        public readonly bool ChildShouldParenthesize;
+        public readonly string FullNameWithoutFormatSpecifiers;
+        public readonly ReadOnlyCollection<string> FormatSpecifiers;
+        public readonly string ChildFullNamePrefix;
+
+        public EvalResultDataItem(
+            string name,
+            TypeAndCustomInfo declaredTypeAndInfo,
+            DkmClrValue value,
+            Expansion expansion,
+            bool childShouldParenthesize,
+            string fullNameWithoutFormatSpecifiers,
+            string childFullNamePrefixOpt,
+            ReadOnlyCollection<string> formatSpecifiers)
+        {
+            this.Name = name;
+            this.DeclaredTypeAndInfo = declaredTypeAndInfo;
+            this.Value = value;
+            this.ChildShouldParenthesize = childShouldParenthesize;
+            this.FullNameWithoutFormatSpecifiers = fullNameWithoutFormatSpecifiers;
+            this.ChildFullNamePrefix = childFullNamePrefixOpt;
+            this.FormatSpecifiers = formatSpecifiers;
+            this.Expansion = expansion;
+        }
+
+        protected override void OnClose()
+        {
+            // If we have an expansion, there's a danger that more than one data item is 
+            // referring to the same DkmClrValue (e.g. if it's an AggregateExpansion).
+            // To be safe, we'll only call Close when there's no expansion.  Since this
+            // is only an optimization (the debugger will eventually close the value
+            // anyway), a conservative approach is acceptable.
+            if (this.Expansion == null)
+            {
+                Value.Close();
+            }
+        }
+    }
+
+    internal enum ExpansionKind
+    {
+        Default,
+        Explicit, // All interesting fields set explicitly including DisplayName, DisplayValue, DisplayType.
+        DynamicView,
+        Error,
+        NativeView,
+        NonPublicMembers,
+        PointerDereference,
+        RawView,
+        ResultsView,
+        StaticMembers,
+        TypeVariable
+    }
+
+    internal sealed class EvalResult
+    {
+        // The flags we were constructed with before adding our additional flags
+        private readonly DkmEvaluationResultFlags m_rawFlags;
+
+        public readonly ExpansionKind Kind;
+        public readonly string Name;
+        public readonly TypeAndCustomInfo TypeDeclaringMemberAndInfo;
+        public readonly TypeAndCustomInfo DeclaredTypeAndInfo;
+        public readonly bool UseDebuggerDisplay;
+        public readonly DkmClrValue Value;
+        public readonly string DisplayName;
+        public readonly string DisplayValue; // overrides the "Value" text displayed for certain kinds of DataItems (errors, invalid pointer dereferences, etc)...not to be confused with DebuggerDisplayAttribute Value...
+        public readonly string DisplayType;
         public readonly Expansion Expansion;
         public readonly bool ChildShouldParenthesize;
         public readonly string FullNameWithoutFormatSpecifiers;
@@ -36,6 +104,9 @@ namespace Microsoft.CodeAnalysis.ExpressionEvaluator
         public readonly DkmEvaluationResultCategory Category;
         public readonly DkmEvaluationResultFlags Flags;
         public readonly string EditableValue;
+        public readonly DkmInspectionContext InspectionContext;
+        public readonly bool CanFavorite;
+        public readonly bool IsFavorite;
 
         public string FullName
         {
@@ -53,11 +124,35 @@ namespace Microsoft.CodeAnalysis.ExpressionEvaluator
             }
         }
 
-        public EvalResultDataItem(
+        public EvalResult(string name, string errorMessage, DkmInspectionContext inspectionContext)
+            : this(
+                ExpansionKind.Error,
+                name: name,
+                typeDeclaringMemberAndInfo: default(TypeAndCustomInfo),
+                declaredTypeAndInfo: default(TypeAndCustomInfo),
+                useDebuggerDisplay: false,
+                value: null,
+                displayValue: errorMessage,
+                expansion: null,
+                childShouldParenthesize: false,
+                fullName: null,
+                childFullNamePrefixOpt: null,
+                formatSpecifiers: Formatter.NoFormatSpecifiers,
+                category: DkmEvaluationResultCategory.Other,
+                flags: DkmEvaluationResultFlags.None,
+                editableValue: null,
+                inspectionContext: inspectionContext)
+        {
+        }
+
+        public EvalResult(
+            ExpansionKind kind,
             string name,
-            Type typeDeclaringMember,
-            Type declaredType,
+            TypeAndCustomInfo typeDeclaringMemberAndInfo,
+            TypeAndCustomInfo declaredTypeAndInfo,
+            bool useDebuggerDisplay,
             DkmClrValue value,
+            string displayValue,
             Expansion expansion,
             bool childShouldParenthesize,
             string fullName,
@@ -65,26 +160,81 @@ namespace Microsoft.CodeAnalysis.ExpressionEvaluator
             ReadOnlyCollection<string> formatSpecifiers,
             DkmEvaluationResultCategory category,
             DkmEvaluationResultFlags flags,
-            string editableValue)
+            string editableValue,
+            DkmInspectionContext inspectionContext,
+            string displayName = null,
+            string displayType = null,
+            bool canFavorite = false,
+            bool isFavorite = false)
         {
+            Debug.Assert(name != null);
             Debug.Assert(formatSpecifiers != null);
             Debug.Assert((flags & DkmEvaluationResultFlags.Expandable) == 0);
 
-            this.NameOpt = name;
-            this.TypeDeclaringMember = typeDeclaringMember;
-            this.DeclaredType = declaredType;
+            m_rawFlags = flags;
+
+            this.Kind = kind;
+            this.Name = name;
+            this.TypeDeclaringMemberAndInfo = typeDeclaringMemberAndInfo;
+            this.DeclaredTypeAndInfo = declaredTypeAndInfo;
+            this.UseDebuggerDisplay = useDebuggerDisplay;
             this.Value = value;
+            this.DisplayValue = displayValue;
             this.ChildShouldParenthesize = childShouldParenthesize;
             this.FullNameWithoutFormatSpecifiers = fullName;
             this.ChildFullNamePrefix = childFullNamePrefixOpt;
             this.FormatSpecifiers = formatSpecifiers;
             this.Category = category;
             this.EditableValue = editableValue;
-            this.Flags = flags | GetFlags(value) | ((expansion == null) ? DkmEvaluationResultFlags.None : DkmEvaluationResultFlags.Expandable);
+            this.Flags = flags | GetFlags(value, inspectionContext, expansion, canFavorite, isFavorite);
             this.Expansion = expansion;
+            this.InspectionContext = inspectionContext;
+            this.DisplayName = displayName;
+            this.DisplayType = displayType;
+            this.CanFavorite = canFavorite;
+            this.IsFavorite = isFavorite;
         }
 
-        private static DkmEvaluationResultFlags GetFlags(DkmClrValue value)
+        internal EvalResultDataItem ToDataItem()
+        {
+            return new EvalResultDataItem(
+                Name,
+                DeclaredTypeAndInfo,
+                Value,
+                Expansion,
+                ChildShouldParenthesize,
+                FullNameWithoutFormatSpecifiers,
+                ChildFullNamePrefix,
+                FormatSpecifiers);
+        }
+
+        internal EvalResult WithDisableCanAddFavorite()
+        {
+            return new EvalResult(
+                kind: Kind,
+                name: Name,
+                typeDeclaringMemberAndInfo: TypeDeclaringMemberAndInfo,
+                declaredTypeAndInfo: DeclaredTypeAndInfo,
+                useDebuggerDisplay: UseDebuggerDisplay,
+                value: Value,
+                displayValue: DisplayValue,
+                expansion: Expansion,
+                childShouldParenthesize: ChildShouldParenthesize,
+                fullName: FullName,
+                childFullNamePrefixOpt: ChildFullNamePrefix,
+                formatSpecifiers: FormatSpecifiers,
+                category: Category,
+                flags: m_rawFlags,
+                editableValue: EditableValue,
+                inspectionContext: InspectionContext,
+                displayName: DisplayName,
+                displayType: DisplayType,
+                canFavorite: false,
+                isFavorite: IsFavorite);
+
+        }
+
+        private static DkmEvaluationResultFlags GetFlags(DkmClrValue value, DkmInspectionContext inspectionContext, Expansion expansion, bool canFavorite, bool isFavorite)
         {
             if (value == null)
             {
@@ -103,18 +253,38 @@ namespace Microsoft.CodeAnalysis.ExpressionEvaluator
                 }
             }
 
-            if (!value.IsError() && value.HasUnderlyingString())
+            if (!value.IsError() && value.HasUnderlyingString(inspectionContext))
             {
                 resultFlags |= DkmEvaluationResultFlags.RawString;
             }
 
-            return resultFlags;
-        }
+            // As in the old EE, we won't allow editing members of a DynamicView expansion.
+            if (type.IsDynamicProperty())
+            {
+                resultFlags |= DkmEvaluationResultFlags.ReadOnly;
+            }
 
-        protected override void OnClose()
-        {
-            Debug.WriteLine("Closing " + FullName);
-            Value.Close();
+            if (expansion != null)
+            {
+                resultFlags |= DkmEvaluationResultFlags.Expandable;
+
+                if (expansion.ContainsFavorites)
+                {
+                    resultFlags |= DkmEvaluationResultFlags.HasFavorites;
+                }
+            }
+
+            if (canFavorite)
+            {
+                resultFlags |= DkmEvaluationResultFlags.CanFavorite;
+            }
+
+            if (isFavorite)
+            {
+                resultFlags |= DkmEvaluationResultFlags.IsFavorite;
+            }
+
+            return resultFlags;
         }
     }
 }

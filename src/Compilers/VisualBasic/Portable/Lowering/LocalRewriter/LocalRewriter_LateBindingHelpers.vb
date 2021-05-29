@@ -1,8 +1,11 @@
-﻿' Copyright (c) Microsoft.  All Rights Reserved.  Licensed under the Apache License, Version 2.0.  See License.txt in the project root for license information.
+﻿' Licensed to the .NET Foundation under one or more agreements.
+' The .NET Foundation licenses this file to you under the MIT license.
+' See the LICENSE file in the project root for more information.
 
 Imports System.Collections.Immutable
 Imports System.Diagnostics
 Imports System.Runtime.InteropServices
+Imports Microsoft.CodeAnalysis.PooledObjects
 Imports Microsoft.CodeAnalysis.Text
 Imports Microsoft.CodeAnalysis.VisualBasic.Symbols
 Imports Microsoft.CodeAnalysis.VisualBasic.Syntax
@@ -12,7 +15,7 @@ Namespace Microsoft.CodeAnalysis.VisualBasic
     Partial Friend NotInheritable Class LocalRewriter
 
         ' returns receiver, or Nothing literal otherwise
-        Private Function LateMakeReceiverArgument(node As VisualBasicSyntaxNode,
+        Private Function LateMakeReceiverArgument(node As SyntaxNode,
                                                 rewrittenReceiver As BoundExpression,
                                                 objectType As TypeSymbol) As BoundExpression
             Debug.Assert(objectType.IsObjectType)
@@ -21,9 +24,9 @@ Namespace Microsoft.CodeAnalysis.VisualBasic
                 Return MakeNullLiteral(node, objectType)
             Else
                 If Not rewrittenReceiver.Type.IsObjectType Then
-                    Dim useSiteDiagnostics As HashSet(Of DiagnosticInfo) = Nothing
-                    Dim convKind = Conversions.ClassifyDirectCastConversion(rewrittenReceiver.Type, objectType, useSiteDiagnostics)
-                    diagnostics.Add(node, useSiteDiagnostics)
+                    Dim useSiteInfo = GetNewCompoundUseSiteInfo()
+                    Dim convKind = Conversions.ClassifyDirectCastConversion(rewrittenReceiver.Type, objectType, useSiteInfo)
+                    _diagnostics.Add(node, useSiteInfo)
                     rewrittenReceiver = New BoundDirectCast(node, rewrittenReceiver, convKind, objectType)
                 End If
 
@@ -32,7 +35,7 @@ Namespace Microsoft.CodeAnalysis.VisualBasic
         End Function
 
         ' returns GetType(Type) if receiver is nothing, or Nothing literal otherwise
-        Private Function LateMakeContainerArgument(node As VisualBasicSyntaxNode,
+        Private Function LateMakeContainerArgument(node As SyntaxNode,
                                                        receiver As BoundExpression,
                                                        containerType As TypeSymbol,
                                                        typeType As TypeSymbol) As BoundExpression
@@ -46,7 +49,7 @@ Namespace Microsoft.CodeAnalysis.VisualBasic
 
 
         ' returns "New Type(){GetType(Type1), GetType(Type2) ...} or Nothing literal
-        Private Function LateMakeTypeArgumentArrayArgument(node As VisualBasicSyntaxNode, arguments As BoundTypeArguments, typeArrayType As TypeSymbol) As BoundExpression
+        Private Function LateMakeTypeArgumentArrayArgument(node As SyntaxNode, arguments As BoundTypeArguments, typeArrayType As TypeSymbol) As BoundExpression
             If arguments Is Nothing Then
                 Return MakeNullLiteral(node, typeArrayType)
             Else
@@ -55,14 +58,14 @@ Namespace Microsoft.CodeAnalysis.VisualBasic
         End Function
 
         ' returns "New Boolean(length){}
-        Private Function LateMakeCopyBackArray(node As VisualBasicSyntaxNode,
+        Private Function LateMakeCopyBackArray(node As SyntaxNode,
                                                flags As ImmutableArray(Of Boolean),
                                                booleanArrayType As TypeSymbol) As BoundExpression
 
             Dim arrayType = DirectCast(booleanArrayType, ArrayTypeSymbol)
             Dim booleanType = arrayType.ElementType
 
-            Debug.Assert(arrayType.Rank = 1)
+            Debug.Assert(arrayType.IsSZArray)
             Debug.Assert(booleanType.IsBooleanType)
 
             If flags.IsDefaultOrEmpty Then
@@ -83,7 +86,7 @@ Namespace Microsoft.CodeAnalysis.VisualBasic
             End If
         End Function
 
-        Private Function LateMakeArgumentArrayArgument(node As VisualBasicSyntaxNode,
+        Private Function LateMakeArgumentArrayArgument(node As SyntaxNode,
                                                rewrittenArguments As ImmutableArray(Of BoundExpression),
                                                argumentNames As ImmutableArray(Of String),
                                                objectArrayType As TypeSymbol) As BoundExpression
@@ -105,7 +108,7 @@ Namespace Microsoft.CodeAnalysis.VisualBasic
             Dim arrayType = DirectCast(objectArrayType, ArrayTypeSymbol)
             Dim objectType = arrayType.ElementType
 
-            Debug.Assert(arrayType.Rank = 1)
+            Debug.Assert(arrayType.IsSZArray)
             Debug.Assert(objectType.IsObjectType)
             Debug.Assert(Not rewrittenArguments.IsDefaultOrEmpty)
 
@@ -113,7 +116,7 @@ Namespace Microsoft.CodeAnalysis.VisualBasic
             Dim bounds As BoundExpression = New BoundLiteral(node, ConstantValue.Create(rewrittenArguments.Length), intType)
 
             Dim arrayCreation = New BoundArrayCreation(node, ImmutableArray.Create(bounds), Nothing, objectArrayType)
-            Dim arrayTemp As LocalSymbol = New SynthesizedLocal(Me.currentMethodOrLambda, arrayCreation.Type, SynthesizedLocalKind.LoweringTemp)
+            Dim arrayTemp As LocalSymbol = New SynthesizedLocal(Me._currentMethodOrLambda, arrayCreation.Type, SynthesizedLocalKind.LoweringTemp)
             Dim arrayTempRef = New BoundLocal(node, arrayTemp, arrayTemp.Type)
 
             Dim arrayInit = New BoundAssignmentOperator(node, arrayTempRef, arrayCreation, suppressObjectClone:=True)
@@ -127,9 +130,9 @@ Namespace Microsoft.CodeAnalysis.VisualBasic
                 Dim argument = rewrittenArguments(i)
                 argument = argument.MakeRValue
                 If Not argument.Type.IsObjectType Then
-                    Dim useSiteDiagnostics As HashSet(Of DiagnosticInfo) = Nothing
-                    Dim convKind = Conversions.ClassifyDirectCastConversion(argument.Type, objectType, useSiteDiagnostics)
-                    diagnostics.Add(node, useSiteDiagnostics)
+                    Dim useSiteInfo = GetNewCompoundUseSiteInfo()
+                    Dim convKind = Conversions.ClassifyDirectCastConversion(argument.Type, objectType, useSiteInfo)
+                    _diagnostics.Add(node, useSiteInfo)
                     argument = New BoundDirectCast(node, argument, convKind, objectType)
                 End If
 
@@ -154,7 +157,7 @@ Namespace Microsoft.CodeAnalysis.VisualBasic
         End Function
 
         ' returns "New object(){Arg1, Arg2 ..., value}
-        Private Function LateMakeSetArgumentArrayArgument(node As VisualBasicSyntaxNode,
+        Private Function LateMakeSetArgumentArrayArgument(node As SyntaxNode,
                                             rewrittenValue As BoundExpression,
                                             rewrittenArguments As ImmutableArray(Of BoundExpression),
                                             argumentNames As ImmutableArray(Of String),
@@ -163,14 +166,14 @@ Namespace Microsoft.CodeAnalysis.VisualBasic
             Dim arrayType = DirectCast(objectArrayType, ArrayTypeSymbol)
             Dim objectType = arrayType.ElementType
 
-            Debug.Assert(arrayType.Rank = 1)
+            Debug.Assert(arrayType.IsSZArray)
             Debug.Assert(objectType.IsObjectType)
 
-            Dim useSiteDiagnostics As HashSet(Of DiagnosticInfo) = Nothing
+            Dim useSiteInfo = GetNewCompoundUseSiteInfo()
 
             If Not rewrittenValue.Type.IsObjectType Then
-                Dim convKind = Conversions.ClassifyDirectCastConversion(rewrittenValue.Type, objectType, useSiteDiagnostics)
-                diagnostics.Add(node, useSiteDiagnostics)
+                Dim convKind = Conversions.ClassifyDirectCastConversion(rewrittenValue.Type, objectType, useSiteInfo)
+                _diagnostics.Add(node, useSiteInfo)
                 rewrittenValue = New BoundDirectCast(node, rewrittenValue, convKind, objectType)
             End If
 
@@ -202,7 +205,7 @@ Namespace Microsoft.CodeAnalysis.VisualBasic
             Dim bounds As BoundExpression = New BoundLiteral(node, ConstantValue.Create(rewrittenArguments.Length + 1), intType)
 
             Dim arrayCreation = New BoundArrayCreation(node, ImmutableArray.Create(bounds), Nothing, objectArrayType)
-            Dim arrayTemp As LocalSymbol = New SynthesizedLocal(Me.currentMethodOrLambda, arrayCreation.Type, SynthesizedLocalKind.LoweringTemp)
+            Dim arrayTemp As LocalSymbol = New SynthesizedLocal(Me._currentMethodOrLambda, arrayCreation.Type, SynthesizedLocalKind.LoweringTemp)
             Dim arrayTempRef = New BoundLocal(node, arrayTemp, arrayTemp.Type)
 
             Dim arrayInit = New BoundAssignmentOperator(node, arrayTempRef, arrayCreation, suppressObjectClone:=True)
@@ -216,8 +219,8 @@ Namespace Microsoft.CodeAnalysis.VisualBasic
                 Dim argument = rewrittenArguments(i)
                 argument = argument.MakeRValue
                 If Not argument.Type.IsObjectType Then
-                    Dim convKind = Conversions.ClassifyDirectCastConversion(argument.Type, objectType, useSiteDiagnostics)
-                    diagnostics.Add(argument, useSiteDiagnostics)
+                    Dim convKind = Conversions.ClassifyDirectCastConversion(argument.Type, objectType, useSiteInfo)
+                    _diagnostics.Add(argument, useSiteInfo)
                     argument = New BoundDirectCast(node, argument, convKind, objectType)
                 End If
 
@@ -232,8 +235,8 @@ Namespace Microsoft.CodeAnalysis.VisualBasic
 
             ' value goes last
             If Not rewrittenValue.Type.IsObjectType Then
-                Dim convKind = Conversions.ClassifyDirectCastConversion(rewrittenValue.Type, objectType, useSiteDiagnostics)
-                diagnostics.Add(rewrittenValue, useSiteDiagnostics)
+                Dim convKind = Conversions.ClassifyDirectCastConversion(rewrittenValue.Type, objectType, useSiteInfo)
+                _diagnostics.Add(rewrittenValue, useSiteInfo)
                 rewrittenValue = New BoundDirectCast(node, rewrittenValue, convKind, objectType)
             End If
 
@@ -243,7 +246,7 @@ Namespace Microsoft.CodeAnalysis.VisualBasic
             Return New BoundSequence(node, ImmutableArray.Create(arrayTemp), sideeffects.ToImmutableAndFree, arrayTempRef, arrayTempRef.Type)
         End Function
 
-        Private Function LateAssignToArrayElement(node As VisualBasicSyntaxNode,
+        Private Shared Function LateAssignToArrayElement(node As SyntaxNode,
                                                   arrayRef As BoundExpression,
                                                   index As Integer,
                                                   value As BoundExpression,
@@ -259,7 +262,7 @@ Namespace Microsoft.CodeAnalysis.VisualBasic
         End Function
 
         ' returns "New object(){Arg1, Arg2 ...}
-        Private Function LateMakeArgumentArrayArgumentNoNamed(node As VisualBasicSyntaxNode,
+        Private Function LateMakeArgumentArrayArgumentNoNamed(node As SyntaxNode,
                                                        rewrittenArguments As ImmutableArray(Of BoundExpression),
                                                        objectArrayType As TypeSymbol) As BoundExpression
 
@@ -267,7 +270,7 @@ Namespace Microsoft.CodeAnalysis.VisualBasic
             Dim objectType = arrayType.ElementType
             Dim intType = Me.GetSpecialType(SpecialType.System_Int32)
 
-            Debug.Assert(arrayType.Rank = 1)
+            Debug.Assert(arrayType.IsSZArray)
             Debug.Assert(objectType.IsObjectType)
 
             If rewrittenArguments.IsDefaultOrEmpty Then
@@ -281,9 +284,9 @@ Namespace Microsoft.CodeAnalysis.VisualBasic
                 For Each argument In rewrittenArguments
                     argument = argument.MakeRValue
                     If Not argument.Type.IsObjectType Then
-                        Dim useSiteDiagnostics As HashSet(Of DiagnosticInfo) = Nothing
-                        Dim convKind = Conversions.ClassifyDirectCastConversion(argument.Type, objectType, useSiteDiagnostics)
-                        diagnostics.Add(argument, useSiteDiagnostics)
+                        Dim useSiteInfo = GetNewCompoundUseSiteInfo()
+                        Dim convKind = Conversions.ClassifyDirectCastConversion(argument.Type, objectType, useSiteInfo)
+                        _diagnostics.Add(argument, useSiteInfo)
                         argument = New BoundDirectCast(node, argument, convKind, objectType)
                     End If
 
@@ -298,14 +301,14 @@ Namespace Microsoft.CodeAnalysis.VisualBasic
         End Function
 
         ' returns "New object(){name1, name2 ...} or Nothing literal
-        Private Function LateMakeArgumentNameArrayArgument(node As VisualBasicSyntaxNode,
+        Private Function LateMakeArgumentNameArrayArgument(node As SyntaxNode,
                                                        argumentNames As ImmutableArray(Of String),
                                                        stringArrayType As TypeSymbol) As BoundExpression
 
             Dim arrayType = DirectCast(stringArrayType, ArrayTypeSymbol)
             Dim stringType = arrayType.ElementType
 
-            Debug.Assert(arrayType.Rank = 1)
+            Debug.Assert(arrayType.IsSZArray)
             Debug.Assert(stringType.IsStringType)
 
             If argumentNames.IsDefaultOrEmpty Then
@@ -360,7 +363,7 @@ Namespace Microsoft.CodeAnalysis.VisualBasic
 
             Dim targetType = assignmentTarget.Type
 
-            If Not targetType.IsSameTypeIgnoringCustomModifiers(objectType) Then
+            If Not targetType.IsSameTypeIgnoringAll(objectType) Then
                 ' // Call ChangeType to perform a latebound conversion
                 Dim changeTypeMethod As MethodSymbol = Nothing
                 If TryGetWellknownMember(changeTypeMethod,
@@ -377,14 +380,20 @@ Namespace Microsoft.CodeAnalysis.VisualBasic
                                           Nothing,
                                           ImmutableArray.Create(Of BoundExpression)(value, getTypeExpr),
                                           Nothing,
-                                          False,
-                                          objectType)
+                                          suppressObjectClone:=False,
+                                          type:=objectType)
 
                 End If
-
-                Dim useSiteDiagnostics As HashSet(Of DiagnosticInfo) = Nothing
-                Dim conversionKind = Conversions.ClassifyDirectCastConversion(objectType, targetType, useSiteDiagnostics)
-                Debug.Assert(useSiteDiagnostics.IsNullOrEmpty)
+#If DEBUG Then
+                Dim useSiteInfo As New CompoundUseSiteInfo(Of AssemblySymbol)(Me.Compilation.Assembly)
+#Else
+                Dim useSiteInfo = CompoundUseSiteInfo(Of AssemblySymbol).Discarded
+#End If
+                Dim conversionKind = Conversions.ClassifyDirectCastConversion(objectType, targetType, useSiteInfo)
+#If DEBUG Then
+                Debug.Assert(useSiteInfo.Diagnostics.IsNullOrEmpty)
+                Debug.Assert(useSiteInfo.Dependencies.IsNullOrEmpty)
+#End If
                 value = New BoundDirectCast(syntax, value, conversionKind, targetType)
             End If
 
@@ -406,12 +415,12 @@ Namespace Microsoft.CodeAnalysis.VisualBasic
             Return VisitExpressionNode(result)
         End Function
 
-        Private Function LateMakeCopyback(syntax As VisualBasicSyntaxNode,
+        Private Function LateMakeCopyback(syntax As SyntaxNode,
                                           assignmentTarget As BoundExpression,
                                           convertedValue As BoundExpression) As BoundExpression
 
             If assignmentTarget.Kind = BoundKind.LateMemberAccess Then
-                ' objExpr.foo = bar
+                ' objExpr.goo = bar
                 Dim memberAccess = DirectCast(assignmentTarget, BoundLateMemberAccess)
                 Return LateSet(syntax,
                                memberAccess,
@@ -425,7 +434,7 @@ Namespace Microsoft.CodeAnalysis.VisualBasic
 
                 If invocation.Member.Kind = BoundKind.LateMemberAccess Then
                     Dim memberAccess = DirectCast(invocation.Member, BoundLateMemberAccess)
-                    ' objExpr.foo(args) = bar
+                    ' objExpr.goo(args) = bar
                     Return LateSet(syntax,
                                memberAccess,
                                convertedValue,
@@ -467,7 +476,7 @@ Namespace Microsoft.CodeAnalysis.VisualBasic
 
             Dim syntax = node.Syntax
 
-            ' expr = o.Foo<TypeParam>
+            ' expr = o.Goo<TypeParam>
             ' emit as:
             '     LateGet(invocation.Member, 
             '         invocation.Arguments, 
@@ -491,12 +500,20 @@ Namespace Microsoft.CodeAnalysis.VisualBasic
                                                                     argumentNames)
 
 
-            Dim callerInvocation As BoundExpression = New BoundCall(syntax, lateIndexGetMethod, Nothing, Nothing, callArgs, Nothing, True, lateIndexGetMethod.ReturnType)
+            Dim callerInvocation As BoundExpression = New BoundCall(
+                syntax,
+                lateIndexGetMethod,
+                Nothing,
+                Nothing,
+                callArgs,
+                Nothing,
+                suppressObjectClone:=True,
+                type:=lateIndexGetMethod.ReturnType)
 
             Return callerInvocation
         End Function
 
-        Private Function LateSet(syntax As VisualBasicSyntaxNode,
+        Private Function LateSet(syntax As SyntaxNode,
                                 memberAccess As BoundLateMemberAccess,
                                 assignmentValue As BoundExpression,
                                 argExpressions As ImmutableArray(Of BoundExpression),
@@ -566,10 +583,18 @@ Namespace Microsoft.CodeAnalysis.VisualBasic
                                                                     rValueBase)
             End If
 
-            Return New BoundCall(syntax, lateSetMethod, Nothing, Nothing, callArgs, Nothing, True, lateSetMethod.ReturnType)
+            Return New BoundCall(
+                syntax,
+                lateSetMethod,
+                Nothing,
+                Nothing,
+                callArgs,
+                Nothing,
+                suppressObjectClone:=True,
+                type:=lateSetMethod.ReturnType)
         End Function
 
-        Private Function LateIndexSet(syntax As VisualBasicSyntaxNode,
+        Private Function LateIndexSet(syntax As SyntaxNode,
                                       invocation As BoundLateInvocation,
                                       assignmentValue As BoundExpression,
                                       isCopyBack As Boolean) As BoundExpression
@@ -624,11 +649,18 @@ Namespace Microsoft.CodeAnalysis.VisualBasic
                                              rValueBase)
             End If
 
-
-            Return New BoundCall(syntax, lateIndexSetMethod, Nothing, Nothing, callArgs, Nothing, True, lateIndexSetMethod.ReturnType)
+            Return New BoundCall(
+                syntax,
+                lateIndexSetMethod,
+                Nothing,
+                Nothing,
+                callArgs,
+                Nothing,
+                suppressObjectClone:=True,
+                type:=lateIndexSetMethod.ReturnType)
         End Function
 
-        ' NOTE: assignmentArguments are no-sideeffects expressions representing
+        ' NOTE: assignmentArguments are no-side-effects expressions representing
         '       corresponding arguments if those need to be used as target of assignments.
         Private Function LateCallOrGet(memberAccess As BoundLateMemberAccess,
                                     receiverExpression As BoundExpression,
@@ -641,7 +673,7 @@ Namespace Microsoft.CodeAnalysis.VisualBasic
 
             Debug.Assert((assignmentArguments.IsDefaultOrEmpty AndAlso argExpressions.IsDefaultOrEmpty) OrElse
               (assignmentArguments.Length = argExpressions.Length),
-              "number of readable and writeable arguments must match")
+              "number of readable and writable arguments must match")
 
             Debug.Assert(argNames.IsDefaultOrEmpty OrElse argNames.Length = argExpressions.Length,
                          "should not have argument names or should have name for every argument")
@@ -722,11 +754,11 @@ Namespace Microsoft.CodeAnalysis.VisualBasic
 
                     If copyBackFlagArrayTemp Is Nothing Then
                         ' since we may have copybacks, we need a temp for the flags array to examine its content after the call
-                        copyBackFlagArrayTemp = New SynthesizedLocal(Me.currentMethodOrLambda, copyBackFlagArray.Type, SynthesizedLocalKind.LoweringTemp)
+                        copyBackFlagArrayTemp = New SynthesizedLocal(Me._currentMethodOrLambda, copyBackFlagArray.Type, SynthesizedLocalKind.LoweringTemp)
                         copyBackFlagArrayRef = (New BoundLocal(syntax, copyBackFlagArrayTemp, copyBackFlagArrayTemp.Type)).MakeRValue
 
                         ' since we may have copybacks, we need a temp for the arguments array to access it after the call
-                        valueArrayTemp = New SynthesizedLocal(Me.currentMethodOrLambda, argumentsArray.Type, SynthesizedLocalKind.LoweringTemp)
+                        valueArrayTemp = New SynthesizedLocal(Me._currentMethodOrLambda, argumentsArray.Type, SynthesizedLocalKind.LoweringTemp)
                         valueArrayRef = New BoundLocal(syntax, valueArrayTemp, valueArrayTemp.Type)
                         argumentsArray = (New BoundAssignmentOperator(syntax, valueArrayRef, argumentsArray, suppressObjectClone:=True)).MakeRValue
                         valueArrayRef = valueArrayRef.MakeRValue
@@ -797,11 +829,19 @@ Namespace Microsoft.CodeAnalysis.VisualBasic
                 callArgs = callArgs.Add(ignoreReturn)
             End If
 
-            Dim callerInvocation As BoundExpression = New BoundCall(syntax, lateCallOrGetMethod, Nothing, Nothing, callArgs, Nothing, True, lateCallOrGetMethod.ReturnType)
+            Dim callerInvocation As BoundExpression = New BoundCall(
+                syntax,
+                lateCallOrGetMethod,
+                Nothing,
+                Nothing,
+                callArgs,
+                Nothing,
+                suppressObjectClone:=True,
+                type:=lateCallOrGetMethod.ReturnType)
 
             ' process copybacks
             If copyBackFlagArrayTemp IsNot Nothing Then
-                Dim valueTemp = New SynthesizedLocal(Me.currentMethodOrLambda, callerInvocation.Type, SynthesizedLocalKind.LoweringTemp)
+                Dim valueTemp = New SynthesizedLocal(Me._currentMethodOrLambda, callerInvocation.Type, SynthesizedLocalKind.LoweringTemp)
                 Dim valueRef = New BoundLocal(syntax, valueTemp, valueTemp.Type)
                 Dim store = New BoundAssignmentOperator(syntax, valueRef, callerInvocation, suppressObjectClone:=True)
 
@@ -818,13 +858,13 @@ Namespace Microsoft.CodeAnalysis.VisualBasic
 
         ' same as LateCaptureReceiverAndArgsComplex, but without a receiver
         ' and does not produce reReadable arguments - just 
-        ' argument (that includes initialization of captures if needed) and a no-sideeffect writeable.
-        ' NOTE: writeables are not rewritten. They will be rewritten when they are combined with values into assignments.
+        ' argument (that includes initialization of captures if needed) and a no-side-effect writable.
+        ' NOTE: writables are not rewritten. They will be rewritten when they are combined with values into assignments.
         Private Sub LateCaptureArgsComplex(ByRef temps As ArrayBuilder(Of SynthesizedLocal),
                            ByRef arguments As ImmutableArray(Of BoundExpression),
                            <Out> ByRef writeTargets As ImmutableArray(Of BoundExpression))
 
-            Dim container = Me.currentMethodOrLambda
+            Dim container = Me._currentMethodOrLambda
 
             If temps Is Nothing Then
                 temps = ArrayBuilder(Of SynthesizedLocal).GetInstance
@@ -884,7 +924,7 @@ Namespace Microsoft.CodeAnalysis.VisualBasic
         ' TODO: 
         ' ================= GENERAL PURPOSE, MOVE TO COMMON FILE
 
-        Private Function MakeStringLiteral(node As VisualBasicSyntaxNode,
+        Private Shared Function MakeStringLiteral(node As SyntaxNode,
                                            value As String,
                                            stringType As TypeSymbol) As BoundLiteral
 
@@ -895,14 +935,14 @@ Namespace Microsoft.CodeAnalysis.VisualBasic
             End If
         End Function
 
-        Private Function MakeBooleanLiteral(node As VisualBasicSyntaxNode,
+        Private Shared Function MakeBooleanLiteral(node As SyntaxNode,
                                    value As Boolean,
                                    booleanType As TypeSymbol) As BoundLiteral
 
             Return New BoundLiteral(node, ConstantValue.Create(value), booleanType)
         End Function
 
-        Private Function MakeGetTypeExpression(node As VisualBasicSyntaxNode,
+        Private Shared Function MakeGetTypeExpression(node As SyntaxNode,
                                                type As TypeSymbol,
                                                typeType As TypeSymbol) As BoundGetType
 
@@ -910,7 +950,7 @@ Namespace Microsoft.CodeAnalysis.VisualBasic
             Return New BoundGetType(node, typeExpr, typeType)
         End Function
 
-        Private Function MakeArrayOfGetTypeExpressions(node As VisualBasicSyntaxNode,
+        Private Function MakeArrayOfGetTypeExpressions(node As SyntaxNode,
                                        types As ImmutableArray(Of TypeSymbol),
                                        typeArrayType As TypeSymbol) As BoundArrayCreation
 
@@ -930,20 +970,22 @@ Namespace Microsoft.CodeAnalysis.VisualBasic
 
         Private Function TryGetWellknownMember(Of T As Symbol)(<Out> ByRef result As T,
                                                                memberId As WellKnownMember,
-                                                               syntax As VisualBasicSyntaxNode,
+                                                               syntax As SyntaxNode,
                                                                Optional isOptional As Boolean = False) As Boolean
 
-            Dim diagInfo As DiagnosticInfo = Nothing
-            Dim memberSymbol = Binder.GetWellKnownTypeMember(Me.Compilation, memberId, diagInfo)
+            result = Nothing
+            Dim useSiteInfo As UseSiteInfo(Of AssemblySymbol) = Nothing
+            Dim memberSymbol = Binder.GetWellKnownTypeMember(Me.Compilation, memberId, useSiteInfo)
 
-            If diagInfo IsNot Nothing Then
+            If useSiteInfo.DiagnosticInfo IsNot Nothing Then
                 If Not isOptional Then
-                    Binder.ReportDiagnostic(diagnostics, New VBDiagnostic(diagInfo, syntax.GetLocation()))
+                    Binder.ReportUseSite(_diagnostics, syntax.GetLocation(), useSiteInfo)
                 End If
 
                 Return False
             End If
 
+            _diagnostics.AddDependencies(useSiteInfo)
             result = DirectCast(memberSymbol, T)
             Return True
         End Function
@@ -953,14 +995,13 @@ Namespace Microsoft.CodeAnalysis.VisualBasic
         ''' </summary>
         Private Function TryGetSpecialMember(Of T As Symbol)(<Out> ByRef result As T,
                                                        memberId As SpecialMember,
-                                                       syntax As VisualBasicSyntaxNode) As Boolean
+                                                       syntax As SyntaxNode) As Boolean
 
-            Dim diagInfo As DiagnosticInfo = Nothing
-            Dim memberSymbol = Binder.GetSpecialTypeMember(Me.topMethod.ContainingAssembly, memberId, diagInfo)
+            result = Nothing
+            Dim useSiteInfo As UseSiteInfo(Of AssemblySymbol) = Nothing
+            Dim memberSymbol = Binder.GetSpecialTypeMember(Me._topMethod.ContainingAssembly, memberId, useSiteInfo)
 
-            If diagInfo IsNot Nothing Then
-                Binder.ReportDiagnostic(diagnostics, New VBDiagnostic(diagInfo, syntax.GetLocation()))
-                result = Nothing
+            If Binder.ReportUseSite(_diagnostics, syntax.GetLocation(), useSiteInfo) Then
                 Return False
             End If
 

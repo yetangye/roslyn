@@ -1,4 +1,6 @@
-﻿' Copyright (c) Microsoft.  All Rights Reserved.  Licensed under the Apache License, Version 2.0.  See License.txt in the project root for license information.
+﻿' Licensed to the .NET Foundation under one or more agreements.
+' The .NET Foundation licenses this file to you under the MIT license.
+' See the LICENSE file in the project root for more information.
 
 Imports System.Collections.Concurrent
 Imports System.Collections.Generic
@@ -37,14 +39,14 @@ Namespace Microsoft.CodeAnalysis.VisualBasic
     ''' </summary>
     Friend Structure MemberResolutionResult(Of TMember As Symbol)
 
-        Private ReadOnly m_Candidate As OverloadResolution.CandidateAnalysisResult
-        Private ReadOnly m_IsValid As Boolean
+        Private ReadOnly _candidate As OverloadResolution.CandidateAnalysisResult
+        Private ReadOnly _isValid As Boolean
 
         Friend Sub New(candidate As OverloadResolution.CandidateAnalysisResult, isValid As Boolean)
             Debug.Assert(Not isValid OrElse candidate.State = OverloadResolution.CandidateAnalysisResultState.Applicable)
 
-            m_Candidate = candidate
-            m_IsValid = isValid
+            _candidate = candidate
+            _isValid = isValid
         End Sub
 
         ''' <summary>
@@ -52,7 +54,7 @@ Namespace Microsoft.CodeAnalysis.VisualBasic
         ''' </summary>
         Public ReadOnly Property Member As TMember
             Get
-                Return DirectCast(m_Candidate.Candidate.UnderlyingSymbol, TMember)
+                Return DirectCast(_candidate.Candidate.UnderlyingSymbol, TMember)
             End Get
         End Property
 
@@ -61,11 +63,11 @@ Namespace Microsoft.CodeAnalysis.VisualBasic
         ''' </summary>
         Public ReadOnly Property Resolution As MemberResolutionKind
             Get
-                If m_Candidate.State = OverloadResolution.CandidateAnalysisResultState.HasUnsupportedMetadata Then
+                If _candidate.State = OverloadResolution.CandidateAnalysisResultState.HasUnsupportedMetadata Then
                     Return MemberResolutionKind.HasUseSiteError
                 End If
 
-                Return CType(m_Candidate.State, MemberResolutionKind)
+                Return CType(_candidate.State, MemberResolutionKind)
             End Get
         End Property
 
@@ -74,7 +76,7 @@ Namespace Microsoft.CodeAnalysis.VisualBasic
         ''' </summary>
         Public ReadOnly Property IsValid As Boolean
             Get
-                Return m_IsValid
+                Return _isValid
             End Get
         End Property
 
@@ -83,7 +85,7 @@ Namespace Microsoft.CodeAnalysis.VisualBasic
         ''' </summary>
         Friend ReadOnly Property IsExpandedParamArrayForm As Boolean
             Get
-                Return m_Candidate.IsExpandedParamArrayForm
+                Return _candidate.IsExpandedParamArrayForm
             End Get
         End Property
     End Structure

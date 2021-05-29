@@ -1,23 +1,18 @@
-' Copyright (c) Microsoft.  All Rights Reserved.  Licensed under the Apache License, Version 2.0.  See License.txt in the project root for license information.
-
-Imports Microsoft.CodeAnalysis.Text
-Imports Microsoft.CodeAnalysis.VisualBasic
-Imports Microsoft.CodeAnalysis.VisualBasic.Symbols
-Imports Microsoft.CodeAnalysis.VisualBasic.Syntax
-Imports Roslyn.Test.Utilities
-Imports Xunit
+﻿' Licensed to the .NET Foundation under one or more agreements.
+' The .NET Foundation licenses this file to you under the MIT license.
+' See the LICENSE file in the project root for more information.
 
 Namespace Microsoft.CodeAnalysis.Editor.VisualBasic.UnitTests.Recommendations.Statements
     Public Class IfKeywordRecommenderTests
         <Fact>
         <Trait(Traits.Feature, Traits.Features.KeywordRecommending)>
-        Public Sub IfInMethodBody()
+        Public Sub IfInMethodBodyTest()
             VerifyRecommendationsContain(<MethodBody>|</MethodBody>, "If")
         End Sub
 
         <Fact>
         <Trait(Traits.Feature, Traits.Features.KeywordRecommending)>
-        Public Sub IfInMultiLineLambda()
+        Public Sub IfInMultiLineLambdaTest()
             VerifyRecommendationsContain(<MethodBody>
 Dim x = Sub()
 |
@@ -26,14 +21,14 @@ Dim x = Sub()
 
         <Fact>
         <Trait(Traits.Feature, Traits.Features.KeywordRecommending)>
-        Public Sub IfInSingleLineLambda()
+        Public Sub IfInSingleLineLambdaTest()
             VerifyRecommendationsContain(<MethodBody>
 Dim x = Sub() |</MethodBody>, "If")
         End Sub
 
         <Fact>
         <Trait(Traits.Feature, Traits.Features.KeywordRecommending)>
-        Public Sub IfAfterElseInMultiLine1()
+        Public Sub IfAfterElseInMultiLine1Test()
             VerifyRecommendationsContain(<MethodBody>
 If True Then
 Else |
@@ -42,7 +37,7 @@ End If</MethodBody>, "If")
 
         <Fact>
         <Trait(Traits.Feature, Traits.Features.KeywordRecommending)>
-        Public Sub IfAfterElseInMultiLine2()
+        Public Sub IfAfterElseInMultiLine2Test()
             VerifyRecommendationsContain(<MethodBody>
 If True Then
 Else If
@@ -52,13 +47,13 @@ End If</MethodBody>, "If")
 
         <Fact>
         <Trait(Traits.Feature, Traits.Features.KeywordRecommending)>
-        Public Sub IfAfterElseInSingleLineIf()
+        Public Sub IfAfterElseInSingleLineIfTest()
             VerifyRecommendationsContain(<MethodBody>If True Then Stop Else |</MethodBody>, "If")
         End Sub
 
         <Fact>
         <Trait(Traits.Feature, Traits.Features.KeywordRecommending)>
-        Public Sub IfAfterExternalSourceDirective()
+        Public Sub IfAfterExternalSourceDirectiveTest()
             VerifyRecommendationsContain(
 <MethodBody>
 #ExternalSource ("file", 1)

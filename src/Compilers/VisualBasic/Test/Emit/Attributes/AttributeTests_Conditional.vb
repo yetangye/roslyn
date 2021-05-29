@@ -1,4 +1,6 @@
-﻿' Copyright (c) Microsoft.  All Rights Reserved.  Licensed under the Apache License, Version 2.0.  See License.txt in the project root for license information.
+﻿' Licensed to the .NET Foundation under one or more agreements.
+' The .NET Foundation licenses this file to you under the MIT license.
+' See the LICENSE file in the project root for more information.
 
 Imports System.Collections.Immutable
 Imports System.Globalization
@@ -8,6 +10,7 @@ Imports System.Runtime.CompilerServices
 Imports System.Runtime.InteropServices
 Imports System.Text
 Imports System.Xml.Linq
+Imports Microsoft.CodeAnalysis.PooledObjects
 Imports Microsoft.CodeAnalysis.Test.Utilities
 Imports Microsoft.CodeAnalysis.Text
 Imports Microsoft.CodeAnalysis.VisualBasic
@@ -24,7 +27,7 @@ Namespace Microsoft.CodeAnalysis.VisualBasic.UnitTests.Semantics
 #Region "Conditional Attribute Type tests"
 
 #Region "Common Helpers"
-        Private Shared ReadOnly CommonTestSource_ConditionalAttrDefs As String = <![CDATA[
+        Private Shared ReadOnly s_commonTestSource_ConditionalAttrDefs As String = <![CDATA[
 Imports System
 Imports System.Diagnostics
 
@@ -87,7 +90,7 @@ Public Class PartiallyPreservedAppliedAttribute
 End Class
 ]]>.Value
 
-        Private Shared ReadOnly CommonTestSource_ConditionalAttributesApplied As String = <![CDATA[
+        Private Shared ReadOnly s_commonTestSource_ConditionalAttributesApplied As String = <![CDATA[
 <PreservedAppliedAttribute, OmittedAppliedAttribute, PreservedInheritedAttribute, OmittedInheritedAttribute, PreservedMultipleAttribute, OmittedMultipleAttribute, PartiallyPreservedAppliedAttribute> _
 Public MustInherit Class Z
     <PreservedAppliedAttribute, OmittedAppliedAttribute, PreservedInheritedAttribute, OmittedInheritedAttribute, PreservedMultipleAttribute, OmittedMultipleAttribute, PartiallyPreservedAppliedAttribute> _
@@ -145,7 +148,7 @@ Public Class Test
     End Sub
 End Class
 ]]>.Value
-        Dim CommonValidatorForCondAttrType As Func(Of Boolean, Action(Of ModuleSymbol)) =
+        Private ReadOnly _commonValidatorForCondAttrType As Func(Of Boolean, Action(Of ModuleSymbol)) =
             Function(isFromSource As Boolean) _
                 Sub(m As ModuleSymbol)
 
@@ -272,9 +275,9 @@ End Class
             ' Same source file
             Debug.Assert(Not preprocessorSymbols.IsDefault)
             Dim parseOpts = VisualBasicParseOptions.Default.WithPreprocessorSymbols(preprocessorSymbols)
-            Dim testSource As String = condDefs & CommonTestSource_ConditionalAttrDefs & CommonTestSource_ConditionalAttributesApplied
-            Dim compilation = CreateCompilationWithMscorlib({Parse(testSource, parseOpts)}, TestOptions.ReleaseExe)
-            CompileAndVerify(compilation, emitOptions:=TestEmitters.CCI, sourceSymbolValidator:=CommonValidatorForCondAttrType(True), symbolValidator:=CommonValidatorForCondAttrType(False), expectedOutput:="")
+            Dim testSource As String = condDefs & s_commonTestSource_ConditionalAttrDefs & s_commonTestSource_ConditionalAttributesApplied
+            Dim compilation = CreateCompilationWithMscorlib40({Parse(testSource, parseOpts)}, options:=TestOptions.ReleaseExe)
+            CompileAndVerify(compilation, sourceSymbolValidator:=_commonValidatorForCondAttrType(True), symbolValidator:=_commonValidatorForCondAttrType(False), expectedOutput:="")
         End Sub
 
         Private Sub TestConditionAttributeType_SameSource(condDefs As String)
@@ -289,11 +292,11 @@ End Class
                                                                preprocessorSymbolsSrcFile1 As ImmutableArray(Of KeyValuePair(Of String, Object)),
                                                                condDefsSrcFile2 As String,
                                                                preprocessorSymbolsSrcFile2 As ImmutableArray(Of KeyValuePair(Of String, Object)))
-            Dim source1 As String = condDefsSrcFile1 & CommonTestSource_ConditionalAttrDefs
+            Dim source1 As String = condDefsSrcFile1 & s_commonTestSource_ConditionalAttrDefs
             Dim source2 As String = condDefsSrcFile2 & <![CDATA[
 Imports System
 Imports System.Diagnostics
-]]>.Value & CommonTestSource_ConditionalAttributesApplied
+]]>.Value & s_commonTestSource_ConditionalAttributesApplied
 
             Debug.Assert(Not preprocessorSymbolsSrcFile1.IsDefault)
             Dim parseOpts1 = VisualBasicParseOptions.Default.WithPreprocessorSymbols(preprocessorSymbolsSrcFile1)
@@ -301,13 +304,13 @@ Imports System.Diagnostics
             Dim parseOpts2 = VisualBasicParseOptions.Default.WithPreprocessorSymbols(preprocessorSymbolsSrcFile2)
 
             ' Different source files, same compilation
-            Dim comp = CreateCompilationWithMscorlib({Parse(source1, parseOpts1), Parse(source2, parseOpts2)})
-            CompileAndVerify(comp, emitOptions:=TestEmitters.CCI, sourceSymbolValidator:=CommonValidatorForCondAttrType(True), symbolValidator:=CommonValidatorForCondAttrType(False), expectedOutput:="")
+            Dim comp = CreateCompilationWithMscorlib40({Parse(source1, parseOpts1), Parse(source2, parseOpts2)}, options:=TestOptions.ReleaseExe)
+            CompileAndVerify(comp, sourceSymbolValidator:=_commonValidatorForCondAttrType(True), symbolValidator:=_commonValidatorForCondAttrType(False), expectedOutput:="")
 
             ' Different source files, different compilation
-            Dim comp1 = CreateCompilationWithMscorlib({Parse(source1, parseOpts1)}, TestOptions.ReleaseDll)
-            Dim comp2 = VisualBasicCompilation.Create("comp2", {Parse(source2, parseOpts2)}, {MscorlibRef, New VisualBasicCompilationReference(comp1)})
-            CompileAndVerify(comp2, emitOptions:=TestEmitters.CCI, sourceSymbolValidator:=CommonValidatorForCondAttrType(True), symbolValidator:=CommonValidatorForCondAttrType(False), expectedOutput:="")
+            Dim comp1 = CreateCompilationWithMscorlib40({Parse(source1, parseOpts1)}, options:=TestOptions.ReleaseDll)
+            Dim comp2 = VisualBasicCompilation.Create("comp2", {Parse(source2, parseOpts2)}, {MscorlibRef, New VisualBasicCompilationReference(comp1)}, options:=TestOptions.ReleaseExe)
+            CompileAndVerify(comp2, sourceSymbolValidator:=_commonValidatorForCondAttrType(True), symbolValidator:=_commonValidatorForCondAttrType(False), expectedOutput:="")
         End Sub
 #End Region
 
@@ -433,7 +436,7 @@ End Class
 #Region "Conditional Method tests"
 
 #Region "Common Helpers"
-        Private Shared ReadOnly CommonTestSource_ConditionalMethodDefs As String = <![CDATA[
+        Private Shared ReadOnly s_commonTestSource_ConditionalMethodDefs As String = <![CDATA[
     Imports System
     Imports System.Diagnostics
 
@@ -469,13 +472,13 @@ End Class
             System.Console.WriteLine("Z.OmittedCalls_AppliedConditional_Method")
         End Sub
 
-        ' Conditional symbols are not inherited by overridding methods in VB
+        ' Conditional symbols are not inherited by overriding methods in VB
         <Conditional("cond3")> _
         Public Overrides Sub PreservedCalls_InheritedConditional_Method()
             System.Console.WriteLine("Z.PreservedCalls_InheritedConditional_Method")
         End Sub
 
-    #Const cond4_base = "Conditional symbols are not inherited by overridding methods in VB"
+    #Const cond4_base = "Conditional symbols are not inherited by overriding methods in VB"
         <Conditional("cond4")> _
         Public Overrides Sub OmittedCalls_InheritedConditional_Method()
             System.Console.WriteLine("Z.OmittedCalls_InheritedConditional_Method")
@@ -516,7 +519,7 @@ End Class
     End Class
     ]]>.Value
 
-        Private Shared ReadOnly CommonTestSource_ConditionalMethodCalls As String = <![CDATA[
+        Private Shared ReadOnly s_commonTestSource_ConditionalMethodCalls As String = <![CDATA[
     Module Module1
         Public Sub Main()
             Dim z = New Z()
@@ -545,15 +548,15 @@ End Class
     End Module
     ]]>.Value
 
-        Private Shared ReadOnly CommonExpectedOutput_ConditionalMethodsTest As String =
-            "Z.PreservedCalls_AppliedConditional_Method" & vbCrLf &
-            "Z.PreservedCalls_InheritedConditional_Method" & vbCrLf &
-            "Z.PreservedCalls_MultipleConditional_Method" & vbCrLf &
-            "Z.PartiallyPreservedCalls_Interface_Method" & vbCrLf &
-            "Z.PreservedCalls_Function" & vbCrLf &
-            "0" & vbCrLf &
-            "Z.PartiallyPreservedCalls_PartiallyPreservedAppliedAttribute_Method2" & vbCrLf &
-            "Z.PartiallyPreservedCalls_PartiallyPreservedAppliedAttribute_Method4" & vbCrLf
+        Private Shared ReadOnly s_commonExpectedOutput_ConditionalMethodsTest As String =
+            "Z.PreservedCalls_AppliedConditional_Method" & Environment.NewLine &
+            "Z.PreservedCalls_InheritedConditional_Method" & Environment.NewLine &
+            "Z.PreservedCalls_MultipleConditional_Method" & Environment.NewLine &
+            "Z.PartiallyPreservedCalls_Interface_Method" & Environment.NewLine &
+            "Z.PreservedCalls_Function" & Environment.NewLine &
+            "0" & Environment.NewLine &
+            "Z.PartiallyPreservedCalls_PartiallyPreservedAppliedAttribute_Method2" & Environment.NewLine &
+            "Z.PartiallyPreservedCalls_PartiallyPreservedAppliedAttribute_Method4" & Environment.NewLine
 
         Private Sub TestConditionalMethod_SameSource(condDefs As String)
             TestConditionalMethod_SameSource(condDefs, ImmutableArray.Create(Of KeyValuePair(Of String, Object))())
@@ -563,9 +566,9 @@ End Class
             ' Same source file
             Debug.Assert(Not preprocessorSymbols.IsDefault)
             Dim parseOpts = VisualBasicParseOptions.Default.WithPreprocessorSymbols(preprocessorSymbols)
-            Dim testSource As String = condDefs & CommonTestSource_ConditionalMethodDefs & CommonTestSource_ConditionalMethodCalls
+            Dim testSource As String = condDefs & s_commonTestSource_ConditionalMethodDefs & s_commonTestSource_ConditionalMethodCalls
             Dim comp = VisualBasicCompilation.Create(GetUniqueName(), {Parse(testSource, parseOpts)}, {MscorlibRef, SystemCoreRef, MsvbRef})
-            CompileAndVerify(comp, emitOptions:=TestEmitters.CCI, expectedOutput:=CommonExpectedOutput_ConditionalMethodsTest)
+            CompileAndVerify(comp, expectedOutput:=s_commonExpectedOutput_ConditionalMethodsTest)
         End Sub
 
         Private Sub TestConditionalMethod_DifferentSource(condDefsSrcFile1 As String, condDefsSrcFile2 As String)
@@ -576,11 +579,11 @@ End Class
                                                           preprocessorSymbolsSrcFile1 As ImmutableArray(Of KeyValuePair(Of String, Object)),
                                                           condDefsSrcFile2 As String,
                                                           preprocessorSymbolsSrcFile2 As ImmutableArray(Of KeyValuePair(Of String, Object)))
-            Dim source1 As String = condDefsSrcFile1 & CommonTestSource_ConditionalMethodDefs
+            Dim source1 As String = condDefsSrcFile1 & s_commonTestSource_ConditionalMethodDefs
             Dim source2 As String = condDefsSrcFile2 & <![CDATA[
 Imports System
 Imports System.Diagnostics
-]]>.Value & CommonTestSource_ConditionalMethodCalls
+]]>.Value & s_commonTestSource_ConditionalMethodCalls
 
             Debug.Assert(Not preprocessorSymbolsSrcFile1.IsDefault)
             Dim parseOpts1 = VisualBasicParseOptions.Default.WithPreprocessorSymbols(preprocessorSymbolsSrcFile1)
@@ -589,12 +592,12 @@ Imports System.Diagnostics
 
             ' Different source files, same compilation
             Dim comp = VisualBasicCompilation.Create(GetUniqueName(), {Parse(source1, parseOpts1), Parse(source2, parseOpts2)}, {MscorlibRef, MsvbRef}, TestOptions.ReleaseExe)
-            CompileAndVerify(comp, emitOptions:=TestEmitters.CCI, expectedOutput:=CommonExpectedOutput_ConditionalMethodsTest)
+            CompileAndVerify(comp, expectedOutput:=s_commonExpectedOutput_ConditionalMethodsTest)
 
             ' Different source files, different compilation
             Dim comp1 = VisualBasicCompilation.Create(GetUniqueName(), {Parse(source1, parseOpts1)}, {MscorlibRef, MsvbRef}, TestOptions.ReleaseDll)
             Dim comp2 = VisualBasicCompilation.Create(GetUniqueName(), {Parse(source2, parseOpts2)}, {MscorlibRef, MsvbRef, comp1.ToMetadataReference()}, TestOptions.ReleaseExe)
-            CompileAndVerify(comp2, emitOptions:=TestEmitters.CCI, expectedOutput:=CommonExpectedOutput_ConditionalMethodsTest)
+            CompileAndVerify(comp2, expectedOutput:=s_commonExpectedOutput_ConditionalMethodsTest)
         End Sub
 #End Region
 
@@ -691,7 +694,7 @@ Imports System.Diagnostics
             TestConditionalMethod_DifferentSource(conditionalDefsDummy, preprocessorSymbolsDummy, conditionalDefs, preprocessorSymbols)
         End Sub
 
-        <WorkItem(546089, "DevDiv")>
+        <WorkItem(546089, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/546089")>
         <Fact>
         Public Sub CaseInsensitivityTest()
             Dim source =
@@ -717,7 +720,7 @@ End Module
             CompileAndVerify(source, expectedOutput:=<![CDATA[Sub1 Called]]>)
         End Sub
 
-        <WorkItem(546089, "DevDiv")>
+        <WorkItem(546089, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/546089")>
         <Fact>
         Public Sub CaseInsensitivityTest_02()
             Dim source =
@@ -744,7 +747,7 @@ End Module
             CompileAndVerify(source, expectedOutput:=<![CDATA[Sub1 Called]]>)
         End Sub
 
-        <WorkItem(546094, "DevDiv")>
+        <WorkItem(546094, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/546094")>
         <Fact>
         Public Sub ConditionalAttributeOnPropertySetter()
             Dim source =
@@ -753,7 +756,7 @@ End Module
 Imports System
 
 Class TestClass
-    WriteOnly Property foo() As String
+    WriteOnly Property goo() As String
         &lt;Diagnostics.Conditional("N")&gt;
         Set(ByVal Value As String)
             Console.WriteLine("Property Called")
@@ -764,7 +767,7 @@ End Class
 Module M1
     Sub Main()
         Dim t As New TestClass()
-        t.foo = "abds"
+        t.goo = "abds"
     End Sub
 End Module
 
@@ -775,7 +778,7 @@ End Module
         End Sub
 #End Region
 
-        <WorkItem(1003274)>
+        <WorkItem(1003274, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/1003274")>
         <Fact>
         Public Sub ConditionalAttributeInNetModule()
             Const source = "
@@ -797,8 +800,8 @@ Class C
 End Class
 "
             Dim parseOptions As New VisualBasicParseOptions(preprocessorSymbols:={New KeyValuePair(Of String, Object)("Defined", True)})
-            Dim comp = CreateCompilationWithMscorlib({VisualBasicSyntaxTree.ParseText(source, parseOptions)}, compOptions:=TestOptions.ReleaseModule)
-            CompileAndVerify(comp, verify:=False).VerifyIL("C.M", "
+            Dim comp = CreateCompilationWithMscorlib40({VisualBasicSyntaxTree.ParseText(source, parseOptions)}, options:=TestOptions.ReleaseModule)
+            CompileAndVerify(comp, verify:=Verification.Fails).VerifyIL("C.M", "
 {
   // Code size        7 (0x7)
   .maxstack  1

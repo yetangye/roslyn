@@ -1,13 +1,16 @@
-﻿' Copyright (c) Microsoft.  All Rights Reserved.  Licensed under the Apache License, Version 2.0.  See License.txt in the project root for license information.
+﻿' Licensed to the .NET Foundation under one or more agreements.
+' The .NET Foundation licenses this file to you under the MIT license.
+' See the LICENSE file in the project root for more information.
 
 Imports System.Collections.Immutable
+Imports Microsoft.CodeAnalysis.PooledObjects
 
 Namespace Microsoft.CodeAnalysis.VisualBasic
     ' If a DiagnosticInfo contains symbols that should be returned through the binding API,
     ' it should implement this interface and return the symbols associated with the DiagnosticInfo
     ' via GetAssociatedSymbols
     Friend Interface IDiagnosticInfoWithSymbols
-        ' Add the associated symbold to the given array builder.
+        ' Add the associated symbols to the given array builder.
         Sub GetAssociatedSymbols(builder As ArrayBuilder(Of Symbol))
     End Interface
 
@@ -21,7 +24,7 @@ Namespace Microsoft.CodeAnalysis.VisualBasic
         Implements IDiagnosticInfoWithSymbols
 
         ' not serialized
-        Private m_badSymbol As Symbol
+        Private ReadOnly _badSymbol As Symbol
 
         ' Create a new bad symbol diagnostic with the given error id. This error message
         ' should have a single fill-in string, which is filled in with the symbol.
@@ -33,23 +36,23 @@ Namespace Microsoft.CodeAnalysis.VisualBasic
         ' is not automatically filled in as an argument.
         Friend Sub New(badSymbol As Symbol, errid As ERRID, ParamArray additionalArgs As Object())
             MyBase.New(VisualBasic.MessageProvider.Instance, errid, additionalArgs)
-            m_badSymbol = badSymbol
+            _badSymbol = badSymbol
         End Sub
 
         Public ReadOnly Property BadSymbol As Symbol
             Get
-                Return m_badSymbol
+                Return _badSymbol
             End Get
         End Property
 
         Private Sub GetAssociatedSymbols(builder As ArrayBuilder(Of Symbol)) Implements IDiagnosticInfoWithSymbols.GetAssociatedSymbols
-            builder.Add(m_badSymbol)
+            builder.Add(_badSymbol)
         End Sub
 
         ' Get the locations of all the symbols.
         Public Overrides ReadOnly Property AdditionalLocations As IReadOnlyList(Of Location)
             Get
-                Return m_badSymbol.Locations
+                Return _badSymbol.Locations
             End Get
         End Property
 
@@ -67,29 +70,29 @@ Namespace Microsoft.CodeAnalysis.VisualBasic
         Implements IDiagnosticInfoWithSymbols
 
         ' not serialized:
-        Private m_symbols As ImmutableArray(Of Symbol)
+        Private _symbols As ImmutableArray(Of Symbol)
 
         ' Create a new ambiguous symbol diagnostic with the give error id and error arguments.
         Friend Sub New(errid As ERRID, symbols As ImmutableArray(Of Symbol), ParamArray args As Object())
             MyBase.New(VisualBasic.MessageProvider.Instance, errid, args)
-            m_symbols = symbols
+            _symbols = symbols
         End Sub
 
         Public ReadOnly Property AmbiguousSymbols As ImmutableArray(Of Symbol)
             Get
-                Return m_symbols
+                Return _symbols
             End Get
         End Property
 
         Private Sub GetAssociatedSymbols(builder As ArrayBuilder(Of Symbol)) Implements IDiagnosticInfoWithSymbols.GetAssociatedSymbols
-            builder.AddRange(m_symbols)
+            builder.AddRange(_symbols)
         End Sub
 
         ' Get the locations of all the symbols.
         Public Overrides ReadOnly Property AdditionalLocations As IReadOnlyList(Of Location)
             Get
                 Dim builder = ArrayBuilder(Of Location).GetInstance()
-                For Each sym In m_symbols
+                For Each sym In _symbols
                     For Each l In sym.Locations
                         builder.Add(l)
                     Next

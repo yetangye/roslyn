@@ -1,6 +1,9 @@
-﻿' Copyright (c) Microsoft.  All Rights Reserved.  Licensed under the Apache License, Version 2.0.  See License.txt in the project root for license information.
+﻿' Licensed to the .NET Foundation under one or more agreements.
+' The .NET Foundation licenses this file to you under the MIT license.
+' See the LICENSE file in the project root for more information.
 
 Imports System.Collections.Immutable
+Imports Microsoft.CodeAnalysis.PooledObjects
 
 Namespace Microsoft.CodeAnalysis.VisualBasic.Symbols
 
@@ -9,14 +12,14 @@ Namespace Microsoft.CodeAnalysis.VisualBasic.Symbols
         Partial Private NotInheritable Class AnonymousType_IEquatable_EqualsMethodSymbol
             Inherits SynthesizedRegularMethodBase
 
-            Private ReadOnly m_parameters As ImmutableArray(Of ParameterSymbol)
-            Private ReadOnly m_interfaceMethod As ImmutableArray(Of MethodSymbol)
+            Private ReadOnly _parameters As ImmutableArray(Of ParameterSymbol)
+            Private ReadOnly _interfaceMethod As ImmutableArray(Of MethodSymbol)
 
             Public Sub New(container As AnonymousTypeTemplateSymbol, interfaceMethod As MethodSymbol)
                 MyBase.New(VisualBasicSyntaxTree.Dummy.GetRoot(), container, WellKnownMemberNames.ObjectEquals)
 
-                m_parameters = ImmutableArray.Create(Of ParameterSymbol)(New SynthesizedParameterSimpleSymbol(Me, container, 0, "val"))
-                m_interfaceMethod = ImmutableArray.Create(interfaceMethod)
+                _parameters = ImmutableArray.Create(Of ParameterSymbol)(New SynthesizedParameterSimpleSymbol(Me, container, 0, "val"))
+                _interfaceMethod = ImmutableArray.Create(interfaceMethod)
             End Sub
 
             Private ReadOnly Property AnonymousType As AnonymousTypeTemplateSymbol
@@ -57,13 +60,13 @@ Namespace Microsoft.CodeAnalysis.VisualBasic.Symbols
 
             Public Overrides ReadOnly Property Parameters As ImmutableArray(Of ParameterSymbol)
                 Get
-                    Return Me.m_parameters
+                    Return Me._parameters
                 End Get
             End Property
 
             Public Overrides ReadOnly Property ExplicitInterfaceImplementations As ImmutableArray(Of MethodSymbol)
                 Get
-                    Return m_interfaceMethod
+                    Return _interfaceMethod
                 End Get
             End Property
 

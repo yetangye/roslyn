@@ -1,4 +1,6 @@
-﻿' Copyright (c) Microsoft.  All Rights Reserved.  Licensed under the Apache License, Version 2.0.  See License.txt in the project root for license information.
+﻿' Licensed to the .NET Foundation under one or more agreements.
+' The .NET Foundation licenses this file to you under the MIT license.
+' See the LICENSE file in the project root for more information.
 
 Imports System.Collections.Generic
 Imports System.Collections.Immutable
@@ -17,16 +19,16 @@ Namespace Microsoft.CodeAnalysis.VisualBasic.Symbols
     Friend Class SourceComplexParameterSymbol
         Inherits SourceParameterSymbol
 
-        Private ReadOnly m_syntaxRef As SyntaxReference
-        Private ReadOnly m_flags As SourceParameterFlags
+        Private ReadOnly _syntaxRef As SyntaxReference
+        Private ReadOnly _flags As SourceParameterFlags
 
         ' m_lazyDefaultValue is not readonly because it is lazily computed
-        Private m_lazyDefaultValue As ConstantValue
-        Private m_lazyCustomAttributesBag As CustomAttributesBag(Of VisualBasicAttributeData)
+        Private _lazyDefaultValue As ConstantValue
+        Private _lazyCustomAttributesBag As CustomAttributesBag(Of VisualBasicAttributeData)
 
 #If DEBUG Then
         Friend Sub AssertAttributesNotValidatedYet()
-            Debug.Assert(m_lazyCustomAttributesBag Is Nothing)
+            Debug.Assert(_lazyCustomAttributesBag Is Nothing)
         End Sub
 #End If
         ''' <summary>
@@ -55,8 +57,8 @@ Namespace Microsoft.CodeAnalysis.VisualBasic.Symbols
 
         Friend Overrides ReadOnly Property AttributeDeclarationList As SyntaxList(Of AttributeListSyntax)
             Get
-                Return If(Me.m_syntaxRef Is Nothing, Nothing,
-                          DirectCast(Me.m_syntaxRef.GetSyntax, ParameterSyntax).AttributeLists())
+                Return If(Me._syntaxRef Is Nothing, Nothing,
+                          DirectCast(Me._syntaxRef.GetSyntax, ParameterSyntax).AttributeLists())
             End Get
         End Property
 
@@ -88,7 +90,7 @@ Namespace Microsoft.CodeAnalysis.VisualBasic.Symbols
         End Function
 
         Friend Overrides Function GetAttributesBag() As CustomAttributesBag(Of VisualBasicAttributeData)
-            If m_lazyCustomAttributesBag Is Nothing OrElse Not m_lazyCustomAttributesBag.IsSealed Then
+            If _lazyCustomAttributesBag Is Nothing OrElse Not _lazyCustomAttributesBag.IsSealed Then
 
                 Dim copyFrom As SourceParameterSymbol = Me.BoundAttributesSource
 
@@ -97,18 +99,18 @@ Namespace Microsoft.CodeAnalysis.VisualBasic.Symbols
 
                 If copyFrom IsNot Nothing Then
                     Dim attributesBag = copyFrom.GetAttributesBag()
-                    Interlocked.CompareExchange(m_lazyCustomAttributesBag, attributesBag, Nothing)
+                    Interlocked.CompareExchange(_lazyCustomAttributesBag, attributesBag, Nothing)
                 Else
                     Dim attributeSyntax = Me.GetAttributeDeclarations()
-                    LoadAndValidateAttributes(attributeSyntax, m_lazyCustomAttributesBag)
+                    LoadAndValidateAttributes(attributeSyntax, _lazyCustomAttributesBag)
                 End If
             End If
 
-            Return m_lazyCustomAttributesBag
+            Return _lazyCustomAttributesBag
         End Function
 
         Friend Overrides Function GetEarlyDecodedWellKnownAttributeData() As ParameterEarlyWellKnownAttributeData
-            Dim attributesBag As CustomAttributesBag(Of VisualBasicAttributeData) = Me.m_lazyCustomAttributesBag
+            Dim attributesBag As CustomAttributesBag(Of VisualBasicAttributeData) = Me._lazyCustomAttributesBag
             If attributesBag Is Nothing OrElse Not attributesBag.IsEarlyDecodedWellKnownAttributeDataComputed Then
                 attributesBag = Me.GetAttributesBag()
             End If
@@ -117,7 +119,7 @@ Namespace Microsoft.CodeAnalysis.VisualBasic.Symbols
         End Function
 
         Friend Overrides Function GetDecodedWellKnownAttributeData() As CommonParameterWellKnownAttributeData
-            Dim attributesBag As CustomAttributesBag(Of VisualBasicAttributeData) = Me.m_lazyCustomAttributesBag
+            Dim attributesBag As CustomAttributesBag(Of VisualBasicAttributeData) = Me._lazyCustomAttributesBag
             If attributesBag Is Nothing OrElse Not attributesBag.IsDecodedWellKnownAttributeDataComputed Then
                 attributesBag = Me.GetAttributesBag()
             End If
@@ -133,19 +135,19 @@ Namespace Microsoft.CodeAnalysis.VisualBasic.Symbols
 
         Friend Overrides ReadOnly Property ExplicitDefaultConstantValue(inProgress As SymbolsInProgress(Of ParameterSymbol)) As ConstantValue
             Get
-                If m_lazyDefaultValue Is ConstantValue.Unset Then
-                    Dim diagnostics = DiagnosticBag.GetInstance()
-                    If Interlocked.CompareExchange(m_lazyDefaultValue, BindDefaultValue(inProgress, diagnostics), ConstantValue.Unset) Is ConstantValue.Unset Then
-                        DirectCast(ContainingModule, SourceModuleSymbol).AddDiagnostics(diagnostics, CompilationStage.Declare)
+                If _lazyDefaultValue Is ConstantValue.Unset Then
+                    Dim diagnostics = BindingDiagnosticBag.GetInstance()
+                    If Interlocked.CompareExchange(_lazyDefaultValue, BindDefaultValue(inProgress, diagnostics), ConstantValue.Unset) Is ConstantValue.Unset Then
+                        DirectCast(ContainingModule, SourceModuleSymbol).AddDeclarationDiagnostics(diagnostics)
                     End If
                     diagnostics.Free()
                 End If
 
-                Return m_lazyDefaultValue
+                Return _lazyDefaultValue
             End Get
         End Property
 
-        Private Function BindDefaultValue(inProgress As SymbolsInProgress(Of ParameterSymbol), diagnostics As DiagnosticBag) As ConstantValue
+        Private Function BindDefaultValue(inProgress As SymbolsInProgress(Of ParameterSymbol), diagnostics As BindingDiagnosticBag) As ConstantValue
 
             Dim parameterSyntax = SyntaxNode
             If parameterSyntax Is Nothing Then
@@ -158,7 +160,7 @@ Namespace Microsoft.CodeAnalysis.VisualBasic.Symbols
             End If
 
             Dim binder As Binder = BinderBuilder.CreateBinderForParameterDefaultValue(DirectCast(ContainingModule, SourceModuleSymbol),
-                                                                                      m_syntaxRef.SyntaxTree,
+                                                                                      _syntaxRef.SyntaxTree,
                                                                                       Me,
                                                                                       parameterSyntax)
 
@@ -183,7 +185,7 @@ Namespace Microsoft.CodeAnalysis.VisualBasic.Symbols
 
         Friend ReadOnly Property SyntaxNode As ParameterSyntax
             Get
-                Return If(m_syntaxRef Is Nothing, Nothing, DirectCast(m_syntaxRef.GetSyntax(), ParameterSyntax))
+                Return If(_syntaxRef Is Nothing, Nothing, DirectCast(_syntaxRef.GetSyntax(), ParameterSyntax))
             End Get
         End Property
 
@@ -191,8 +193,8 @@ Namespace Microsoft.CodeAnalysis.VisualBasic.Symbols
             Get
                 If IsImplicitlyDeclared Then
                     Return ImmutableArray(Of SyntaxReference).Empty
-                ElseIf m_syntaxRef IsNot Nothing Then
-                    Return GetDeclaringSyntaxReferenceHelper(m_syntaxRef)
+                ElseIf _syntaxRef IsNot Nothing Then
+                    Return GetDeclaringSyntaxReferenceHelper(_syntaxRef)
                 Else
                     Return MyBase.DeclaringSyntaxReferences
                 End If
@@ -205,13 +207,13 @@ Namespace Microsoft.CodeAnalysis.VisualBasic.Symbols
 
         Public Overrides ReadOnly Property IsOptional As Boolean
             Get
-                Return (m_flags And SourceParameterFlags.Optional) <> 0
+                Return (_flags And SourceParameterFlags.Optional) <> 0
             End Get
         End Property
 
         Public Overrides ReadOnly Property IsParamArray As Boolean
             Get
-                If (m_flags And SourceParameterFlags.ParamArray) <> 0 Then
+                If (_flags And SourceParameterFlags.ParamArray) <> 0 Then
                     Return True
                 End If
 
@@ -255,7 +257,7 @@ Namespace Microsoft.CodeAnalysis.VisualBasic.Symbols
         ''' </summary>
         Friend Overrides ReadOnly Property IsExplicitByRef As Boolean
             Get
-                Return (m_flags And SourceParameterFlags.ByRef) <> 0
+                Return (_flags And SourceParameterFlags.ByRef) <> 0
             End Get
         End Property
 
@@ -270,9 +272,9 @@ Namespace Microsoft.CodeAnalysis.VisualBasic.Symbols
             defaultValueOpt As ConstantValue
         )
             MyBase.New(container, name, ordinal, type, location)
-            m_flags = flags
-            m_lazyDefaultValue = defaultValueOpt
-            m_syntaxRef = syntaxRef
+            _flags = flags
+            _lazyDefaultValue = defaultValueOpt
+            _syntaxRef = syntaxRef
         End Sub
 
         ' Create a simple or complex parameter, as necessary.
@@ -305,7 +307,7 @@ Namespace Microsoft.CodeAnalysis.VisualBasic.Symbols
             ' Asking for the default value earlier than that can lead to infinite recursion. Instead, pass in the m_lazyDefaultValue.  If the value hasn't
             ' been computed yet, the new symbol will compute it.
 
-            Return New SourceComplexParameterSymbol(newContainingSymbol, Me.Name, Me.Ordinal, Me.Type, Me.Locations(0), m_syntaxRef, m_flags, m_lazyDefaultValue)
+            Return New SourceComplexParameterSymbol(newContainingSymbol, Me.Name, Me.Ordinal, Me.Type, Me.Locations(0), _syntaxRef, _flags, _lazyDefaultValue)
         End Function
 
         ' Create a parameter from syntax.
@@ -316,7 +318,7 @@ Namespace Microsoft.CodeAnalysis.VisualBasic.Symbols
                                                 ordinal As Integer,
                                                 binder As Binder,
                                                 checkModifier As CheckParameterModifierDelegate,
-                                                diagnostics As DiagnosticBag) As ParameterSymbol
+                                                diagnostics As BindingDiagnosticBag) As ParameterSymbol
             Dim getErrorInfo As Func(Of DiagnosticInfo) = Nothing
 
             If binder.OptionStrict = OptionStrict.On Then
@@ -333,13 +335,13 @@ Namespace Microsoft.CodeAnalysis.VisualBasic.Symbols
                     Binder.ReportDiagnostic(diagnostics, syntax.Identifier, ERRID.ERR_ParamArrayNotArray)
                 Else
                     Dim paramTypeAsArray = DirectCast(paramType, ArrayTypeSymbol)
-                    If paramTypeAsArray.Rank <> 1 Then
+                    If Not paramTypeAsArray.IsSZArray Then
                         ' ParamArray type must be rank-1 array.
                         Binder.ReportDiagnostic(diagnostics, syntax.Identifier.Identifier, ERRID.ERR_ParamArrayRank)
                     End If
 
                     ' 'touch' the constructor in order to generate proper diagnostics
-                    binder.ReportUseSiteErrorForSynthesizedAttribute(WellKnownMember.System_ParamArrayAttribute__ctor,
+                    binder.ReportUseSiteInfoForSynthesizedAttribute(WellKnownMember.System_ParamArrayAttribute__ctor,
                                                                      syntax,
                                                                      diagnostics)
                 End If
@@ -365,12 +367,12 @@ Namespace Microsoft.CodeAnalysis.VisualBasic.Symbols
                 ' Report diagnostic if constructors for datetime and decimal default values are not available
                 Select Case paramType.SpecialType
                     Case SpecialType.System_DateTime
-                        binder.ReportUseSiteErrorForSynthesizedAttribute(WellKnownMember.System_Runtime_CompilerServices_DateTimeConstantAttribute__ctor,
+                        binder.ReportUseSiteInfoForSynthesizedAttribute(WellKnownMember.System_Runtime_CompilerServices_DateTimeConstantAttribute__ctor,
                                                                          syntax.Default,
                                                                          diagnostics)
 
                     Case SpecialType.System_Decimal
-                        binder.ReportUseSiteErrorForSynthesizedAttribute(WellKnownMember.System_Runtime_CompilerServices_DecimalConstantAttribute__ctor,
+                        binder.ReportUseSiteInfoForSynthesizedAttribute(WellKnownMember.System_Runtime_CompilerServices_DecimalConstantAttribute__ctor,
                                                                         syntax.Default,
                                                                         diagnostics)
                 End Select
@@ -385,25 +387,25 @@ Namespace Microsoft.CodeAnalysis.VisualBasic.Symbols
             End Get
         End Property
 
-        Friend Overrides ReadOnly Property HasByRefBeforeCustomModifiers As Boolean
+        Public Overrides ReadOnly Property RefCustomModifiers As ImmutableArray(Of CustomModifier)
             Get
-                Return False
+                Return ImmutableArray(Of CustomModifier).Empty
             End Get
         End Property
 
-        Friend Overrides Function WithTypeAndCustomModifiers(type As TypeSymbol, customModifiers As ImmutableArray(Of CustomModifier), hasByRefBeforeCustomModifiers As Boolean) As ParameterSymbol
-            If customModifiers.IsDefaultOrEmpty Then
-                Return New SourceComplexParameterSymbol(Me.ContainingSymbol, Me.Name, Me.Ordinal, type, Me.Location, m_syntaxRef, m_flags, m_lazyDefaultValue)
+        Friend Overrides Function WithTypeAndCustomModifiers(type As TypeSymbol, customModifiers As ImmutableArray(Of CustomModifier), refCustomModifiers As ImmutableArray(Of CustomModifier)) As ParameterSymbol
+            If customModifiers.IsEmpty AndAlso refCustomModifiers.IsEmpty Then
+                Return New SourceComplexParameterSymbol(Me.ContainingSymbol, Me.Name, Me.Ordinal, type, Me.Location, _syntaxRef, _flags, _lazyDefaultValue)
             End If
 
-            Return New SourceComplexParameterSymbolWithCustomModifiers(Me.ContainingSymbol, Me.Name, Me.Ordinal, type, Me.Location, m_syntaxRef, m_flags, m_lazyDefaultValue, customModifiers, hasByRefBeforeCustomModifiers)
+            Return New SourceComplexParameterSymbolWithCustomModifiers(Me.ContainingSymbol, Me.Name, Me.Ordinal, type, Me.Location, _syntaxRef, _flags, _lazyDefaultValue, customModifiers, refCustomModifiers)
         End Function
 
         Private Class SourceComplexParameterSymbolWithCustomModifiers
             Inherits SourceComplexParameterSymbol
 
-            Private ReadOnly m_customModifiers As ImmutableArray(Of CustomModifier)
-            Private ReadOnly m_hasByRefBeforeCustomModifiers As Boolean
+            Private ReadOnly _customModifiers As ImmutableArray(Of CustomModifier)
+            Private ReadOnly _refCustomModifiers As ImmutableArray(Of CustomModifier)
 
             Public Sub New(
                 container As Symbol,
@@ -415,28 +417,30 @@ Namespace Microsoft.CodeAnalysis.VisualBasic.Symbols
                 flags As SourceParameterFlags,
                 defaultValueOpt As ConstantValue,
                 customModifiers As ImmutableArray(Of CustomModifier),
-                hasByRefBeforeCustomModifiers As Boolean
+                refCustomModifiers As ImmutableArray(Of CustomModifier)
             )
                 MyBase.New(container, name, ordinal, type, location, syntaxRef, flags, defaultValueOpt)
 
-                Debug.Assert(Not customModifiers.IsDefaultOrEmpty)
-                m_customModifiers = If(customModifiers.IsDefault, ImmutableArray(Of CustomModifier).Empty, customModifiers)
-                m_hasByRefBeforeCustomModifiers = hasByRefBeforeCustomModifiers
+                Debug.Assert(Not customModifiers.IsEmpty OrElse Not refCustomModifiers.IsEmpty)
+                _customModifiers = customModifiers
+                _refCustomModifiers = refCustomModifiers
+
+                Debug.Assert(_refCustomModifiers.IsEmpty OrElse IsByRef)
             End Sub
 
             Public Overrides ReadOnly Property CustomModifiers As ImmutableArray(Of CustomModifier)
                 Get
-                    Return m_customModifiers
+                    Return _customModifiers
                 End Get
             End Property
 
-            Friend Overrides ReadOnly Property HasByRefBeforeCustomModifiers As Boolean
+            Public Overrides ReadOnly Property RefCustomModifiers As ImmutableArray(Of CustomModifier)
                 Get
-                    Return m_hasByRefBeforeCustomModifiers
+                    Return _refCustomModifiers
                 End Get
             End Property
 
-            Friend Overrides Function WithTypeAndCustomModifiers(type As TypeSymbol, customModifiers As ImmutableArray(Of CustomModifier), hasByRefBeforeCustomModifiers As Boolean) As ParameterSymbol
+            Friend Overrides Function WithTypeAndCustomModifiers(type As TypeSymbol, customModifiers As ImmutableArray(Of CustomModifier), refCustomModifiers As ImmutableArray(Of CustomModifier)) As ParameterSymbol
                 Throw ExceptionUtilities.Unreachable
             End Function
         End Class

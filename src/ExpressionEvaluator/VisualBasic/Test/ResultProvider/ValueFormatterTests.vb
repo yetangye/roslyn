@@ -1,15 +1,20 @@
-﻿Imports System
+﻿' Licensed to the .NET Foundation under one or more agreements.
+' The .NET Foundation licenses this file to you under the MIT license.
+' See the LICENSE file in the project root for more information.
+
+Imports System
 Imports Microsoft.CodeAnalysis.ExpressionEvaluator
+Imports Microsoft.VisualStudio.Debugger.Clr
 Imports Microsoft.VisualStudio.Debugger.Evaluation
 Imports Microsoft.VisualStudio.Debugger.Evaluation.ClrCompilation
 Imports Xunit
 
-Namespace Microsoft.CodeAnalysis.VisualBasic.ExpressionEvaluator
+Namespace Microsoft.CodeAnalysis.VisualBasic.ExpressionEvaluator.UnitTests
 
     Public Class ValueFormatterTests : Inherits VisualBasicResultProviderTestBase
 
         <Fact>
-        Sub IntegralPrimitives()
+        Public Sub IntegralPrimitives()
             ' only testing a couple simple cases here...more tests live in ObjectDisplayTests...
             Assert.Equal("1", FormatValue(CUShort(1)))
             Assert.Equal("65535", FormatValue(UShort.MaxValue))
@@ -25,7 +30,7 @@ Namespace Microsoft.CodeAnalysis.VisualBasic.ExpressionEvaluator
         End Sub
 
         <Fact>
-        Sub Doubles()
+        Public Sub Doubles()
             Assert.Equal("-1.7976931348623157E+308", FormatValue(Double.MinValue))
             Assert.Equal("-1.1", FormatValue(CDbl(-1.1)))
             Assert.Equal("0", FormatValue(CDbl(0)))
@@ -39,7 +44,7 @@ Namespace Microsoft.CodeAnalysis.VisualBasic.ExpressionEvaluator
         End Sub
 
         <Fact>
-        Sub Singles()
+        Public Sub Singles()
             Assert.Equal("-3.40282347E+38", FormatValue(Single.MinValue))
             Assert.Equal("-1.1", FormatValue(CSng(-1.1)))
             Assert.Equal("0", FormatValue(CSng(0)))
@@ -53,7 +58,7 @@ Namespace Microsoft.CodeAnalysis.VisualBasic.ExpressionEvaluator
         End Sub
 
         <Fact>
-        Sub Decimals()
+        Public Sub Decimals()
             Assert.Equal("-79228162514264337593543950335", FormatValue(Decimal.MinValue))
             Assert.Equal("-1.1", FormatValue(CDec(-1.1)))
             Assert.Equal("0", FormatValue(CDec(0)))
@@ -62,13 +67,13 @@ Namespace Microsoft.CodeAnalysis.VisualBasic.ExpressionEvaluator
         End Sub
 
         <Fact>
-        Sub Booleans()
+        Public Sub Booleans()
             Assert.Equal("True", FormatValue(True))
             Assert.Equal("False", FormatValue(False))
         End Sub
 
         <Fact>
-        Sub Chars()
+        Public Sub Chars()
             ' We'll exhaustively test the first 256 code points (single-byte characters) as well
             ' as a few double-byte characters.  Testing all possible characters takes too long.
             Dim ch As Char
@@ -123,7 +128,7 @@ Namespace Microsoft.CodeAnalysis.VisualBasic.ExpressionEvaluator
         End Sub
 
         <Fact>
-        Sub Strings()
+        Public Sub Strings()
             Assert.Equal("Nothing", FormatNull(Of String)())
             Assert.Equal("Nothing", FormatNull(Of String)(useHexadecimal:=True))
 
@@ -182,10 +187,15 @@ Namespace Microsoft.CodeAnalysis.VisualBasic.ExpressionEvaluator
             Dim multiByte = ChrW(&HD83C) & ChrW(&HDFC8)
             Assert.Equal("""🏈""", FormatValue(multiByte))
             Assert.Equal("""🏈""", FormatValue(multiByte, useHexadecimal:=True))
+            Assert.Equal("🏈", multiByte)
+
+            multiByte = ChrW(&HDFC8) & ChrW(&HD83C)
+            Assert.Equal("ChrW(57288) & ChrW(55356)", FormatValue(multiByte))
+            Assert.Equal("ChrW(&HDFC8) & ChrW(&HD83C)", FormatValue(multiByte, useHexadecimal:=True))
         End Sub
 
         <Fact>
-        Sub Void()
+        Public Sub Void()
             ' Something happens but, in practice, we expect the debugger to recognize
             ' that the value is of type void and turn it into the error string 
             ' "Expression has been evaluated and has no value".
@@ -193,21 +203,21 @@ Namespace Microsoft.CodeAnalysis.VisualBasic.ExpressionEvaluator
         End Sub
 
         <Fact>
-        Sub InvalidValue_1()
+        Public Sub InvalidValue_1()
             Const errorMessage = "An error has occurred."
             Dim clrValue = CreateDkmClrValue(errorMessage, GetType(String), evalFlags:=DkmEvaluationResultFlags.None, valueFlags:=DkmClrValueFlags.Error)
             Assert.Equal(errorMessage, (DirectCast(FormatResult("invalidIdentifier", clrValue), DkmFailedEvaluationResult)).ErrorMessage)
         End Sub
 
         <Fact>
-        Sub InvalidValue_2()
+        Public Sub InvalidValue_2()
             Const errorMessage = "An error has occurred."
             Dim clrValue = CreateDkmClrValue(errorMessage, GetType(Integer), evalFlags:=DkmEvaluationResultFlags.None, valueFlags:=DkmClrValueFlags.Error)
             Assert.Equal(errorMessage, (DirectCast(FormatResult("invalidIdentifier", clrValue), DkmFailedEvaluationResult)).ErrorMessage)
         End Sub
 
         <Fact>
-        Sub NonFlagsEnum()
+        Public Sub NonFlagsEnum()
             Dim source = "
 Enum E
     A = 1
@@ -225,7 +235,7 @@ End Enum
         End Sub
 
         <Fact>
-        Sub NonFlagsEnum_Negative()
+        Public Sub NonFlagsEnum_Negative()
             Dim source = "
 Enum E
     A = -1
@@ -243,7 +253,7 @@ End Enum
         End Sub
 
         <Fact>
-        Sub NonFlagsEnum_Order()
+        Public Sub NonFlagsEnum_Order()
             Dim source = "
 Enum E1
     A = 1
@@ -266,7 +276,7 @@ End Enum
         End Sub
 
         <Fact>
-        Sub FlagsEnum()
+        Public Sub FlagsEnum()
             Dim source = "
 Imports System
 
@@ -288,7 +298,7 @@ End Enum
         End Sub
 
         <Fact>
-        Sub FlagsEnum_Zero()
+        Public Sub FlagsEnum_Zero()
             Dim source = "
 Imports System
 
@@ -311,7 +321,7 @@ End Enum
         End Sub
 
         <Fact>
-        Sub FlagsEnum_Combination()
+        Public Sub FlagsEnum_Combination()
             Dim source = "
 Imports System
 
@@ -335,7 +345,7 @@ End Enum
         End Sub
 
         <Fact>
-        Sub FlagsEnum_Negative()
+        Public Sub FlagsEnum_Negative()
             Dim source = "
 Imports System
 
@@ -358,7 +368,7 @@ End Enum
         End Sub
 
         <Fact>
-        Sub FlagsEnum_Order()
+        Public Sub FlagsEnum_Order()
             Dim source = "
 Imports System
 
@@ -395,7 +405,7 @@ End Enum
         End Sub
 
         <Fact>
-        Sub Arrays()
+        Public Sub Arrays()
             Dim source = "
 Namespace N
     Public Class A(Of T)
@@ -423,7 +433,7 @@ End Namespace
         End Sub
 
         <Fact>
-        Sub Pointers()
+        Public Sub Pointers()
             Dim pointerType = GetType(Integer).MakePointerType()
             Dim doublePointerType = pointerType.MakePointerType()
 
@@ -435,7 +445,7 @@ End Namespace
         End Sub
 
         <Fact>
-        Sub Nullable()
+        Public Sub Nullable()
             Dim source = "
 Namespace N
     Public Structure A(Of T)
@@ -463,7 +473,7 @@ End Namespace
         End Sub
 
         <Fact>
-        Sub ToStringOverrides()
+        Public Sub ToStringOverrides()
             Dim source = "
 Public Class A(Of T)
 End Class
@@ -492,7 +502,7 @@ End Class
         End Sub
 
         <Fact>
-        Sub ValuesWithUnderlyingString()
+        Public Sub ValuesWithUnderlyingString()
             Assert.True(HasUnderlyingString("Test"))
             Assert.False(HasUnderlyingString(Nothing, GetType(String)))
             Assert.False(HasUnderlyingString(0))
@@ -504,12 +514,12 @@ End Class
         End Sub
 
         <Fact>
-        Sub VisualizeString()
+        Public Sub VisualizeString()
             Assert.Equal(vbCrLf, GetUnderlyingString(vbCrLf))
         End Sub
 
         <Fact>
-        Sub VisualizeSqlString()
+        Public Sub VisualizeSqlString()
             Dim source = "
 Namespace System.Data.SqlTypes
     Public Structure SqlString
@@ -530,7 +540,7 @@ End Namespace
         End Sub
 
         <Fact>
-        Sub VisualizeXNode()
+        Public Sub VisualizeXNode()
             Dim source = "
 Namespace System.Xml.Linq
     Public Class XNode
@@ -558,16 +568,69 @@ End Namespace
         End Sub
 
         <Fact>
-        Sub Dates()
+        Public Sub Dates()
             Assert.Equal("#1/1/0001 12:00:00 AM#", FormatValue(New Date(0)))
             Assert.Equal("#1/1/1970 12:00:00 AM#", FormatValue(New Date(1970, 1, 1)))
             Assert.Equal("#1/1/0001 12:00:00 PM#", FormatValue(New Date(1, 1, 1, 12, 0, 0, 0)))
-            Assert.Equal("#1/1/0001 12:00:00 PM#", FormatValue(New Date(1, 1, 1, 12, 0, 0, 0), useHexadecimal:=True)) ' Hexadecimal setting shouldn't change ouptut
+            Assert.Equal("#1/1/0001 12:00:00 PM#", FormatValue(New Date(1, 1, 1, 12, 0, 0, 0), useHexadecimal:=True)) ' Hexadecimal setting shouldn't change output
             ' DateTimeKind is stored in the top two bits of the ULong value that backs the DateTime instance.
             ' We need to make sure we don't throw an Exception when those bits are set to non-zero values.
             Assert.Equal("#1/1/1970 12:00:00 AM#", FormatValue(New Date(&H89F7FF5F7B58000, DateTimeKind.Local)))
             Assert.Equal("#1/1/1970 12:00:00 AM#", FormatValue(New Date(&H89F7FF5F7B58000, DateTimeKind.Utc)))
         End Sub
+
+        <Fact>
+        Public Sub HostValueNotFound_Integer()
+            Dim clrValue = New DkmClrValue(value:=Nothing, hostObjectValue:=Nothing, New DkmClrType(CType(GetType(Integer), TypeImpl)),
+                alias:=Nothing, evalFlags:=DkmEvaluationResultFlags.None, valueFlags:=DkmClrValueFlags.None)
+
+            Assert.Equal(Resources.HostValueNotFound, FormatValue(clrValue))
+        End Sub
+
+        <Fact>
+        Public Sub HostValueNotFound_char()
+            Dim clrValue = New DkmClrValue(value:=Nothing, hostObjectValue:=Nothing, New DkmClrType(CType(GetType(Char), TypeImpl)),
+                                           alias:=Nothing, evalFlags:=DkmEvaluationResultFlags.None, valueFlags:=DkmClrValueFlags.None)
+
+            Assert.Equal(Resources.HostValueNotFound, FormatValue(clrValue))
+        End Sub
+
+        <Fact>
+        Public Sub HostValueNotFound_IntPtr()
+            Dim clrValue = New DkmClrValue(value:=Nothing, hostObjectValue:=Nothing, New DkmClrType(CType(GetType(IntPtr), TypeImpl)),
+                                           alias:=Nothing, evalFlags:=DkmEvaluationResultFlags.None, valueFlags:=DkmClrValueFlags.None)
+
+            Assert.Equal(Resources.HostValueNotFound, FormatValue(clrValue))
+        End Sub
+
+        <Fact>
+        Public Sub HostValueNotFound_UIntPtr()
+            Dim clrValue = New DkmClrValue(value:=Nothing, hostObjectValue:=Nothing, New DkmClrType(CType(GetType(UIntPtr), TypeImpl)),
+                                           alias:=Nothing, evalFlags:=DkmEvaluationResultFlags.None, valueFlags:=DkmClrValueFlags.None)
+
+            Assert.Equal(Resources.HostValueNotFound, FormatValue(clrValue))
+        End Sub
+
+        <Fact>
+        Public Sub HostValueNotFound_Enum()
+            Dim clrValue = New DkmClrValue(value:=Nothing, hostObjectValue:=Nothing, New DkmClrType(CType(GetType(TestEnum), TypeImpl)),
+                                           alias:=Nothing, evalFlags:=DkmEvaluationResultFlags.None, valueFlags:=DkmClrValueFlags.None)
+
+            Assert.Equal(Resources.HostValueNotFound, FormatValue(clrValue))
+        End Sub
+
+        ' DateTime is a primitive type in VB but not in C#.
+        <Fact>
+        Public Sub HostValueNotFound_DateTime()
+            Dim clrValue = New DkmClrValue(value:=Nothing, hostObjectValue:=Nothing, New DkmClrType(CType(GetType(DateTime), TypeImpl)),
+                                           alias:=Nothing, evalFlags:=DkmEvaluationResultFlags.None, valueFlags:=DkmClrValueFlags.None)
+
+            Assert.Equal(Resources.HostValueNotFound, FormatValue(clrValue))
+        End Sub
+
+        Private Enum TestEnum
+            One
+        End Enum
 
     End Class
 

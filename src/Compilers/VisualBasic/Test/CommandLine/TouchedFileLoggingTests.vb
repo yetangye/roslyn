@@ -1,11 +1,13 @@
-﻿' Copyright (c) Microsoft.  All Rights Reserved.  Licensed under the Apache License, Version 2.0.  See License.txt in the project root for license information.
+﻿' Licensed to the .NET Foundation under one or more agreements.
+' The .NET Foundation licenses this file to you under the MIT license.
+' See the LICENSE file in the project root for more information.
 
 Imports System.Globalization
 Imports System.IO
+Imports System.Reflection
 Imports System.Runtime.InteropServices
-Imports Microsoft.CodeAnalysis.CompilerServer
 Imports Microsoft.CodeAnalysis.Test.Utilities
-Imports Microsoft.CodeAnalysis.Test.Utilities.SharedResourceHelpers
+Imports Roslyn.Test.Utilities.SharedResourceHelpers
 Imports Microsoft.CodeAnalysis.VisualBasic.UnitTests
 Imports Xunit
 
@@ -14,11 +16,11 @@ Namespace Microsoft.CodeAnalysis.VisualBasic.CommandLine.UnitTests
     Public Class TouchedFileLoggingTests
         Inherits BasicTestBase
 
-        Private Shared ReadOnly libDirectory As String = Environment.GetEnvironmentVariable("LIB")
+        Private Shared ReadOnly s_libDirectory As String = Environment.GetEnvironmentVariable("LIB")
 
-        Private ReadOnly baseDirectory As String = TempRoot.Root
+        Private ReadOnly _baseDirectory As String = TempRoot.Root
 
-        Private ReadOnly helloWorldCS As String = <text>
+        Private ReadOnly _helloWorldCS As String = <text>
 Imports System
 Class C
     Shared Sub Main(args As String())
@@ -29,11 +31,11 @@ End Class
 
         <Fact>
         Public Sub TrivialSourceFileOnlyVbc()
-            Dim hello = Temp.CreateFile().WriteAllText(helloWorldCS).Path
+            Dim hello = Temp.CreateFile().WriteAllText(_helloWorldCS).Path
             Dim touchedDir = Temp.CreateDirectory()
             Dim touchedBase = Path.Combine(touchedDir.Path, "touched")
 
-            Dim cmd = New MockVisualBasicCompiler(Nothing, baseDirectory,
+            Dim cmd = New MockVisualBasicCompiler(Nothing, _baseDirectory,
                 {"/nologo",
                  "/touchedfiles:" + touchedBase,
                  hello})
@@ -59,13 +61,13 @@ End Class
 
         <Fact>
         Public Sub StrongNameKeyVbc()
-            Dim hello = Temp.CreateFile().WriteAllText(helloWorldCS).Path
-            Dim snkPath = Temp.CreateFile("TestKeyPair_", ".snk").WriteAllBytes(TestResources.SymbolsTests.General.snKey).Path
+            Dim hello = Temp.CreateFile().WriteAllText(_helloWorldCS).Path
+            Dim snkPath = Temp.CreateFile("TestKeyPair_", ".snk").WriteAllBytes(TestResources.General.snKey).Path
             Dim touchedDir = Temp.CreateDirectory()
             Dim touchedBase = Path.Combine(touchedDir.Path, "touched")
 
             Dim outWriter = New StringWriter(CultureInfo.InvariantCulture)
-            Dim cmd = New MockVisualBasicCompiler(Nothing, baseDirectory,
+            Dim cmd = New MockVisualBasicCompiler(Nothing, _baseDirectory,
                 {"/nologo",
                  "/touchedfiles:" + touchedBase,
                  "/keyfile:" + snkPath,
@@ -106,7 +108,7 @@ End Class
             Dim touchedDir = Temp.CreateDirectory()
             Dim touchedBase = Path.Combine(touchedDir.Path, "touched")
 
-            Dim cmd = New MockVisualBasicCompiler(Nothing, baseDirectory,
+            Dim cmd = New MockVisualBasicCompiler(Nothing, _baseDirectory,
                 {"/nologo",
                  "/target:library",
                  "/doc:" + xml.Path,
@@ -154,47 +156,6 @@ End Class
             CleanupAllGeneratedFiles(xml.Path)
         End Sub
 
-        <Fact>
-        Public Sub TrivialMetadataCaching()
-            Dim folderList As New List(Of String)
-            Dim filelist As New List(Of String)
-
-            For i = 0 To 2 - 1
-                Dim source1 = Temp.CreateFile().WriteAllText(helloWorldCS).Path
-                Dim touchedDir = Temp.CreateDirectory()
-                Dim touchedBase = Path.Combine(touchedDir.Path, "touched")
-                filelist.Add(source1)
-                folderList.Add(touchedDir.Path)
-
-                Dim outWriter = New StringWriter()
-                Dim cmd = New VisualBasicCompilerServer(Nothing,
-                    {"/nologo",
-                     "/touchedfiles:" + touchedBase,
-                     source1},
-                    baseDirectory,
-                    libDirectory,
-                    Path.GetTempPath())
-                Dim expectedReads As List(Of String) = Nothing
-                Dim expectedWrites As List(Of String) = Nothing
-                BuildTouchedFiles(cmd,
-                                  Path.ChangeExtension(source1, "exe"),
-                                  expectedReads,
-                                  expectedWrites)
-
-                Dim exitCode = cmd.Run(outWriter, Nothing)
-                Assert.Equal(String.Empty, outWriter.ToString().Trim())
-                Assert.Equal(0, exitCode)
-
-                AssertTouchedFilesEqual(expectedReads,
-                                        expectedWrites,
-                                        touchedBase)
-            Next
-
-            For Each f In filelist
-                CleanupAllGeneratedFiles(f)
-            Next
-        End Sub
-
         ''' <summary>
         ''' Builds the expected base of touched files.
         ''' Adds a hook for temporary file creation as well,
@@ -219,9 +180,6 @@ End Class
 
             Dim writes = New List(Of String)
             writes.Add(outputPath)
-            AddHandler cmd.OnCreateTempFile, Sub(tempPath, stream)
-                                                 writes.Add(tempPath)
-                                             End Sub
             expectedWrites = writes
         End Sub
 
@@ -239,6 +197,18 @@ End Class
             Assert.Equal(String.Join(vbCrLf, expected),
                          File.ReadAllText(touchedWritesPath).Trim())
         End Sub
+
+        Private Class TestAnalyzerAssemblyLoader
+            Implements IAnalyzerAssemblyLoader
+
+            Public Sub AddDependencyLocation(fullPath As String) Implements IAnalyzerAssemblyLoader.AddDependencyLocation
+                Throw New NotImplementedException()
+            End Sub
+
+            Public Function LoadFromPath(fullPath As String) As Assembly Implements IAnalyzerAssemblyLoader.LoadFromPath
+                Throw New NotImplementedException()
+            End Function
+        End Class
 
     End Class
 End Namespace

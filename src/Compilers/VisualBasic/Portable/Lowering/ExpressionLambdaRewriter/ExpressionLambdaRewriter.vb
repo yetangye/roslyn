@@ -1,4 +1,6 @@
-﻿' Copyright (c) Microsoft.  All Rights Reserved.  Licensed under the Apache License, Version 2.0.  See License.txt in the project root for license information.
+﻿' Licensed to the .NET Foundation under one or more agreements.
+' The .NET Foundation licenses this file to you under the MIT license.
+' See the LICENSE file in the project root for more information.
 
 Imports System
 Imports System.Collections.Generic
@@ -7,6 +9,7 @@ Imports System.Diagnostics
 Imports System.Linq
 Imports System.Runtime.InteropServices
 Imports System.Text
+Imports Microsoft.CodeAnalysis.PooledObjects
 Imports Microsoft.CodeAnalysis.Text
 Imports Microsoft.CodeAnalysis.VisualBasic.Symbols
 Imports Microsoft.CodeAnalysis.VisualBasic.Syntax
@@ -34,11 +37,15 @@ Namespace Microsoft.CodeAnalysis.VisualBasic
 
         Private ReadOnly _parameterMap As Dictionary(Of ParameterSymbol, BoundExpression) = New Dictionary(Of ParameterSymbol, BoundExpression)()
 
-        Private Sub New(currentMethod As MethodSymbol, compilationState As TypeCompilationState, typeMap As TypeSubstitution, binder As Binder, node As VisualBasicSyntaxNode, diagnostics As DiagnosticBag)
+        Private _recursionDepth As Integer
+
+        Private Sub New(currentMethod As MethodSymbol, compilationState As TypeCompilationState, typeMap As TypeSubstitution, binder As Binder,
+                        node As SyntaxNode, recursionDepth As Integer, diagnostics As BindingDiagnosticBag)
             _binder = binder
             _typeMap = typeMap
             _factory = New SyntheticBoundNodeFactory(Nothing, currentMethod, node, compilationState, diagnostics)
             _expressionType = _factory.WellKnownType(WellKnownType.System_Linq_Expressions_Expression)
+            _recursionDepth = recursionDepth
         End Sub
 
         Public ReadOnly Property ElementInitType As NamedTypeSymbol
@@ -94,10 +101,11 @@ Namespace Microsoft.CodeAnalysis.VisualBasic
                                              delegateType As NamedTypeSymbol,
                                              compilationState As TypeCompilationState,
                                              typeMap As TypeSubstitution,
-                                             diagnostics As DiagnosticBag,
-                                             rewrittenNodes As HashSet(Of BoundNode)) As BoundExpression
+                                             diagnostics As BindingDiagnosticBag,
+                                             rewrittenNodes As HashSet(Of BoundNode),
+                                             recursionDepth As Integer) As BoundExpression
 
-            Dim r As New ExpressionLambdaRewriter(currentMethod, compilationState, typeMap, node.LambdaSymbol.ContainingBinder, node.Syntax, diagnostics)
+            Dim r As New ExpressionLambdaRewriter(currentMethod, compilationState, typeMap, node.LambdaSymbol.ContainingBinder, node.Syntax, recursionDepth, diagnostics)
             Dim expressionTree As BoundExpression = r.VisitLambdaInternal(node, delegateType)
 
             If Not expressionTree.HasErrors Then
@@ -106,13 +114,14 @@ Namespace Microsoft.CodeAnalysis.VisualBasic
                                                                      compilationState,
                                                                      previousSubmissionFields:=Nothing,
                                                                      diagnostics:=diagnostics,
-                                                                     rewrittenNodes:=rewrittenNodes)
+                                                                     rewrittenNodes:=rewrittenNodes,
+                                                                     recursionDepth:=recursionDepth)
             End If
 
             Return expressionTree
         End Function
 
-        Private ReadOnly Property Diagnostics As DiagnosticBag
+        Private ReadOnly Property Diagnostics As BindingDiagnosticBag
             Get
                 Return _factory.Diagnostics
             End Get
@@ -121,7 +130,7 @@ Namespace Microsoft.CodeAnalysis.VisualBasic
         Private Function TranslateLambdaBody(block As BoundBlock) As BoundExpression
             ' VB expression trees can be only one statement. Similar analysis is performed 
             ' in DiagnosticsPass, but it does not take into account how the statements
-            ' are rewritten, so here we recheck lowered lambda bodiess as well.
+            ' are rewritten, so here we recheck lowered lambda bodies as well.
 
             ' There might be a sequence point at the beginning.
             ' There may be a label and return statement at the end also but the expression tree ignores that.
@@ -149,7 +158,7 @@ lSelect:
                     If expression IsNot Nothing Then
                         Return Visit(expression)
                     End If
-                    ' Otherwise fall through and generate an error
+                ' Otherwise fall through and generate an error
 
                 Case BoundKind.ExpressionStatement
                     Return Visit((DirectCast(stmt, BoundExpressionStatement)).Expression)
@@ -181,14 +190,14 @@ lSelect:
             End If
 
             ' Set the syntax node for bound nodes we are generating.
-            Dim old As VisualBasicSyntaxNode = _factory.Syntax
+            Dim old As SyntaxNode = _factory.Syntax
             _factory.Syntax = node.Syntax
             Dim result = VisitInternal(node)
             _factory.Syntax = old
             Return _factory.Convert(_expressionType, result)
         End Function
 
-        Private Function VisitInternal(node As BoundExpression) As BoundExpression
+        Private Function VisitExpressionWithoutStackGuard(node As BoundExpression) As BoundExpression
             Select Case node.Kind
                 Case BoundKind.ArrayCreation
                     Return VisitArrayCreation(DirectCast(node, BoundArrayCreation))
@@ -211,7 +220,11 @@ lSelect:
                 Case BoundKind.DirectCast
                     Return VisitDirectCast(DirectCast(node, BoundDirectCast))
                 Case BoundKind.FieldAccess
-                    Return VisitFieldAccess(DirectCast(node, BoundFieldAccess))
+                    Dim fieldAccess = DirectCast(node, BoundFieldAccess)
+                    If fieldAccess.FieldSymbol.IsCapturedFrame Then
+                        Return CreateLiteralExpression(node)
+                    End If
+                    Return VisitFieldAccess(fieldAccess)
                 Case BoundKind.Lambda
                     Return VisitLambda(DirectCast(node, BoundLambda))
                 Case BoundKind.NewT
@@ -271,6 +284,36 @@ lSelect:
             End Select
         End Function
 
+        Private Function VisitInternal(node As BoundExpression) As BoundExpression
+            Dim result As BoundExpression
+            _recursionDepth += 1
+
+#If DEBUG Then
+            Dim saveRecursionDepth = _recursionDepth
+#End If
+
+            If _recursionDepth > 1 Then
+                StackGuard.EnsureSufficientExecutionStack(_recursionDepth)
+                result = VisitExpressionWithoutStackGuard(node)
+            Else
+                result = VisitExpressionWithStackGuard(node)
+            End If
+
+#If DEBUG Then
+            Debug.Assert(saveRecursionDepth = _recursionDepth)
+#End If
+            _recursionDepth -= 1
+            Return result
+        End Function
+
+        Private Function VisitExpressionWithStackGuard(node As BoundExpression) As BoundExpression
+            Try
+                Return VisitExpressionWithoutStackGuard(node)
+            Catch ex As InsufficientExecutionStackException
+                Throw New BoundTreeVisitor.CancelledByStackGuardException(ex, node)
+            End Try
+        End Function
+
         Private Function VisitLambdaInternal(node As BoundLambda, delegateType As NamedTypeSymbol) As BoundExpression
             Dim parameterExpressionType = _factory.WellKnownType(WellKnownType.System_Linq_Expressions_ParameterExpression)
 
@@ -290,7 +333,7 @@ lSelect:
                 parameters.Add(parameterReference)
                 _parameterMap(p) = parameterReference
 
-                Dim parameter As BoundExpression = ConvertRuntimeHelperToExpressionTree("Parameter", _factory.[Typeof](p.Type.InternalSubstituteTypeParameters(_typeMap)), _factory.Literal(p.Name))
+                Dim parameter As BoundExpression = ConvertRuntimeHelperToExpressionTree("Parameter", _factory.[Typeof](p.Type.InternalSubstituteTypeParameters(_typeMap).Type), _factory.Literal(p.Name))
                 If Not parameter.HasErrors Then
                     initializers.Add(_factory.AssignmentExpression(parameterReferenceLValue, parameter))
                 End If
@@ -428,9 +471,12 @@ lSelect:
 
             Dim methodInfo As BoundExpression = Me._factory.MethodInfo(If(method.CallsiteReducedFromMethod, method))
 
-            Dim useSiteError As DiagnosticInfo = Nothing
-            Dim createDelegate = Binder.GetWellKnownTypeMember(Me._factory.Compilation, WellKnownMember.System_Reflection_MethodInfo__CreateDelegate, useSiteError)
-            If createDelegate IsNot Nothing And useSiteError Is Nothing Then
+            Dim useSiteInfo As UseSiteInfo(Of AssemblySymbol) = Nothing
+            Dim createDelegate = Binder.GetWellKnownTypeMember(Me._factory.Compilation, WellKnownMember.System_Reflection_MethodInfo__CreateDelegate, useSiteInfo)
+            If createDelegate IsNot Nothing And useSiteInfo.DiagnosticInfo Is Nothing Then
+
+                Diagnostics.AddDependencies(useSiteInfo)
+
                 ' beginning in 4.5, we do it this way
                 result = Me._factory.Call(methodInfo,
                                           DirectCast(createDelegate, MethodSymbol),
@@ -546,7 +592,7 @@ lSelect:
                 Dim right As BoundExpression = assignment.Right
 
                 Debug.Assert(initializer.PlaceholderOpt IsNot Nothing)
-                Debug.Assert(Not BoundNodeFinder.ContainsNode(right, initializer.PlaceholderOpt), "Should be addressed in DiagnosticsPass")
+                Debug.Assert(Not BoundNodeFinder.ContainsNode(right, initializer.PlaceholderOpt, _recursionDepth, convertInsufficientExecutionStackExceptionToCancelledByStackGuardException:=True), "Should be addressed in DiagnosticsPass")
                 Debug.Assert(leftSymbol.Kind = SymbolKind.Field OrElse leftSymbol.Kind = SymbolKind.Property)
 
                 Dim memberRef As BoundExpression = If(leftSymbol.Kind = SymbolKind.Field,
@@ -567,12 +613,21 @@ lSelect:
             For i = 0 To initializerCount - 1
                 Debug.Assert(initializers(i).Kind = BoundKind.Call)
                 Dim [call] = DirectCast(initializers(i), BoundCall)
+
+                ' Note, for extension methods we are dropping the "Me" parameter to remove
+                ' BoundCollectionInitializerExpression.PlaceholderOpt references from the tree.
+                ' Otherwise, IL generation fails because it doesn't know what to do with it.
+                ' At run-time, this code is going to throw because ElementInit API doesn't accept
+                ' shared methods. We don't fail compilation in this scenario due to backward
+                ' compatibility reasons.
                 newInitializers(i) = _factory.Convert(
                                             ElementInitType,
                                             ConvertRuntimeHelperToExpressionTree(
                                                     "ElementInit",
                                                     _factory.MethodInfo([call].Method),
-                                                    ConvertArgumentsIntoArray([call].Arguments)))
+                                                    ConvertArgumentsIntoArray(If([call].Method.IsShared AndAlso [call].Method.IsExtensionMethod,
+                                                                                 [call].Arguments.RemoveAt(0),
+                                                                                 [call].Arguments))))
             Next
 
             Return _factory.Array(ElementInitType, newInitializers.AsImmutableOrNull())
@@ -621,7 +676,7 @@ lSelect:
             ' All other cases are not supported, note that some cases of invalid
             ' sequences are handled in DiagnosticsPass, but we still want to catch
             ' here those sequences created in lowering
-            Return GenerateDiagnosticAndReturnDummyExpression(ERRID.ERR_ExpressionTreeNotSupported, value)
+            Return GenerateDiagnosticAndReturnDummyExpression(ERRID.ERR_ExpressionTreeNotSupported, node)
         End Function
 
         Private Function VisitArrayLength(node As BoundArrayLength) As BoundExpression
@@ -635,8 +690,9 @@ lSelect:
                                 node.Expression,
                                 ImmutableArray(Of BoundExpression).Empty,
                                 Nothing,
-                                True,
-                                resultType))
+                                isLValue:=False,
+                                suppressObjectClone:=True,
+                                type:=resultType))
             Else
                 Return ConvertRuntimeHelperToExpressionTree("ArrayLength", Visit(node.Expression))
             End If
@@ -647,7 +703,7 @@ lSelect:
             Dim boundType As BoundExpression = _factory.[Typeof](arrayType.ElementType)
             Dim initializer As BoundArrayInitialization = node.InitializerOpt
             If initializer IsNot Nothing AndAlso Not initializer.Initializers.IsEmpty Then
-                Debug.Assert(arrayType.Rank = 1, "Rank > 1 should be addressed in DiagnosticsPass")
+                Debug.Assert(arrayType.IsSZArray, "Not SZArray should be addressed in DiagnosticsPass")
                 Return ConvertRuntimeHelperToExpressionTree("NewArrayInit", boundType, ConvertArgumentsIntoArray(node.InitializerOpt.Initializers))
             Else
                 Return ConvertRuntimeHelperToExpressionTree("NewArrayBounds", boundType, ConvertArgumentsIntoArray(node.Bounds))
@@ -767,14 +823,14 @@ lSelect:
             Dim group As BoundMethodGroup = Nothing
             Dim result = LookupResult.GetInstance()
 
-            Dim useSiteDiagnostics As HashSet(Of DiagnosticInfo) = Nothing
+            Dim useSiteInfo = _binder.GetNewCompoundUseSiteInfo(Me.Diagnostics)
             _binder.LookupMember(result,
                                  Me._expressionType,
                                  methodName,
                                  arity:=0,
                                  options:=LookupOptions.AllMethodsOfAnyArity Or LookupOptions.IgnoreExtensionMethods,
-                                 useSiteDiagnostics:=useSiteDiagnostics)
-            Me.Diagnostics.Add(Me._factory.Syntax, useSiteDiagnostics)
+                                 useSiteInfo:=useSiteInfo)
+            Me.Diagnostics.Add(Me._factory.Syntax, useSiteInfo)
 
             If result.IsGood Then
                 Debug.Assert(result.Symbols.Count > 0)

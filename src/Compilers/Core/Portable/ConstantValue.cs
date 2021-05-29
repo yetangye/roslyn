@@ -1,8 +1,11 @@
-﻿// Copyright (c) Microsoft.  All Rights Reserved.  Licensed under the Apache License, Version 2.0.  See License.txt in the project root for license information.
+﻿// Licensed to the .NET Foundation under one or more agreements.
+// The .NET Foundation licenses this file to you under the MIT license.
+// See the LICENSE file in the project root for more information.
 
 using System;
 using System.Diagnostics;
-using Microsoft.CodeAnalysis.Text;
+using System.Diagnostics.CodeAnalysis;
+using System.Reflection.Metadata;
 using Roslyn.Utilities;
 
 namespace Microsoft.CodeAnalysis
@@ -20,6 +23,8 @@ namespace Microsoft.CodeAnalysis
         UInt32,
         Int64,
         UInt64,
+        NInt,
+        NUInt,
         Char,
         Boolean,
         Single,
@@ -29,12 +34,14 @@ namespace Microsoft.CodeAnalysis
         DateTime,
     }
 
-    internal abstract partial class ConstantValue : IEquatable<ConstantValue>
+    internal abstract partial class ConstantValue : IEquatable<ConstantValue?>
     {
         public abstract ConstantValueTypeDiscriminator Discriminator { get; }
         internal abstract SpecialType SpecialType { get; }
 
-        public virtual string StringValue { get { throw new InvalidOperationException(); } }
+        public virtual string? StringValue { get { throw new InvalidOperationException(); } }
+        internal virtual Rope? RopeValue { get { throw new InvalidOperationException(); } }
+
         public virtual bool BooleanValue { get { throw new InvalidOperationException(); } }
 
         public virtual sbyte SByteValue { get { throw new InvalidOperationException(); } }
@@ -87,13 +94,19 @@ namespace Microsoft.CodeAnalysis
         public static ConstantValue True { get { return ConstantValueOne.Boolean; } }
         public static ConstantValue False { get { return ConstantValueDefault.Boolean; } }
 
-        public static ConstantValue Create(string value)
+        public static ConstantValue Create(string? value)
         {
             if (value == null)
             {
                 return Null;
             }
 
+            return new ConstantValueString(value);
+        }
+
+        internal static ConstantValue CreateFromRope(Rope value)
+        {
+            RoslynDebug.Assert(value != null);
             return new ConstantValueString(value);
         }
 
@@ -219,6 +232,34 @@ namespace Microsoft.CodeAnalysis
             return new ConstantValueI64(value);
         }
 
+        public static ConstantValue CreateNativeInt(Int32 value)
+        {
+            if (value == 0)
+            {
+                return ConstantValueDefault.NInt;
+            }
+            else if (value == 1)
+            {
+                return ConstantValueOne.NInt;
+            }
+
+            return new ConstantValueNativeInt(value);
+        }
+
+        public static ConstantValue CreateNativeUInt(UInt32 value)
+        {
+            if (value == 0)
+            {
+                return ConstantValueDefault.NUInt;
+            }
+            else if (value == 1)
+            {
+                return ConstantValueOne.NUInt;
+            }
+
+            return new ConstantValueNativeInt(value);
+        }
+
         public static ConstantValue Create(bool value)
         {
             if (value)
@@ -233,7 +274,7 @@ namespace Microsoft.CodeAnalysis
 
         public static ConstantValue Create(float value)
         {
-            if (value == 0 && 1 / value > 0)
+            if (BitConverter.DoubleToInt64Bits(value) == 0)
             {
                 return ConstantValueDefault.Single;
             }
@@ -247,7 +288,7 @@ namespace Microsoft.CodeAnalysis
 
         public static ConstantValue CreateSingle(double value)
         {
-            if (value == 0 && 1 / value > 0)
+            if (BitConverter.DoubleToInt64Bits(value) == 0)
             {
                 return ConstantValueDefault.Single;
             }
@@ -261,7 +302,7 @@ namespace Microsoft.CodeAnalysis
 
         public static ConstantValue Create(double value)
         {
-            if (value == 0 && 1 / value > 0)
+            if (BitConverter.DoubleToInt64Bits(value) == 0)
             {
                 return ConstantValueDefault.Double;
             }
@@ -331,6 +372,8 @@ namespace Microsoft.CodeAnalysis
                 case ConstantValueTypeDiscriminator.UInt32: return Create((uint)value);
                 case ConstantValueTypeDiscriminator.Int64: return Create((long)value);
                 case ConstantValueTypeDiscriminator.UInt64: return Create((ulong)value);
+                case ConstantValueTypeDiscriminator.NInt: return CreateNativeInt((int)value);
+                case ConstantValueTypeDiscriminator.NUInt: return CreateNativeUInt((uint)value);
                 case ConstantValueTypeDiscriminator.Char: return Create((char)value);
                 case ConstantValueTypeDiscriminator.Boolean: return Create((bool)value);
                 case ConstantValueTypeDiscriminator.Single:
@@ -368,6 +411,8 @@ namespace Microsoft.CodeAnalysis
                 case ConstantValueTypeDiscriminator.UInt32: return ConstantValueDefault.UInt32;
                 case ConstantValueTypeDiscriminator.Int64: return ConstantValueDefault.Int64;
                 case ConstantValueTypeDiscriminator.UInt64: return ConstantValueDefault.UInt64;
+                case ConstantValueTypeDiscriminator.NInt: return ConstantValueDefault.NInt;
+                case ConstantValueTypeDiscriminator.NUInt: return ConstantValueDefault.NUInt;
                 case ConstantValueTypeDiscriminator.Char: return ConstantValueDefault.Char;
                 case ConstantValueTypeDiscriminator.Boolean: return ConstantValueDefault.Boolean;
                 case ConstantValueTypeDiscriminator.Single: return ConstantValueDefault.Single;
@@ -394,6 +439,8 @@ namespace Microsoft.CodeAnalysis
                 case SpecialType.System_UInt32: return ConstantValueTypeDiscriminator.UInt32;
                 case SpecialType.System_Int64: return ConstantValueTypeDiscriminator.Int64;
                 case SpecialType.System_UInt64: return ConstantValueTypeDiscriminator.UInt64;
+                case SpecialType.System_IntPtr: return ConstantValueTypeDiscriminator.NInt;
+                case SpecialType.System_UIntPtr: return ConstantValueTypeDiscriminator.NUInt;
                 case SpecialType.System_Char: return ConstantValueTypeDiscriminator.Char;
                 case SpecialType.System_Boolean: return ConstantValueTypeDiscriminator.Boolean;
                 case SpecialType.System_Single: return ConstantValueTypeDiscriminator.Single;
@@ -418,6 +465,8 @@ namespace Microsoft.CodeAnalysis
                 case ConstantValueTypeDiscriminator.UInt32: return SpecialType.System_UInt32;
                 case ConstantValueTypeDiscriminator.Int64: return SpecialType.System_Int64;
                 case ConstantValueTypeDiscriminator.UInt64: return SpecialType.System_UInt64;
+                case ConstantValueTypeDiscriminator.NInt: return SpecialType.System_IntPtr;
+                case ConstantValueTypeDiscriminator.NUInt: return SpecialType.System_UIntPtr;
                 case ConstantValueTypeDiscriminator.Char: return SpecialType.System_Char;
                 case ConstantValueTypeDiscriminator.Boolean: return SpecialType.System_Boolean;
                 case ConstantValueTypeDiscriminator.Single: return SpecialType.System_Single;
@@ -429,7 +478,7 @@ namespace Microsoft.CodeAnalysis
             }
         }
 
-        public object Value
+        public object? Value
         {
             get
             {
@@ -437,19 +486,21 @@ namespace Microsoft.CodeAnalysis
                 {
                     case ConstantValueTypeDiscriminator.Bad: return null;
                     case ConstantValueTypeDiscriminator.Null: return null;
-                    case ConstantValueTypeDiscriminator.SByte: return SByteValue;
-                    case ConstantValueTypeDiscriminator.Byte: return ByteValue;
-                    case ConstantValueTypeDiscriminator.Int16: return Int16Value;
-                    case ConstantValueTypeDiscriminator.UInt16: return UInt16Value;
-                    case ConstantValueTypeDiscriminator.Int32: return Int32Value;
-                    case ConstantValueTypeDiscriminator.UInt32: return UInt32Value;
-                    case ConstantValueTypeDiscriminator.Int64: return Int64Value;
-                    case ConstantValueTypeDiscriminator.UInt64: return UInt64Value;
-                    case ConstantValueTypeDiscriminator.Char: return CharValue;
-                    case ConstantValueTypeDiscriminator.Boolean: return BooleanValue;
-                    case ConstantValueTypeDiscriminator.Single: return SingleValue;
-                    case ConstantValueTypeDiscriminator.Double: return DoubleValue;
-                    case ConstantValueTypeDiscriminator.Decimal: return DecimalValue;
+                    case ConstantValueTypeDiscriminator.SByte: return Boxes.Box(SByteValue);
+                    case ConstantValueTypeDiscriminator.Byte: return Boxes.Box(ByteValue);
+                    case ConstantValueTypeDiscriminator.Int16: return Boxes.Box(Int16Value);
+                    case ConstantValueTypeDiscriminator.UInt16: return Boxes.Box(UInt16Value);
+                    case ConstantValueTypeDiscriminator.Int32: return Boxes.Box(Int32Value);
+                    case ConstantValueTypeDiscriminator.UInt32: return Boxes.Box(UInt32Value);
+                    case ConstantValueTypeDiscriminator.Int64: return Boxes.Box(Int64Value);
+                    case ConstantValueTypeDiscriminator.UInt64: return Boxes.Box(UInt64Value);
+                    case ConstantValueTypeDiscriminator.NInt: return Boxes.Box(Int32Value);
+                    case ConstantValueTypeDiscriminator.NUInt: return Boxes.Box(UInt32Value);
+                    case ConstantValueTypeDiscriminator.Char: return Boxes.Box(CharValue);
+                    case ConstantValueTypeDiscriminator.Boolean: return Boxes.Box(BooleanValue);
+                    case ConstantValueTypeDiscriminator.Single: return Boxes.Box(SingleValue);
+                    case ConstantValueTypeDiscriminator.Double: return Boxes.Box(DoubleValue);
+                    case ConstantValueTypeDiscriminator.Decimal: return Boxes.Box(DecimalValue);
                     case ConstantValueTypeDiscriminator.DateTime: return DateTimeValue;
                     case ConstantValueTypeDiscriminator.String: return StringValue;
                     default: throw ExceptionUtilities.UnexpectedValue(this.Discriminator);
@@ -469,6 +520,8 @@ namespace Microsoft.CodeAnalysis
                 case ConstantValueTypeDiscriminator.UInt32:
                 case ConstantValueTypeDiscriminator.Int64:
                 case ConstantValueTypeDiscriminator.UInt64:
+                case ConstantValueTypeDiscriminator.NInt:
+                case ConstantValueTypeDiscriminator.NUInt:
                     return true;
 
                 default:
@@ -495,6 +548,7 @@ namespace Microsoft.CodeAnalysis
                     case ConstantValueTypeDiscriminator.Int16:
                         return Int16Value < 0;
                     case ConstantValueTypeDiscriminator.Int32:
+                    case ConstantValueTypeDiscriminator.NInt:
                         return Int32Value < 0;
                     case ConstantValueTypeDiscriminator.Int64:
                         return Int64Value < 0;
@@ -528,6 +582,8 @@ namespace Microsoft.CodeAnalysis
                     case ConstantValueTypeDiscriminator.UInt16:
                     case ConstantValueTypeDiscriminator.UInt32:
                     case ConstantValueTypeDiscriminator.UInt64:
+                    case ConstantValueTypeDiscriminator.NInt:
+                    case ConstantValueTypeDiscriminator.NUInt:
                         return true;
 
                     default:
@@ -544,6 +600,7 @@ namespace Microsoft.CodeAnalysis
                 case ConstantValueTypeDiscriminator.UInt16:
                 case ConstantValueTypeDiscriminator.UInt32:
                 case ConstantValueTypeDiscriminator.UInt64:
+                case ConstantValueTypeDiscriminator.NUInt:
                     return true;
 
                 default:
@@ -590,6 +647,7 @@ namespace Microsoft.CodeAnalysis
             return discriminator == ConstantValueTypeDiscriminator.String;
         }
 
+        [MemberNotNullWhen(true, nameof(StringValue))]
         public bool IsString
         {
             get
@@ -663,53 +721,53 @@ namespace Microsoft.CodeAnalysis
             }
         }
 
-        public void Serialize(Microsoft.Cci.BinaryWriter to)
+        public void Serialize(BlobBuilder writer)
         {
             switch (this.Discriminator)
             {
                 case ConstantValueTypeDiscriminator.Boolean:
-                    to.WriteBool(this.BooleanValue);
+                    writer.WriteBoolean(this.BooleanValue);
                     break;
 
                 case ConstantValueTypeDiscriminator.SByte:
-                    to.WriteSbyte(this.SByteValue);
+                    writer.WriteSByte(this.SByteValue);
                     break;
 
                 case ConstantValueTypeDiscriminator.Byte:
-                    to.WriteByte(this.ByteValue);
+                    writer.WriteByte(this.ByteValue);
                     break;
 
                 case ConstantValueTypeDiscriminator.Char:
                 case ConstantValueTypeDiscriminator.Int16:
-                    to.WriteShort(this.Int16Value);
+                    writer.WriteInt16(this.Int16Value);
                     break;
 
                 case ConstantValueTypeDiscriminator.UInt16:
-                    to.WriteUshort(this.UInt16Value);
+                    writer.WriteUInt16(this.UInt16Value);
                     break;
 
                 case ConstantValueTypeDiscriminator.Single:
-                    to.WriteFloat(this.SingleValue);
+                    writer.WriteSingle(this.SingleValue);
                     break;
 
                 case ConstantValueTypeDiscriminator.Int32:
-                    to.WriteInt(this.Int32Value);
+                    writer.WriteInt32(this.Int32Value);
                     break;
 
                 case ConstantValueTypeDiscriminator.UInt32:
-                    to.WriteUint(this.UInt32Value);
+                    writer.WriteUInt32(this.UInt32Value);
                     break;
 
                 case ConstantValueTypeDiscriminator.Double:
-                    to.WriteDouble(this.DoubleValue);
+                    writer.WriteDouble(this.DoubleValue);
                     break;
 
                 case ConstantValueTypeDiscriminator.Int64:
-                    to.WriteLong(this.Int64Value);
+                    writer.WriteInt64(this.Int64Value);
                     break;
 
                 case ConstantValueTypeDiscriminator.UInt64:
-                    to.WriteUlong(this.UInt64Value);
+                    writer.WriteUInt64(this.UInt64Value);
                     break;
 
                 default: throw ExceptionUtilities.UnexpectedValue(this.Discriminator);
@@ -718,19 +776,19 @@ namespace Microsoft.CodeAnalysis
 
         public override string ToString()
         {
-            string valueToDisplay = this.GetValueToDisplay();
+            string? valueToDisplay = this.GetValueToDisplay();
             return String.Format("{0}({1}: {2})", this.GetType().Name, valueToDisplay, this.Discriminator);
         }
 
-        internal virtual string GetValueToDisplay()
+        internal virtual string? GetValueToDisplay()
         {
-            return this.Value.ToString();
+            return this.Value?.ToString();
         }
 
         // equal constants must have matching discriminators
         // derived types override this if equivalence is more than just discriminators match. 
         // singletons also override this since they only need a reference compare.
-        public virtual bool Equals(ConstantValue other)
+        public virtual bool Equals(ConstantValue? other)
         {
             if (ReferenceEquals(other, this))
             {
@@ -745,7 +803,7 @@ namespace Microsoft.CodeAnalysis
             return this.Discriminator == other.Discriminator;
         }
 
-        public static bool operator ==(ConstantValue left, ConstantValue right)
+        public static bool operator ==(ConstantValue? left, ConstantValue? right)
         {
             if (ReferenceEquals(right, left))
             {
@@ -760,7 +818,7 @@ namespace Microsoft.CodeAnalysis
             return left.Equals(right);
         }
 
-        public static bool operator !=(ConstantValue left, ConstantValue right)
+        public static bool operator !=(ConstantValue? left, ConstantValue? right)
         {
             return !(left == right);
         }
@@ -770,7 +828,7 @@ namespace Microsoft.CodeAnalysis
             return this.Discriminator.GetHashCode();
         }
 
-        public override bool Equals(object obj)
+        public override bool Equals(object? obj)
         {
             return this.Equals(obj as ConstantValue);
         }

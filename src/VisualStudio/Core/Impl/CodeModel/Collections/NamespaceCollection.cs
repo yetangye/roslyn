@@ -1,9 +1,14 @@
-// Copyright (c) Microsoft.  All Rights Reserved.  Licensed under the Apache License, Version 2.0.  See License.txt in the project root for license information.
+﻿// Licensed to the .NET Foundation under one or more agreements.
+// The .NET Foundation licenses this file to you under the MIT license.
+// See the LICENSE file in the project root for more information.
+
+#nullable disable
 
 using System.Collections.Immutable;
 using System.Diagnostics;
 using System.Linq;
 using System.Runtime.InteropServices;
+using Microsoft.CodeAnalysis.PooledObjects;
 using Microsoft.CodeAnalysis;
 using Microsoft.VisualStudio.LanguageServices.Implementation.CodeModel.InternalElements;
 using Microsoft.VisualStudio.LanguageServices.Implementation.CodeModel.Interop;
@@ -25,8 +30,8 @@ namespace Microsoft.VisualStudio.LanguageServices.Implementation.CodeModel.Colle
             return (EnvDTE.CodeElements)ComAggregate.CreateAggregatedObject(collection);
         }
 
-        private ComHandle<EnvDTE.FileCodeModel, FileCodeModel> _fileCodeModel;
-        private SyntaxNodeKey _nodeKey;
+        private readonly ComHandle<EnvDTE.FileCodeModel, FileCodeModel> _fileCodeModel;
+        private readonly SyntaxNodeKey _nodeKey;
 
         private NamespaceCollection(
             CodeModelState state,
@@ -65,25 +70,21 @@ namespace Microsoft.VisualStudio.LanguageServices.Implementation.CodeModel.Colle
 
         private EnvDTE.CodeElement CreateCodeOptionsStatement(SyntaxNode node, SyntaxNode parentNode)
         {
-            string name;
-            int ordinal;
-            CodeModelService.GetOptionNameAndOrdinal(parentNode, node, out name, out ordinal);
+            CodeModelService.GetOptionNameAndOrdinal(parentNode, node, out var name, out var ordinal);
 
-            return (EnvDTE.CodeElement)CodeOptionsStatement.Create(this.State, this.FileCodeModel, name, ordinal);
+            return CodeOptionsStatement.Create(this.State, this.FileCodeModel, name, ordinal);
         }
 
         private EnvDTE.CodeElement CreateCodeImport(SyntaxNode node, AbstractCodeElement parentElement)
         {
             var name = CodeModelService.GetImportNamespaceOrType(node);
 
-            return (EnvDTE.CodeElement)CodeImport.Create(this.State, this.FileCodeModel, parentElement, name);
+            return CodeImport.Create(this.State, this.FileCodeModel, parentElement, name);
         }
 
         private EnvDTE.CodeElement CreateCodeAttribute(SyntaxNode node, SyntaxNode parentNode, AbstractCodeElement parentElement)
         {
-            string name;
-            int ordinal;
-            CodeModelService.GetAttributeNameAndOrdinal(parentNode, node, out name, out ordinal);
+            CodeModelService.GetAttributeNameAndOrdinal(parentNode, node, out var name, out var ordinal);
 
             return (EnvDTE.CodeElement)CodeAttribute.Create(this.State, this.FileCodeModel, parentElement, name, ordinal);
         }
@@ -95,13 +96,14 @@ namespace Microsoft.VisualStudio.LanguageServices.Implementation.CodeModel.Colle
                 ? (AbstractCodeElement)this.Parent
                 : null;
 
-            var nodesBuilder = ImmutableArray.CreateBuilder<SyntaxNode>();
+            var nodesBuilder = ArrayBuilder<SyntaxNode>.GetInstance();
             nodesBuilder.AddRange(CodeModelService.GetOptionNodes(node));
             nodesBuilder.AddRange(CodeModelService.GetImportNodes(node));
             nodesBuilder.AddRange(CodeModelService.GetAttributeNodes(node));
-            nodesBuilder.AddRange(CodeModelService.GetFlattenedMemberNodes(node));
+            nodesBuilder.AddRange(CodeModelService.GetLogicalSupportedMemberNodes(node));
 
-            return new NodeSnapshot(this.State, _fileCodeModel, node, parentElement, nodesBuilder.ToImmutable());
+            return new NodeSnapshot(this.State, _fileCodeModel, node, parentElement,
+                nodesBuilder.ToImmutableAndFree());
         }
 
         protected override bool TryGetItemByIndex(int index, out EnvDTE.CodeElement element)
@@ -111,7 +113,7 @@ namespace Microsoft.VisualStudio.LanguageServices.Implementation.CodeModel.Colle
                 ? (AbstractCodeElement)this.Parent
                 : null;
 
-            int currentIndex = 0;
+            var currentIndex = 0;
 
             // Option statements
             var optionNodes = CodeModelService.GetOptionNodes(node);
@@ -150,12 +152,12 @@ namespace Microsoft.VisualStudio.LanguageServices.Implementation.CodeModel.Colle
             currentIndex += attributeNodeCount;
 
             // Members
-            var memberNodes = CodeModelService.GetFlattenedMemberNodes(node);
+            var memberNodes = CodeModelService.GetLogicalSupportedMemberNodes(node);
             var memberNodeCount = memberNodes.Count();
             if (index < currentIndex + memberNodeCount)
             {
                 var child = memberNodes.ElementAt(index - currentIndex);
-                element = FileCodeModel.CreateCodeElement<EnvDTE.CodeElement>(child);
+                element = FileCodeModel.GetOrCreateCodeElement<EnvDTE.CodeElement>(child);
                 return true;
             }
 
@@ -173,12 +175,10 @@ namespace Microsoft.VisualStudio.LanguageServices.Implementation.CodeModel.Colle
             // Option statements
             foreach (var child in CodeModelService.GetOptionNodes(node))
             {
-                string childName;
-                int ordinal;
-                CodeModelService.GetOptionNameAndOrdinal(node, child, out childName, out ordinal);
+                CodeModelService.GetOptionNameAndOrdinal(node, child, out var childName, out var ordinal);
                 if (childName == name)
                 {
-                    element = (EnvDTE.CodeElement)CodeOptionsStatement.Create(State, FileCodeModel, childName, ordinal);
+                    element = CodeOptionsStatement.Create(State, FileCodeModel, childName, ordinal);
                     return true;
                 }
             }
@@ -189,7 +189,7 @@ namespace Microsoft.VisualStudio.LanguageServices.Implementation.CodeModel.Colle
                 var childName = CodeModelService.GetImportNamespaceOrType(child);
                 if (childName == name)
                 {
-                    element = (EnvDTE.CodeElement)CodeImport.Create(State, FileCodeModel, parentElement, childName);
+                    element = CodeImport.Create(State, FileCodeModel, parentElement, childName);
                     return true;
                 }
             }
@@ -197,9 +197,7 @@ namespace Microsoft.VisualStudio.LanguageServices.Implementation.CodeModel.Colle
             // Attributes
             foreach (var child in CodeModelService.GetAttributeNodes(node))
             {
-                string childName;
-                int ordinal;
-                CodeModelService.GetAttributeNameAndOrdinal(node, child, out childName, out ordinal);
+                CodeModelService.GetAttributeNameAndOrdinal(node, child, out var childName, out var ordinal);
                 if (childName == name)
                 {
                     element = (EnvDTE.CodeElement)CodeAttribute.Create(State, FileCodeModel, parentElement, childName, ordinal);
@@ -208,12 +206,12 @@ namespace Microsoft.VisualStudio.LanguageServices.Implementation.CodeModel.Colle
             }
 
             // Members
-            foreach (var child in CodeModelService.GetFlattenedMemberNodes(node))
+            foreach (var child in CodeModelService.GetLogicalSupportedMemberNodes(node))
             {
                 var childName = CodeModelService.GetName(child);
                 if (childName == name)
                 {
-                    element = FileCodeModel.CreateCodeElement<EnvDTE.CodeElement>(child);
+                    element = FileCodeModel.GetOrCreateCodeElement<EnvDTE.CodeElement>(child);
                     return true;
                 }
             }
@@ -231,7 +229,7 @@ namespace Microsoft.VisualStudio.LanguageServices.Implementation.CodeModel.Colle
                     CodeModelService.GetOptionNodes(node).Count() +
                     CodeModelService.GetImportNodes(node).Count() +
                     CodeModelService.GetAttributeNodes(node).Count() +
-                    CodeModelService.GetFlattenedMemberNodes(node).Count();
+                    CodeModelService.GetLogicalSupportedMemberNodes(node).Count();
             }
         }
     }

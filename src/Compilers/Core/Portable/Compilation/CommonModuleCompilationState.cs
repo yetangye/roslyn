@@ -1,8 +1,12 @@
-﻿// Copyright (c) Microsoft.  All Rights Reserved.  Licensed under the Apache License, Version 2.0.  See License.txt in the project root for license information.
+﻿// Licensed to the .NET Foundation under one or more agreements.
+// The .NET Foundation licenses this file to you under the MIT license.
+// See the LICENSE file in the project root for more information.
 
 using System.Collections.Generic;
 using System.Diagnostics;
+using System.Diagnostics.CodeAnalysis;
 using System.Threading;
+using Microsoft.CodeAnalysis.Symbols;
 
 namespace Microsoft.CodeAnalysis
 {
@@ -27,15 +31,15 @@ namespace Microsoft.CodeAnalysis
     }
 
     internal class ModuleCompilationState<TNamedTypeSymbol, TMethodSymbol> : CommonModuleCompilationState
-        where TNamedTypeSymbol : class, Cci.INamespaceTypeDefinition
-        where TMethodSymbol : class, Cci.IMethodDefinition
+        where TNamedTypeSymbol : class, INamedTypeSymbolInternal
+        where TMethodSymbol : class, IMethodSymbolInternal
     {
         /// <summary>
         /// Maps an async/iterator method to the synthesized state machine type that implements the method. 
         /// </summary>
-        private Dictionary<TMethodSymbol, TNamedTypeSymbol> _lazyStateMachineTypes;
+        private Dictionary<TMethodSymbol, TNamedTypeSymbol>? _lazyStateMachineTypes;
 
-        internal void SetStateMachineType(TMethodSymbol method, TNamedTypeSymbol stateMatchineClass)
+        internal void SetStateMachineType(TMethodSymbol method, TNamedTypeSymbol stateMachineClass)
         {
             Debug.Assert(!Frozen);
 
@@ -46,11 +50,11 @@ namespace Microsoft.CodeAnalysis
 
             lock (_lazyStateMachineTypes)
             {
-                _lazyStateMachineTypes.Add(method, stateMatchineClass);
+                _lazyStateMachineTypes.Add(method, stateMachineClass);
             }
         }
 
-        internal bool TryGetStateMachineType(TMethodSymbol method, out TNamedTypeSymbol stateMachineType)
+        internal bool TryGetStateMachineType(TMethodSymbol method, [NotNullWhen(true)] out TNamedTypeSymbol? stateMachineType)
         {
             Debug.Assert(Frozen);
 

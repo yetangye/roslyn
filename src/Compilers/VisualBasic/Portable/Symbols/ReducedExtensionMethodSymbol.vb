@@ -1,8 +1,11 @@
-﻿' Copyright (c) Microsoft.  All Rights Reserved.  Licensed under the Apache License, Version 2.0.  See License.txt in the project root for license information.
+﻿' Licensed to the .NET Foundation under one or more agreements.
+' The .NET Foundation licenses this file to you under the MIT license.
+' See the LICENSE file in the project root for more information.
 
 Imports System.Collections.Generic
 Imports System.Collections.Immutable
 Imports System.Threading
+Imports Microsoft.CodeAnalysis.PooledObjects
 Imports Microsoft.CodeAnalysis.Text
 Imports Microsoft.CodeAnalysis.VisualBasic.Symbols
 Imports Microsoft.CodeAnalysis.VisualBasic.Syntax
@@ -16,20 +19,20 @@ Namespace Microsoft.CodeAnalysis.VisualBasic.Symbols
     Friend NotInheritable Class ReducedExtensionMethodSymbol
         Inherits MethodSymbol
 
-        Private ReadOnly m_ReceiverType As TypeSymbol
-        Private ReadOnly m_CurriedFromMethod As MethodSymbol
-        Private ReadOnly m_FixedTypeParameters As ImmutableArray(Of KeyValuePair(Of TypeParameterSymbol, TypeSymbol))
-        Private ReadOnly m_Proximity As Integer
-        Private ReadOnly m_CurryTypeSubstitution As TypeSubstitution
-        Private ReadOnly m_CurriedTypeParameters As ImmutableArray(Of ReducedTypeParameterSymbol)
-        Private m_lazyReturnType As TypeSymbol
-        Private m_lazyParameters As ImmutableArray(Of ReducedParameterSymbol)
+        Private ReadOnly _receiverType As TypeSymbol
+        Private ReadOnly _curriedFromMethod As MethodSymbol
+        Private ReadOnly _fixedTypeParameters As ImmutableArray(Of KeyValuePair(Of TypeParameterSymbol, TypeSymbol))
+        Private ReadOnly _proximity As Integer
+        Private ReadOnly _curryTypeSubstitution As TypeSubstitution
+        Private ReadOnly _curriedTypeParameters As ImmutableArray(Of ReducedTypeParameterSymbol)
+        Private _lazyReturnType As TypeSymbol
+        Private _lazyParameters As ImmutableArray(Of ReducedParameterSymbol)
 
         ''' <summary>
         ''' If this is an extension method that can be applied to an instance of the given type,
         ''' returns the curried method symbol thus formed. Otherwise, returns Nothing.
         ''' </summary>
-        Public Shared Function Create(instanceType As TypeSymbol, possiblyExtensionMethod As MethodSymbol, proximity As Integer) As MethodSymbol
+        Public Shared Function Create(instanceType As TypeSymbol, possiblyExtensionMethod As MethodSymbol, proximity As Integer, ByRef useSiteInfo As CompoundUseSiteInfo(Of AssemblySymbol)) As MethodSymbol
             Debug.Assert(instanceType IsNot Nothing)
             Debug.Assert(possiblyExtensionMethod IsNot Nothing)
             Debug.Assert(proximity >= 0)
@@ -55,9 +58,9 @@ Namespace Microsoft.CodeAnalysis.VisualBasic.Symbols
 
             receiverType.CollectReferencedTypeParameters(hashSetOfTypeParametersToFix)
 
-            Dim typeParametersToFix() As TypeParameterSymbol = Nothing
-            Dim fixWith() As TypeSymbol = Nothing
-            Dim useSiteDiagnostics As HashSet(Of DiagnosticInfo) = Nothing
+            Dim typeParametersToFixArray As ImmutableArray(Of TypeParameterSymbol) = Nothing
+            Dim fixWithArray As ImmutableArray(Of TypeSymbol) = Nothing
+            Dim reducedUseSiteInfo = If(useSiteInfo.AccumulatesDependencies, New CompoundUseSiteInfo(Of AssemblySymbol)(useSiteInfo.AssemblyBeingBuilt), CompoundUseSiteInfo(Of AssemblySymbol).DiscardedDependecies)
 
             If hashSetOfTypeParametersToFix.Count > 0 Then
                 ' Try to infer type parameters from the supplied instanceType.
@@ -71,11 +74,15 @@ Namespace Microsoft.CodeAnalysis.VisualBasic.Symbols
                 Dim someInferenceFailed As Boolean = False
                 Dim inferenceErrorReasons As InferenceErrorReasons = InferenceErrorReasons.Other
 
-                Dim fixTheseTypeParameters = BitArray.Create(possiblyExtensionMethod.Arity)
+                Dim fixTheseTypeParameters = BitVector.Create(possiblyExtensionMethod.Arity)
 
                 For Each typeParameter As TypeParameterSymbol In hashSetOfTypeParametersToFix
                     fixTheseTypeParameters(typeParameter.Ordinal) = True
                 Next
+
+                Dim inferenceDiagnostic = If(reducedUseSiteInfo.AccumulatesDependencies,
+                                             BindingDiagnosticBag.GetInstance(withDiagnostics:=False, withDependencies:=True),
+                                             BindingDiagnosticBag.Discarded)
 
                 Dim success As Boolean = TypeArgumentInference.Infer(possiblyExtensionMethod,
                                                arguments:=ImmutableArray.Create(Of BoundExpression)(
@@ -93,58 +100,75 @@ Namespace Microsoft.CodeAnalysis.VisualBasic.Symbols
                                                inferredTypeByAssumption:=Nothing,
                                                typeArgumentsLocation:=Nothing,
                                                asyncLambdaSubToFunctionMismatch:=Nothing,
-                                               useSiteDiagnostics:=useSiteDiagnostics,
-                                               diagnostic:=Nothing,
+                                               useSiteInfo:=reducedUseSiteInfo,
+                                               diagnostic:=inferenceDiagnostic,
                                                inferTheseTypeParameters:=fixTheseTypeParameters)
 
 
                 parameterToArgumentMap.Free()
 
-                If Not success OrElse Not useSiteDiagnostics.IsNullOrEmpty() Then
+                If Not success OrElse Not reducedUseSiteInfo.Diagnostics.IsNullOrEmpty() Then
+                    inferenceDiagnostic.Free()
                     Return Nothing
                 End If
 
-                ' Adjust the receiver type accordingly.
-                typeParametersToFix = New TypeParameterSymbol(hashSetOfTypeParametersToFix.Count - 1) {}
-                fixWith = New TypeSymbol(typeParametersToFix.Count - 1) {}
+                reducedUseSiteInfo.AddDependencies(inferenceDiagnostic.DependenciesBag)
+                inferenceDiagnostic.Free()
 
-                Dim j As Integer = 0
+                Dim toFixCount = hashSetOfTypeParametersToFix.Count
+                Dim typeParametersToFix = ArrayBuilder(Of TypeParameterSymbol).GetInstance(toFixCount)
+                Dim fixWith = ArrayBuilder(Of TypeSymbol).GetInstance(toFixCount)
+
+                ' Adjust the receiver type accordingly.
                 For i As Integer = 0 To possiblyExtensionMethod.Arity - 1
                     If fixTheseTypeParameters(i) Then
-                        typeParametersToFix(j) = possiblyExtensionMethod.TypeParameters(i)
-                        fixWith(j) = typeArguments(i)
-                        Debug.Assert(fixWith(j) IsNot Nothing)
-                        j += 1
+                        typeParametersToFix.Add(possiblyExtensionMethod.TypeParameters(i))
+                        fixWith.Add(typeArguments(i))
+                        Debug.Assert(fixWith.Last() IsNot Nothing)
 
-                        If j = typeParametersToFix.Count Then
+                        If typeParametersToFix.Count = toFixCount Then
                             Exit For
                         End If
                     End If
                 Next
 
-                Dim partialSubstitution = TypeSubstitution.Create(possiblyExtensionMethod, typeParametersToFix, fixWith)
+                typeParametersToFixArray = typeParametersToFix.ToImmutableAndFree()
+                fixWithArray = fixWith.ToImmutableAndFree()
+
+                Dim partialSubstitution = TypeSubstitution.Create(possiblyExtensionMethod, typeParametersToFixArray, fixWithArray)
 
                 If partialSubstitution IsNot Nothing Then
                     ' Check constraints.
                     Dim diagnosticsBuilder = ArrayBuilder(Of TypeParameterDiagnosticInfo).GetInstance()
                     Dim useSiteDiagnosticsBuilder As ArrayBuilder(Of TypeParameterDiagnosticInfo) = Nothing
                     success = possiblyExtensionMethod.CheckConstraints(partialSubstitution,
-                                                                       typeParametersToFix.AsImmutableOrNull(),
-                                                                       fixWith.AsImmutableOrNull(),
+                                                                       typeParametersToFixArray,
+                                                                       fixWithArray,
                                                                        diagnosticsBuilder,
-                                                                       useSiteDiagnosticsBuilder)
-                    diagnosticsBuilder.Free()
+                                                                       useSiteDiagnosticsBuilder,
+                                                                       template:=New CompoundUseSiteInfo(Of AssemblySymbol)(reducedUseSiteInfo))
 
                     If Not success Then
+                        diagnosticsBuilder.Free()
                         Return Nothing
                     End If
 
-                    receiverType = receiverType.InternalSubstituteTypeParameters(partialSubstitution)
+                    If useSiteDiagnosticsBuilder IsNot Nothing Then
+                        diagnosticsBuilder.AddRange(useSiteDiagnosticsBuilder)
+                    End If
+
+                    For Each pair In diagnosticsBuilder
+                        reducedUseSiteInfo.AddDependencies(pair.UseSiteInfo)
+                    Next
+
+                    diagnosticsBuilder.Free()
+
+                    receiverType = receiverType.InternalSubstituteTypeParameters(partialSubstitution).Type
                 End If
             End If
 
-            If Not OverloadResolution.DoesReceiverMatchInstance(instanceType, receiverType, useSiteDiagnostics) OrElse
-               Not useSiteDiagnostics.IsNullOrEmpty() Then
+            If Not OverloadResolution.DoesReceiverMatchInstance(instanceType, receiverType, reducedUseSiteInfo) OrElse
+               Not reducedUseSiteInfo.Diagnostics.IsNullOrEmpty() Then
                 Return Nothing
             End If
 
@@ -157,15 +181,17 @@ Namespace Microsoft.CodeAnalysis.VisualBasic.Symbols
 
             Dim fixedTypeParameters = ImmutableArray(Of KeyValuePair(Of TypeParameterSymbol, TypeSymbol)).Empty
 
-            If typeParametersToFix IsNot Nothing Then
-                Dim fixed(typeParametersToFix.Count - 1) As KeyValuePair(Of TypeParameterSymbol, TypeSymbol)
+            If Not typeParametersToFixArray.IsDefault Then
+                Dim fixed = ArrayBuilder(Of KeyValuePair(Of TypeParameterSymbol, TypeSymbol)).GetInstance(typeParametersToFixArray.Length)
 
-                For i As Integer = 0 To fixed.Count - 1
-                    fixed(i) = New KeyValuePair(Of TypeParameterSymbol, TypeSymbol)(typeParametersToFix(i), fixWith(i))
+                For i As Integer = 0 To typeParametersToFixArray.Length - 1
+                    fixed.Add(New KeyValuePair(Of TypeParameterSymbol, TypeSymbol)(typeParametersToFixArray(i), fixWithArray(i)))
                 Next
 
-                fixedTypeParameters = fixed.AsImmutableOrNull()
+                fixedTypeParameters = fixed.ToImmutableAndFree()
             End If
+
+            useSiteInfo.AddDependencies(reducedUseSiteInfo)
 
             Return New ReducedExtensionMethodSymbol(receiverType, possiblyExtensionMethod, fixedTypeParameters, proximity)
         End Function
@@ -176,14 +202,14 @@ Namespace Microsoft.CodeAnalysis.VisualBasic.Symbols
             fixedTypeParameters As ImmutableArray(Of KeyValuePair(Of TypeParameterSymbol, TypeSymbol)),
             proximity As Integer
         )
-            m_CurriedFromMethod = curriedFromMethod
-            m_ReceiverType = receiverType
-            m_FixedTypeParameters = fixedTypeParameters
-            m_Proximity = proximity
+            _curriedFromMethod = curriedFromMethod
+            _receiverType = receiverType
+            _fixedTypeParameters = fixedTypeParameters
+            _proximity = proximity
 
-            If m_CurriedFromMethod.Arity = 0 Then
-                m_CurryTypeSubstitution = Nothing
-                m_CurriedTypeParameters = ImmutableArray(Of ReducedTypeParameterSymbol).Empty
+            If _curriedFromMethod.Arity = 0 Then
+                _curryTypeSubstitution = Nothing
+                _curriedTypeParameters = ImmutableArray(Of ReducedTypeParameterSymbol).Empty
                 Return
             End If
 
@@ -206,37 +232,37 @@ Namespace Microsoft.CodeAnalysis.VisualBasic.Symbols
 
             ' Now deal with the curried ones.
             If curriedTypeParameters Is Nothing Then
-                m_CurriedTypeParameters = ImmutableArray(Of ReducedTypeParameterSymbol).Empty
+                _curriedTypeParameters = ImmutableArray(Of ReducedTypeParameterSymbol).Empty
             Else
                 Dim j As Integer = 0
-                For i = 0 To curryTypeArguments.Count - 1
+                For i = 0 To curryTypeArguments.Length - 1
                     If curryTypeArguments(i) Is Nothing Then
                         Dim curried = New ReducedTypeParameterSymbol(Me, curriedFromMethod.TypeParameters(i), j)
                         curriedTypeParameters(j) = curried
                         curryTypeArguments(i) = curried
                         j += 1
 
-                        If j = curriedTypeParameters.Count Then
+                        If j = curriedTypeParameters.Length Then
                             Exit For
                         End If
                     End If
                 Next
 
-                m_CurriedTypeParameters = curriedTypeParameters.AsImmutableOrNull()
+                _curriedTypeParameters = curriedTypeParameters.AsImmutableOrNull()
             End If
 
-            m_CurryTypeSubstitution = TypeSubstitution.Create(curriedFromMethod, curriedFromMethod.TypeParameters, curryTypeArguments.AsImmutableOrNull())
+            _curryTypeSubstitution = TypeSubstitution.Create(curriedFromMethod, curriedFromMethod.TypeParameters, curryTypeArguments.AsImmutableOrNull())
         End Sub
 
         Public Overrides ReadOnly Property ReceiverType As TypeSymbol
             Get
-                Return m_ReceiverType
+                Return _receiverType
             End Get
         End Property
 
         Friend Overrides ReadOnly Property FixedTypeParameters As ImmutableArray(Of KeyValuePair(Of TypeParameterSymbol, TypeSymbol))
             Get
-                Return m_FixedTypeParameters
+                Return _fixedTypeParameters
             End Get
         End Property
 
@@ -245,12 +271,12 @@ Namespace Microsoft.CodeAnalysis.VisualBasic.Symbols
                 Throw New ArgumentNullException()
             End If
 
-            If reducedFromTypeParameter.ContainingSymbol <> m_CurriedFromMethod Then
+            If reducedFromTypeParameter.ContainingSymbol <> _curriedFromMethod Then
                 Throw New ArgumentException()
             End If
 
-            For Each pair As KeyValuePair(Of TypeParameterSymbol, TypeSymbol) In m_FixedTypeParameters
-                If pair.Key = reducedFromTypeParameter Then
+            For Each pair As KeyValuePair(Of TypeParameterSymbol, TypeSymbol) In _fixedTypeParameters
+                If TypeSymbol.Equals(pair.Key, reducedFromTypeParameter, TypeCompareKind.ConsiderEverything) Then
                     Return pair.Value
                 End If
             Next
@@ -260,31 +286,31 @@ Namespace Microsoft.CodeAnalysis.VisualBasic.Symbols
 
         Public Overrides ReadOnly Property ReducedFrom As MethodSymbol
             Get
-                Return m_CurriedFromMethod
+                Return _curriedFromMethod
             End Get
         End Property
 
         Friend Overrides ReadOnly Property CallsiteReducedFromMethod As MethodSymbol
             Get
-                If m_CurryTypeSubstitution Is Nothing Then
-                    Return m_CurriedFromMethod
+                If _curryTypeSubstitution Is Nothing Then
+                    Return _curriedFromMethod
                 End If
 
-                If m_CurriedFromMethod.Arity = Me.Arity Then
-                    Return New SubstitutedMethodSymbol.ConstructedNotSpecializedGenericMethod(m_CurryTypeSubstitution, Me.TypeArguments)
+                If _curriedFromMethod.Arity = Me.Arity Then
+                    Return New SubstitutedMethodSymbol.ConstructedNotSpecializedGenericMethod(_curryTypeSubstitution, Me.TypeArguments)
                 End If
 
-                Dim resultTypeArguments(m_CurriedFromMethod.Arity - 1) As TypeSymbol
+                Dim resultTypeArguments(_curriedFromMethod.Arity - 1) As TypeSymbol
 
-                For Each pair As KeyValuePair(Of TypeParameterSymbol, TypeSymbol) In m_FixedTypeParameters
+                For Each pair As KeyValuePair(Of TypeParameterSymbol, TypeSymbol) In _fixedTypeParameters
                     resultTypeArguments(pair.Key.Ordinal) = pair.Value
                 Next
 
-                For Each typeParameter As ReducedTypeParameterSymbol In m_CurriedTypeParameters
+                For Each typeParameter As ReducedTypeParameterSymbol In _curriedTypeParameters
                     resultTypeArguments(typeParameter.ReducedFrom.Ordinal) = typeParameter
                 Next
 
-                Return New SubstitutedMethodSymbol.ConstructedNotSpecializedGenericMethod(m_CurryTypeSubstitution, resultTypeArguments.AsImmutableOrNull())
+                Return New SubstitutedMethodSymbol.ConstructedNotSpecializedGenericMethod(_curryTypeSubstitution, resultTypeArguments.AsImmutableOrNull())
 
             End Get
         End Property
@@ -297,23 +323,23 @@ Namespace Microsoft.CodeAnalysis.VisualBasic.Symbols
 
         Friend Overrides ReadOnly Property Proximity As Integer
             Get
-                Return m_Proximity
+                Return _proximity
             End Get
         End Property
 
-        Friend Overrides Function GetUseSiteErrorInfo() As DiagnosticInfo
-            Return m_CurriedFromMethod.GetUseSiteErrorInfo()
+        Friend Overrides Function GetUseSiteInfo() As UseSiteInfo(Of AssemblySymbol)
+            Return _curriedFromMethod.GetUseSiteInfo()
         End Function
 
         Public Overrides ReadOnly Property ContainingSymbol As Symbol
             Get
-                Return m_CurriedFromMethod.ContainingSymbol
+                Return _curriedFromMethod.ContainingSymbol
             End Get
         End Property
 
         Public Overrides ReadOnly Property ContainingType As NamedTypeSymbol
             Get
-                Return m_CurriedFromMethod.ContainingType
+                Return _curriedFromMethod.ContainingType
             End Get
         End Property
 
@@ -331,45 +357,51 @@ Namespace Microsoft.CodeAnalysis.VisualBasic.Symbols
 
         Public Overrides ReadOnly Property Arity As Integer
             Get
-                Return m_CurriedTypeParameters.Length
+                Return _curriedTypeParameters.Length
             End Get
         End Property
 
         Public Overrides ReadOnly Property TypeParameters As ImmutableArray(Of TypeParameterSymbol)
             Get
-                Return StaticCast(Of TypeParameterSymbol).From(m_CurriedTypeParameters)
+                Return StaticCast(Of TypeParameterSymbol).From(_curriedTypeParameters)
             End Get
         End Property
 
         Public Overrides ReadOnly Property TypeArguments As ImmutableArray(Of TypeSymbol)
             Get
-                Return StaticCast(Of TypeSymbol).From(m_CurriedTypeParameters)
+                Return StaticCast(Of TypeSymbol).From(_curriedTypeParameters)
+            End Get
+        End Property
+
+        Public Overrides ReadOnly Property ReturnsByRef As Boolean
+            Get
+                Return _curriedFromMethod.ReturnsByRef
             End Get
         End Property
 
         Public Overrides ReadOnly Property ReturnType As TypeSymbol
             Get
-                If m_lazyReturnType Is Nothing Then
-                    Dim type As TypeSymbol = m_CurriedFromMethod.ReturnType
+                If _lazyReturnType Is Nothing Then
+                    Dim type As TypeSymbol = _curriedFromMethod.ReturnType
 
-                    If m_CurryTypeSubstitution IsNot Nothing Then
-                        type = type.InternalSubstituteTypeParameters(m_CurryTypeSubstitution)
+                    If _curryTypeSubstitution IsNot Nothing Then
+                        type = type.InternalSubstituteTypeParameters(_curryTypeSubstitution).Type
                     End If
 
-                    Interlocked.CompareExchange(m_lazyReturnType, type, Nothing)
+                    Interlocked.CompareExchange(_lazyReturnType, type, Nothing)
                 End If
 
-                Return m_lazyReturnType
+                Return _lazyReturnType
             End Get
         End Property
 
         Public Overrides ReadOnly Property Parameters As ImmutableArray(Of ParameterSymbol)
             Get
-                If m_lazyParameters.IsDefault Then
-                    Dim fromParams As ImmutableArray(Of ParameterSymbol) = m_CurriedFromMethod.Parameters
+                If _lazyParameters.IsDefault Then
+                    Dim fromParams As ImmutableArray(Of ParameterSymbol) = _curriedFromMethod.Parameters
 
                     If fromParams.Length = 1 Then
-                        m_lazyParameters = ImmutableArray(Of ReducedParameterSymbol).Empty
+                        _lazyParameters = ImmutableArray(Of ReducedParameterSymbol).Empty
                     Else
                         Dim newParams(fromParams.Length - 2) As ReducedParameterSymbol
 
@@ -377,19 +409,19 @@ Namespace Microsoft.CodeAnalysis.VisualBasic.Symbols
                             newParams(i - 1) = New ReducedParameterSymbol(Me, fromParams(i))
                         Next
 
-                        ImmutableInterlocked.InterlockedCompareExchange(m_lazyParameters,
+                        ImmutableInterlocked.InterlockedCompareExchange(_lazyParameters,
                                                             newParams.AsImmutableOrNull(),
                                                             Nothing)
                     End If
                 End If
 
-                Return StaticCast(Of ParameterSymbol).From(m_lazyParameters)
+                Return StaticCast(Of ParameterSymbol).From(_lazyParameters)
             End Get
         End Property
 
         Friend Overrides ReadOnly Property ParameterCount As Integer
             Get
-                Return m_CurriedFromMethod.ParameterCount - 1
+                Return _curriedFromMethod.ParameterCount - 1
             End Get
         End Property
 
@@ -449,41 +481,53 @@ Namespace Microsoft.CodeAnalysis.VisualBasic.Symbols
 
         Public Overrides ReadOnly Property IsSub As Boolean
             Get
-                Return m_CurriedFromMethod.IsSub
+                Return _curriedFromMethod.IsSub
             End Get
         End Property
 
         Public Overrides ReadOnly Property IsAsync As Boolean
             Get
-                Return m_CurriedFromMethod.IsAsync
+                Return _curriedFromMethod.IsAsync
             End Get
         End Property
 
         Public Overrides ReadOnly Property IsIterator As Boolean
             Get
-                Return m_CurriedFromMethod.IsIterator
+                Return _curriedFromMethod.IsIterator
+            End Get
+        End Property
+
+        Public Overrides ReadOnly Property IsInitOnly As Boolean
+            Get
+                Return _curriedFromMethod.IsInitOnly
             End Get
         End Property
 
         Public Overrides ReadOnly Property IsVararg As Boolean
             Get
-                Return m_CurriedFromMethod.IsVararg
+                Return _curriedFromMethod.IsVararg
             End Get
         End Property
 
         Public Overrides Function GetReturnTypeAttributes() As ImmutableArray(Of VisualBasicAttributeData)
-            Return m_CurriedFromMethod.GetReturnTypeAttributes()
+            Return _curriedFromMethod.GetReturnTypeAttributes()
         End Function
 
         Public Overrides ReadOnly Property ReturnTypeCustomModifiers As ImmutableArray(Of CustomModifier)
             Get
-                Return m_CurriedFromMethod.ReturnTypeCustomModifiers
+                Return _curriedFromMethod.ReturnTypeCustomModifiers
             End Get
         End Property
 
-        Friend Overrides ReadOnly Property Syntax As VisualBasicSyntaxNode
+        Public Overrides ReadOnly Property RefCustomModifiers As ImmutableArray(Of CustomModifier)
             Get
-                Return m_CurriedFromMethod.Syntax
+                Return _curriedFromMethod.RefCustomModifiers
+            End Get
+        End Property
+
+        Friend Overrides ReadOnly Property Syntax As SyntaxNode
+            Get
+                Return _curriedFromMethod.Syntax
             End Get
         End Property
 
@@ -501,99 +545,99 @@ Namespace Microsoft.CodeAnalysis.VisualBasic.Symbols
 
         Public Overrides ReadOnly Property IsExternalMethod As Boolean
             Get
-                Return m_CurriedFromMethod.IsExternalMethod
+                Return _curriedFromMethod.IsExternalMethod
             End Get
         End Property
 
         Public Overrides Function GetDllImportData() As DllImportData
-            Return m_CurriedFromMethod.GetDllImportData()
+            Return _curriedFromMethod.GetDllImportData()
         End Function
 
         Friend Overrides ReadOnly Property ReturnTypeMarshallingInformation As MarshalPseudoCustomAttributeData
             Get
-                Return m_CurriedFromMethod.ReturnTypeMarshallingInformation
+                Return _curriedFromMethod.ReturnTypeMarshallingInformation
             End Get
         End Property
 
         Friend Overrides ReadOnly Property ImplementationAttributes As Reflection.MethodImplAttributes
             Get
-                Return m_CurriedFromMethod.ImplementationAttributes
+                Return _curriedFromMethod.ImplementationAttributes
             End Get
         End Property
 
         Friend Overrides ReadOnly Property HasDeclarativeSecurity As Boolean
             Get
-                Return m_CurriedFromMethod.HasDeclarativeSecurity
+                Return _curriedFromMethod.HasDeclarativeSecurity
             End Get
         End Property
 
         Friend Overrides Function GetSecurityInformation() As IEnumerable(Of Microsoft.Cci.SecurityAttribute)
-            Return m_CurriedFromMethod.GetSecurityInformation()
+            Return _curriedFromMethod.GetSecurityInformation()
         End Function
 
         Friend Overrides ReadOnly Property CallingConvention As Microsoft.Cci.CallingConvention
             Get
-                Return m_CurriedFromMethod.CallingConvention
+                Return _curriedFromMethod.CallingConvention
             End Get
         End Property
 
         Friend Overrides ReadOnly Property ObsoleteAttributeData As ObsoleteAttributeData
             Get
-                Return m_CurriedFromMethod.ObsoleteAttributeData
+                Return _curriedFromMethod.ObsoleteAttributeData
             End Get
         End Property
 
         Public Overrides ReadOnly Property Locations As ImmutableArray(Of Location)
             Get
-                Return m_CurriedFromMethod.Locations
+                Return _curriedFromMethod.Locations
             End Get
         End Property
 
         Public Overrides ReadOnly Property DeclaringSyntaxReferences As ImmutableArray(Of SyntaxReference)
             Get
-                Return m_CurriedFromMethod.DeclaringSyntaxReferences
+                Return _curriedFromMethod.DeclaringSyntaxReferences
             End Get
         End Property
 
         Public Overrides ReadOnly Property DeclaredAccessibility As Accessibility
             Get
-                Return m_CurriedFromMethod.DeclaredAccessibility
+                Return _curriedFromMethod.DeclaredAccessibility
             End Get
         End Property
 
         Public Overrides Function GetAttributes() As ImmutableArray(Of VisualBasicAttributeData)
-            Return m_CurriedFromMethod.GetAttributes()
+            Return _curriedFromMethod.GetAttributes()
         End Function
 
         Public Overrides Function GetDocumentationCommentXml(Optional preferredCulture As Globalization.CultureInfo = Nothing, Optional expandIncludes As Boolean = False, Optional cancellationToken As CancellationToken = Nothing) As String
-            Return m_CurriedFromMethod.GetDocumentationCommentXml(preferredCulture, expandIncludes, cancellationToken)
+            Return _curriedFromMethod.GetDocumentationCommentXml(preferredCulture, expandIncludes, cancellationToken)
         End Function
 
         Public Overrides ReadOnly Property IsImplicitlyDeclared As Boolean
             Get
-                Return m_CurriedFromMethod.IsImplicitlyDeclared
+                Return _curriedFromMethod.IsImplicitlyDeclared
             End Get
         End Property
 
         Public Overrides ReadOnly Property Name As String
             Get
-                Return m_CurriedFromMethod.Name
+                Return _curriedFromMethod.Name
             End Get
         End Property
 
         Friend Overrides ReadOnly Property HasSpecialName As Boolean
             Get
-                Return m_CurriedFromMethod.HasSpecialName
+                Return _curriedFromMethod.HasSpecialName
             End Get
         End Property
 
         Friend Overrides Function GetAppliedConditionalSymbols() As ImmutableArray(Of String)
-            Return m_CurriedFromMethod.GetAppliedConditionalSymbols()
+            Return _curriedFromMethod.GetAppliedConditionalSymbols()
         End Function
 
         Public Overrides ReadOnly Property MetadataName As String
             Get
-                Return m_CurriedFromMethod.MetadataName
+                Return _curriedFromMethod.MetadataName
             End Get
         End Property
 
@@ -603,7 +647,7 @@ Namespace Microsoft.CodeAnalysis.VisualBasic.Symbols
 
         Friend Overrides ReadOnly Property GenerateDebugInfoImpl As Boolean
             Get
-                Return m_CurriedFromMethod.GenerateDebugInfo
+                Return _curriedFromMethod.GenerateDebugInfo
             End Get
         End Property
 
@@ -612,7 +656,7 @@ Namespace Microsoft.CodeAnalysis.VisualBasic.Symbols
         End Function
 
         Public Overrides Function GetHashCode() As Integer
-            Return Hash.Combine(m_ReceiverType.GetHashCode(), m_CurriedFromMethod.GetHashCode)
+            Return Hash.Combine(_receiverType.GetHashCode(), _curriedFromMethod.GetHashCode)
         End Function
 
         Public Overrides Function Equals(obj As Object) As Boolean
@@ -623,8 +667,8 @@ Namespace Microsoft.CodeAnalysis.VisualBasic.Symbols
             Dim other = TryCast(obj, ReducedExtensionMethodSymbol)
 
             Return other IsNot Nothing AndAlso
-                   other.m_CurriedFromMethod.Equals(m_CurriedFromMethod) AndAlso
-                   other.m_ReceiverType.Equals(m_ReceiverType)
+                   other._curriedFromMethod.Equals(_curriedFromMethod) AndAlso
+                   other._receiverType.Equals(_receiverType)
         End Function
 
         ''' <summary>
@@ -633,14 +677,14 @@ Namespace Microsoft.CodeAnalysis.VisualBasic.Symbols
         Private NotInheritable Class ReducedTypeParameterSymbol
             Inherits TypeParameterSymbol
 
-            Private ReadOnly m_CurriedMethod As ReducedExtensionMethodSymbol
-            Private ReadOnly m_CurriedFromTypeParameter As TypeParameterSymbol
-            Private ReadOnly m_Ordinal As Integer
+            Private ReadOnly _curriedMethod As ReducedExtensionMethodSymbol
+            Private ReadOnly _curriedFromTypeParameter As TypeParameterSymbol
+            Private ReadOnly _ordinal As Integer
 
             Public Sub New(curriedMethod As ReducedExtensionMethodSymbol, curriedFromTypeParameter As TypeParameterSymbol, ordinal As Integer)
-                m_CurriedMethod = curriedMethod
-                m_CurriedFromTypeParameter = curriedFromTypeParameter
-                m_Ordinal = ordinal
+                _curriedMethod = curriedMethod
+                _curriedFromTypeParameter = curriedFromTypeParameter
+                _ordinal = ordinal
             End Sub
 
             Public Overrides ReadOnly Property TypeParameterKind As TypeParameterKind
@@ -651,26 +695,26 @@ Namespace Microsoft.CodeAnalysis.VisualBasic.Symbols
 
             Public Overrides ReadOnly Property Name As String
                 Get
-                    Return m_CurriedFromTypeParameter.Name
+                    Return _curriedFromTypeParameter.Name
                 End Get
             End Property
 
             Public Overrides ReadOnly Property MetadataName As String
                 Get
-                    Return m_CurriedFromTypeParameter.MetadataName
+                    Return _curriedFromTypeParameter.MetadataName
                 End Get
             End Property
 
             Public Overrides ReadOnly Property ReducedFrom As TypeParameterSymbol
                 Get
-                    Return m_CurriedFromTypeParameter
+                    Return _curriedFromTypeParameter
                 End Get
             End Property
 
             Friend Overrides ReadOnly Property ConstraintTypesNoUseSiteDiagnostics As ImmutableArray(Of TypeSymbol)
                 Get
-                    Dim types = m_CurriedFromTypeParameter.ConstraintTypesNoUseSiteDiagnostics
-                    Dim substitution = m_CurriedMethod.m_CurryTypeSubstitution
+                    Dim types = _curriedFromTypeParameter.ConstraintTypesNoUseSiteDiagnostics
+                    Dim substitution = _curriedMethod._curryTypeSubstitution
                     If substitution IsNot Nothing Then
                         types = InternalSubstituteTypeParametersDistinct(substitution, types)
                     End If
@@ -680,87 +724,89 @@ Namespace Microsoft.CodeAnalysis.VisualBasic.Symbols
 
             Public Overrides ReadOnly Property ContainingSymbol As Symbol
                 Get
-                    Return m_CurriedMethod
+                    Return _curriedMethod
                 End Get
             End Property
 
             Public Overloads Overrides Function GetAttributes() As ImmutableArray(Of VisualBasicAttributeData)
-                Return m_CurriedFromTypeParameter.GetAttributes()
+                Return _curriedFromTypeParameter.GetAttributes()
             End Function
 
             Public Overrides ReadOnly Property HasConstructorConstraint As Boolean
                 Get
-                    Return m_CurriedFromTypeParameter.HasConstructorConstraint
+                    Return _curriedFromTypeParameter.HasConstructorConstraint
                 End Get
             End Property
 
             Public Overrides ReadOnly Property HasReferenceTypeConstraint As Boolean
                 Get
-                    Return m_CurriedFromTypeParameter.HasReferenceTypeConstraint
+                    Return _curriedFromTypeParameter.HasReferenceTypeConstraint
                 End Get
             End Property
 
             Public Overrides ReadOnly Property HasValueTypeConstraint As Boolean
                 Get
-                    Return m_CurriedFromTypeParameter.HasValueTypeConstraint
+                    Return _curriedFromTypeParameter.HasValueTypeConstraint
                 End Get
             End Property
 
             Public Overrides ReadOnly Property Locations As ImmutableArray(Of Location)
                 Get
-                    Return m_CurriedFromTypeParameter.Locations
+                    Return _curriedFromTypeParameter.Locations
                 End Get
             End Property
 
             Public Overrides ReadOnly Property DeclaringSyntaxReferences As ImmutableArray(Of SyntaxReference)
                 Get
-                    Return m_CurriedFromTypeParameter.DeclaringSyntaxReferences
+                    Return _curriedFromTypeParameter.DeclaringSyntaxReferences
                 End Get
             End Property
 
             Public Overrides ReadOnly Property Ordinal As Integer
                 Get
-                    Return m_Ordinal
+                    Return _ordinal
                 End Get
             End Property
 
             Public Overrides ReadOnly Property Variance As VarianceKind
                 Get
-                    Return m_CurriedFromTypeParameter.Variance
+                    Return _curriedFromTypeParameter.Variance
                 End Get
             End Property
 
             Public Overrides Function GetDocumentationCommentXml(Optional preferredCulture As Globalization.CultureInfo = Nothing, Optional expandIncludes As Boolean = False, Optional cancellationToken As CancellationToken = Nothing) As String
-                Return m_CurriedFromTypeParameter.GetDocumentationCommentXml(preferredCulture, expandIncludes, cancellationToken)
+                Return _curriedFromTypeParameter.GetDocumentationCommentXml(preferredCulture, expandIncludes, cancellationToken)
             End Function
 
-            Friend Overrides Function GetUseSiteErrorInfo() As DiagnosticInfo
-                Return m_CurriedFromTypeParameter.GetUseSiteErrorInfo()
+            Friend Overrides Function GetUseSiteInfo() As UseSiteInfo(Of AssemblySymbol)
+                Return _curriedFromTypeParameter.GetUseSiteInfo()
             End Function
 
             Public Overrides ReadOnly Property IsImplicitlyDeclared As Boolean
                 Get
-                    Return m_CurriedFromTypeParameter.IsImplicitlyDeclared
+                    Return _curriedFromTypeParameter.IsImplicitlyDeclared
                 End Get
             End Property
 
             Friend Overrides Sub EnsureAllConstraintsAreResolved()
-                m_CurriedFromTypeParameter.EnsureAllConstraintsAreResolved()
+                _curriedFromTypeParameter.EnsureAllConstraintsAreResolved()
             End Sub
 
             Public Overrides Function GetHashCode() As Integer
-                Return Hash.Combine(m_Ordinal.GetHashCode(), Me.ContainingSymbol.GetHashCode())
+                Return Hash.Combine(_ordinal.GetHashCode(), Me.ContainingSymbol.GetHashCode())
             End Function
 
-            Public Overrides Function Equals(obj As Object) As Boolean
+            Public Overrides Function Equals(other As TypeSymbol, comparison As TypeCompareKind) As Boolean
+                Return Equals(TryCast(other, ReducedTypeParameterSymbol), comparison)
+            End Function
 
-                If Me Is obj Then
+            Public Overloads Function Equals(other As ReducedTypeParameterSymbol, comparison As TypeCompareKind) As Boolean
+
+                If Me Is other Then
                     Return True
                 End If
 
-                Dim other = TryCast(obj, ReducedTypeParameterSymbol)
-
-                Return other IsNot Nothing AndAlso Me.m_Ordinal = other.m_Ordinal AndAlso Me.ContainingSymbol.Equals(other.ContainingSymbol)
+                Return other IsNot Nothing AndAlso Me._ordinal = other._ordinal AndAlso Me.ContainingSymbol.Equals(other.ContainingSymbol, comparison)
             End Function
 
         End Class
@@ -771,34 +817,34 @@ Namespace Microsoft.CodeAnalysis.VisualBasic.Symbols
         Private Class ReducedParameterSymbol
             Inherits ReducedParameterSymbolBase
 
-            Private ReadOnly m_CurriedMethod As ReducedExtensionMethodSymbol
-            Private m_lazyType As TypeSymbol
+            Private ReadOnly _curriedMethod As ReducedExtensionMethodSymbol
+            Private _lazyType As TypeSymbol
 
             Public Sub New(curriedMethod As ReducedExtensionMethodSymbol, curriedFromParameter As ParameterSymbol)
                 MyBase.New(curriedFromParameter)
-                m_CurriedMethod = curriedMethod
+                _curriedMethod = curriedMethod
             End Sub
 
             Public Overrides ReadOnly Property ContainingSymbol As Symbol
                 Get
-                    Return m_CurriedMethod
+                    Return _curriedMethod
                 End Get
             End Property
 
             Public Overrides ReadOnly Property Type As TypeSymbol
                 Get
-                    If m_lazyType Is Nothing Then
+                    If _lazyType Is Nothing Then
 
                         Dim paramType As TypeSymbol = m_CurriedFromParameter.Type
 
-                        If m_CurriedMethod.m_CurryTypeSubstitution IsNot Nothing Then
-                            paramType = paramType.InternalSubstituteTypeParameters(m_CurriedMethod.m_CurryTypeSubstitution)
+                        If _curriedMethod._curryTypeSubstitution IsNot Nothing Then
+                            paramType = paramType.InternalSubstituteTypeParameters(_curriedMethod._curryTypeSubstitution).Type
                         End If
 
-                        Interlocked.CompareExchange(m_lazyType, paramType, Nothing)
+                        Interlocked.CompareExchange(_lazyType, paramType, Nothing)
                     End If
 
-                    Return m_lazyType
+                    Return _lazyType
                 End Get
             End Property
         End Class
@@ -832,6 +878,12 @@ Namespace Microsoft.CodeAnalysis.VisualBasic.Symbols
         Public Overrides ReadOnly Property CustomModifiers As ImmutableArray(Of CustomModifier)
             Get
                 Return m_CurriedFromParameter.CustomModifiers
+            End Get
+        End Property
+
+        Public Overrides ReadOnly Property RefCustomModifiers As ImmutableArray(Of CustomModifier)
+            Get
+                Return m_CurriedFromParameter.RefCustomModifiers
             End Get
         End Property
 
@@ -895,12 +947,6 @@ Namespace Microsoft.CodeAnalysis.VisualBasic.Symbols
             End Get
         End Property
 
-        Friend NotOverridable Overrides ReadOnly Property HasByRefBeforeCustomModifiers As Boolean
-            Get
-                Return m_CurriedFromParameter.HasByRefBeforeCustomModifiers
-            End Get
-        End Property
-
         Public Overrides ReadOnly Property HasExplicitDefaultValue As Boolean
             Get
                 Return m_CurriedFromParameter.HasExplicitDefaultValue
@@ -951,8 +997,8 @@ Namespace Microsoft.CodeAnalysis.VisualBasic.Symbols
             Return m_CurriedFromParameter.GetDocumentationCommentXml(preferredCulture, expandIncludes, cancellationToken)
         End Function
 
-        Friend Overrides Function GetUseSiteErrorInfo() As DiagnosticInfo
-            Return m_CurriedFromParameter.GetUseSiteErrorInfo()
+        Friend Overrides Function GetUseSiteInfo() As UseSiteInfo(Of AssemblySymbol)
+            Return m_CurriedFromParameter.GetUseSiteInfo()
         End Function
 
         Public Overrides ReadOnly Property Name As String

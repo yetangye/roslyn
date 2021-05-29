@@ -1,13 +1,15 @@
-' Copyright (c) Microsoft.  All Rights Reserved.  Licensed under the Apache License, Version 2.0.  See License.txt in the project root for license information.
+﻿' Licensed to the .NET Foundation under one or more agreements.
+' The .NET Foundation licenses this file to you under the MIT license.
+' See the LICENSE file in the project root for more information.
 
+Imports Microsoft.CodeAnalysis.Test.Utilities
 Imports Roslyn.Test.Utilities
-Imports Microsoft.VisualStudio.LanguageServices.UnitTests.CodeModel
 
 Namespace Microsoft.VisualStudio.LanguageServices.UnitTests.CodeModel.MethodXML
     Partial Public Class MethodXMLTests
 
-        <ConditionalFact(GetType(x86)), Trait(Traits.Feature, Traits.Features.CodeModelMethodXml)>
-        Public Sub VBLocalDeclarations_NoInitializer()
+        <WpfFact, Trait(Traits.Feature, Traits.Features.CodeModelMethodXml)>
+        Public Sub TestVBLocalDeclarations_NoInitializer()
             Dim definition =
 <Workspace>
     <Project Language="Visual Basic" CommonReferences="true">
@@ -33,8 +35,8 @@ End Class
             Test(definition, expected)
         End Sub
 
-        <ConditionalFact(GetType(x86)), Trait(Traits.Feature, Traits.Features.CodeModelMethodXml)>
-        Public Sub VBLocalDeclarations_WithLiteralInitializer()
+        <WpfFact, Trait(Traits.Feature, Traits.Features.CodeModelMethodXml)>
+        Public Sub TestVBLocalDeclarations_WithLiteralInitializer()
             Dim definition =
 <Workspace>
     <Project Language="Visual Basic" CommonReferences="true">
@@ -65,8 +67,8 @@ End Class
             Test(definition, expected)
         End Sub
 
-        <ConditionalFact(GetType(x86)), Trait(Traits.Feature, Traits.Features.CodeModelMethodXml)>
-        Public Sub VBLocalDeclarations_WithInvocationInitializer1()
+        <WpfFact, Trait(Traits.Feature, Traits.Features.CodeModelMethodXml)>
+        Public Sub TestVBLocalDeclarations_WithInvocationInitializer1()
             Dim definition =
 <Workspace>
     <Project Language="Visual Basic" CommonReferences="true">
@@ -74,10 +76,10 @@ End Class
         <Document>
 Public Class Class1
     $$Sub M()
-        Dim s As String = Foo()
+        Dim s As String = Goo()
     End Sub
 
-    Function Foo() As String
+    Function Goo() As String
         Return "Hello"
     End Function
 End Class
@@ -97,7 +99,7 @@ End Class
                         <Expression>
                             <ThisReference/>
                         </Expression>
-                        <Name>Foo</Name>
+                        <Name>Goo</Name>
                     </NameRef>
                 </Expression>
             </MethodCall>
@@ -108,8 +110,8 @@ End Class
             Test(definition, expected)
         End Sub
 
-        <ConditionalFact(GetType(x86)), Trait(Traits.Feature, Traits.Features.CodeModelMethodXml)>
-        Public Sub VBLocalDeclarations_WithInvocationInitializer2()
+        <WpfFact, Trait(Traits.Feature, Traits.Features.CodeModelMethodXml)>
+        Public Sub TestVBLocalDeclarations_WithInvocationInitializer2()
             Dim definition =
 <Workspace>
     <Project Language="Visual Basic" CommonReferences="true">
@@ -117,10 +119,10 @@ End Class
         <Document>
 Public Class Class1
     $$Sub M()
-        Dim s As String = Foo(1)
+        Dim s As String = Goo(1)
     End Sub
 
-    Function Foo(i As Integer) As String
+    Function Goo(i As Integer) As String
         Return "Hello"
     End Function
 End Class
@@ -140,7 +142,7 @@ End Class
                         <Expression>
                             <ThisReference/>
                         </Expression>
-                        <Name>Foo</Name>
+                        <Name>Goo</Name>
                     </NameRef>
                 </Expression>
                 <Argument>
@@ -158,8 +160,8 @@ End Class
             Test(definition, expected)
         End Sub
 
-        <ConditionalFact(GetType(x86)), Trait(Traits.Feature, Traits.Features.CodeModelMethodXml)>
-        Public Sub VBLocalDeclarations_WithEscapedNameAndAsNewClause()
+        <WpfFact, Trait(Traits.Feature, Traits.Features.CodeModelMethodXml)>
+        Public Sub TestVBLocalDeclarations_WithEscapedNameAndAsNewClause()
             ' Note: The behavior here is different than Dev10 where escaped keywords
             ' would not be escaped in the generated XML.
 
@@ -193,8 +195,8 @@ End Class
             Test(definition, expected)
         End Sub
 
-        <ConditionalFact(GetType(x86)), Trait(Traits.Feature, Traits.Features.CodeModelMethodXml)>
-        Public Sub VBLocalDeclarations_TwoInferredDeclarators()
+        <WpfFact, Trait(Traits.Feature, Traits.Features.CodeModelMethodXml)>
+        Public Sub TestVBLocalDeclarations_TwoInferredDeclarators()
             Dim definition =
 <Workspace>
     <Project Language="Visual Basic" CommonReferences="true">
@@ -234,8 +236,8 @@ End Class
             Test(definition, expected)
         End Sub
 
-        <ConditionalFact(GetType(x86)), Trait(Traits.Feature, Traits.Features.CodeModelMethodXml)>
-        Public Sub VBLocalDeclarations_StaticLocal()
+        <WpfFact, Trait(Traits.Feature, Traits.Features.CodeModelMethodXml)>
+        Public Sub TestVBLocalDeclarations_StaticLocal()
             Dim definition =
 <Workspace>
     <Project Language="Visual Basic" CommonReferences="true">
@@ -266,8 +268,8 @@ End Class
             Test(definition, expected)
         End Sub
 
-        <ConditionalFact(GetType(x86)), Trait(Traits.Feature, Traits.Features.CodeModelMethodXml)>
-        Public Sub VBLocalDeclarations_ConstLocal()
+        <WpfFact, Trait(Traits.Feature, Traits.Features.CodeModelMethodXml)>
+        Public Sub TestVBLocalDeclarations_ConstLocal()
             ' NOTE: Dev10 didn't generate *any* XML for Const locals because it walked the
             ' lowered IL tree. We're now generating the same thing that C# does (which has
             ' generates a local without the "Const" modifier -- i.e. a bug).
@@ -302,8 +304,8 @@ End Class
             Test(definition, expected)
         End Sub
 
-        <ConditionalFact(GetType(x86)), Trait(Traits.Feature, Traits.Features.CodeModelMethodXml)>
-        Public Sub VBLocalDeclarations_TwoNamesWithAsNewClause()
+        <WpfFact, Trait(Traits.Feature, Traits.Features.CodeModelMethodXml)>
+        Public Sub TestVBLocalDeclarations_TwoNamesWithAsNewClause()
             Dim definition =
 <Workspace>
     <Project Language="Visual Basic" CommonReferences="true">
@@ -340,8 +342,8 @@ End Class
             Test(definition, expected)
         End Sub
 
-        <ConditionalFact(GetType(x86)), Trait(Traits.Feature, Traits.Features.CodeModelMethodXml)>
-        Public Sub VBLocalDeclarations_ArrayWithNoBoundOrInitializer1()
+        <WpfFact, Trait(Traits.Feature, Traits.Features.CodeModelMethodXml)>
+        Public Sub TestVBLocalDeclarations_ArrayWithNoBoundOrInitializer1()
             Dim definition =
 <Workspace>
     <Project Language="Visual Basic" CommonReferences="true">
@@ -369,8 +371,8 @@ End Class
             Test(definition, expected)
         End Sub
 
-        <ConditionalFact(GetType(x86)), Trait(Traits.Feature, Traits.Features.CodeModelMethodXml)>
-        Public Sub VBLocalDeclarations_ArrayWithNoBoundOrInitializer2()
+        <WpfFact, Trait(Traits.Feature, Traits.Features.CodeModelMethodXml)>
+        Public Sub TestVBLocalDeclarations_ArrayWithNoBoundOrInitializer2()
             Dim definition =
 <Workspace>
     <Project Language="Visual Basic" CommonReferences="true">
@@ -398,8 +400,8 @@ End Class
             Test(definition, expected)
         End Sub
 
-        <ConditionalFact(GetType(x86)), Trait(Traits.Feature, Traits.Features.CodeModelMethodXml)>
-        Public Sub VBLocalDeclarations_ArrayWithSimpleBound()
+        <WpfFact, Trait(Traits.Feature, Traits.Features.CodeModelMethodXml)>
+        Public Sub TestVBLocalDeclarations_ArrayWithSimpleBound()
             Dim definition =
 <Workspace>
     <Project Language="Visual Basic" CommonReferences="true">
@@ -441,8 +443,8 @@ End Class
             Test(definition, expected)
         End Sub
 
-        <ConditionalFact(GetType(x86)), Trait(Traits.Feature, Traits.Features.CodeModelMethodXml)>
-        Public Sub VBLocalDeclarations_ArrayWithRangeBound()
+        <WpfFact, Trait(Traits.Feature, Traits.Features.CodeModelMethodXml)>
+        Public Sub TestVBLocalDeclarations_ArrayWithRangeBound()
             Dim definition =
 <Workspace>
     <Project Language="Visual Basic" CommonReferences="true">
@@ -484,8 +486,8 @@ End Class
             Test(definition, expected)
         End Sub
 
-        <ConditionalFact(GetType(x86)), Trait(Traits.Feature, Traits.Features.CodeModelMethodXml)>
-        Public Sub VBLocalDeclarations_ArrayWithSimpleAndRangeBounds()
+        <WpfFact, Trait(Traits.Feature, Traits.Features.CodeModelMethodXml)>
+        Public Sub TestVBLocalDeclarations_ArrayWithSimpleAndRangeBounds()
             Dim definition =
 <Workspace>
     <Project Language="Visual Basic" CommonReferences="true">
@@ -534,8 +536,8 @@ End Class
             Test(definition, expected)
         End Sub
 
-        <ConditionalFact(GetType(x86)), Trait(Traits.Feature, Traits.Features.CodeModelMethodXml)>
-        Public Sub VBLocalDeclarations_ArrayWithStringBound()
+        <WpfFact, Trait(Traits.Feature, Traits.Features.CodeModelMethodXml)>
+        Public Sub TestVBLocalDeclarations_ArrayWithStringBound()
             Dim definition =
 <Workspace>
     <Project Language="Visual Basic" CommonReferences="true">
@@ -543,7 +545,7 @@ End Class
         <Document>
 Public Class Class1
     $$Sub M()
-        Dim i("Foo") As Integer
+        Dim i("Goo") As Integer
     End Sub
 End Class
         </Document>
@@ -552,14 +554,14 @@ End Class
 
             Dim expected =
 <Block>
-    <Quote line="3">Dim i("Foo") As Integer</Quote>
+    <Quote line="3">Dim i("Goo") As Integer</Quote>
 </Block>
 
             Test(definition, expected)
         End Sub
 
-        <ConditionalFact(GetType(x86)), Trait(Traits.Feature, Traits.Features.CodeModelMethodXml)>
-        Public Sub VBLocalDeclarations_ArrayWithStringAndCastBound()
+        <WpfFact, Trait(Traits.Feature, Traits.Features.CodeModelMethodXml)>
+        Public Sub TestVBLocalDeclarations_ArrayWithStringAndCastBound()
             Dim definition =
 <Workspace>
     <Project Language="Visual Basic" CommonReferences="true">
@@ -567,7 +569,7 @@ End Class
         <Document>
 Public Class Class1
     $$Sub M()
-        Dim i(CInt("Foo")) As Integer
+        Dim i(CInt("Goo")) As Integer
     End Sub
 End Class
         </Document>
@@ -576,14 +578,14 @@ End Class
 
             Dim expected =
 <Block>
-    <Quote line="3">Dim i(CInt("Foo")) As Integer</Quote>
+    <Quote line="3">Dim i(CInt("Goo")) As Integer</Quote>
 </Block>
 
             Test(definition, expected)
         End Sub
 
-        <ConditionalFact(GetType(x86)), Trait(Traits.Feature, Traits.Features.CodeModelMethodXml)>
-        Public Sub VBLocalDeclarations_ArrayWithPropertyAccessBound()
+        <WpfFact, Trait(Traits.Feature, Traits.Features.CodeModelMethodXml)>
+        Public Sub TestVBLocalDeclarations_ArrayWithPropertyAccessBound()
             Dim definition =
     <Workspace>
         <Project Language="Visual Basic" CommonReferences="true">
@@ -591,7 +593,7 @@ End Class
             <Document>
 Public Class Class1
     $$Sub M()
-        Dim i("Foo".Length) As Integer
+        Dim i("Goo".Length) As Integer
     End Sub
 End Class
         </Document>
@@ -600,14 +602,14 @@ End Class
 
             Dim expected =
     <Block>
-        <Quote line="3">Dim i("Foo".Length) As Integer</Quote>
+        <Quote line="3">Dim i("Goo".Length) As Integer</Quote>
     </Block>
 
             Test(definition, expected)
         End Sub
 
-        <ConditionalFact(GetType(x86)), Trait(Traits.Feature, Traits.Features.CodeModelMethodXml)>
-        Public Sub VBLocalDeclarations_ArrayWithNoBoundAndCollectionInitializer1()
+        <WpfFact, Trait(Traits.Feature, Traits.Features.CodeModelMethodXml)>
+        Public Sub TestVBLocalDeclarations_ArrayWithNoBoundAndCollectionInitializer1()
             Dim definition =
     <Workspace>
         <Project Language="Visual Basic" CommonReferences="true">
@@ -664,8 +666,8 @@ End Class
             Test(definition, expected)
         End Sub
 
-        <ConditionalFact(GetType(x86)), Trait(Traits.Feature, Traits.Features.CodeModelMethodXml)>
-        Public Sub VBLocalDeclarations_ArrayWithNoBoundAndCollectionInitializer2()
+        <WpfFact, Trait(Traits.Feature, Traits.Features.CodeModelMethodXml)>
+        Public Sub TestVBLocalDeclarations_ArrayWithNoBoundAndCollectionInitializer2()
             Dim definition =
     <Workspace>
         <Project Language="Visual Basic" CommonReferences="true">
@@ -722,8 +724,8 @@ End Class
             Test(definition, expected)
         End Sub
 
-        <ConditionalFact(GetType(x86)), Trait(Traits.Feature, Traits.Features.CodeModelMethodXml)>
-        Public Sub VBLocalDeclarations_InitializeWithStringConcatenation()
+        <WpfFact, Trait(Traits.Feature, Traits.Features.CodeModelMethodXml)>
+        Public Sub TestVBLocalDeclarations_InitializeWithStringConcatenation()
             Dim definition =
     <Workspace>
         <Project Language="Visual Basic" CommonReferences="true">
@@ -755,6 +757,78 @@ End Class
                 </Literal>
             </Expression>
         </BinaryOperation>
+    </Expression>
+    </Local>
+</Block>
+
+            Test(definition, expected)
+        End Sub
+
+        <WpfFact, Trait(Traits.Feature, Traits.Features.CodeModelMethodXml)>
+        Public Sub TestVBLocalDeclarations_DirectCast()
+            Dim definition =
+    <Workspace>
+        <Project Language="Visual Basic" CommonReferences="true">
+            <CompilationOptions RootNamespace="ClassLibrary1"/>
+            <Document>
+Public Class C
+    $$Sub M()
+        Dim s = DirectCast("Text", String)
+    End Sub
+End Class
+        </Document>
+        </Project>
+    </Workspace>
+
+            Dim expected =
+<Block><Local line="3">
+    <Type>System.String</Type>
+    <Name>s</Name>
+    <Expression>
+        <Cast directcast="yes">
+            <Type>System.String</Type>
+            <Expression>
+                <Literal>
+                    <String>Text</String>
+                </Literal>
+            </Expression>
+        </Cast>
+    </Expression>
+    </Local>
+</Block>
+
+            Test(definition, expected)
+        End Sub
+
+        <WpfFact, Trait(Traits.Feature, Traits.Features.CodeModelMethodXml)>
+        Public Sub TestVBLocalDeclarations_TryCast()
+            Dim definition =
+    <Workspace>
+        <Project Language="Visual Basic" CommonReferences="true">
+            <CompilationOptions RootNamespace="ClassLibrary1"/>
+            <Document>
+Public Class C
+    $$Sub M()
+        Dim s = TryCast("Text", String)
+    End Sub
+End Class
+        </Document>
+        </Project>
+    </Workspace>
+
+            Dim expected =
+<Block><Local line="3">
+    <Type>System.String</Type>
+    <Name>s</Name>
+    <Expression>
+        <Cast trycast="yes">
+            <Type>System.String</Type>
+            <Expression>
+                <Literal>
+                    <String>Text</String>
+                </Literal>
+            </Expression>
+        </Cast>
     </Expression>
     </Local>
 </Block>

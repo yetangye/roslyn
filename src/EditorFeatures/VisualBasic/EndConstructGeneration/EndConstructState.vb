@@ -1,15 +1,16 @@
-' Copyright (c) Microsoft.  All Rights Reserved.  Licensed under the Apache License, Version 2.0.  See License.txt in the project root for license information.
-
+﻿' Licensed to the .NET Foundation under one or more agreements.
+' The .NET Foundation licenses this file to you under the MIT license.
+' See the LICENSE file in the project root for more information.
 
 Namespace Microsoft.CodeAnalysis.Editor.VisualBasic.EndConstructGeneration
-    Class EndConstructState
+    Friend Class EndConstructState
         Private ReadOnly _caretPosition As Integer
         Private ReadOnly _semanticModel As Lazy(Of SemanticModel)
         Private ReadOnly _tree As SyntaxTree
         Private ReadOnly _tokenToLeft As SyntaxToken
         Private ReadOnly _newLineCharacter As String
 
-        Sub New(caretPosition As Integer, semanticModel As Lazy(Of SemanticModel), syntaxTree As SyntaxTree, tokenToLeft As SyntaxToken, newLineCharacter As String)
+        Public Sub New(caretPosition As Integer, semanticModel As Lazy(Of SemanticModel), syntaxTree As SyntaxTree, tokenToLeft As SyntaxToken, newLineCharacter As String)
             ThrowIfNull(syntaxTree)
 
             _caretPosition = caretPosition

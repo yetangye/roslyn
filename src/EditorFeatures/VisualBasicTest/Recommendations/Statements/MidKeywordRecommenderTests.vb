@@ -1,29 +1,27 @@
-' Copyright (c) Microsoft.  All Rights Reserved.  Licensed under the Apache License, Version 2.0.  See License.txt in the project root for license information.
-
-Imports Microsoft.CodeAnalysis.Text
-Imports Roslyn.Test.Utilities
+﻿' Licensed to the .NET Foundation under one or more agreements.
+' The .NET Foundation licenses this file to you under the MIT license.
+' See the LICENSE file in the project root for more information.
 
 Namespace Microsoft.CodeAnalysis.Editor.VisualBasic.UnitTests.Recommendations.Statements
     Public Class MidKeywordRecommenderTests
         <Fact>
         <Trait(Traits.Feature, Traits.Features.KeywordRecommending)>
-        Public Sub MidHelpText()
+        Public Sub MidHelpTextTest()
             VerifyRecommendationDescriptionTextIs(<MethodBody>|</MethodBody>, "Mid",
-                                      <Text><![CDATA[
-Mid statement
-Replaces a specified number of characters in a String variable with characters from another string.
-Mid(<stringName>, <startIndex>, [<length>]) = <stringExpression>]]></Text>)
+$"{VBFeaturesResources.Mid_statement}
+{VBWorkspaceResources.Replaces_a_specified_number_of_characters_in_a_String_variable_with_characters_from_another_string}
+Mid({VBWorkspaceResources.stringName}, {VBWorkspaceResources.startIndex}, [{VBWorkspaceResources.length}]) = {VBWorkspaceResources.stringExpression}")
         End Sub
 
         <Fact>
         <Trait(Traits.Feature, Traits.Features.KeywordRecommending)>
-        Public Sub MidInMethodBody()
+        Public Sub MidInMethodBodyTest()
             VerifyRecommendationsContain(<MethodBody>|</MethodBody>, "Mid")
         End Sub
 
         <Fact>
         <Trait(Traits.Feature, Traits.Features.KeywordRecommending)>
-        Public Sub MidAfterStatement()
+        Public Sub MidAfterStatementTest()
             VerifyRecommendationsContain(<MethodBody>
 Dim x 
 |</MethodBody>, "Mid")
@@ -31,19 +29,19 @@ Dim x
 
         <Fact>
         <Trait(Traits.Feature, Traits.Features.KeywordRecommending)>
-        Public Sub MidMissingInClassBlock()
+        Public Sub MidMissingInClassBlockTest()
             VerifyRecommendationsMissing(<ClassDeclaration>|</ClassDeclaration>, "Mid")
         End Sub
 
         <Fact>
         <Trait(Traits.Feature, Traits.Features.KeywordRecommending)>
-        Public Sub MidInSingleLineLambda()
+        Public Sub MidInSingleLineLambdaTest()
             VerifyRecommendationsContain(<MethodBody>Dim x = Sub() |</MethodBody>, "Mid")
         End Sub
 
         <Fact>
         <Trait(Traits.Feature, Traits.Features.KeywordRecommending)>
-        Public Sub MidNotInSingleLineFunctionLambda()
+        Public Sub MidNotInSingleLineFunctionLambdaTest()
             VerifyRecommendationsMissing(<MethodBody>Dim x = Function() |</MethodBody>, "Mid")
         End Sub
     End Class

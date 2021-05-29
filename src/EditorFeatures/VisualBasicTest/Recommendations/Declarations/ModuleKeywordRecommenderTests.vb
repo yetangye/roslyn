@@ -1,71 +1,66 @@
-' Copyright (c) Microsoft.  All Rights Reserved.  Licensed under the Apache License, Version 2.0.  See License.txt in the project root for license information.
-
-Imports Microsoft.CodeAnalysis.Text
-Imports Microsoft.CodeAnalysis.VisualBasic
-Imports Microsoft.CodeAnalysis.VisualBasic.Symbols
-Imports Microsoft.CodeAnalysis.VisualBasic.Syntax
-Imports Roslyn.Test.Utilities
-Imports Xunit
+﻿' Licensed to the .NET Foundation under one or more agreements.
+' The .NET Foundation licenses this file to you under the MIT license.
+' See the LICENSE file in the project root for more information.
 
 Namespace Microsoft.CodeAnalysis.Editor.VisualBasic.UnitTests.Recommendations.Declarations
     Public Class ModuleKeywordRecommenderTests
         <Fact>
         <Trait(Traits.Feature, Traits.Features.KeywordRecommending)>
-        Public Sub ModuleInFile()
+        Public Sub ModuleInFileTest()
             VerifyRecommendationsContain(<File>|</File>, "Module")
         End Sub
 
         <Fact>
         <Trait(Traits.Feature, Traits.Features.KeywordRecommending)>
-        Public Sub ModuleNotInMethodDeclaration()
+        Public Sub ModuleNotInMethodDeclarationTest()
             VerifyRecommendationsMissing(<MethodBody>|</MethodBody>, "Module")
         End Sub
 
         <Fact>
         <Trait(Traits.Feature, Traits.Features.KeywordRecommending)>
-        Public Sub ModuleInNamespace()
+        Public Sub ModuleInNamespaceTest()
             VerifyRecommendationsContain(<NamespaceDeclaration>|</NamespaceDeclaration>, "Module")
         End Sub
 
         <Fact>
         <Trait(Traits.Feature, Traits.Features.KeywordRecommending)>
-        Public Sub ModuleNotInInterface()
+        Public Sub ModuleNotInInterfaceTest()
             VerifyRecommendationsMissing(<InterfaceDeclaration>|</InterfaceDeclaration>, "Module")
         End Sub
 
         <Fact>
         <Trait(Traits.Feature, Traits.Features.KeywordRecommending)>
-        Public Sub ModuleNotInEnum()
+        Public Sub ModuleNotInEnumTest()
             VerifyRecommendationsMissing(<EnumDeclaration>|</EnumDeclaration>, "Module")
         End Sub
 
         <Fact>
         <Trait(Traits.Feature, Traits.Features.KeywordRecommending)>
-        Public Sub ModuleNotInStructure()
+        Public Sub ModuleNotInStructureTest()
             VerifyRecommendationsMissing(<StructureDeclaration>|</StructureDeclaration>, "Module")
         End Sub
 
         <Fact>
         <Trait(Traits.Feature, Traits.Features.KeywordRecommending)>
-        Public Sub ModuleNotInModule()
+        Public Sub ModuleNotInModuleTest()
             VerifyRecommendationsMissing(<ModuleDeclaration>|</ModuleDeclaration>, "Module")
         End Sub
 
         <Fact>
         <Trait(Traits.Feature, Traits.Features.KeywordRecommending)>
-        Public Sub ModuleAfterPartial()
+        Public Sub ModuleAfterPartialTest()
             VerifyRecommendationsContain(<File>Partial |</File>, "Module")
         End Sub
 
         <Fact>
         <Trait(Traits.Feature, Traits.Features.KeywordRecommending)>
-        Public Sub ModuleAfterPublic()
+        Public Sub ModuleAfterPublicTest()
             VerifyRecommendationsContain(<File>Public |</File>, "Module")
         End Sub
 
-        <Fact, WorkItem(530727)>
+        <Fact, WorkItem(530727, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/530727")>
         <Trait(Traits.Feature, Traits.Features.KeywordRecommending)>
-        Public Sub ModuleAfterEndModule()
+        Public Sub ModuleAfterEndModuleTest()
             Dim code =
 <File>
 Module M1
@@ -78,7 +73,7 @@ End Module
 
         <Fact>
         <Trait(Traits.Feature, Traits.Features.KeywordRecommending)>
-        Public Sub ModuleFollowsDelegateDeclaration()
+        Public Sub ModuleFollowsDelegateDeclarationTest()
             Dim code =
 <File>
 Delegate Sub DelegateType()
@@ -89,165 +84,164 @@ Delegate Sub DelegateType()
 
         <Fact>
         <Trait(Traits.Feature, Traits.Features.KeywordRecommending)>
-        Public Sub ModuleNotAfterPublicInClassDeclaration()
+        Public Sub ModuleNotAfterPublicInClassDeclarationTest()
             VerifyRecommendationsMissing(<ClassDeclaration>Public |</ClassDeclaration>, "Module")
         End Sub
 
         <Fact>
         <Trait(Traits.Feature, Traits.Features.KeywordRecommending)>
-        Public Sub ModuleNotAfterProtectedInFile()
+        Public Sub ModuleNotAfterProtectedInFileTest()
             VerifyRecommendationsMissing(<File>Protected |</File>, "Module")
         End Sub
 
         <Fact>
         <Trait(Traits.Feature, Traits.Features.KeywordRecommending)>
-        Public Sub ModuleNotAfterProtectedInClassDeclaration()
+        Public Sub ModuleNotAfterProtectedInClassDeclarationTest()
             VerifyRecommendationsMissing(<ClassDeclaration>Protected |</ClassDeclaration>, "Module")
         End Sub
 
         <Fact>
         <Trait(Traits.Feature, Traits.Features.KeywordRecommending)>
-        Public Sub ModuleAfterFriendInFile()
+        Public Sub ModuleAfterFriendInFileTest()
             VerifyRecommendationsContain(<File>Friend |</File>, "Module")
         End Sub
 
         <Fact>
         <Trait(Traits.Feature, Traits.Features.KeywordRecommending)>
-        Public Sub ModuleNotAfterFriendInClassDeclaration()
+        Public Sub ModuleNotAfterFriendInClassDeclarationTest()
             VerifyRecommendationsMissing(<ClassDeclaration>Friend |</ClassDeclaration>, "Module")
         End Sub
 
         <Fact>
         <Trait(Traits.Feature, Traits.Features.KeywordRecommending)>
-        Public Sub ModuleNotAfterPrivateInFile()
+        Public Sub ModuleNotAfterPrivateInFileTest()
             VerifyRecommendationsMissing(<File>Private |</File>, "Module")
         End Sub
 
         <Fact>
         <Trait(Traits.Feature, Traits.Features.KeywordRecommending)>
-        Public Sub ModuleNotAfterPrivateInNestedClass()
+        Public Sub ModuleNotAfterPrivateInNestedClassTest()
             VerifyRecommendationsMissing(<ClassDeclaration>Private |</ClassDeclaration>, "Module")
         End Sub
 
         <Fact>
         <Trait(Traits.Feature, Traits.Features.KeywordRecommending)>
-        Public Sub ModuleNotAfterPrivateInNamespace()
+        Public Sub ModuleNotAfterPrivateInNamespaceTest()
             VerifyRecommendationsMissing(<NamespaceDeclaration>Private |</NamespaceDeclaration>, "Module")
         End Sub
 
         <Fact>
         <Trait(Traits.Feature, Traits.Features.KeywordRecommending)>
-        Public Sub ModuleNotAfterProtectedFriendInFile()
+        Public Sub ModuleNotAfterProtectedFriendInFileTest()
             VerifyRecommendationsMissing(<File>Protected Friend |</File>, "Module")
         End Sub
 
         <Fact>
         <Trait(Traits.Feature, Traits.Features.KeywordRecommending)>
-        Public Sub ModuleNotAfterProtectedFriendInClass()
+        Public Sub ModuleNotAfterProtectedFriendInClassTest()
             VerifyRecommendationsMissing(<ClassDeclaration>Protected Friend |</ClassDeclaration>, "Module")
         End Sub
 
         <Fact>
         <Trait(Traits.Feature, Traits.Features.KeywordRecommending)>
-        Public Sub ModuleNotAfterOverloads()
+        Public Sub ModuleNotAfterOverloadsTest()
             VerifyRecommendationsMissing(<ClassDeclaration>Overloads |</ClassDeclaration>, "Module")
         End Sub
 
         <Fact>
         <Trait(Traits.Feature, Traits.Features.KeywordRecommending)>
-        Public Sub ModuleNotAfterOverrides()
+        Public Sub ModuleNotAfterOverridesTest()
             VerifyRecommendationsMissing(<ClassDeclaration>Overrides |</ClassDeclaration>, "Module")
         End Sub
 
         <Fact>
         <Trait(Traits.Feature, Traits.Features.KeywordRecommending)>
-        Public Sub ModuleNotAfterOverridable()
+        Public Sub ModuleNotAfterOverridableTest()
             VerifyRecommendationsMissing(<ClassDeclaration>Overridable |</ClassDeclaration>, "Module")
         End Sub
 
         <Fact>
         <Trait(Traits.Feature, Traits.Features.KeywordRecommending)>
-        Public Sub ModuleNotAfterNotOverridable()
+        Public Sub ModuleNotAfterNotOverridableTest()
             VerifyRecommendationsMissing(<ClassDeclaration>NotOverridable |</ClassDeclaration>, "Module")
         End Sub
 
         <Fact>
         <Trait(Traits.Feature, Traits.Features.KeywordRecommending)>
-        Public Sub ModuleNotAfterMustOverride()
+        Public Sub ModuleNotAfterMustOverrideTest()
             VerifyRecommendationsMissing(<ClassDeclaration>MustOverride |</ClassDeclaration>, "Module")
         End Sub
 
         <Fact>
         <Trait(Traits.Feature, Traits.Features.KeywordRecommending)>
-        Public Sub ModuleNotAfterMustOverrideOverrides()
+        Public Sub ModuleNotAfterMustOverrideOverridesTest()
             VerifyRecommendationsMissing(<ClassDeclaration>MustOverride Overrides |</ClassDeclaration>, "Module")
         End Sub
 
         <Fact>
         <Trait(Traits.Feature, Traits.Features.KeywordRecommending)>
-        Public Sub ModuleNotAfterNotOverridableOverrides()
+        Public Sub ModuleNotAfterNotOverridableOverridesTest()
             VerifyRecommendationsMissing(<ClassDeclaration>NotOverridable Overrides |</ClassDeclaration>, "Module")
         End Sub
 
         <Fact>
         <Trait(Traits.Feature, Traits.Features.KeywordRecommending)>
-        Public Sub ModuleNotAfterConst()
+        Public Sub ModuleNotAfterConstTest()
             VerifyRecommendationsMissing(<ClassDeclaration>Const |</ClassDeclaration>, "Module")
         End Sub
 
         <Fact>
         <Trait(Traits.Feature, Traits.Features.KeywordRecommending)>
-        Public Sub ModuleNotAfterDefault()
+        Public Sub ModuleNotAfterDefaultTest()
             VerifyRecommendationsMissing(<ClassDeclaration>Default |</ClassDeclaration>, "Module")
         End Sub
 
         <Fact>
         <Trait(Traits.Feature, Traits.Features.KeywordRecommending)>
-        Public Sub ModuleNotAfterMustInherit()
+        Public Sub ModuleNotAfterMustInheritTest()
             VerifyRecommendationsMissing(<ClassDeclaration>MustInherit |</ClassDeclaration>, "Module")
         End Sub
 
         <Fact>
         <Trait(Traits.Feature, Traits.Features.KeywordRecommending)>
-        Public Sub ModuleNotAfterNotInheritable()
+        Public Sub ModuleNotAfterNotInheritableTest()
             VerifyRecommendationsMissing(<ClassDeclaration>NotInheritable |</ClassDeclaration>, "Module")
         End Sub
 
         <Fact>
         <Trait(Traits.Feature, Traits.Features.KeywordRecommending)>
-        Public Sub ModuleNotAfterNarrowing()
+        Public Sub ModuleNotAfterNarrowingTest()
             VerifyRecommendationsMissing(<ClassDeclaration>Narrowing |</ClassDeclaration>, "Module")
         End Sub
 
         <Fact>
         <Trait(Traits.Feature, Traits.Features.KeywordRecommending)>
-        Public Sub ModuleNotAfterWidening()
+        Public Sub ModuleNotAfterWideningTest()
             VerifyRecommendationsMissing(<ClassDeclaration>Widening |</ClassDeclaration>, "Module")
         End Sub
 
         <Fact>
         <Trait(Traits.Feature, Traits.Features.KeywordRecommending)>
-        Public Sub ModuleNotAfterReadOnly()
+        Public Sub ModuleNotAfterReadOnlyTest()
             VerifyRecommendationsMissing(<ClassDeclaration>ReadOnly |</ClassDeclaration>, "Module")
         End Sub
 
         <Fact>
         <Trait(Traits.Feature, Traits.Features.KeywordRecommending)>
-        Public Sub ModuleNotAfterWriteOnly()
+        Public Sub ModuleNotAfterWriteOnlyTest()
             VerifyRecommendationsMissing(<ClassDeclaration>WriteOnly |</ClassDeclaration>, "Module")
         End Sub
 
         <Fact>
         <Trait(Traits.Feature, Traits.Features.KeywordRecommending)>
-        Public Sub ModuleNotAfterCustom()
+        Public Sub ModuleNotAfterCustomTest()
             VerifyRecommendationsMissing(<ClassDeclaration>Custom |</ClassDeclaration>, "Module")
         End Sub
 
         <Fact>
         <Trait(Traits.Feature, Traits.Features.KeywordRecommending)>
-        Public Sub ModuleNotAfterShared()
+        Public Sub ModuleNotAfterSharedTest()
             VerifyRecommendationsMissing(<ClassDeclaration>Shared |</ClassDeclaration>, "Module")
         End Sub
-
     End Class
 End Namespace

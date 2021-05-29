@@ -1,10 +1,16 @@
-' Copyright (c) Microsoft.  All Rights Reserved.  Licensed under the Apache License, Version 2.0.  See License.txt in the project root for license information.
+﻿' Licensed to the .NET Foundation under one or more agreements.
+' The .NET Foundation licenses this file to you under the MIT license.
+' See the LICENSE file in the project root for more information.
 
+Imports System.Threading.Tasks
 Imports Microsoft.CodeAnalysis
+Imports Microsoft.CodeAnalysis.Editor.UnitTests
 Imports Microsoft.CodeAnalysis.Editor.UnitTests.Workspaces
+Imports Microsoft.CodeAnalysis.Test.Utilities
 Imports Microsoft.VisualStudio.LanguageServices.Implementation.CodeModel
 
 Namespace Microsoft.VisualStudio.LanguageServices.UnitTests.CodeModel
+    <[UseExportProvider]>
     Public MustInherit Class AbstractEventCollectorTests
 
         Protected MustOverride ReadOnly Property LanguageName As String
@@ -15,23 +21,11 @@ Namespace Microsoft.VisualStudio.LanguageServices.UnitTests.CodeModel
 
                        Assert.Equal(CodeModelEventType.Add, codeModelEvent.Type)
 
-                       If node IsNot Nothing Then
-                           Assert.NotNull(codeModelEvent.Node)
-                           Assert.Equal(node, codeModelService.GetName(codeModelEvent.Node))
-                       Else
-                           Assert.Null(codeModelEvent.Node)
-                       End If
-
-                       If parent IsNot Nothing Then
-                           Assert.NotNull(codeModelEvent.ParentNode)
-                           Assert.Equal(parent, codeModelService.GetName(codeModelEvent.ParentNode))
-                       Else
-                           Assert.Null(codeModelEvent.ParentNode)
-                       End If
+                       CheckCodeModelEvents(codeModelEvent, codeModelService, node, parent)
                    End Sub
         End Function
 
-        Friend Function Change(type As CodeModelEventType, node As String) As Action(Of CodeModelEvent, ICodeModelService)
+        Friend Function Change(type As CodeModelEventType, node As String, Optional parent As String = Nothing) As Action(Of CodeModelEvent, ICodeModelService)
             Return Sub(codeModelEvent, codeModelService)
                        Assert.NotNull(codeModelEvent)
 
@@ -43,27 +37,32 @@ Namespace Microsoft.VisualStudio.LanguageServices.UnitTests.CodeModel
                        Else
                            Assert.Null(codeModelEvent.Node)
                        End If
+
+                       If parent IsNot Nothing Then
+                           Assert.NotNull(codeModelEvent.ParentNode)
+                           Assert.Equal(parent, codeModelService.GetName(codeModelEvent.ParentNode))
+                       End If
                    End Sub
         End Function
 
-        Friend Function ArgChange(node As String) As Action(Of CodeModelEvent, ICodeModelService)
-            Return Change(CodeModelEventType.ArgChange, node)
+        Friend Function ArgChange(node As String, Optional parent As String = Nothing) As Action(Of CodeModelEvent, ICodeModelService)
+            Return Change(CodeModelEventType.ArgChange, node, parent)
         End Function
 
-        Friend Function BaseChange(node As String) As Action(Of CodeModelEvent, ICodeModelService)
-            Return Change(CodeModelEventType.BaseChange, node)
+        Friend Function BaseChange(node As String, Optional parent As String = Nothing) As Action(Of CodeModelEvent, ICodeModelService)
+            Return Change(CodeModelEventType.BaseChange, node, parent)
         End Function
 
-        Friend Function TypeRefChange(node As String) As Action(Of CodeModelEvent, ICodeModelService)
-            Return Change(CodeModelEventType.TypeRefChange, node)
+        Friend Function TypeRefChange(node As String, Optional parent As String = Nothing) As Action(Of CodeModelEvent, ICodeModelService)
+            Return Change(CodeModelEventType.TypeRefChange, node, parent)
         End Function
 
-        Friend Function Rename(node As String) As Action(Of CodeModelEvent, ICodeModelService)
-            Return Change(CodeModelEventType.Rename, node)
+        Friend Function Rename(node As String, Optional parent As String = Nothing) As Action(Of CodeModelEvent, ICodeModelService)
+            Return Change(CodeModelEventType.Rename, node, parent)
         End Function
 
-        Friend Function Unknown(node As String) As Action(Of CodeModelEvent, ICodeModelService)
-            Return Change(CodeModelEventType.Unknown, node)
+        Friend Function Unknown(node As String, Optional parent As String = Nothing) As Action(Of CodeModelEvent, ICodeModelService)
+            Return Change(CodeModelEventType.Unknown, node, parent)
         End Function
 
         Friend Function Remove(node As String, parent As String) As Action(Of CodeModelEvent, ICodeModelService)
@@ -72,23 +71,27 @@ Namespace Microsoft.VisualStudio.LanguageServices.UnitTests.CodeModel
 
                        Assert.Equal(CodeModelEventType.Remove, codeModelEvent.Type)
 
-                       If node IsNot Nothing Then
-                           Assert.NotNull(codeModelEvent.Node)
-                           Assert.Equal(node, codeModelService.GetName(codeModelEvent.Node))
-                       Else
-                           Assert.Null(codeModelEvent.Node)
-                       End If
-
-                       If parent IsNot Nothing Then
-                           Assert.NotNull(codeModelEvent.ParentNode)
-                           Assert.Equal(parent, codeModelService.GetName(codeModelEvent.ParentNode))
-                       Else
-                           Assert.Null(codeModelEvent.ParentNode)
-                       End If
+                       CheckCodeModelEvents(codeModelEvent, codeModelService, node, parent)
                    End Sub
         End Function
 
-        Friend Sub Test(code As XElement, change As XElement, ParamArray expectedEvents As Action(Of CodeModelEvent, ICodeModelService)())
+        Private Sub CheckCodeModelEvents(codeModelEvent As CodeModelEvent, codeModelService As ICodeModelService, node As String, parent As String)
+            If node IsNot Nothing Then
+                Assert.NotNull(codeModelEvent.Node)
+                Assert.Equal(node, codeModelService.GetName(codeModelEvent.Node))
+            Else
+                Assert.Null(codeModelEvent.Node)
+            End If
+
+            If parent IsNot Nothing Then
+                Assert.NotNull(codeModelEvent.ParentNode)
+                Assert.Equal(parent, codeModelService.GetName(codeModelEvent.ParentNode))
+            Else
+                Assert.Null(codeModelEvent.ParentNode)
+            End If
+        End Sub
+
+        Friend Async Function TestAsync(code As XElement, change As XElement, ParamArray expectedEvents As Action(Of CodeModelEvent, ICodeModelService)()) As Task
             Dim definition =
 <Workspace>
     <Project Language=<%= LanguageName %> CommonReferences="true">
@@ -97,16 +100,16 @@ Namespace Microsoft.VisualStudio.LanguageServices.UnitTests.CodeModel
     </Project>
 </Workspace>
 
-            Using workspace = TestWorkspaceFactory.CreateWorkspace(definition, exportProvider:=VisualStudioTestExportProvider.ExportProvider)
+            Using workspace = TestWorkspace.Create(definition, composition:=VisualStudioTestCompositions.LanguageServices)
                 Dim project = workspace.CurrentSolution.Projects.First()
                 Dim codeModelService = project.LanguageServices.GetService(Of ICodeModelService)()
                 Assert.NotNull(codeModelService)
 
                 Dim codeDocument = workspace.CurrentSolution.GetDocument(workspace.Documents(0).Id)
-                Dim codeTree = codeDocument.GetSyntaxTreeAsync().Result
+                Dim codeTree = Await codeDocument.GetSyntaxTreeAsync()
 
                 Dim changeDocument = workspace.CurrentSolution.GetDocument(workspace.Documents(1).Id)
-                Dim changeTree = changeDocument.GetSyntaxTreeAsync().Result
+                Dim changeTree = Await changeDocument.GetSyntaxTreeAsync()
 
                 Dim collectedEvents = codeModelService.CollectCodeModelEvents(codeTree, changeTree)
                 Assert.NotNull(collectedEvents)
@@ -117,7 +120,7 @@ Namespace Microsoft.VisualStudio.LanguageServices.UnitTests.CodeModel
                     expectedEvent(collectedEvent, codeModelService)
                 Next
             End Using
-        End Sub
+        End Function
 
     End Class
 End Namespace

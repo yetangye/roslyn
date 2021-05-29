@@ -1,185 +1,184 @@
-' Copyright (c) Microsoft.  All Rights Reserved.  Licensed under the Apache License, Version 2.0.  See License.txt in the project root for license information.
-
-Imports Microsoft.CodeAnalysis.Text
-Imports Roslyn.Test.Utilities
+﻿' Licensed to the .NET Foundation under one or more agreements.
+' The .NET Foundation licenses this file to you under the MIT license.
+' See the LICENSE file in the project root for more information.
 
 Namespace Microsoft.CodeAnalysis.Editor.VisualBasic.UnitTests.Recommendations.Declarations
     Public Class IteratorKeywordRecommenderTests
 
         <Fact, Trait(Traits.Feature, Traits.Features.KeywordRecommending)>
-        Public Sub KeywordsAfterIterator()
+        Public Sub KeywordsAfterIteratorTest()
             VerifyRecommendationsAreExactly(<ClassDeclaration>Iterator |</ClassDeclaration>,
                                             "Friend", "Function", "Private", "Property", "Protected", "Protected Friend", "Public")
         End Sub
 
         <Fact, Trait(Traits.Feature, Traits.Features.KeywordRecommending)>
-        Public Sub InClass()
+        Public Sub InClassTest()
             VerifyRecommendationsContain(<ClassDeclaration>|</ClassDeclaration>, "Iterator")
         End Sub
 
         <Fact, Trait(Traits.Feature, Traits.Features.KeywordRecommending)>
-        Public Sub InModule()
+        Public Sub InModuleTest()
             VerifyRecommendationsContain(<ModuleDeclaration>|</ModuleDeclaration>, "Iterator")
         End Sub
 
         <Fact, Trait(Traits.Feature, Traits.Features.KeywordRecommending)>
-        Public Sub NotInInterface()
+        Public Sub NotInInterfaceTest()
             VerifyRecommendationsMissing(<InterfaceDeclaration>|</InterfaceDeclaration>, "Iterator")
         End Sub
 
         <Fact, Trait(Traits.Feature, Traits.Features.KeywordRecommending)>
-        Public Sub InStructure()
+        Public Sub InStructureTest()
             VerifyRecommendationsContain(<StructureDeclaration>|</StructureDeclaration>, "Iterator")
         End Sub
 
         <Fact, Trait(Traits.Feature, Traits.Features.KeywordRecommending)>
-        Public Sub AfterPrivate()
+        Public Sub AfterPrivateTest()
             VerifyRecommendationsContain(<ClassDeclaration>Private |</ClassDeclaration>, "Iterator")
         End Sub
 
         <Fact, Trait(Traits.Feature, Traits.Features.KeywordRecommending)>
-        Public Sub AfterProtected()
+        Public Sub AfterProtectedTest()
             VerifyRecommendationsContain(<ClassDeclaration>Protected |</ClassDeclaration>, "Iterator")
         End Sub
 
         <Fact, Trait(Traits.Feature, Traits.Features.KeywordRecommending)>
-        Public Sub AfterProtectedFriend()
+        Public Sub AfterProtectedFriendTest()
             VerifyRecommendationsContain(<ClassDeclaration>Protected Friend |</ClassDeclaration>, "Iterator")
         End Sub
 
         <Fact, Trait(Traits.Feature, Traits.Features.KeywordRecommending)>
-        Public Sub AfterFriendProtected()
+        Public Sub AfterFriendProtectedTest()
             VerifyRecommendationsContain(<ClassDeclaration>Friend Protected |</ClassDeclaration>, "Iterator")
         End Sub
 
         <Fact, Trait(Traits.Feature, Traits.Features.KeywordRecommending)>
-        Public Sub AfterFriend()
+        Public Sub AfterFriendTest()
             VerifyRecommendationsContain(<ClassDeclaration>Friend |</ClassDeclaration>, "Iterator")
         End Sub
 
         <Fact, Trait(Traits.Feature, Traits.Features.KeywordRecommending)>
-        Public Sub AfterPublic()
+        Public Sub AfterPublicTest()
             VerifyRecommendationsContain(<ClassDeclaration>Public |</ClassDeclaration>, "Iterator")
         End Sub
 
         <Fact, Trait(Traits.Feature, Traits.Features.KeywordRecommending)>
-        Public Sub AfterOverridable()
+        Public Sub AfterOverridableTest()
             VerifyRecommendationsContain(<ClassDeclaration>Overridable |</ClassDeclaration>, "Iterator")
         End Sub
 
         <Fact, Trait(Traits.Feature, Traits.Features.KeywordRecommending)>
-        Public Sub AfterShadows()
+        Public Sub AfterShadowsTest()
             VerifyRecommendationsContain(<ClassDeclaration>Shadows |</ClassDeclaration>, "Iterator")
         End Sub
 
         <Fact, Trait(Traits.Feature, Traits.Features.KeywordRecommending)>
-        Public Sub AfterMustOverride()
+        Public Sub AfterMustOverrideTest()
             VerifyRecommendationsContain(<ClassDeclaration>MustOverride |</ClassDeclaration>, "Iterator")
         End Sub
 
         <Fact, Trait(Traits.Feature, Traits.Features.KeywordRecommending)>
-        Public Sub NotAfterConst()
+        Public Sub NotAfterConstTest()
             VerifyRecommendationsMissing(<ClassDeclaration>Const |</ClassDeclaration>, "Iterator")
         End Sub
 
         <Fact, Trait(Traits.Feature, Traits.Features.KeywordRecommending)>
-        Public Sub NotAfterDim()
+        Public Sub NotAfterDimTest()
             VerifyRecommendationsMissing(<ClassDeclaration>Dim |</ClassDeclaration>, "Iterator")
         End Sub
 
         <Fact, Trait(Traits.Feature, Traits.Features.KeywordRecommending)>
-        Public Sub NotAfterWithEvents()
+        Public Sub NotAfterWithEventsTest()
             VerifyRecommendationsMissing(<ClassDeclaration>WithEvents |</ClassDeclaration>, "Iterator")
         End Sub
 
         <Fact, Trait(Traits.Feature, Traits.Features.KeywordRecommending)>
-        Public Sub NotAfterFunction()
+        Public Sub NotAfterFunctionTest()
             VerifyRecommendationsMissing(<ClassDeclaration>Function |</ClassDeclaration>, "Iterator")
         End Sub
 
         <Fact, Trait(Traits.Feature, Traits.Features.KeywordRecommending)>
-        Public Sub NotAfterSub()
+        Public Sub NotAfterSubTest()
             VerifyRecommendationsMissing(<ClassDeclaration>Sub |</ClassDeclaration>, "Iterator")
         End Sub
 
         <Fact, Trait(Traits.Feature, Traits.Features.KeywordRecommending)>
-        Public Sub NotAfterProperty()
+        Public Sub NotAfterPropertyTest()
             VerifyRecommendationsMissing(<ClassDeclaration>Property |</ClassDeclaration>, "Iterator")
         End Sub
 
         <Fact, Trait(Traits.Feature, Traits.Features.KeywordRecommending)>
-        Public Sub NotAfterWriteOnly()
+        Public Sub NotAfterWriteOnlyTest()
             VerifyRecommendationsMissing(<ClassDeclaration>WriteOnly |</ClassDeclaration>, "Iterator")
         End Sub
 
         <Fact, Trait(Traits.Feature, Traits.Features.KeywordRecommending)>
-        Public Sub AfterReadOnly()
+        Public Sub AfterReadOnlyTest()
             VerifyRecommendationsContain(<ClassDeclaration>ReadOnly |</ClassDeclaration>, "Iterator")
         End Sub
 
         <Fact, Trait(Traits.Feature, Traits.Features.KeywordRecommending)>
-        Public Sub AfterShared()
+        Public Sub AfterSharedTest()
             VerifyRecommendationsContain(<ClassDeclaration>Shared |</ClassDeclaration>, "Iterator")
         End Sub
 
         <Fact, Trait(Traits.Feature, Traits.Features.KeywordRecommending)>
-        Public Sub NotAfterAsync()
+        Public Sub NotAfterAsyncTest()
             VerifyRecommendationsMissing(<ClassDeclaration>Async |</ClassDeclaration>, "Iterator")
         End Sub
 
         <Fact, Trait(Traits.Feature, Traits.Features.KeywordRecommending)>
-        Public Sub NotAfterDeclare()
+        Public Sub NotAfterDeclareTest()
             VerifyRecommendationsMissing(<ClassDeclaration>Declare |</ClassDeclaration>, "Iterator")
         End Sub
 
         <Fact, Trait(Traits.Feature, Traits.Features.KeywordRecommending)>
-        Public Sub AfterDefault()
+        Public Sub AfterDefaultTest()
             VerifyRecommendationsContain(<ClassDeclaration>Default |</ClassDeclaration>, "Iterator")
         End Sub
 
         <Fact, Trait(Traits.Feature, Traits.Features.KeywordRecommending)>
-        Public Sub NotAfterNarrowing()
+        Public Sub NotAfterNarrowingTest()
             VerifyRecommendationsMissing(<ClassDeclaration>Narrowing |</ClassDeclaration>, "Iterator")
         End Sub
 
         <Fact, Trait(Traits.Feature, Traits.Features.KeywordRecommending)>
-        Public Sub NotAfterWidening()
+        Public Sub NotAfterWideningTest()
             VerifyRecommendationsMissing(<ClassDeclaration>Widening |</ClassDeclaration>, "Iterator")
         End Sub
 
         <Fact, Trait(Traits.Feature, Traits.Features.KeywordRecommending)>
-        Public Sub NotAfterPartial()
+        Public Sub NotAfterPartialTest()
             VerifyRecommendationsMissing(<ClassDeclaration>Partial |</ClassDeclaration>, "Iterator")
         End Sub
 
         <Fact, Trait(Traits.Feature, Traits.Features.KeywordRecommending)>
-        Public Sub NotAfterClass()
+        Public Sub NotAfterClassTest()
             VerifyRecommendationsMissing(<ClassDeclaration>Class |</ClassDeclaration>, "Iterator")
         End Sub
 
         <Fact, Trait(Traits.Feature, Traits.Features.KeywordRecommending)>
-        Public Sub NotAfterEnum()
+        Public Sub NotAfterEnumTest()
             VerifyRecommendationsMissing(<ClassDeclaration>Enum |</ClassDeclaration>, "Iterator")
         End Sub
 
         <Fact, Trait(Traits.Feature, Traits.Features.KeywordRecommending)>
-        Public Sub NotAfterInterface()
+        Public Sub NotAfterInterfaceTest()
             VerifyRecommendationsMissing(<ClassDeclaration>Interface |</ClassDeclaration>, "Iterator")
         End Sub
 
         <Fact, Trait(Traits.Feature, Traits.Features.KeywordRecommending)>
-        Public Sub NotAfterStructure()
+        Public Sub NotAfterStructureTest()
             VerifyRecommendationsMissing(<ClassDeclaration>Structure |</ClassDeclaration>, "Iterator")
         End Sub
 
         <Fact, Trait(Traits.Feature, Traits.Features.KeywordRecommending)>
-        Public Sub NotAfterWriteOnlyShared()
+        Public Sub NotAfterWriteOnlySharedTest()
             VerifyRecommendationsMissing(<ClassDeclaration>WriteOnly Shared |</ClassDeclaration>, "Iterator")
         End Sub
 
-        <WorkItem(674791)>
+        <WorkItem(674791, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/674791")>
         <Fact, Trait(Traits.Feature, Traits.Features.KeywordRecommending)>
-        Public Sub NotAfterHash()
+        Public Sub NotAfterHashTest()
             VerifyRecommendationsMissing(<File>
 Imports System
 

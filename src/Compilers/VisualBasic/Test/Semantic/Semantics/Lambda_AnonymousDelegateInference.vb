@@ -1,6 +1,9 @@
-﻿' Copyright (c) Microsoft.  All Rights Reserved.  Licensed under the Apache License, Version 2.0.  See License.txt in the project root for license information.
+﻿' Licensed to the .NET Foundation under one or more agreements.
+' The .NET Foundation licenses this file to you under the MIT license.
+' See the LICENSE file in the project root for more information.
 
 Imports Microsoft.CodeAnalysis
+Imports Microsoft.CodeAnalysis.Test.Utilities
 Imports Microsoft.CodeAnalysis.VisualBasic
 Imports Microsoft.CodeAnalysis.VisualBasic.Symbols
 Imports Microsoft.CodeAnalysis.VisualBasic.Syntax
@@ -47,7 +50,7 @@ End Module
     </file>
 </compilation>
 
-            Dim compilation = CompilationUtils.CreateCompilationWithMscorlibAndVBRuntime(compilationDef, TestOptions.ReleaseExe)
+            Dim compilation = CompilationUtils.CreateCompilationWithMscorlib40AndVBRuntime(compilationDef, TestOptions.ReleaseExe)
 
             Assert.Equal(OptionStrict.Off, compilation.Options.OptionStrict)
 
@@ -152,7 +155,7 @@ End Module
     </file>
 </compilation>
 
-            Dim compilation = CompilationUtils.CreateCompilationWithMscorlibAndVBRuntime(compilationDef, TestOptions.ReleaseExe)
+            Dim compilation = CompilationUtils.CreateCompilationWithMscorlib40AndVBRuntime(compilationDef, TestOptions.ReleaseExe)
 
             For Each strict In {OptionStrict.Off, OptionStrict.On, OptionStrict.Custom}
                 compilation = compilation.WithOptions(TestOptions.ReleaseExe.WithOptionStrict(strict))
@@ -316,7 +319,7 @@ End Module
     </file>
 </compilation>
 
-            Dim compilation = CompilationUtils.CreateCompilationWithMscorlibAndVBRuntime(compilationDef, TestOptions.ReleaseExe)
+            Dim compilation = CompilationUtils.CreateCompilationWithMscorlib40AndVBRuntime(compilationDef, TestOptions.ReleaseExe)
 
             Assert.Equal(OptionStrict.Off, compilation.Options.OptionStrict)
 
@@ -386,7 +389,7 @@ End Module
     </file>
 </compilation>
 
-            Dim compilation = CompilationUtils.CreateCompilationWithMscorlibAndVBRuntime(compilationDef, TestOptions.ReleaseExe)
+            Dim compilation = CompilationUtils.CreateCompilationWithMscorlib40AndVBRuntime(compilationDef, TestOptions.ReleaseExe)
 
             CompilationUtils.AssertTheseDiagnostics(compilation,
 <expected>
@@ -429,7 +432,7 @@ End Module
     </file>
 </compilation>
 
-            Dim compilation = CompilationUtils.CreateCompilationWithMscorlibAndVBRuntime(compilationDef, TestOptions.ReleaseExe)
+            Dim compilation = CompilationUtils.CreateCompilationWithMscorlib40AndVBRuntime(compilationDef, TestOptions.ReleaseExe)
 
             Assert.Equal(OptionStrict.Off, compilation.Options.OptionStrict)
 
@@ -472,7 +475,7 @@ End Module
                 Assert.True(conv.Exists)
             End If
 
-            Dim verifier = CompileAndVerify(compilation, expectedOutput:="1" & vbCrLf & "2" & vbCrLf & "3")
+            Dim verifier = CompileAndVerify(compilation, expectedOutput:="1" & Environment.NewLine & "2" & Environment.NewLine & "3")
 
             CompilationUtils.AssertTheseDiagnostics(compilation, <expected></expected>)
 
@@ -481,37 +484,37 @@ End Module
 {
   // Code size      131 (0x83)
   .maxstack  2
-  IL_0000:  ldsfld     "Program._Closure$__.$I0-1 As <generated method>"
+  IL_0000:  ldsfld     "Program._Closure$__.$I0-0 As <generated method>"
   IL_0005:  brfalse.s  IL_000e
-  IL_0007:  ldsfld     "Program._Closure$__.$I0-1 As <generated method>"
+  IL_0007:  ldsfld     "Program._Closure$__.$I0-0 As <generated method>"
   IL_000c:  br.s       IL_0024
   IL_000e:  ldsfld     "Program._Closure$__.$I As Program._Closure$__"
-  IL_0013:  ldftn      "Sub Program._Closure$__._Lambda$__0-1(Integer)"
+  IL_0013:  ldftn      "Sub Program._Closure$__._Lambda$__0-0(Integer)"
   IL_0019:  newobj     "Sub VB$AnonymousDelegate_0(Of Integer)..ctor(Object, System.IntPtr)"
   IL_001e:  dup
-  IL_001f:  stsfld     "Program._Closure$__.$I0-1 As <generated method>"
+  IL_001f:  stsfld     "Program._Closure$__.$I0-0 As <generated method>"
   IL_0024:  ldc.i4.1
   IL_0025:  callvirt   "Sub VB$AnonymousDelegate_0(Of Integer).Invoke(Integer)"
-  IL_002a:  ldsfld     "Program._Closure$__.$I0-2 As <generated method>"
+  IL_002a:  ldsfld     "Program._Closure$__.$I0-1 As <generated method>"
   IL_002f:  brfalse.s  IL_0038
-  IL_0031:  ldsfld     "Program._Closure$__.$I0-2 As <generated method>"
+  IL_0031:  ldsfld     "Program._Closure$__.$I0-1 As <generated method>"
   IL_0036:  br.s       IL_004e
   IL_0038:  ldsfld     "Program._Closure$__.$I As Program._Closure$__"
-  IL_003d:  ldftn      "Sub Program._Closure$__._Lambda$__0-2(Integer)"
+  IL_003d:  ldftn      "Sub Program._Closure$__._Lambda$__0-1(Integer)"
   IL_0043:  newobj     "Sub VB$AnonymousDelegate_0(Of Integer)..ctor(Object, System.IntPtr)"
   IL_0048:  dup
-  IL_0049:  stsfld     "Program._Closure$__.$I0-2 As <generated method>"
+  IL_0049:  stsfld     "Program._Closure$__.$I0-1 As <generated method>"
   IL_004e:  ldc.i4.2
   IL_004f:  callvirt   "Sub VB$AnonymousDelegate_0(Of Integer).Invoke(Integer)"
-  IL_0054:  ldsfld     "Program._Closure$__.$I0-3 As <generated method>"
+  IL_0054:  ldsfld     "Program._Closure$__.$I0-2 As <generated method>"
   IL_0059:  brfalse.s  IL_0062
-  IL_005b:  ldsfld     "Program._Closure$__.$I0-3 As <generated method>"
+  IL_005b:  ldsfld     "Program._Closure$__.$I0-2 As <generated method>"
   IL_0060:  br.s       IL_0078
   IL_0062:  ldsfld     "Program._Closure$__.$I As Program._Closure$__"
-  IL_0067:  ldftn      "Function Program._Closure$__._Lambda$__0-3() As Integer"
+  IL_0067:  ldftn      "Function Program._Closure$__._Lambda$__0-2() As Integer"
   IL_006d:  newobj     "Sub VB$AnonymousDelegate_1(Of Integer)..ctor(Object, System.IntPtr)"
   IL_0072:  dup
-  IL_0073:  stsfld     "Program._Closure$__.$I0-3 As <generated method>"
+  IL_0073:  stsfld     "Program._Closure$__.$I0-2 As <generated method>"
   IL_0078:  callvirt   "Function VB$AnonymousDelegate_1(Of Integer).Invoke() As Integer"
   IL_007d:  call       "Sub System.Console.WriteLine(Integer)"
   IL_0082:  ret
@@ -548,11 +551,11 @@ End Module
     </file>
 </compilation>
 
-            Dim compilation = CompilationUtils.CreateCompilationWithMscorlibAndVBRuntime(compilationDef, TestOptions.ReleaseExe)
+            Dim compilation = CompilationUtils.CreateCompilationWithMscorlib40AndVBRuntime(compilationDef, TestOptions.ReleaseExe)
 
             Assert.Equal(OptionStrict.Off, compilation.Options.OptionStrict)
 
-            Dim verifier = CompileAndVerify(compilation, expectedOutput:="3" & vbCrLf & "5" & vbCrLf & "7")
+            Dim verifier = CompileAndVerify(compilation, expectedOutput:="3" & Environment.NewLine & "5" & Environment.NewLine & "7")
 
             CompilationUtils.AssertTheseDiagnostics(compilation, <expected></expected>)
 
@@ -573,11 +576,11 @@ End Module
   IL_0015:  stfld      "Program._Closure$__0-0.$VB$Local_y3 As Integer"
   IL_001a:  dup
   IL_001b:  ldc.i4.1
-  IL_001c:  callvirt   "Sub Program._Closure$__0-0._Lambda$__1(Integer)"
+  IL_001c:  callvirt   "Sub Program._Closure$__0-0._Lambda$__0(Integer)"
   IL_0021:  dup
   IL_0022:  ldc.i4.2
-  IL_0023:  callvirt   "Sub Program._Closure$__0-0._Lambda$__2(Integer)"
-  IL_0028:  callvirt   "Function Program._Closure$__0-0._Lambda$__3() As Integer"
+  IL_0023:  callvirt   "Sub Program._Closure$__0-0._Lambda$__1(Integer)"
+  IL_0028:  callvirt   "Function Program._Closure$__0-0._Lambda$__2() As Integer"
   IL_002d:  call       "Sub System.Console.WriteLine(Integer)"
   IL_0032:  ret
 }
@@ -587,7 +590,7 @@ End Module
 
         End Sub
 
-        <WorkItem(543286, "DevDiv")>
+        <WorkItem(543286, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/543286")>
         <Fact()>
         Public Sub AnonDelegateReturningLambdaWithGenericType()
             Dim compilationDef =
@@ -596,7 +599,7 @@ End Module
 Imports System
 
 Module S1
-    Public Function Foo(Of T)() As System.Func(Of System.Func(Of T))
+    Public Function Goo(Of T)() As System.Func(Of System.Func(Of T))
         Dim x2 = Function()
                      Return Function() As T
                                 Return Nothing
@@ -607,13 +610,13 @@ Module S1
     End Function
 
     Sub Main()
-        Console.WriteLine(Foo(Of Integer)()()())
+        Console.WriteLine(Goo(Of Integer)()()())
     End Sub
 End Module
     </file>
 </compilation>
 
-            Dim compilation = CompilationUtils.CreateCompilationWithMscorlibAndVBRuntime(compilationDef, TestOptions.ReleaseExe)
+            Dim compilation = CompilationUtils.CreateCompilationWithMscorlib40AndVBRuntime(compilationDef, TestOptions.ReleaseExe)
             CompilationUtils.AssertTheseDiagnostics(compilation, <expected></expected>)
             Dim verifier = CompileAndVerify(compilation, expectedOutput:="0")
         End Sub

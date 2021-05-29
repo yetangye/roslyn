@@ -1,4 +1,8 @@
-// Copyright (c) Microsoft.  All Rights Reserved.  Licensed under the Apache License, Version 2.0.  See License.txt in the project root for license information.
+﻿// Licensed to the .NET Foundation under one or more agreements.
+// The .NET Foundation licenses this file to you under the MIT license.
+// See the LICENSE file in the project root for more information.
+
+#nullable disable
 
 using System.Runtime.InteropServices;
 using Microsoft.CodeAnalysis;
@@ -8,7 +12,7 @@ using Microsoft.VisualStudio.LanguageServices.Implementation.Utilities;
 namespace Microsoft.VisualStudio.LanguageServices.Implementation.CodeModel.InternalElements
 {
     [ComVisible(true)]
-    [ComDefaultInterface(typeof(EnvDTE.CodeVariable))]
+    [ComDefaultInterface(typeof(EnvDTE80.CodeVariable2))]
     public sealed class CodeVariable : AbstractCodeMember, EnvDTE.CodeVariable, EnvDTE80.CodeVariable2
     {
         internal static EnvDTE.CodeVariable Create(
@@ -20,7 +24,7 @@ namespace Microsoft.VisualStudio.LanguageServices.Implementation.CodeModel.Inter
             var element = new CodeVariable(state, fileCodeModel, nodeKey, nodeKind);
             var result = (EnvDTE.CodeVariable)ComAggregate.CreateAggregatedObject(element);
 
-            fileCodeModel.OnElementCreated(nodeKey, (EnvDTE.CodeElement)result);
+            fileCodeModel.OnCodeElementCreated(nodeKey, (EnvDTE.CodeElement)result);
 
             return result;
         }
@@ -142,11 +146,11 @@ namespace Microsoft.VisualStudio.LanguageServices.Implementation.CodeModel.Inter
 
             set
             {
-                // The type is sometimes part of the node key, so we should be sure to reaquire
+                // The type is sometimes part of the node key, so we should be sure to reacquire
                 // it after updating it. Note that we pass trackKinds: false because it's possible
                 // that UpdateType might change the kind of a node (e.g. change a VB Sub to a Function).
 
-                UpdateNodeAndReaquireNodeKey(FileCodeModel.UpdateType, value, trackKinds: false);
+                UpdateNodeAndReacquireNodeKey(FileCodeModel.UpdateType, value, trackKinds: false);
             }
         }
     }

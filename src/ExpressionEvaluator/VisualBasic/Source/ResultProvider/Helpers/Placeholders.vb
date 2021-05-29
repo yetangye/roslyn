@@ -1,4 +1,8 @@
-﻿Imports Microsoft.CodeAnalysis.VisualBasic
+﻿' Licensed to the .NET Foundation under one or more agreements.
+' The .NET Foundation licenses this file to you under the MIT license.
+' See the LICENSE file in the project root for more information.
+
+Imports Microsoft.CodeAnalysis.VisualBasic
 
 ' Required by Microsoft.CodeAnalysis.VisualBasic.Syntax.KeywordTable
 Namespace Microsoft.CodeAnalysis.Text
@@ -20,7 +24,7 @@ End Namespace
 Namespace System.Runtime.CompilerServices
 
     <AttributeUsage(AttributeTargets.Assembly Or AttributeTargets.Class Or AttributeTargets.Method, AllowMultiple:=False, Inherited:=False)>
-    Class ExtensionAttribute : Inherits Attribute
+    Friend Class ExtensionAttribute : Inherits Attribute
     End Class
 
 End Namespace

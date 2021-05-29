@@ -1,40 +1,33 @@
-// Copyright (c) Microsoft.  All Rights Reserved.  Licensed under the Apache License, Version 2.0.  See License.txt in the project root for license information.
+﻿// Licensed to the .NET Foundation under one or more agreements.
+// The .NET Foundation licenses this file to you under the MIT license.
+// See the LICENSE file in the project root for more information.
 
-using System.Collections.Immutable;
-using System.Diagnostics;
+#nullable disable
+
 using Microsoft.CodeAnalysis.CSharp.Symbols;
 
 namespace Microsoft.CodeAnalysis.CSharp.ExpressionEvaluator
 {
     internal sealed class ExceptionLocalSymbol : PlaceholderLocalSymbol
     {
-        internal ExceptionLocalSymbol(MethodSymbol method, string name, TypeSymbol type) :
-            base(method, name, type)
+        private readonly string _getExceptionMethodName;
+
+        internal ExceptionLocalSymbol(MethodSymbol method, string name, string displayName, TypeSymbol type, string getExceptionMethodName) :
+            base(method, name, displayName, type)
         {
+            _getExceptionMethodName = getExceptionMethodName;
         }
 
-        internal override bool IsWritable
+        internal override bool IsWritableVariable
         {
             get { return false; }
         }
 
-        internal override BoundExpression RewriteLocal(CSharpCompilation compilation, EENamedTypeSymbol container, CSharpSyntaxNode syntax)
+        internal override BoundExpression RewriteLocal(CSharpCompilation compilation, EENamedTypeSymbol container, SyntaxNode syntax, DiagnosticBag diagnostics)
         {
-            Debug.Assert(this.Name == this.Name.ToLowerInvariant());
-            var method = container.GetOrAddSynthesizedMethod(
-                this.Name,
-                (c, n, s) =>
-                {
-                    var returnType = compilation.GetWellKnownType(WellKnownType.System_Exception);
-                    return new PlaceholderMethodSymbol(
-                        c,
-                        s,
-                        n,
-                        returnType,
-                        m => ImmutableArray<ParameterSymbol>.Empty);
-                });
+            var method = GetIntrinsicMethod(compilation, _getExceptionMethodName);
             var call = BoundCall.Synthesized(syntax, receiverOpt: null, method: method);
-            return ConvertToLocalType(compilation, call, this.Type);
+            return ConvertToLocalType(compilation, call, this.Type, diagnostics);
         }
     }
 }

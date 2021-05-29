@@ -1,10 +1,13 @@
-﻿' Copyright (c) Microsoft.  All Rights Reserved.  Licensed under the Apache License, Version 2.0.  See License.txt in the project root for license information.
+﻿' Licensed to the .NET Foundation under one or more agreements.
+' The .NET Foundation licenses this file to you under the MIT license.
+' See the LICENSE file in the project root for more information.
 
 Imports System.Collections.Generic
 Imports System.Collections.Immutable
 Imports System.Threading
 Imports Microsoft.CodeAnalysis.Collections
 Imports Microsoft.CodeAnalysis.Text
+Imports Microsoft.CodeAnalysis.Symbols
 Imports Microsoft.CodeAnalysis.VisualBasic.Symbols
 Imports Microsoft.CodeAnalysis.VisualBasic.Syntax
 
@@ -14,7 +17,7 @@ Namespace Microsoft.CodeAnalysis.VisualBasic.Symbols
     ''' </summary>
     Friend MustInherit Class NamespaceOrTypeSymbol
         Inherits Symbol
-        Implements INamespaceOrTypeSymbol
+        Implements INamespaceOrTypeSymbol, INamespaceOrTypeSymbolInternal
 
         ' !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
         ' Changes to the public interface of this class should remain synchronized with the C# version.
@@ -58,20 +61,17 @@ Namespace Microsoft.CodeAnalysis.VisualBasic.Symbols
             '' Default implementation Is to use ordered version. When performance indicates, we specialize to have
             '' separate implementation.
 
-#If DEBUG Then
-            '' In DEBUG, swap first And last elements so that use of Unordered in a place it isn't warranted is caught
-            '' more obviously.
-            Return GetMembers().DeOrder()
-#Else
-            Return GetMembers()
-#End If
+            Return GetMembers().ConditionallyDeOrder()
         End Function
 
         ''' <summary>
         ''' Get all the members of this symbol that have a particular name.
         ''' </summary>
         ''' <returns>An ImmutableArray containing all the members of this symbol with the given name. If there are
-        ''' no members with this name, returns an empty ImmutableArray. Never returns Nothing.</returns>
+        ''' no members with this name, returns an empty ImmutableArray. The result is deterministic (i.e. the same
+        ''' from call to call and from compilation to compilation). Members of the same kind appear in the result
+        ''' in the same order in which they appeared at their origin (metadata or source).
+        ''' Never returns Nothing.</returns>
         Public MustOverride Function GetMembers(name As String) As ImmutableArray(Of Symbol)
 
         ''' <summary>
@@ -85,13 +85,7 @@ Namespace Microsoft.CodeAnalysis.VisualBasic.Symbols
             '' Default implementation Is to use ordered version. When performance indicates, we specialize to have
             '' separate implementation.
 
-#If DEBUG Then
-            '' In DEBUG, swap first And last elements so that use of Unordered in a place it isn't warranted is caught
-            '' more obviously.
-            Return GetTypeMembers().DeOrder()
-#Else
-            Return GetTypeMembers()
-#End If
+            Return GetTypeMembers().ConditionallyDeOrder()
         End Function
 
         ''' <summary>
@@ -118,7 +112,7 @@ Namespace Microsoft.CodeAnalysis.VisualBasic.Symbols
         Public Overridable Function GetTypeMembers(name As String, arity As Integer) As ImmutableArray(Of NamedTypeSymbol)
             ' default implementation does a post-filter. We can override this if its a performance burden, but 
             ' experience is that it won't be.
-            Return GetTypeMembers(name).WhereAsArray(Function(t) t.Arity = arity)
+            Return GetTypeMembers(name).WhereAsArray(Function(type, arity_) type.Arity = arity_, arity)
         End Function
 
         ' Only the compiler can create new instances.
@@ -185,7 +179,7 @@ Namespace Microsoft.CodeAnalysis.VisualBasic.Symbols
         ''' 
         ''' Its purpose is to add names of probable extension methods found in membersByName parameter
         ''' to nameSet parameter. Method's viability check is delegated to overridable method
-        ''' AddExtensionMethodLookupSymbolsInfoViabilityCheck, which is overriden by RetargetingNamedtypeSymbol
+        ''' AddExtensionMethodLookupSymbolsInfoViabilityCheck, which is overridden by RetargetingNamedtypeSymbol
         ''' and RetargetingNamespaceSymbol in order to perform the check on corresponding RetargetingMethodSymbol.
         ''' 
         ''' Returns true if there were extension methods among the members, 
@@ -212,7 +206,7 @@ Namespace Microsoft.CodeAnalysis.VisualBasic.Symbols
                         If method.MayBeReducibleExtensionMethod Then
                             haveSeenExtensionMethod = True
 
-                            If AddExtensionMethodLookupSymbolsInfoViabilityCheck(method, options, originalBinder) Then
+                            If AddExtensionMethodLookupSymbolsInfoViabilityCheck(method, options, nameSet, originalBinder) Then
                                 nameSet.AddSymbol(member, member.Name, member.GetArity())
 
                                 ' Move to the next name.
@@ -228,7 +222,7 @@ Namespace Microsoft.CodeAnalysis.VisualBasic.Symbols
 
         ''' <summary>
         ''' Perform extension method viability check within AppendExtensionMethodNames method above.
-        ''' This method is overriden by RetargetingNamedtypeSymbol and RetargetingNamespaceSymbol in order to 
+        ''' This method is overridden by RetargetingNamedtypeSymbol and RetargetingNamespaceSymbol in order to 
         ''' perform the check on corresponding RetargetingMethodSymbol.
         ''' 
         ''' Returns true if the method is viable. 
@@ -236,9 +230,10 @@ Namespace Microsoft.CodeAnalysis.VisualBasic.Symbols
         Friend Overridable Function AddExtensionMethodLookupSymbolsInfoViabilityCheck(
             method As MethodSymbol,
             options As LookupOptions,
+            nameSet As LookupSymbolsInfo,
             originalBinder As Binder
         ) As Boolean
-            Return originalBinder.CanAddLookupSymbolInfo(method, options, accessThroughType:=method.ContainingType)
+            Return originalBinder.CanAddLookupSymbolInfo(method, options, nameSet, accessThroughType:=method.ContainingType)
         End Function
 
         ''' <summary> 

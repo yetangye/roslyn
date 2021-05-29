@@ -1,4 +1,8 @@
-﻿// Copyright (c) Microsoft.  All Rights Reserved.  Licensed under the Apache License, Version 2.0.  See License.txt in the project root for license information.
+﻿// Licensed to the .NET Foundation under one or more agreements.
+// The .NET Foundation licenses this file to you under the MIT license.
+// See the LICENSE file in the project root for more information.
+
+#nullable disable
 
 using System.Collections.Generic;
 using Microsoft.CodeAnalysis.Text;
@@ -7,9 +11,9 @@ namespace Microsoft.CodeAnalysis
 {
     internal sealed class UnmergedDocumentChanges
     {
-        public IEnumerable<TextChange> UnmergedChanges { get; private set; }
-        public string ProjectName { get; private set; }
-        public DocumentId DocumentId { get; private set; }
+        public IEnumerable<TextChange> UnmergedChanges { get; }
+        public string ProjectName { get; }
+        public DocumentId DocumentId { get; }
 
         public UnmergedDocumentChanges(IEnumerable<TextChange> unmergedChanges, string projectName, DocumentId documentId)
         {

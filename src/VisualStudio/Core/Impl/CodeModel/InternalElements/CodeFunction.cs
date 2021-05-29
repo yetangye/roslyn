@@ -1,6 +1,9 @@
-// Copyright (c) Microsoft.  All Rights Reserved.  Licensed under the Apache License, Version 2.0.  See License.txt in the project root for license information.
+﻿// Licensed to the .NET Foundation under one or more agreements.
+// The .NET Foundation licenses this file to you under the MIT license.
+// See the LICENSE file in the project root for more information.
 
-using System;
+#nullable disable
+
 using System.Collections.Immutable;
 using System.Linq;
 using System.Runtime.InteropServices;
@@ -13,7 +16,7 @@ using Microsoft.VisualStudio.LanguageServices.Implementation.Utilities;
 namespace Microsoft.VisualStudio.LanguageServices.Implementation.CodeModel.InternalElements
 {
     [ComVisible(true)]
-    [ComDefaultInterface(typeof(EnvDTE.CodeFunction))]
+    [ComDefaultInterface(typeof(EnvDTE80.CodeFunction2))]
     public partial class CodeFunction : AbstractCodeMember, ICodeElementContainer<CodeParameter>, ICodeElementContainer<CodeAttribute>, EnvDTE.CodeFunction, EnvDTE80.CodeFunction2, IMethodXML, IMethodXML2
     {
         internal static EnvDTE.CodeFunction Create(
@@ -25,7 +28,7 @@ namespace Microsoft.VisualStudio.LanguageServices.Implementation.CodeModel.Inter
             var element = new CodeFunction(state, fileCodeModel, nodeKey, nodeKind);
             var result = (EnvDTE.CodeFunction)ComAggregate.CreateAggregatedObject(element);
 
-            fileCodeModel.OnElementCreated(nodeKey, (EnvDTE.CodeElement)result);
+            fileCodeModel.OnCodeElementCreated(nodeKey, (EnvDTE.CodeElement)result);
 
             return result;
         }
@@ -59,34 +62,24 @@ namespace Microsoft.VisualStudio.LanguageServices.Implementation.CodeModel.Inter
         }
 
         EnvDTE.CodeElements ICodeElementContainer<CodeParameter>.GetCollection()
-        {
-            return this.Parameters;
-        }
+            => this.Parameters;
 
         EnvDTE.CodeElements ICodeElementContainer<CodeAttribute>.GetCollection()
-        {
-            return this.Attributes;
-        }
+            => this.Attributes;
 
         private IMethodSymbol MethodSymbol
         {
             get { return (IMethodSymbol)LookupSymbol(); }
         }
 
-        internal override ImmutableArray<IParameterSymbol> GetParameters()
-        {
-            return MethodSymbol.Parameters;
-        }
+        internal override ImmutableArray<SyntaxNode> GetParameters()
+            => ImmutableArray.CreateRange(CodeModelService.GetParameterNodes(LookupNode()));
 
         protected override object GetExtenderNames()
-        {
-            return CodeModelService.GetFunctionExtenderNames();
-        }
+            => CodeModelService.GetFunctionExtenderNames();
 
         protected override object GetExtender(string name)
-        {
-            return CodeModelService.GetFunctionExtender(name, LookupNode(), LookupSymbol());
-        }
+            => CodeModelService.GetFunctionExtender(name, LookupNode(), LookupSymbol());
 
         public override EnvDTE.vsCMElement Kind
         {
@@ -110,21 +103,12 @@ namespace Microsoft.VisualStudio.LanguageServices.Implementation.CodeModel.Inter
         {
             get
             {
-                var symbol = (IMethodSymbol)LookupSymbol();
-                switch (symbol.MethodKind)
+                if (!(LookupSymbol() is IMethodSymbol symbol))
                 {
-                    case MethodKind.Ordinary:
-                        return EnvDTE.vsCMFunction.vsCMFunctionFunction;
-                    case MethodKind.Constructor:
-                    case MethodKind.StaticConstructor:
-                        return EnvDTE.vsCMFunction.vsCMFunctionConstructor;
-                    case MethodKind.Destructor:
-                        return EnvDTE.vsCMFunction.vsCMFunctionDestructor;
-                    case MethodKind.UserDefinedOperator:
-                        return EnvDTE.vsCMFunction.vsCMFunctionOperator;
-                    default:
-                        throw Exceptions.ThrowEUnexpected();
+                    throw Exceptions.ThrowEUnexpected();
                 }
+
+                return CodeModelService.GetFunctionKind(symbol);
             }
         }
 
@@ -170,11 +154,11 @@ namespace Microsoft.VisualStudio.LanguageServices.Implementation.CodeModel.Inter
 
             set
             {
-                // The type is sometimes part of the node key, so we should be sure to reaquire
+                // The type is sometimes part of the node key, so we should be sure to reacquire
                 // it after updating it. Note that we pass trackKinds: false because it's possible
                 // that UpdateType might change the kind of a node (e.g. change a VB Sub to a Function).
 
-                UpdateNodeAndReaquireNodeKey(FileCodeModel.UpdateType, value, trackKinds: false);
+                UpdateNodeAndReacquireNodeKey(FileCodeModel.UpdateType, value, trackKinds: false);
             }
         }
     }

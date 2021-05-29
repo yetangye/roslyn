@@ -1,4 +1,6 @@
-﻿' Copyright (c) Microsoft.  All Rights Reserved.  Licensed under the Apache License, Version 2.0.  See License.txt in the project root for license information.
+﻿' Licensed to the .NET Foundation under one or more agreements.
+' The .NET Foundation licenses this file to you under the MIT license.
+' See the LICENSE file in the project root for more information.
 
 Imports System.IO
 Imports System.Reflection
@@ -7,47 +9,47 @@ Namespace Microsoft.CodeAnalysis.VisualBasic.Symbols
 
     Friend Class EmbeddedResources
 
-        Private Shared _embedded As String
+        Private Shared s_embedded As String
         Public Shared ReadOnly Property Embedded As String
             Get
-                If _embedded Is Nothing Then
-                    _embedded = GetManifestResourceString("Embedded.vb")
+                If s_embedded Is Nothing Then
+                    s_embedded = GetManifestResourceString("Embedded.vb")
                 End If
 
-                Return _embedded
+                Return s_embedded
             End Get
         End Property
 
-        Private Shared _internalXmlHelper As String
+        Private Shared s_internalXmlHelper As String
         Public Shared ReadOnly Property InternalXmlHelper As String
             Get
-                If _internalXmlHelper Is Nothing Then
-                    _internalXmlHelper = GetManifestResourceString("InternalXmlHelper.vb")
+                If s_internalXmlHelper Is Nothing Then
+                    s_internalXmlHelper = GetManifestResourceString("InternalXmlHelper.vb")
                 End If
 
-                Return _internalXmlHelper
+                Return s_internalXmlHelper
             End Get
         End Property
 
-        Private Shared _vbCoreSourceText As String
+        Private Shared s_vbCoreSourceText As String
         Public Shared ReadOnly Property VbCoreSourceText As String
             Get
-                If _vbCoreSourceText Is Nothing Then
-                    _vbCoreSourceText = GetManifestResourceString("VbCoreSourceText.vb")
+                If s_vbCoreSourceText Is Nothing Then
+                    s_vbCoreSourceText = GetManifestResourceString("VbCoreSourceText.vb")
                 End If
 
-                Return _vbCoreSourceText
+                Return s_vbCoreSourceText
             End Get
         End Property
 
-        Private Shared _vbMyTemplateText As String
+        Private Shared s_vbMyTemplateText As String
         Public Shared ReadOnly Property VbMyTemplateText As String
             Get
-                If _vbMyTemplateText Is Nothing Then
-                    _vbMyTemplateText = GetManifestResourceString("VbMyTemplateText.vb")
+                If s_vbMyTemplateText Is Nothing Then
+                    s_vbMyTemplateText = GetManifestResourceString("VbMyTemplateText.vb")
                 End If
 
-                Return _vbMyTemplateText
+                Return s_vbMyTemplateText
             End Get
         End Property
 

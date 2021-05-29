@@ -1,11 +1,18 @@
-// Copyright (c) Microsoft.  All Rights Reserved.  Licensed under the Apache License, Version 2.0.  See License.txt in the project root for license information.
+﻿// Licensed to the .NET Foundation under one or more agreements.
+// The .NET Foundation licenses this file to you under the MIT license.
+// See the LICENSE file in the project root for more information.
+
+#nullable disable
 
 using System;
+using System.Globalization;
 using Microsoft.CodeAnalysis.ExpressionEvaluator;
+using Microsoft.VisualStudio.Debugger.Clr;
 using Microsoft.VisualStudio.Debugger.Evaluation;
+using Microsoft.VisualStudio.Debugger.Evaluation.ClrCompilation;
 using Xunit;
 
-namespace Microsoft.CodeAnalysis.CSharp.UnitTests
+namespace Microsoft.CodeAnalysis.CSharp.ExpressionEvaluator.UnitTests
 {
     public class ValueFormattingTests : CSharpResultProviderTestBase
     {
@@ -83,7 +90,8 @@ namespace Microsoft.CodeAnalysis.CSharp.UnitTests
             // as a few double-byte characters.  Testing all possible characters takes too long.
             const string format = "{0} '{1}'";
             const string formatUsingHex = "0x{0:x4} '{1}'";
-            for (char ch = (char)0; ch < 0xff; ch++)
+            char ch;
+            for (ch = (char)0; ch < 0xff; ch++)
             {
                 string expected;
                 switch (ch)
@@ -94,11 +102,17 @@ namespace Microsoft.CodeAnalysis.CSharp.UnitTests
                     case '\t':
                         expected = "\\t";
                         break;
+                    case '\f':
+                        expected = "\\f";
+                        break;
                     case '\r':
                         expected = "\\r";
                         break;
                     case '\n':
                         expected = "\\n";
+                        break;
+                    case '\a':
+                        expected = "\\a";
                         break;
                     case '\b':
                         expected = "\\b";
@@ -113,21 +127,28 @@ namespace Microsoft.CodeAnalysis.CSharp.UnitTests
                         expected = "\\\\";
                         break;
                     default:
-                        expected = ch.ToString();
+                        expected = FormatStringChar(ch);
                         break;
                 }
                 Assert.Equal(string.Format(format, (int)ch, expected), FormatValue(ch));
                 Assert.Equal(string.Format(formatUsingHex, (int)ch, expected), FormatValue(ch, useHexadecimal: true));
             }
 
-            foreach (char ch in new[] { (char)0xabcd, (char)0xfeef, (char)0xffef })
-            {
-                Assert.Equal(string.Format(format, (int)ch, ch), FormatValue(ch));
-                Assert.Equal(string.Format(formatUsingHex, (int)ch, ch), FormatValue(ch, useHexadecimal: true));
-            }
+            ch = (char)0xabcd;
+            Assert.Equal(string.Format(format, (int)ch, ch), FormatValue(ch));
+            Assert.Equal(string.Format(formatUsingHex, (int)ch, ch), FormatValue(ch, useHexadecimal: true));
 
-            Assert.Equal("65535 '\uffff'", FormatValue(char.MaxValue));
-            Assert.Equal("0xffff '\uffff'", FormatValue(char.MaxValue, useHexadecimal: true));
+            ch = (char)0xfeef;
+            Assert.Equal(string.Format(format, (int)ch, ch), FormatValue(ch));
+            Assert.Equal(string.Format(formatUsingHex, (int)ch, ch), FormatValue(ch, useHexadecimal: true));
+
+            ch = (char)0xffef;
+            Assert.Equal("65519 '\\uffef'", FormatValue(ch));
+            Assert.Equal("0xffef '\\uffef'", FormatValue(ch, useHexadecimal: true));
+
+            ch = char.MaxValue;
+            Assert.Equal("65535 '\\uffff'", FormatValue(ch));
+            Assert.Equal("0xffff '\\uffff'", FormatValue(ch, useHexadecimal: true));
         }
 
         [Fact]
@@ -150,11 +171,17 @@ namespace Microsoft.CodeAnalysis.CSharp.UnitTests
                     case '\t':
                         expected = "\\t";
                         break;
+                    case '\f':
+                        expected = "\\f";
+                        break;
                     case '\r':
                         expected = "\\r";
                         break;
                     case '\n':
                         expected = "\\n";
+                        break;
+                    case '\a':
+                        expected = "\\a";
                         break;
                     case '\b':
                         expected = "\\b";
@@ -169,25 +196,48 @@ namespace Microsoft.CodeAnalysis.CSharp.UnitTests
                         expected = "\\\\";
                         break;
                     default:
-                        expected = ch.ToString();
+                        expected = FormatStringChar(ch);
                         break;
                 }
                 Assert.Equal(string.Format(format, expected), FormatValue(ch.ToString()));
                 Assert.Equal(string.Format(format, expected), FormatValue(ch.ToString(), useHexadecimal: true));
             }
 
-            foreach (char ch in new[] { (char)0xabcd, (char)0xfeef, (char)0xffef })
-            {
-                Assert.Equal(string.Format(format, ch), FormatValue(ch.ToString()));
-                Assert.Equal(string.Format(format, ch), FormatValue(ch.ToString(), useHexadecimal: true));
-            }
+            var s = ((char)0xabcd).ToString();
+            Assert.Equal(string.Format(format, s), FormatValue(s));
+            Assert.Equal(string.Format(format, s), FormatValue(s, useHexadecimal: true));
 
-            Assert.Equal("\"\uffff\"", FormatValue(char.MaxValue.ToString()));
-            Assert.Equal("\"\uffff\"", FormatValue(char.MaxValue.ToString(), useHexadecimal: true));
+            s = ((char)0xfeef).ToString();
+            Assert.Equal(string.Format(format, s), FormatValue(s));
+            Assert.Equal(string.Format(format, s), FormatValue(s, useHexadecimal: true));
 
-            string multiByte = "\ud83c\udfc8";
+            s = ((char)0xffef).ToString();
+            Assert.Equal("\"\\uffef\"", FormatValue(s));
+            Assert.Equal("\"\\uffef\"", FormatValue(s, useHexadecimal: true));
+
+            s = char.MaxValue.ToString();
+            Assert.Equal("\"\\uffff\"", FormatValue(s));
+            Assert.Equal("\"\\uffff\"", FormatValue(s, useHexadecimal: true));
+
+            string multiByte = "\ud83c\udfc8"; // unicode surrogates properly paired representing a printable Unicode codepoint
             Assert.Equal(string.Format(format, "🏈"), FormatValue(multiByte));
             Assert.Equal(string.Format(format, "🏈"), FormatValue(multiByte, useHexadecimal: true));
+            Assert.Equal("🏈", multiByte);
+
+            multiByte = "\udbff\udfff"; // unicode surrogates representing an unprintable Unicode codepoint
+            Assert.Equal(string.Format(format, "\\U0010ffff"), FormatValue(multiByte));
+            Assert.Equal(string.Format(format, "\\U0010ffff"), FormatValue(multiByte, useHexadecimal: true));
+
+            multiByte = "\udfc8\ud83c"; // unicode surrogates not properly paired (in the wrong order in this case)
+            Assert.Equal(string.Format(format, "\\udfc8\\ud83c"), FormatValue(multiByte));
+            Assert.Equal(string.Format(format, "\\udfc8\\ud83c"), FormatValue(multiByte, useHexadecimal: true));
+        }
+
+        private static string FormatStringChar(char c)
+        {
+            return (CharUnicodeInfo.GetUnicodeCategory(c) == UnicodeCategory.Control) ?
+                $"\\u{((int)c).ToString("x4")}" :
+                c.ToString();
         }
 
         [Fact]
@@ -611,6 +661,61 @@ namespace System.Xml.Linq
 
             Assert.Equal("Test1", GetUnderlyingString(xnType.Instantiate()));
             Assert.Equal("Test2", GetUnderlyingString(xeType.Instantiate()));
+        }
+
+        [Fact]
+        public void HostValueNotFound_int()
+        {
+            var clrValue = new DkmClrValue(
+                value: null, hostObjectValue: null, new DkmClrType((TypeImpl)typeof(int)),
+                alias: null, evalFlags: DkmEvaluationResultFlags.None, valueFlags: DkmClrValueFlags.None);
+
+            Assert.Equal(Resources.HostValueNotFound, FormatValue(clrValue));
+        }
+
+        [Fact]
+        public void HostValueNotFound_char()
+        {
+            var clrValue = new DkmClrValue(
+                value: null, hostObjectValue: null, new DkmClrType((TypeImpl)typeof(char)),
+                alias: null, evalFlags: DkmEvaluationResultFlags.None, valueFlags: DkmClrValueFlags.None);
+
+            Assert.Equal(Resources.HostValueNotFound, FormatValue(clrValue));
+        }
+
+        [Fact]
+        public void HostValueNotFound_IntPtr()
+        {
+            var clrValue = new DkmClrValue(
+                value: null, hostObjectValue: null, new DkmClrType((TypeImpl)typeof(IntPtr)),
+                alias: null, evalFlags: DkmEvaluationResultFlags.None, valueFlags: DkmClrValueFlags.None);
+
+            Assert.Equal(Resources.HostValueNotFound, FormatValue(clrValue));
+        }
+
+        [Fact]
+        public void HostValueNotFound_UIntPtr()
+        {
+            var clrValue = new DkmClrValue(
+                value: null, hostObjectValue: null, new DkmClrType((TypeImpl)typeof(UIntPtr)),
+                alias: null, evalFlags: DkmEvaluationResultFlags.None, valueFlags: DkmClrValueFlags.None);
+
+            Assert.Equal(Resources.HostValueNotFound, FormatValue(clrValue));
+        }
+
+        [Fact]
+        public void HostValueNotFound_enum()
+        {
+            var clrValue = new DkmClrValue(
+                value: null, hostObjectValue: null, new DkmClrType((TypeImpl)typeof(TestEnum)),
+                alias: null, evalFlags: DkmEvaluationResultFlags.None, valueFlags: DkmClrValueFlags.None);
+
+            Assert.Equal(Resources.HostValueNotFound, FormatValue(clrValue));
+        }
+
+        private enum TestEnum
+        {
+            One
         }
     }
 }

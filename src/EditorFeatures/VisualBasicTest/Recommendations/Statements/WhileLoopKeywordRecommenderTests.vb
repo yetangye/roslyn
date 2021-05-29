@@ -1,16 +1,17 @@
-' Copyright (c) Microsoft.  All Rights Reserved.  Licensed under the Apache License, Version 2.0.  See License.txt in the project root for license information.
+﻿' Licensed to the .NET Foundation under one or more agreements.
+' The .NET Foundation licenses this file to you under the MIT license.
+' See the LICENSE file in the project root for more information.
 
-Imports Microsoft.CodeAnalysis.Text
 Namespace Microsoft.CodeAnalysis.Editor.VisualBasic.UnitTests.Recommendations.Statements
     Public Class WhileLoopKeywordRecommenderTests
 
         <Fact, Trait(Traits.Feature, Traits.Features.KeywordRecommending)>
-        Public Sub WhileInMethodBody()
+        Public Sub WhileInMethodBodyTest()
             VerifyRecommendationsContain(<MethodBody>|</MethodBody>, "While")
         End Sub
 
         <Fact, Trait(Traits.Feature, Traits.Features.KeywordRecommending)>
-        Public Sub WhileInLambda()
+        Public Sub WhileInLambdaTest()
             VerifyRecommendationsContain(<MethodBody>
 Dim x = Sub()
 |
@@ -18,14 +19,14 @@ Dim x = Sub()
         End Sub
 
         <Fact, Trait(Traits.Feature, Traits.Features.KeywordRecommending)>
-        Public Sub WhileAfterStatement()
+        Public Sub WhileAfterStatementTest()
             VerifyRecommendationsContain(<MethodBody>
 Dim x
 |</MethodBody>, "While")
         End Sub
 
         <Fact, Trait(Traits.Feature, Traits.Features.KeywordRecommending)>
-        Public Sub WhileAfterExitKeyword()
+        Public Sub WhileAfterExitKeywordTest()
             VerifyRecommendationsContain(<MethodBody>
 While
 Exit |
@@ -33,7 +34,7 @@ Loop</MethodBody>, "While")
         End Sub
 
         <Fact, Trait(Traits.Feature, Traits.Features.KeywordRecommending)>
-        Public Sub WhileAfterContinueKeyword()
+        Public Sub WhileAfterContinueKeywordTest()
             VerifyRecommendationsContain(<MethodBody>
 While
 Continue |
@@ -41,21 +42,21 @@ Loop</MethodBody>, "While")
         End Sub
 
         <Fact, Trait(Traits.Feature, Traits.Features.KeywordRecommending)>
-        Public Sub WhileNotAfterContinueKeywordOutsideLoop()
+        Public Sub WhileNotAfterContinueKeywordOutsideLoopTest()
             VerifyRecommendationsMissing(<MethodBody>
 Continue |
 </MethodBody>, "While")
         End Sub
 
         <Fact, Trait(Traits.Feature, Traits.Features.KeywordRecommending)>
-        Public Sub WhileNotAfterExitKeywordOutsideLoop()
+        Public Sub WhileNotAfterExitKeywordOutsideLoopTest()
             VerifyRecommendationsMissing(<MethodBody>
 Exit |
 </MethodBody>, "While")
         End Sub
 
         <Fact, Trait(Traits.Feature, Traits.Features.KeywordRecommending)>
-        Public Sub NoWhileAfterExitInsideLambdaInsideWhileLoop()
+        Public Sub NoWhileAfterExitInsideLambdaInsideWhileLoopTest()
             VerifyRecommendationsMissing(<MethodBody>
 While
 Dim x = Sub()
@@ -66,7 +67,7 @@ Loop
         End Sub
 
         <Fact, Trait(Traits.Feature, Traits.Features.KeywordRecommending)>
-        Public Sub WhileAfterExitInsideWhileLoopInsideLambda()
+        Public Sub WhileAfterExitInsideWhileLoopInsideLambdaTest()
             VerifyRecommendationsContain(<MethodBody>
 Dim x = Sub()
             While True
@@ -77,7 +78,7 @@ Dim x = Sub()
         End Sub
 
         <Fact, Trait(Traits.Feature, Traits.Features.KeywordRecommending)>
-        Public Sub NotAfterExitInFinallyBlock()
+        Public Sub NotAfterExitInFinallyBlockTest()
             Dim code =
 <MethodBody>
 While True
@@ -88,6 +89,5 @@ While True
 
             VerifyRecommendationsMissing(code, "While")
         End Sub
-
     End Class
 End Namespace

@@ -1,4 +1,6 @@
-' Copyright (c) Microsoft.  All Rights Reserved.  Licensed under the Apache License, Version 2.0.  See License.txt in the project root for license information.
+﻿' Licensed to the .NET Foundation under one or more agreements.
+' The .NET Foundation licenses this file to you under the MIT license.
+' See the LICENSE file in the project root for more information.
 
 #If False Then
 Imports System
@@ -12,7 +14,7 @@ Namespace Roslyn.Services.Editor.VisualBasic.UnitTests.Organizing
     Public Class OrganizeModifiersTests
         Inherits AbstractOrganizerTests
 
-        <Fact, Trait(Traits.Feature, Traits.Features.Organizing)>
+        <WpfFact, Trait(Traits.Feature, Traits.Features.Organizing)>
         Public Sub TestMethods1()
             Dim initial =
 <element>class C
@@ -28,7 +30,7 @@ end class</element>.Value
             Check(initial, final)
         End Sub
 
-        <Fact, Trait(Traits.Feature, Traits.Features.Organizing)>
+        <WpfFact, Trait(Traits.Feature, Traits.Features.Organizing)>
         Public Sub TestMethods2()
             Dim initial =
 <element>class D
@@ -44,7 +46,7 @@ end class</element>.Value
             Check(initial, final)
         End Sub
 
-        <Fact, Trait(Traits.Feature, Traits.Features.Organizing)>
+        <WpfFact, Trait(Traits.Feature, Traits.Features.Organizing)>
         Public Sub TestMethods3()
 
             Dim initial =
@@ -61,7 +63,7 @@ end class</element>.Value
             Check(initial, final)
         End Sub
 
-        <Fact, Trait(Traits.Feature, Traits.Features.Organizing)>
+        <WpfFact, Trait(Traits.Feature, Traits.Features.Organizing)>
         Public Sub TestMethods4()
 
             Dim initial =

@@ -1,9 +1,15 @@
-﻿// Copyright (c) Microsoft.  All Rights Reserved.  Licensed under the Apache License, Version 2.0.  See License.txt in the project root for license information.
+﻿// Licensed to the .NET Foundation under one or more agreements.
+// The .NET Foundation licenses this file to you under the MIT license.
+// See the LICENSE file in the project root for more information.
+
+#nullable disable
 
 using Microsoft.CodeAnalysis.CSharp.Symbols;
 using Microsoft.CodeAnalysis.CSharp.Syntax;
+using Microsoft.CodeAnalysis.Test.Utilities;
 using Microsoft.CodeAnalysis.Text;
 using Roslyn.Test.Utilities;
+using System.Linq;
 using Xunit;
 
 namespace Microsoft.CodeAnalysis.CSharp.UnitTests.Symbols.Source
@@ -23,7 +29,7 @@ partial class A : Object {}
 ";
             var tree = Parse(text);
             var root = tree.GetCompilationUnitRoot() as CompilationUnitSyntax;
-            var comp = CreateCompilationWithMscorlib(tree);
+            var comp = CreateCompilation(tree);
 
             var usingAlias = root.Usings[0];
 
@@ -80,7 +86,7 @@ partial class A : Object {}
 ";
             var tree = Parse(text);
             var root = tree.GetCompilationUnitRoot() as CompilationUnitSyntax;
-            var comp = CreateCompilationWithMscorlib(tree);
+            var comp = CreateCompilation(tree);
 
             var usingAlias = root.Usings[0];
 
@@ -135,7 +141,7 @@ partial class A : Object {}
 ";
             var tree = Parse(text);
             var root = tree.GetCompilationUnitRoot() as CompilationUnitSyntax;
-            var comp = CreateCompilationWithMscorlib(tree);
+            var comp = CreateCompilation(tree);
 
             var usingAlias = root.Usings[0];
 
@@ -152,19 +158,19 @@ partial class A : Object {}
             var model = comp.GetSemanticModel(tree);
 
             var symbolInfo = model.GetSpeculativeSymbolInfo(base2.SpanStart, base2, SpeculativeBindingOption.BindAsTypeOrNamespace);
-            var info2 = symbolInfo.Symbol as TypeSymbol;
+            var info2 = symbolInfo.Symbol as ITypeSymbol;
             Assert.NotNull(info2);
             Assert.Equal("System.Object", info2.ToDisplayString(format: SymbolDisplayFormat.TestFormat));
             Assert.Equal("System.Object", info2.ToDisplayString(format: SymbolDisplayFormat.TestFormat));
 
             symbolInfo = model.GetSpeculativeSymbolInfo(base3.SpanStart, base3, SpeculativeBindingOption.BindAsTypeOrNamespace);
-            var info3 = symbolInfo.Symbol as TypeSymbol;
+            var info3 = symbolInfo.Symbol as ITypeSymbol;
             Assert.NotNull(info3);
             Assert.Equal("System.Object", info3.ToDisplayString(format: SymbolDisplayFormat.TestFormat));
             Assert.Equal("System.Object", info3.ToDisplayString(format: SymbolDisplayFormat.TestFormat));
 
             symbolInfo = model.GetSpeculativeSymbolInfo(base4.SpanStart, base4, SpeculativeBindingOption.BindAsTypeOrNamespace);
-            var info4 = symbolInfo.Symbol as TypeSymbol;
+            var info4 = symbolInfo.Symbol as ITypeSymbol;
             Assert.Null(info4); // no "using System;"
         }
 
@@ -176,7 +182,7 @@ partial class A : Object {}
 ";
             var tree = Parse(text);
             var root = tree.GetCompilationUnitRoot() as CompilationUnitSyntax;
-            var comp = CreateCompilationWithMscorlib(tree);
+            var comp = CreateCompilation(tree);
 
             var usingAlias = root.Usings[0];
 
@@ -185,8 +191,8 @@ partial class A : Object {}
             var alias = model.GetDeclaredSymbol(usingAlias);
             Assert.Equal("O", alias.ToDisplayString());
             Assert.Equal("O=System.Object", alias.ToDisplayString(format: SymbolDisplayFormat.TestFormat));
-            var global = (NamespaceSymbol)alias.ContainingSymbol;
-            Assert.Equal(NamespaceKind.Module, global.Extent.Kind);
+            var global = (INamespaceSymbol)alias.ContainingSymbol;
+            Assert.Equal(NamespaceKind.Module, global.NamespaceKind);
         }
 
         [Fact]
@@ -195,14 +201,14 @@ partial class A : Object {}
             var text = "using System;";
             var tree = Parse(text);
             var root = tree.GetCompilationUnitRoot() as CompilationUnitSyntax;
-            var comp = CreateCompilationWithMscorlib(tree);
+            var comp = CreateCompilation(tree);
 
             var usingAlias = root.Usings[0];
 
             var model = comp.GetSemanticModel(tree);
 
             var alias = model.GetDeclaredSymbol(usingAlias);
-            Assert.Equal(null, alias);
+            Assert.Null(alias);
         }
 
         [Fact]
@@ -214,7 +220,7 @@ class C {}
 ";
             var tree = Parse(text);
             var root = tree.GetCompilationUnitRoot() as CompilationUnitSyntax;
-            var comp = CreateCompilationWithMscorlib(tree);
+            var comp = CreateCompilation(tree);
 
             var usingAlias = root.Usings[0];
 
@@ -233,7 +239,7 @@ class C {}
 ";
             var tree = Parse(text);
             var root = tree.GetCompilationUnitRoot() as CompilationUnitSyntax;
-            var comp = CreateCompilationWithMscorlib(tree);
+            var comp = CreateCompilation(tree);
 
             var usingAlias = root.Usings[0];
 
@@ -245,7 +251,7 @@ class C {}
             Assert.Equal("O=System.Object", symbols[0].ToDisplayString(format: SymbolDisplayFormat.TestFormat));
         }
 
-        [WorkItem(537401, "DevDiv")]
+        [WorkItem(537401, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/537401")]
         [Fact]
         public void EventEscapedIdentifier()
         {
@@ -254,14 +260,14 @@ using @for = @foreach;
 namespace @foreach { }
 ";
             SyntaxTree syntaxTree = Parse(text);
-            CSharpCompilation comp = CreateCompilationWithMscorlib(syntaxTree);
+            CSharpCompilation comp = CreateCompilation(syntaxTree);
             UsingDirectiveSyntax usingAlias = (syntaxTree.GetCompilationUnitRoot() as CompilationUnitSyntax).Usings.First();
             var alias = comp.GetSemanticModel(syntaxTree).GetDeclaredSymbol(usingAlias);
             Assert.Equal("for", alias.Name);
             Assert.Equal("@for", alias.ToString());
         }
 
-        [WorkItem(541937, "DevDiv")]
+        [WorkItem(541937, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/541937")]
         [Fact]
         public void LocalDeclaration()
         {
@@ -275,13 +281,13 @@ class Program
     }
 }";
             SyntaxTree syntaxTree = Parse(text);
-            CSharpCompilation comp = CreateCompilationWithMscorlib(syntaxTree);
+            CSharpCompilation comp = CreateCompilation(syntaxTree);
             var model = comp.GetSemanticModel(syntaxTree);
             IdentifierNameSyntax exprSyntaxToBind = (IdentifierNameSyntax)GetExprSyntaxForBinding(GetExprSyntaxList(syntaxTree));
             Assert.Equal(SymbolKind.Alias, model.GetAliasInfo(exprSyntaxToBind).Kind);
         }
 
-        [WorkItem(576809, "DevDiv")]
+        [WorkItem(576809, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/576809")]
         [Fact]
         public void AsClause()
         {
@@ -298,13 +304,13 @@ class Program
 }
 ";
             SyntaxTree syntaxTree = Parse(text);
-            CSharpCompilation comp = CreateCompilationWithMscorlib(syntaxTree);
+            CSharpCompilation comp = CreateCompilation(syntaxTree);
             var model = comp.GetSemanticModel(syntaxTree);
             IdentifierNameSyntax exprSyntaxToBind = (IdentifierNameSyntax)GetExprSyntaxForBinding(GetExprSyntaxList(syntaxTree));
             Assert.Equal("System.Int32?", model.GetAliasInfo(exprSyntaxToBind).Target.ToTestDisplayString());
         }
 
-        [WorkItem(542552, "DevDiv")]
+        [WorkItem(542552, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/542552")]
         [Fact]
         public void IncompleteDuplicateAlias()
         {
@@ -315,8 +321,53 @@ namespace prog
     using ns = namespace1;
     using ns =";
             SyntaxTree syntaxTree = Parse(text);
-            CSharpCompilation comp = CreateCompilationWithMscorlib(syntaxTree);
+            CSharpCompilation comp = CreateCompilation(syntaxTree);
             var discarded = comp.GetDiagnostics();
+        }
+
+        [ClrOnlyFact, WorkItem(2805, "https://github.com/dotnet/roslyn/issues/2805")]
+        public void AliasWithAnError()
+        {
+            var text =
+@"
+namespace NS
+{
+    using Short = LongNamespace;
+    class Test
+    {
+        public object Method1()
+        {
+            return (new Short.MyClass()).Prop;
+        }
+    }
+}";
+
+            var compilation = CreateCompilation(text);
+
+            compilation.VerifyDiagnostics(
+    // (4,19): error CS0246: The type or namespace name 'LongNamespace' could not be found (are you missing a using directive or an assembly reference?)
+    //     using Short = LongNamespace;
+    Diagnostic(ErrorCode.ERR_SingleTypeNameNotFound, "LongNamespace").WithArguments("LongNamespace").WithLocation(4, 19)
+                );
+
+            var tree = compilation.SyntaxTrees.Single();
+
+            var node = tree.GetRoot().DescendantNodes().OfType<IdentifierNameSyntax>().Where(id => id.Identifier.ValueText == "Short").Skip(1).Single();
+
+            Assert.Equal("Short.MyClass", node.Parent.ToString());
+
+            var model = compilation.GetSemanticModel(tree);
+
+            var alias = model.GetAliasInfo(node);
+            Assert.Equal("Short=LongNamespace", alias.ToTestDisplayString());
+            Assert.Equal(SymbolKind.ErrorType, alias.Target.Kind);
+            Assert.Equal("LongNamespace", alias.Target.ToTestDisplayString());
+
+            var symbolInfo = model.GetSymbolInfo(node);
+
+            Assert.Null(symbolInfo.Symbol);
+            Assert.Equal(0, symbolInfo.CandidateSymbols.Length);
+            Assert.Equal(CandidateReason.None, symbolInfo.CandidateReason);
         }
     }
 }

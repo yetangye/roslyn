@@ -1,4 +1,8 @@
-﻿// Copyright (c) Microsoft.  All Rights Reserved.  Licensed under the Apache License, Version 2.0.  See License.txt in the project root for license information.
+﻿// Licensed to the .NET Foundation under one or more agreements.
+// The .NET Foundation licenses this file to you under the MIT license.
+// See the LICENSE file in the project root for more information.
+
+#nullable disable
 
 using System.Collections.Generic;
 using Microsoft.CodeAnalysis.CSharp.Syntax;
@@ -168,8 +172,8 @@ namespace Microsoft.CodeAnalysis.CSharp.UnitTests
             Assert.Throws<ArgumentOutOfRangeException>(() => list.InsertRange(list.Count + 1, new[] { triviaD }));
             Assert.Throws<ArgumentOutOfRangeException>(() => list.RemoveAt(-1));
             Assert.Throws<ArgumentOutOfRangeException>(() => list.RemoveAt(list.Count));
-            Assert.Throws<ArgumentException>(() => list.Add(default(SyntaxTrivia)));
-            Assert.Throws<ArgumentException>(() => list.Insert(0, default(SyntaxTrivia)));
+            Assert.Throws<ArgumentOutOfRangeException>(() => list.Add(default(SyntaxTrivia)));
+            Assert.Throws<ArgumentOutOfRangeException>(() => list.Insert(0, default(SyntaxTrivia)));
             Assert.Throws<ArgumentNullException>(() => list.AddRange((IEnumerable<SyntaxTrivia>)null));
             Assert.Throws<ArgumentNullException>(() => list.InsertRange(0, (IEnumerable<SyntaxTrivia>)null));
             Assert.Throws<ArgumentNullException>(() => list.ReplaceRange(elementA, (IEnumerable<SyntaxTrivia>)null));
@@ -214,10 +218,10 @@ namespace Microsoft.CodeAnalysis.CSharp.UnitTests
             Assert.Throws<ArgumentOutOfRangeException>(() => list.Insert(-1, triviaD));
             Assert.Throws<ArgumentOutOfRangeException>(() => list.InsertRange(1, new[] { triviaD }));
             Assert.Throws<ArgumentOutOfRangeException>(() => list.InsertRange(-1, new[] { triviaD }));
-            Assert.Throws<ArgumentException>(() => list.Replace(triviaD, triviaE));
-            Assert.Throws<ArgumentException>(() => list.ReplaceRange(triviaD, new[] { triviaE }));
-            Assert.Throws<ArgumentException>(() => list.Add(default(SyntaxTrivia)));
-            Assert.Throws<ArgumentException>(() => list.Insert(0, default(SyntaxTrivia)));
+            Assert.Throws<ArgumentOutOfRangeException>(() => list.Replace(triviaD, triviaE));
+            Assert.Throws<ArgumentOutOfRangeException>(() => list.ReplaceRange(triviaD, new[] { triviaE }));
+            Assert.Throws<ArgumentOutOfRangeException>(() => list.Add(default(SyntaxTrivia)));
+            Assert.Throws<ArgumentOutOfRangeException>(() => list.Insert(0, default(SyntaxTrivia)));
             Assert.Throws<ArgumentNullException>(() => list.AddRange((IEnumerable<SyntaxTrivia>)null));
             Assert.Throws<ArgumentNullException>(() => list.InsertRange(0, (IEnumerable<SyntaxTrivia>)null));
         }

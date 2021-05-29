@@ -1,4 +1,6 @@
-﻿' Copyright (c) Microsoft.  All Rights Reserved.  Licensed under the Apache License, Version 2.0.  See License.txt in the project root for license information.
+﻿' Licensed to the .NET Foundation under one or more agreements.
+' The .NET Foundation licenses this file to you under the MIT license.
+' See the LICENSE file in the project root for more information.
 
 Imports Microsoft.CodeAnalysis.Emit
 Imports Microsoft.CodeAnalysis.VisualBasic.Symbols
@@ -15,17 +17,17 @@ Namespace Microsoft.CodeAnalysis.VisualBasic.Emit
         Inherits SpecializedMethodReference
         Implements Cci.IGenericMethodInstanceReference
 
-        Private m_GenericMethod As SpecializedMethodReference
+        Private ReadOnly _genericMethod As SpecializedMethodReference
 
         Public Sub New(underlyingMethod As MethodSymbol)
             MyBase.New(underlyingMethod)
 
             Debug.Assert(underlyingMethod.ContainingType.IsOrInGenericType() AndAlso underlyingMethod.ContainingType.IsDefinition)
-            m_GenericMethod = New SpecializedMethodReference(underlyingMethod)
+            _genericMethod = New SpecializedMethodReference(underlyingMethod)
         End Sub
 
         Public Function GetGenericMethod(context As EmitContext) As Cci.IMethodReference Implements Cci.IGenericMethodInstanceReference.GetGenericMethod
-            Return m_GenericMethod
+            Return _genericMethod
         End Function
 
         Public Function GetGenericArguments(context As EmitContext) As IEnumerable(Of Cci.ITypeReference) Implements Cci.IGenericMethodInstanceReference.GetGenericArguments

@@ -1,4 +1,6 @@
-﻿' Copyright (c) Microsoft.  All Rights Reserved.  Licensed under the Apache License, Version 2.0.  See License.txt in the project root for license information.
+﻿' Licensed to the .NET Foundation under one or more agreements.
+' The .NET Foundation licenses this file to you under the MIT license.
+' See the LICENSE file in the project root for more information.
 
 Imports System.Collections.Generic
 Imports System.Collections.Immutable
@@ -16,11 +18,11 @@ Namespace Microsoft.CodeAnalysis.VisualBasic.Symbols
     Friend MustInherit Class LambdaParameterSymbol
         Inherits ParameterSymbol
 
-        Private ReadOnly m_location As ImmutableArray(Of Location)
-        Private ReadOnly m_name As String
-        Private ReadOnly m_type As TypeSymbol ' Can be Nothing for UnboundLambdaParameterSymbol.
-        Private ReadOnly m_ordinal As UShort
-        Private ReadOnly m_isByRef As Boolean
+        Private ReadOnly _location As ImmutableArray(Of Location)
+        Private ReadOnly _name As String
+        Private ReadOnly _type As TypeSymbol ' Can be Nothing for UnboundLambdaParameterSymbol.
+        Private ReadOnly _ordinal As UShort
+        Private ReadOnly _isByRef As Boolean
 
         Protected Sub New(
             name As String,
@@ -29,28 +31,28 @@ Namespace Microsoft.CodeAnalysis.VisualBasic.Symbols
             isByRef As Boolean,
             location As Location
         )
-            m_name = name
-            m_ordinal = CType(ordinal, UShort)
-            m_type = type
+            _name = name
+            _ordinal = CType(ordinal, UShort)
+            _type = type
 
             If location IsNot Nothing Then
-                m_location = ImmutableArray.Create(Of Location)(location)
+                _location = ImmutableArray.Create(Of Location)(location)
             Else
-                m_location = ImmutableArray(Of Location).Empty
+                _location = ImmutableArray(Of Location).Empty
             End If
 
-            m_isByRef = isByRef
+            _isByRef = isByRef
         End Sub
 
         Public NotOverridable Overrides ReadOnly Property Name As String
             Get
-                Return m_name
+                Return _name
             End Get
         End Property
 
         Public NotOverridable Overrides ReadOnly Property Ordinal As Integer
             Get
-                Return m_ordinal
+                Return _ordinal
             End Get
         End Property
 
@@ -126,12 +128,6 @@ Namespace Microsoft.CodeAnalysis.VisualBasic.Symbols
             End Get
         End Property
 
-        Friend NotOverridable Overrides ReadOnly Property HasByRefBeforeCustomModifiers As Boolean
-            Get
-                Return False
-            End Get
-        End Property
-
         Public NotOverridable Overrides ReadOnly Property IsParamArray As Boolean
             Get
                 Return False
@@ -140,7 +136,7 @@ Namespace Microsoft.CodeAnalysis.VisualBasic.Symbols
 
         Public NotOverridable Overrides ReadOnly Property Locations As ImmutableArray(Of Location)
             Get
-                Return m_location
+                Return _location
             End Get
         End Property
 
@@ -152,23 +148,29 @@ Namespace Microsoft.CodeAnalysis.VisualBasic.Symbols
 
         Public NotOverridable Overrides ReadOnly Property Type As TypeSymbol
             Get
-                Return m_type
+                Return _type
             End Get
         End Property
 
         Public NotOverridable Overrides ReadOnly Property IsByRef As Boolean
             Get
-                Return m_isByRef
+                Return _isByRef
             End Get
         End Property
 
         Friend NotOverridable Overrides ReadOnly Property IsExplicitByRef As Boolean
             Get
-                Return m_isByRef
+                Return _isByRef
             End Get
         End Property
 
         Public NotOverridable Overrides ReadOnly Property CustomModifiers As ImmutableArray(Of CustomModifier)
+            Get
+                Return ImmutableArray(Of CustomModifier).Empty
+            End Get
+        End Property
+
+        Public NotOverridable Overrides ReadOnly Property RefCustomModifiers As ImmutableArray(Of CustomModifier)
             Get
                 Return ImmutableArray(Of CustomModifier).Empty
             End Get

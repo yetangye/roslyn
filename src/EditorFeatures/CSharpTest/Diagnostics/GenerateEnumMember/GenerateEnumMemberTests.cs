@@ -1,251 +1,988 @@
-﻿// Copyright (c) Microsoft.  All Rights Reserved.  Licensed under the Apache License, Version 2.0.  See License.txt in the project root for license information.
+﻿// Licensed to the .NET Foundation under one or more agreements.
+// The .NET Foundation licenses this file to you under the MIT license.
+// See the LICENSE file in the project root for more information.
 
-using System;
+#nullable disable
+
+using System.Threading.Tasks;
 using Microsoft.CodeAnalysis.CodeFixes;
 using Microsoft.CodeAnalysis.CSharp.CodeFixes.GenerateEnumMember;
 using Microsoft.CodeAnalysis.Diagnostics;
+using Microsoft.CodeAnalysis.Test.Utilities;
 using Roslyn.Test.Utilities;
 using Xunit;
+using Xunit.Abstractions;
 
 namespace Microsoft.CodeAnalysis.Editor.CSharp.UnitTests.Diagnostics.GenerateEnumMember
 {
     public class GenerateEnumMemberTests : AbstractCSharpDiagnosticProviderBasedUserDiagnosticTest
     {
-        internal override Tuple<DiagnosticAnalyzer, CodeFixProvider> CreateDiagnosticProviderAndFixer(Workspace workspace)
+        public GenerateEnumMemberTests(ITestOutputHelper logger)
+           : base(logger)
         {
-            return new Tuple<DiagnosticAnalyzer, CodeFixProvider>(null, new GenerateEnumMemberCodeFixProvider());
+        }
+
+        internal override (DiagnosticAnalyzer, CodeFixProvider) CreateDiagnosticProviderAndFixer(Workspace workspace)
+            => (null, new GenerateEnumMemberCodeFixProvider());
+
+        [Fact, Trait(Traits.Feature, Traits.Features.CodeActionsGenerateEnumMember)]
+        public async Task TestEmptyEnum()
+        {
+            await TestInRegularAndScriptAsync(
+@"class Program
+{
+    void Main()
+    {
+        Color.[|Red|];
+    }
+}
+
+enum Color
+{
+}",
+@"class Program
+{
+    void Main()
+    {
+        Color.Red;
+    }
+}
+
+enum Color
+{
+    Red
+}");
         }
 
         [Fact, Trait(Traits.Feature, Traits.Features.CodeActionsGenerateEnumMember)]
-        public void TestEmptyEnum()
+        public async Task TestWithSingleMember()
         {
-            Test(
-@"class Program { void Main ( ) { Color . [|Red|] ; } } enum Color { } ",
-@"class Program { void Main ( ) { Color . Red ; } } enum Color { Red } ");
+            await TestInRegularAndScriptAsync(
+@"class Program
+{
+    void Main()
+    {
+        Color.[|Blue|];
+    }
+}
+
+enum Color
+{
+    Red
+}",
+@"class Program
+{
+    void Main()
+    {
+        Color.Blue;
+    }
+}
+
+enum Color
+{
+    Red,
+    Blue
+}");
         }
 
         [Fact, Trait(Traits.Feature, Traits.Features.CodeActionsGenerateEnumMember)]
-        public void TestWithSingleMember()
+        public async Task TestWithExistingComma()
         {
-            Test(
-@"class Program { void Main ( ) { Color . [|Blue|] ; } } enum Color { Red } ",
-@"class Program { void Main ( ) { Color . Blue ; } } enum Color { Red , Blue } ");
+            await TestInRegularAndScriptAsync(
+@"class Program
+{
+    void Main()
+    {
+        Color.[|Blue|];
+    }
+}
+
+enum Color
+{
+    Red,
+}",
+@"class Program
+{
+    void Main()
+    {
+        Color.Blue;
+    }
+}
+
+enum Color
+{
+    Red,
+    Blue,
+}");
         }
 
         [Fact, Trait(Traits.Feature, Traits.Features.CodeActionsGenerateEnumMember)]
-        public void TestWithExistingComma()
+        public async Task TestWithMultipleMembers()
         {
-            Test(
-@"class Program { void Main ( ) { Color . [|Blue|] ; } } enum Color { Red , } ",
-@"class Program { void Main ( ) { Color . Blue ; } } enum Color { Red , Blue , } ");
+            await TestInRegularAndScriptAsync(
+@"class Program
+{
+    void Main()
+    {
+        Color.[|Green|];
+    }
+}
+
+enum Color
+{
+    Red,
+    Blue
+}",
+@"class Program
+{
+    void Main()
+    {
+        Color.Green;
+    }
+}
+
+enum Color
+{
+    Red,
+    Blue,
+    Green
+}");
         }
 
         [Fact, Trait(Traits.Feature, Traits.Features.CodeActionsGenerateEnumMember)]
-        public void TestWithMultipleMembers()
+        public async Task TestWithZero()
         {
-            Test(
-@"class Program { void Main ( ) { Color . [|Green|] ; } } enum Color { Red , Blue } ",
-@"class Program { void Main ( ) { Color . Green ; } } enum Color { Red , Blue , Green } ");
+            await TestInRegularAndScriptAsync(
+@"class Program
+{
+    void Main()
+    {
+        Color.[|Blue|];
+    }
+}
+
+enum Color
+{
+    Red = 0
+}",
+@"class Program
+{
+    void Main()
+    {
+        Color.Blue;
+    }
+}
+
+enum Color
+{
+    Red = 0,
+    Blue = 1
+}");
         }
 
         [Fact, Trait(Traits.Feature, Traits.Features.CodeActionsGenerateEnumMember)]
-        public void TestWithZero()
+        public async Task TestWithIntegralValue()
         {
-            Test(
-@"class Program { void Main ( ) { Color . [|Blue|] ; } } enum Color { Red = 0 } ",
-@"class Program { void Main ( ) { Color . Blue ; } } enum Color { Red = 0 , Blue = 1 } ");
+            await TestInRegularAndScriptAsync(
+@"class Program
+{
+    void Main()
+    {
+        Color.[|Blue|];
+    }
+}
+
+enum Color
+{
+    Red = 1
+}",
+@"class Program
+{
+    void Main()
+    {
+        Color.Blue;
+    }
+}
+
+enum Color
+{
+    Red = 1,
+    Blue = 2
+}");
         }
 
         [Fact, Trait(Traits.Feature, Traits.Features.CodeActionsGenerateEnumMember)]
-        public void TestWithIntegralValue()
+        public async Task TestWithSingleBitIntegral()
         {
-            Test(
-@"class Program { void Main ( ) { Color . [|Blue|] ; } } enum Color { Red = 1 } ",
-@"class Program { void Main ( ) { Color . Blue ; } } enum Color { Red = 1 , Blue = 2 } ");
+            await TestInRegularAndScriptAsync(
+@"class Program
+{
+    void Main()
+    {
+        Color.[|Blue|];
+    }
+}
+
+enum Color
+{
+    Red = 2
+}",
+@"class Program
+{
+    void Main()
+    {
+        Color.Blue;
+    }
+}
+
+enum Color
+{
+    Red = 2,
+    Blue = 4
+}");
         }
 
         [Fact, Trait(Traits.Feature, Traits.Features.CodeActionsGenerateEnumMember)]
-        public void TestWithSingleBitIntegral()
+        public async Task TestGenerateIntoGeometricSequence()
         {
-            Test(
-@"class Program { void Main ( ) { Color . [|Blue|] ; } } enum Color { Red = 2 } ",
-@"class Program { void Main ( ) { Color . Blue ; } } enum Color { Red = 2 , Blue = 4 } ");
+            await TestInRegularAndScriptAsync(
+@"class Program
+{
+    void Main()
+    {
+        Color.[|Blue|];
+    }
+}
+
+enum Color
+{
+    Red = 1,
+    Yellow = 2,
+    Green = 4
+}",
+@"class Program
+{
+    void Main()
+    {
+        Color.Blue;
+    }
+}
+
+enum Color
+{
+    Red = 1,
+    Yellow = 2,
+    Green = 4,
+    Blue = 8
+}");
         }
 
         [Fact, Trait(Traits.Feature, Traits.Features.CodeActionsGenerateEnumMember)]
-        public void TestGenerateIntoGeometricSequence()
+        public async Task TestWithSimpleSequence1()
         {
-            Test(
-@"class Program { void Main ( ) { Color . [|Blue|] ; } } enum Color { Red = 1 , Yellow = 2 , Green = 4 }",
-@"class Program { void Main ( ) { Color . Blue ; } } enum Color { Red = 1 , Yellow = 2 , Green = 4 , Blue = 8}");
+            await TestInRegularAndScriptAsync(
+@"class Program
+{
+    void Main()
+    {
+        Color.[|Blue|];
+    }
+}
+
+enum Color
+{
+    Red = 1,
+    Green = 2
+}",
+@"class Program
+{
+    void Main()
+    {
+        Color.Blue;
+    }
+}
+
+enum Color
+{
+    Red = 1,
+    Green = 2,
+    Blue = 3
+}");
         }
 
         [Fact, Trait(Traits.Feature, Traits.Features.CodeActionsGenerateEnumMember)]
-        public void TestWithSimpleSequence1()
+        public async Task TestWithSimpleSequence2()
         {
-            Test(
-@"class Program { void Main ( ) { Color . [|Blue|] ; } } enum Color { Red = 1 , Green = 2 } ",
-@"class Program { void Main ( ) { Color . Blue ; } } enum Color { Red = 1 , Green = 2 , Blue = 3 } ");
+            await TestInRegularAndScriptAsync(
+@"class Program
+{
+    void Main()
+    {
+        Color.[|Blue|];
+    }
+}
+
+enum Color
+{
+    Yellow = 0,
+    Red = 1,
+    Green = 2
+}",
+@"class Program
+{
+    void Main()
+    {
+        Color.Blue;
+    }
+}
+
+enum Color
+{
+    Yellow = 0,
+    Red = 1,
+    Green = 2,
+    Blue = 3
+}");
         }
 
         [Fact, Trait(Traits.Feature, Traits.Features.CodeActionsGenerateEnumMember)]
-        public void TestWithSimpleSequence2()
+        public async Task TestWithNonZeroInteger()
         {
-            Test(
-@"class Program { void Main ( ) { Color . [|Blue|] ; } } enum Color { Yellow = 0, Red = 1 , Green = 2 } ",
-@"class Program { void Main ( ) { Color . Blue ; } } enum Color { Yellow = 0, Red = 1 , Green = 2 , Blue = 3 } ");
-        }
+            await TestInRegularAndScriptAsync(
+@"class Program
+{
+    void Main()
+    {
+        Color.[|Blue|];
+    }
+}
 
-        [Trait(Traits.Feature, Traits.Features.CodeActionsGenerateEnumMember)]
-        public void TestWithNonZeroInteger()
-        {
-            Test(
-@"class Program { void Main ( ) { Color . [|Blue|] ; } } enum Color { Green = 5 } ",
-@"class Program { void Main ( ) { Color . Blue ; } } enum Color { Green = 5 , Blue = 6 } ");
-        }
+enum Color
+{
+    Green = 5
+}",
+@"class Program
+{
+    void Main()
+    {
+        Color.Blue;
+    }
+}
 
-        [Fact, Trait(Traits.Feature, Traits.Features.CodeActionsGenerateEnumMember)]
-        public void TestWithLeftShift0()
-        {
-            Test(
-@"class Program { void Main ( ) { Color . [|Blue|] ; } } enum Color { Green = 1 << 0 } ",
-@"class Program { void Main ( ) { Color . Blue ; } } enum Color { Green = 1 << 0 , Blue = 1 << 1 } ");
-        }
-
-        [Fact, Trait(Traits.Feature, Traits.Features.CodeActionsGenerateEnumMember)]
-        public void TestWithLeftShift5()
-        {
-            Test(
-@"class Program { void Main ( ) { Color . [|Blue|] ; } } enum Color { Green = 1 << 5 } ",
-@"class Program { void Main ( ) { Color . Blue ; } } enum Color { Green = 1 << 5 , Blue = 1 << 6 } ");
-        }
-
-        [Fact, Trait(Traits.Feature, Traits.Features.CodeActionsGenerateEnumMember)]
-        public void TestWithDifferentStyles()
-        {
-            Test(
-@"class Program { void Main ( ) { Color . [|Blue|] ; } } enum Color { Red = 2 , Green = 1 << 5 } ",
-@"class Program { void Main ( ) { Color . Blue ; } } enum Color { Red = 2 , Green = 1 << 5 , Blue = 33 } ");
+enum Color
+{
+    Green = 5,
+    Blue = 6
+}");
         }
 
         [Fact, Trait(Traits.Feature, Traits.Features.CodeActionsGenerateEnumMember)]
-        public void TestHex1()
+        public async Task TestWithLeftShift0()
         {
-            Test(
-@"class Program { void Main ( ) { Color . [|Blue|] ; } } enum Color { Red = 0x1 } ",
-@"class Program { void Main ( ) { Color . Blue ; } } enum Color { Red = 0x1 , Blue = 0x2 } ");
+            await TestInRegularAndScriptAsync(
+@"class Program
+{
+    void Main()
+    {
+        Color.[|Blue|];
+    }
+}
+
+enum Color
+{
+    Green = 1 << 0
+}",
+@"class Program
+{
+    void Main()
+    {
+        Color.Blue;
+    }
+}
+
+enum Color
+{
+    Green = 1 << 0,
+    Blue = 1 << 1
+}");
         }
 
         [Fact, Trait(Traits.Feature, Traits.Features.CodeActionsGenerateEnumMember)]
-        public void TestHex9()
+        public async Task TestWithLeftShift5()
         {
-            Test(
-@"class Program { void Main ( ) { Color . [|Blue|] ; } } enum Color { Red = 0x9 } ",
-@"class Program { void Main ( ) { Color . Blue ; } } enum Color { Red = 0x9 , Blue = 0xA } ");
+            await TestInRegularAndScriptAsync(
+@"class Program
+{
+    void Main()
+    {
+        Color.[|Blue|];
+    }
+}
+
+enum Color
+{
+    Green = 1 << 5
+}",
+@"class Program
+{
+    void Main()
+    {
+        Color.Blue;
+    }
+}
+
+enum Color
+{
+    Green = 1 << 5,
+    Blue = 1 << 6
+}");
         }
 
         [Fact, Trait(Traits.Feature, Traits.Features.CodeActionsGenerateEnumMember)]
-        public void TestHexF()
+        public async Task TestWithDifferentStyles()
         {
-            Test(
-@"class Program { void Main ( ) { Color . [|Blue|] ; } } enum Color { Red = 0xF } ",
-@"class Program { void Main ( ) { Color . Blue ; } } enum Color { Red = 0xF , Blue = 0x10 } ");
+            await TestInRegularAndScriptAsync(
+@"class Program
+{
+    void Main()
+    {
+        Color.[|Blue|];
+    }
+}
+
+enum Color
+{
+    Red = 2,
+    Green = 1 << 5
+}",
+@"class Program
+{
+    void Main()
+    {
+        Color.Blue;
+    }
+}
+
+enum Color
+{
+    Red = 2,
+    Green = 1 << 5,
+    Blue = 33
+}");
         }
 
         [Fact, Trait(Traits.Feature, Traits.Features.CodeActionsGenerateEnumMember)]
-        public void TestGenerateAfterEnumWithIntegerMaxValue()
+        public async Task TestBinary()
         {
-            Test(
-@"class Program { void Main ( ) { Color . [|Blue|] ; } } enum Color { Red = int.MaxValue } ",
-@"class Program { void Main ( ) { Color . Blue ; } } enum Color { Red = int.MaxValue , Blue = int.MinValue } ");
+            await TestInRegularAndScriptAsync(
+@"class Program
+{
+    void Main()
+    {
+        Color.[|Blue|];
+    }
+}
+
+enum Color
+{
+    Red = 0b01
+}",
+@"class Program
+{
+    void Main()
+    {
+        Color.Blue;
+    }
+}
+
+enum Color
+{
+    Red = 0b01,
+    Blue = 0b10
+}");
         }
 
         [Fact, Trait(Traits.Feature, Traits.Features.CodeActionsGenerateEnumMember)]
-        public void TestUnsigned16BitEnums()
+        public async Task TestHex1()
         {
-            Test(
-@"class Program { void Main ( ) { Color . [|Blue|] ; } } enum Color : ushort { Red = 65535 } ",
-@"class Program { void Main ( ) { Color . Blue ; } } enum Color : ushort { Red = 65535 , Blue = 0 } ");
+            await TestInRegularAndScriptAsync(
+@"class Program
+{
+    void Main()
+    {
+        Color.[|Blue|];
+    }
+}
+
+enum Color
+{
+    Red = 0x1
+}",
+@"class Program
+{
+    void Main()
+    {
+        Color.Blue;
+    }
+}
+
+enum Color
+{
+    Red = 0x1,
+    Blue = 0x2
+}");
         }
 
         [Fact, Trait(Traits.Feature, Traits.Features.CodeActionsGenerateEnumMember)]
-        public void TestGenerateEnumMemberOfTypeLong()
+        public async Task TestHex9()
         {
-            Test(
-@"class Program { void Main ( ) { Color . [|Blue|] ; } } enum Color : long { Red = long.MaxValue } ",
-@"class Program { void Main ( ) { Color . Blue ; } } enum Color : long { Red = long.MaxValue , Blue = long.MinValue } ");
+            await TestInRegularAndScriptAsync(
+@"class Program
+{
+    void Main()
+    {
+        Color.[|Blue|];
+    }
+}
+
+enum Color
+{
+    Red = 0x9
+}",
+@"class Program
+{
+    void Main()
+    {
+        Color.Blue;
+    }
+}
+
+enum Color
+{
+    Red = 0x9,
+    Blue = 0xA
+}");
         }
 
         [Fact, Trait(Traits.Feature, Traits.Features.CodeActionsGenerateEnumMember)]
-        public void TestGenerateAfterEnumWithLongMaxValueInHex()
+        public async Task TestHexF()
         {
-            Test(
-@"class Program { void Main ( ) { Color . [|Blue|] ; } } enum Color : long { Red = 0x7FFFFFFFFFFFFFFF } ",
-@"class Program { void Main ( ) { Color . Blue ; } } enum Color : long { Red = 0x7FFFFFFFFFFFFFFF , Blue = 0x8000000000000000 } ");
-        }
+            await TestInRegularAndScriptAsync(
+@"class Program
+{
+    void Main()
+    {
+        Color.[|Blue|];
+    }
+}
 
-        [WorkItem(528312)]
-        [Fact, Trait(Traits.Feature, Traits.Features.CodeActionsGenerateEnumMember)]
-        public void TestGenerateAfterEnumWithLongMinValueInHex()
-        {
-            Test(
-@"class Program { void Main ( ) { Color . [|Blue|] ; } } enum Color : long { Red = 0xFFFFFFFFFFFFFFFF } ",
-@"class Program { void Main ( ) { Color . Blue ; } } enum Color : long { Red = 0xFFFFFFFFFFFFFFFF , Blue} ");
-        }
+enum Color
+{
+    Red = 0xF
+}",
+@"class Program
+{
+    void Main()
+    {
+        Color.Blue;
+    }
+}
 
-        [WorkItem(528312)]
-        [Fact, Trait(Traits.Feature, Traits.Features.CodeActionsGenerateEnumMember)]
-        public void TestGenerateAfterPositiveLongInHex()
-        {
-            Test(
-@"class Program { void Main ( ) { Color . [|Blue|] ; } } enum Color : long { Red = 0xFFFFFFFFFFFFFFFF , Green = 0x0 } ",
-@"class Program { void Main ( ) { Color . Blue ; } } enum Color : long { Red = 0xFFFFFFFFFFFFFFFF , Green = 0x0 , Blue = 0x1 } ");
-        }
-
-        [Fact, Trait(Traits.Feature, Traits.Features.CodeActionsGenerateEnumMember)]
-        public void TestGenerateAfterPositiveLongExprInHex()
-        {
-            Test(
-@"class Program { void Main ( ) { Color . [|Blue|] ; } } enum Color : long { Red = 0x414 / 2 } ",
-@"class Program { void Main ( ) { Color . Blue ; } } enum Color : long { Red = 0x414 / 2 , Blue = 523 } ");
+enum Color
+{
+    Red = 0xF,
+    Blue = 0x10
+}");
         }
 
         [Fact, Trait(Traits.Feature, Traits.Features.CodeActionsGenerateEnumMember)]
-        public void TestGenerateAfterEnumWithULongMaxValue()
+        public async Task TestGenerateAfterEnumWithIntegerMaxValue()
         {
-            Test(
-@"class Program { void Main ( ) { Color . [|Blue|] ; } } enum Color : ulong { Red = ulong.MaxValue } ",
-@"class Program { void Main ( ) { Color . Blue ; } } enum Color : ulong { Red = ulong.MaxValue , Blue = 0 } ");
+            await TestInRegularAndScriptAsync(
+@"class Program
+{
+    void Main()
+    {
+        Color.[|Blue|];
+    }
+}
+
+enum Color
+{
+    Red = int.MaxValue
+}",
+@"class Program
+{
+    void Main()
+    {
+        Color.Blue;
+    }
+}
+
+enum Color
+{
+    Red = int.MaxValue,
+    Blue = int.MinValue
+}");
         }
 
         [Fact, Trait(Traits.Feature, Traits.Features.CodeActionsGenerateEnumMember)]
-        public void TestNegativeRangeIn64BitSignedEnums()
+        public async Task TestUnsigned16BitEnums()
         {
-            Test(
-@"class Program { void Main ( ) { Color . [|Blue|] ; } } enum Color : long { Red = -10 } ",
-@"class Program { void Main ( ) { Color . Blue ; } } enum Color : long { Red = -10 , Blue = -9 } ");
+            await TestInRegularAndScriptAsync(
+@"class Program
+{
+    void Main()
+    {
+        Color.[|Blue|];
+    }
+}
+
+enum Color : ushort
+{
+    Red = 65535
+}",
+@"class Program
+{
+    void Main()
+    {
+        Color.Blue;
+    }
+}
+
+enum Color : ushort
+{
+    Red = 65535,
+    Blue = 0
+}");
         }
 
         [Fact, Trait(Traits.Feature, Traits.Features.CodeActionsGenerateEnumMember)]
-        public void TestGenerateWithImplicitValues()
+        public async Task TestGenerateEnumMemberOfTypeLong()
         {
-            Test(
-@"class Program { void Main ( ) { Color . [|Blue|] ; } } enum Color { Red , Green , Yellow = -1 }",
-@"class Program { void Main ( ) { Color . Blue ; } } enum Color { Red , Green , Yellow = -1 , Blue = 2 }");
+            await TestInRegularAndScriptAsync(
+@"class Program
+{
+    void Main()
+    {
+        Color.[|Blue|];
+    }
+}
+
+enum Color : long
+{
+    Red = long.MaxValue
+}",
+@"class Program
+{
+    void Main()
+    {
+        Color.Blue;
+    }
+}
+
+enum Color : long
+{
+    Red = long.MaxValue,
+    Blue = long.MinValue
+}");
         }
 
         [Fact, Trait(Traits.Feature, Traits.Features.CodeActionsGenerateEnumMember)]
-        public void TestGenerateWithImplicitValues2()
+        public async Task TestGenerateAfterEnumWithLongMaxValueInBinary()
         {
-            Test(
-@"class Program { void Main ( ) { Color . [|Blue|] ; } } enum Color { Red , Green = 10 , Yellow }",
-@"class Program { void Main ( ) { Color . Blue ; } } enum Color { Red , Green = 10 , Yellow , Blue }");
+            await TestInRegularAndScriptAsync(
+@"class Program
+{
+    void Main()
+    {
+        Color.[|Blue|];
+    }
+}
+
+enum Color : long
+{
+    Red = 0b0111111111111111111111111111111111111111111111111111111111111111
+}",
+@"class Program
+{
+    void Main()
+    {
+        Color.Blue;
+    }
+}
+
+enum Color : long
+{
+    Red = 0b0111111111111111111111111111111111111111111111111111111111111111,
+    Blue = 0b1000000000000000000000000000000000000000000000000000000000000000
+}");
         }
 
         [Fact, Trait(Traits.Feature, Traits.Features.CodeActionsGenerateEnumMember)]
-        public void TestNoExtraneousStatementTerminatorBeforeCommentedMember()
+        public async Task TestGenerateAfterEnumWithLongMaxValueInHex()
         {
-            Test(
+            await TestInRegularAndScriptAsync(
+@"class Program
+{
+    void Main()
+    {
+        Color.[|Blue|];
+    }
+}
+
+enum Color : long
+{
+    Red = 0x7FFFFFFFFFFFFFFF
+}",
+@"class Program
+{
+    void Main()
+    {
+        Color.Blue;
+    }
+}
+
+enum Color : long
+{
+    Red = 0x7FFFFFFFFFFFFFFF,
+    Blue = 0x8000000000000000
+}");
+        }
+
+        [WorkItem(528312, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/528312")]
+        [Fact, Trait(Traits.Feature, Traits.Features.CodeActionsGenerateEnumMember)]
+        public async Task TestGenerateAfterEnumWithLongMinValueInHex()
+        {
+            await TestInRegularAndScriptAsync(
+@"class Program
+{
+    void Main()
+    {
+        Color.[|Blue|];
+    }
+}
+
+enum Color : long
+{
+    Red = 0xFFFFFFFFFFFFFFFF
+}",
+@"class Program
+{
+    void Main()
+    {
+        Color.Blue;
+    }
+}
+
+enum Color : long
+{
+    Red = 0xFFFFFFFFFFFFFFFF,
+    Blue
+}");
+        }
+
+        [WorkItem(528312, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/528312")]
+        [Fact, Trait(Traits.Feature, Traits.Features.CodeActionsGenerateEnumMember)]
+        public async Task TestGenerateAfterPositiveLongInHex()
+        {
+            await TestInRegularAndScriptAsync(
+@"class Program
+{
+    void Main()
+    {
+        Color.[|Blue|];
+    }
+}
+
+enum Color : long
+{
+    Red = 0xFFFFFFFFFFFFFFFF,
+    Green = 0x0
+}",
+@"class Program
+{
+    void Main()
+    {
+        Color.Blue;
+    }
+}
+
+enum Color : long
+{
+    Red = 0xFFFFFFFFFFFFFFFF,
+    Green = 0x0,
+    Blue = 0x1
+}");
+        }
+
+        [Fact, Trait(Traits.Feature, Traits.Features.CodeActionsGenerateEnumMember)]
+        public async Task TestGenerateAfterPositiveLongExprInHex()
+        {
+            await TestInRegularAndScriptAsync(
+@"class Program
+{
+    void Main()
+    {
+        Color.[|Blue|];
+    }
+}
+
+enum Color : long
+{
+    Red = 0x414 / 2
+}",
+@"class Program
+{
+    void Main()
+    {
+        Color.Blue;
+    }
+}
+
+enum Color : long
+{
+    Red = 0x414 / 2,
+    Blue = 523
+}");
+        }
+
+        [Fact, Trait(Traits.Feature, Traits.Features.CodeActionsGenerateEnumMember)]
+        public async Task TestGenerateAfterEnumWithULongMaxValue()
+        {
+            await TestInRegularAndScriptAsync(
+@"class Program
+{
+    void Main()
+    {
+        Color.[|Blue|];
+    }
+}
+
+enum Color : ulong
+{
+    Red = ulong.MaxValue
+}",
+@"class Program
+{
+    void Main()
+    {
+        Color.Blue;
+    }
+}
+
+enum Color : ulong
+{
+    Red = ulong.MaxValue,
+    Blue = 0
+}");
+        }
+
+        [Fact, Trait(Traits.Feature, Traits.Features.CodeActionsGenerateEnumMember)]
+        public async Task TestNegativeRangeIn64BitSignedEnums()
+        {
+            await TestInRegularAndScriptAsync(
+@"class Program
+{
+    void Main()
+    {
+        Color.[|Blue|];
+    }
+}
+
+enum Color : long
+{
+    Red = -10
+}",
+@"class Program
+{
+    void Main()
+    {
+        Color.Blue;
+    }
+}
+
+enum Color : long
+{
+    Red = -10,
+    Blue = -9
+}");
+        }
+
+        [Fact, Trait(Traits.Feature, Traits.Features.CodeActionsGenerateEnumMember)]
+        public async Task TestGenerateWithImplicitValues()
+        {
+            await TestInRegularAndScriptAsync(
+@"class Program
+{
+    void Main()
+    {
+        Color.[|Blue|];
+    }
+}
+
+enum Color
+{
+    Red,
+    Green,
+    Yellow = -1
+}",
+@"class Program
+{
+    void Main()
+    {
+        Color.Blue;
+    }
+}
+
+enum Color
+{
+    Red,
+    Green,
+    Yellow = -1,
+    Blue = 2
+}");
+        }
+
+        [Fact, Trait(Traits.Feature, Traits.Features.CodeActionsGenerateEnumMember)]
+        public async Task TestGenerateWithImplicitValues2()
+        {
+            await TestInRegularAndScriptAsync(
+@"class Program
+{
+    void Main()
+    {
+        Color.[|Blue|];
+    }
+}
+
+enum Color
+{
+    Red,
+    Green = 10,
+    Yellow
+}",
+@"class Program
+{
+    void Main()
+    {
+        Color.Blue;
+    }
+}
+
+enum Color
+{
+    Red,
+    Green = 10,
+    Yellow,
+    Blue
+}");
+        }
+
+        [Fact, Trait(Traits.Feature, Traits.Features.CodeActionsGenerateEnumMember)]
+        public async Task TestNoExtraneousStatementTerminatorBeforeCommentedMember()
+        {
+            await TestInRegularAndScriptAsync(
 @"class Program
 {
     static void Main(string[] args)
@@ -272,14 +1009,13 @@ enum Color
     Red,
     Blue
     //Blue
-}",
-compareTokens: false);
+}");
         }
 
         [Fact, Trait(Traits.Feature, Traits.Features.CodeActionsGenerateEnumMember)]
-        public void TestNoExtraneousStatementTerminatorBeforeCommentedMember2()
+        public async Task TestNoExtraneousStatementTerminatorBeforeCommentedMember2()
         {
-            Test(
+            await TestInRegularAndScriptAsync(
 @"class Program
 {
     static void Main(string[] args)
@@ -306,118 +1042,476 @@ enum Color
     Red,
     Blue
     /*Blue*/
+}");
+        }
+
+        [Fact, Trait(Traits.Feature, Traits.Features.CodeActionsGenerateEnumMember)]
+        public async Task TestGenerateAfterEnumWithMinValue()
+        {
+            await TestInRegularAndScriptAsync(
+@"class Program
+{
+    void Main()
+    {
+        Color.[|Blue|];
+    }
+}
+
+enum Color
+{
+    Red = int.MinValue
 }",
-compareTokens: false);
+@"class Program
+{
+    void Main()
+    {
+        Color.Blue;
+    }
+}
+
+enum Color
+{
+    Red = int.MinValue,
+    Blue = -2147483647
+}");
         }
 
         [Fact, Trait(Traits.Feature, Traits.Features.CodeActionsGenerateEnumMember)]
-        public void TestGenerateAfterEnumWithMinValue()
+        public async Task TestGenerateAfterEnumWithMinValuePlusConstant()
         {
-            Test(
-@"class Program { void Main ( ) { Color . [|Blue|] ; } } enum Color { Red = int.MinValue } ",
-@"class Program { void Main ( ) { Color . Blue ; } } enum Color { Red = int.MinValue , Blue = -2147483647 } ");
+            await TestInRegularAndScriptAsync(
+@"class Program
+{
+    void Main()
+    {
+        Color.[|Blue|];
+    }
+}
+
+enum Color
+{
+    Red = int.MinValue + 100
+}",
+@"class Program
+{
+    void Main()
+    {
+        Color.Blue;
+    }
+}
+
+enum Color
+{
+    Red = int.MinValue + 100,
+    Blue = -2147483547
+}");
         }
 
         [Fact, Trait(Traits.Feature, Traits.Features.CodeActionsGenerateEnumMember)]
-        public void TestGenerateAfterEnumWithMinValuePlusConstant()
+        public async Task TestGenerateAfterEnumWithByteMaxValue()
         {
-            Test(
-@"class Program { void Main ( ) { Color . [|Blue|] ; } } enum Color { Red = int.MinValue + 100 } ",
-@"class Program { void Main ( ) { Color . Blue ; } } enum Color { Red = int.MinValue + 100 , Blue = -2147483547 } ");
+            await TestInRegularAndScriptAsync(
+@"class Program
+{
+    void Main()
+    {
+        Color.[|Blue|];
+    }
+}
+
+enum Color : byte
+{
+    Red = 255
+}",
+@"class Program
+{
+    void Main()
+    {
+        Color.Blue;
+    }
+}
+
+enum Color : byte
+{
+    Red = 255,
+    Blue = 0
+}");
         }
 
         [Fact, Trait(Traits.Feature, Traits.Features.CodeActionsGenerateEnumMember)]
-        public void TestGenerateAfterEnumWithByteMaxValue()
+        public async Task TestGenerateIntoBitshiftEnum1()
         {
-            Test(
-@"class Program { void Main ( ) { Color . [|Blue|] ; } } enum Color : byte { Red = 255 }",
-@"class Program { void Main ( ) { Color . Blue ; } } enum Color : byte { Red = 255 , Blue = 0 }");
+            await TestInRegularAndScriptAsync(
+@"class Program
+{
+    void Main()
+    {
+        Color.[|Blue|];
+    }
+}
+
+enum Color
+{
+    Red = 1 << 1,
+    Green = 1 << 2
+}",
+@"class Program
+{
+    void Main()
+    {
+        Color.Blue;
+    }
+}
+
+enum Color
+{
+    Red = 1 << 1,
+    Green = 1 << 2,
+    Blue = 1 << 3
+}");
         }
 
         [Fact, Trait(Traits.Feature, Traits.Features.CodeActionsGenerateEnumMember)]
-        public void TestGenerateIntoBitshiftEnum1()
+        public async Task TestGenerateIntoBitshiftEnum2()
         {
-            Test(
-@"class Program { void Main ( ) { Color . [|Blue|] ; } } enum Color { Red = 1 << 1 , Green = 1 << 2 }",
-@"class Program { void Main ( ) { Color . Blue ; } } enum Color { Red = 1 << 1 , Green = 1 << 2 , Blue = 1 << 3 }");
+            await TestInRegularAndScriptAsync(
+@"class Program
+{
+    void Main()
+    {
+        Color.[|Blue|];
+    }
+}
+
+enum Color
+{
+    Red = 2 >> 1
+}",
+@"class Program
+{
+    void Main()
+    {
+        Color.Blue;
+    }
+}
+
+enum Color
+{
+    Red = 2 >> 1,
+    Blue = 2
+}");
         }
 
         [Fact, Trait(Traits.Feature, Traits.Features.CodeActionsGenerateEnumMember)]
-        public void TestGenerateIntoBitshiftEnum2()
+        public async Task TestStandaloneReference()
         {
-            Test(
-@"class Program { void Main ( ) { Color . [|Blue|] ; } } enum Color { Red = 2 >> 1 }",
-@"class Program { void Main ( ) { Color . Blue ; } } enum Color { Red = 2 >> 1 , Blue = 2 }");
+            await TestInRegularAndScriptAsync(
+@"class Program
+{
+    void Main()
+    {
+        Color.[|Blue|];
+    }
+}
+
+enum Color
+{
+    Red = int.MinValue,
+    Green = 1
+}",
+@"class Program
+{
+    void Main()
+    {
+        Color.Blue;
+    }
+}
+
+enum Color
+{
+    Red = int.MinValue,
+    Green = 1,
+    Blue = 2
+}");
         }
 
         [Fact, Trait(Traits.Feature, Traits.Features.CodeActionsGenerateEnumMember)]
-        public void TestStandaloneReference()
+        public async Task TestCircularEnumsForErrorTolerance()
         {
-            Test(
-@"class Program { void Main ( ) { Color . [|Blue|] ; } } enum Color { Red = int.MinValue , Green = 1 }",
-@"class Program { void Main ( ) { Color . Blue ; } } enum Color { Red = int.MinValue , Green = 1 , Blue = 2 }");
+            await TestInRegularAndScriptAsync(
+@"class Program
+{
+    void Main()
+    {
+        Circular.[|C|];
+    }
+}
+
+enum Circular
+{
+    A = B,
+    B
+}",
+@"class Program
+{
+    void Main()
+    {
+        Circular.C;
+    }
+}
+
+enum Circular
+{
+    A = B,
+    B,
+    C
+}");
         }
 
         [Fact, Trait(Traits.Feature, Traits.Features.CodeActionsGenerateEnumMember)]
-        public void TestCircularEnumsForErrorTolerance()
+        public async Task TestEnumWithIncorrectValueForErrorTolerance()
         {
-            Test(
-@"class Program { void Main ( ) { Circular . [|C|] ; } } enum Circular { A = B , B }",
-@"class Program { void Main ( ) { Circular . C ; } } enum Circular { A = B , B , C }");
+            await TestInRegularAndScriptAsync(
+@"class Program
+{
+    void Main()
+    {
+        Circular.[|B|];
+    }
+}
+
+enum Circular : byte
+{
+    A = -2
+}",
+@"class Program
+{
+    void Main()
+    {
+        Circular.B;
+    }
+}
+
+enum Circular : byte
+{
+    A = -2,
+    B
+}");
         }
 
         [Fact, Trait(Traits.Feature, Traits.Features.CodeActionsGenerateEnumMember)]
-        public void TestEnumWithIncorrectValueForErrorTolerance()
+        public async Task TestGenerateIntoNewEnum()
         {
-            Test(
-@"class Program { void Main ( ) { Circular . [|B|] ; } } enum Circular : byte { A = -2 }",
-@"class Program { void Main ( ) { Circular . B ; } } enum Circular : byte { A = -2 , B }");
+            await TestInRegularAndScriptAsync(
+@"class B : A
+{
+    void Main()
+    {
+        BaseColor.[|Blue|];
+    }
+
+    public new enum BaseColor
+    {
+        Yellow = 3
+    }
+}
+
+class A
+{
+    public enum BaseColor
+    {
+        Red = 1,
+        Green = 2
+    }
+}",
+@"class B : A
+{
+    void Main()
+    {
+        BaseColor.Blue;
+    }
+
+    public new enum BaseColor
+    {
+        Yellow = 3,
+        Blue = 4
+    }
+}
+
+class A
+{
+    public enum BaseColor
+    {
+        Red = 1,
+        Green = 2
+    }
+}");
         }
 
         [Fact, Trait(Traits.Feature, Traits.Features.CodeActionsGenerateEnumMember)]
-        public void TestGenerateIntoNewEnum()
+        public async Task TestGenerateIntoDerivedEnumMissingNewKeyword()
         {
-            Test(
-@"class B : A { void Main ( ) { BaseColor . [|Blue|] ; } public new enum BaseColor { Yellow = 3 } } class A { public enum BaseColor { Red = 1, Green = 2 } }",
-@"class B : A { void Main ( ) { BaseColor . Blue ; } public new enum BaseColor { Yellow = 3 , Blue = 4 } } class A { public enum BaseColor { Red = 1, Green = 2 } }");
+            await TestInRegularAndScriptAsync(
+@"class B : A
+{
+    void Main()
+    {
+        BaseColor.[|Blue|];
+    }
+
+    public enum BaseColor
+    {
+        Yellow = 3
+    }
+}
+
+class A
+{
+    public enum BaseColor
+    {
+        Red = 1,
+        Green = 2
+    }
+}",
+@"class B : A
+{
+    void Main()
+    {
+        BaseColor.Blue;
+    }
+
+    public enum BaseColor
+    {
+        Yellow = 3,
+        Blue = 4
+    }
+}
+
+class A
+{
+    public enum BaseColor
+    {
+        Red = 1,
+        Green = 2
+    }
+}");
         }
 
         [Fact, Trait(Traits.Feature, Traits.Features.CodeActionsGenerateEnumMember)]
-        public void TestGenerateIntoDerivedEnumMissingNewKeyword()
+        public async Task TestGenerateIntoBaseEnum()
         {
-            Test(
-@"class B : A { void Main ( ) { BaseColor . [|Blue|] ; } public enum BaseColor { Yellow = 3 } } class A { public enum BaseColor { Red = 1, Green = 2 } }",
-@"class B : A { void Main ( ) { BaseColor . Blue ; } public enum BaseColor { Yellow = 3 , Blue = 4 } } class A { public enum BaseColor { Red = 1, Green = 2 } }");
+            await TestInRegularAndScriptAsync(
+@"class B : A
+{
+    void Main()
+    {
+        BaseColor.[|Blue|];
+    }
+}
+
+class A
+{
+    public enum BaseColor
+    {
+        Red = 1,
+        Green = 2
+    }
+}",
+@"class B : A
+{
+    void Main()
+    {
+        BaseColor.Blue;
+    }
+}
+
+class A
+{
+    public enum BaseColor
+    {
+        Red = 1,
+        Green = 2,
+        Blue = 3
+    }
+}");
         }
 
         [Fact, Trait(Traits.Feature, Traits.Features.CodeActionsGenerateEnumMember)]
-        public void TestGenerateIntoBaseEnum()
+        public async Task TestGenerationWhenMembersShareValues()
         {
-            Test(
-@"class B : A { void Main ( ) { BaseColor . [|Blue|] ; } } class A { public enum BaseColor { Red = 1, Green = 2 } }",
-@"class B : A { void Main ( ) { BaseColor . Blue ; } } class A { public enum BaseColor { Red = 1, Green = 2 , Blue = 3 } }");
+            await TestInRegularAndScriptAsync(
+@"class Program
+{
+    void Main()
+    {
+        Color.[|Blue|];
+    }
+}
+
+enum Color
+{
+    Red,
+    Green,
+    Yellow = Green
+}",
+@"class Program
+{
+    void Main()
+    {
+        Color.Blue;
+    }
+}
+
+enum Color
+{
+    Red,
+    Green,
+    Yellow = Green,
+    Blue = 2
+}");
         }
 
         [Fact, Trait(Traits.Feature, Traits.Features.CodeActionsGenerateEnumMember)]
-        public void TestGenerationWhenMembersShareValues()
+        public async Task TestInvokeFromAddAssignmentStatement()
         {
-            Test(
-@"class Program { void Main ( ) { Color . [|Blue|] ; } } enum Color { Red , Green , Yellow = Green }",
-@"class Program { void Main ( ) { Color . Blue ; } } enum Color { Red , Green , Yellow = Green , Blue = 2 }");
+            await TestInRegularAndScriptAsync(
+@"class Program
+{
+    void Main()
+    {
+        int a = 1;
+        a += Color.[|Blue|];
+    }
+}
+
+enum Color
+{
+    Red,
+    Green = 10,
+    Yellow
+}",
+@"class Program
+{
+    void Main()
+    {
+        int a = 1;
+        a += Color.Blue;
+    }
+}
+
+enum Color
+{
+    Red,
+    Green = 10,
+    Yellow,
+    Blue
+}");
         }
 
         [Fact, Trait(Traits.Feature, Traits.Features.CodeActionsGenerateEnumMember)]
-        public void TestInvokeFromAddAssignmentStatement()
+        public async Task TestFormatting()
         {
-            Test(
-@"class Program { void Main ( ) { int a = 1 ; a += Color . [|Blue|] ; } } enum Color { Red , Green = 10 , Yellow }",
-@"class Program { void Main ( ) { int a = 1 ; a += Color . Blue ; } } enum Color { Red , Green = 10 , Yellow , Blue }");
-        }
-
-        [Fact, Trait(Traits.Feature, Traits.Features.CodeActionsGenerateEnumMember)]
-        public void TestFormatting()
-        {
-            Test(
+            await TestInRegularAndScriptAsync(
 @"class Program
 {
     static void Main(string[] args)
@@ -440,31 +1534,66 @@ enum Weekday
 {
     Monday,
     Tuesday
+}");
+        }
+
+        [WorkItem(540919, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/540919")]
+        [Fact, Trait(Traits.Feature, Traits.Features.CodeActionsGenerateEnumMember)]
+        public async Task TestKeyword()
+        {
+            await TestInRegularAndScriptAsync(
+@"class Program
+{
+    static void Main(string[] args)
+    {
+        Color.[|@enum|];
+    }
+}
+
+enum Color
+{
+    Red
 }",
-compareTokens: false);
+@"class Program
+{
+    static void Main(string[] args)
+    {
+        Color.@enum;
+    }
+}
+
+enum Color
+{
+    Red,
+    @enum
+}");
         }
 
-        [WorkItem(540919)]
+        [WorkItem(544333, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/544333")]
         [Fact, Trait(Traits.Feature, Traits.Features.CodeActionsGenerateEnumMember)]
-        public void TestKeyword()
+        public async Task TestNotAfterPointer()
         {
-            Test(
-@"class Program { static void Main ( string [ ] args ) { Color . [|@enum|] ; } } enum Color { Red } ",
-@"class Program { static void Main ( string [ ] args ) { Color . @enum ; } } enum Color { Red , @enum } ");
+            await TestMissingInRegularAndScriptAsync(
+@"struct MyStruct
+{
+    public int MyField;
+}
+
+class Program
+{
+    static unsafe void Main(string[] args)
+    {
+        MyStruct s = new MyStruct();
+        MyStruct* ptr = &s;
+        var i1 = (() => &s)->[|M|];
+    }
+}");
         }
 
-        [WorkItem(544333)]
         [Fact, Trait(Traits.Feature, Traits.Features.CodeActionsGenerateEnumMember)]
-        public void TestNotAfterPointer()
+        public async Task TestMissingOnHiddenEnum()
         {
-            TestMissing(
-@"struct MyStruct { public int MyField ; } class Program { static unsafe void Main ( string [ ] args ) { MyStruct s = new MyStruct ( ) ; MyStruct * ptr = & s ; var i1 = ( ( ) => & s ) -> [|M|] ; } } ");
-        }
-
-        [Fact, Trait(Traits.Feature, Traits.Features.CodeActionsGenerateEnumMember)]
-        public void TestMissingOnHiddenEnum()
-        {
-            TestMissing(
+            await TestMissingInRegularAndScriptAsync(
 @"using System;
 
 enum E
@@ -483,9 +1612,9 @@ class Program
         }
 
         [Fact, Trait(Traits.Feature, Traits.Features.CodeActionsGenerateEnumMember)]
-        public void TestMissingOnPartiallyHiddenEnum()
+        public async Task TestMissingOnPartiallyHiddenEnum()
         {
-            TestMissing(
+            await TestMissingInRegularAndScriptAsync(
 @"using System;
 
 enum E
@@ -506,22 +1635,158 @@ class Program
 }");
         }
 
-        [WorkItem(545903)]
+        [WorkItem(545903, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/545903")]
         [Fact, Trait(Traits.Feature, Traits.Features.CodeActionsGenerateEnumMember)]
-        public void TestNoOctal()
+        public async Task TestNoOctal()
         {
-            Test(
-@"enum E { A = 007 , } class C { E x = E . [|B|] ; } ",
-@"enum E { A = 007 , B = 8 , } class C { E x = E . B ; } ");
+            await TestInRegularAndScriptAsync(
+@"enum E
+{
+    A = 007,
+}
+
+class C
+{
+    E x = E.[|B|];
+}",
+@"enum E
+{
+    A = 007,
+    B = 8,
+}
+
+class C
+{
+    E x = E.B;
+}");
         }
 
-        [WorkItem(546654)]
+        [WorkItem(546654, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/546654")]
         [Fact, Trait(Traits.Feature, Traits.Features.CodeActionsGenerateEnumMember)]
-        public void TestLastValueDoesNotHaveInitializer()
+        public async Task TestLastValueDoesNotHaveInitializer()
         {
-            Test(
-@"enum E { A = 1 , B } class Program { void Main ( ) { E . [|C|] } } ",
-@"enum E { A = 1 , B , C } class Program { void Main ( ) { E . C } } ");
+            await TestInRegularAndScriptAsync(
+@"enum E
+{
+    A = 1,
+    B
+}
+
+class Program
+{
+    void Main()
+    {
+        E.[|C|] }
+}",
+@"enum E
+{
+    A = 1,
+    B,
+    C
+}
+
+class Program
+{
+    void Main()
+    {
+        E.C }
+}");
+        }
+
+        [WorkItem(49679, "https://github.com/dotnet/roslyn/issues/49679")]
+        [Fact, Trait(Traits.Feature, Traits.Features.CodeActionsGenerateEnumMember)]
+        public async Task TestWithLeftShift_Long()
+        {
+            await TestInRegularAndScriptAsync(
+@"class Program
+{
+    void Main()
+    {
+        Color.[|Blue|];
+    }
+}
+
+enum Color : long
+{
+    Green = 1L << 0
+}",
+@"class Program
+{
+    void Main()
+    {
+        Color.Blue;
+    }
+}
+
+enum Color : long
+{
+    Green = 1L << 0,
+    Blue = 1L << 1
+}");
+        }
+
+        [WorkItem(49679, "https://github.com/dotnet/roslyn/issues/49679")]
+        [Fact, Trait(Traits.Feature, Traits.Features.CodeActionsGenerateEnumMember)]
+        public async Task TestWithLeftShift_UInt()
+        {
+            await TestInRegularAndScriptAsync(
+@"class Program
+{
+    void Main()
+    {
+        Color.[|Blue|];
+    }
+}
+
+enum Color : uint
+{
+    Green = 1u << 0
+}",
+@"class Program
+{
+    void Main()
+    {
+        Color.Blue;
+    }
+}
+
+enum Color : uint
+{
+    Green = 1u << 0,
+    Blue = 1u << 1
+}");
+        }
+
+        [WorkItem(49679, "https://github.com/dotnet/roslyn/issues/49679")]
+        [Fact, Trait(Traits.Feature, Traits.Features.CodeActionsGenerateEnumMember)]
+        public async Task TestWithLeftShift_ULong()
+        {
+            await TestInRegularAndScriptAsync(
+@"class Program
+{
+    void Main()
+    {
+        Color.[|Blue|];
+    }
+}
+
+enum Color : ulong
+{
+    Green = 1UL << 0
+}",
+@"class Program
+{
+    void Main()
+    {
+        Color.Blue;
+    }
+}
+
+enum Color : ulong
+{
+    Green = 1UL << 0,
+    Blue = 1UL << 1
+}");
         }
     }
 }

@@ -1,9 +1,12 @@
-﻿// Copyright (c) Microsoft.  All Rights Reserved.  Licensed under the Apache License, Version 2.0.  See License.txt in the project root for license information.
+﻿// Licensed to the .NET Foundation under one or more agreements.
+// The .NET Foundation licenses this file to you under the MIT license.
+// See the LICENSE file in the project root for more information.
 
 using System;
 using System.Collections.Immutable;
 using System.Diagnostics;
-using Microsoft.CodeAnalysis.Symbols;
+using System.Reflection.Metadata;
+using Roslyn.Utilities;
 
 namespace Microsoft.CodeAnalysis.CodeGen
 {
@@ -13,105 +16,55 @@ namespace Microsoft.CodeAnalysis.CodeGen
     /// </summary>
     internal sealed class LocalConstantDefinition : Cci.ILocalDefinition
     {
-        private readonly string _name;
-        private readonly Location _location;
-        private readonly Cci.IMetadataConstant _compileTimeValue;
-        private readonly bool _isDynamic;
-
-        //Gives the synthesized dynamic attributes of the local definition
-        private readonly ImmutableArray<TypedConstant> _dynamicTransformFlags;
-
-        public LocalConstantDefinition(string name, Location location, Cci.IMetadataConstant compileTimeValue, bool isDynamic = false,
-            ImmutableArray<TypedConstant> dynamicTransformFlags = default(ImmutableArray<TypedConstant>))
+        public LocalConstantDefinition(
+            string name,
+            Location location,
+            MetadataConstant compileTimeValue,
+            ImmutableArray<bool> dynamicTransformFlags,
+            ImmutableArray<string> tupleElementNames)
         {
-            Debug.Assert(!string.IsNullOrEmpty(name));
-            Debug.Assert(compileTimeValue != null);
+            RoslynDebug.Assert(!RoslynString.IsNullOrEmpty(name));
+            RoslynDebug.Assert(compileTimeValue != null);
 
-            _name = name;
-            _location = location;
-            _compileTimeValue = compileTimeValue;
-            _isDynamic = isDynamic;
-            _dynamicTransformFlags = dynamicTransformFlags;
+            Name = name;
+            Location = location;
+            CompileTimeValue = compileTimeValue;
+            DynamicTransformFlags = dynamicTransformFlags.NullToEmpty();
+            TupleElementNames = tupleElementNames.NullToEmpty();
         }
 
-        public string Name
-        {
-            get { return _name; }
-        }
+        public string Name { get; }
 
-        public Location Location
-        {
-            get { return _location; }
-        }
+        public Location Location { get; }
 
-        public Cci.IMetadataConstant CompileTimeValue
-        {
-            get { return _compileTimeValue; }
-        }
+        public MetadataConstant CompileTimeValue { get; }
 
-        public Cci.ITypeReference Type
-        {
-            get { return _compileTimeValue.Type; }
-        }
+        public Cci.ITypeReference Type => CompileTimeValue.Type;
 
-        public bool IsConstant
-        {
-            get { return true; }
-        }
+        public bool IsConstant => true;
 
         public ImmutableArray<Cci.ICustomModifier> CustomModifiers
-        {
-            get { return ImmutableArray<Cci.ICustomModifier>.Empty; }
-        }
+            => ImmutableArray<Cci.ICustomModifier>.Empty;
 
-        public bool IsModified
-        {
-            get { return false; }
-        }
+        public bool IsModified => false;
 
-        public bool IsPinned
-        {
-            get { return false; }
-        }
+        public bool IsPinned => false;
 
-        public bool IsReference
-        {
-            get { return false; }
-        }
+        public bool IsReference => false;
 
-        public LocalSlotConstraints Constraints
-        {
-            get { return LocalSlotConstraints.None; }
-        }
+        public LocalSlotConstraints Constraints => LocalSlotConstraints.None;
 
-        public bool IsDynamic
-        {
-            get { return _isDynamic; }
-        }
+        public LocalVariableAttributes PdbAttributes => LocalVariableAttributes.None;
 
-        public uint PdbAttributes
-        {
-            get { return Cci.PdbWriter.DefaultLocalAttributesValue; }
-        }
+        public ImmutableArray<bool> DynamicTransformFlags { get; }
 
-        public ImmutableArray<TypedConstant> DynamicTransformFlags
-        {
-            get { return _dynamicTransformFlags; }
-        }
+        public ImmutableArray<string> TupleElementNames { get; }
 
-        public int SlotIndex
-        {
-            get { return -1; }
-        }
+        public int SlotIndex => -1;
 
-        public byte[] Signature
-        {
-            get { return null; }
-        }
+        public byte[]? Signature => null;
 
         public LocalSlotDebugInfo SlotInfo
-        {
-            get { return new LocalSlotDebugInfo(SynthesizedLocalKind.UserDefined, LocalDebugId.None); }
-        }
+            => new LocalSlotDebugInfo(SynthesizedLocalKind.UserDefined, LocalDebugId.None);
     }
 }

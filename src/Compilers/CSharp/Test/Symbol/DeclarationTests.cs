@@ -1,13 +1,20 @@
-﻿// Copyright (c) Microsoft.  All Rights Reserved.  Licensed under the Apache License, Version 2.0.  See License.txt in the project root for license information.
+﻿// Licensed to the .NET Foundation under one or more agreements.
+// The .NET Foundation licenses this file to you under the MIT license.
+// See the LICENSE file in the project root for more information.
+
+#nullable disable
 
 using System;
+using System.Collections.Immutable;
 using System.Diagnostics;
 using System.Linq;
+using System.Text;
 using System.Threading;
 using Microsoft.CodeAnalysis.CSharp.Symbols;
 using Microsoft.CodeAnalysis.CSharp.Syntax;
 using Microsoft.CodeAnalysis.CSharp.Test.Utilities;
 using Microsoft.CodeAnalysis.Text;
+using Roslyn.Test.Utilities;
 using Roslyn.Utilities;
 using Xunit;
 //test
@@ -56,8 +63,8 @@ namespace NA
             var tree2 = SyntaxFactory.ParseSyntaxTree(text2);
             Assert.NotNull(tree1);
             Assert.NotNull(tree2);
-            var decl1 = DeclarationTreeBuilder.ForTree(tree1, new CSharpCompilationOptions(OutputKind.ConsoleApplication).ScriptClassName, isSubmission: false);
-            var decl2 = DeclarationTreeBuilder.ForTree(tree2, new CSharpCompilationOptions(OutputKind.ConsoleApplication).ScriptClassName, isSubmission: false);
+            var decl1 = DeclarationTreeBuilder.ForTree(tree1, TestOptions.DebugExe.ScriptClassName, isSubmission: false);
+            var decl2 = DeclarationTreeBuilder.ForTree(tree2, TestOptions.DebugExe.ScriptClassName, isSubmission: false);
             Assert.NotNull(decl1);
             Assert.NotNull(decl2);
             Assert.Equal(string.Empty, decl1.Name);
@@ -115,18 +122,16 @@ namespace NA
             Assert.Equal(0, d2.Children.Length);
 
             var table = DeclarationTable.Empty;
-            Assert.Empty(table.AllRootNamespacesUnordered());
-
-            var mr = table.MergedRoot;
+            var mr = table.CalculateMergedRoot(null);
             Assert.NotNull(mr);
+            Assert.True(mr.Declarations.IsEmpty);
             Assert.True(table.TypeNames.IsEmpty());
 
             table = table.AddRootDeclaration(Lazy(decl1));
+            mr = table.CalculateMergedRoot(null);
 
-            Assert.Equal(decl1, table.AllRootNamespacesUnordered().Single());
+            Assert.Equal(mr.Declarations, new[] { decl1 });
             Assert.True(table.TypeNames.OrderBy(s => s).SequenceEqual(new[] { "C", "D" }));
-
-            mr = table.MergedRoot;
 
             Assert.Equal(DeclarationKind.Namespace, mr.Kind);
             Assert.Equal(string.Empty, mr.Name);
@@ -155,12 +160,11 @@ namespace NA
             Assert.Equal("D", d.Name);
 
             table = table.AddRootDeclaration(Lazy(decl2));
+            mr = table.CalculateMergedRoot(null);
 
             Assert.True(table.TypeNames.Distinct().OrderBy(s => s).SequenceEqual(new[] { "C", "D" }));
 
-            Assert.Equal(2, table.AllRootNamespacesUnordered().Intersect(new[] { decl1, decl2 }).Count());
-
-            mr = table.MergedRoot;
+            Assert.Equal(mr.Declarations, new[] { decl1, decl2 });
 
             Assert.Equal(DeclarationKind.Namespace, mr.Kind);
             Assert.Equal(string.Empty, mr.Name);
@@ -228,8 +232,8 @@ namespace NA
             var tree2 = SyntaxFactory.ParseSyntaxTree(text2);
             Assert.NotNull(tree1);
             Assert.NotNull(tree2);
-            var decl1 = Lazy(DeclarationTreeBuilder.ForTree(tree1, new CSharpCompilationOptions(OutputKind.ConsoleApplication).ScriptClassName, isSubmission: false));
-            var decl2 = Lazy(DeclarationTreeBuilder.ForTree(tree2, new CSharpCompilationOptions(OutputKind.ConsoleApplication).ScriptClassName, isSubmission: false));
+            var decl1 = Lazy(DeclarationTreeBuilder.ForTree(tree1, TestOptions.DebugExe.ScriptClassName, isSubmission: false));
+            var decl2 = Lazy(DeclarationTreeBuilder.ForTree(tree2, TestOptions.DebugExe.ScriptClassName, isSubmission: false));
 
             var table = DeclarationTable.Empty;
             table = table.AddRootDeclaration(decl1);
@@ -267,7 +271,7 @@ namespace NA
             Assert.Equal(SymbolKind.NamedType, comp.GlobalNamespace.GetMembers()[0].Kind);
         }
 
-        [Fact()]
+        [ConditionalFact(typeof(NoIOperationValidation), typeof(NoUsedAssembliesValidation))]
         public void OnlyOneParse()
         {
             var underlyingTree = SyntaxFactory.ParseSyntaxTree(@"
@@ -279,7 +283,7 @@ class C
     C(){}
 }
 ");
-            var foriegnType = SyntaxFactory.ParseSyntaxTree(@"
+            var foreignType = SyntaxFactory.ParseSyntaxTree(@"
 public class B
 {
   public int member(string s) { return s.Length; }
@@ -287,9 +291,9 @@ public class B
 }
 ");
 
-            var countedTree = new CountedSyntaxTree(foriegnType);
+            var countedTree = new CountedSyntaxTree(foreignType);
 
-            var compilation = CreateCompilationWithMscorlib(new SyntaxTree[] { underlyingTree, countedTree });
+            var compilation = CreateCompilation(new SyntaxTree[] { underlyingTree, countedTree }, skipUsesIsNullable: true, options: TestOptions.ReleaseDll);
 
             var type = compilation.Assembly.GlobalNamespace.GetTypeMembers().First();
             Assert.Equal(1, countedTree.AccessCount);   // parse once to build the decl table
@@ -299,7 +303,7 @@ public class B
             Assert.Equal(1, countedTree.AccessCount);
 
             // Getting the interfaces will cause us to do some more binding of the current type.
-            var interfaces = type.Interfaces;
+            var interfaces = type.Interfaces();
             Assert.Equal(1, countedTree.AccessCount);
 
             // Now bind the members.
@@ -307,13 +311,17 @@ public class B
             Assert.Equal(1, countedTree.AccessCount);
 
             // Once we have the method, we shouldn't need to go back to syntax again.
-            var returnType = method.ReturnType;
+            var returnType = method.ReturnTypeWithAnnotations;
             Assert.Equal(1, countedTree.AccessCount);
 
             var parameterType = method.Parameters.Single();
             Assert.Equal(1, countedTree.AccessCount);
         }
 
+        /// <remarks>
+        /// When using this type, make sure to pass an explicit CompilationOptions to CreateCompilation, as the check
+        /// to see whether the syntax tree has top-level statements will increment the counter.
+        /// </remarks>
         private class CountedSyntaxTree : CSharpSyntaxTree
         {
             private class Reference : SyntaxReference
@@ -364,7 +372,7 @@ public class B
             private readonly SyntaxTree _underlyingTree;
             private readonly CompilationUnitSyntax _root;
 
-            public int AccessCount = 0;
+            public int AccessCount;
 
             public CountedSyntaxTree(SyntaxTree underlying)
             {
@@ -413,10 +421,18 @@ public class B
                 return _underlyingTree.TryGetText(out text);
             }
 
+            public override Encoding Encoding
+            {
+                get { return _underlyingTree.Encoding; }
+            }
+
             public override int Length
             {
                 get { return _underlyingTree.Length; }
             }
+
+            [Obsolete]
+            public override ImmutableDictionary<string, ReportDiagnostic> DiagnosticOptions => throw new NotImplementedException();
 
             public override SyntaxReference GetReference(SyntaxNode node)
             {

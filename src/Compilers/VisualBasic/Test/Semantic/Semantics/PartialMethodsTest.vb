@@ -1,5 +1,8 @@
-﻿' Copyright (c) Microsoft.  All Rights Reserved.  Licensed under the Apache License, Version 2.0.  See License.txt in the project root for license information.
+﻿' Licensed to the .NET Foundation under one or more agreements.
+' The .NET Foundation licenses this file to you under the MIT license.
+' See the LICENSE file in the project root for more information.
 
+Imports Microsoft.CodeAnalysis.Test.Utilities
 Imports Microsoft.CodeAnalysis.Text
 Imports Microsoft.CodeAnalysis.VisualBasic.Symbols
 Imports Microsoft.CodeAnalysis.VisualBasic.Syntax
@@ -34,7 +37,7 @@ End Class
 
             Dim tree1 = ParseAndVerify(text1)
             Dim tree2 = ParseAndVerify(text2)
-            Dim comp = CreateCompilationWithMscorlib({tree1, tree2})
+            Dim comp = CreateCompilationWithMscorlib40({tree1, tree2})
 
             Dim pTypeSym = comp.SourceModule.GlobalNamespace.GetTypeMembers("C1").Single()
             Assert.Equal("C1", pTypeSym.ToDisplayString())
@@ -114,7 +117,7 @@ End Class
 
             Dim tree1 = ParseAndVerify(text1)
             Dim tree2 = ParseAndVerify(text2)
-            Dim comp = CreateCompilationWithMscorlib({tree1, tree2})
+            Dim comp = CreateCompilationWithMscorlib40({tree1, tree2})
 
             Dim pTypeSym = comp.SourceModule.GlobalNamespace.GetTypeMembers("C1").Single()
             Assert.Equal("C1", pTypeSym.ToDisplayString())
@@ -194,7 +197,7 @@ End Class
 
             Dim tree1 = ParseAndVerify(text1)
             Dim tree2 = ParseAndVerify(text2)
-            Dim comp = CreateCompilationWithMscorlib({tree1, tree2})
+            Dim comp = CreateCompilationWithMscorlib40({tree1, tree2})
 
             Dim pTypeSym = comp.SourceModule.GlobalNamespace.GetTypeMembers("C1").Single()
             Assert.Equal("C1", pTypeSym.ToDisplayString())
@@ -252,7 +255,7 @@ End Class
             Assert.Equal(1, ppSym02.Locations.Length)
         End Sub
 
-        <WorkItem(545469, "DevDiv")>
+        <WorkItem(545469, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/545469")>
         <Fact()>
         Public Sub MetadataNameOnPartialMethodImplementation()
 
@@ -260,10 +263,10 @@ End Class
 Imports System
 
 Public Module Module1
-    Partial Private Sub FOo(Of T As Class, U As T, V As {U, Exception})(aa As T, y As U, z As V)
+    Partial Private Sub GOo(Of T As Class, U As T, V As {U, Exception})(aa As T, y As U, z As V)
     End Sub
-    Private Sub foo(Of T As Class, U As T, V As {U, Exception})(aa As T, y As U, z As V)
-        Console.WriteLine("foo")
+    Private Sub goo(Of T As Class, U As T, V As {U, Exception})(aa As T, y As U, z As V)
+        Console.WriteLine("goo")
     End Sub
     Sub Main()
     End Sub
@@ -271,11 +274,11 @@ End Module
 </text>.Value.Trim()
 
             Dim tree1 = ParseAndVerify(text1)
-            Dim comp = CreateCompilationWithMscorlib({tree1})
+            Dim comp = CreateCompilationWithMscorlib40({tree1})
             Dim model = comp.GetSemanticModel(tree1)
 
             Dim id = tree1.GetCompilationUnitRoot().DescendantNodes().OfType(Of MethodStatementSyntax).
-                                                       Where(Function(node) node.Identifier.ValueText = "foo").First()
+                                                       Where(Function(node) node.Identifier.ValueText = "goo").First()
 
             Dim method = model.GetDeclaredSymbol(id)
             Dim unused = method.MetadataName
@@ -316,7 +319,7 @@ End Class
             Dim tree1 = ParseAndVerify(text1)
             Dim tree2 = ParseAndVerify(text2)
             Dim tree3 = ParseAndVerify(text3)
-            Dim comp = CreateCompilationWithMscorlib({tree1, tree2, tree3})
+            Dim comp = CreateCompilationWithMscorlib40({tree1, tree2, tree3})
 
             Dim pTypeSym = comp.SourceModule.GlobalNamespace.GetTypeMembers("C1").Single()
             Assert.Equal("C1", pTypeSym.ToDisplayString())
@@ -422,7 +425,7 @@ End Class
 
             Dim tree1 = ParseAndVerify(text1)
             Dim tree2 = ParseAndVerify(text2)
-            Dim comp = CreateCompilationWithMscorlib({tree1, tree2})
+            Dim comp = CreateCompilationWithMscorlib40({tree1, tree2})
 
             Dim pTypeSym = comp.SourceModule.GlobalNamespace.GetTypeMembers("C1").Single()
             Assert.Equal("C1", pTypeSym.ToDisplayString())
@@ -474,7 +477,7 @@ End Class
 
             Dim tree1 = ParseAndVerify(text1)
             Dim tree2 = ParseAndVerify(text2)
-            Dim comp = CreateCompilationWithMscorlib({tree1, tree2})
+            Dim comp = CreateCompilationWithMscorlib40({tree1, tree2})
 
             Dim pTypeSym = comp.SourceModule.GlobalNamespace.GetTypeMembers("C1").Single()
             Assert.Equal("C1", pTypeSym.ToDisplayString())
@@ -531,7 +534,7 @@ End Class
 
             Dim tree1 = ParseAndVerify(text1)
             Dim tree2 = ParseAndVerify(text2)
-            Dim comp = CreateCompilationWithMscorlib({tree1, tree2})
+            Dim comp = CreateCompilationWithMscorlib40({tree1, tree2})
 
             Dim pTypeSym = comp.SourceModule.GlobalNamespace.GetTypeMembers("C1").Single()
             Assert.Equal("C1", pTypeSym.ToDisplayString())
@@ -589,7 +592,7 @@ End Class
 
             Dim tree1 = ParseAndVerify(text1)
             Dim tree2 = ParseAndVerify(text2)
-            Dim comp = CreateCompilationWithMscorlib({tree1, tree2}, New VisualBasicCompilationOptions(OutputKind.DynamicallyLinkedLibrary))
+            Dim comp = CreateCompilationWithMscorlib40({tree1, tree2}, options:=New VisualBasicCompilationOptions(OutputKind.DynamicallyLinkedLibrary))
 
             Dim pTypeSym = comp.SourceModule.GlobalNamespace.GetTypeMembers("C1").Single()
             Assert.Equal("C1", pTypeSym.ToDisplayString())
@@ -709,7 +712,7 @@ End Class
                 End Sub)
         End Sub
 
-        <WorkItem(544502, "DevDiv")>
+        <WorkItem(544502, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/544502")>
         <Fact()>
         Public Sub MergePartialMethodEvents()
             CompileAndVerify(
@@ -750,7 +753,7 @@ End Class
 expectedOutput:="1;2;2;3;")
         End Sub
 
-        <WorkItem(544502, "DevDiv")>
+        <WorkItem(544502, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/544502")>
         <Fact()>
         Public Sub MergePartialMethodEvents2()
             CompileAndVerify(
@@ -791,7 +794,7 @@ End Class
 expectedOutput:="1;2;2;3;")
         End Sub
 
-        <WorkItem(544502, "DevDiv")>
+        <WorkItem(544502, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/544502")>
         <Fact()>
         Public Sub MergePartialMethodEvents3()
             CompileAndVerify(
@@ -918,7 +921,7 @@ End Class
 
             Dim tree1 = ParseAndVerify(text1)
             Dim tree2 = ParseAndVerify(text2)
-            Dim comp = CreateCompilationWithMscorlib({tree1, tree2}, New VisualBasicCompilationOptions(OutputKind.DynamicallyLinkedLibrary))
+            Dim comp = CreateCompilationWithMscorlib40({tree1, tree2}, options:=New VisualBasicCompilationOptions(OutputKind.DynamicallyLinkedLibrary))
 
             Dim pTypeSym = comp.SourceModule.GlobalNamespace.GetTypeMembers("C1").Single()
             Assert.Equal("C1", pTypeSym.ToDisplayString())
@@ -937,7 +940,7 @@ End Class
             comp.VerifyDiagnostics(Diagnostic(ERRID.ERR_InterfaceNotImplemented1, "A").WithArguments("A"))
         End Sub
 
-        <WorkItem(544432, "DevDiv")>
+        <WorkItem(544432, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/544432")>
         <Fact()>
         Public Sub TestCaseWithTypeArgumentsAndConstraints()
             Dim text1 = <text>
@@ -953,7 +956,7 @@ End Module
 </text>.Value.Trim()
 
             Dim tree1 = ParseAndVerify(text1)
-            Dim comp = CreateCompilationWithMscorlib({tree1}, New VisualBasicCompilationOptions(OutputKind.DynamicallyLinkedLibrary))
+            Dim comp = CreateCompilationWithMscorlib40({tree1}, options:=New VisualBasicCompilationOptions(OutputKind.DynamicallyLinkedLibrary))
 
             Dim pTypeSym = comp.SourceModule.GlobalNamespace.GetTypeMembers("Module1").Single()
             Assert.Equal("Module1", pTypeSym.ToDisplayString())
@@ -971,7 +974,7 @@ End Module
             Assert.Same(methodImpl.PartialDefinitionPart, methodDecl)
         End Sub
 
-        <WorkItem(544445, "DevDiv")>
+        <WorkItem(544445, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/544445")>
         <Fact()>
         Public Sub TestCaseWithTypeArgumentsAndConstraints2()
             Dim text1 = <text>
@@ -988,7 +991,7 @@ End Module
 </text>.Value.Trim()
 
             Dim tree1 = VisualBasicSyntaxTree.ParseText(text1)
-            Dim comp = CreateCompilationWithMscorlib({tree1}, New VisualBasicCompilationOptions(OutputKind.DynamicallyLinkedLibrary))
+            Dim comp = CreateCompilationWithMscorlib40({tree1}, options:=New VisualBasicCompilationOptions(OutputKind.DynamicallyLinkedLibrary))
 
             Dim pTypeSym = comp.SourceModule.GlobalNamespace.GetTypeMembers("Module1").Single()
             Assert.Equal("Module1", pTypeSym.ToDisplayString())
@@ -1032,7 +1035,7 @@ End Class
 
             Dim tree1 = ParseAndVerify(text1)
             Dim tree2 = ParseAndVerify(text2)
-            Dim comp = CreateCompilationWithMscorlib({tree1, tree2}, New VisualBasicCompilationOptions(OutputKind.DynamicallyLinkedLibrary))
+            Dim comp = CreateCompilationWithMscorlib40({tree1, tree2}, options:=New VisualBasicCompilationOptions(OutputKind.DynamicallyLinkedLibrary))
 
             Dim model1 = comp.GetSemanticModel(tree1)
             Dim model2 = comp.GetSemanticModel(tree2)
@@ -1088,7 +1091,7 @@ End Class
 
             Dim tree1 = ParseAndVerify(text1)
             Dim tree2 = ParseAndVerify(text2)
-            Dim comp = CreateCompilationWithMscorlib({tree1, tree2}, New VisualBasicCompilationOptions(OutputKind.DynamicallyLinkedLibrary))
+            Dim comp = CreateCompilationWithMscorlib40({tree1, tree2}, options:=New VisualBasicCompilationOptions(OutputKind.DynamicallyLinkedLibrary))
 
             Dim model1 = comp.GetSemanticModel(tree1)
             Dim model2 = comp.GetSemanticModel(tree2)
@@ -1118,7 +1121,7 @@ End Class
             Assert.NotEqual(typeParaSym1.Locations(0), typeParaSym2.Locations(0))
         End Sub
 
-        <WorkItem(544499, "DevDiv")>
+        <WorkItem(544499, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/544499")>
         <Fact()>
         Public Sub GetMembersForMustoverridePartialMethod()
             'TODO: Please add any additional verification below if necessary.
@@ -1129,7 +1132,7 @@ Partial Class C1
 End Class
 </text>.Value.Trim()
             Dim tree = VisualBasicSyntaxTree.ParseText(text)
-            Dim comp = CreateCompilationWithMscorlib({tree}, New VisualBasicCompilationOptions(OutputKind.DynamicallyLinkedLibrary))
+            Dim comp = CreateCompilationWithMscorlib40({tree}, options:=New VisualBasicCompilationOptions(OutputKind.DynamicallyLinkedLibrary))
             Dim typeSym = comp.GetTypeByMetadataName("C1")
             Assert.NotNull(typeSym)
 
@@ -1137,7 +1140,7 @@ End Class
             Assert.NotNull(methodSym)
         End Sub
 
-        <WorkItem(921704, "DevDiv")>
+        <WorkItem(921704, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/921704")>
         <Fact()>
         Public Sub Bug921704()
             CompileAndVerify(

@@ -1,9 +1,17 @@
-// Copyright (c) Microsoft.  All Rights Reserved.  Licensed under the Apache License, Version 2.0.  See License.txt in the project root for license information.
+﻿// Licensed to the .NET Foundation under one or more agreements.
+// The .NET Foundation licenses this file to you under the MIT license.
+// See the LICENSE file in the project root for more information.
+
+#nullable disable
 
 using System;
 using System.Linq;
 using EnvDTE;
 using Microsoft.CodeAnalysis.Editor.UnitTests.Workspaces;
+using Microsoft.CodeAnalysis.Test.Utilities;
+using Microsoft.VisualStudio.LanguageServices.Implementation.Interop;
+using Roslyn.Test.Utilities;
+using SyntaxNodeKey = Microsoft.VisualStudio.LanguageServices.Implementation.CodeModel.SyntaxNodeKey;
 
 namespace Microsoft.VisualStudio.LanguageServices.CSharp.UnitTests.CodeModel
 {
@@ -11,34 +19,62 @@ namespace Microsoft.VisualStudio.LanguageServices.CSharp.UnitTests.CodeModel
     /// Base class of a all test-containing classes. Automatically creates a FileCodeModel for testing with the given
     /// file.
     /// </summary>
+    [UseExportProvider]
     public abstract class AbstractFileCodeElementTests : IDisposable
     {
-        protected TestWorkspace Workspace { get; private set; }
-        protected FileCodeModel CodeModel { get; private set; }
+        private readonly string _contents;
+        private (TestWorkspace workspace, VisualStudioWorkspace extraWorkspaceToDisposeButNotUse, FileCodeModel fileCodeModel)? _workspaceAndCodeModel;
 
-        protected Microsoft.CodeAnalysis.Solution CurrentSolution { get; private set; }
-        protected Microsoft.CodeAnalysis.Project CurrentProject { get; private set; }
-        protected Microsoft.CodeAnalysis.Document CurrentDocument { get; private set; }
-
-        public AbstractFileCodeElementTests(string file)
+        public AbstractFileCodeElementTests(string contents)
         {
-            var pair = FileCodeModelTestHelpers.CreateWorkspaceAndFileCodeModel(file);
-            Workspace = pair.Item1;
-            CodeModel = pair.Item2;
-
-            CurrentSolution = Workspace.CurrentSolution;
-            CurrentProject = CurrentSolution.Projects.Single();
-            CurrentDocument = CurrentProject.Documents.Single();
+            _contents = contents;
         }
+
+        public (TestWorkspace workspace, VisualStudioWorkspace extraWorkspaceToDisposeButNotUse, FileCodeModel fileCodeModel) WorkspaceAndCodeModel
+        {
+            get
+            {
+                return _workspaceAndCodeModel ??= CreateWorkspaceAndFileCodeModelAsync(_contents);
+            }
+        }
+
+        protected TestWorkspace GetWorkspace()
+        {
+            return WorkspaceAndCodeModel.workspace;
+        }
+
+        private VisualStudioWorkspace GetExtraWorkspaceToDisposeButNotUse()
+        {
+            return WorkspaceAndCodeModel.extraWorkspaceToDisposeButNotUse;
+        }
+
+        protected FileCodeModel GetCodeModel()
+        {
+            return WorkspaceAndCodeModel.fileCodeModel;
+        }
+
+        protected Microsoft.CodeAnalysis.Solution GetCurrentSolution()
+            => GetWorkspace().CurrentSolution;
+
+        protected Microsoft.CodeAnalysis.Project GetCurrentProject()
+            => GetCurrentSolution().Projects.Single();
+
+        protected Microsoft.CodeAnalysis.Document GetCurrentDocument()
+            => GetCurrentProject().Documents.Single();
+
+        protected static (TestWorkspace workspace, VisualStudioWorkspace extraWorkspaceToDisposeButNotUse, FileCodeModel fileCodeModel) CreateWorkspaceAndFileCodeModelAsync(string file)
+            => FileCodeModelTestHelpers.CreateWorkspaceAndFileCodeModel(file);
 
         protected CodeElement GetCodeElement(params object[] path)
         {
+            WpfTestRunner.RequireWpfFact($"Tests create {nameof(CodeElement)}s which use the affinitized {nameof(CleanableWeakComHandleTable<SyntaxNodeKey, CodeElement>)}");
+
             if (path.Length == 0)
             {
-                throw new ArgumentException("path must be non-empty.", "path");
+                throw new ArgumentException("path must be non-empty.", nameof(path));
             }
 
-            CodeElement codeElement = CodeModel.CodeElements.Item(path[0]);
+            var codeElement = (GetCodeModel()).CodeElements.Item(path[0]);
 
             foreach (var pathElement in path.Skip(1))
             {
@@ -50,7 +86,8 @@ namespace Microsoft.VisualStudio.LanguageServices.CSharp.UnitTests.CodeModel
 
         public void Dispose()
         {
-            Workspace.Dispose();
+            GetExtraWorkspaceToDisposeButNotUse().Dispose();
+            GetWorkspace().Dispose();
         }
 
         /// <summary>
@@ -58,7 +95,7 @@ namespace Microsoft.VisualStudio.LanguageServices.CSharp.UnitTests.CodeModel
         /// </summary>
         protected string GetFileText()
         {
-            return Workspace.Documents.Single().GetTextBuffer().CurrentSnapshot.GetText();
+            return (GetWorkspace()).Documents.Single().GetTextBuffer().CurrentSnapshot.GetText();
         }
     }
 }

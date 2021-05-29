@@ -1,14 +1,19 @@
-﻿// Copyright (c) Microsoft.  All Rights Reserved.  Licensed under the Apache License, Version 2.0.  See License.txt in the project root for license information.
+﻿// Licensed to the .NET Foundation under one or more agreements.
+// The .NET Foundation licenses this file to you under the MIT license.
+// See the LICENSE file in the project root for more information.
 
 using System;
 using System.Collections.Generic;
 using System.Collections.Immutable;
+using System.ComponentModel;
 using System.Diagnostics;
+using System.Diagnostics.CodeAnalysis;
 using System.IO;
 using System.Linq;
-using System.Reflection;
 using System.Text;
 using System.Threading;
+using Microsoft.CodeAnalysis.Debugging;
+using Microsoft.CodeAnalysis.PooledObjects;
 using Roslyn.Utilities;
 
 namespace Microsoft.CodeAnalysis.Text
@@ -20,15 +25,19 @@ namespace Microsoft.CodeAnalysis.Text
     {
         private const int CharBufferSize = 32 * 1024;
         private const int CharBufferCount = 5;
+        internal const int LargeObjectHeapLimitInChars = 40 * 1024; // 40KB
 
         private static readonly ObjectPool<char[]> s_charArrayPool = new ObjectPool<char[]>(() => new char[CharBufferSize], CharBufferCount);
 
         private readonly SourceHashAlgorithm _checksumAlgorithm;
-        private SourceTextContainer _lazyContainer;
-        private LineInfo _lazyLineInfo;
+        private SourceTextContainer? _lazyContainer;
+        private TextLineCollection? _lazyLineInfo;
         private ImmutableArray<byte> _lazyChecksum;
+        private ImmutableArray<byte> _precomputedEmbeddedTextBlob;
 
-        protected SourceText(ImmutableArray<byte> checksum = default(ImmutableArray<byte>), SourceHashAlgorithm checksumAlgorithm = SourceHashAlgorithm.Sha1, SourceTextContainer container = null)
+        private static readonly Encoding s_utf8EncodingWithNoBOM = new UTF8Encoding(encoderShouldEmitUTF8Identifier: false, throwOnInvalidBytes: false);
+
+        protected SourceText(ImmutableArray<byte> checksum = default(ImmutableArray<byte>), SourceHashAlgorithm checksumAlgorithm = SourceHashAlgorithm.Sha1, SourceTextContainer? container = null)
         {
             ValidateChecksumAlgorithm(checksumAlgorithm);
 
@@ -42,9 +51,27 @@ namespace Microsoft.CodeAnalysis.Text
             _lazyContainer = container;
         }
 
+        internal SourceText(ImmutableArray<byte> checksum, SourceHashAlgorithm checksumAlgorithm, ImmutableArray<byte> embeddedTextBlob)
+            : this(checksum, checksumAlgorithm, container: null)
+        {
+            // We should never have precomputed the embedded text blob without precomputing the checksum.
+            Debug.Assert(embeddedTextBlob.IsDefault || !checksum.IsDefault);
+
+            if (!checksum.IsDefault && embeddedTextBlob.IsDefault)
+            {
+                // We can't compute the embedded text blob lazily if we're given a precomputed checksum.
+                // This happens when source bytes/stream were given, but canBeEmbedded=true was not passed.
+                _precomputedEmbeddedTextBlob = ImmutableArray<byte>.Empty;
+            }
+            else
+            {
+                _precomputedEmbeddedTextBlob = embeddedTextBlob;
+            }
+        }
+
         internal static void ValidateChecksumAlgorithm(SourceHashAlgorithm checksumAlgorithm)
         {
-            if (!Cci.DebugSourceDocument.IsSupportedAlgorithm(checksumAlgorithm))
+            if (!SourceHashAlgorithms.IsSupportedAlgorithm(checksumAlgorithm))
             {
                 throw new ArgumentException(CodeAnalysisResources.UnsupportedHashAlgorithm, nameof(checksumAlgorithm));
             }
@@ -65,7 +92,7 @@ namespace Microsoft.CodeAnalysis.Text
         /// </param>
         /// <exception cref="ArgumentNullException"><paramref name="text"/> is null.</exception>
         /// <exception cref="ArgumentException"><paramref name="checksumAlgorithm"/> is not supported.</exception>
-        public static SourceText From(string text, Encoding encoding = null, SourceHashAlgorithm checksumAlgorithm = SourceHashAlgorithm.Sha1)
+        public static SourceText From(string text, Encoding? encoding = null, SourceHashAlgorithm checksumAlgorithm = SourceHashAlgorithm.Sha1)
         {
             if (text == null)
             {
@@ -76,9 +103,51 @@ namespace Microsoft.CodeAnalysis.Text
         }
 
         /// <summary>
+        /// Constructs a <see cref="SourceText"/> from text in a string.
+        /// </summary>
+        /// <param name="reader">TextReader</param>
+        /// <param name="length">length of content from <paramref name="reader"/></param>
+        /// <param name="encoding">
+        /// Encoding of the file that the <paramref name="reader"/> was read from or is going to be saved to.
+        /// <c>null</c> if the encoding is unspecified.
+        /// If the encoding is not specified the resulting <see cref="SourceText"/> isn't debuggable.
+        /// If an encoding-less <see cref="SourceText"/> is written to a file a <see cref="Encoding.UTF8"/> shall be used as a default.
+        /// </param>
+        /// <param name="checksumAlgorithm">
+        /// Hash algorithm to use to calculate checksum of the text that's saved to PDB.
+        /// </param>
+        /// <exception cref="ArgumentNullException"><paramref name="reader"/> is null.</exception>
+        /// <exception cref="ArgumentException"><paramref name="checksumAlgorithm"/> is not supported.</exception>
+        public static SourceText From(
+            TextReader reader,
+            int length,
+            Encoding? encoding = null,
+            SourceHashAlgorithm checksumAlgorithm = SourceHashAlgorithm.Sha1)
+        {
+            if (reader == null)
+            {
+                throw new ArgumentNullException(nameof(reader));
+            }
+
+            // If the resulting string would end up on the large object heap, then use LargeEncodedText.
+            if (length >= LargeObjectHeapLimitInChars)
+            {
+                return LargeText.Decode(reader, length, encoding, checksumAlgorithm);
+            }
+
+            string text = reader.ReadToEnd();
+            return From(text, encoding, checksumAlgorithm);
+        }
+
+        // 1.0 BACKCOMPAT OVERLOAD - DO NOT TOUCH
+        [EditorBrowsable(EditorBrowsableState.Never)]
+        public static SourceText From(Stream stream, Encoding? encoding, SourceHashAlgorithm checksumAlgorithm, bool throwIfBinaryDetected)
+          => From(stream, encoding, checksumAlgorithm, throwIfBinaryDetected, canBeEmbedded: false);
+
+        /// <summary>
         /// Constructs a <see cref="SourceText"/> from stream content.
         /// </summary>
-        /// <param name="stream">Stream.</param>
+        /// <param name="stream">Stream. The stream must be seekable.</param>
         /// <param name="encoding">
         /// Data encoding to use if the stream doesn't start with Byte Order Mark specifying the encoding.
         /// <see cref="Encoding.UTF8"/> if not specified.
@@ -86,49 +155,215 @@ namespace Microsoft.CodeAnalysis.Text
         /// <param name="checksumAlgorithm">
         /// Hash algorithm to use to calculate checksum of the text that's saved to PDB.
         /// </param>
+        /// <param name="throwIfBinaryDetected">If the decoded text contains at least two consecutive NUL
+        /// characters, then an <see cref="InvalidDataException"/> is thrown.</param>
+        /// <param name="canBeEmbedded">True if the text can be passed to <see cref="EmbeddedText.FromSource"/> and be embedded in a PDB.</param>
         /// <exception cref="ArgumentNullException"><paramref name="stream"/> is null.</exception>
         /// <exception cref="ArgumentException">
         /// <paramref name="stream"/> doesn't support reading or seeking.
         /// <paramref name="checksumAlgorithm"/> is not supported.
         /// </exception>
+        /// <exception cref="DecoderFallbackException">If the given encoding is set to use a throwing decoder as a fallback</exception>
+        /// <exception cref="InvalidDataException">Two consecutive NUL characters were detected in the decoded text and <paramref name="throwIfBinaryDetected"/> was true.</exception>
         /// <exception cref="IOException">An I/O error occurs.</exception>
         /// <remarks>Reads from the beginning of the stream. Leaves the stream open.</remarks>
-        public static SourceText From(Stream stream, Encoding encoding = null, SourceHashAlgorithm checksumAlgorithm = SourceHashAlgorithm.Sha1)
+        public static SourceText From(
+            Stream stream,
+            Encoding? encoding = null,
+            SourceHashAlgorithm checksumAlgorithm = SourceHashAlgorithm.Sha1,
+            bool throwIfBinaryDetected = false,
+            bool canBeEmbedded = false)
         {
             if (stream == null)
             {
                 throw new ArgumentNullException(nameof(stream));
             }
 
-            if (!stream.CanRead || !stream.CanSeek)
+            if (!stream.CanRead)
             {
                 throw new ArgumentException(CodeAnalysisResources.StreamMustSupportReadAndSeek, nameof(stream));
             }
 
             ValidateChecksumAlgorithm(checksumAlgorithm);
 
-            encoding = encoding ?? Encoding.UTF8;
+            encoding = encoding ?? s_utf8EncodingWithNoBOM;
 
-            // TODO: unify encoding detection with EncodedStringText
-
-            stream.Seek(0, SeekOrigin.Begin);
-            string text;
-            using (var reader = new StreamReader(stream, encoding, detectEncodingFromByteOrderMarks: true, bufferSize: 1024, leaveOpen: true))
+            if (stream.CanSeek)
             {
-                text = reader.ReadToEnd();
-                encoding = reader.CurrentEncoding;
+                // If the resulting string would end up on the large object heap, then use LargeEncodedText.
+                if (encoding.GetMaxCharCountOrThrowIfHuge(stream) >= LargeObjectHeapLimitInChars)
+                {
+                    return LargeText.Decode(stream, encoding, checksumAlgorithm, throwIfBinaryDetected, canBeEmbedded);
+                }
             }
 
-            return new StringText(text, encoding, CalculateChecksum(stream, checksumAlgorithm), checksumAlgorithm);
+            string text = Decode(stream, encoding, out encoding);
+            if (throwIfBinaryDetected && IsBinary(text))
+            {
+                throw new InvalidDataException();
+            }
+
+            // We must compute the checksum and embedded text blob now while we still have the original bytes in hand.
+            // We cannot re-encode to obtain checksum and blob as the encoding is not guaranteed to round-trip.
+            var checksum = CalculateChecksum(stream, checksumAlgorithm);
+            var embeddedTextBlob = canBeEmbedded ? EmbeddedText.CreateBlob(stream) : default(ImmutableArray<byte>);
+            return new StringText(text, encoding, checksum, checksumAlgorithm, embeddedTextBlob);
+        }
+
+        // 1.0 BACKCOMPAT OVERLOAD - DO NOT TOUCH
+        [EditorBrowsable(EditorBrowsableState.Never)]
+        public static SourceText From(byte[] buffer, int length, Encoding? encoding, SourceHashAlgorithm checksumAlgorithm, bool throwIfBinaryDetected)
+            => From(buffer, length, encoding, checksumAlgorithm, throwIfBinaryDetected, canBeEmbedded: false);
+
+        /// <summary>
+        /// Constructs a <see cref="SourceText"/> from a byte array.
+        /// </summary>
+        /// <param name="buffer">The encoded source buffer.</param>
+        /// <param name="length">The number of bytes to read from the buffer.</param>
+        /// <param name="encoding">
+        /// Data encoding to use if the encoded buffer doesn't start with Byte Order Mark.
+        /// <see cref="Encoding.UTF8"/> if not specified.
+        /// </param>
+        /// <param name="checksumAlgorithm">
+        /// Hash algorithm to use to calculate checksum of the text that's saved to PDB.
+        /// </param>
+        /// <param name="throwIfBinaryDetected">If the decoded text contains at least two consecutive NUL
+        /// characters, then an <see cref="InvalidDataException"/> is thrown.</param>
+        /// <returns>The decoded text.</returns>
+        /// <param name="canBeEmbedded">True if the text can be passed to <see cref="EmbeddedText.FromSource"/> and be embedded in a PDB.</param>
+        /// <exception cref="ArgumentNullException">The <paramref name="buffer"/> is null.</exception>
+        /// <exception cref="ArgumentOutOfRangeException">The <paramref name="length"/> is negative or longer than the <paramref name="buffer"/>.</exception>
+        /// <exception cref="ArgumentException"><paramref name="checksumAlgorithm"/> is not supported.</exception>
+        /// <exception cref="DecoderFallbackException">If the given encoding is set to use a throwing decoder as a fallback</exception>
+        /// <exception cref="InvalidDataException">Two consecutive NUL characters were detected in the decoded text and <paramref name="throwIfBinaryDetected"/> was true.</exception>
+        public static SourceText From(
+            byte[] buffer,
+            int length,
+            Encoding? encoding = null,
+            SourceHashAlgorithm checksumAlgorithm = SourceHashAlgorithm.Sha1,
+            bool throwIfBinaryDetected = false,
+            bool canBeEmbedded = false)
+        {
+            if (buffer == null)
+            {
+                throw new ArgumentNullException(nameof(buffer));
+            }
+
+            if (length < 0 || length > buffer.Length)
+            {
+                throw new ArgumentOutOfRangeException(nameof(length));
+            }
+
+            ValidateChecksumAlgorithm(checksumAlgorithm);
+
+            string text = Decode(buffer, length, encoding ?? s_utf8EncodingWithNoBOM, out encoding);
+            if (throwIfBinaryDetected && IsBinary(text))
+            {
+                throw new InvalidDataException();
+            }
+
+            // We must compute the checksum and embedded text blob now while we still have the original bytes in hand.
+            // We cannot re-encode to obtain checksum and blob as the encoding is not guaranteed to round-trip.
+            var checksum = CalculateChecksum(buffer, 0, length, checksumAlgorithm);
+            var embeddedTextBlob = canBeEmbedded ? EmbeddedText.CreateBlob(new ArraySegment<byte>(buffer, 0, length)) : default(ImmutableArray<byte>);
+            return new StringText(text, encoding, checksum, checksumAlgorithm, embeddedTextBlob);
+        }
+
+        /// <summary>
+        /// Decode text from a stream.
+        /// </summary>
+        /// <param name="stream">The stream containing encoded text.</param>
+        /// <param name="encoding">The encoding to use if an encoding cannot be determined from the byte order mark.</param>
+        /// <param name="actualEncoding">The actual encoding used.</param>
+        /// <returns>The decoded text.</returns>
+        /// <exception cref="DecoderFallbackException">If the given encoding is set to use a throwing decoder as a fallback</exception>
+        private static string Decode(Stream stream, Encoding encoding, out Encoding actualEncoding)
+        {
+            RoslynDebug.Assert(stream != null);
+            RoslynDebug.Assert(encoding != null);
+            const int maxBufferSize = 4096;
+            int bufferSize = maxBufferSize;
+
+            if (stream.CanSeek)
+            {
+                stream.Seek(0, SeekOrigin.Begin);
+
+                int length = (int)stream.Length;
+                if (length == 0)
+                {
+                    actualEncoding = encoding;
+                    return string.Empty;
+                }
+
+                bufferSize = Math.Min(maxBufferSize, length);
+            }
+
+            // Note: We are setting the buffer size to 4KB instead of the default 1KB. That's
+            // because we can reach this code path for FileStreams and, to avoid FileStream
+            // buffer allocations for small files, we may intentionally be using a FileStream
+            // with a very small (1 byte) buffer. Using 4KB here matches the default buffer
+            // size for FileStream and means we'll still be doing file I/O in 4KB chunks.
+            using (var reader = new StreamReader(stream, encoding, detectEncodingFromByteOrderMarks: true, bufferSize: bufferSize, leaveOpen: true))
+            {
+                string text = reader.ReadToEnd();
+                actualEncoding = reader.CurrentEncoding;
+                return text;
+            }
+        }
+
+        /// <summary>
+        /// Decode text from a byte array.
+        /// </summary>
+        /// <param name="buffer">The byte array containing encoded text.</param>
+        /// <param name="length">The count of valid bytes in <paramref name="buffer"/>.</param>
+        /// <param name="encoding">The encoding to use if an encoding cannot be determined from the byte order mark.</param>
+        /// <param name="actualEncoding">The actual encoding used.</param>
+        /// <returns>The decoded text.</returns>
+        /// <exception cref="DecoderFallbackException">If the given encoding is set to use a throwing decoder as a fallback</exception>
+        private static string Decode(byte[] buffer, int length, Encoding encoding, out Encoding actualEncoding)
+        {
+            RoslynDebug.Assert(buffer != null);
+            RoslynDebug.Assert(encoding != null);
+            int preambleLength;
+            actualEncoding = TryReadByteOrderMark(buffer, length, out preambleLength) ?? encoding;
+            return actualEncoding.GetString(buffer, preambleLength, length - preambleLength);
+        }
+
+        /// <summary>
+        /// Check for occurrence of two consecutive NUL (U+0000) characters.
+        /// This is unlikely to appear in genuine text, so it's a good heuristic
+        /// to detect binary files.
+        /// </summary>
+        /// <remarks>
+        /// internal for unit testing
+        /// </remarks>
+        internal static bool IsBinary(string text)
+        {
+            // PERF: We can advance two chars at a time unless we find a NUL.
+            for (int i = 1; i < text.Length;)
+            {
+                if (text[i] == '\0')
+                {
+                    if (text[i - 1] == '\0')
+                    {
+                        return true;
+                    }
+
+                    i += 1;
+                }
+                else
+                {
+                    i += 2;
+                }
+            }
+
+            return false;
         }
 
         /// <summary>
         /// Hash algorithm to use to calculate checksum of the text that's saved to PDB.
         /// </summary>
-        public SourceHashAlgorithm ChecksumAlgorithm
-        {
-            get { return _checksumAlgorithm; }
-        }
+        public SourceHashAlgorithm ChecksumAlgorithm => _checksumAlgorithm;
 
         /// <summary>
         /// Encoding of the file that the text was read from or is going to be saved to.
@@ -138,12 +373,67 @@ namespace Microsoft.CodeAnalysis.Text
         /// If the encoding is not specified the source isn't debuggable.
         /// If an encoding-less <see cref="SourceText"/> is written to a file a <see cref="Encoding.UTF8"/> shall be used as a default.
         /// </remarks>
-        public abstract Encoding Encoding { get; }
+        public abstract Encoding? Encoding { get; }
 
         /// <summary>
         /// The length of the text in characters.
         /// </summary>
         public abstract int Length { get; }
+
+        /// <summary>
+        /// The size of the storage representation of the text (in characters).
+        /// This can differ from length when storage buffers are reused to represent fragments/subtext.
+        /// </summary>
+        internal virtual int StorageSize
+        {
+            get { return this.Length; }
+        }
+
+        internal virtual ImmutableArray<SourceText> Segments
+        {
+            get { return ImmutableArray<SourceText>.Empty; }
+        }
+
+        internal virtual SourceText StorageKey
+        {
+            get { return this; }
+        }
+
+        /// <summary>
+        /// Indicates whether this source text can be embedded in the PDB.
+        /// </summary>
+        /// <remarks>
+        /// If this text was constructed via <see cref="From(byte[], int, Encoding, SourceHashAlgorithm, bool, bool)"/> or
+        /// <see cref="From(Stream, Encoding, SourceHashAlgorithm, bool, bool)"/>, then the canBeEmbedded arg must have
+        /// been true.
+        ///
+        /// Otherwise, <see cref="Encoding" /> must be non-null.
+        /// </remarks>
+        public bool CanBeEmbedded
+        {
+            get
+            {
+                if (_precomputedEmbeddedTextBlob.IsDefault)
+                {
+                    // If we didn't precompute the embedded text blob from bytes/stream, 
+                    // we can only support embedding if we have an encoding with which 
+                    // to encode the text in the PDB.
+                    return Encoding != null;
+                }
+
+                // We use a sentinel empty blob to indicate that embedding has been disallowed.
+                return !_precomputedEmbeddedTextBlob.IsEmpty;
+            }
+        }
+
+        /// <summary>
+        /// If the text was created from a stream or byte[] and canBeEmbedded argument was true, 
+        /// this provides the embedded text blob that was precomputed using the original stream
+        /// or byte[]. The precomputation was required in that case so that the bytes written to
+        /// the PDB match the original bytes exactly (and match the checksum of the original 
+        /// bytes). 
+        /// </summary>
+        internal ImmutableArray<byte> PrecomputedEmbeddedTextBlob => _precomputedEmbeddedTextBlob;
 
         /// <summary>
         /// Returns a character at given position.
@@ -177,9 +467,11 @@ namespace Microsoft.CodeAnalysis.Text
 
         internal void CheckSubSpan(TextSpan span)
         {
-            if (span.Start < 0 || span.Start > this.Length || span.End > this.Length)
+            Debug.Assert(0 <= span.Start && span.Start <= span.End);
+
+            if (span.End > this.Length)
             {
-                throw new ArgumentOutOfRangeException("span");
+                throw new ArgumentOutOfRangeException(nameof(span));
             }
         }
 
@@ -212,7 +504,7 @@ namespace Microsoft.CodeAnalysis.Text
         {
             if (start < 0 || start > this.Length)
             {
-                throw new ArgumentOutOfRangeException("start");
+                throw new ArgumentOutOfRangeException(nameof(start));
             }
 
             if (start == 0)
@@ -243,13 +535,13 @@ namespace Microsoft.CodeAnalysis.Text
             var buffer = s_charArrayPool.Allocate();
             try
             {
-                int offset = Math.Min(this.Length, span.Start);
-                int length = Math.Min(this.Length, span.End) - offset;
-                while (offset < length)
+                int offset = span.Start;
+                int end = span.End;
+                while (offset < end)
                 {
                     cancellationToken.ThrowIfCancellationRequested();
 
-                    int count = Math.Min(buffer.Length, length - offset);
+                    int count = Math.Min(buffer.Length, end - offset);
                     this.CopyTo(offset, buffer, 0, count);
                     writer.Write(buffer, 0, count);
                     offset += count;
@@ -261,14 +553,11 @@ namespace Microsoft.CodeAnalysis.Text
             }
         }
 
-        internal ImmutableArray<byte> GetChecksum()
+        public ImmutableArray<byte> GetChecksum()
         {
             if (_lazyChecksum.IsDefault)
             {
-                // we shouldn't be asking for a checksum of encoding-less source text:
-                Debug.Assert(this.Encoding != null);
-
-                using (var stream = new SourceTextStream(this))
+                using (var stream = new SourceTextStream(this, useDefaultEncodingIfNull: true))
                 {
                     ImmutableInterlocked.InterlockedInitialize(ref _lazyChecksum, CalculateChecksum(stream, _checksumAlgorithm));
                 }
@@ -277,25 +566,25 @@ namespace Microsoft.CodeAnalysis.Text
             return _lazyChecksum;
         }
 
-        private static ImmutableArray<byte> CalculateChecksum(Stream stream, SourceHashAlgorithm algorithmId)
+        internal static ImmutableArray<byte> CalculateChecksum(byte[] buffer, int offset, int count, SourceHashAlgorithm algorithmId)
         {
             using (var algorithm = CryptographicHashProvider.TryGetAlgorithm(algorithmId))
             {
-                Debug.Assert(algorithm != null);
+                RoslynDebug.Assert(algorithm != null);
+                return ImmutableArray.Create(algorithm.ComputeHash(buffer, offset, count));
+            }
+        }
+
+        internal static ImmutableArray<byte> CalculateChecksum(Stream stream, SourceHashAlgorithm algorithmId)
+        {
+            using (var algorithm = CryptographicHashProvider.TryGetAlgorithm(algorithmId))
+            {
+                RoslynDebug.Assert(algorithm != null);
                 if (stream.CanSeek)
                 {
                     stream.Seek(0, SeekOrigin.Begin);
                 }
                 return ImmutableArray.Create(algorithm.ComputeHash(stream));
-            }
-        }
-
-        protected static ImmutableArray<byte> CalculateChecksum(byte[] buffer, int offset, int count, SourceHashAlgorithm algorithmId)
-        {
-            using (var algorithm = CryptographicHashProvider.TryGetAlgorithm(algorithmId))
-            {
-                Debug.Assert(algorithm != null);
-                return ImmutableArray.Create(algorithm.ComputeHash(buffer, offset, count));
             }
         }
 
@@ -353,46 +642,95 @@ namespace Microsoft.CodeAnalysis.Text
 
             var segments = ArrayBuilder<SourceText>.GetInstance();
             var changeRanges = ArrayBuilder<TextChangeRange>.GetInstance();
-            int position = 0;
-
-            foreach (var change in changes)
+            try
             {
-                // there can be no overlapping changes
-                if (change.Span.Start < position)
+                int position = 0;
+
+                foreach (var change in changes)
                 {
-                    throw new ArgumentException(CodeAnalysisResources.ChangesMustBeOrderedAndNotOverlapping, nameof(changes));
+                    if (change.Span.End > this.Length)
+                        throw new ArgumentException(CodeAnalysisResources.ChangesMustBeWithinBoundsOfSourceText, nameof(changes));
+
+                    // there can be no overlapping changes
+                    if (change.Span.Start < position)
+                    {
+                        // Handle the case of unordered changes by sorting the input and retrying. This is inefficient, but
+                        // downstream consumers have been known to hit this case in the past and we want to avoid crashes.
+                        // https://github.com/dotnet/roslyn/pull/26339
+                        if (change.Span.End <= changeRanges.Last().Span.Start)
+                        {
+                            changes = (from c in changes
+                                       where !c.Span.IsEmpty || c.NewText?.Length > 0
+                                       orderby c.Span
+                                       select c).ToList();
+                            return WithChanges(changes);
+                        }
+
+                        throw new ArgumentException(CodeAnalysisResources.ChangesMustNotOverlap, nameof(changes));
+                    }
+
+                    var newTextLength = change.NewText?.Length ?? 0;
+
+                    // ignore changes that don't change anything
+                    if (change.Span.Length == 0 && newTextLength == 0)
+                        continue;
+
+                    // if we've skipped a range, add
+                    if (change.Span.Start > position)
+                    {
+                        var subText = this.GetSubText(new TextSpan(position, change.Span.Start - position));
+                        CompositeText.AddSegments(segments, subText);
+                    }
+
+                    if (newTextLength > 0)
+                    {
+                        var segment = SourceText.From(change.NewText!, this.Encoding, this.ChecksumAlgorithm);
+                        CompositeText.AddSegments(segments, segment);
+                    }
+
+                    position = change.Span.End;
+
+                    changeRanges.Add(new TextChangeRange(change.Span, newTextLength));
                 }
 
-                // if we've skipped a range, add
-                if (change.Span.Start > position)
+                // no changes actually happened?
+                if (position == 0 && segments.Count == 0)
                 {
-                    var subText = this.GetSubText(new TextSpan(position, change.Span.Start - position));
+                    return this;
+                }
+
+                if (position < this.Length)
+                {
+                    var subText = this.GetSubText(new TextSpan(position, this.Length - position));
                     CompositeText.AddSegments(segments, subText);
                 }
 
-                if (!string.IsNullOrEmpty(change.NewText))
+                var newText = CompositeText.ToSourceText(segments, this, adjustSegments: true);
+                if (newText != this)
                 {
-                    var segment = SourceText.From(change.NewText, this.Encoding, this.ChecksumAlgorithm);
-                    CompositeText.AddSegments(segments, segment);
+                    return new ChangedText(this, newText, changeRanges.ToImmutable());
                 }
-
-                position = change.Span.End;
-
-                changeRanges.Add(new TextChangeRange(change.Span, change.NewText != null ? change.NewText.Length : 0));
+                else
+                {
+                    return this;
+                }
             }
-
-            if (position < this.Length)
+            finally
             {
-                var subText = this.GetSubText(new TextSpan(position, this.Length - position));
-                CompositeText.AddSegments(segments, subText);
+                segments.Free();
+                changeRanges.Free();
             }
-
-            return new ChangedText(this, changeRanges.ToImmutableAndFree(), segments.ToImmutableAndFree());
         }
 
         /// <summary>
         /// Constructs a new SourceText from this text with the specified changes.
+        /// <exception cref="ArgumentException">If any changes are not in bounds of this <see cref="SourceText"/>.</exception>
+        /// <exception cref="ArgumentException">If any changes overlap other changes.</exception>
         /// </summary>
+        /// <remarks>
+        /// Changes do not have to be in sorted order.  However, <see cref="WithChanges(IEnumerable{TextChange})"/> will
+        /// perform better if they are.
+        /// </remarks>
         public SourceText WithChanges(params TextChange[] changes)
         {
             return this.WithChanges((IEnumerable<TextChange>)changes);
@@ -423,7 +761,7 @@ namespace Microsoft.CodeAnalysis.Text
         {
             if (oldText == null)
             {
-                throw new ArgumentNullException("oldText");
+                throw new ArgumentNullException(nameof(oldText));
             }
 
             if (oldText == this)
@@ -479,25 +817,36 @@ namespace Microsoft.CodeAnalysis.Text
         /// <summary>
         /// The collection of individual text lines.
         /// </summary>
-        public virtual TextLineCollection Lines
+        public TextLineCollection Lines
         {
             get
             {
-                if (_lazyLineInfo == null)
-                {
-                    var info = new LineInfo(this, this.ParseLineStarts());
-                    Interlocked.CompareExchange(ref _lazyLineInfo, info, null);
-                }
-
-                return _lazyLineInfo;
+                var info = _lazyLineInfo;
+                return info ?? Interlocked.CompareExchange(ref _lazyLineInfo, info = GetLinesCore(), null) ?? info;
             }
         }
 
-        private class LineInfo : TextLineCollection
+        internal bool TryGetLines([NotNullWhen(returnValue: true)] out TextLineCollection? lines)
+        {
+            lines = _lazyLineInfo;
+            return lines != null;
+        }
+
+        /// <summary>
+        /// Called from <see cref="Lines"/> to initialize the <see cref="TextLineCollection"/>. Thereafter,
+        /// the collection is cached.
+        /// </summary>
+        /// <returns>A new <see cref="TextLineCollection"/> representing the individual text lines.</returns>
+        protected virtual TextLineCollection GetLinesCore()
+        {
+            return new LineInfo(this, ParseLineStarts());
+        }
+
+        internal sealed class LineInfo : TextLineCollection
         {
             private readonly SourceText _text;
             private readonly int[] _lineStarts;
-            private int _lastLineNumber = 0;
+            private int _lastLineNumber;
 
             public LineInfo(SourceText text, int[] lineStarts)
             {
@@ -505,10 +854,7 @@ namespace Microsoft.CodeAnalysis.Text
                 _lineStarts = lineStarts;
             }
 
-            public override int Count
-            {
-                get { return _lineStarts.Length; }
-            }
+            public override int Count => _lineStarts.Length;
 
             public override TextLine this[int index]
             {
@@ -516,7 +862,7 @@ namespace Microsoft.CodeAnalysis.Text
                 {
                     if (index < 0 || index >= _lineStarts.Length)
                     {
-                        throw new ArgumentOutOfRangeException("index");
+                        throw new ArgumentOutOfRangeException(nameof(index));
                     }
 
                     int start = _lineStarts[index];
@@ -536,7 +882,7 @@ namespace Microsoft.CodeAnalysis.Text
             {
                 if (position < 0 || position > _text.Length)
                 {
-                    throw new ArgumentOutOfRangeException("position");
+                    throw new ArgumentOutOfRangeException(nameof(position));
                 }
 
                 int lineNumber;
@@ -577,55 +923,96 @@ namespace Microsoft.CodeAnalysis.Text
             }
         }
 
+        private void EnumerateChars(Action<int, char[], int> action)
+        {
+            var position = 0;
+            var buffer = s_charArrayPool.Allocate();
+
+            var length = this.Length;
+            while (position < length)
+            {
+                var contentLength = Math.Min(length - position, buffer.Length);
+                this.CopyTo(position, buffer, 0, contentLength);
+                action(position, buffer, contentLength);
+                position += contentLength;
+            }
+
+            // once more with zero length to signal the end
+            action(position, buffer, 0);
+
+            s_charArrayPool.Free(buffer);
+        }
+
         private int[] ParseLineStarts()
         {
-            int length = this.Length;
-
             // Corner case check
             if (0 == this.Length)
             {
-                return new int[] { 0 };
+                return new[] { 0 };
             }
 
-            var position = 0;
-            var index = 0;
-            var arrayBuilder = ArrayBuilder<int>.GetInstance();
+            var lineStarts = ArrayBuilder<int>.GetInstance();
+            lineStarts.Add(0); // there is always the first line
+
+            var lastWasCR = false;
 
             // The following loop goes through every character in the text. It is highly
             // performance critical, and thus inlines knowledge about common line breaks
             // and non-line breaks.
-            while (index < length)
+            EnumerateChars((int position, char[] buffer, int length) =>
             {
-                char c = this[index++];
-
-                // Common case - ASCII & not a line break
-                // if (c > '\r' && c <= 127)
-                // if (c >= ('\r'+1) && c <= 127)
-                const uint bias = '\r' + 1;
-                if (unchecked(c - bias) <= (127 - bias))
+                var index = 0;
+                if (lastWasCR)
                 {
-                    continue;
+                    if (length > 0 && buffer[0] == '\n')
+                    {
+                        index++;
+                    }
+
+                    lineStarts.Add(position + index);
+                    lastWasCR = false;
                 }
 
-                // Assumes that the only 2-char line break sequence is CR+LF
-                if (c == '\r' && index < length && this[index] == '\n')
+                while (index < length)
                 {
+                    char c = buffer[index];
                     index++;
+
+                    // Common case - ASCII & not a line break
+                    // if (c > '\r' && c <= 127)
+                    // if (c >= ('\r'+1) && c <= 127)
+                    const uint bias = '\r' + 1;
+                    if (unchecked(c - bias) <= (127 - bias))
+                    {
+                        continue;
+                    }
+
+                    // Assumes that the only 2-char line break sequence is CR+LF
+                    if (c == '\r')
+                    {
+                        if (index < length && buffer[index] == '\n')
+                        {
+                            index++;
+                        }
+                        else if (index >= length)
+                        {
+                            lastWasCR = true;
+                            continue;
+                        }
+                    }
+                    else if (!TextUtilities.IsAnyLineBreakCharacter(c))
+                    {
+                        continue;
+                    }
+
+                    // next line starts at index
+                    lineStarts.Add(position + index);
                 }
-                else if (!TextUtilities.IsAnyLineBreakCharacter(c))
-                {
-                    continue;
-                }
+            });
 
-                arrayBuilder.Add(position);
-                position = index;
-            }
-
-            // Create a start for the final line.  
-            arrayBuilder.Add(position);
-
-            return arrayBuilder.ToArrayAndFree();
+            return lineStarts.ToArrayAndFree();
         }
+        #endregion
 
         /// <summary>
         /// Compares the content with content of another <see cref="SourceText"/>.
@@ -699,7 +1086,54 @@ namespace Microsoft.CodeAnalysis.Text
             }
         }
 
-        #endregion
+        /// <summary>
+        /// Detect an encoding by looking for byte order marks.
+        /// </summary>
+        /// <param name="source">A buffer containing the encoded text.</param>
+        /// <param name="length">The length of valid data in the buffer.</param>
+        /// <param name="preambleLength">The length of any detected byte order marks.</param>
+        /// <returns>The detected encoding or null if no recognized byte order mark was present.</returns>
+        internal static Encoding? TryReadByteOrderMark(byte[] source, int length, out int preambleLength)
+        {
+            RoslynDebug.Assert(source != null);
+            Debug.Assert(length <= source.Length);
+
+            if (length >= 2)
+            {
+                switch (source[0])
+                {
+                    case 0xFE:
+                        if (source[1] == 0xFF)
+                        {
+                            preambleLength = 2;
+                            return Encoding.BigEndianUnicode;
+                        }
+
+                        break;
+
+                    case 0xFF:
+                        if (source[1] == 0xFE)
+                        {
+                            preambleLength = 2;
+                            return Encoding.Unicode;
+                        }
+
+                        break;
+
+                    case 0xEF:
+                        if (source[1] == 0xBB && length >= 3 && source[2] == 0xBF)
+                        {
+                            preambleLength = 3;
+                            return Encoding.UTF8;
+                        }
+
+                        break;
+                }
+            }
+
+            preambleLength = 0;
+            return null;
+        }
 
         private class StaticContainer : SourceTextContainer
         {
@@ -710,10 +1144,7 @@ namespace Microsoft.CodeAnalysis.Text
                 _text = text;
             }
 
-            public override SourceText CurrentText
-            {
-                get { return _text; }
-            }
+            public override SourceText CurrentText => _text;
 
             public override event EventHandler<TextChangeEventArgs> TextChanged
             {

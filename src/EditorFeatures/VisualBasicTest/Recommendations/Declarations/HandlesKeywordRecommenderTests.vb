@@ -1,57 +1,58 @@
-' Copyright (c) Microsoft.  All Rights Reserved.  Licensed under the Apache License, Version 2.0.  See License.txt in the project root for license information.
+﻿' Licensed to the .NET Foundation under one or more agreements.
+' The .NET Foundation licenses this file to you under the MIT license.
+' See the LICENSE file in the project root for more information.
 
 Namespace Microsoft.CodeAnalysis.Editor.VisualBasic.UnitTests.Recommendations.Declarations
     Public Class HandlesKeywordRecommenderTests
 
         <Fact, Trait(Traits.Feature, Traits.Features.KeywordRecommending)>
-        Public Sub HandlesAfterMethodInClass()
+        Public Sub HandlesAfterMethodInClassTest()
             VerifyRecommendationsContain(<File>
-Class Foo
-Sub Foo() |
+Class Goo
+Sub Goo() |
 |</File>, "Handles")
         End Sub
 
         <Fact, Trait(Traits.Feature, Traits.Features.KeywordRecommending)>
-        Public Sub HandlesAfterMethodInModule()
+        Public Sub HandlesAfterMethodInModuleTest()
             VerifyRecommendationsContain(<File>
-Module Foo
-Sub Foo() |
+Module Goo
+Sub Goo() |
 |</File>, "Handles")
         End Sub
 
         <Fact, Trait(Traits.Feature, Traits.Features.KeywordRecommending)>
-        Public Sub HandlesAfterFunction()
+        Public Sub HandlesAfterFunctionTest()
             VerifyRecommendationsContain(<File>
-Module Foo
-Function Foo() As Integer |
+Module Goo
+Function Goo() As Integer |
 |</File>, "Handles")
         End Sub
 
         <Fact, Trait(Traits.Feature, Traits.Features.KeywordRecommending)>
-        Public Sub HandlesNotAfterMethodInStructure()
+        Public Sub HandlesNotAfterMethodInStructureTest()
             VerifyRecommendationsMissing(<File>
-Structure Foo
-Sub Foo() |
+Structure Goo
+Sub Goo() |
 |</File>, "Handles")
         End Sub
 
         <Fact, Trait(Traits.Feature, Traits.Features.KeywordRecommending)>
-        Public Sub HandlesNotAfterNewLine()
+        Public Sub HandlesNotAfterNewLineTest()
             VerifyRecommendationsMissing(<File>
-Class Foo
-Sub Foo() 
+Class Goo
+Sub Goo() 
         |
 </File>, "Handles")
         End Sub
 
-        <WorkItem(577941)>
+        <WorkItem(577941, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/577941")>
         <Fact, Trait(Traits.Feature, Traits.Features.KeywordRecommending)>
-        Public Sub NoHandlesAfterIterator()
+        Public Sub NoHandlesAfterIteratorTest()
             VerifyRecommendationsMissing(<File>
 Class C
     Private Iterator Function TestIterator() |
 </File>, "Handles")
         End Sub
-
     End Class
 End Namespace

@@ -1,4 +1,6 @@
-﻿' Copyright (c) Microsoft.  All Rights Reserved.  Licensed under the Apache License, Version 2.0.  See License.txt in the project root for license information.
+﻿' Licensed to the .NET Foundation under one or more agreements.
+' The .NET Foundation licenses this file to you under the MIT license.
+' See the LICENSE file in the project root for more information.
 
 Imports Microsoft.CodeAnalysis
 Imports Microsoft.CodeAnalysis.Text
@@ -15,7 +17,7 @@ Namespace Microsoft.CodeAnalysis.VisualBasic.UnitTests
         Inherits BasicTestBase
 
         <Fact()>
-        Sub ErrorHandler_WithValidLabel_No_Resume()
+        Public Sub ErrorHandler_WithValidLabel_No_Resume()
             Dim compilationDef =
     <compilation>
         <file name="a.vb">
@@ -24,24 +26,24 @@ Module Module1
     Sub Main()
         Dim sPath As String = ""
         sPath = "Test1"
-        On Error GoTo foo
+        On Error GoTo goo
         Error 5
         Console.WriteLine(sPath)
         Exit Sub
-foo:
-        sPath &amp;= "foo"
+goo:
+        sPath &amp;= "goo"
         Console.WriteLine(sPath)
     End Sub
 End Module
 </file>
     </compilation>
 
-            Dim compilation = CompilationUtils.CreateCompilationWithMscorlibAndVBRuntime(compilationDef)
+            Dim compilation = CompilationUtils.CreateCompilationWithMscorlib40AndVBRuntime(compilationDef)
             CompileAndVerify(compilation)
         End Sub
 
         <Fact()>
-        Sub ErrorHandler_WithGotoMinus1andMatchingLabel()
+        Public Sub ErrorHandler_WithGotoMinus1andMatchingLabel()
             Dim compilationDef =
     <compilation>
         <file name="a.vb">
@@ -52,19 +54,19 @@ Module Module1
         On Error GoTo -1
         Error 5
         exit sub
-foo:
+goo:
         Resume 
     End Sub
 End Module 
 </file>
     </compilation>
 
-            Dim compilation = CompilationUtils.CreateCompilationWithMscorlibAndVBRuntime(compilationDef)
+            Dim compilation = CompilationUtils.CreateCompilationWithMscorlib40AndVBRuntime(compilationDef)
             CompileAndVerify(compilation)
         End Sub
 
         <Fact()>
-        Sub Error_ErrorHandler_WithGoto0andNoMatchingLabel()
+        Public Sub Error_ErrorHandler_WithGoto0andNoMatchingLabel()
             Dim compilationDef =
     <compilation>
         <file name="a.vb">
@@ -75,20 +77,20 @@ Module Module1
         On Error GoTo 0
         Error 5
         exit sub
-Foo:
+Goo:
         Resume 
     End Sub
 End Module 
 </file>
     </compilation>
 
-            Dim compilation = CompilationUtils.CreateCompilationWithMscorlibAndVBRuntime(compilationDef)
+            Dim compilation = CompilationUtils.CreateCompilationWithMscorlib40AndVBRuntime(compilationDef)
             CompileAndVerify(compilation)
             'compilation.VerifyDiagnostics()
         End Sub
 
         <Fact()>
-        Sub Error_ErrorHandler_WithResumeNext()
+        Public Sub Error_ErrorHandler_WithResumeNext()
             Dim compilationDef =
     <compilation>
         <file name="a.vb">
@@ -104,13 +106,13 @@ End Module
 </file>
     </compilation>
 
-            Dim compilation = CompilationUtils.CreateCompilationWithMscorlibAndVBRuntime(compilationDef)
+            Dim compilation = CompilationUtils.CreateCompilationWithMscorlib40AndVBRuntime(compilationDef)
             CompileAndVerify(compilation)
             'compilation.VerifyDiagnostics()
         End Sub
 
         <Fact()>
-        Sub ErrorHandler_WithValidLabelMatchingKeywordsEscaped()
+        Public Sub ErrorHandler_WithValidLabelMatchingKeywordsEscaped()
             Dim compilationDef =
     <compilation>
         <file name="a.vb">
@@ -136,13 +138,13 @@ End Module
 </file>
     </compilation>
 
-            Dim compilation = CompilationUtils.CreateCompilationWithMscorlibAndVBRuntime(compilationDef)
+            Dim compilation = CompilationUtils.CreateCompilationWithMscorlib40AndVBRuntime(compilationDef)
             CompileAndVerify(compilation)
             ' compilation.VerifyDiagnostics()
         End Sub
 
         <Fact()>
-        Sub Error_ErrorHandler_WithValidLabelMatchingKeywordsNotEscaped()
+        Public Sub Error_ErrorHandler_WithValidLabelMatchingKeywordsNotEscaped()
             Dim compilationDef =
     <compilation>
         <file name="a.vb">
@@ -165,7 +167,7 @@ End Module
     </file>
     </compilation>
 
-            Dim compilation = CompilationUtils.CreateCompilationWithMscorlibAndVBRuntime(compilationDef)
+            Dim compilation = CompilationUtils.CreateCompilationWithMscorlib40AndVBRuntime(compilationDef)
 
             compilation.VerifyDiagnostics(Diagnostic(ERRID.ERR_ExpectedIdentifier, ""),
         Diagnostic(ERRID.ERR_ExpectedIdentifier, ""),
@@ -177,7 +179,7 @@ End Module
 
 
         <Fact()>
-        Sub Error_ErrorHandler_WithInValidLabelMatchingKeywordsEscaped()
+        Public Sub Error_ErrorHandler_WithInValidLabelMatchingKeywordsEscaped()
             Dim compilationDef =
     <compilation>
         <file name="a.vb">
@@ -200,7 +202,7 @@ End Module
     </file>
     </compilation>
 
-            Dim compilation = CompilationUtils.CreateCompilationWithMscorlibAndVBRuntime(compilationDef)
+            Dim compilation = CompilationUtils.CreateCompilationWithMscorlib40AndVBRuntime(compilationDef)
 
             compilation.VerifyDiagnostics(Diagnostic(ERRID.ERR_ExpectedIdentifier, ""),
         Diagnostic(ERRID.ERR_ExpectedIdentifier, ""),
@@ -219,7 +221,7 @@ End Module
         End Sub
 
         <Fact()>
-        Sub Error_ErrorHandler_WithGoto0andMatchingLabel()
+        Public Sub Error_ErrorHandler_WithGoto0andMatchingLabel()
             Dim compilationDef =
     <compilation>
         <file name="a.vb">
@@ -237,7 +239,7 @@ End Module
     </file>
     </compilation>
 
-            Dim compilation = CompilationUtils.CreateCompilationWithMscorlibAndVBRuntime(compilationDef)
+            Dim compilation = CompilationUtils.CreateCompilationWithMscorlib40AndVBRuntime(compilationDef)
 
             Dim compilationVerifier = CompileAndVerify(compilation)
             compilationVerifier.VerifyIL("Module1.Main", <![CDATA[
@@ -325,8 +327,8 @@ End Module
     ]]>)
         End Sub
 
-        <Fact()>
-        Sub Error_ErrorHandler_WithGoto1andMatchingLabel()
+        <ConditionalFact(GetType(DesktopOnly), Reason:="https://github.com/dotnet/roslyn/issues/28044")>
+        Public Sub Error_ErrorHandler_WithGoto1andMatchingLabel()
             Dim compilationDef =
     <compilation>
         <file name="a.vb">
@@ -348,14 +350,14 @@ End Module
     </compilation>
 
 
-            Dim compilation = CreateCompilationWithMscorlibAndVBRuntime(compilationDef, TestOptions.ReleaseExe)
+            Dim compilation = CreateCompilationWithMscorlib40AndVBRuntime(compilationDef, TestOptions.ReleaseExe)
             CompileAndVerify(compilation, expectedOutput:=<![CDATA[Start
 1
 2]]>)
         End Sub
 
         <Fact()>
-        Sub Error_ErrorHandler_WithMissingOrIncorrectLabels()
+        Public Sub Error_ErrorHandler_WithMissingOrIncorrectLabels()
             Dim compilationDef =
     <compilation>
         <file name="a.vb">
@@ -366,7 +368,7 @@ End Module
 
         Sub Goto_MissingLabel()
             'Error - label is not present
-            On Error GoTo foo
+            On Error GoTo goo
 
         End Sub
 
@@ -388,20 +390,20 @@ End Module
     </compilation>
 
 
-            Dim compilation = CreateCompilationWithMscorlibAndVBRuntime(compilationDef, TestOptions.ReleaseExe)
+            Dim compilation = CreateCompilationWithMscorlib40AndVBRuntime(compilationDef, TestOptions.ReleaseExe)
             compilation.VerifyDiagnostics(Diagnostic(ERRID.ERR_ExpectedSpecifier, "Labels"),
                                           Diagnostic(ERRID.ERR_ExpectedDeclaration, "sing"),
                                           Diagnostic(ERRID.ERR_ExpectedEOS, "."),
                                           Diagnostic(ERRID.ERR_DuplicateProcDef1, "GotoLabelInDifferentMethod").WithArguments("Public Sub GotoLabelInDifferentMethod()"),
-                                          Diagnostic(ERRID.ERR_LabelNotDefined1, "foo").WithArguments("foo"),
+                                          Diagnostic(ERRID.ERR_LabelNotDefined1, "goo").WithArguments("goo"),
                                           Diagnostic(ERRID.ERR_LabelNotDefined1, "diffMethodLabel").WithArguments("diffMethodLabel"),
                                           Diagnostic(ERRID.ERR_LabelNotDefined1, "DifferentMethod").WithArguments("DifferentMethod"))
         End Sub
 
 
 
-        <Fact()>
-        Sub Error_ErrorHandler_BothTypesOfErrorHandling()
+        <ConditionalFact(GetType(WindowsOnly), Reason:="https://github.com/dotnet/roslyn/issues/29568")>
+        Public Sub Error_ErrorHandler_BothTypesOfErrorHandling()
             Dim compilationDef =
     <compilation>
         <file name="a.vb">
@@ -416,16 +418,16 @@ End Module
         Sub TryAndOnErrorInSameMethod()
             'Nested
             Try
-                On Error GoTo foo
-    foo:
+                On Error GoTo goo
+    goo:
             Catch ex As Exception
             End Try
         End Sub
 
         Sub OnErrorAndTryInSameMethod()
             'Sequential
-            On Error GoTo foo
-    foo:
+            On Error GoTo goo
+    goo:
             Try
             Catch ex As Exception
             End Try
@@ -434,11 +436,11 @@ End Module
     </file>
     </compilation>
 
-            Dim compilation = CreateCompilationWithMscorlibAndVBRuntime(compilationDef, TestOptions.ReleaseExe)
+            Dim compilation = CreateCompilationWithMscorlib40AndVBRuntime(compilationDef, TestOptions.ReleaseExe)
 
             Dim ExpectedOutput = <![CDATA[Try
-                On Error GoTo foo
-    foo:
+                On Error GoTo goo
+    goo:
             Catch ex As Exception
             End Try]]>
 
@@ -447,42 +449,42 @@ End Module
             End Try]]>
 
             compilation.VerifyDiagnostics(Diagnostic(ERRID.ERR_TryAndOnErrorDoNotMix, ExpectedOutput),
-                                          Diagnostic(ERRID.ERR_TryAndOnErrorDoNotMix, "On Error GoTo foo"),
-                                          Diagnostic(ERRID.ERR_TryAndOnErrorDoNotMix, "On Error GoTo foo"),
+                                          Diagnostic(ERRID.ERR_TryAndOnErrorDoNotMix, "On Error GoTo goo"),
+                                          Diagnostic(ERRID.ERR_TryAndOnErrorDoNotMix, "On Error GoTo goo"),
                                           Diagnostic(ERRID.ERR_TryAndOnErrorDoNotMix, ExpectedOutput2)
     )
         End Sub
 
-        <Fact()>
-        Sub Error_ErrorHandler_InVBCore()
+        <ConditionalFact(GetType(WindowsOnly), Reason:="https://github.com/dotnet/roslyn/issues/29568")>
+        Public Sub Error_ErrorHandler_InVBCore()
             'Old Style handling not supported in VBCore
             Dim compilationDef =
     <compilation>
         <file name="a.vb">
     Module Module1   
         Public Sub Main        
-            On Error GoTo foo
-    foo:
+            On Error GoTo goo
+    goo:
         End Sub
     End Module 
     </file>
     </compilation>
 
-            Dim compilation = CompilationUtils.CreateCompilationWithReferences(compilationDef,
+            Dim compilation = CompilationUtils.CreateEmptyCompilationWithReferences(compilationDef,
                                                                          references:={MscorlibRef, SystemRef, SystemCoreRef},
                                                                          options:=TestOptions.ReleaseDll.WithEmbedVbCoreRuntime(True))
 
             Dim ExpectedOutput = <![CDATA[Public Sub Main        
-            On Error GoTo foo
-    foo:
+            On Error GoTo goo
+    goo:
         End Sub]]>
 
 
-            compilation.VerifyDiagnostics(Diagnostic(ERRID.ERR_PlatformDoesntSupport, ExpectedOutput).WithArguments("Unstructured exception handling").WithLocation(2, 9))
+            compilation.VerifyEmitDiagnostics(Diagnostic(ERRID.ERR_PlatformDoesntSupport, ExpectedOutput).WithArguments("Unstructured exception handling").WithLocation(2, 9))
         End Sub
 
         <Fact()>
-        Sub Error_ErrorHandler_InVBCore_LateBound1()
+        Public Sub Error_ErrorHandler_InVBCore_LateBound1()
             Dim compilationDef =
     <compilation>
         <file name="a.vb">
@@ -503,19 +505,19 @@ End Class
     </file>
     </compilation>
 
-            Dim compilation = CompilationUtils.CreateCompilationWithReferences(compilationDef,
+            Dim compilation = CompilationUtils.CreateEmptyCompilationWithReferences(compilationDef,
                                                                          references:={MscorlibRef, SystemRef, SystemCoreRef},
                                                                          options:=TestOptions.ReleaseDll.WithEmbedVbCoreRuntime(True))
 
 
-            compilation.VerifyDiagnostics(Diagnostic(ERRID.ERR_PlatformDoesntSupport, "a + 1").WithArguments("Late binding").WithLocation(6, 13),
+            compilation.VerifyEmitDiagnostics(Diagnostic(ERRID.ERR_PlatformDoesntSupport, "a + 1").WithArguments("Late binding").WithLocation(6, 13),
                                           Diagnostic(ERRID.ERR_PlatformDoesntSupport, "a & ""test""").WithArguments("Late binding").WithLocation(8, 13)
                                           )
 
         End Sub
 
         <Fact()>
-        Sub Error_ErrorHandler_InVBCore_LikeOperator()
+        Public Sub Error_ErrorHandler_InVBCore_LikeOperator()
             Dim compilationDef =
     <compilation>
         <file name="a.vb">
@@ -529,17 +531,17 @@ End Module
     </file>
     </compilation>
 
-            Dim compilation = CompilationUtils.CreateCompilationWithReferences(compilationDef,
+            Dim compilation = CompilationUtils.CreateEmptyCompilationWithReferences(compilationDef,
                                                                          references:={MscorlibRef, SystemRef, SystemCoreRef},
                                                                          options:=TestOptions.ReleaseDll.WithEmbedVbCoreRuntime(True))
 
             Dim ExpectedOutput = <![CDATA["F" Like "F"]]>
 
-            compilation.VerifyDiagnostics(Diagnostic(ERRID.ERR_PlatformDoesntSupport, ExpectedOutput).WithArguments("Like operator").WithLocation(5, 21))
+            compilation.VerifyEmitDiagnostics(Diagnostic(ERRID.ERR_PlatformDoesntSupport, ExpectedOutput).WithArguments("Like operator").WithLocation(5, 21))
         End Sub
 
         <Fact()>
-        Sub Error_ErrorHandler_InVBCore_ErrObject()
+        Public Sub Error_ErrorHandler_InVBCore_ErrObject()
             Dim compilationDef =
     <compilation>
         <file name="a.vb">
@@ -552,15 +554,15 @@ End Module
             </file>
     </compilation>
 
-            Dim compilation = CompilationUtils.CreateCompilationWithReferences(compilationDef,
+            Dim compilation = CompilationUtils.CreateEmptyCompilationWithReferences(compilationDef,
                                                                          references:={MscorlibRef, SystemRef, SystemCoreRef},
                                                                          options:=TestOptions.ReleaseDll.WithEmbedVbCoreRuntime(True))
 
-            compilation.VerifyDiagnostics(Diagnostic(ERRID.ERR_PlatformDoesntSupport, "Error 1").WithArguments("Unstructured exception handling").WithLocation(4, 18))
+            compilation.VerifyEmitDiagnostics(Diagnostic(ERRID.ERR_PlatformDoesntSupport, "Error 1").WithArguments("Unstructured exception handling").WithLocation(4, 18))
         End Sub
 
         <Fact()>
-        Sub Error_ErrorHandler_InVBCore_AnonymousType()
+        Public Sub Error_ErrorHandler_InVBCore_AnonymousType()
             Dim source =
     <compilation>
         <file name="a.vb">
@@ -577,15 +579,15 @@ End Module
             </file>
     </compilation>
 
-            Dim compilation = CompilationUtils.CreateCompilationWithReferences(source,
+            Dim compilation = CompilationUtils.CreateEmptyCompilationWithReferences(source,
                                                                          references:={MscorlibRef, SystemRef, SystemCoreRef},
                                                                          options:=TestOptions.ReleaseDll.WithEmbedVbCoreRuntime(True))
 
-            compilation.VerifyDiagnostics(Diagnostic(ERRID.ERR_PlatformDoesntSupport, "a + 1").WithArguments("Late binding").WithLocation(6, 40))
+            compilation.VerifyEmitDiagnostics(Diagnostic(ERRID.ERR_PlatformDoesntSupport, "a + 1").WithArguments("Late binding").WithLocation(6, 40))
         End Sub
 
 
-        <Fact(), WorkItem(545772, "DevDiv")>
+        <Fact(), WorkItem(545772, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/545772")>
         Public Sub VbCoreMyNamespace()
             Dim source =
 <compilation>
@@ -598,7 +600,7 @@ End Module
     </file>
 </compilation>
 
-            Dim compilation = CompilationUtils.CreateCompilationWithReferences(source,
+            Dim compilation = CompilationUtils.CreateEmptyCompilationWithReferences(source,
                                                                          references:={MscorlibRef, SystemRef, SystemCoreRef},
                                                                          options:=TestOptions.ReleaseDll.WithEmbedVbCoreRuntime(True))
 
@@ -606,7 +608,7 @@ End Module
         End Sub
 
         <Fact()>
-        Sub Error_ErrorHandler_OutsideOfMethodBody()
+        Public Sub Error_ErrorHandler_OutsideOfMethodBody()
             Dim compilationDef =
     <compilation>
         <file name="a.vb">
@@ -616,20 +618,20 @@ End Module
         End Sub
 
         'Error Outside of Method Body
-        On Error Goto foo
+        On Error Goto goo
 
-        Sub Foo
+        Sub Goo
         End Sub
     End Module 
     </file>
     </compilation>
 
-            Dim compilation = CreateCompilationWithMscorlibAndVBRuntime(compilationDef, TestOptions.ReleaseExe)
-            compilation.VerifyDiagnostics(Diagnostic(ERRID.ERR_ExecutableAsDeclaration, "On Error Goto foo"))
+            Dim compilation = CreateCompilationWithMscorlib40AndVBRuntime(compilationDef, TestOptions.ReleaseExe)
+            compilation.VerifyDiagnostics(Diagnostic(ERRID.ERR_ExecutableAsDeclaration, "On Error Goto goo"))
         End Sub
 
         <Fact()>
-        Sub ErrorHandler_In_Different_Types()
+        Public Sub ErrorHandler_In_Different_Types()
             'Basic Validation that this is permissible in Class/Structure/(Module Tested elsewhere)
             'Generic
             Dim compilationDef =
@@ -641,7 +643,7 @@ End Module
         Sub Main        
         End Sub
 
-      Class Foo
+      Class Goo
             Sub Method()
                 On Error GoTo CLassMethodLabel
 
@@ -662,7 +664,7 @@ End Module
         End Class
 
 
-    Structure Foo_Struct
+    Structure Goo_Struct
             Sub Method()
                 On Error GoTo StructMethodLabel
 
@@ -682,7 +684,7 @@ End Module
             End Property
         End Structure 
 
-        Class GenericFoo(Of t)
+        Class GenericGoo(Of t)
             Sub Method()
                 'Normal Method In Generic Class
                 On Error GoTo CLassMethodLabel
@@ -714,12 +716,12 @@ End Module
     </file>
     </compilation>
 
-            Dim compilation = CreateCompilationWithMscorlibAndVBRuntime(compilationDef, TestOptions.ReleaseExe)
+            Dim compilation = CreateCompilationWithMscorlib40AndVBRuntime(compilationDef, TestOptions.ReleaseExe)
             compilation.AssertNoDiagnostics()
         End Sub
 
         <Fact()>
-        Sub ErrorHandler_Other_Constructor_Dispose()
+        Public Sub ErrorHandler_Other_Constructor_Dispose()
             Dim compilationDef =
     <compilation>
         <file name="a.vb">
@@ -790,12 +792,12 @@ End Module
     </file>
     </compilation>
 
-            Dim compilation = CreateCompilationWithMscorlibAndVBRuntime(compilationDef, TestOptions.ReleaseExe)
+            Dim compilation = CreateCompilationWithMscorlib40AndVBRuntime(compilationDef, TestOptions.ReleaseExe)
             compilation.VerifyDiagnostics()
         End Sub
 
         <Fact()>
-        Sub Error_InvalidTypes_ImplicitConversions()
+        Public Sub Error_InvalidTypes_ImplicitConversions()
 
             Dim compilationDef =
     <compilation>
@@ -814,12 +816,12 @@ End Module
     </file>
     </compilation>
 
-            Dim compilation = CreateCompilationWithMscorlibAndVBRuntime(compilationDef, TestOptions.ReleaseExe)
+            Dim compilation = CreateCompilationWithMscorlib40AndVBRuntime(compilationDef, TestOptions.ReleaseExe)
             compilation.AssertNoDiagnostics()
         End Sub
 
         <Fact()>
-        Sub Error_InvalidTypes_InvalidTypes_StrictOn()
+        Public Sub Error_InvalidTypes_InvalidTypes_StrictOn()
             Dim compilationDef =
     <compilation>
         <file name="a.vb">
@@ -837,13 +839,13 @@ End Module
     </file>
     </compilation>
 
-            Dim compilation = CreateCompilationWithMscorlibAndVBRuntime(compilationDef, TestOptions.ReleaseExe)
+            Dim compilation = CreateCompilationWithMscorlib40AndVBRuntime(compilationDef, TestOptions.ReleaseExe)
             compilation.VerifyDiagnostics(Diagnostic(ERRID.ERR_NarrowingConversionDisallowed2, """3""").WithArguments("String", "Integer"),
                                           Diagnostic(ERRID.ERR_NarrowingConversionDisallowed2, "4!").WithArguments("Single", "Integer"))
         End Sub
 
         <Fact()>
-        Sub ErrorHandler_Error_InSyncLockBlock()
+        Public Sub ErrorHandler_Error_InSyncLockBlock()
             Dim compilationDef =
     <compilation>
         <file name="a.vb">
@@ -857,9 +859,9 @@ End Module
             On Error GoTo handler
 
             SyncLock lock
-                On Error GoTo foo
+                On Error GoTo goo
 
-    foo:
+    goo:
                 Resume Next
             End SyncLock
             Exit Sub
@@ -868,13 +870,13 @@ End Module
     </file>
     </compilation>
 
-            Dim compilation = CreateCompilationWithMscorlibAndVBRuntime(compilationDef, TestOptions.ReleaseExe)
+            Dim compilation = CreateCompilationWithMscorlib40AndVBRuntime(compilationDef, TestOptions.ReleaseExe)
             compilation.VerifyDiagnostics(Diagnostic(ERRID.ERR_LabelNotDefined1, "handler").WithArguments("handler"),
-                                          Diagnostic(ERRID.ERR_OnErrorInSyncLock, "On Error GoTo foo"))
+                                          Diagnostic(ERRID.ERR_OnErrorInSyncLock, "On Error GoTo goo"))
         End Sub
 
-        <Fact()>
-        Sub ErrorHandler_Error_InMethodWithSyncLockBlock()
+        <ConditionalFact(GetType(DesktopOnly), Reason:="https://github.com/dotnet/roslyn/issues/28044")>
+        Public Sub ErrorHandler_Error_InMethodWithSyncLockBlock()
             'Method has a Error Handler and Error Occurs within SyncLock
             'resume next will occur outside of the SyncLock Block
             Dim compilationDef =
@@ -907,7 +909,7 @@ End Module
     </file>
     </compilation>
 
-            Dim compilation = CreateCompilationWithMscorlibAndVBRuntime(compilationDef, TestOptions.ReleaseExe)
+            Dim compilation = CreateCompilationWithMscorlib40AndVBRuntime(compilationDef, TestOptions.ReleaseExe)
             compilation.VerifyDiagnostics()
             Dim CompilationVerifier = CompileAndVerify(compilation, expectedOutput:=<![CDATA[Start
 In SyncLock
@@ -1035,6 +1037,90 @@ End]]>)
   IL_00f7:  ret
 }
 ]]>)
+        End Sub
+
+        <Fact>
+        Public Sub SynthesizingDefaultConstructorsWithMsCorLibMissing_Nothing()
+            Dim comp = CompilationUtils.CreateEmptyCompilation("
+Class Test
+End Class
+", options:=TestOptions.ReleaseDll.WithModuleName("testModule"))
+
+            CompilationUtils.AssertTheseDiagnostics(comp, <expected>
+BC30002: Type 'System.Void' is not defined.
+Class Test
+~~~~~~~~~~~
+BC31091: Import of type 'Object' from assembly or module 'testModule' failed.
+Class Test
+      ~~~~
+                                                          </expected>)
+        End Sub
+
+        <Fact>
+        Public Sub SynthesizingDefaultConstructorsWithMsCorLibMissing_NoSystemVoid()
+            Dim comp = CompilationUtils.CreateEmptyCompilation("
+Namespace System
+    Public Class [Object]
+    End Class
+End Namespace
+Class Test
+End Class
+", options:=TestOptions.ReleaseDll.WithModuleName("testModule"))
+
+            CompilationUtils.AssertTheseDiagnostics(comp, <expected>
+BC30002: Type 'System.Void' is not defined.
+    Public Class [Object]
+    ~~~~~~~~~~~~~~~~~~~~~~
+BC30002: Type 'System.Void' is not defined.
+Class Test
+~~~~~~~~~~~
+                                                          </expected>)
+        End Sub
+
+        <Fact>
+        Public Sub SynthesizingDefaultConstructorsWithMsCorLibMissing_NoSystemObject()
+            Dim comp = CompilationUtils.CreateEmptyCompilation("
+Namespace System
+    Public Class Void
+    End Class
+End Namespace
+Class Test
+End Class
+", options:=TestOptions.ReleaseDll.WithModuleName("testModule"))
+
+            CompilationUtils.AssertTheseDiagnostics(comp, <expected>
+BC31091: Import of type 'Object' from assembly or module 'testModule' failed.
+    Public Class Void
+                 ~~~~
+BC31091: Import of type 'Object' from assembly or module 'testModule' failed.
+Class Test
+      ~~~~
+</expected>)
+        End Sub
+
+        <Fact>
+        Public Sub SynthesizingDefaultConstructorsWithMsCorLibMissing_NoSystemObjectDefaultConstructor()
+            Dim comp = CompilationUtils.CreateEmptyCompilation("
+Namespace System
+    Public Class [Object]
+        Public Sub New(other as Object)
+        End Sub
+    End Class
+    Public Class Void
+        Public Sub New()
+            MyBase.New(Nothing)
+        End Sub
+    End Class
+End Namespace
+Class Test
+End Class
+", options:=TestOptions.ReleaseDll.WithModuleName("testModule"))
+
+            CompilationUtils.AssertTheseDiagnostics(comp, <expected>
+BC30387: Class 'Test' must declare a 'Sub New' because its base class 'Object' does not have an accessible 'Sub New' that can be called with no arguments.
+Class Test
+      ~~~~
+                                                          </expected>)
         End Sub
 
     End Class

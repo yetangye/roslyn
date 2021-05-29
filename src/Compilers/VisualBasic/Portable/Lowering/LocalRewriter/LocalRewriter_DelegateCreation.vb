@@ -1,4 +1,6 @@
-﻿' Copyright (c) Microsoft.  All Rights Reserved.  Licensed under the Apache License, Version 2.0.  See License.txt in the project root for license information.
+﻿' Licensed to the .NET Foundation under one or more agreements.
+' The .NET Foundation licenses this file to you under the MIT license.
+' See the LICENSE file in the project root for more information.
 
 Imports System.Collections.Immutable
 Imports Microsoft.CodeAnalysis.VisualBasic.Symbols
@@ -13,7 +15,7 @@ Namespace Microsoft.CodeAnalysis.VisualBasic
             ' The lambda rewriter will then take care of the code generation later on.
 
             If node.RelaxationLambdaOpt Is Nothing Then
-                Debug.Assert(node.RelaxationReceiverPlaceholderOpt Is Nothing OrElse Me.inExpressionLambda)
+                Debug.Assert(node.RelaxationReceiverPlaceholderOpt Is Nothing OrElse Me._inExpressionLambda)
                 Return MyBase.VisitDelegateCreationExpression(node)
 
             Else
@@ -22,10 +24,10 @@ Namespace Microsoft.CodeAnalysis.VisualBasic
                 Dim captureTemp As SynthesizedLocal = Nothing
 
                 If placeholderOpt IsNot Nothing Then
-                    If Me.inExpressionLambda Then
+                    If Me._inExpressionLambda Then
                         Me.AddPlaceholderReplacement(placeholderOpt, VisitExpression(node.ReceiverOpt))
                     Else
-                        captureTemp = New SynthesizedLocal(Me.currentMethodOrLambda, placeholderOpt.Type, SynthesizedLocalKind.DelegateRelaxationReceiver, syntaxOpt:=placeholderOpt.Syntax)
+                        captureTemp = New SynthesizedLocal(Me._currentMethodOrLambda, placeholderOpt.Type, SynthesizedLocalKind.DelegateRelaxationReceiver, syntaxOpt:=placeholderOpt.Syntax)
                         Dim actualReceiver = New BoundLocal(placeholderOpt.Syntax, captureTemp, captureTemp.Type).MakeRValue
                         Me.AddPlaceholderReplacement(placeholderOpt, actualReceiver)
                     End If

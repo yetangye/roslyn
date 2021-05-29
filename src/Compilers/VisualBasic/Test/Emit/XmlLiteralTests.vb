@@ -1,8 +1,12 @@
-﻿' Copyright (c) Microsoft.  All Rights Reserved.  Licensed under the Apache License, Version 2.0.  See License.txt in the project root for license information.
+﻿' Licensed to the .NET Foundation under one or more agreements.
+' The .NET Foundation licenses this file to you under the MIT license.
+' See the LICENSE file in the project root for more information.
 
 Imports System.IO
 Imports System.Text
 Imports Microsoft.Cci
+Imports Microsoft.CodeAnalysis.PooledObjects
+Imports Microsoft.CodeAnalysis.VisualBasic.Symbols
 Imports Roslyn.Test.Utilities
 
 Namespace Microsoft.CodeAnalysis.VisualBasic.UnitTests
@@ -22,7 +26,7 @@ Module M
     End Sub
 End Module
     ]]></file>
-</compilation>, additionalRefs:=XmlReferences, expectedOutput:=<![CDATA[
+</compilation>, references:=Net40XmlReferences, expectedOutput:=<![CDATA[
 <!-- comment -->
 ]]>)
             compilation.VerifyIL("M..cctor", <![CDATA[
@@ -61,7 +65,7 @@ Module M
     End Sub
 End Module
     ]]></file>
-</compilation>, additionalRefs:=XmlReferences, expectedOutput:=<![CDATA[
+</compilation>, references:=XmlReferences, expectedOutput:=<![CDATA[
 <!-- A -->
 <?p?>
 <x>
@@ -164,7 +168,7 @@ Partial Class C
 End Class
 ]]>
     </file>
-</compilation>, additionalRefs:=XmlReferences, expectedOutput:=<![CDATA[
+</compilation>, references:=XmlReferences, expectedOutput:=<![CDATA[
 <x a="0" />
 x, a
 <x a="1" xmlns="http://roslyn/default1" />
@@ -219,7 +223,7 @@ Module M
     End Sub
 End Module
     ]]></file>
-</compilation>, additionalRefs:=XmlReferences, expectedOutput:=<![CDATA[
+</compilation>, references:=XmlReferences, expectedOutput:=<![CDATA[
 1
 4
 
@@ -385,7 +389,7 @@ Partial Class C
     Private Shared F4 As XElement = <p1:x a="a2" p2:b="b2"/>
 End Class
     ]]></file>
-</compilation>, additionalRefs:=XmlReferences, expectedOutput:=<![CDATA[
+</compilation>, references:=XmlReferences, expectedOutput:=<![CDATA[
 <p:x xmlns="http://roslyn/p" a="a1" p:b="b1" xmlns:p="http://roslyn/p" />
 a1
 [none]
@@ -434,7 +438,7 @@ Module M
     End Sub
 End Module
     ]]></file>
-</compilation>, additionalRefs:=XmlReferences, expectedOutput:=<![CDATA[
+</compilation>, references:=XmlReferences, expectedOutput:=<![CDATA[
 0
 
 http://roslyn/default
@@ -478,7 +482,7 @@ Partial Class C
     Private Shared F2 As XElement = <x xmlns="http://roslyn/2" xmlns:q="http://roslyn/q"/>
 End Class
     ]]></file>
-</compilation>, additionalRefs:=XmlReferences, expectedOutput:=<![CDATA[
+</compilation>, references:=XmlReferences, expectedOutput:=<![CDATA[
 <x xmlns="http://roslyn/1" xmlns:p="http://roslyn/p" />
 http://roslyn/1
 [none]
@@ -523,7 +527,7 @@ Module M
     End Sub
 End Module
     ]]></file>
-</compilation>, additionalRefs:=XmlReferences, expectedOutput:=<![CDATA[
+</compilation>, references:=XmlReferences, expectedOutput:=<![CDATA[
 1
 1
 <c>1</c>
@@ -607,7 +611,7 @@ Module M
     End Sub
 End Module
     ]]></file>
-</compilation>, additionalRefs:=XmlReferences, expectedOutput:=<![CDATA[
+</compilation>, references:=XmlReferences, expectedOutput:=<![CDATA[
 <c>1</c>
 <c>4</c>
 <p3:c xmlns:p3="http://roslyn/p">3</p3:c>
@@ -640,7 +644,7 @@ End Module
 
         <Fact()>
         Public Sub MemberAccessReceiverNotRValue()
-            Dim compilation = CreateCompilationWithMscorlibAndVBRuntimeAndReferences(
+            Dim compilation = CreateCompilationWithMscorlib40AndVBRuntimeAndReferences(
 <compilation>
     <file name="c.vb"><![CDATA[
 Option Strict On
@@ -672,7 +676,7 @@ Module M
     End Sub
 End Module
     ]]></file>
-</compilation>, additionalRefs:=XmlReferences)
+</compilation>, references:=XmlReferences)
             compilation.AssertTheseDiagnostics(<errors><![CDATA[
 BC30524: Property 'Q' is 'WriteOnly'.
         o = Q.<x>
@@ -690,7 +694,7 @@ BC30524: Property 'Q' is 'WriteOnly'.
         ' if the receiver is an error type.
         <Fact()>
         Public Sub MemberAccessUnknownReceiver()
-            Dim compilation = CompilationUtils.CreateCompilationWithMscorlibAndVBRuntimeAndReferences(
+            Dim compilation = CompilationUtils.CreateCompilationWithMscorlib40AndVBRuntimeAndReferences(
 <compilation>
     <file name="c.vb"><![CDATA[
 Option Strict On
@@ -704,7 +708,7 @@ Module M
     End Sub
 End Module
     ]]></file>
-</compilation>, additionalRefs:=XmlReferences)
+</compilation>, references:=XmlReferences)
             compilation.AssertTheseDiagnostics(<errors><![CDATA[
 BC30002: Type 'C' is not defined.
         Dim x As C = Nothing
@@ -714,7 +718,7 @@ BC30002: Type 'C' is not defined.
 
         <Fact()>
         Public Sub MemberAccessUntypedReceiver()
-            Dim compilation = CompilationUtils.CreateCompilationWithMscorlibAndVBRuntimeAndReferences(
+            Dim compilation = CompilationUtils.CreateCompilationWithMscorlib40AndVBRuntimeAndReferences(
 <compilation>
     <file name="c.vb"><![CDATA[
 Option Strict On
@@ -734,7 +738,7 @@ Module M
     End Sub
 End Module
     ]]></file>
-</compilation>, additionalRefs:=XmlReferences)
+</compilation>, references:=XmlReferences)
             compilation.AssertTheseDiagnostics(<errors><![CDATA[
 BC31168: XML axis properties do not support late binding.
         o = Nothing.<x>
@@ -797,7 +801,7 @@ Module M
     End Sub
 End Module
     ]]></file>
-</compilation>, additionalRefs:=XmlReferences, expectedOutput:=<![CDATA[
+</compilation>, references:=XmlReferences, expectedOutput:=<![CDATA[
 <y />
 <y />
 1
@@ -858,7 +862,7 @@ Module M
     End Sub
 End Module
     ]]></file>
-</compilation>, additionalRefs:=XmlReferences, expectedOutput:=<![CDATA[
+</compilation>, references:=XmlReferences, expectedOutput:=<![CDATA[
 <y />
 <y />
 1
@@ -870,7 +874,7 @@ End Module
 
         <Fact()>
         Public Sub MemberAccessImplicitReceiverLambdaCannotLiftMe()
-            Dim compilation = CompilationUtils.CreateCompilationWithMscorlibAndVBRuntimeAndReferences(
+            Dim compilation = CompilationUtils.CreateCompilationWithMscorlib40AndVBRuntimeAndReferences(
 <compilation>
     <file name="c.vb"><![CDATA[
 Option Strict On
@@ -910,7 +914,7 @@ Structure S
     End Function
 End Structure
     ]]></file>
-</compilation>, additionalRefs:=XmlReferences)
+</compilation>, references:=XmlReferences)
             compilation.AssertTheseDiagnostics(<errors><![CDATA[
 BC36638: Instance members and 'Me' cannot be used within a lambda expression in structures.
             Return (Function() .<y>)()
@@ -954,7 +958,7 @@ Module M
     End Sub
 End Module
     ]]></file>
-</compilation>, additionalRefs:=XmlReferences, expectedOutput:=<![CDATA[
+</compilation>, references:=XmlReferences, expectedOutput:=<![CDATA[
 <pb:b xmlns:pb="http://roslyn" />
 <pa:c xmlns:pa="http://roslyn" />
 <pa:d xmlns:pa="http://roslyn" />
@@ -963,7 +967,7 @@ End Module
 
         <Fact()>
         Public Sub MemberAccessAssignment()
-            Dim compilation = CompilationUtils.CreateCompilationWithMscorlibAndVBRuntimeAndReferences(
+            Dim compilation = CompilationUtils.CreateCompilationWithMscorlib40AndVBRuntimeAndReferences(
 <compilation>
     <file name="c.vb"><![CDATA[
 Option Strict On
@@ -985,7 +989,7 @@ Module M
     End Sub
 End Module
     ]]></file>
-</compilation>, additionalRefs:=XmlReferences)
+</compilation>, references:=XmlReferences)
             compilation.AssertTheseDiagnostics(<errors><![CDATA[
 BC30068: Expression is a value and therefore cannot be the target of an assignment.
         x.<y> = Nothing
@@ -1027,7 +1031,7 @@ Module M
     End Sub
 End Module
     ]]></file>
-</compilation>, additionalRefs:=XmlReferences, expectedOutput:=<![CDATA[
+</compilation>, references:=XmlReferences, expectedOutput:=<![CDATA[
 <x a="1">
   <y />
   <y />
@@ -1055,7 +1059,7 @@ Module M
 End Module
 ]]>
     </file>
-</compilation>, additionalRefs:=XmlReferences, expectedOutput:=<![CDATA[
+</compilation>, references:=XmlReferences, expectedOutput:=<![CDATA[
 <x a="12" b="3" />
 ]]>)
         End Sub
@@ -1073,7 +1077,7 @@ Module M
     End Sub
 End Module
     ]]></file>
-</compilation>, additionalRefs:=XmlReferences, expectedOutput:=<![CDATA[
+</compilation>, references:=XmlReferences, expectedOutput:=<![CDATA[
 b
 c
 ]]>)
@@ -1099,7 +1103,7 @@ Module M
 End Module
 ]]>
     </file>
-</compilation>, additionalRefs:=XmlReferences, expectedOutput:=<![CDATA[
+</compilation>, references:=Net40XmlReferences, expectedOutput:=<![CDATA[
 <x a="2" />
 ]]>)
         End Sub
@@ -1119,7 +1123,7 @@ Module M
 End Module
 ]]>
     </file>
-</compilation>, additionalRefs:=XmlReferences, expectedOutput:="b")
+</compilation>, references:=Net40XmlReferences, expectedOutput:="b")
         End Sub
 
         ' Project-level imports should be used if file-level
@@ -1152,7 +1156,7 @@ Class C
     End Sub
 End Class
     ]]></file>
-</compilation>, additionalRefs:=XmlReferences, options:=options, expectedOutput:=<![CDATA[
+</compilation>, references:=Net40XmlReferences, options:=options, expectedOutput:=<![CDATA[
 default1
 p1
 q2
@@ -1250,7 +1254,7 @@ Module M
     End Sub
 End Module
     ]]></file>
-</compilation>, additionalRefs:=XmlReferences, options:=options, expectedOutput:=<![CDATA[
+</compilation>, references:=Net40XmlReferences, options:=options, expectedOutput:=<![CDATA[
 <x xmlns:p="http://roslyn/p" xmlns="http://roslyn">
   <p:y />
 </x>
@@ -1285,7 +1289,7 @@ Module M
     End Sub
 End Module
     ]]></file>
-</compilation>, additionalRefs:=XmlReferences, expectedOutput:=<![CDATA[
+</compilation>, references:=Net40XmlReferences, expectedOutput:=<![CDATA[
 <p:x xmlns="http://roslyn/default" xmlns:p="http://roslyn/p">
   <y />
   <z xmlns="" />
@@ -1357,7 +1361,7 @@ Module M
     End Sub
 End Module
     ]]></file>
-</compilation>, additionalRefs:=XmlReferences, expectedOutput:=<![CDATA[
+</compilation>, references:=Net40XmlReferences, expectedOutput:=<![CDATA[
 <x xmlns="http://roslyn/default" xmlns:p="http://roslyn/p" xmlns:q="http://roslyn/q">
   <p:y1 />
   <p:y2 />
@@ -1433,7 +1437,7 @@ Module M
     End Sub
 End Module
     ]]></file>
-</compilation>, additionalRefs:=XmlReferences, expectedOutput:=<![CDATA[
+</compilation>, references:=Net40XmlReferences, expectedOutput:=<![CDATA[
 <a xmlns:p1="http://roslyn/1" xmlns:p2="http://roslyn/2">
   <b>
     <c>
@@ -1524,7 +1528,7 @@ Partial Class C
     End Function
 End Class
     ]]></file>
-</compilation>, additionalRefs:=XmlReferences, expectedOutput:=<![CDATA[
+</compilation>, references:=Net40XmlReferences, expectedOutput:=<![CDATA[
 <x>
   <y />
   <y xmlns="http://roslyn/2" />
@@ -1574,7 +1578,7 @@ Module N
     Public F As Object = <p:z q:a="b" s:c="d"/>
 End Module
     ]]></file>
-</compilation>, additionalRefs:=XmlReferences, expectedOutput:=<![CDATA[
+</compilation>, references:=Net40XmlReferences, expectedOutput:=<![CDATA[
 <x xmlns:r="http://roslyn/r" xmlns:q="http://roslyn/q1" xmlns:p="http://roslyn/p" xmlns:s="http://roslyn/r">
   <y>
     <p:z q:a="b" s:c="d" />
@@ -1605,7 +1609,7 @@ Module M
     End Sub
 End Module
     ]]></file>
-</compilation>, additionalRefs:=XmlReferences, expectedOutput:=<![CDATA[
+</compilation>, references:=Net40XmlReferences, expectedOutput:=<![CDATA[
 <x xmlns:p="http://roslyn/">
   <p:y />
 </x>
@@ -1642,7 +1646,7 @@ Module M
     End Sub
 End Module
     ]]></file>
-</compilation>, additionalRefs:=XmlReferences, expectedOutput:=<![CDATA[
+</compilation>, references:=Net40XmlReferences, expectedOutput:=<![CDATA[
 <x xmlns:q="http://roslyn/q" xmlns:p="http://roslyn/p">
   <p:y q:a="b" />
   <p:z />
@@ -1658,7 +1662,7 @@ End Module
         ' InternalXmlHelper.RemoveNamespaceAttributes() modifies
         ' the embedded expression argument so subsequent uses of
         ' the expression may give different results.
-        <WorkItem(529410, "DevDiv")>
+        <WorkItem(529410, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/529410")>
         <Fact()>
         Public Sub ImplicitXmlnsAttributes_SideEffects()
             Dim compilation = CompileAndVerify(
@@ -1677,7 +1681,7 @@ Module M
     End Sub
 End Module
     ]]></file>
-</compilation>, additionalRefs:=XmlReferences, expectedOutput:=<![CDATA[
+</compilation>, references:=Net40XmlReferences, expectedOutput:=<![CDATA[
 <p:x xmlns:p="http://roslyn/p" xmlns:q="http://roslyn/q">
   <q:y />
 </p:x>
@@ -1703,7 +1707,7 @@ Module M
     End Sub
 End Module
     ]]></file>
-</compilation>, additionalRefs:=XmlReferences, expectedOutput:=<![CDATA[
+</compilation>, references:=Net40XmlReferences, expectedOutput:=<![CDATA[
 <x x="..." />
 ]]>)
             compilation.VerifyIL("M..cctor", <![CDATA[
@@ -1749,7 +1753,7 @@ Module M
     End Sub
 End Module
     ]]></file>
-</compilation>, additionalRefs:=XmlReferences, expectedOutput:=<![CDATA[
+</compilation>, references:=Net40XmlReferences, expectedOutput:=<![CDATA[
 <x x="..." />
 <y p1:y="..." xmlns:p1="http://roslyn" xmlns="http://roslyn" />
 <z z="...">z</z>
@@ -1825,7 +1829,7 @@ Module M
     End Sub
 End Module
     ]]></file>
-</compilation>, additionalRefs:=XmlReferences, expectedOutput:=<![CDATA[
+</compilation>, references:=Net40XmlReferences, expectedOutput:=<![CDATA[
 [1] <x a1="b1" />
 [1] <x a2="b2" />
 [1] <x a3="3" />
@@ -1913,7 +1917,7 @@ Module M
     End Sub
 End Module
     ]]></file>
-</compilation>, additionalRefs:=XmlReferences, expectedOutput:=<![CDATA[
+</compilation>, references:=Net40XmlReferences, expectedOutput:=<![CDATA[
 <w w="f" />
 <x>f</x>
 <y>
@@ -1955,7 +1959,7 @@ Module M
     End Sub
 End Module
     ]]></file>
-</compilation>, additionalRefs:=XmlReferences, expectedOutput:=<![CDATA[
+</compilation>, references:=Net40XmlReferences, expectedOutput:=<![CDATA[
 <x1>s</x1>
 <x2>s</x2>
 <y1>n</y1>
@@ -2032,7 +2036,7 @@ Module M
     End Sub
 End Module
     ]]></file>
-</compilation>, additionalRefs:=XmlReferences, expectedOutput:=<![CDATA[
+</compilation>, references:=Net40XmlReferences, expectedOutput:=<![CDATA[
 <x0>
   <c1 />
   <c2 />
@@ -2223,7 +2227,7 @@ End Module
 
         <Fact()>
         Public Sub EmbeddedExpressionConversions()
-            Dim compilation = CreateCompilationWithMscorlibAndVBRuntimeAndReferences(
+            Dim compilation = CreateCompilationWithMscorlib40AndVBRuntimeAndReferences(
 <compilation>
     <file name="c.vb"><![CDATA[
 Option Strict On
@@ -2270,7 +2274,7 @@ Class C(Of T)
     End Sub
 End Class
     ]]></file>
-</compilation>, additionalRefs:=XmlReferences)
+</compilation>, references:=Net40XmlReferences)
             compilation.AssertTheseDiagnostics(<errors><![CDATA[
 BC30002: Type 'Unknown' is not defined.
     Private Shared F8 As Unknown = Nothing
@@ -2309,7 +2313,7 @@ Module M
     End Function
 End Module
     ]]></file>
-</compilation>, additionalRefs:=XmlReferences)
+</compilation>, references:=Net40XmlReferences)
             compilation.VerifyIL("M.F", <![CDATA[
 {
   // Code size      114 (0x72)
@@ -2346,7 +2350,7 @@ End Module
 
         <Fact()>
         Public Sub EmbeddedExpressionDelegateConversion()
-            Dim compilation = CreateCompilationWithMscorlibAndVBRuntimeAndReferences(
+            Dim compilation = CreateCompilationWithMscorlib40AndVBRuntimeAndReferences(
 <compilation>
     <file name="c.vb"><![CDATA[
 Option Strict On
@@ -2369,7 +2373,7 @@ Module M
     Private F3 As XElement = <x><%= AddressOf M3 %></x>
 End Module
     ]]></file>
-</compilation>, additionalRefs:=XmlReferences)
+</compilation>, references:=Net40XmlReferences)
             compilation.AssertTheseDiagnostics(<errors><![CDATA[
 BC31172: An embedded expression cannot be used here.
     Private F0 As D = <%= AddressOf M0 %>
@@ -2411,7 +2415,7 @@ Module M
     End Sub
 End Module
     ]]></file>
-</compilation>, additionalRefs:=XmlReferences, expectedOutput:=<![CDATA[
+</compilation>, references:=Net40XmlReferences, expectedOutput:=<![CDATA[
 <x />
 <x a="b">c</x>
 <x1 a1="b1" a2="b2">c1c2</x1>
@@ -2473,7 +2477,7 @@ End Module
 
         <Fact()>
         Public Sub EmbeddedExpressionNoXElementConstructor()
-            Dim compilation = CreateCompilationWithMscorlibAndVBRuntimeAndReferences(
+            Dim compilation = CreateCompilationWithMscorlib40AndVBRuntimeAndReferences(
 <compilation>
     <file name="c.vb"><![CDATA[
 Option Strict On
@@ -2504,7 +2508,7 @@ Class C(Of T)
     End Sub
 End Class
     ]]></file>
-</compilation>, additionalRefs:=XmlReferences)
+</compilation>, references:=Net40XmlReferences)
             compilation.AssertTheseDiagnostics(<errors><![CDATA[
 BC30002: Type 'Unknown' is not defined.
     Private Shared F8 As Unknown = Nothing
@@ -2540,7 +2544,7 @@ BC30518: Overload resolution failed because no accessible 'New' can be called wi
         ' bound, even if outside of an XML expression (error cases).
         <Fact()>
         Public Sub EmbeddedExpressionOutsideXmlExpression()
-            Dim compilation = CreateCompilationWithMscorlibAndVBRuntimeAndReferences(
+            Dim compilation = CreateCompilationWithMscorlib40AndVBRuntimeAndReferences(
 <compilation>
     <file name="c.vb"><![CDATA[
 Class A
@@ -2563,7 +2567,7 @@ Module M
     Private F3 As B = <%= P3 %>
 End Module
     ]]></file>
-</compilation>, additionalRefs:=XmlReferences)
+</compilation>, references:=Net40XmlReferences)
             compilation.AssertTheseDiagnostics(<errors><![CDATA[
 BC30311: Value of type 'A' cannot be converted to 'B'.
     Private F1 As B = <%= P1 %>
@@ -2590,7 +2594,7 @@ BC30524: Property 'P3' is 'WriteOnly'.
         ' declarations, even if the expression is a string constant.
         <Fact()>
         Public Sub EmbeddedXmlnsExpressions()
-            Dim compilation = CreateCompilationWithMscorlibAndVBRuntimeAndReferences(
+            Dim compilation = CreateCompilationWithMscorlib40AndVBRuntimeAndReferences(
 <compilation>
     <file name="c.vb"><![CDATA[
 Imports System.Xml.Linq
@@ -2600,7 +2604,7 @@ Module M
     Private F3 As XElement = <x:y <%= XName.Get("x", "http://www.w3.org/2000/xmlns/") %>="http://roslyn"/>
 End Module
     ]]></file>
-</compilation>, additionalRefs:=XmlReferences)
+</compilation>, references:=Net40XmlReferences)
             compilation.AssertTheseDiagnostics(<errors><![CDATA[
 BC31148: XML namespace prefix 'x' is not defined.
     Private F2 As XElement = <x:y <%= "xmlns:x" %>="http://roslyn"/>
@@ -2627,7 +2631,7 @@ Class C
     End Sub
 End Class
     ]]></file>
-</compilation>, additionalRefs:=XmlReferences, expectedOutput:=<![CDATA[
+</compilation>, references:=Net40XmlReferences, expectedOutput:=<![CDATA[
 <f />
 <g />
 ]]>)
@@ -2637,7 +2641,7 @@ End Class
         <Fact()>
         Public Sub EmbeddedExpressionImportCycle()
             Dim options = TestOptions.ReleaseDll.WithGlobalImports(GlobalImport.Parse({"<xmlns:p=<%= <p:x/>.@y %>>"}))
-            Dim compilation = CreateCompilationWithMscorlibAndVBRuntimeAndReferences(
+            Dim compilation = CreateCompilationWithMscorlib40AndVBRuntimeAndReferences(
 <compilation>
     <file name="c.vb"><![CDATA[
 Imports <xmlns:q=<%= <q:x/>.@y %>>
@@ -2645,7 +2649,7 @@ Module M
     Private F As String = <p:x q:y=""/>.@z
 End Module
     ]]></file>
-</compilation>, additionalRefs:=XmlReferences, options:=options)
+</compilation>, references:=Net40XmlReferences, options:=options)
             compilation.AssertTheseDiagnostics(<errors><![CDATA[
 BC31172: Error in project-level import '<xmlns:p=<%= <p:x/>.@y %>>' at '<%= <p:x/>.@y %>' : An embedded expression cannot be used here.
 BC31172: An embedded expression cannot be used here.
@@ -2675,7 +2679,7 @@ Class C
     End Sub
 End Class
     ]]></file>
-</compilation>, additionalRefs:=XmlReferences, expectedOutput:=<![CDATA[
+</compilation>, references:=Net40XmlReferences, expectedOutput:=<![CDATA[
 &'><"XYZ
 &'><"XYZ
 ]]>)
@@ -2746,7 +2750,7 @@ Module M
     End Sub
 End Module
 </file>
-</compilation>, additionalRefs:=XmlReferences, expectedOutput:="System.Xml.Linq.XCData: <![CDATA[value]]>")
+</compilation>, references:=Net40XmlReferences, expectedOutput:="System.Xml.Linq.XCData: <![CDATA[value]]>")
             compilation.VerifyIL("M.Main", <![CDATA[
 {
   // Code size       29 (0x1d)
@@ -2783,7 +2787,7 @@ Module M
     End Sub
 End Module
 </file>
-</compilation>, additionalRefs:=XmlReferences, expectedOutput:="<b>" & vbLf & "  <c/>" & vbLf & "</>")
+</compilation>, references:=Net40XmlReferences, expectedOutput:="<b>" & vbLf & "  <c/>" & vbLf & "</>")
         End Sub
 
         <Fact()>
@@ -2807,7 +2811,7 @@ Module M
     End Sub
 End Module
     ]]></file>
-</compilation>, additionalRefs:=XmlReferences, expectedOutput:=<![CDATA[
+</compilation>, references:=Net40XmlReferences, expectedOutput:=<![CDATA[
 http://www.w3.org/XML/1998/namespace
 http://www.w3.org/2000/xmlns/
 
@@ -2843,7 +2847,7 @@ http://roslyn/p-q
         ' argument. Those cases are not treated as errors in Roslyn.
         <Fact()>
         Public Sub GetXmlNamespaceWithTrivia()
-            Dim compilation = CreateCompilationWithMscorlibAndVBRuntimeAndReferences(
+            Dim compilation = CreateCompilationWithMscorlib40AndVBRuntimeAndReferences(
 <compilation>
     <file name="c.vb"><![CDATA[
 Imports <xmlns:p="http://roslyn/">
@@ -2853,18 +2857,18 @@ Module M
     Private F3 = GetXmlNamespace( p)
 End Module
     ]]></file>
-</compilation>, additionalRefs:=XmlReferences)
+</compilation>, references:=Net40XmlReferences)
             compilation.AssertNoErrors()
         End Sub
 
-        <WorkItem(544261, "DevDiv")>
+        <WorkItem(544261, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/544261")>
         <Fact()>
         Public Sub IncompleteProjectLevelImport()
             Assert.Throws(Of ArgumentException)(Sub() TestOptions.ReleaseDll.WithGlobalImports(GlobalImport.Parse({"<xmlns:p=""..."""})))
             Assert.Throws(Of ArgumentException)(Sub() TestOptions.ReleaseDll.WithGlobalImports(GlobalImport.Parse({"<xmlns:p=""..."">, <xmlns:q=""..."""})))
         End Sub
 
-        <WorkItem(544360, "DevDiv")>
+        <WorkItem(544360, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/544360")>
         <Fact()>
         Public Sub ExplicitDefaultXmlnsAttribute_1()
             Dim compilation = CompileAndVerify(
@@ -2881,7 +2885,7 @@ Module M
     End Sub
 End Module
     ]]></file>
-</compilation>, additionalRefs:=XmlReferences, expectedOutput:=<![CDATA[
+</compilation>, references:=Net40XmlReferences, expectedOutput:=<![CDATA[
 [x,    ]: <x xmlns="   " />
 [y, http://roslyn]: <y xmlns="http://roslyn" />
 ]]>)
@@ -2903,12 +2907,12 @@ Module M
     End Sub
 End Module
     ]]></file>
-</compilation>, additionalRefs:=XmlReferences, expectedOutput:=<![CDATA[
+</compilation>, references:=Net40XmlReferences, expectedOutput:=<![CDATA[
 [x, http://roslyn/2]: <x xmlns="http://roslyn/2" />
 ]]>)
         End Sub
 
-        <WorkItem(544461, "DevDiv")>
+        <WorkItem(544461, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/544461")>
         <Fact()>
         Public Sub ValueExtensionProperty()
             Dim compilation = CompileAndVerify(
@@ -2963,7 +2967,7 @@ Module M
     End Sub
 End Module
     ]]></file>
-</compilation>, additionalRefs:=XmlReferences)
+</compilation>, references:=Net40XmlReferences)
             compilation.VerifyIL("M.M(Of T)", <![CDATA[
 {
   // Code size      166 (0xa6)
@@ -3024,7 +3028,7 @@ End Module
 
         <Fact()>
         Public Sub ValueExtensionProperty_2()
-            Dim compilation = CreateCompilationWithMscorlibAndVBRuntimeAndReferences(
+            Dim compilation = CreateCompilationWithMscorlib40AndVBRuntimeAndReferences(
 <compilation>
     <file name="c.vb"><![CDATA[
 Option Strict On
@@ -3084,7 +3088,7 @@ Module M
     End Sub
 End Module
     ]]></file>
-</compilation>, additionalRefs:=XmlReferences)
+</compilation>, references:=Net40XmlReferences)
             compilation.AssertTheseDiagnostics(<errors><![CDATA[
 BC30991: Member 'Value' cannot be initialized in an object initializer expression because it is shared.
         Dim _a As New A() With {.Value = .P, .P = .Value}
@@ -3115,7 +3119,7 @@ BC30068: Expression is a value and therefore cannot be the target of an assignme
 
         <Fact()>
         Public Sub ValueExtensionProperty_3()
-            Dim compilation = CreateCompilationWithMscorlibAndVBRuntimeAndReferences(
+            Dim compilation = CreateCompilationWithMscorlib40AndVBRuntimeAndReferences(
 <compilation>
     <file name="c.vb"><![CDATA[
 Option Strict On
@@ -3136,7 +3140,7 @@ Class C
     End Function
 End Class
     ]]></file>
-</compilation>, additionalRefs:=XmlReferences)
+</compilation>, references:=Net40XmlReferences)
             compilation.AssertTheseDiagnostics(<errors><![CDATA[
 BC30469: Reference to a non-shared member requires an object reference.
         Value = F(Value)
@@ -3175,7 +3179,7 @@ Module M
     End Sub
 End Module
     ]]></file>
-</compilation>, additionalRefs:=XmlReferences, expectedOutput:=<![CDATA[
+</compilation>, references:=Net40XmlReferences, expectedOutput:=<![CDATA[
 <x>
   <y>content2</y>
   <z>3</z>
@@ -3192,7 +3196,7 @@ End Module
         <Fact()>
         Public Sub ValueExtensionPropertyAndExtensionMethod()
             ' Accessible extension method.
-            Dim compilation = CreateCompilationWithMscorlibAndVBRuntimeAndReferences(
+            Dim compilation = CreateCompilationWithMscorlib40AndVBRuntimeAndReferences(
 <compilation>
     <file name="c.vb"><![CDATA[
 Imports System.Collections.Generic
@@ -3212,14 +3216,14 @@ Module M
     End Function
 End Module
     ]]></file>
-</compilation>, additionalRefs:=XmlReferences)
+</compilation>, references:=Net40XmlReferences)
             compilation.AssertTheseDiagnostics(<errors><![CDATA[
 BC36586: Argument not specified for parameter 'y' of extension method 'Public Function Value(y As Object) As Object' defined in 'M'.
         Dim o = x.Value()
                   ~~~~~
 ]]></errors>)
             ' Inaccessible extension method.
-            compilation = CreateCompilationWithMscorlibAndVBRuntimeAndReferences(
+            compilation = CreateCompilationWithMscorlib40AndVBRuntimeAndReferences(
 <compilation>
     <file name="c.vb"><![CDATA[
 Imports System.Collections.Generic
@@ -3239,7 +3243,7 @@ Module M
     End Function
 End Module
     ]]></file>
-</compilation>, additionalRefs:=XmlReferences)
+</compilation>, references:=Net40XmlReferences)
             compilation.AssertTheseDiagnostics(<errors><![CDATA[
 BC30057: Too many arguments to 'Public Property Value As String'.
         x.Value(o)
@@ -3254,7 +3258,7 @@ BC30057: Too many arguments to 'Public Property Value As String'.
         ''' </summary>
         <Fact()>
         Public Sub ValueExtensionPropertyAndInaccessibleMember()
-            Dim compilation = CreateCompilationWithMscorlibAndVBRuntimeAndReferences(
+            Dim compilation = CreateCompilationWithMscorlib40AndVBRuntimeAndReferences(
 <compilation>
     <file name="c.vb"><![CDATA[
 Imports System.Collections
@@ -3277,7 +3281,7 @@ Module M
     End Function
 End Module
     ]]></file>
-</compilation>, additionalRefs:=XmlReferences)
+</compilation>, references:=Net40XmlReferences)
             compilation.AssertNoErrors()
         End Sub
 
@@ -3287,7 +3291,7 @@ End Module
         ' only be available if the namespace is imported.
         <Fact()>
         Public Sub ValueAndAttributeValueExtensionProperties()
-            Dim compilation = CreateCompilationWithMscorlibAndVBRuntimeAndReferences(
+            Dim compilation = CreateCompilationWithMscorlib40AndVBRuntimeAndReferences(
 <compilation>
     <file name="c.vb"><![CDATA[
 Option Strict On
@@ -3351,7 +3355,7 @@ Module M
     End Sub
 End Module
     ]]></file>
-</compilation>, additionalRefs:=XmlReferences)
+</compilation>, references:=Net40XmlReferences)
             compilation.AssertTheseDiagnostics(<errors><![CDATA[
 BC30456: 'AttributeValue' is not a member of 'XElement'.
         o = <x/>.AttributeValue(name)
@@ -3438,13 +3442,13 @@ Module M
                             </x>
     Sub Main()
         For Each y In F.<y>
-            Console.Write("{0}" & vbLf, y.ToString().Replace(vbCrLf, vbLf))
-            Console.Write("[{0}]" & vbLf, y.Value)
+            Console.Write("{0}" & Environment.NewLine, y.ToString())
+            Console.Write("[{0}]" & Environment.NewLine, y.Value.Replace(vbLf, Environment.NewLine))
         Next
     End Sub
 End Module
     ]]></file>
-</compilation>, additionalRefs:=XmlReferences, expectedOutput:=<![CDATA[
+</compilation>, references:=Net40XmlReferences, expectedOutput:=<![CDATA[
 <y>
   <z> nested </z>
 </y>
@@ -3469,16 +3473,16 @@ End Module
 [
                                     begin  nested  end
                                 ]
-]]>.Value.Replace(vbCrLf, vbLf))
+]]>)
         End Sub
 
         ''' <summary>
         ''' CR/LF and single CR characters should be
         ''' replaced by single LF characters.
         ''' </summary>
-        <WorkItem(545508, "DevDiv")>
+        <WorkItem(545508, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/545508")>
         <Fact()>
-        Public Sub NormalizeNewlines()
+        Public Sub NormalizeNewlinesTest()
             For Each eol In {vbCr, vbLf, vbCrLf}
                 Dim sourceBuilder = New StringBuilder()
                 sourceBuilder.AppendLine("Module M")
@@ -3494,7 +3498,7 @@ End Module
                 sourceBuilder.AppendLine("End Module")
 
                 Dim sourceTree = VisualBasicSyntaxTree.ParseText(sourceBuilder.ToString())
-                Dim comp = VisualBasicCompilation.Create(Guid.NewGuid().ToString(), {sourceTree}, DefaultReferences.Concat(XmlReferences))
+                Dim comp = VisualBasicCompilation.Create(Guid.NewGuid().ToString(), {sourceTree}, DefaultVbReferences.Concat(Net40XmlReferences))
                 CompileAndVerify(comp, expectedOutput:=<![CDATA[
 91
 10
@@ -3545,7 +3549,7 @@ End Module
             sourceBuilder.AppendLine("End Module")
 
             Dim sourceTree = VisualBasicSyntaxTree.ParseText(sourceBuilder.ToString())
-            Dim comp = VisualBasicCompilation.Create(Guid.NewGuid().ToString(), {sourceTree}, DefaultReferences.Concat(XmlReferences))
+            Dim comp = VisualBasicCompilation.Create(Guid.NewGuid().ToString(), {sourceTree}, DefaultVbReferences.Concat(Net40XmlReferences))
             CompileAndVerify(comp, expectedOutput:="[[" & NormalizeValue(str) & "]]")
         End Sub
 
@@ -3565,7 +3569,7 @@ End Module
         ' Dev11 treats p:xmlns="..." as an xmlns declaration for the default
         ' namespace. Roslyn issues warnings for these cases and only considers
         ' p:xmlns="..." an xmlns declaration if 'p' maps to the default namespace.
-        <WorkItem(544366, "DevDiv")>
+        <WorkItem(544366, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/544366")>
         <Fact()>
         Public Sub PrefixAndXmlnsLocalName()
             Dim compilation = CompileAndVerify(
@@ -3593,7 +3597,7 @@ Module M
     End Sub
 End Module
     ]]></file>
-</compilation>, additionalRefs:=XmlReferences, expectedOutput:=<![CDATA[
+</compilation>, references:=Net40XmlReferences, expectedOutput:=<![CDATA[
 {N0}x1: <x1 a="b" xmlns="N0" />
   a
   xmlns
@@ -3638,7 +3642,7 @@ Module M
     End Sub
 End Module
     ]]></file>
-</compilation>, additionalRefs:=XmlReferences, expectedOutput:=<![CDATA[
+</compilation>, references:=Net40XmlReferences, expectedOutput:=<![CDATA[
 [Nothing]
 ]]>)
             compilation.Compilation.AssertTheseDiagnostics(<errors><![CDATA[
@@ -3698,7 +3702,7 @@ Module M
     End Sub
 End Module
     ]]></file>
-</compilation>, additionalRefs:=XmlReferences, expectedOutput:=<![CDATA[
+</compilation>, references:=Net40XmlReferences, expectedOutput:=<![CDATA[
 <x0 a="b" xmlns:p="http://roslyn/" />
 <x1 p:a="b" xmlns:p="http://roslyn/" />
 <x2 xmlns:p="http://roslyn/">
@@ -3768,7 +3772,7 @@ Partial Class C
     End Sub
 End Class
     ]]></file>
-</compilation>, additionalRefs:=XmlReferences, expectedOutput:=<![CDATA[
+</compilation>, references:=Net40XmlReferences, expectedOutput:=<![CDATA[
 <x xmlns:p="http://roslyn/" />
 <x xmlns:p="http://roslyn/" />
 ]]>)
@@ -3815,7 +3819,7 @@ End Class
 ]]>)
         End Sub
 
-        <WorkItem(545345, "DevDiv")>
+        <WorkItem(545345, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/545345")>
         <Fact()>
         Public Sub RemoveExistingNamespaceAttribute()
             Dim compilation = CompileAndVerify(
@@ -3850,7 +3854,7 @@ Partial Class C
     End Function
 End Class
     ]]></file>
-</compilation>, additionalRefs:=XmlReferences, expectedOutput:=<![CDATA[
+</compilation>, references:=Net40XmlReferences, expectedOutput:=<![CDATA[
 <x xmlns:p="http://roslyn/p">
   <p:y />
 </x>
@@ -3889,7 +3893,7 @@ Module M
     End Sub
 End Module
     ]]></file>
-</compilation>, additionalRefs:=XmlReferences, expectedOutput:=<![CDATA[
+</compilation>, references:=Net40XmlReferences, expectedOutput:=<![CDATA[
 <x a="1" />
 <x a="1" xmlns="" />
 <x xmlns="">
@@ -3901,7 +3905,7 @@ End Module
 ]]>)
         End Sub
 
-        <WorkItem(545401, "DevDiv")>
+        <WorkItem(545401, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/545401")>
         <Fact()>
         Public Sub DefaultAndEmptyNamespaces_2()
             Dim compilation = CompileAndVerify(
@@ -3925,7 +3929,7 @@ Module M
     End Sub
 End Module
     ]]></file>
-</compilation>, additionalRefs:=XmlReferences, expectedOutput:=<![CDATA[
+</compilation>, references:=Net40XmlReferences, expectedOutput:=<![CDATA[
 <x a="1" p:b="2" xmlns:p="ns" xmlns="default" />
 <x a="1" p:b="2" xmlns:p="ns" xmlns="" />
 <p:x a="1" b="2" xmlns:p="ns" />
@@ -3948,7 +3952,7 @@ End Module
         ''' Should not call RemoveNamespaceAttributes
         ''' on intrinsic types or enums.
         ''' </summary>
-        <WorkItem(546191, "DevDiv")>
+        <WorkItem(546191, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/546191")>
         <Fact()>
         Public Sub RemoveNamespaceAttributes_OtherContentTypes()
             Dim verifier = CompileAndVerify(
@@ -4060,7 +4064,7 @@ Class C(Of T)
     End Function
 End Class
     ]]></file>
-</compilation>, additionalRefs:=XmlReferences)
+</compilation>, references:=Net40XmlReferences)
             Assert.True(CallsRemoveNamespaceAttributes(verifier.VisualizeIL("C(Of T).F1()")))
             Assert.False(CallsRemoveNamespaceAttributes(verifier.VisualizeIL("C(Of T).F2()")))
             Assert.False(CallsRemoveNamespaceAttributes(verifier.VisualizeIL("C(Of T).F3()")))
@@ -4091,7 +4095,7 @@ End Class
         ''' Should not call RemoveNamespaceAttributes
         ''' unless there are xmlns Imports in scope.
         ''' </summary>
-        <WorkItem(546191, "DevDiv")>
+        <WorkItem(546191, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/546191")>
         <Fact()>
         Public Sub RemoveNamespaceAttributes_XmlnsInScope()
             ' No xmlns.
@@ -4108,7 +4112,7 @@ Module M
     End Function
 End Module
     ]]></file>
-</compilation>, additionalRefs:=XmlReferences)
+</compilation>, references:=Net40XmlReferences)
             Assert.False(CallsRemoveNamespaceAttributes(verifier.VisualizeIL("M.F1()")))
 
             ' xmlns attribute.
@@ -4125,7 +4129,7 @@ Module M
     End Function
 End Module
     ]]></file>
-</compilation>, additionalRefs:=XmlReferences)
+</compilation>, references:=Net40XmlReferences)
             Assert.False(CallsRemoveNamespaceAttributes(verifier.VisualizeIL("M.F1()")))
 
             ' Imports <...> in file.
@@ -4143,7 +4147,7 @@ Module M
     End Function
 End Module
     ]]></file>
-</compilation>, additionalRefs:=XmlReferences)
+</compilation>, references:=Net40XmlReferences)
             Assert.True(CallsRemoveNamespaceAttributes(verifier.VisualizeIL("M.F1()")))
 
             ' Imports <...> at project scope.
@@ -4161,7 +4165,7 @@ Module M
     End Function
 End Module
     ]]></file>
-</compilation>, additionalRefs:=XmlReferences, options:=options)
+</compilation>, references:=Net40XmlReferences, options:=options)
             Assert.True(CallsRemoveNamespaceAttributes(verifier.VisualizeIL("M.F1()")))
         End Sub
 
@@ -4169,7 +4173,7 @@ End Module
             Return actualIL.Contains("My.InternalXmlHelper.RemoveNamespaceAttributes")
         End Function
 
-        <WorkItem(546480, "DevDiv")>
+        <WorkItem(546480, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/546480")>
         <Fact()>
         Public Sub OpenCloseTag()
             Dim compilation = CompileAndVerify(
@@ -4194,7 +4198,7 @@ Module M
     End Sub
 End Module
     ]]></file>
-</compilation>, additionalRefs:=XmlReferences, expectedOutput:=<![CDATA[
+</compilation>, references:=Net40XmlReferences, expectedOutput:=<![CDATA[
 [0] <x />
 [0] <x></x>
 [0] <x></x>
@@ -4212,7 +4216,7 @@ End Module
 ]]>)
         End Sub
 
-        <Fact(), WorkItem(530882, "DevDiv")>
+        <Fact(), WorkItem(530882, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/530882")>
         Public Sub SelectFromIEnumerableOfXElementMultitargetingNetFX35()
             Dim source =
                 <compilation>
@@ -4226,7 +4230,7 @@ Imports System.Xml.Linq
 Module Module1
     Dim stuff As XElement =
         <root>
-            <output someattrib="foo1">
+            <output someattrib="goo1">
                 <value>1</value>
             </output>
             <output>
@@ -4250,7 +4254,7 @@ End Module]]>
                     </file>
                 </compilation>
 
-            Dim comp = CreateCompilationWithReferences(
+            Dim comp = CreateEmptyCompilationWithReferences(
                 source,
                 references:={MscorlibRef_v20, SystemRef_v20, MsvbRef, SystemXmlRef, SystemXmlLinqRef, SystemCoreRef},
                 options:=TestOptions.ReleaseExe.WithAssemblyIdentityComparer(DesktopAssemblyIdentityComparer.Default))
@@ -4258,10 +4262,10 @@ End Module]]>
             CompileAndVerify(comp, expectedOutput:="1" & Environment.NewLine & "2" & Environment.NewLine &
                                                    "1" & Environment.NewLine & "2" & Environment.NewLine &
                                                    "1" & Environment.NewLine & "2" & Environment.NewLine &
-                                                   "foo1")
+                                                   "goo1")
         End Sub
 
-        <Fact(), WorkItem(530882, "DevDiv")>
+        <Fact(), WorkItem(530882, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/530882")>
         Public Sub SelectFromIEnumerableOfXElementMultitargetingNetFX35_Errors()
             Dim source =
                 <compilation>
@@ -4283,7 +4287,7 @@ End Module
                     ]]></file>
                 </compilation>
 
-            Dim comp = CreateCompilationWithReferences(
+            Dim comp = CreateEmptyCompilationWithReferences(
                 source,
                 references:={MscorlibRef_v20, SystemRef_v20, MsvbRef, SystemXmlRef, SystemXmlLinqRef, SystemCoreRef},
                 options:=TestOptions.ReleaseExe.WithAssemblyIdentityComparer(DesktopAssemblyIdentityComparer.Default))
@@ -4292,7 +4296,7 @@ End Module
                                     Diagnostic(ERRID.ERR_TypeDisallowsAttributes, "objArray.@someAttrib").WithArguments("Object()"))
         End Sub
 
-        <Fact(), WorkItem(531351, "DevDiv")>
+        <Fact(), WorkItem(531351, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/531351")>
         Public Sub Bug17985()
             Dim compilation = CompileAndVerify(
 <compilation>
@@ -4300,13 +4304,13 @@ End Module
 Imports System.Xml.Linq
 
 Class scen1(Of T As XElement)
-    Sub foo(ByVal o As T)
+    Sub goo(ByVal o As T)
         Dim res = o.<moo>
     End Sub
 End Class
     ]]></file>
-</compilation>, additionalRefs:=XmlReferences, options:=TestOptions.ReleaseDll).
-            VerifyIL("scen1(Of T).foo(T)",
+</compilation>, references:=Net40XmlReferences, options:=TestOptions.ReleaseDll).
+            VerifyIL("scen1(Of T).goo(T)",
             <![CDATA[
 {
   // Code size       30 (0x1e)
@@ -4323,10 +4327,30 @@ End Class
 ]]>)
         End Sub
 
-        <WorkItem(531445, "DevDiv")>
-        <Fact(Skip:="531445")>
+        <WorkItem(531445, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/531445")>
+        <WorkItem(101597, "https://devdiv.visualstudio.com/defaultcollection/DevDiv/_workitems#_a=edit&id=101597")>
+        <Fact>
         Public Sub SameNamespaceDifferentPrefixes()
             Dim options = TestOptions.ReleaseExe.WithGlobalImports(GlobalImport.Parse({"<xmlns:r=""http://roslyn/"">", "<xmlns:s=""http://roslyn/"">"}))
+
+            Dim expectedOutput As Xml.Linq.XCData
+
+            Const bug101597IsFixed = False
+
+            If bug101597IsFixed Then
+                expectedOutput = <![CDATA[
+<p:x xmlns:s="http://roslyn/" xmlns:r="http://roslyn/" xmlns:q="http://roslyn/" xmlns:p="http://roslyn/">
+  <p:y p:a="" p:b="" />
+</p:x>
+]]>
+            Else
+                expectedOutput = <![CDATA[
+<q:x xmlns:p="http://roslyn/" xmlns:s="http://roslyn/" xmlns:r="http://roslyn/" xmlns:q="http://roslyn/">
+  <q:y q:a="" q:b="" />
+</q:x>
+]]>
+            End If
+
             Dim compilation = CompileAndVerify(
 <compilation>
     <file name="a.vb"><![CDATA[
@@ -4341,17 +4365,13 @@ Module M
     End Sub
 End Module
     ]]></file>
-</compilation>, additionalRefs:=XmlReferences, options:=options, expectedOutput:=<![CDATA[
-<p:x xmlns:s="http://roslyn/" xmlns:r="http://roslyn/" xmlns:q="http://roslyn/" xmlns:p="http://roslyn/">
-  <p:y p:a="" p:b="" />
-</p:x>
-]]>)
+</compilation>, references:=Net40XmlReferences, options:=options, expectedOutput:=expectedOutput)
         End Sub
 
-        <WorkItem(623035, "DevDiv")>
+        <WorkItem(623035, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/623035")>
         <Fact()>
         Public Sub Bug623035()
-            Dim compilation = CreateCompilationWithMscorlibAndVBRuntimeAndReferences(
+            Dim compilation = CreateCompilationWithMscorlib40AndVBRuntimeAndReferences(
 <compilation>
     <file name="a.vb"><![CDATA[
 Friend Module Program
@@ -4363,7 +4383,7 @@ Friend Module Program
     End Sub
 End Module
     ]]></file>
-</compilation>, XmlReferences, TestOptions.ReleaseExe.WithOptionStrict(OptionStrict.Off))
+</compilation>, Net40XmlReferences, TestOptions.ReleaseExe.WithOptionStrict(OptionStrict.Off))
 
             CompileAndVerify(compilation,
             <![CDATA[
@@ -4390,7 +4410,7 @@ BC30518: Overload resolution failed because no accessible 'New' can be called wi
 ]]></expected>)
         End Sub
 
-        <WorkItem(631047, "DevDiv")>
+        <WorkItem(631047, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/631047")>
         <Fact()>
         Public Sub Regress631047()
             CompileAndVerify(
@@ -4400,15 +4420,15 @@ BC30518: Overload resolution failed because no accessible 'New' can be called wi
 Imports System        
 Module Program
     Sub Main()
-        Console.Write(<?foo                       ?>.ToString() = "<?foo                       ?>")
+        Console.Write(<?goo                       ?>.ToString() = "<?goo                       ?>")
     End Sub
 End Module
 ]]>
     </file>
-</compilation>, additionalRefs:=XmlReferences, expectedOutput:=<![CDATA[True]]>)
+</compilation>, references:=Net40XmlReferences, expectedOutput:=<![CDATA[True]]>)
         End Sub
 
-        <WorkItem(814075, "DevDiv")>
+        <WorkItem(814075, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/814075")>
         <Fact()>
         Public Sub ExpressionTreeContainingExtensionProperty()
             Dim compilation = CompileAndVerify(
@@ -4429,7 +4449,7 @@ Module M
     End Sub
 End Module
     ]]></file>
-</compilation>, additionalRefs:=XmlReferences, expectedOutput:=<![CDATA[
+</compilation>, references:=Net40XmlReferences, expectedOutput:=<![CDATA[
 x => get_Value(x.Elements(Get("y", "")))
 content
 ]]>)
@@ -4497,8 +4517,8 @@ content
 ]]>)
         End Sub
 
-        <WorkItem(814052, "DevDiv")>
-        <Fact()>
+        <WorkItem(814052, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/814052")>
+        <ConditionalFact(GetType(WindowsOnly), Reason:=ConditionalSkipReason.NativePdbRequiresDesktop)>
         Public Sub XmlnsNamespaceTooLong()
             Dim identifier = New String("a"c, MetadataWriter.PdbLengthLimit)
             XmlnsNamespaceTooLongCore(identifier.Substring(6), tooLong:=False)
@@ -4520,9 +4540,9 @@ Module M
 End Module
     ]]>.Value, identifier)
 
-            Dim compilation = CompilationUtils.CreateCompilationWithMscorlibAndVBRuntimeAndReferences(
+            Dim compilation = CompilationUtils.CreateCompilationWithMscorlib40AndVBRuntimeAndReferences(
                 <compilation><file name="c.vb"><%= source %></file></compilation>,
-                additionalRefs:=XmlReferences, options:=options)
+                references:=Net40XmlReferences, options:=options)
 
             If Not tooLong Then
                 compilation.AssertTheseDiagnostics(<errors/>)
@@ -4548,7 +4568,7 @@ Module M
         ''' <summary>
         ''' Constant embedded expression with duplicate xmlns attribute.
         ''' </summary>
-        <WorkItem(863159, "DevDiv")>
+        <WorkItem(863159, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/863159")>
         <Fact()>
         Public Sub XmlnsPrefixUsedInEmbeddedExpressionAndSibling_Constant()
             CompileAndVerify(
@@ -4567,7 +4587,7 @@ Module M
     End Sub
 End Module
     ]]></file>
-</compilation>, additionalRefs:=XmlReferences, expectedOutput:=<![CDATA[
+</compilation>, references:=Net40XmlReferences, expectedOutput:=<![CDATA[
 <x xmlns:p="http://roslyn/">
   <y>
     <p:z />
@@ -4580,7 +4600,7 @@ End Module
         ''' <summary>
         ''' Non-constant embedded expression with duplicate xmlns attribute.
         ''' </summary>
-        <WorkItem(863159, "DevDiv")>
+        <WorkItem(863159, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/863159")>
         <Fact()>
         Public Sub XmlnsPrefixUsedInEmbeddedExpressionAndSibling_NonConstant()
             ' Dev12 generates code that throws "InvalidOperationException: Duplicate attribute".
@@ -4689,7 +4709,7 @@ Class C
     End Sub
 End Class
     ]]></file>
-</compilation>, additionalRefs:=XmlReferences, expectedOutput:=<![CDATA[
+</compilation>, references:=Net40XmlReferences, expectedOutput:=<![CDATA[
 <x xmlns:r="http://roslyn/r" xmlns:q="http://roslyn/q" xmlns:p="http://roslyn/p">
   <y>
     <a>
@@ -4852,7 +4872,7 @@ End Class
 ]]>)
         End Sub
 
-        <WorkItem(863159, "DevDiv")>
+        <WorkItem(863159, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/863159")>
         <Fact()>
         Public Sub XmlnsPrefixUsedInEmbeddedExpressionAndSibling_ExpressionTree()
             CompileAndVerify(
@@ -4878,7 +4898,7 @@ Module M
     End Sub
 End Module
     ]]></file>
-</compilation>, additionalRefs:=XmlReferences, expectedOutput:=<![CDATA[
+</compilation>, references:=Net40XmlReferences, expectedOutput:=<![CDATA[
 <x xmlns:q="http://roslyn/q" xmlns:p="http://roslyn/p">
   <y>
     <p:z />
@@ -4915,12 +4935,56 @@ Module M
     End Sub
 End Module
     ]]></file>
-</compilation>, additionalRefs:=XmlReferences, expectedOutput:=<![CDATA[
+</compilation>, references:=Net40XmlReferences, expectedOutput:=<![CDATA[
 <q:y xmlns:q="http://roslyn/q" />
 <p:x xmlns:p="http://roslyn/p" xmlns:r="http://roslyn/r">
   <r:z />
 </p:x>
 ]]>)
+        End Sub
+
+        ''' <summary>
+        ''' My.InternalXmlHelper should be emitted into the root namespace.
+        ''' </summary>
+        <Fact()>
+        Public Sub InternalXmlHelper_RootNamespace()
+            Const source = "
+Imports System
+Imports System.Xml.Linq
+
+Class C
+    Sub M()
+        Dim a = <element attr='value'/>.@attr
+    End Sub
+End Class
+"
+            Dim tree = VisualBasicSyntaxTree.ParseText(source)
+
+            Dim refBuilder = ArrayBuilder(Of MetadataReference).GetInstance()
+            refBuilder.Add(TestMetadata.Net40.mscorlib)
+            refBuilder.Add(TestMetadata.Net40.System)
+            refBuilder.Add(TestMetadata.Net40.MicrosoftVisualBasic)
+            refBuilder.AddRange(Net40XmlReferences)
+            Dim refs = refBuilder.ToImmutableAndFree()
+
+            CompileAndVerify(
+                CreateEmptyCompilationWithReferences(tree, refs, TestOptions.DebugDll),
+                symbolValidator:=
+                    Sub(moduleSymbol)
+                        moduleSymbol.GlobalNamespace.
+                            GetMember(Of NamespaceSymbol)("My").
+                            GetMember(Of NamedTypeSymbol)("InternalXmlHelper")
+                    End Sub)
+
+            CompileAndVerify(
+                CreateEmptyCompilationWithReferences(tree, refs, TestOptions.DebugDll.WithRootNamespace("Root")),
+                symbolValidator:=
+                    Sub(moduleSymbol)
+                        moduleSymbol.GlobalNamespace.
+                            GetMember(Of NamespaceSymbol)("Root").
+                            GetMember(Of NamespaceSymbol)("My").
+                            GetMember(Of NamedTypeSymbol)("InternalXmlHelper")
+                    End Sub)
         End Sub
 
     End Class

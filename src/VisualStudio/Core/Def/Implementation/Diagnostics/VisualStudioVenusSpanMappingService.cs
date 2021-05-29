@@ -1,13 +1,17 @@
-﻿// Copyright (c) Microsoft.  All Rights Reserved.  Licensed under the Apache License, Version 2.0.  See License.txt in the project root for license information.
+﻿// Licensed to the .NET Foundation under one or more agreements.
+// The .NET Foundation licenses this file to you under the MIT license.
+// See the LICENSE file in the project root for more information.
 
+#nullable disable
+
+using System;
 using System.Composition;
+using System.Threading;
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.Diagnostics;
 using Microsoft.CodeAnalysis.Host.Mef;
 using Microsoft.CodeAnalysis.Text;
 using Microsoft.VisualStudio.LanguageServices.Implementation.ProjectSystem;
-using Microsoft.VisualStudio.LanguageServices.Implementation.Venus;
-using Roslyn.Utilities;
 
 namespace Microsoft.VisualStudio.LanguageServices.Implementation.Diagnostics
 {
@@ -17,10 +21,9 @@ namespace Microsoft.VisualStudio.LanguageServices.Implementation.Diagnostics
         private readonly VisualStudioWorkspaceImpl _workspace;
 
         [ImportingConstructor]
+        [Obsolete(MefConstruction.ImportingConstructorMessage, error: true)]
         public VisualStudioVenusSpanMappingService(VisualStudioWorkspaceImpl workspace)
-        {
-            _workspace = workspace;
-        }
+            => _workspace = workspace;
 
         public void GetAdjustedDiagnosticSpan(
             DocumentId documentId, Location location,
@@ -30,10 +33,14 @@ namespace Microsoft.VisualStudio.LanguageServices.Implementation.Diagnostics
             originalLineInfo = location.GetLineSpan();
             mappedLineInfo = location.GetMappedLineSpan();
 
+            // check quick bail out case.
+            if (location == Location.None)
+            {
+                return;
+            }
+
             // Update the original source span, if required.
-            LinePositionSpan originalSpan;
-            LinePositionSpan mappedSpan;
-            if (!TryAdjustSpanIfNeededForVenus(documentId, originalLineInfo, mappedLineInfo, out originalSpan, out mappedSpan))
+            if (!TryAdjustSpanIfNeededForVenus(documentId, originalLineInfo, mappedLineInfo, out var originalSpan, out var mappedSpan))
             {
                 return;
             }
@@ -42,10 +49,15 @@ namespace Microsoft.VisualStudio.LanguageServices.Implementation.Diagnostics
             {
                 originalLineInfo = new FileLinePositionSpan(originalLineInfo.Path, originalSpan.Start, originalSpan.End);
 
-                var textLines = location.SourceTree.GetText().Lines;
-                var startPos = textLines.GetPosition(originalSpan.Start);
-                var endPos = textLines.GetPosition(originalSpan.End);
-                sourceSpan = new TextSpan(startPos, endPos - startPos);
+                var textLines = GetTextLines(documentId, location);
+                if (textLines != null)
+                {
+                    // adjust sourceSpan only if we could get text lines
+                    var startPos = textLines.GetPosition(originalSpan.Start);
+                    var endPos = textLines.GetPosition(originalSpan.End);
+
+                    sourceSpan = TextSpan.FromBounds(startPos, Math.Max(startPos, endPos));
+                }
             }
 
             if (mappedSpan.Start != mappedLineInfo.StartLinePosition || mappedSpan.End != mappedLineInfo.EndLinePosition)
@@ -54,45 +66,78 @@ namespace Microsoft.VisualStudio.LanguageServices.Implementation.Diagnostics
             }
         }
 
+        private TextLineCollection GetTextLines(DocumentId currentDocumentId, Location location)
+        {
+            // normal case - all C# and VB should hit this
+            if (location.SourceTree != null)
+            {
+                return location.SourceTree.GetText().Lines;
+            }
+
+            // special case for typescript and etc that don't use our compilations.
+            var filePath = location.GetLineSpan().Path;
+            if (filePath != null)
+            {
+                // as a sanity check, make sure given location is on the current document
+                // we do the check down the stack for C# and VB using SyntaxTree in location
+                // but for typescript and other, we don't have the tree, so adding this as
+                // sanity check. later we could convert this to Contract to crash VS and
+                // know about the issue.
+                var documentIds = _workspace.CurrentSolution.GetDocumentIdsWithFilePath(filePath);
+                if (documentIds.Contains(currentDocumentId))
+                {
+                    // text most likely already read in
+                    return _workspace.CurrentSolution.GetDocument(currentDocumentId).State.GetTextSynchronously(CancellationToken.None).Lines;
+                }
+            }
+
+            // we don't know how to get text lines for the given location
+            return null;
+        }
+
         private bool TryAdjustSpanIfNeededForVenus(
             DocumentId documentId, FileLinePositionSpan originalLineInfo, FileLinePositionSpan mappedLineInfo, out LinePositionSpan originalSpan, out LinePositionSpan mappedSpan)
         {
             var startChanged = true;
-            MappedSpan startLineColumn;
-            if (!TryAdjustSpanIfNeededForVenus(_workspace, documentId, originalLineInfo.StartLinePosition.Line, originalLineInfo.StartLinePosition.Character, out startLineColumn))
+            if (!TryAdjustSpanIfNeededForVenus(_workspace, documentId, originalLineInfo.StartLinePosition.Line, originalLineInfo.StartLinePosition.Character, out var startLineColumn))
             {
                 startChanged = false;
                 startLineColumn = new MappedSpan(originalLineInfo.StartLinePosition.Line, originalLineInfo.StartLinePosition.Character, mappedLineInfo.StartLinePosition.Line, mappedLineInfo.StartLinePosition.Character);
             }
 
             var endChanged = true;
-            MappedSpan endLineColumn;
-            if (!TryAdjustSpanIfNeededForVenus(_workspace, documentId, originalLineInfo.EndLinePosition.Line, originalLineInfo.EndLinePosition.Character, out endLineColumn))
+            if (!TryAdjustSpanIfNeededForVenus(_workspace, documentId, originalLineInfo.EndLinePosition.Line, originalLineInfo.EndLinePosition.Character, out var endLineColumn))
             {
                 endChanged = false;
                 endLineColumn = new MappedSpan(originalLineInfo.EndLinePosition.Line, originalLineInfo.EndLinePosition.Character, mappedLineInfo.EndLinePosition.Line, mappedLineInfo.EndLinePosition.Character);
             }
 
-            originalSpan = new LinePositionSpan(startLineColumn.OriginalLinePosition, Max(startLineColumn.OriginalLinePosition, endLineColumn.OriginalLinePosition));
-            mappedSpan = new LinePositionSpan(startLineColumn.MappedLinePosition, Max(startLineColumn.MappedLinePosition, endLineColumn.MappedLinePosition));
+            // start and end position can be swapped when mapped between primary and secondary buffer if start position is within visible span (at the edge)
+            // but end position is outside of visible span. in that case, swap start and end position.
+            originalSpan = GetLinePositionSpan(startLineColumn.OriginalLinePosition, endLineColumn.OriginalLinePosition);
+            mappedSpan = GetLinePositionSpan(startLineColumn.MappedLinePosition, endLineColumn.MappedLinePosition);
+
             return startChanged || endChanged;
         }
 
-        private static LinePosition Max(LinePosition position1, LinePosition position2)
+        private LinePositionSpan GetLinePositionSpan(LinePosition position1, LinePosition position2)
         {
-            return position1 > position2 ? position1 : position2;
+            if (position1 <= position2)
+            {
+                return new LinePositionSpan(position1, position2);
+            }
+
+            return new LinePositionSpan(position2, position1);
         }
 
         public static LinePosition GetAdjustedLineColumn(Workspace workspace, DocumentId documentId, int originalLine, int originalColumn, int mappedLine, int mappedColumn)
         {
-            var vsWorkspace = workspace as VisualStudioWorkspaceImpl;
-            if (vsWorkspace == null)
+            if (!(workspace is VisualStudioWorkspaceImpl vsWorkspace))
             {
                 return new LinePosition(mappedLine, mappedColumn);
             }
 
-            MappedSpan span;
-            if (TryAdjustSpanIfNeededForVenus(vsWorkspace, documentId, originalLine, originalColumn, out span))
+            if (TryAdjustSpanIfNeededForVenus(vsWorkspace, documentId, originalLine, originalColumn, out var span))
             {
                 return span.MappedLinePosition;
             }
@@ -102,14 +147,14 @@ namespace Microsoft.VisualStudio.LanguageServices.Implementation.Diagnostics
 
         private static bool TryAdjustSpanIfNeededForVenus(VisualStudioWorkspaceImpl workspace, DocumentId documentId, int originalLine, int originalColumn, out MappedSpan mappedSpan)
         {
-            mappedSpan = default(MappedSpan);
+            mappedSpan = default;
 
             if (documentId == null)
             {
                 return false;
             }
 
-            var containedDocument = workspace.GetHostDocument(documentId) as ContainedDocument;
+            var containedDocument = workspace.TryGetContainedDocument(documentId);
             if (containedDocument == null)
             {
                 return false;
@@ -123,9 +168,8 @@ namespace Microsoft.VisualStudio.LanguageServices.Implementation.Diagnostics
                 iEndIndex = originalColumn
             };
 
-            var containedLanguage = containedDocument.ContainedLanguage;
-            var bufferCoordinator = containedLanguage.BufferCoordinator;
-            var containedLanguageHost = containedLanguage.ContainedLanguageHost;
+            var bufferCoordinator = containedDocument.BufferCoordinator;
+            var containedLanguageHost = containedDocument.ContainedLanguageHost;
 
             var spansOnPrimaryBuffer = new TextManager.Interop.TextSpan[1];
             if (VSConstants.S_OK == bufferCoordinator.MapSecondaryToPrimarySpan(originalSpanOnSecondaryBuffer, spansOnPrimaryBuffer))
@@ -136,7 +180,8 @@ namespace Microsoft.VisualStudio.LanguageServices.Implementation.Diagnostics
             }
 
             // we can't directly map span in subject buffer to surface buffer. see whether there is any visible span we can use from the subject buffer span
-            if (VSConstants.S_OK != containedLanguageHost.GetNearestVisibleToken(originalSpanOnSecondaryBuffer, spansOnPrimaryBuffer))
+            if (containedLanguageHost != null &&
+                VSConstants.S_OK != containedLanguageHost.GetNearestVisibleToken(originalSpanOnSecondaryBuffer, spansOnPrimaryBuffer))
             {
                 // no visible span we can use.
                 return false;
@@ -170,8 +215,7 @@ namespace Microsoft.VisualStudio.LanguageServices.Implementation.Diagnostics
                 return true;
             }
 
-            LinePosition adjustedPosition;
-            if (TryFixUpNearestVisibleSpan(containedLanguageHost, bufferCoordinator, nearestVisibleSpanOnSecondaryBuffer.iStartLine, nearestVisibleSpanOnSecondaryBuffer.iStartIndex, out adjustedPosition))
+            if (TryFixUpNearestVisibleSpan(bufferCoordinator, nearestVisibleSpanOnSecondaryBuffer.iStartLine, nearestVisibleSpanOnSecondaryBuffer.iStartIndex, out var adjustedPosition))
             {
                 // span has changed yet again, re-calculate span
                 return TryAdjustSpanIfNeededForVenus(workspace, documentId, adjustedPosition.Line, adjustedPosition.Character, out mappedSpan);
@@ -182,7 +226,7 @@ namespace Microsoft.VisualStudio.LanguageServices.Implementation.Diagnostics
         }
 
         private static bool TryFixUpNearestVisibleSpan(
-            TextManager.Interop.IVsContainedLanguageHost containedLanguageHost, TextManager.Interop.IVsTextBufferCoordinator bufferCoordinator,
+            TextManager.Interop.IVsTextBufferCoordinator bufferCoordinator,
             int originalLine, int originalColumn, out LinePosition adjustedPosition)
         {
             // GetNearestVisibleToken gives us the position right at the end of visible span.
@@ -195,10 +239,8 @@ namespace Microsoft.VisualStudio.LanguageServices.Implementation.Diagnostics
 
             if (originalLine > 1)
             {
-                TextManager.Interop.IVsTextLines secondaryBuffer;
-                int length;
-                if (VSConstants.S_OK == bufferCoordinator.GetSecondaryBuffer(out secondaryBuffer) &&
-                    VSConstants.S_OK == secondaryBuffer.GetLengthOfLine(originalLine - 1, out length))
+                if (VSConstants.S_OK == bufferCoordinator.GetSecondaryBuffer(out var secondaryBuffer) &&
+                    VSConstants.S_OK == secondaryBuffer.GetLengthOfLine(originalLine - 1, out var length))
                 {
                     adjustedPosition = new LinePosition(originalLine - 1, length);
                     return true;

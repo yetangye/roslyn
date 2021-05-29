@@ -1,61 +1,56 @@
-' Copyright (c) Microsoft.  All Rights Reserved.  Licensed under the Apache License, Version 2.0.  See License.txt in the project root for license information.
-
-Imports Microsoft.CodeAnalysis.Text
-Imports Microsoft.CodeAnalysis.VisualBasic
-Imports Microsoft.CodeAnalysis.VisualBasic.Symbols
-Imports Microsoft.CodeAnalysis.VisualBasic.Syntax
-Imports Roslyn.Test.Utilities
-Imports Xunit
+﻿' Licensed to the .NET Foundation under one or more agreements.
+' The .NET Foundation licenses this file to you under the MIT license.
+' See the LICENSE file in the project root for more information.
 
 Namespace Microsoft.CodeAnalysis.Editor.VisualBasic.UnitTests.Recommendations.Statements
     Public Class CaseKeywordRecommenderTests
         <Fact>
         <Trait(Traits.Feature, Traits.Features.KeywordRecommending)>
-        Public Sub CaseAfterSelect()
+        Public Sub CaseAfterSelectTest()
             VerifyRecommendationsContain(<MethodBody>Select |</MethodBody>, "Case")
         End Sub
 
         <Fact>
         <Trait(Traits.Feature, Traits.Features.KeywordRecommending)>
-        Public Sub NoCaseAfterQuerySelect()
+        Public Sub NoCaseAfterQuerySelectTest()
             VerifyRecommendationsMissing(<MethodBody>Dim q = From x in "abc" Select |</MethodBody>, "Case")
         End Sub
 
         <Fact>
         <Trait(Traits.Feature, Traits.Features.KeywordRecommending)>
-        Public Sub NoCaseElseAfterQuerySelect()
+        Public Sub NoCaseElseAfterQuerySelectTest()
             VerifyRecommendationsMissing(<MethodBody>Dim q = From x in "abc" Select |</MethodBody>, "Case Else")
         End Sub
 
         <Fact>
         <Trait(Traits.Feature, Traits.Features.KeywordRecommending)>
-        Public Sub CaseNotByItself()
+        Public Sub CaseNotByItselfTest()
             VerifyRecommendationsMissing(<MethodBody>|</MethodBody>, "Case")
         End Sub
 
         <Fact>
         <Trait(Traits.Feature, Traits.Features.KeywordRecommending)>
-        Public Sub CaseInSelectBlock()
+        Public Sub CaseInSelectBlockTest()
             VerifyRecommendationsContain(<MethodBody>
-Select Case foo
+Select Case goo
 |
 End Select</MethodBody>, "Case")
         End Sub
 
         <Fact>
         <Trait(Traits.Feature, Traits.Features.KeywordRecommending)>
-        Public Sub CaseElseInSelectBlock()
+        Public Sub CaseElseInSelectBlockTest()
             VerifyRecommendationsContain(<MethodBody>
-Select Case foo
+Select Case goo
 |
 End Select</MethodBody>, "Case Else")
         End Sub
 
         <Fact>
         <Trait(Traits.Feature, Traits.Features.KeywordRecommending)>
-        Public Sub CaseElseNotInSelectBlockThatAlreadyHasCaseElse()
+        Public Sub CaseElseNotInSelectBlockThatAlreadyHasCaseElseTest()
             VerifyRecommendationsMissing(<MethodBody>
-Select Case foo
+Select Case goo
 Case Else
 |
 End Select</MethodBody>, "Case Else")
@@ -63,20 +58,20 @@ End Select</MethodBody>, "Case Else")
 
         <Fact>
         <Trait(Traits.Feature, Traits.Features.KeywordRecommending)>
-        Public Sub CaseElseNotInSelectBlockIfBeforeCase()
+        Public Sub CaseElseNotInSelectBlockIfBeforeCaseTest()
             VerifyRecommendationsMissing(<MethodBody>
-Select Case foo
+Select Case goo
 |
 Case
 End Select</MethodBody>, "Case Else")
         End Sub
 
         <Fact>
-        <WorkItem(543384)>
+        <WorkItem(543384, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/543384")>
         <Trait(Traits.Feature, Traits.Features.KeywordRecommending)>
-        Public Sub NoCaseInSelectBlockIfAfterCaseElse()
+        Public Sub NoCaseInSelectBlockIfAfterCaseElseTest()
             VerifyRecommendationsMissing(<MethodBody>
-Select Case foo
+Select Case goo
     Case Else
         Dim i = 3
     |
@@ -84,11 +79,11 @@ End Select</MethodBody>, "Case")
         End Sub
 
         <Fact>
-        <WorkItem(543384)>
+        <WorkItem(543384, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/543384")>
         <Trait(Traits.Feature, Traits.Features.KeywordRecommending)>
-        Public Sub CaseInSelectBlockBeforeCaseElse()
+        Public Sub CaseInSelectBlockBeforeCaseElseTest()
             VerifyRecommendationsContain(<MethodBody>
-Select Case foo
+Select Case goo
     |
     Case Else
         Dim i = 3
@@ -97,9 +92,9 @@ End Select</MethodBody>, "Case")
 
         <Fact>
         <Trait(Traits.Feature, Traits.Features.KeywordRecommending)>
-        Public Sub NoCaseIsInSelectBlock()
+        Public Sub NoCaseIsInSelectBlockTest()
             VerifyRecommendationsMissing(<MethodBody>
-Select Case foo
+Select Case goo
 |
 End Select</MethodBody>, "Case Is")
         End Sub

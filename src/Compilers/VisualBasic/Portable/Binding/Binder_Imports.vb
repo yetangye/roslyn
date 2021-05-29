@@ -1,7 +1,10 @@
-﻿' Copyright (c) Microsoft.  All Rights Reserved.  Licensed under the Apache License, Version 2.0.  See License.txt in the project root for license information.
+﻿' Licensed to the .NET Foundation under one or more agreements.
+' The .NET Foundation licenses this file to you under the MIT license.
+' See the LICENSE file in the project root for more information.
 
 Imports System.Collections.Generic
 Imports System.Threading
+Imports Microsoft.CodeAnalysis.PooledObjects
 Imports Microsoft.CodeAnalysis.Text
 Imports Microsoft.CodeAnalysis.VisualBasic.Symbols
 Imports Microsoft.CodeAnalysis.VisualBasic.Syntax
@@ -27,8 +30,8 @@ Namespace Microsoft.CodeAnalysis.VisualBasic
         Public ReadOnly Aliases As Dictionary(Of String, AliasAndImportsClausePosition)
         Public ReadOnly XmlNamespaces As Dictionary(Of String, XmlNamespaceAndImportsClausePosition)
 
-        Public MustOverride Sub AddMember(syntaxRef As SyntaxReference, member As NamespaceOrTypeSymbol, importsClausePosition As Integer)
-        Public MustOverride Sub AddAlias(syntaxRef As SyntaxReference, name As String, [alias] As AliasSymbol, importsClausePosition As Integer)
+        Public MustOverride Sub AddMember(syntaxRef As SyntaxReference, member As NamespaceOrTypeSymbol, importsClausePosition As Integer, dependencies As IReadOnlyCollection(Of AssemblySymbol))
+        Public MustOverride Sub AddAlias(syntaxRef As SyntaxReference, name As String, [alias] As AliasSymbol, importsClausePosition As Integer, dependencies As IReadOnlyCollection(Of AssemblySymbol))
     End Class
 
     Partial Friend Class Binder
@@ -74,7 +77,10 @@ Namespace Microsoft.CodeAnalysis.VisualBasic
             Private Shared Sub BindAliasImportsClause(aliasImportSyntax As SimpleImportsClauseSyntax,
                                                       binder As Binder,
                                                       data As ImportData,
-                                                      diagBag As DiagnosticBag)
+                                                      diagnostics As DiagnosticBag)
+                Dim dependenciesBag = PooledHashSet(Of AssemblySymbol).GetInstance()
+                Dim diagBag = New BindingDiagnosticBag(diagnostics, dependenciesBag)
+
                 Dim aliasesName = aliasImportSyntax.Name
                 Dim aliasTarget As NamespaceOrTypeSymbol = binder.BindNamespaceOrTypeSyntax(aliasesName, diagBag)
 
@@ -90,63 +96,72 @@ Namespace Microsoft.CodeAnalysis.VisualBasic
                     End If
                 End If
 
-                If aliasTarget.Kind <> SymbolKind.ErrorType Then
-                    Dim aliasIdentifier = aliasImportSyntax.Alias.Identifier
-                    Dim aliasText = aliasIdentifier.ValueText
-                    ' Parser checks for type characters on alias text, so don't need to check again here.
+                Dim aliasIdentifier = aliasImportSyntax.Alias.Identifier
+                Dim aliasText = aliasIdentifier.ValueText
+                ' Parser checks for type characters on alias text, so don't need to check again here.
 
-                    ' Check for duplicate symbol.
-                    If data.Aliases.ContainsKey(aliasText) Then
-                        Binder.ReportDiagnostic(diagBag, aliasIdentifier, ERRID.ERR_DuplicateNamedImportAlias1, aliasText)
-                    Else
-                        ' Make sure that the Import's alias doesn't have the same name as a type or a namespace in the global namespace
-                        Dim conflictsWith = binder.Compilation.GlobalNamespace.GetMembers(aliasText)
+                ' Check for duplicate symbol.
+                If data.Aliases.ContainsKey(aliasText) Then
+                    Binder.ReportDiagnostic(diagBag, aliasIdentifier, ERRID.ERR_DuplicateNamedImportAlias1, aliasText)
+                Else
+                    ' Make sure that the Import's alias doesn't have the same name as a type or a namespace in the global namespace
+                    Dim conflictsWith = binder.Compilation.GlobalNamespace.GetMembers(aliasText)
 
-                        If Not conflictsWith.IsEmpty Then
-                            ' TODO: Note that symbol's name in this error message is supposed to include Class/Namespace word at the beginning.
-                            '       Might need to use special format for that parameter in the error message. 
-                            Binder.ReportDiagnostic(diagBag,
+                    If Not conflictsWith.IsEmpty Then
+                        ' TODO: Note that symbol's name in this error message is supposed to include Class/Namespace word at the beginning.
+                        '       Might need to use special format for that parameter in the error message. 
+                        Binder.ReportDiagnostic(diagBag,
                                                     aliasImportSyntax,
                                                     ERRID.ERR_ImportAliasConflictsWithType2,
                                                     aliasText,
                                                     conflictsWith(0))
-                        Else
-                            ' NOTE: we are mimicing Dev10 behavior where referencing type symbol in 
-                            '       alias 'declaration' fails in case the symbol has errors.
-                            Dim useSiteErrorInfo As DiagnosticInfo = aliasTarget.GetUseSiteErrorInfo()
-                            If Not AllowAliasWithUseSiteError(useSiteErrorInfo) Then
-                                Binder.ReportDiagnostic(diagBag, aliasImportSyntax, useSiteErrorInfo)
-                                ' NOTE: Do not create an alias!!!
+                    Else
+                        If aliasTarget.Kind <> SymbolKind.ErrorType Then
+                            Dim useSiteInfo As UseSiteInfo(Of AssemblySymbol) = aliasTarget.GetUseSiteInfo()
 
+                            If ShouldReportUseSiteErrorForAlias(useSiteInfo.DiagnosticInfo) Then
+                                Binder.ReportUseSite(diagBag, aliasImportSyntax, useSiteInfo)
                             Else
-                                Dim aliasSymbol = New AliasSymbol(binder.Compilation,
-                                                                 binder.ContainingNamespaceOrType,
-                                                                 aliasText,
-                                                                 aliasTarget,
-                                                                 If(binder.BindingLocation = BindingLocation.ProjectImportsDeclaration, NoLocation.Singleton, aliasIdentifier.GetLocation()))
-
-                                data.AddAlias(binder.GetSyntaxReference(aliasImportSyntax), aliasText, aliasSymbol, aliasImportSyntax.SpanStart)
+                                diagBag.AddDependencies(useSiteInfo)
                             End If
+                        Else
+                            dependenciesBag.Clear()
                         End If
+
+                        ' We create the alias symbol even when the target is erroneous, 
+                        ' so that we can bind to the alias and avoid cascading errors.
+                        ' As a result the further consumers of the aliases have to account for the error case.
+                        Dim aliasSymbol = New AliasSymbol(binder.Compilation,
+                                                             binder.ContainingNamespaceOrType,
+                                                             aliasText,
+                                                             aliasTarget,
+                                                             If(binder.BindingLocation = BindingLocation.ProjectImportsDeclaration, NoLocation.Singleton, aliasIdentifier.GetLocation()))
+
+                        data.AddAlias(binder.GetSyntaxReference(aliasImportSyntax), aliasText, aliasSymbol, aliasImportSyntax.SpanStart, dependenciesBag)
                     End If
                 End If
+
+                dependenciesBag.Free()
             End Sub
 
             ''' <summary>
-            ''' Checks use site error and returns True in case the alias should still be created for the
-            ''' type with this site error. In current implementation checks for errors ##36924, 36925
+            ''' Checks use site error and returns True in case it should be reported for the alias. 
+            ''' In current implementation checks for errors #36924 and #36925
             ''' </summary>
-            Private Shared Function AllowAliasWithUseSiteError(useSiteErrorInfo As DiagnosticInfo) As Boolean
-                Return useSiteErrorInfo Is Nothing OrElse
-                        useSiteErrorInfo.Code = ERRID.ERR_CannotUseGenericTypeAcrossAssemblyBoundaries OrElse
-                        useSiteErrorInfo.Code = ERRID.ERR_CannotUseGenericBaseTypeAcrossAssemblyBoundaries
+            Private Shared Function ShouldReportUseSiteErrorForAlias(useSiteErrorInfo As DiagnosticInfo) As Boolean
+                Return useSiteErrorInfo IsNot Nothing AndAlso
+                       useSiteErrorInfo.Code <> ERRID.ERR_CannotUseGenericTypeAcrossAssemblyBoundaries AndAlso
+                       useSiteErrorInfo.Code <> ERRID.ERR_CannotUseGenericBaseTypeAcrossAssemblyBoundaries
             End Function
 
             ' Bind a members imports clause. If it is OK, and also unique, add it to the members imports set.
             Private Shared Sub BindMembersImportsClause(membersImportsSyntax As SimpleImportsClauseSyntax,
                                                         binder As Binder,
                                                         data As ImportData,
-                                                        diagBag As DiagnosticBag)
+                                                        diagnostics As DiagnosticBag)
+                Dim dependenciesBag = PooledHashSet(Of AssemblySymbol).GetInstance()
+                Dim diagBag = New BindingDiagnosticBag(diagnostics, dependenciesBag)
+
                 Debug.Assert(membersImportsSyntax.Alias Is Nothing)
                 Dim importsName = membersImportsSyntax.Name
                 Dim importedSymbol As NamespaceOrTypeSymbol = binder.BindNamespaceOrTypeSyntax(importsName, diagBag)
@@ -191,16 +206,25 @@ Namespace Microsoft.CodeAnalysis.VisualBasic
                         End If
 
                         If importedSymbolIsValid Then
-                            data.AddMember(binder.GetSyntaxReference(importsName), importedSymbol, membersImportsSyntax.SpanStart)
+                            data.AddMember(binder.GetSyntaxReference(importsName), importedSymbol, membersImportsSyntax.SpanStart, dependenciesBag)
                         End If
                     End If
                 End If
+
+                dependenciesBag.Free()
             End Sub
 
             Private Shared Sub BindXmlNamespaceImportsClause(syntax As XmlNamespaceImportsClauseSyntax,
                                                              binder As Binder,
                                                              data As ImportData,
-                                                             diagBag As DiagnosticBag)
+                                                             diagnostics As DiagnosticBag)
+#If DEBUG Then
+                Dim dependenciesBag = PooledHashSet(Of AssemblySymbol).GetInstance()
+                Dim diagBag = New BindingDiagnosticBag(diagnostics, dependenciesBag)
+#Else
+                Dim diagBag = New BindingDiagnosticBag(diagnostics)
+#End If
+
                 Dim prefix As String = Nothing
                 Dim namespaceName As String = Nothing
                 Dim [namespace] As BoundExpression = Nothing
@@ -216,6 +240,10 @@ Namespace Microsoft.CodeAnalysis.VisualBasic
                         data.XmlNamespaces.Add(prefix, New XmlNamespaceAndImportsClausePosition(namespaceName, syntax.SpanStart))
                     End If
                 End If
+#If DEBUG Then
+                Debug.Assert(dependenciesBag.Count = 0)
+                dependenciesBag.Free()
+#End If
             End Sub
         End Class
     End Class

@@ -1,8 +1,11 @@
-﻿' Copyright (c) Microsoft.  All Rights Reserved.  Licensed under the Apache License, Version 2.0.  See License.txt in the project root for license information.
+﻿' Licensed to the .NET Foundation under one or more agreements.
+' The .NET Foundation licenses this file to you under the MIT license.
+' See the LICENSE file in the project root for more information.
 
 Imports System.Diagnostics
 Imports System.Linq
 Imports Microsoft.CodeAnalysis.Collections
+Imports Microsoft.CodeAnalysis.PooledObjects
 Imports Microsoft.CodeAnalysis.Text
 Imports Microsoft.CodeAnalysis.VisualBasic.Symbols
 Imports Microsoft.CodeAnalysis.VisualBasic.Syntax
@@ -113,7 +116,7 @@ Namespace Microsoft.CodeAnalysis.VisualBasic
                     End If
                 Next
 
-                Debug.Assert(False)
+                Throw ExceptionUtilities.Unreachable
             End Sub
 
 
@@ -128,12 +131,12 @@ Namespace Microsoft.CodeAnalysis.VisualBasic
                 Dim orderedList = ArrayBuilder(Of TGraphNode).GetInstance()
                 Dfs(orderedList)
 
-                ' Step 2: Reset graph algorith Data
+                ' Step 2: Reset graph algorithm Data
                 For Each current As TGraphNode In orderedList
                     current.AlgorithmData = New GraphAlgorithmData(Of TGraphNode)()
                 Next
 
-                ' Step 3: Walk the nodes and place each tree in the forrest in a separate node.
+                ' Step 3: Walk the nodes and place each tree in the forest in a separate node.
                 For Each current As TGraphNode In orderedList
                     If current.AlgorithmData.Color = DFSColor.None Then
                         Dim sccNode As New StronglyConnectedComponent(Of TGraphNode)(sccGraph)

@@ -1,9 +1,12 @@
-﻿' Copyright (c) Microsoft.  All Rights Reserved.  Licensed under the Apache License, Version 2.0.  See License.txt in the project root for license information.
+﻿' Licensed to the .NET Foundation under one or more agreements.
+' The .NET Foundation licenses this file to you under the MIT license.
+' See the LICENSE file in the project root for more information.
 
+Imports System.Collections.Immutable
+Imports System.ComponentModel
 Imports System.Text
 Imports System.Threading
 Imports System.Threading.Tasks
-Imports Microsoft.CodeAnalysis.Instrumentation
 Imports Microsoft.CodeAnalysis.Text
 Imports Microsoft.CodeAnalysis.VisualBasic.Symbols
 Imports Microsoft.CodeAnalysis.VisualBasic.Syntax
@@ -83,8 +86,7 @@ Namespace Microsoft.CodeAnalysis.VisualBasic
             Get
                 Debug.Assert(Me.HasCompilationUnitRoot)
 
-                Return (Options.Kind = SourceCodeKind.Interactive OrElse Options.Kind = SourceCodeKind.Script) AndAlso
-                        GetCompilationUnitRoot().GetReferenceDirectives().Count > 0
+                Return Options.Kind = SourceCodeKind.Script AndAlso GetCompilationUnitRoot().GetReferenceDirectives().Count > 0
             End Get
         End Property
 
@@ -97,16 +99,14 @@ Namespace Microsoft.CodeAnalysis.VisualBasic
         ''' source text.
         ''' </remarks>
         Public Overrides Function WithChangedText(newText As SourceText) As SyntaxTree
-            Using Logger.LogBlock(FunctionId.VisualBasic_SyntaxTree_IncrementalParse, message:=Me.FilePath)
-                ' try to find the changes between the old text and the new text.
-                Dim oldText As SourceText = Nothing
-                If Me.TryGetText(oldText) Then
-                    Return Me.WithChanges(newText, newText.GetChangeRanges(oldText).ToArray())
-                End If
+            ' try to find the changes between the old text and the new text.
+            Dim oldText As SourceText = Nothing
+            If Me.TryGetText(oldText) Then
+                Return Me.WithChanges(newText, newText.GetChangeRanges(oldText).ToArray())
+            End If
 
-                ' if we do not easily know the old text, then specify entire text as changed so we do a full reparse.
-                Return Me.WithChanges(newText, {New TextChangeRange(New TextSpan(0, Me.Length), newText.Length)})
-            End Using
+            ' if we do not easily know the old text, then specify entire text as changed so we do a full reparse.
+            Return Me.WithChanges(newText, {New TextChangeRange(New TextSpan(0, Me.Length), newText.Length)})
         End Function
 
         ''' <summary>
@@ -114,13 +114,13 @@ Namespace Microsoft.CodeAnalysis.VisualBasic
         ''' </summary>
         Private Function WithChanges(newText As SourceText, changes As TextChangeRange()) As SyntaxTree
             If changes Is Nothing Then
-                Throw New ArgumentNullException("changes")
+                Throw New ArgumentNullException(NameOf(changes))
             End If
 
-            Dim scanner As scanner
+            Dim scanner As Scanner
             If changes.Length = 1 AndAlso changes(0).Span = New TextSpan(0, Me.Length) AndAlso changes(0).NewLength = newText.Length Then
                 ' if entire text is replaced then do a full reparse
-                scanner = New scanner(newText, Options)
+                scanner = New Scanner(newText, Options)
             Else
                 scanner = New Blender(newText, changes, Me, Me.Options)
             End If
@@ -131,7 +131,18 @@ Namespace Microsoft.CodeAnalysis.VisualBasic
             End Using
 
             Dim root = DirectCast(node.CreateRed(Nothing, 0), CompilationUnitSyntax)
-            Dim tree = New ParsedSyntaxTree(newText, newText.Encoding, newText.ChecksumAlgorithm, Me.FilePath, Options, root, isMyTemplate:=False)
+            ' Diagnostic options are obsolete, but preserved for compat
+#Disable Warning BC40000
+            Dim tree = New ParsedSyntaxTree(
+                newText,
+                newText.Encoding,
+                newText.ChecksumAlgorithm,
+                FilePath,
+                Options,
+                root,
+                isMyTemplate:=False,
+                DiagnosticOptions)
+#Enable Warning BC40000
 
             tree.VerifySource(changes)
             Return tree
@@ -146,12 +157,14 @@ Namespace Microsoft.CodeAnalysis.VisualBasic
         ''' <summary>
         ''' Creates a new syntax tree from a syntax node.
         ''' </summary>
+        ''' <param name="diagnosticOptions">An obsolete parameter. Diagnostic options should now be passed with <see cref="CompilationOptions.SyntaxTreeOptionsProvider"/></param>
         Public Shared Function Create(root As VisualBasicSyntaxNode,
                                       Optional options As VisualBasicParseOptions = Nothing,
                                       Optional path As String = "",
-                                      Optional encoding As Encoding = Nothing) As SyntaxTree
+                                      Optional encoding As Encoding = Nothing,
+                                      Optional diagnosticOptions As ImmutableDictionary(Of String, ReportDiagnostic) = Nothing) As SyntaxTree
             If root Is Nothing Then
-                Throw New ArgumentNullException("root")
+                Throw New ArgumentNullException(NameOf(root))
             End If
 
             Return New ParsedSyntaxTree(
@@ -161,7 +174,8 @@ Namespace Microsoft.CodeAnalysis.VisualBasic
                 path:=path,
                 options:=If(options, VisualBasicParseOptions.Default),
                 syntaxRoot:=root,
-                isMyTemplate:=False)
+                isMyTemplate:=False,
+                diagnosticOptions)
         End Function
 
         ''' <summary>
@@ -183,15 +197,18 @@ Namespace Microsoft.CodeAnalysis.VisualBasic
                 options:=VisualBasicParseOptions.Default,
                 syntaxRoot:=root,
                 isMyTemplate:=False,
+                diagnosticOptions:=Nothing,
                 cloneRoot:=False)
         End Function
 
+        ''' <param name="diagnosticOptions">An obsolete parameter. Diagnostic options should now be passed with <see cref="CompilationOptions.SyntaxTreeOptionsProvider"/></param>
         Public Shared Function ParseText(text As String,
                                          Optional options As VisualBasicParseOptions = Nothing,
                                          Optional path As String = "",
                                          Optional encoding As Encoding = Nothing,
+                                         Optional diagnosticOptions As ImmutableDictionary(Of String, ReportDiagnostic) = Nothing,
                                          Optional cancellationToken As CancellationToken = Nothing) As SyntaxTree
-            Return ParseText(text, False, options, path, encoding, cancellationToken)
+            Return ParseText(text, isMyTemplate:=False, options, path, encoding, diagnosticOptions, cancellationToken)
         End Function
 
         Friend Shared Function ParseText(text As String,
@@ -199,8 +216,15 @@ Namespace Microsoft.CodeAnalysis.VisualBasic
                                          Optional options As VisualBasicParseOptions = Nothing,
                                          Optional path As String = "",
                                          Optional encoding As Encoding = Nothing,
+                                         Optional diagnosticOptions As ImmutableDictionary(Of String, ReportDiagnostic) = Nothing,
                                          Optional cancellationToken As CancellationToken = Nothing) As SyntaxTree
-            Return ParseText(SourceText.From(text, encoding), isMyTemplate, options, path, cancellationToken)
+            Return ParseText(
+                SourceText.From(text, encoding),
+                isMyTemplate,
+                options,
+                path,
+                diagnosticOptions,
+                cancellationToken)
         End Function
 
         ''' <summary>
@@ -209,38 +233,49 @@ Namespace Microsoft.CodeAnalysis.VisualBasic
         Public Shared Function ParseText(text As SourceText,
                                          Optional options As VisualBasicParseOptions = Nothing,
                                          Optional path As String = "",
+                                         Optional diagnosticOptions As ImmutableDictionary(Of String, ReportDiagnostic) = Nothing,
                                          Optional cancellationToken As CancellationToken = Nothing) As SyntaxTree
-            Return ParseText(text, False, options, path, cancellationToken)
+            Return ParseText(
+                text,
+                isMyTemplate:=False,
+                options,
+                path,
+                diagnosticOptions:=diagnosticOptions,
+                cancellationToken)
         End Function
 
-        Friend Shared Function ParseText(text As SourceText,
-                                         isMyTemplate As Boolean,
-                                         Optional options As VisualBasicParseOptions = Nothing,
-                                         Optional path As String = "",
-                                         Optional cancellationToken As CancellationToken = Nothing) As SyntaxTree
+        Friend Shared Function ParseText(
+            text As SourceText,
+            isMyTemplate As Boolean,
+            Optional parseOptions As VisualBasicParseOptions = Nothing,
+            Optional path As String = "",
+            Optional diagnosticOptions As ImmutableDictionary(Of String, ReportDiagnostic) = Nothing,
+            Optional cancellationToken As CancellationToken = Nothing) As SyntaxTree
 
             If text Is Nothing Then
-                Throw New ArgumentNullException("text")
+                Throw New ArgumentNullException(NameOf(text))
             End If
 
-            If path Is Nothing Then
-                Throw New ArgumentNullException("path")
-            End If
+            parseOptions = If(parseOptions, VisualBasicParseOptions.Default)
 
-            Using Logger.LogBlock(FunctionId.VisualBasic_SyntaxTree_FullParse, path, text.Length, cancellationToken)
-                options = If(options, VisualBasicParseOptions.Default)
-
-                Dim node As InternalSyntax.CompilationUnitSyntax
-                Using parser As New parser(text, options, cancellationToken)
-                    node = parser.ParseCompilationUnit()
-                End Using
-
-                Dim root = DirectCast(node.CreateRed(Nothing, 0), CompilationUnitSyntax)
-                Dim tree = New ParsedSyntaxTree(text, text.Encoding, text.ChecksumAlgorithm, path, options, root, isMyTemplate)
-
-                tree.VerifySource()
-                Return tree
+            Dim node As InternalSyntax.CompilationUnitSyntax
+            Using parser As New Parser(text, parseOptions, cancellationToken)
+                node = parser.ParseCompilationUnit()
             End Using
+
+            Dim root = DirectCast(node.CreateRed(Nothing, 0), CompilationUnitSyntax)
+            Dim tree = New ParsedSyntaxTree(
+                text,
+                text.Encoding,
+                text.ChecksumAlgorithm,
+                path,
+                parseOptions,
+                root,
+                isMyTemplate,
+                diagnosticOptions:=diagnosticOptions)
+
+            tree.VerifySource()
+            Return tree
         End Function
 
         ''' <summary>
@@ -250,7 +285,7 @@ Namespace Microsoft.CodeAnalysis.VisualBasic
         ''' This method does not filter diagnostics based on compiler options like /nowarn, /warnaserror etc.
         ''' </remarks>
         Public Overrides Function GetDiagnostics(node As SyntaxNode) As IEnumerable(Of Diagnostic)
-            If node Is Nothing Then Throw New ArgumentNullException("node")
+            If node Is Nothing Then Throw New ArgumentNullException(NameOf(node))
 
             Return Me.GetDiagnostics(DirectCast(node.Green, InternalSyntax.VisualBasicSyntaxNode), DirectCast(node, VisualBasicSyntaxNode).Position, InDocumentationComment(node))
         End Function
@@ -409,15 +444,15 @@ Namespace Microsoft.CodeAnalysis.VisualBasic
 
         ' Gets the reporting state for a warning (diagnostic) at a given source location based on warning directives.
         Friend Function GetWarningState(id As String, position As Integer) As ReportDiagnostic
-            If lazyWarningStateMap Is Nothing Then
+            If _lazyWarningStateMap Is Nothing Then
                 ' Create the warning state map on demand.
-                Interlocked.CompareExchange(lazyWarningStateMap, New VisualBasicWarningStateMap(Me), Nothing)
+                Interlocked.CompareExchange(_lazyWarningStateMap, New VisualBasicWarningStateMap(Me), Nothing)
             End If
 
-            Return lazyWarningStateMap.GetWarningState(id, position)
+            Return _lazyWarningStateMap.GetWarningState(id, position)
         End Function
 
-        Private lazyWarningStateMap As VisualBasicWarningStateMap
+        Private _lazyWarningStateMap As VisualBasicWarningStateMap
 
         Private Function GetLinePosition(position As Integer) As LinePosition
             Return Me.GetText().Lines.GetLinePosition(position)
@@ -456,7 +491,7 @@ Namespace Microsoft.CodeAnalysis.VisualBasic
         ''' <remarks>The list is pessimistic because it may claim more or larger regions than actually changed.</remarks>
         Public Overrides Function GetChangedSpans(oldTree As SyntaxTree) As IList(Of TextSpan)
             If oldTree Is Nothing Then
-                Throw New ArgumentNullException("oldTree")
+                Throw New ArgumentNullException(NameOf(oldTree))
             End If
 
             Return SyntaxDiffer.GetPossiblyDifferentTextSpans(oldTree.GetRoot(), Me.GetRoot())
@@ -469,7 +504,7 @@ Namespace Microsoft.CodeAnalysis.VisualBasic
         ''' <remarks>The list of changes may be different than the original changes that produced this tree.</remarks>
         Public Overrides Function GetChanges(oldTree As SyntaxTree) As IList(Of TextChange)
             If oldTree Is Nothing Then
-                Throw New ArgumentNullException("oldTree")
+                Throw New ArgumentNullException(NameOf(oldTree))
             End If
 
             Return SyntaxDiffer.GetTextChanges(oldTree, Me)
@@ -521,7 +556,7 @@ Namespace Microsoft.CodeAnalysis.VisualBasic
         Friend Function IsAnyPreprocessorSymbolDefined(conditionalSymbolNames As IEnumerable(Of String), atNode As SyntaxNodeOrToken) As Boolean
             Debug.Assert(conditionalSymbolNames IsNot Nothing)
 
-            Dim conditionalSymbolsMap As conditionalSymbolsMap = Me.ConditionalSymbols
+            Dim conditionalSymbolsMap As ConditionalSymbolsMap = Me.ConditionalSymbols
             If conditionalSymbolsMap Is Nothing Then
                 Return False
             End If
@@ -544,5 +579,32 @@ Namespace Microsoft.CodeAnalysis.VisualBasic
 
 #End Region
 
+        ' 2.8 BACK COMPAT OVERLOAD -- DO NOT MODIFY
+        <EditorBrowsable(EditorBrowsableState.Never)>
+        Public Shared Function ParseText(text As String,
+                                         options As VisualBasicParseOptions,
+                                         path As String,
+                                         encoding As Encoding,
+                                         cancellationToken As CancellationToken) As SyntaxTree
+            Return ParseText(text, options, path, encoding, diagnosticOptions:=Nothing, cancellationToken)
+        End Function
+
+        ' 2.8 BACK COMPAT OVERLOAD -- DO NOT MODIFY
+        <EditorBrowsable(EditorBrowsableState.Never)>
+        Public Shared Function ParseText(text As SourceText,
+                                         options As VisualBasicParseOptions,
+                                         path As String,
+                                         cancellationToken As CancellationToken) As SyntaxTree
+            Return ParseText(text, options, path, diagnosticOptions:=Nothing, cancellationToken)
+        End Function
+
+        ' 2.8 BACK COMPAT OVERLOAD -- DO NOT MODIFY
+        <EditorBrowsable(EditorBrowsableState.Never)>
+        Public Shared Function Create(root As VisualBasicSyntaxNode,
+                                      options As VisualBasicParseOptions,
+                                      path As String,
+                                      encoding As Encoding) As SyntaxTree
+            Return Create(root, options, path, encoding, diagnosticOptions:=Nothing)
+        End Function
     End Class
 End Namespace

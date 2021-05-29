@@ -1,4 +1,8 @@
-' Copyright (c) Microsoft.  All Rights Reserved.  Licensed under the Apache License, Version 2.0.  See License.txt in the project root for license information.
+﻿' Licensed to the .NET Foundation under one or more agreements.
+' The .NET Foundation licenses this file to you under the MIT license.
+' See the LICENSE file in the project root for more information.
+
+Imports System.Threading.Tasks
 
 Namespace Microsoft.VisualStudio.LanguageServices.UnitTests.CodeModel
     Public MustInherit Class AbstractCodeImportTests
@@ -37,12 +41,10 @@ Namespace Microsoft.VisualStudio.LanguageServices.UnitTests.CodeModel
         End Function
 
         Protected Sub TestNamespace(code As XElement, expectedNamespace As String)
-            Using state = CreateCodeModelTestState(GetWorkspaceDefinition(code))
-                Dim codeElement = state.GetCodeElementAtCursor(Of EnvDTE80.CodeImport)()
-                Assert.NotNull(codeElement)
-
-                Assert.Equal(expectedNamespace, codeElement.Namespace)
-            End Using
+            TestElement(code,
+                Sub(codeElement)
+                    Assert.Equal(expectedNamespace, codeElement.Namespace)
+                End Sub)
         End Sub
 
     End Class

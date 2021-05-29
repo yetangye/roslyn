@@ -1,4 +1,6 @@
-﻿// Copyright (c) Microsoft.  All Rights Reserved.  Licensed under the Apache License, Version 2.0.  See License.txt in the project root for license information.
+﻿// Licensed to the .NET Foundation under one or more agreements.
+// The .NET Foundation licenses this file to you under the MIT license.
+// See the LICENSE file in the project root for more information.
 
 using System;
 using System.Diagnostics;
@@ -10,7 +12,7 @@ namespace Microsoft.CodeAnalysis.Collections
     /// A set of ints that is small, thread-safe and lock free.
     /// Several assumptions have been made that allow it to be small and fast:
     /// 1. Deletes never happen.
-    /// 2. The size is small. In dogfooding experiements, 89% had 4 or fewer elements and
+    /// 2. The size is small. In dogfooding experiments, 89% had 4 or fewer elements and
     ///    98% had 8 or fewer elements. The largest size was 17.
     /// 3. As a result of assumption 2, linear look-up is good enough.
     /// 4. One value, in this case int.MinValue, is used as a sentinel and may never appear in the set.
@@ -23,7 +25,7 @@ namespace Microsoft.CodeAnalysis.Collections
         private int _v2;
         private int _v3;
         private int _v4;
-        private SmallConcurrentSetOfInts _next;
+        private SmallConcurrentSetOfInts? _next;
 
         private const int unoccupied = int.MinValue;
 
@@ -51,18 +53,19 @@ namespace Microsoft.CodeAnalysis.Collections
 
         private static bool Contains(SmallConcurrentSetOfInts set, int i)
         {
+            SmallConcurrentSetOfInts? current = set;
             do
             {
                 // PERF: Not testing for unoccupied slots since it adds complexity. The extra comparisons
                 // would slow down this inner loop such that any benefit of an 'early out' would be lost.
-                if (set._v1 == i || set._v2 == i || set._v3 == i || set._v4 == i)
+                if (current._v1 == i || current._v2 == i || current._v3 == i || current._v4 == i)
                 {
                     return true;
                 }
 
-                set = set._next;
+                current = current._next;
             }
-            while (set != null);
+            while (current != null);
 
             return false;
         }

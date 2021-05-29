@@ -1,4 +1,6 @@
-﻿' Copyright (c) Microsoft.  All Rights Reserved.  Licensed under the Apache License, Version 2.0.  See License.txt in the project root for license information.
+﻿' Licensed to the .NET Foundation under one or more agreements.
+' The .NET Foundation licenses this file to you under the MIT license.
+' See the LICENSE file in the project root for more information.
 
 Imports System.Collections.Immutable
 Imports System.Diagnostics
@@ -11,22 +13,86 @@ Imports TypeKind = Microsoft.CodeAnalysis.TypeKind
 Namespace Microsoft.CodeAnalysis.VisualBasic
     Partial Friend NotInheritable Class LocalRewriter
         Public Overrides Function VisitTryStatement(node As BoundTryStatement) As BoundNode
-            Debug.Assert(unstructuredExceptionHandling.Context Is Nothing)
+            Debug.Assert(_unstructuredExceptionHandling.Context Is Nothing)
 
-            Dim rewrittenTryBlock = RewriteTryBlock(node.TryBlock)
+            Dim rewrittenTryBlock = RewriteTryBlock(node)
             Dim rewrittenCatchBlocks = VisitList(node.CatchBlocks)
-            Dim rewrittenFinally = RewriteFinallyBlock(node.FinallyBlockOpt)
+            Dim rewrittenFinally = RewriteFinallyBlock(node)
 
-            Return RewriteTryStatement(node.Syntax, rewrittenTryBlock, rewrittenCatchBlocks, rewrittenFinally, node.ExitLabelOpt)
+            Dim rewritten As BoundStatement = RewriteTryStatement(node.Syntax, rewrittenTryBlock, rewrittenCatchBlocks, rewrittenFinally, node.ExitLabelOpt)
+
+            If Me.Instrument(node) Then
+                Dim syntax = TryCast(node.Syntax, TryBlockSyntax)
+
+                If syntax IsNot Nothing Then
+                    rewritten = _instrumenterOpt.InstrumentTryStatement(node, rewritten)
+                End If
+            End If
+
+            Return rewritten
+        End Function
+
+        ''' <summary>
+        ''' Is there any code to execute in the given statement that could have side-effects,
+        ''' such as throwing an exception? This implementation is conservative, in the sense
+        ''' that it may return true when the statement actually may have no side effects.
+        ''' </summary>
+        Private Shared Function HasSideEffects(statement As BoundStatement) As Boolean
+            If statement Is Nothing Then
+                Return False
+            End If
+
+            Select Case statement.Kind
+                Case BoundKind.NoOpStatement
+                    Return False
+                Case BoundKind.Block
+                    Dim block = DirectCast(statement, BoundBlock)
+                    For Each s In block.Statements
+                        If HasSideEffects(s) Then
+                            Return True
+                        End If
+                    Next
+                    Return False
+                Case BoundKind.SequencePoint
+                    Dim sequence = DirectCast(statement, BoundSequencePoint)
+                    Return HasSideEffects(sequence.StatementOpt)
+                Case BoundKind.SequencePointWithSpan
+                    Dim sequence = DirectCast(statement, BoundSequencePointWithSpan)
+                    Return HasSideEffects(sequence.StatementOpt)
+                Case Else
+                    Return True
+            End Select
         End Function
 
         Public Function RewriteTryStatement(
-            syntaxNode As VisualBasicSyntaxNode,
+            syntaxNode As SyntaxNode,
             tryBlock As BoundBlock,
             catchBlocks As ImmutableArray(Of BoundCatchBlock),
             finallyBlockOpt As BoundBlock,
             exitLabelOpt As LabelSymbol
         ) As BoundStatement
+            If Not Me.OptimizationLevelIsDebug Then
+                ' When optimizing and the try block has no side effects, we can discard the catch blocks.
+                If Not HasSideEffects(tryBlock) Then
+                    catchBlocks = ImmutableArray(Of BoundCatchBlock).Empty
+                End If
+
+                ' A finally block with no side effects can be omitted.
+                If Not HasSideEffects(finallyBlockOpt) Then
+                    finallyBlockOpt = Nothing
+                End If
+
+                If catchBlocks.IsDefaultOrEmpty AndAlso finallyBlockOpt Is Nothing Then
+                    If exitLabelOpt Is Nothing Then
+                        Return tryBlock
+                    Else
+                        ' Ensure implicit label statement is materialized
+                        Return New BoundStatementList(syntaxNode,
+                                                      ImmutableArray.Create(Of BoundStatement)(tryBlock,
+                                                      New BoundLabelStatement(syntaxNode, exitLabelOpt)))
+                    End If
+                End If
+            End If
 
             Dim newTry As BoundStatement = New BoundTryStatement(syntaxNode, tryBlock, catchBlocks, finallyBlockOpt, exitLabelOpt)
 
@@ -34,50 +100,38 @@ Namespace Microsoft.CodeAnalysis.VisualBasic
                 ReportErrorsOnCatchBlockHelpers([catch])
             Next
 
-            ' Add a sequence point for End Try
-            ' Note that scope the point is outside of Try/Catch/Finally 
-            If Me.GenerateDebugInfo Then
-                Dim syntax = TryCast(syntaxNode, TryBlockSyntax)
-
-                If syntax IsNot Nothing Then
-                    newTry = New BoundStatementList(syntaxNode,
-                                                    ImmutableArray.Create(Of BoundStatement)(
-                                                        newTry,
-                                                        New BoundSequencePoint(syntax.EndTryStatement, Nothing)
-                                                    )
-                                                )
-                End If
-            End If
-
             Return newTry
         End Function
 
-        Private Function RewriteFinallyBlock(node As BoundBlock) As BoundBlock
+        Private Function RewriteFinallyBlock(tryStatement As BoundTryStatement) As BoundBlock
+            Dim node As BoundBlock = tryStatement.FinallyBlockOpt
+
             If node Is Nothing Then
                 Return node
             End If
 
             Dim newFinally = DirectCast(Visit(node), BoundBlock)
 
-            If GenerateDebugInfo Then
+            If Instrument(tryStatement) Then
                 Dim syntax = TryCast(node.Syntax, FinallyBlockSyntax)
 
                 If syntax IsNot Nothing Then
-                    newFinally = PrependWithSequencePoint(newFinally, syntax.FinallyStatement)
+                    newFinally = PrependWithPrologue(newFinally, _instrumenterOpt.CreateFinallyBlockPrologue(tryStatement))
                 End If
             End If
 
             Return newFinally
         End Function
 
-        Private Function RewriteTryBlock(node As BoundBlock) As BoundBlock
+        Private Function RewriteTryBlock(tryStatement As BoundTryStatement) As BoundBlock
+            Dim node As BoundBlock = tryStatement.TryBlock
             Dim newTry = DirectCast(Visit(node), BoundBlock)
 
-            If GenerateDebugInfo Then
+            If Instrument(tryStatement) Then
                 Dim syntax = TryCast(node.Syntax, TryBlockSyntax)
 
                 If syntax IsNot Nothing Then
-                    newTry = PrependWithSequencePoint(newTry, syntax.TryStatement)
+                    newTry = PrependWithPrologue(newTry, _instrumenterOpt.CreateTryBlockPrologue(tryStatement))
                 End If
             End If
 
@@ -90,18 +144,18 @@ Namespace Microsoft.CodeAnalysis.VisualBasic
             Dim newFilter = VisitExpressionNode(node.ExceptionFilterOpt)
             Dim newCatchBody As BoundBlock = DirectCast(Visit(node.Body), BoundBlock)
 
-            If GenerateDebugInfo Then
+            If Instrument(node) Then
                 Dim syntax = TryCast(node.Syntax, CatchBlockSyntax)
 
                 If syntax IsNot Nothing Then
                     If newFilter IsNot Nothing Then
                         ' if we have a filter, we want to stop before the filter expression
                         ' and associate the sequence point with whole Catch statement
-                        newFilter = New BoundSequencePointExpression(syntax.CatchStatement,
-                                                                     newFilter,
-                                                                     newFilter.Type)
+                        ' EnC: We need to insert a hidden sequence point to handle function remapping in case 
+                        ' the containing method is edited while methods invoked in the condition are being executed.
+                        newFilter = _instrumenterOpt.InstrumentCatchBlockFilter(node, newFilter, _currentMethodOrLambda)
                     Else
-                        newCatchBody = PrependWithSequencePoint(newCatchBody, syntax.CatchStatement)
+                        newCatchBody = PrependWithPrologue(newCatchBody, _instrumenterOpt.CreateCatchBlockPrologue(node))
                     End If
                 End If
             End If
@@ -109,16 +163,21 @@ Namespace Microsoft.CodeAnalysis.VisualBasic
             Dim errorLineNumber As BoundExpression = Nothing
 
             If node.ErrorLineNumberOpt IsNot Nothing Then
-                Debug.Assert(currentLineTemporary Is Nothing)
-                Debug.Assert((Me.Flags And RewritingFlags.AllowCatchWithErrorLineNumberReference) <> 0)
+                Debug.Assert(_currentLineTemporary Is Nothing)
+                Debug.Assert((Me._flags And RewritingFlags.AllowCatchWithErrorLineNumberReference) <> 0)
 
                 errorLineNumber = VisitExpressionNode(node.ErrorLineNumberOpt)
 
-            ElseIf currentLineTemporary IsNot Nothing AndAlso currentMethodOrLambda Is topMethod Then
-                errorLineNumber = New BoundLocal(node.Syntax, currentLineTemporary, isLValue:=False, type:=currentLineTemporary.Type)
+            ElseIf _currentLineTemporary IsNot Nothing AndAlso _currentMethodOrLambda Is _topMethod Then
+                errorLineNumber = New BoundLocal(node.Syntax, _currentLineTemporary, isLValue:=False, type:=_currentLineTemporary.Type)
             End If
 
-            Return node.Update(node.LocalOpt, newExceptionSource, errorLineNumber, newFilter, newCatchBody, node.IsSynthesizedAsyncCatchAll)
+            Return node.Update(node.LocalOpt,
+                               newExceptionSource,
+                               errorLineNumber,
+                               newFilter,
+                               newCatchBody,
+                               node.IsSynthesizedAsyncCatchAll)
         End Function
 
         Private Sub ReportErrorsOnCatchBlockHelpers(node As BoundCatchBlock)

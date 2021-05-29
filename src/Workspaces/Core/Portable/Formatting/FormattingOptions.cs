@@ -1,36 +1,48 @@
-﻿// Copyright (c) Microsoft.  All Rights Reserved.  Licensed under the Apache License, Version 2.0.  See License.txt in the project root for license information.
+﻿// Licensed to the .NET Foundation under one or more agreements.
+// The .NET Foundation licenses this file to you under the MIT license.
+// See the LICENSE file in the project root for more information.
 
 using Microsoft.CodeAnalysis.Options;
 
 namespace Microsoft.CodeAnalysis.Formatting
 {
-    public static class FormattingOptions
+    /// <inheritdoc cref="FormattingOptions2"/>
+    public static partial class FormattingOptions
     {
-        internal const string TabFeatureName = "Tab";
-        internal const string InternalTabFeatureName = "InternalTab";
-        internal const string FormattingFeatureName = "Formatting";
+        /// <inheritdoc cref="FormattingOptions2.UseTabs"/>
+        // Suppression due to https://github.com/dotnet/roslyn/issues/42614
+        public static PerLanguageOption<bool> UseTabs { get; } = ((PerLanguageOption<bool>)FormattingOptions2.UseTabs)!;
 
-        public static readonly PerLanguageOption<bool> UseTabs = new PerLanguageOption<bool>(TabFeatureName, "UseTab", defaultValue: false);
+        /// <inheritdoc cref="FormattingOptions2.TabSize"/>
+        // Suppression due to https://github.com/dotnet/roslyn/issues/42614
+        public static PerLanguageOption<int> TabSize { get; } = ((PerLanguageOption<int>)FormattingOptions2.TabSize)!;
 
-        public static readonly PerLanguageOption<int> TabSize = new PerLanguageOption<int>(TabFeatureName, "TabSize", defaultValue: 4);
+        /// <inheritdoc cref="FormattingOptions2.IndentationSize"/>
+        // Suppression due to https://github.com/dotnet/roslyn/issues/42614
+        public static PerLanguageOption<int> IndentationSize { get; } = ((PerLanguageOption<int>)FormattingOptions2.IndentationSize)!;
 
-        public static readonly PerLanguageOption<int> IndentationSize = new PerLanguageOption<int>(TabFeatureName, "IndentationSize", defaultValue: 4);
+        /// <inheritdoc cref="FormattingOptions2.SmartIndent"/>
+        // Suppression due to https://github.com/dotnet/roslyn/issues/42614
+        public static PerLanguageOption<IndentStyle> SmartIndent { get; } = ((PerLanguageOption<IndentStyle>)FormattingOptions2.SmartIndent)!;
 
-        public static readonly PerLanguageOption<IndentStyle> SmartIndent = new PerLanguageOption<IndentStyle>(FormattingFeatureName, "SmartIndent", defaultValue: IndentStyle.Smart);
+        /// <inheritdoc cref="FormattingOptions2.NewLine"/>
+        // Suppression due to https://github.com/dotnet/roslyn/issues/42614
+        public static PerLanguageOption<string> NewLine { get; } = ((PerLanguageOption<string>)FormattingOptions2.NewLine)!;
 
-        public static readonly PerLanguageOption<bool> UseTabOnlyForIndentation = new PerLanguageOption<bool>(InternalTabFeatureName, "UseTabOnlyForIndentation", defaultValue: false);
+        /// <inheritdoc cref="FormattingOptions2.InsertFinalNewLine"/>
+        // Suppression due to https://github.com/dotnet/roslyn/issues/42614
+        internal static Option<bool> InsertFinalNewLine { get; } = ((Option<bool>)FormattingOptions2.InsertFinalNewLine)!;
 
-        public static readonly PerLanguageOption<string> NewLine = new PerLanguageOption<string>(FormattingFeatureName, "NewLine", defaultValue: "\r\n");
+        /// <inheritdoc cref="FormattingOptions2.PreferredWrappingColumn"/>
+        // Suppression due to https://github.com/dotnet/roslyn/issues/42614
+        internal static Option<int> PreferredWrappingColumn { get; } = ((Option<int>)FormattingOptions2.PreferredWrappingColumn)!;
 
-        internal static readonly PerLanguageOption<bool> DebugMode = new PerLanguageOption<bool>(FormattingFeatureName, "DebugMode", defaultValue: false);
+        /// <inheritdoc cref="FormattingOptions2.AllowDisjointSpanMerging"/>
+        // Suppression due to https://github.com/dotnet/roslyn/issues/42614
+        internal static Option<bool> AllowDisjointSpanMerging { get; } = ((Option<bool>)FormattingOptions2.AllowDisjointSpanMerging)!;
 
-        internal static readonly Option<bool> AllowDisjointSpanMerging = new Option<bool>(FormattingFeatureName, "ShouldUseFormattingSpanCollapse", defaultValue: false);
-
-        public enum IndentStyle
-        {
-            None = 0,
-            Block = 1,
-            Smart = 2
-        }
+        /// <inheritdoc cref="FormattingOptions2.AutoFormattingOnReturn"/>
+        // Suppression due to https://github.com/dotnet/roslyn/issues/42614
+        internal static readonly PerLanguageOption<bool> AutoFormattingOnReturn = ((PerLanguageOption<bool>)FormattingOptions2.AutoFormattingOnReturn)!;
     }
 }

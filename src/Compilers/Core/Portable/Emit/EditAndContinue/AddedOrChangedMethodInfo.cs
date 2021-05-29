@@ -1,4 +1,8 @@
-﻿// Copyright (c) Microsoft.  All Rights Reserved.  Licensed under the Apache License, Version 2.0.  See License.txt in the project root for license information.
+﻿// Licensed to the .NET Foundation under one or more agreements.
+// The .NET Foundation licenses this file to you under the MIT license.
+// See the LICENSE file in the project root for more information.
+
+#nullable disable
 
 using System.Collections.Immutable;
 using System.Diagnostics;
@@ -8,7 +12,7 @@ namespace Microsoft.CodeAnalysis.Emit
 {
     internal struct AddedOrChangedMethodInfo
     {
-        public readonly MethodDebugId MethodId;
+        public readonly DebugId MethodId;
 
         // locals:
         public readonly ImmutableArray<EncLocalInfo> Locals;
@@ -23,16 +27,17 @@ namespace Microsoft.CodeAnalysis.Emit
         public readonly ImmutableArray<Cci.ITypeReference> StateMachineAwaiterSlotsOpt;
 
         public AddedOrChangedMethodInfo(
-            MethodDebugId methodId,
-            ImmutableArray<EncLocalInfo> locals, 
+            DebugId methodId,
+            ImmutableArray<EncLocalInfo> locals,
             ImmutableArray<LambdaDebugInfo> lambdaDebugInfo,
             ImmutableArray<ClosureDebugInfo> closureDebugInfo,
             string stateMachineTypeNameOpt,
             ImmutableArray<EncHoistedLocalInfo> stateMachineHoistedLocalSlotsOpt,
             ImmutableArray<Cci.ITypeReference> stateMachineAwaiterSlotsOpt)
         {
-            // method can only be added/changed during EnC, thus generation can't be 0.
-            Debug.Assert(methodId.Generation >= 1);
+            // An updated method will carry its id over,
+            // an added method id has generation set to the current generation ordinal.
+            Debug.Assert(methodId.Generation >= 0);
 
             // each state machine has to have awaiters:
             Debug.Assert(stateMachineAwaiterSlotsOpt.IsDefault == (stateMachineTypeNameOpt == null));

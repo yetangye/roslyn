@@ -1,70 +1,64 @@
-' Copyright (c) Microsoft.  All Rights Reserved.  Licensed under the Apache License, Version 2.0.  See License.txt in the project root for license information.
-
-Imports Microsoft.CodeAnalysis.Text
-Imports Microsoft.CodeAnalysis.VisualBasic
-Imports Microsoft.CodeAnalysis.VisualBasic.Completion.KeywordRecommenders.Expressions
-Imports Microsoft.CodeAnalysis.VisualBasic.Symbols
-Imports Microsoft.CodeAnalysis.VisualBasic.Syntax
-Imports Roslyn.Test.Utilities
-Imports Xunit
+﻿' Licensed to the .NET Foundation under one or more agreements.
+' The .NET Foundation licenses this file to you under the MIT license.
+' See the LICENSE file in the project root for more information.
 
 Namespace Microsoft.CodeAnalysis.Editor.VisualBasic.UnitTests.Recommendations.Queries
     Public Class GroupKeywordRecommenderTests
         <Fact, Trait(Traits.Feature, Traits.Features.KeywordRecommending)>
-        Public Sub GroupNotInStatement()
+        Public Sub GroupNotInStatementTest()
             VerifyRecommendationsMissing(<MethodBody>|</MethodBody>, "Group")
         End Sub
 
         <Fact, Trait(Traits.Feature, Traits.Features.KeywordRecommending)>
-        Public Sub GroupInQuery()
+        Public Sub GroupInQueryTest()
             VerifyRecommendationsContain(<MethodBody>Dim x = From y In z |</MethodBody>, "Group")
         End Sub
 
         <Fact, Trait(Traits.Feature, Traits.Features.KeywordRecommending)>
-        Public Sub GroupInQueryAfterGroupInto()
+        Public Sub GroupInQueryAfterGroupIntoTest()
             VerifyRecommendationsContain(<MethodBody>Dim x = From y In z Group By y Into |</MethodBody>, "Group")
         End Sub
 
         <Fact, Trait(Traits.Feature, Traits.Features.KeywordRecommending)>
-        Public Sub GroupInQueryAfterAliasedAggregation()
+        Public Sub GroupInQueryAfterAliasedAggregationTest()
             VerifyRecommendationsContain(<MethodBody>Dim x = From y In z Group By y Into w = |</MethodBody>, "Group")
         End Sub
 
-        <WorkItem(543173)>
+        <WorkItem(543173, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/543173")>
         <Fact, Trait(Traits.Feature, Traits.Features.KeywordRecommending)>
-        Public Sub GroupAfterMultiLineFunctionLambdaExpr()
+        Public Sub GroupAfterMultiLineFunctionLambdaExprTest()
             VerifyRecommendationsContain(<MethodBody>Dim q2 = From i1 In arr Order By Function()
                                              Return 5
                                          End Function |</MethodBody>, "Group")
         End Sub
 
-        <WorkItem(543174)>
+        <WorkItem(543174, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/543174")>
         <Fact, Trait(Traits.Feature, Traits.Features.KeywordRecommending)>
-        Public Sub GroupAfterAnonymousObjectCreationExpr()
+        Public Sub GroupAfterAnonymousObjectCreationExprTest()
             VerifyRecommendationsContain(<MethodBody>Dim q2 = From i1 In arr Order By New With {.Key = 10} |</MethodBody>, "Group")
         End Sub
 
-        <WorkItem(543219)>
+        <WorkItem(543219, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/543219")>
         <Fact, Trait(Traits.Feature, Traits.Features.KeywordRecommending)>
-        Public Sub GroupAfterIntoClause()
+        Public Sub GroupAfterIntoClauseTest()
             VerifyRecommendationsContain(<MethodBody>Dim q1 = From i1 In arr Group By i1 Into Count |</MethodBody>, "Group")
         End Sub
 
-        <WorkItem(543221)>
+        <WorkItem(543221, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/543221")>
         <Fact, Trait(Traits.Feature, Traits.Features.KeywordRecommending)>
-        Public Sub GroupInsideIntoClauseFollowingAggregateFunction()
+        Public Sub GroupInsideIntoClauseFollowingAggregateFunctionTest()
             VerifyRecommendationsContain(<MethodBody>Dim q1 = From i1 In arr Group i1 By i1 = i1 Into Count, |</MethodBody>, "Group")
         End Sub
 
-        <WorkItem(543232)>
+        <WorkItem(543232, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/543232")>
         <Fact, Trait(Traits.Feature, Traits.Features.KeywordRecommending)>
-        Public Sub GroupAfterNestedAggregateFromClause()
+        Public Sub GroupAfterNestedAggregateFromClauseTest()
             VerifyRecommendationsContain(<MethodBody>Dim q1 = Aggregate i1 In arr From i4 In arr |</MethodBody>, "Group")
         End Sub
 
-        <WorkItem(543240)>
+        <WorkItem(543240, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/543240")>
         <Fact, Trait(Traits.Feature, Traits.Features.KeywordRecommending)>
-        Public Sub GroupInsideIntoClauseOfGroupJoin()
+        Public Sub GroupInsideIntoClauseOfGroupJoinTest()
             VerifyRecommendationsContain(<MethodBody>Dim q1 = From i1 In arr Group Join o1 As Byte In arr On i1 Equals o1 Into |</MethodBody>, "Group")
         End Sub
     End Class

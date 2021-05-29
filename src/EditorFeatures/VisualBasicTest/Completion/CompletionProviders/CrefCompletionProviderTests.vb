@@ -1,58 +1,62 @@
-' Copyright (c) Microsoft.  All Rights Reserved.  Licensed under the Apache License, Version 2.0.  See License.txt in the project root for license information.
+﻿' Licensed to the .NET Foundation under one or more agreements.
+' The .NET Foundation licenses this file to you under the MIT license.
+' See the LICENSE file in the project root for more information.
 
-Imports Microsoft.CodeAnalysis.Completion.Providers
-Imports Microsoft.CodeAnalysis.Editor.VisualBasic.UnitTests.Completion.CompletionProviders
+Imports System.Collections.Immutable
+Imports Microsoft.CodeAnalysis.Completion
+Imports Microsoft.CodeAnalysis.Editor.UnitTests.Workspaces
 Imports Microsoft.CodeAnalysis.VisualBasic.Completion.Providers
+Imports Microsoft.CodeAnalysis.VisualBasic.Syntax
 
 Namespace Microsoft.CodeAnalysis.Editor.VisualBasic.UnitTests.Completion.CompletionProviders
     Public Class CrefCompletionProviderTests
         Inherits AbstractVisualBasicCompletionProviderTests
 
-        Friend Overrides Function CreateCompletionProvider() As ICompletionProvider
-            Return New CrefCompletionProvider()
+        Friend Overrides Function GetCompletionProviderType() As Type
+            Return GetType(CrefCompletionProvider)
         End Function
 
         <Fact, Trait(Traits.Feature, Traits.Features.Completion)>
-        Public Sub NotOutsideCref()
+        Public Async Function TestNotOutsideCref() As Task
             Dim text = <File>
 Class C
     ''' $$
-    Sub Foo()
+    Sub Goo()
     End Sub
 End Class
 </File>.Value
 
-            VerifyNoItemsExist(text)
-        End Sub
+            Await VerifyNoItemsExistAsync(text)
+        End Function
 
         <Fact, Trait(Traits.Feature, Traits.Features.Completion)>
-        Public Sub NotOutsideCref2()
+        Public Async Function TestNotOutsideCref2() As Task
             Dim text = <File>
 Class C
     $$
-    Sub Foo()
+    Sub Goo()
     End Sub
 End Class
 </File>.Value
 
-            VerifyNoItemsExist(text)
-        End Sub
+            Await VerifyNoItemsExistAsync(text)
+        End Function
 
         <Fact, Trait(Traits.Feature, Traits.Features.Completion)>
-        Public Sub NotOutsideCref3()
+        Public Async Function TestNotOutsideCref3() As Task
             Dim text = <File>
 Class C
-    Sub Foo()
+    Sub Goo()
         Me.$$
     End Sub
 End Class
 </File>.Value
 
-            VerifyNoItemsExist(text)
-        End Sub
+            Await VerifyNoItemsExistAsync(text)
+        End Function
 
         <Fact, Trait(Traits.Feature, Traits.Features.Completion)>
-        Public Sub AfterCrefOpenQuote()
+        Public Async Function TestAfterCrefOpenQuote() As Task
             Dim text = <File><![CDATA[
 Imports System
 
@@ -60,15 +64,15 @@ Imports System
 ''' <see cref="$$
 ''' </summary>
 Module Program
-    Sub Foo()
+    Sub Goo()
     End Sub
 End Module]]></File>.Value
 
-            VerifyAnyItemExists(text)
-        End Sub
+            Await VerifyAnyItemExistsAsync(text)
+        End Function
 
         <Fact, Trait(Traits.Feature, Traits.Features.Completion)>
-        Public Sub RightSideOfQualifiedName()
+        Public Async Function TestRightSideOfQualifiedName() As Task
             Dim text = <File><![CDATA[
 Imports System
 
@@ -76,15 +80,15 @@ Imports System
 ''' <see cref="Program.$$"
 ''' </summary>
 Module Program
-    Sub Foo()
+    Sub Goo()
     End Sub
 End Module]]></File>.Value
 
-            VerifyItemExists(text, "Foo()")
-        End Sub
+            Await VerifyItemExistsAsync(text, "Goo()")
+        End Function
 
         <Fact, Trait(Traits.Feature, Traits.Features.Completion)>
-        Public Sub InTypeParameterContext()
+        Public Async Function TestNotInTypeParameterContext() As Task
             Dim text = <File><![CDATA[
 Imports System
 
@@ -92,93 +96,93 @@ Imports System
 ''' <see cref="Program(Of $$
 ''' </summary>
 Class Program(Of T)
-    Sub Foo()
+    Sub Goo()
     End Sub
 End Class]]></File>.Value
 
-            VerifyItemExists(text, "Integer")
-        End Sub
+            Await VerifyItemIsAbsentAsync(text, "Integer")
+        End Function
 
         <Fact, Trait(Traits.Feature, Traits.Features.Completion)>
-        Public Sub InSignature_FirstParameter()
+        Public Async Function TestInSignature_FirstParameter() As Task
             Dim text = <File><![CDATA[
 Imports System
 
 ''' <summary>
-''' <see cref="Program(Of T).Foo($$"
+''' <see cref="Program(Of T).Goo($$"
 ''' </summary>
 Class Program(Of T)
-    Sub Foo(z as Integer)
+    Sub Goo(z as Integer)
     End Sub
 End Class]]></File>.Value
 
-            VerifyItemExists(text, "Integer")
-            VerifyItemIsAbsent(text, "Foo(Integer")
-        End Sub
+            Await VerifyItemExistsAsync(text, "Integer")
+            Await VerifyItemIsAbsentAsync(text, "Goo(Integer")
+        End Function
 
         <Fact, Trait(Traits.Feature, Traits.Features.Completion)>
-        Public Sub InSignature_SecondParameter()
+        Public Async Function TestInSignature_SecondParameter() As Task
             Dim text = <File><![CDATA[
 Imports System
 
 ''' <summary>
-''' <see cref="Program(Of T).Foo(Integer, $$"
+''' <see cref="Program(Of T).Goo(Integer, $$"
 ''' </summary>
 Class Program(Of T)
-    Sub Foo(z as Integer, q as Integer)
+    Sub Goo(z as Integer, q as Integer)
     End Sub
 End Class]]></File>.Value
 
-            VerifyItemExists(text, "Integer")
-        End Sub
+            Await VerifyItemExistsAsync(text, "Integer")
+        End Function
 
         <Fact, Trait(Traits.Feature, Traits.Features.Completion)>
-        Public Sub NotAfterSignature()
+        Public Async Function TestNotAfterSignature() As Task
             Dim text = <File><![CDATA[
 Imports System
 
 ''' <summary>
-''' <see cref="Program(Of T).Foo(Integer, Integer)$$"
+''' <see cref="Program(Of T).Goo(Integer, Integer)$$"
 ''' </summary>
 Class Program(Of T)
-    Sub Foo(z as Integer, q as Integer)
+    Sub Goo(z as Integer, q as Integer)
     End Sub
 End Class]]></File>.Value
 
-            VerifyNoItemsExist(text)
-        End Sub
+            Await VerifyNoItemsExistAsync(text)
+        End Function
         <Fact, Trait(Traits.Feature, Traits.Features.Completion)>
-        Public Sub NotAfterDotAfterSignature()
+        Public Async Function TestNotAfterDotAfterSignature() As Task
             Dim text = <File><![CDATA[
 Imports System
 
 ''' <summary>
-''' <see cref="Program(Of T).Foo(Integer, Integer).$$"
+''' <see cref="Program(Of T).Goo(Integer, Integer).$$"
 ''' </summary>
 Class Program(Of T)
-    Sub Foo(z as Integer, q as Integer)
+    Sub Goo(z as Integer, q as Integer)
     End Sub
 End Class]]></File>.Value
 
-            VerifyNoItemsExist(text)
-        End Sub
+            Await VerifyNoItemsExistAsync(text)
+        End Function
 
         <Fact, Trait(Traits.Feature, Traits.Features.Completion)>
-        Public Sub MethodParametersIncluded()
+        Public Async Function TestMethodParametersIncluded() As Task
             Dim text = <File><![CDATA[
 ''' <summary>
 ''' <see cref="Program(Of T).$$"
 ''' </summary>
 Class Program(Of T)
-    Sub Foo(ByRef z As Integer, ByVal x As Integer, ParamArray xx As Integer())
+    Sub Goo(ByRef z As Integer, ByVal x As Integer, ParamArray xx As Integer())
     End Sub
 End Class]]></File>.Value
 
-            VerifyItemExists(text, "Foo(ByRef Integer, Integer, Integer())")
-        End Sub
+            Await VerifyItemExistsAsync(text, "Goo(ByRef Integer, Integer, Integer())")
+        End Function
 
         <Fact, Trait(Traits.Feature, Traits.Features.Completion)>
-        Public Sub TypesSuggestedWithTypeParameters()
+        Public Async Function TestTypesSuggestedWithTypeParameters() As Task
             Dim text = <File><![CDATA[
 ''' <summary>
 ''' <see cref="$$"
@@ -189,11 +193,11 @@ End Class
 Class Program
 End Class]]></File>.Value
 
-            VerifyItemExists(text, "Program")
-            VerifyItemExists(text, "Program(Of TTypeParameter)")
-        End Sub
+            Await VerifyItemExistsAsync(text, "Program")
+            Await VerifyItemExistsAsync(text, "Program(Of TTypeParameter)")
+        End Function
         <Fact, Trait(Traits.Feature, Traits.Features.Completion)>
-        Public Sub Operators()
+        Public Async Function TestOperators() As Task
             Dim text = <File><![CDATA[Imports System
 Imports System.Collections.Generic
 Imports System.Linq
@@ -215,11 +219,11 @@ Class C
     End Operator
 End Class]]></File>.Value
 
-            VerifyItemExists(text, "Operator +(C)")
-        End Sub
+            Await VerifyItemExistsAsync(text, "Operator +(C)")
+        End Function
 
         <Fact, Trait(Traits.Feature, Traits.Features.Completion)>
-        Public Sub ModOperator()
+        Public Async Function TestModOperator() As Task
             Dim text = <File><![CDATA[Imports System
 Imports System.Collections.Generic
 Imports System.Linq
@@ -241,11 +245,11 @@ Class C
     End Operator
 End Class]]></File>.Value
 
-            VerifyItemExists(text, "Operator Mod(C, Integer)")
-        End Sub
+            Await VerifyItemExistsAsync(text, "Operator Mod(C, Integer)")
+        End Function
 
         <Fact, Trait(Traits.Feature, Traits.Features.Completion)>
-        Public Sub ConstructorsShown()
+        Public Async Function TestConstructorsShown() As Task
             Dim text = <File><![CDATA[
 ''' <summary>
 ''' <see cref="C.$$"/>
@@ -256,10 +260,10 @@ Class C
 End Class
 ]]></File>.Value
 
-            VerifyItemExists(text, "New(Integer)")
-        End Sub
+            Await VerifyItemExistsAsync(text, "New(Integer)")
+        End Function
         <Fact, Trait(Traits.Feature, Traits.Features.Completion)>
-        Public Sub AfterNamespace()
+        Public Async Function TestAfterNamespace() As Task
             Dim text = <File><![CDATA[
 Imports System
 ''' <summary>
@@ -271,11 +275,11 @@ Class C
 End Class
 ]]></File>.Value
 
-            VerifyItemExists(text, "String")
-        End Sub
+            Await VerifyItemExistsAsync(text, "String")
+        End Function
 
         <Fact, Trait(Traits.Feature, Traits.Features.Completion)>
-        Public Sub ParameterizedProperties()
+        Public Async Function TestParameterizedProperties() As Task
             Dim text = <File><![CDATA[
 ''' <summary>
 ''' <see cref="C.$$"/>
@@ -300,12 +304,12 @@ End Class
 
 ]]></File>.Value
 
-            VerifyItemExists(text, "Item(Integer)")
-            VerifyItemExists(text, "Item(Integer, String)")
-        End Sub
+            Await VerifyItemExistsAsync(text, "Item(Integer)")
+            Await VerifyItemExistsAsync(text, "Item(Integer, String)")
+        End Function
 
         <Fact, Trait(Traits.Feature, Traits.Features.Completion)>
-        Public Sub NoIdentifierEscaping()
+        Public Async Function TestNoIdentifierEscaping() As Task
             Dim text = <File><![CDATA[
 ''' <see cref="A.$$"/>
 ''' </summary>
@@ -314,14 +318,14 @@ End Class
 
 ]]></File>.Value
 
-            VerifyItemExists(text, "GetType()")
-        End Sub
+            Await VerifyItemExistsAsync(text, "GetType()")
+        End Function
 
         <Fact, Trait(Traits.Feature, Traits.Features.Completion)>
-        Public Sub NoCommitOnParen()
+        Public Async Function TestNoCommitOnParen() As Task
             Dim text = <File><![CDATA[
 ''' <summary>
-''' <see cref="C.$$"/>
+''' <see cref="C.bar$$"/>
 ''' </summary>
 Class C
 Sub bar(x As Integer, y As Integer)
@@ -331,7 +335,7 @@ End Class
 
             Dim expected = <File><![CDATA[
 ''' <summary>
-''' <see cref="C."/>
+''' <see cref="C.bar("/>
 ''' </summary>
 Class C
 Sub bar(x As Integer, y As Integer)
@@ -339,15 +343,15 @@ End Sub
 End Class
 ]]></File>.Value
 
-            VerifyProviderCommit(text, "bar(Integer, Integer)", expected, "("c, "bar")
-        End Sub
+            Await VerifyProviderCommitAsync(text, "bar(Integer, Integer)", expected, "("c)
+        End Function
 
         <Fact, Trait(Traits.Feature, Traits.Features.Completion)>
-        Public Sub AllowTypingTypeParameters()
+        Public Async Function TestAllowTypingTypeParameters() As Task
             Dim text = <File><![CDATA[
 Imports System.Collections.Generic
 ''' <summary>
-''' <see cref="$$"/>
+''' <see cref="Lis$$"/>
 ''' </summary>
 Class C
 Sub bar(x As Integer, y As Integer)
@@ -358,7 +362,7 @@ End Class
             Dim expected = <File><![CDATA[
 Imports System.Collections.Generic
 ''' <summary>
-''' <see cref=""/>
+''' <see cref="List(Of T) "/>
 ''' </summary>
 Class C
 Sub bar(x As Integer, y As Integer)
@@ -366,7 +370,85 @@ End Sub
 End Class
 ]]></File>.Value
 
-            VerifyProviderCommit(text, "List(Of T)", expected, " "c, "List(Of")
-        End Sub
+            Await VerifyProviderCommitAsync(text, "List(Of T)", expected, " "c)
+        End Function
+
+        <Fact, Trait(Traits.Feature, Traits.Features.Completion)>
+        Public Async Function TestOfAfterParen() As Task
+            Dim text = <File><![CDATA[
+Imports System
+
+''' <summary>
+''' <see cref="Goo($$
+''' </summary>
+Module Program
+    Sub Goo()
+    End Sub
+End Module]]></File>.Value
+
+            Await VerifyItemExistsAsync(text, "Of")
+        End Function
+
+        <Fact, Trait(Traits.Feature, Traits.Features.Completion)>
+        Public Async Function TestOfNotAfterComma() As Task
+            Dim text = <File><![CDATA[
+Imports System
+
+''' <summary>
+''' <see cref="Goo(a, $$
+''' </summary>
+Module Program
+    Sub Goo()
+    End Sub
+End Module]]></File>.Value
+
+            Await VerifyItemIsAbsentAsync(text, "Of")
+        End Function
+
+        <Fact, Trait(Traits.Feature, Traits.Features.Completion)>
+        Public Async Function TestCrefCompletionSpeculatesOutsideTrivia() As Task
+            Dim text = <a><![CDATA[
+Class C
+    ''' <see cref="$$
+    Sub goo()
+    End Sub
+End Class]]></a>.Value.NormalizeLineEndings()
+
+            Using workspace = TestWorkspace.Create(LanguageNames.VisualBasic, New VisualBasicCompilationOptions(OutputKind.ConsoleApplication), New VisualBasicParseOptions(), {text}, ExportProvider)
+                Dim called = False
+
+                Dim hostDocument = workspace.DocumentWithCursor
+                Dim document = workspace.CurrentSolution.GetDocument(hostDocument.Id)
+                Dim service = GetCompletionService(document.Project)
+                Dim provider = Assert.IsType(Of CrefCompletionProvider)(service.GetTestAccessor().GetAllProviders(ImmutableHashSet(Of String).Empty).Single())
+                provider.GetTestAccessor().SetSpeculativeNodeCallback(
+                    Sub(node As SyntaxNode)
+                        ' asserts that we aren't be asked speculate on nodes inside documentation trivia.
+                        ' This verifies that the provider Is asking for a speculative SemanticModel
+                        ' by walking to the node the documentation Is attached to. 
+
+                        called = True
+                        Dim trivia = node.GetAncestor(Of DocumentationCommentTriviaSyntax)
+                        Assert.Null(trivia)
+                    End Sub)
+
+                Dim completionList = Await GetCompletionListAsync(service, document, hostDocument.CursorPosition.Value, CompletionTrigger.Invoke)
+
+                Assert.True(called)
+            End Using
+        End Function
+
+        <Fact, Trait(Traits.Feature, Traits.Features.Completion)>
+        Public Async Function TestNoSuggestionAfterEmptyCref() As Task
+            Dim text = "
+Class C
+    ''' <see cref="""" $$
+    Sub Goo()
+    End Sub
+End Class
+"
+
+            Await VerifyNoItemsExistAsync(text)
+        End Function
     End Class
 End Namespace

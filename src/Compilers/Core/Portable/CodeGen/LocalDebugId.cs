@@ -1,4 +1,6 @@
-﻿// Copyright (c) Microsoft.  All Rights Reserved.  Licensed under the Apache License, Version 2.0.  See License.txt in the project root for license information.
+﻿// Licensed to the .NET Foundation under one or more agreements.
+// The .NET Foundation licenses this file to you under the MIT license.
+// See the LICENSE file in the project root for more information.
 
 using System;
 using System.Diagnostics;
@@ -9,7 +11,7 @@ namespace Microsoft.CodeAnalysis.CodeGen
     /// <summary>
     /// Id that associates an emitted user-defined or long-lived synthesized local variable 
     /// with a syntax node that defined it. If a syntax node defines multiple variables it 
-    /// provides information neccessary to identify which one of these variables is it.
+    /// provides information necessary to identify which one of these variables is it.
     /// </summary>
     internal struct LocalDebugId : IEquatable<LocalDebugId>
     {
@@ -72,7 +74,7 @@ namespace Microsoft.CodeAnalysis.CodeGen
             return Hash.Combine(SyntaxOffset, Ordinal);
         }
 
-        public override bool Equals(object obj)
+        public override bool Equals(object? obj)
         {
             return obj is LocalDebugId && Equals((LocalDebugId)obj);
         }

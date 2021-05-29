@@ -1,16 +1,21 @@
-﻿// Copyright (c) Microsoft.  All Rights Reserved.  Licensed under the Apache License, Version 2.0.  See License.txt in the project root for license information.
+﻿// Licensed to the .NET Foundation under one or more agreements.
+// The .NET Foundation licenses this file to you under the MIT license.
+// See the LICENSE file in the project root for more information.
 
 using System;
 using System.Collections.Generic;
 using System.Diagnostics;
+using System.Diagnostics.CodeAnalysis;
 
 namespace Microsoft.CodeAnalysis.InternalUtilities
 {
     /// <summary>
-    /// Cache with a fixed size that evictes the least recently used members.
+    /// Cache with a fixed size that evicts the least recently used members.
     /// Thread-safe.
     /// </summary>
     internal class ConcurrentLruCache<K, V>
+        where K : notnull
+        where V : notnull
     {
         private readonly int _capacity;
 
@@ -23,13 +28,13 @@ namespace Microsoft.CodeAnalysis.InternalUtilities
         private readonly Dictionary<K, CacheValue> _cache;
         private readonly LinkedList<K> _nodeList;
         // This is a naive course-grained lock, it can probably be optimized
-        private readonly object _lockObject = new object();
+        private readonly object _lockObject = new();
 
         public ConcurrentLruCache(int capacity)
         {
             if (capacity <= 0)
             {
-                throw new ArgumentOutOfRangeException("capacity");
+                throw new ArgumentOutOfRangeException(nameof(capacity));
             }
             _capacity = capacity;
             _cache = new Dictionary<K, CacheValue>(capacity);
@@ -96,8 +101,8 @@ namespace Microsoft.CodeAnalysis.InternalUtilities
         {
             Debug.Assert(_capacity > 0);
             var lastNode = _nodeList.Last;
-            _nodeList.Remove(lastNode);
-            _cache.Remove(lastNode.Value);
+            _nodeList.Remove(lastNode!);
+            _cache.Remove(lastNode!.Value);
         }
 
         private void UnsafeAddNodeToTop(K key, V value)
@@ -112,12 +117,11 @@ namespace Microsoft.CodeAnalysis.InternalUtilities
         /// </summary>
         private void UnsafeAdd(K key, V value, bool throwExceptionIfKeyExists)
         {
-            CacheValue result;
-            if (_cache.TryGetValue(key, out result))
+            if (_cache.TryGetValue(key, out var result))
             {
                 if (throwExceptionIfKeyExists)
                 {
-                    throw new ArgumentException("Key already exists", "key");
+                    throw new ArgumentException("Key already exists", nameof(key));
                 }
                 else if (!result.Value.Equals(value))
                 {
@@ -140,8 +144,7 @@ namespace Microsoft.CodeAnalysis.InternalUtilities
         {
             get
             {
-                V value;
-                if (TryGetValue(key, out value))
+                if (TryGetValue(key, out var value))
                 {
                     return value;
                 }
@@ -159,7 +162,7 @@ namespace Microsoft.CodeAnalysis.InternalUtilities
             }
         }
 
-        public bool TryGetValue(K key, out V value)
+        public bool TryGetValue(K key, [MaybeNullWhen(returnValue: false)] out V value)
         {
             lock (_lockObject)
             {
@@ -170,10 +173,9 @@ namespace Microsoft.CodeAnalysis.InternalUtilities
         /// <summary>
         /// Doesn't lock.
         /// </summary>
-        public bool UnsafeTryGetValue(K key, out V value)
+        public bool UnsafeTryGetValue(K key, [MaybeNullWhen(returnValue: false)] out V value)
         {
-            CacheValue result;
-            if (_cache.TryGetValue(key, out result))
+            if (_cache.TryGetValue(key, out var result))
             {
                 MoveNodeToTop(result.Node);
                 value = result.Value;
@@ -181,7 +183,7 @@ namespace Microsoft.CodeAnalysis.InternalUtilities
             }
             else
             {
-                value = default(V);
+                value = default!;
                 return false;
             }
         }
@@ -190,13 +192,46 @@ namespace Microsoft.CodeAnalysis.InternalUtilities
         {
             lock (_lockObject)
             {
-                V result;
-                if (UnsafeTryGetValue(key, out result))
+                if (UnsafeTryGetValue(key, out var result))
                 {
                     return result;
                 }
                 else
                 {
+                    UnsafeAdd(key, value, true);
+                    return value;
+                }
+            }
+        }
+
+        public V GetOrAdd(K key, Func<V> creator)
+        {
+            lock (_lockObject)
+            {
+                if (UnsafeTryGetValue(key, out var result))
+                {
+                    return result;
+                }
+                else
+                {
+                    var value = creator();
+                    UnsafeAdd(key, value, true);
+                    return value;
+                }
+            }
+        }
+
+        public V GetOrAdd<T>(K key, T arg, Func<T, V> creator)
+        {
+            lock (_lockObject)
+            {
+                if (UnsafeTryGetValue(key, out var result))
+                {
+                    return result;
+                }
+                else
+                {
+                    var value = creator(arg);
                     UnsafeAdd(key, value, true);
                     return value;
                 }

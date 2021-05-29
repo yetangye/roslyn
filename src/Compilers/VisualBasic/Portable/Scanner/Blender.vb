@@ -1,4 +1,6 @@
-﻿' Copyright (c) Microsoft.  All Rights Reserved.  Licensed under the Apache License, Version 2.0.  See License.txt in the project root for license information.
+﻿' Licensed to the .NET Foundation under one or more agreements.
+' The .NET Foundation licenses this file to you under the MIT license.
+' See the LICENSE file in the project root for more information.
 
 '-----------------------------------------------------------------------------
 ' Contains the definition of the Scanner, which produces tokens from text 
@@ -6,12 +8,9 @@
 Option Compare Binary
 Option Strict On
 
-Imports System.Collections.ObjectModel
-Imports System.Text
+Imports Microsoft.CodeAnalysis.Syntax.InternalSyntax
 Imports Microsoft.CodeAnalysis.Text
 Imports Microsoft.CodeAnalysis.VisualBasic
-Imports Microsoft.CodeAnalysis.VisualBasic.Symbols
-Imports Microsoft.CodeAnalysis.VisualBasic.Syntax
 
 Namespace Microsoft.CodeAnalysis.VisualBasic.Syntax.InternalSyntax
     Friend NotInheritable Class Blender
@@ -139,7 +138,7 @@ Namespace Microsoft.CodeAnalysis.VisualBasic.Syntax.InternalSyntax
                     Return node.GetTrailingTrivia().Any(SyntaxKind.EndOfLineTrivia)
                 Case SyntaxKind.SingleLineIfStatement,
                      SyntaxKind.SingleLineElseClause
-                    ' Steer clear of single-line if's because they they have custom handling of statement 
+                    ' Steer clear of single-line if's because they have custom handling of statement 
                     ' terminators that may make it difficult to reuse sub-statements.
                     Return False
                 Case Else
@@ -216,7 +215,7 @@ Namespace Microsoft.CodeAnalysis.VisualBasic.Syntax.InternalSyntax
 
             ' Parser requires look ahead of some number of tokens
             ' beyond EOL and some number of characters back.
-            ' Expand the change range to accomodate look ahead/behind.
+            ' Expand the change range to accommodate look ahead/behind.
             Dim span = ExpandToNearestStatements(
                 _baseTreeRoot,
                 ExpandByLookAheadAndBehind(_baseTreeRoot, _change.Span))
@@ -419,7 +418,7 @@ Namespace Microsoft.CodeAnalysis.VisualBasic.Syntax.InternalSyntax
 
             ' As of 2013/03/14, the compiler never attempts to incrementally parse a tree containing
             ' annotations.  Our goal in instituting this restriction is to prevent API clients from
-            ' taking a depedency on the survival of annotations.
+            ' taking a dependency on the survival of annotations.
             If node.ContainsAnnotations Then
                 Return False
             End If
@@ -473,7 +472,7 @@ Namespace Microsoft.CodeAnalysis.VisualBasic.Syntax.InternalSyntax
         Private Function ContainsLeadingLineBreaks(node As VisualBasicSyntaxNode) As Boolean
             Dim lt = node.GetLeadingTrivia
             If lt IsNot Nothing Then
-                If lt.Kind = SyntaxKind.EndOfLineTrivia Then
+                If lt.RawKind = SyntaxKind.EndOfLineTrivia Then
                     Return True
                 End If
 
@@ -538,7 +537,7 @@ Namespace Microsoft.CodeAnalysis.VisualBasic.Syntax.InternalSyntax
             _lineBufferOffset = _lineBufferOffset + _curNodeLength
 
             ' this will just verify that we do not have any prefetched tokens, including current. 
-            ' otherwise advancing linebuffer offeset could go out of sync with token stream.
+            ' otherwise advancing line buffer offset could go out of sync with token stream.
             MyBase.MoveToNextSyntaxNodeInTrivia()
 
             TryPopNode()

@@ -1,27 +1,29 @@
-﻿' Copyright (c) Microsoft.  All Rights Reserved.  Licensed under the Apache License, Version 2.0.  See License.txt in the project root for license information.
+﻿' Licensed to the .NET Foundation under one or more agreements.
+' The .NET Foundation licenses this file to you under the MIT license.
+' See the LICENSE file in the project root for more information.
 
 Imports System.Globalization
 
 Namespace Microsoft.CodeAnalysis.VisualBasic
 
     ''' <summary>
-    ''' The LocalizableErrorArgument class contains members members that allows formatting and serialization of error arguments.
+    ''' The LocalizableErrorArgument class contains members that allows formatting and serialization of error arguments.
     ''' Message IDs may refer to strings that need to be localized.   This struct makes an IFormattable wrapper around a MessageID
     ''' </summary>
     Public Structure LocalizableErrorArgument
-        Implements IFormattable, IMessageSerializable
+        Implements IFormattable
 
-        Private ReadOnly id As ERRID
+        Private ReadOnly _id As ERRID
 
         Friend Sub New(id As ERRID)
-            Me.id = id
+            Me._id = id
         End Sub
 
         ''' <summary>
         '''Creates a string representing the unformatted LocalizableErrorArgument instance.
         ''' </summary>
         Public Overrides Function ToString() As String
-            Return ToString(Nothing)
+            Return ToString_IFormattable(Nothing, Nothing)
         End Function
 
         ''' <summary>
@@ -30,7 +32,7 @@ Namespace Microsoft.CodeAnalysis.VisualBasic
         ''' <param name="format">A string to use for formatting.</param>
         ''' <param name="formatProvider">An object that supplies culture-specific format information about format.</param>
         Public Function ToString_IFormattable(format As String, formatProvider As IFormatProvider) As String Implements IFormattable.ToString
-            Return ErrorFactory.IdToString(id, DirectCast(formatProvider, CultureInfo))
+            Return ErrorFactory.IdToString(_id, DirectCast(formatProvider, CultureInfo))
         End Function
     End Structure
 End Namespace

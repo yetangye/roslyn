@@ -1,103 +1,98 @@
-' Copyright (c) Microsoft.  All Rights Reserved.  Licensed under the Apache License, Version 2.0.  See License.txt in the project root for license information.
-
-Imports Microsoft.CodeAnalysis.Text
-Imports Microsoft.CodeAnalysis.VisualBasic
-Imports Microsoft.CodeAnalysis.VisualBasic.Symbols
-Imports Microsoft.CodeAnalysis.VisualBasic.Syntax
-Imports Roslyn.Test.Utilities
-Imports Xunit
+﻿' Licensed to the .NET Foundation under one or more agreements.
+' The .NET Foundation licenses this file to you under the MIT license.
+' See the LICENSE file in the project root for more information.
 
 Namespace Microsoft.CodeAnalysis.Editor.VisualBasic.UnitTests.Recommendations.Declarations
     Public Class CovarianceModifierKeywordRecommenderTests
         <Fact>
         <Trait(Traits.Feature, Traits.Features.KeywordRecommending)>
-        Public Sub InAfterOfInInterfaceTypeParam()
-            VerifyRecommendationsContain(<File>Interface IFoo(Of |</File>, "In")
+        Public Sub InAfterOfInInterfaceTypeParamTest()
+            VerifyRecommendationsContain(<File>Interface IGoo(Of |</File>, "In")
         End Sub
 
         <Fact>
         <Trait(Traits.Feature, Traits.Features.KeywordRecommending)>
-        Public Sub OutAfterOfInInterfaceTypeParam()
-            VerifyRecommendationsContain(<File>Interface IFoo(Of |</File>, "In")
+        Public Sub OutAfterOfInInterfaceTypeParamTest()
+            VerifyRecommendationsContain(<File>Interface IGoo(Of |</File>, "In")
         End Sub
 
         <Fact>
         <Trait(Traits.Feature, Traits.Features.KeywordRecommending)>
-        Public Sub InNotInClassTypeParam()
-            VerifyRecommendationsMissing(<File>Class Foo(Of |</File>, "In")
+        Public Sub InNotInClassTypeParamTest()
+            VerifyRecommendationsMissing(<File>Class Goo(Of |</File>, "In")
         End Sub
 
         <Fact>
         <Trait(Traits.Feature, Traits.Features.KeywordRecommending)>
-        Public Sub OutNotInClassTypeParam()
-            VerifyRecommendationsMissing(<File>Class Foo(Of |</File>, "Out")
+        Public Sub OutNotInClassTypeParamTest()
+            VerifyRecommendationsMissing(<File>Class Goo(Of |</File>, "Out")
         End Sub
 
         <Fact>
         <Trait(Traits.Feature, Traits.Features.KeywordRecommending)>
-        Public Sub InNotInStructureTypeParam()
-            VerifyRecommendationsMissing(<File>Structure Foo(Of |</File>, "In")
+        Public Sub InNotInStructureTypeParamTest()
+            VerifyRecommendationsMissing(<File>Structure Goo(Of |</File>, "In")
         End Sub
 
         <Fact>
         <Trait(Traits.Feature, Traits.Features.KeywordRecommending)>
-        Public Sub OutNotInStructureTypeParam()
-            VerifyRecommendationsMissing(<File>Structure Foo(Of |</File>, "Out")
+        Public Sub OutNotInStructureTypeParamTest()
+            VerifyRecommendationsMissing(<File>Structure Goo(Of |</File>, "Out")
         End Sub
 
         <Fact>
         <Trait(Traits.Feature, Traits.Features.KeywordRecommending)>
-        Public Sub InForSecondInterfaceTypeParam()
-            VerifyRecommendationsContain(<File>Interface IFoo(Of T, |</File>, "In")
+        Public Sub InForSecondInterfaceTypeParamTest()
+            VerifyRecommendationsContain(<File>Interface IGoo(Of T, |</File>, "In")
         End Sub
 
         <Fact>
         <Trait(Traits.Feature, Traits.Features.KeywordRecommending)>
-        Public Sub OutForSecondInterfaceTypeParam()
-            VerifyRecommendationsContain(<File>Interface IFoo(Of T, |</File>, "In")
+        Public Sub OutForSecondInterfaceTypeParamTest()
+            VerifyRecommendationsContain(<File>Interface IGoo(Of T, |</File>, "In")
         End Sub
 
         <Fact>
         <Trait(Traits.Feature, Traits.Features.KeywordRecommending)>
-        Public Sub InNotInMultipleConstraints()
-            VerifyRecommendationsMissing(<File>Interface IFoo(Of T As {New, |</File>, "In")
+        Public Sub InNotInMultipleConstraintsTest()
+            VerifyRecommendationsMissing(<File>Interface IGoo(Of T As {New, |</File>, "In")
         End Sub
 
         <Fact>
         <Trait(Traits.Feature, Traits.Features.KeywordRecommending)>
-        Public Sub OutNotInMultipleConstraints()
-            VerifyRecommendationsMissing(<File>Interface IFoo(Of T As {New, |</File>, "In")
+        Public Sub OutNotInMultipleConstraintsTest()
+            VerifyRecommendationsMissing(<File>Interface IGoo(Of T As {New, |</File>, "In")
         End Sub
 
         <Fact>
         <Trait(Traits.Feature, Traits.Features.KeywordRecommending)>
-        Public Sub InAfterOfInDelegateTypeParam()
-            VerifyRecommendationsContain(<File>Delegate Sub Foo(Of |</File>, "In")
+        Public Sub InAfterOfInDelegateTypeParamTest()
+            VerifyRecommendationsContain(<File>Delegate Sub Goo(Of |</File>, "In")
         End Sub
 
         <Fact>
         <Trait(Traits.Feature, Traits.Features.KeywordRecommending)>
-        Public Sub OutAfterOfInDelegateTypeParam()
-            VerifyRecommendationsContain(<File>Delegate Sub Foo(Of |</File>, "In")
+        Public Sub OutAfterOfInDelegateTypeParamTest()
+            VerifyRecommendationsContain(<File>Delegate Sub Goo(Of |</File>, "In")
         End Sub
 
         <Fact>
         <Trait(Traits.Feature, Traits.Features.KeywordRecommending)>
-        Public Sub InForSecondDelegateTypeParam()
-            VerifyRecommendationsContain(<File>Delegate Sub Foo(Of |</File>, "In")
+        Public Sub InForSecondDelegateTypeParamTest()
+            VerifyRecommendationsContain(<File>Delegate Sub Goo(Of |</File>, "In")
         End Sub
 
         <Fact>
         <Trait(Traits.Feature, Traits.Features.KeywordRecommending)>
-        Public Sub OutForSecondDelegateTypeParam()
-            VerifyRecommendationsContain(<File>Delegate Sub Foo(Of |</File>, "In")
+        Public Sub OutForSecondDelegateTypeParamTest()
+            VerifyRecommendationsContain(<File>Delegate Sub Goo(Of |</File>, "In")
         End Sub
 
-        <WorkItem(530953)>
+        <WorkItem(530953, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/530953")>
         <Fact, Trait(Traits.Feature, Traits.Features.KeywordRecommending)>
-        Public Sub AfterEol()
+        Public Sub AfterEolTest()
             VerifyRecommendationsContain(
-<File>Delegate Sub Foo(Of 
+<File>Delegate Sub Goo(Of 
     |</File>, "In")
         End Sub
     End Class

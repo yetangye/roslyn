@@ -1,4 +1,6 @@
-﻿' Copyright (c) Microsoft.  All Rights Reserved.  Licensed under the Apache License, Version 2.0.  See License.txt in the project root for license information.
+﻿' Licensed to the .NET Foundation under one or more agreements.
+' The .NET Foundation licenses this file to you under the MIT license.
+' See the LICENSE file in the project root for more information.
 
 Imports System.Collections.Immutable
 Imports System.Diagnostics
@@ -14,14 +16,14 @@ Namespace Microsoft.CodeAnalysis.VisualBasic.Symbols
     Friend NotInheritable Class SourceDeclareMethodSymbol
         Inherits SourceNonPropertyAccessorMethodSymbol
 
-        Private ReadOnly m_name As String
-        Private m_lazyMetadataName As String
+        Private ReadOnly _name As String
+        Private _lazyMetadataName As String
 
         ' Flags indicates results of quick scan of the attributes
-        Private ReadOnly m_quickAttributes As QuickAttributes
+        Private ReadOnly _quickAttributes As QuickAttributes
 
         ' Platform Invoke information for Declare Method
-        Private ReadOnly m_platformInvokeInfo As DllImportData
+        Private ReadOnly _platformInvokeInfo As DllImportData
 
         Public Sub New(container As SourceMemberContainerTypeSymbol,
                        name As String,
@@ -34,36 +36,36 @@ Namespace Microsoft.CodeAnalysis.VisualBasic.Symbols
             Debug.Assert(MyBase.MethodKind = MethodKind.DeclareMethod)
             Debug.Assert(platformInvokeInfo IsNot Nothing)
 
-            m_platformInvokeInfo = platformInvokeInfo
-            m_name = name
+            _platformInvokeInfo = platformInvokeInfo
+            _name = name
 
             ' Check attributes quickly.
-            m_quickAttributes = binder.QuickAttributeChecker.CheckAttributes(syntax.AttributeLists)
+            _quickAttributes = binder.QuickAttributeChecker.CheckAttributes(syntax.AttributeLists)
             If ContainingType.TypeKind <> TypeKind.Module Then
                 ' Extension methods in source can only be inside modules.
-                m_quickAttributes = m_quickAttributes And Not QuickAttributes.Extension
+                _quickAttributes = _quickAttributes And Not QuickAttributes.Extension
             End If
         End Sub
 
         Public Overrides ReadOnly Property Name As String
             Get
-                Return m_name
+                Return _name
             End Get
         End Property
 
         Public Overrides ReadOnly Property MetadataName As String
             Get
-                If m_lazyMetadataName Is Nothing Then
-                    OverloadingHelper.SetMetadataNameForAllOverloads(m_name, SymbolKind.Method, m_containingType)
-                    Debug.Assert(m_lazyMetadataName IsNot Nothing)
+                If _lazyMetadataName Is Nothing Then
+                    OverloadingHelper.SetMetadataNameForAllOverloads(_name, SymbolKind.Method, m_containingType)
+                    Debug.Assert(_lazyMetadataName IsNot Nothing)
                 End If
 
-                Return m_lazyMetadataName
+                Return _lazyMetadataName
             End Get
         End Property
 
         Friend Overrides Sub SetMetadataName(metadataName As String)
-            Dim old = Interlocked.CompareExchange(m_lazyMetadataName, metadataName, Nothing)
+            Dim old = Interlocked.CompareExchange(_lazyMetadataName, metadataName, Nothing)
             Debug.Assert(old Is Nothing OrElse old = metadataName)
         End Sub
 
@@ -75,7 +77,7 @@ Namespace Microsoft.CodeAnalysis.VisualBasic.Symbols
 
         Friend Overrides ReadOnly Property MayBeReducibleExtensionMethod As Boolean
             Get
-                Return (m_quickAttributes And QuickAttributes.Extension) <> 0
+                Return (_quickAttributes And QuickAttributes.Extension) <> 0
             End Get
         End Property
 
@@ -91,7 +93,7 @@ Namespace Microsoft.CodeAnalysis.VisualBasic.Symbols
 
         Friend Overrides ReadOnly Property ObsoleteAttributeData As ObsoleteAttributeData
             Get
-                If (m_quickAttributes And QuickAttributes.Obsolete) <> 0 Then
+                If (_quickAttributes And QuickAttributes.Obsolete) <> 0 Then
                     Return MyBase.ObsoleteAttributeData
                 Else
                     Return Nothing
@@ -100,7 +102,7 @@ Namespace Microsoft.CodeAnalysis.VisualBasic.Symbols
         End Property
 
         Public Overrides Function GetDllImportData() As DllImportData
-            Return Me.m_platformInvokeInfo
+            Return Me._platformInvokeInfo
         End Function
 
         Public Overrides ReadOnly Property TypeParameters As ImmutableArray(Of TypeParameterSymbol)

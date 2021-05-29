@@ -1,53 +1,60 @@
-' Copyright (c) Microsoft.  All Rights Reserved.  Licensed under the Apache License, Version 2.0.  See License.txt in the project root for license information.
+﻿' Licensed to the .NET Foundation under one or more agreements.
+' The .NET Foundation licenses this file to you under the MIT license.
+' See the LICENSE file in the project root for more information.
 
+Imports Microsoft.CodeAnalysis.Editor.Implementation.Interactive
+Imports Microsoft.CodeAnalysis.Editor.Shared.Utilities
+Imports Microsoft.CodeAnalysis.Editor.UnitTests
 Imports Microsoft.CodeAnalysis.Editor.UnitTests.Extensions
 Imports Microsoft.CodeAnalysis.Editor.UnitTests.ExtractInterface
 Imports Microsoft.CodeAnalysis.Editor.UnitTests.Workspaces
+Imports Microsoft.CodeAnalysis.Editor.VisualBasic.ExtractInterface
 Imports Microsoft.CodeAnalysis.ExtractInterface
+Imports Microsoft.VisualStudio.Text.Editor.Commanding.Commands
 
 Namespace Microsoft.CodeAnalysis.Editor.VisualBasic.UnitTests.ExtractInterface
     Public Class ExtractInterfaceTests
         Inherits AbstractExtractInterfaceTests
 
-        <Fact, Trait(Traits.Feature, Traits.Features.ExtractInterface)>
-        Public Sub ExtractInterface_Invocation_CaretInMethod()
+        <WpfFact, Trait(Traits.Feature, Traits.Features.ExtractInterface)>
+        Public Async Function TestExtractInterface_Invocation_CaretInMethod() As Task
             Dim markup = <text>Imports System
 Class TestClass
-    Public Sub Foo()
+    Public Sub Goo()
         $$
     End Sub
 End Class
 </text>.NormalizedValue()
-            TestExtractInterfaceCommandVisualBasic(markup, expectedSuccess:=True)
-        End Sub
+            Await TestExtractInterfaceCommandVisualBasicAsync(markup, expectedSuccess:=True)
+        End Function
 
-        <Fact, Trait(Traits.Feature, Traits.Features.ExtractInterface)>
-        Public Sub ExtractInterface_Invocation_CaretAfterEndClass()
+        <WpfFact, Trait(Traits.Feature, Traits.Features.ExtractInterface)>
+        Public Async Function TestExtractInterface_Invocation_CaretAfterEndClass() As Task
             Dim markup = <text>Imports System
 Class TestClass
-    Public Sub Foo()
+    Public Sub Goo()
     End Sub
 End Class$$
 </text>.NormalizedValue()
-            TestExtractInterfaceCommandVisualBasic(markup, expectedSuccess:=True)
-        End Sub
+            Await TestExtractInterfaceCommandVisualBasicAsync(markup, expectedSuccess:=True)
+        End Function
 
-        <Fact, Trait(Traits.Feature, Traits.Features.ExtractInterface)>
-        Public Sub ExtractInterface_Invocation_CaretBeforeClassKeyword()
+        <WpfFact, Trait(Traits.Feature, Traits.Features.ExtractInterface)>
+        Public Async Function TestExtractInterface_Invocation_CaretBeforeClassKeyword() As Task
             Dim markup = <text>Imports System
 $$Class TestClass
-    Public Sub Foo()
+    Public Sub Goo()
     End Sub
 End Class
 </text>.NormalizedValue()
-            TestExtractInterfaceCommandVisualBasic(markup, expectedSuccess:=True)
-        End Sub
+            Await TestExtractInterfaceCommandVisualBasicAsync(markup, expectedSuccess:=True)
+        End Function
 
-        <Fact, Trait(Traits.Feature, Traits.Features.ExtractInterface)>
-        Public Sub ExtractInterface_Invocation_FromInnerClass1()
+        <WpfFact, Trait(Traits.Feature, Traits.Features.ExtractInterface)>
+        Public Async Function TestExtractInterface_Invocation_FromInnerClass1() As Task
             Dim markup = <text>Imports System
 Class TestClass
-    Public Sub Foo()
+    Public Sub Goo()
     End Sub
 
     Class AnotherClass
@@ -56,14 +63,14 @@ Class TestClass
     End Class
 End Class
 </text>.NormalizedValue()
-            TestExtractInterfaceCommandVisualBasic(markup, expectedSuccess:=True, expectedMemberName:="Bar")
-        End Sub
+            Await TestExtractInterfaceCommandVisualBasicAsync(markup, expectedSuccess:=True, expectedMemberName:="Bar")
+        End Function
 
-        <Fact, Trait(Traits.Feature, Traits.Features.ExtractInterface)>
-        Public Sub ExtractInterface_Invocation_FromInnerClass2()
+        <WpfFact, Trait(Traits.Feature, Traits.Features.ExtractInterface)>
+        Public Async Function TestExtractInterface_Invocation_FromInnerClass2() As Task
             Dim markup = <text>Imports System
 Class TestClass
-    Public Sub Foo()
+    Public Sub Goo()
     End Sub
 
     $$Class AnotherClass
@@ -72,72 +79,72 @@ Class TestClass
     End Class
 End Class
 </text>.NormalizedValue()
-            TestExtractInterfaceCommandVisualBasic(markup, expectedSuccess:=True, expectedMemberName:="Bar")
-        End Sub
+            Await TestExtractInterfaceCommandVisualBasicAsync(markup, expectedSuccess:=True, expectedMemberName:="Bar")
+        End Function
 
-        <Fact, Trait(Traits.Feature, Traits.Features.ExtractInterface)>
-        Public Sub ExtractInterface_Invocation_FromOuterClass()
+        <WpfFact, Trait(Traits.Feature, Traits.Features.ExtractInterface)>
+        Public Async Function TestExtractInterface_Invocation_FromOuterClass() As Task
             Dim markup = <text>Imports System
 Class TestClass
-    Public Sub Foo()
+    Public Sub Goo()
     End Sub$$
 
     Class AnotherClass
-        Public Sub Bar()
+        Public Async Function TestBar() As Task
         End Sub
     End Class
 End Class
 </text>.NormalizedValue()
-            TestExtractInterfaceCommandVisualBasic(markup, expectedSuccess:=True, expectedMemberName:="Foo")
-        End Sub
+            Await TestExtractInterfaceCommandVisualBasicAsync(markup, expectedSuccess:=True, expectedMemberName:="Goo")
+        End Function
 
-        <Fact, Trait(Traits.Feature, Traits.Features.ExtractInterface)>
-        Public Sub ExtractInterface_Invocation_FromInterface()
+        <WpfFact, Trait(Traits.Feature, Traits.Features.ExtractInterface)>
+        Public Async Function TestExtractInterface_Invocation_FromInterface() As Task
             Dim markup = <text>Imports System
 Interface IMyInterface
-    Sub Foo()$$
+    Sub Goo()$$
 End Interface
 </text>.NormalizedValue()
-            TestExtractInterfaceCommandVisualBasic(markup, expectedSuccess:=True, expectedMemberName:="Foo", expectedInterfaceName:="IMyInterface1")
-        End Sub
+            Await TestExtractInterfaceCommandVisualBasicAsync(markup, expectedSuccess:=True, expectedMemberName:="Goo", expectedInterfaceName:="IMyInterface1")
+        End Function
 
-        <Fact, Trait(Traits.Feature, Traits.Features.ExtractInterface)>
-        Public Sub ExtractInterface_Invocation_FromStruct()
+        <WpfFact, Trait(Traits.Feature, Traits.Features.ExtractInterface)>
+        Public Async Function TestExtractInterface_Invocation_FromStruct() As Task
             Dim markup = <text>Imports System
 Structure SomeStruct
-    Sub Foo()$$
+    Sub Goo()$$
     End Sub
 End Structure
 </text>.NormalizedValue()
-            TestExtractInterfaceCommandVisualBasic(markup, expectedSuccess:=True, expectedMemberName:="Foo", expectedInterfaceName:="ISomeStruct")
-        End Sub
+            Await TestExtractInterfaceCommandVisualBasicAsync(markup, expectedSuccess:=True, expectedMemberName:="Goo", expectedInterfaceName:="ISomeStruct")
+        End Function
 
-        <Fact, Trait(Traits.Feature, Traits.Features.ExtractInterface)>
-        Public Sub ExtractInterface_Invocation_FromNamespace()
+        <WpfFact, Trait(Traits.Feature, Traits.Features.ExtractInterface)>
+        Public Async Function TestExtractInterface_Invocation_FromNamespace() As Task
             Dim markup = <text>
 Namespace Ns$$
     Class TestClass
-        Public Sub Foo()
+        Public Async Function TestGoo() As Task
         End Sub
     End Class
 End Namespace</text>.NormalizedValue()
-            TestExtractInterfaceCommandVisualBasic(markup, expectedSuccess:=False)
-        End Sub
+            Await TestExtractInterfaceCommandVisualBasicAsync(markup, expectedSuccess:=False)
+        End Function
 
-        <Fact, Trait(Traits.Feature, Traits.Features.ExtractInterface)>
-        Public Sub ExtractInterface_ExtractableMembers_DoesNotIncludeFields()
+        <WpfFact, Trait(Traits.Feature, Traits.Features.ExtractInterface)>
+        Public Async Function TestExtractInterface_ExtractableMembers_DoesNotIncludeFields() As Task
             Dim markup = <text>
 Class TestClass
     $$Public x As Integer
 
-    Public Sub Foo()
+    Public Sub Goo()
     End Sub
 End Class</text>.NormalizedValue()
-            TestExtractInterfaceCommandVisualBasic(markup, expectedSuccess:=True, expectedMemberName:="Foo")
-        End Sub
+            Await TestExtractInterfaceCommandVisualBasicAsync(markup, expectedSuccess:=True, expectedMemberName:="Goo")
+        End Function
 
-        <Fact, Trait(Traits.Feature, Traits.Features.ExtractInterface)>
-        Public Sub ExtractInterface_ExtractableMembers_IncludesPublicProperty_WithGetAndSet()
+        <WpfFact, Trait(Traits.Feature, Traits.Features.ExtractInterface)>
+        Public Async Function TestExtractInterface_ExtractableMembers_IncludesPublicProperty_WithGetAndSet() As Task
             Dim markup = <text>
 Class TestClass
     Public Property Prop() As Integer
@@ -148,11 +155,11 @@ Class TestClass
         End Set
     End Property
 End Class</text>.NormalizedValue()
-            TestExtractInterfaceCommandVisualBasic(markup, expectedSuccess:=True, expectedMemberName:="Prop")
-        End Sub
+            Await TestExtractInterfaceCommandVisualBasicAsync(markup, expectedSuccess:=True, expectedMemberName:="Prop")
+        End Function
 
-        <Fact, Trait(Traits.Feature, Traits.Features.ExtractInterface)>
-        Public Sub ExtractInterface_ExtractableMembers_IncludesPublicProperty_WithGetAndPrivateSet()
+        <WpfFact, Trait(Traits.Feature, Traits.Features.ExtractInterface)>
+        Public Async Function TestExtractInterface_ExtractableMembers_IncludesPublicProperty_WithGetAndPrivateSet() As Task
             Dim markup = <text>
 Class TestClass
     Public Property Prop() As Integer
@@ -163,11 +170,11 @@ Class TestClass
         End Set
     End Property
 End Class</text>.NormalizedValue()
-            TestExtractInterfaceCommandVisualBasic(markup, expectedSuccess:=True, expectedMemberName:="Prop")
-        End Sub
+            Await TestExtractInterfaceCommandVisualBasicAsync(markup, expectedSuccess:=True, expectedMemberName:="Prop")
+        End Function
 
-        <Fact, Trait(Traits.Feature, Traits.Features.ExtractInterface)>
-        Public Sub ExtractInterface_ExtractableMembers_IncludesPublicProperty_WithGet()
+        <WpfFact, Trait(Traits.Feature, Traits.Features.ExtractInterface)>
+        Public Async Function TestExtractInterface_ExtractableMembers_IncludesPublicProperty_WithGet() As Task
             Dim markup = <text>
 Class TestClass
     Public Readonly Property Prop() As Integer
@@ -176,11 +183,11 @@ Class TestClass
         End Get
     End Property
 End Class</text>.NormalizedValue()
-            TestExtractInterfaceCommandVisualBasic(markup, expectedSuccess:=True, expectedMemberName:="Prop")
-        End Sub
+            Await TestExtractInterfaceCommandVisualBasicAsync(markup, expectedSuccess:=True, expectedMemberName:="Prop")
+        End Function
 
-        <Fact, Trait(Traits.Feature, Traits.Features.ExtractInterface)>
-        Public Sub ExtractInterface_ExtractableMembers_ExcludesPublicProperty_WithPrivateGetAndPrivateSet()
+        <WpfFact, Trait(Traits.Feature, Traits.Features.ExtractInterface)>
+        Public Async Function TestExtractInterface_ExtractableMembers_ExcludesPublicProperty_WithPrivateGetAndPrivateSet() As Task
             Dim markup = <text>
 Class TestClass
     Public Property Prop() As Integer
@@ -191,11 +198,11 @@ Class TestClass
         End Set
     End Property
 End Class</text>.NormalizedValue()
-            TestExtractInterfaceCommandVisualBasic(markup, expectedSuccess:=False)
-        End Sub
+            Await TestExtractInterfaceCommandVisualBasicAsync(markup, expectedSuccess:=False)
+        End Function
 
-        <Fact, Trait(Traits.Feature, Traits.Features.ExtractInterface)>
-        Public Sub ExtractInterface_ExtractableMembers_IncludesPublicIndexer()
+        <WpfFact, Trait(Traits.Feature, Traits.Features.ExtractInterface)>
+        Public Async Function TestExtractInterface_ExtractableMembers_IncludesPublicIndexer() As Task
             Dim markup = <text>
 Class TestClass$$
     Default Public Property Item(index As String) As Integer
@@ -206,11 +213,11 @@ Class TestClass$$
         End Set
     End Property
 End Class</text>.NormalizedValue()
-            TestExtractInterfaceCommandVisualBasic(markup, expectedSuccess:=True, expectedMemberName:="Item")
-        End Sub
+            Await TestExtractInterfaceCommandVisualBasicAsync(markup, expectedSuccess:=True, expectedMemberName:="Item")
+        End Function
 
-        <Fact, Trait(Traits.Feature, Traits.Features.ExtractInterface)>
-        Public Sub ExtractInterface_ExtractableMembers_ExcludesInternalIndexer()
+        <WpfFact, Trait(Traits.Feature, Traits.Features.ExtractInterface)>
+        Public Async Function TestExtractInterface_ExtractableMembers_ExcludesInternalIndexer() As Task
             Dim markup = <text>
 Class TestClass$$
     Default Friend Property Item(index As String) As Integer
@@ -221,61 +228,61 @@ Class TestClass$$
         End Set
     End Property
 End Class</text>.NormalizedValue()
-            TestExtractInterfaceCommandVisualBasic(markup, expectedSuccess:=False)
-        End Sub
+            Await TestExtractInterfaceCommandVisualBasicAsync(markup, expectedSuccess:=False)
+        End Function
 
-        <Fact, Trait(Traits.Feature, Traits.Features.ExtractInterface)>
-        Public Sub ExtractInterface_ExtractableMembers_IncludesPublicMethod()
+        <WpfFact, Trait(Traits.Feature, Traits.Features.ExtractInterface)>
+        Public Async Function TestExtractInterface_ExtractableMembers_IncludesPublicMethod() As Task
             Dim markup = <text>
 Class TestClass$$
     Public Sub M()
     End Sub
 End Class</text>.NormalizedValue()
-            TestExtractInterfaceCommandVisualBasic(markup, expectedSuccess:=True, expectedMemberName:="M")
-        End Sub
+            Await TestExtractInterfaceCommandVisualBasicAsync(markup, expectedSuccess:=True, expectedMemberName:="M")
+        End Function
 
-        <Fact, Trait(Traits.Feature, Traits.Features.ExtractInterface)>
-        Public Sub ExtractInterface_ExtractableMembers_ExcludesInternalMethod()
+        <WpfFact, Trait(Traits.Feature, Traits.Features.ExtractInterface)>
+        Public Async Function TestExtractInterface_ExtractableMembers_ExcludesInternalMethod() As Task
             Dim markup = <text>
 Class TestClass$$
     Friend Sub M()
     End Sub
 End Class</text>.NormalizedValue()
-            TestExtractInterfaceCommandVisualBasic(markup, expectedSuccess:=False)
-        End Sub
+            Await TestExtractInterfaceCommandVisualBasicAsync(markup, expectedSuccess:=False)
+        End Function
 
-        <Fact, Trait(Traits.Feature, Traits.Features.ExtractInterface)>
-        Public Sub ExtractInterface_ExtractableMembers_IncludesAbstractMethod()
+        <WpfFact, Trait(Traits.Feature, Traits.Features.ExtractInterface)>
+        Public Async Function TestExtractInterface_ExtractableMembers_IncludesAbstractMethod() As Task
             Dim markup = <text>
 MustInherit Class TestClass$$
     Public MustOverride Sub M()
 End Class</text>.NormalizedValue()
-            TestExtractInterfaceCommandVisualBasic(markup, expectedSuccess:=True, expectedMemberName:="M")
-        End Sub
+            Await TestExtractInterfaceCommandVisualBasicAsync(markup, expectedSuccess:=True, expectedMemberName:="M")
+        End Function
 
-        <Fact, Trait(Traits.Feature, Traits.Features.ExtractInterface)>
-        Public Sub ExtractInterface_ExtractableMembers_IncludesPublicEvent()
+        <WpfFact, Trait(Traits.Feature, Traits.Features.ExtractInterface)>
+        Public Async Function TestExtractInterface_ExtractableMembers_IncludesPublicEvent() As Task
             Dim markup = <text>
 Class TestClass$$
     Public Event MyEvent()
 End Class</text>.NormalizedValue()
-            TestExtractInterfaceCommandVisualBasic(markup, expectedSuccess:=True, expectedMemberName:="MyEvent")
-        End Sub
+            Await TestExtractInterfaceCommandVisualBasicAsync(markup, expectedSuccess:=True, expectedMemberName:="MyEvent")
+        End Function
 
-        <Fact, Trait(Traits.Feature, Traits.Features.ExtractInterface)>
-        Public Sub ExtractInterface_ExtractableMembers_ExcludesPrivateEvent()
+        <WpfFact, Trait(Traits.Feature, Traits.Features.ExtractInterface)>
+        Public Async Function TestExtractInterface_ExtractableMembers_ExcludesPrivateEvent() As Task
             Dim markup = <text>
 Class TestClass$$
     Private Event MyEvent()
 End Class</text>.NormalizedValue()
-            TestExtractInterfaceCommandVisualBasic(markup, expectedSuccess:=False)
-        End Sub
+            Await TestExtractInterfaceCommandVisualBasicAsync(markup, expectedSuccess:=False)
+        End Function
 
-        <Fact, Trait(Traits.Feature, Traits.Features.ExtractInterface)>
-        Public Sub ExtractInterface_DefaultInterfaceName_DoesNotConflictWithOtherTypeNames()
+        <WpfFact, Trait(Traits.Feature, Traits.Features.ExtractInterface)>
+        Public Async Function TestExtractInterface_DefaultInterfaceName_DoesNotConflictWithOtherTypeNames() As Task
             Dim markup = <text>
 Class TestClass$$
-    Public Sub Foo()
+    Public Sub Goo()
     End Sub
 End Class
 
@@ -287,92 +294,94 @@ End Structure
 
 Class ITestClass2
 End Class</text>.NormalizedValue()
-            TestExtractInterfaceCommandVisualBasic(markup, expectedSuccess:=True, expectedInterfaceName:="ITestClass3")
-        End Sub
+            Await TestExtractInterfaceCommandVisualBasicAsync(markup, expectedSuccess:=True, expectedInterfaceName:="ITestClass3")
+        End Function
 
-        <Fact, Trait(Traits.Feature, Traits.Features.ExtractInterface)>
-        Public Sub ExtractInterface_NamespaceName_NoNamespace()
+        <WpfFact, Trait(Traits.Feature, Traits.Features.ExtractInterface)>
+        Public Async Function TestExtractInterface_NamespaceName_NoNamespace() As Task
             Dim markup = <text>
 Class TestClass$$
-    Public Sub Foo()
+    Public Sub Goo()
     End Sub
 End Class</text>.NormalizedValue()
-            TestExtractInterfaceCommandVisualBasic(markup, expectedSuccess:=True, expectedNamespaceName:="")
-        End Sub
+            Await TestExtractInterfaceCommandVisualBasicAsync(markup, expectedSuccess:=True, expectedNamespaceName:="")
+        End Function
 
-        <Fact, Trait(Traits.Feature, Traits.Features.ExtractInterface)>
-        Public Sub ExtractInterface_NamespaceName_SingleNamespace()
+        <WpfFact, Trait(Traits.Feature, Traits.Features.ExtractInterface)>
+        Public Async Function TestExtractInterface_NamespaceName_SingleNamespace() As Task
             Dim markup = <text>
 Namespace MyNamespace
     Class TestClass$$
-        Public Sub Foo()
+        Public Async Function TestGoo() As Task
         End Sub
     End Class
 End Namespace</text>.NormalizedValue()
-            TestExtractInterfaceCommandVisualBasic(markup, expectedSuccess:=True, expectedNamespaceName:="MyNamespace")
-        End Sub
+            Await TestExtractInterfaceCommandVisualBasicAsync(markup, expectedSuccess:=True, expectedNamespaceName:="MyNamespace")
+        End Function
 
-        <Fact, Trait(Traits.Feature, Traits.Features.ExtractInterface)>
-        Public Sub ExtractInterface_NamespaceName_NestedNamespaces()
+        <WpfFact, Trait(Traits.Feature, Traits.Features.ExtractInterface)>
+        Public Async Function TestExtractInterface_NamespaceName_NestedNamespaces() As Task
             Dim markup = <text>
 Namespace OuterNamespace
     Namespace InnerNamespace
         Class TestClass$$
-            Public Sub Foo()
-            End Sub
+            Public Sub Goo()
+            End Function
         End Class
     End Namespace
 End Namespace</text>.NormalizedValue()
-            TestExtractInterfaceCommandVisualBasic(markup, expectedSuccess:=True, expectedNamespaceName:="OuterNamespace.InnerNamespace")
-        End Sub
+            Await TestExtractInterfaceCommandVisualBasicAsync(markup, expectedSuccess:=True, expectedNamespaceName:="OuterNamespace.InnerNamespace")
+        End Function
 
-        <Fact, Trait(Traits.Feature, Traits.Features.ExtractInterface)>
-        Public Sub ExtractInterface_CodeGen_ClassesImplementExtractedInterface()
+        <WpfFact, Trait(Traits.Feature, Traits.Features.ExtractInterface)>
+        Public Async Function TestExtractInterface_CodeGen_ClassesImplementExtractedInterface() As Task
             Dim markup = <text>
 Class TestClass$$
-    Public Sub Foo()
+    Public Sub Goo()
     End Sub
 End Class</text>.NormalizedValue()
             Dim expectedCode = <text>
 Class TestClass
     Implements ITestClass
-    Public Sub Foo() Implements ITestClass.Foo
+
+    Public Sub Goo() Implements ITestClass.Goo
     End Sub
 End Class</text>.NormalizedValue()
-            TestExtractInterfaceCommandVisualBasic(markup, expectedSuccess:=True, expectedUpdatedOriginalDocumentCode:=expectedCode)
-        End Sub
+            Await TestExtractInterfaceCommandVisualBasicAsync(markup, expectedSuccess:=True, expectedUpdatedOriginalDocumentCode:=expectedCode)
+        End Function
 
-        <Fact, Trait(Traits.Feature, Traits.Features.ExtractInterface)>
-        Public Sub ExtractInterface_CodeGen_StructsImplementExtractedInterface()
+        <WpfFact, Trait(Traits.Feature, Traits.Features.ExtractInterface)>
+        Public Async Function TestExtractInterface_CodeGen_StructsImplementExtractedInterface() As Task
             Dim markup = <text>
 Structure TestClass$$
-    Public Sub Foo()
+    Public Sub Goo()
     End Sub
 End Structure</text>.NormalizedValue()
             Dim expectedCode = <text>
 Structure TestClass
     Implements ITestClass
-    Public Sub Foo() Implements ITestClass.Foo
+
+    Public Sub Goo() Implements ITestClass.Goo
     End Sub
 End Structure</text>.NormalizedValue()
-            TestExtractInterfaceCommandVisualBasic(markup, expectedSuccess:=True, expectedUpdatedOriginalDocumentCode:=expectedCode)
-        End Sub
+            Await TestExtractInterfaceCommandVisualBasicAsync(markup, expectedSuccess:=True, expectedUpdatedOriginalDocumentCode:=expectedCode)
+        End Function
 
-        <Fact, Trait(Traits.Feature, Traits.Features.ExtractInterface)>
-        Public Sub ExtractInterface_CodeGen_InterfacesDoNotImplementExtractedInterface()
+        <WpfFact, Trait(Traits.Feature, Traits.Features.ExtractInterface)>
+        Public Async Function TestExtractInterface_CodeGen_InterfacesDoNotImplementExtractedInterface() As Task
             Dim markup = <text>
 Interface IMyInterface$$
-    Sub Foo()
+    Sub Goo()
 End Interface</text>.NormalizedValue()
             Dim expectedCode = <text>
 Interface IMyInterface
-    Sub Foo()
+    Sub Goo()
 End Interface</text>.NormalizedValue()
-            TestExtractInterfaceCommandVisualBasic(markup, expectedSuccess:=True, expectedUpdatedOriginalDocumentCode:=expectedCode)
-        End Sub
+            Await TestExtractInterfaceCommandVisualBasicAsync(markup, expectedSuccess:=True, expectedUpdatedOriginalDocumentCode:=expectedCode)
+        End Function
 
-        <Fact, Trait(Traits.Feature, Traits.Features.ExtractInterface)>
-        Public Sub ExtractInterface_CodeGen_Methods()
+        <WpfFact, Trait(Traits.Feature, Traits.Features.ExtractInterface)>
+        Public Async Function TestExtractInterface_CodeGen_Methods() As Task
             Dim markup = <text>
 Imports System
 MustInherit Class TestClass$$
@@ -389,11 +398,11 @@ Interface ITestClass
     Sub ExtractableMethod_Abstract()
 End Interface
 </text>.NormalizedValue()
-            TestExtractInterfaceCommandVisualBasic(markup, expectedSuccess:=True, expectedInterfaceCode:=expectedInterfaceCode)
-        End Sub
+            Await TestExtractInterfaceCommandVisualBasicAsync(markup, expectedSuccess:=True, expectedInterfaceCode:=expectedInterfaceCode)
+        End Function
 
-        <Fact, Trait(Traits.Feature, Traits.Features.ExtractInterface)>
-        Public Sub ExtractInterface_CodeGen_Events()
+        <WpfFact, Trait(Traits.Feature, Traits.Features.ExtractInterface)>
+        Public Async Function TestExtractInterface_CodeGen_Events() As Task
             Dim markup = <text>
 Imports System
 
@@ -406,11 +415,11 @@ End Class</text>.NormalizedValue()
     Event ExtractableEvent2(x As Integer?)
 End Interface
 </text>.NormalizedValue()
-            TestExtractInterfaceCommandVisualBasic(markup, expectedSuccess:=True, expectedInterfaceCode:=expectedInterfaceCode)
-        End Sub
+            Await TestExtractInterfaceCommandVisualBasicAsync(markup, expectedSuccess:=True, expectedInterfaceCode:=expectedInterfaceCode)
+        End Function
 
-        <Fact, Trait(Traits.Feature, Traits.Features.ExtractInterface)>
-        Public Sub ExtractInterface_CodeGen_Properties()
+        <WpfFact, Trait(Traits.Feature, Traits.Features.ExtractInterface)>
+        Public Async Function TestExtractInterface_CodeGen_Properties() As Task
             Dim markup = <text>
 Imports System
 
@@ -476,11 +485,11 @@ End Class</text>.NormalizedValue()
     WriteOnly Property ExtractableProp_GetInternal As Integer
 End Interface
 </text>.NormalizedValue()
-            TestExtractInterfaceCommandVisualBasic(markup, expectedSuccess:=True, expectedInterfaceCode:=expectedInterfaceCode)
-        End Sub
+            Await TestExtractInterfaceCommandVisualBasicAsync(markup, expectedSuccess:=True, expectedInterfaceCode:=expectedInterfaceCode)
+        End Function
 
-        <Fact, Trait(Traits.Feature, Traits.Features.ExtractInterface)>
-        Public Sub ExtractInterface_CodeGen_Indexers()
+        <WpfFact, Trait(Traits.Feature, Traits.Features.ExtractInterface)>
+        Public Async Function TestExtractInterface_CodeGen_Indexers() As Task
             Dim markup = <text>
 MustInherit Class TestClass$$
     Default WriteOnly Property Item(index As Integer) As Integer
@@ -517,11 +526,11 @@ End Class</text>.NormalizedValue()
     Default Property Item(x As Integer?, Optional y As String = "42") As Integer
 End Interface
 </text>.NormalizedValue()
-            TestExtractInterfaceCommandVisualBasic(markup, expectedSuccess:=True, expectedInterfaceCode:=expectedInterfaceCode)
-        End Sub
+            Await TestExtractInterfaceCommandVisualBasicAsync(markup, expectedSuccess:=True, expectedInterfaceCode:=expectedInterfaceCode)
+        End Function
 
-        <Fact, Trait(Traits.Feature, Traits.Features.ExtractInterface)>
-        Public Sub ExtractInterface_CodeGen_Imports()
+        <WpfFact, Trait(Traits.Feature, Traits.Features.ExtractInterface)>
+        Public Async Function TestExtractInterface_CodeGen_Imports() As Task
             Dim markup = <text>Imports System.Collections.Generic
 Public Class TestClass$$
     Public Function M1(x As System.Globalization.Calendar) As System.Diagnostics.BooleanSwitch
@@ -546,24 +555,25 @@ Public Interface ITestClass
     Function M1(x As Calendar) As BooleanSwitch
 End Interface
 </text>.NormalizedValue()
-            TestExtractInterfaceCommandVisualBasic(markup, expectedSuccess:=True, expectedInterfaceCode:=expectedInterfaceCode)
-        End Sub
+            Await TestExtractInterfaceCommandVisualBasicAsync(markup, expectedSuccess:=True, expectedInterfaceCode:=expectedInterfaceCode)
+        End Function
 
-        <Fact, Trait(Traits.Feature, Traits.Features.ExtractInterface)>
-        Public Sub ExtractInterface_CodeGen_TypeParameters1()
-            Dim markup = <text>Imports System.Collections.Generic
+        <WpfFact, Trait(Traits.Feature, Traits.Features.ExtractInterface)>
+        Public Async Function TestExtractInterface_CodeGen_TypeParameters1() As Task
+            Dim markup =
+"Imports System.Collections.Generic
 Public Class TestClass(Of A, B, C, D, E As F, F, G, H, NO1)$$
-    Public Sub Foo1(a As A)
+    Public Sub Goo1(a As A)
     End Sub
 
-    Public Function Foo2() As B
+    Public Function Goo2() As B
         Return Nothing
     End Function
 
-    Public Sub Foo3(list As List(Of C))
+    Public Sub Goo3(list As List(Of C))
     End Sub
 
-    Public Event Foo4 As Action
+    Public Event Goo4 As Action
 
     Public WriteOnly Property Prop() As List(Of E)
         Set(value As List(Of E))
@@ -578,40 +588,43 @@ Public Class TestClass(Of A, B, C, D, E As F, F, G, H, NO1)$$
     Public Sub Bar1()
         Dim x As NO1 = Nothing
     End Sub
-End Class</text>.NormalizedValue()
-            Dim expectedInterfaceCode = <text>Imports System.Collections.Generic
+End Class"
+
+            Dim expectedInterfaceCode =
+"Imports System.Collections.Generic
 
 Public Interface ITestClass(Of A, B, C, E As F, F, G, H)
     WriteOnly Property Prop As List(Of E)
     Default WriteOnly Property Item(list As List(Of List(Of H))) As List(Of G)
-    Event Foo4 As Action
-    Sub Foo1(a As A)
-    Sub Foo3(list As List(Of C))
-    Function Foo2() As B
+    Event Goo4 As Action
+    Sub Goo1(a As A)
+    Sub Goo3(list As List(Of C))
     Sub Bar1()
+    Function Goo2() As B
 End Interface
-</text>.NormalizedValue()
-            TestExtractInterfaceCommandVisualBasic(markup, expectedSuccess:=True, expectedInterfaceCode:=expectedInterfaceCode)
-        End Sub
+"
 
-        <Fact, Trait(Traits.Feature, Traits.Features.ExtractInterface)>
-        Public Sub ExtractInterface_CodeGen_TypeParameters2()
+            Await TestExtractInterfaceCommandVisualBasicAsync(markup, expectedSuccess:=True, expectedInterfaceCode:=expectedInterfaceCode)
+        End Function
+
+        <WpfFact, Trait(Traits.Feature, Traits.Features.ExtractInterface)>
+        Public Async Function TestExtractInterface_CodeGen_TypeParameters2() As Task
             Dim markup = <text>Imports System.Collections.Generic
 Friend Class Program(Of A As List(Of B), B As Dictionary(Of List(Of D), List(Of E)), C, D, E)$$
-    Public Sub Foo(Of T As List(Of A))(x As T)
+    Public Sub Goo(Of T As List(Of A))(x As T)
     End Sub
 End Class</text>.NormalizedValue()
             Dim expectedInterfaceCode = <text>Imports System.Collections.Generic
 
 Friend Interface IProgram(Of A As List(Of B), B As Dictionary(Of List(Of D), List(Of E)), D, E)
-    Sub Foo(Of T As List(Of A))(x As T)
+    Sub Goo(Of T As List(Of A))(x As T)
 End Interface
 </text>.NormalizedValue()
-            TestExtractInterfaceCommandVisualBasic(markup, expectedSuccess:=True, expectedInterfaceCode:=expectedInterfaceCode)
-        End Sub
+            Await TestExtractInterfaceCommandVisualBasicAsync(markup, expectedSuccess:=True, expectedInterfaceCode:=expectedInterfaceCode)
+        End Function
 
-        <Fact(Skip:="860565"), Trait(Traits.Feature, Traits.Features.ExtractInterface)>
-        Public Sub ExtractInterface_CodeGen_TypeParameters3()
+        <WpfFact(Skip:="860565"), Trait(Traits.Feature, Traits.Features.ExtractInterface)>
+        Public Async Function TestExtractInterface_CodeGen_TypeParameters3() As Task
             ' Note: This test should pass after RI from Airstream branch to Main.
             Dim markup = <text>
 Class Class1(Of A, B)$$
@@ -625,11 +638,11 @@ End Class</text>.NormalizedValue()
     Sub Method(p1 As A, p2 As Class1(Of A, B).Class2)
 End Interface
 </text>.NormalizedValue()
-            TestExtractInterfaceCommandVisualBasic(markup, expectedSuccess:=True, expectedInterfaceCode:=expectedInterfaceCode)
-        End Sub
+            Await TestExtractInterfaceCommandVisualBasicAsync(markup, expectedSuccess:=True, expectedInterfaceCode:=expectedInterfaceCode)
+        End Function
 
-        <Fact, Trait(Traits.Feature, Traits.Features.ExtractInterface)>
-        Public Sub ExtractInterface_CodeGen_TypeParameters4()
+        <WpfFact, Trait(Traits.Feature, Traits.Features.ExtractInterface)>
+        Public Async Function TestExtractInterface_CodeGen_TypeParameters4() As Task
             Dim markup = <text>
 Class C1(Of A)
     Public Class C2(Of B As New)
@@ -662,79 +675,82 @@ Public Interface IC4(Of A, C As ICollection)
     Function Method() As A
 End Interface
 </text>.NormalizedValue()
-            TestExtractInterfaceCommandVisualBasic(markup, expectedSuccess:=True, expectedInterfaceCode:=expectedInterfaceCode)
-        End Sub
+            Await TestExtractInterfaceCommandVisualBasicAsync(markup, expectedSuccess:=True, expectedInterfaceCode:=expectedInterfaceCode)
+        End Function
 
-        <Fact(Skip:="738545"), Trait(Traits.Feature, Traits.Features.ExtractInterface)>
-        Public Sub ExtractInterface_CodeGen_VBEvents_TypeParametersAndAccessability()
+        <WpfFact(Skip:="738545"), Trait(Traits.Feature, Traits.Features.ExtractInterface)>
+        Public Async Function TestExtractInterface_CodeGen_VBEvents_TypeParametersAndAccessability() As Task
             Dim markup = <text>Imports System.Collections.Generic
 Public Class TestClass(Of A, B, C, D, E As F, F, G, H, NO1)$$
-    Public Event Foo4(d as D)
+    Public Event Goo4(d as D)
 End Class</text>.NormalizedValue()
             Dim expectedInterfaceCode = <text>Imports System.Collections.Generic
 
 Public Interface ITestClass(Of D)
-    Event Foo4(d As D)
+    Event Goo4(d As D)
 End Interface
 </text>.NormalizedValue()
-            TestExtractInterfaceCommandVisualBasic(markup, expectedSuccess:=True, expectedInterfaceCode:=expectedInterfaceCode)
-        End Sub
+            Await TestExtractInterfaceCommandVisualBasicAsync(markup, expectedSuccess:=True, expectedInterfaceCode:=expectedInterfaceCode)
+        End Function
 
-        <Fact, Trait(Traits.Feature, Traits.Features.ExtractInterface)>
-        Public Sub ExtractInterface_CodeGen_BaseList_NewBaseListNonGeneric()
+        <WpfFact, Trait(Traits.Feature, Traits.Features.ExtractInterface)>
+        Public Async Function TestExtractInterface_CodeGen_BaseList_NewBaseListNonGeneric() As Task
             Dim markup = <text>
 Class Program$$
-    Public Sub Foo()
+    Public Sub Goo()
     End Sub
 End Class</text>.NormalizedValue()
             Dim expectedCode = <text>
 Class Program
     Implements IProgram
-    Public Sub Foo() Implements IProgram.Foo
+
+    Public Sub Goo() Implements IProgram.Goo
     End Sub
 End Class</text>.NormalizedValue()
-            TestExtractInterfaceCommandVisualBasic(markup, expectedSuccess:=True, expectedUpdatedOriginalDocumentCode:=expectedCode)
-        End Sub
+            Await TestExtractInterfaceCommandVisualBasicAsync(markup, expectedSuccess:=True, expectedUpdatedOriginalDocumentCode:=expectedCode)
+        End Function
 
-        <Fact, Trait(Traits.Feature, Traits.Features.ExtractInterface)>
-        Public Sub ExtractInterface_CodeGen_BaseList_NewBaseListGeneric()
+        <WpfFact, Trait(Traits.Feature, Traits.Features.ExtractInterface)>
+        Public Async Function TestExtractInterface_CodeGen_BaseList_NewBaseListGeneric() As Task
             Dim markup = <text>
 Class Program(Of T)$$
-    Public Sub Foo(x As T)
+    Public Sub Goo(x As T)
     End Sub
 End Class</text>.NormalizedValue()
             Dim expectedCode = <text>
 Class Program(Of T)
     Implements IProgram(Of T)
-    Public Sub Foo(x As T) Implements IProgram(Of T).Foo
+
+    Public Sub Goo(x As T) Implements IProgram(Of T).Goo
     End Sub
 End Class</text>.NormalizedValue()
-            TestExtractInterfaceCommandVisualBasic(markup, expectedSuccess:=True, expectedUpdatedOriginalDocumentCode:=expectedCode)
-        End Sub
+            Await TestExtractInterfaceCommandVisualBasicAsync(markup, expectedSuccess:=True, expectedUpdatedOriginalDocumentCode:=expectedCode)
+        End Function
 
-        <Fact, Trait(Traits.Feature, Traits.Features.ExtractInterface)>
-        Public Sub ExtractInterface_CodeGen_BaseList_NewBaseListWithWhereClause()
+        <WpfFact, Trait(Traits.Feature, Traits.Features.ExtractInterface)>
+        Public Async Function TestExtractInterface_CodeGen_BaseList_NewBaseListWithWhereClause() As Task
             Dim markup = <text>
 Class Program(Of T As U, U)$$
-    Public Sub Foo(x As T, y As U)
+    Public Sub Goo(x As T, y As U)
     End Sub
 End Class</text>.NormalizedValue()
             Dim expectedCode = <text>
 Class Program(Of T As U, U)
     Implements IProgram(Of T, U)
-    Public Sub Foo(x As T, y As U) Implements IProgram(Of T, U).Foo
+
+    Public Sub Goo(x As T, y As U) Implements IProgram(Of T, U).Goo
     End Sub
 End Class</text>.NormalizedValue()
-            TestExtractInterfaceCommandVisualBasic(markup, expectedSuccess:=True, expectedUpdatedOriginalDocumentCode:=expectedCode)
-        End Sub
+            Await TestExtractInterfaceCommandVisualBasicAsync(markup, expectedSuccess:=True, expectedUpdatedOriginalDocumentCode:=expectedCode)
+        End Function
 
-        <Fact, Trait(Traits.Feature, Traits.Features.ExtractInterface)>
-        Public Sub ExtractInterface_CodeGen_BaseList_LargerBaseList1()
+        <WpfFact, Trait(Traits.Feature, Traits.Features.ExtractInterface)>
+        Public Async Function TestExtractInterface_CodeGen_BaseList_LargerBaseList1() As Task
             Dim markup = <text>
 Class Program$$
     Implements ISomeInterface
 
-    Public Sub Foo()
+    Public Sub Goo()
     End Sub
 End Class
 
@@ -742,26 +758,25 @@ Interface ISomeInterface
 End Interface</text>.NormalizedValue()
             Dim expectedCode = <text>
 Class Program
-    Implements ISomeInterface
-    Implements IProgram
+    Implements ISomeInterface, IProgram
 
-    Public Sub Foo() Implements IProgram.Foo
+    Public Sub Goo() Implements IProgram.Goo
     End Sub
 End Class
 
 Interface ISomeInterface
 End Interface</text>.NormalizedValue()
-            TestExtractInterfaceCommandVisualBasic(markup, expectedSuccess:=True, expectedUpdatedOriginalDocumentCode:=expectedCode)
-        End Sub
+            Await TestExtractInterfaceCommandVisualBasicAsync(markup, expectedSuccess:=True, expectedUpdatedOriginalDocumentCode:=expectedCode)
+        End Function
 
-        <Fact, Trait(Traits.Feature, Traits.Features.ExtractInterface)>
-        Public Sub ExtractInterface_CodeGen_BaseList_LargerBaseList2()
+        <WpfFact, Trait(Traits.Feature, Traits.Features.ExtractInterface)>
+        Public Async Function TestExtractInterface_CodeGen_BaseList_LargerBaseList2() As Task
             Dim markup = <text>
 Class Program$$
     Implements ISomeInterface
     Implements IProgram
 
-    Public Sub Foo() Implements IProgram.Foo
+    Public Sub Goo() Implements IProgram.Goo
     End Sub
 End Class
 
@@ -769,7 +784,7 @@ Interface ISomeInterface
 End Interface
 
 Interface IProgram
-    Sub Foo()
+    Sub Goo()
 End Interface</text>.NormalizedValue()
             Dim expectedCode = <text>
 Class Program
@@ -777,7 +792,7 @@ Class Program
     Implements IProgram
     Implements IProgram1
 
-    Public Sub Foo() Implements IProgram.Foo, IProgram1.Foo
+    Public Sub Goo() Implements IProgram.Goo, IProgram1.Goo
     End Sub
 End Class
 
@@ -785,18 +800,18 @@ Interface ISomeInterface
 End Interface
 
 Interface IProgram
-    Sub Foo()
+    Sub Goo()
 End Interface</text>.NormalizedValue()
-            TestExtractInterfaceCommandVisualBasic(markup, expectedSuccess:=True, expectedUpdatedOriginalDocumentCode:=expectedCode)
-        End Sub
+            Await TestExtractInterfaceCommandVisualBasicAsync(markup, expectedSuccess:=True, expectedUpdatedOriginalDocumentCode:=expectedCode)
+        End Function
 
-        <Fact, Trait(Traits.Feature, Traits.Features.ExtractInterface)>
-        Public Sub ExtractInterface_CodeGen_BaseList_LargerBaseList3()
+        <WpfFact, Trait(Traits.Feature, Traits.Features.ExtractInterface)>
+        Public Async Function TestExtractInterface_CodeGen_BaseList_LargerBaseList3() As Task
             Dim markup = <text>
 Class Program(Of T, U)$$
     Implements ISomeInterface(Of T)
 
-    Public Sub Foo(t As T, u As U)
+    Public Sub Goo(t As T, u As U)
     End Sub
 End Class
 
@@ -805,26 +820,25 @@ Interface ISomeInterface(Of T)
 End Interface</text>.NormalizedValue()
             Dim expectedCode = <text>
 Class Program(Of T, U)
-    Implements ISomeInterface(Of T)
-    Implements IProgram(Of T, U)
+    Implements ISomeInterface(Of T), IProgram(Of T, U)
 
-    Public Sub Foo(t As T, u As U) Implements IProgram(Of T, U).Foo
+    Public Sub Goo(t As T, u As U) Implements IProgram(Of T, U).Goo
     End Sub
 End Class
 
 
 Interface ISomeInterface(Of T)
 End Interface</text>.NormalizedValue()
-            TestExtractInterfaceCommandVisualBasic(markup, expectedSuccess:=True, expectedUpdatedOriginalDocumentCode:=expectedCode)
-        End Sub
+            Await TestExtractInterfaceCommandVisualBasicAsync(markup, expectedSuccess:=True, expectedUpdatedOriginalDocumentCode:=expectedCode)
+        End Function
 
-        <Fact, Trait(Traits.Feature, Traits.Features.ExtractInterface)>
-        Public Sub ExtractInterface_CodeGen_BaseList_LargerBaseList4()
+        <WpfFact, Trait(Traits.Feature, Traits.Features.ExtractInterface)>
+        Public Async Function TestExtractInterface_CodeGen_BaseList_LargerBaseList4() As Task
             Dim markup = <text>
 Class Program(Of T, U)$$
     Implements ISomeInterface(Of T), ISomeInterface2(Of T, U)
 
-    Public Sub Foo(t As T, u As U)
+    Public Sub Goo(t As T, u As U)
     End Sub
 End Class
 
@@ -835,10 +849,9 @@ Interface ISomeInterface2(Of T, U)
 End Interface</text>.NormalizedValue()
             Dim expectedCode = <text>
 Class Program(Of T, U)
-    Implements ISomeInterface(Of T), ISomeInterface2(Of T, U)
-    Implements IProgram(Of T, U)
+    Implements ISomeInterface(Of T), ISomeInterface2(Of T, U), IProgram(Of T, U)
 
-    Public Sub Foo(t As T, u As U) Implements IProgram(Of T, U).Foo
+    Public Sub Goo(t As T, u As U) Implements IProgram(Of T, U).Goo
     End Sub
 End Class
 
@@ -847,14 +860,14 @@ Interface ISomeInterface(Of T)
 End Interface
 Interface ISomeInterface2(Of T, U)
 End Interface</text>.NormalizedValue()
-            TestExtractInterfaceCommandVisualBasic(markup, expectedSuccess:=True, expectedUpdatedOriginalDocumentCode:=expectedCode)
-        End Sub
+            Await TestExtractInterfaceCommandVisualBasicAsync(markup, expectedSuccess:=True, expectedUpdatedOriginalDocumentCode:=expectedCode)
+        End Function
 
-        <Fact, Trait(Traits.Feature, Traits.Features.ExtractInterface)>
-        Public Sub ExtractInterface_CodeGen_UpdateMemberDefinitions_NewImplementsClause()
+        <WpfFact, Trait(Traits.Feature, Traits.Features.ExtractInterface)>
+        Public Async Function TestExtractInterface_CodeGen_UpdateMemberDefinitions_NewImplementsClause() As Task
             Dim markup = <text>
 Class C$$
-    Public Sub Foo()
+    Public Sub Goo()
     End Sub
 
     Public Function Bar() As Integer
@@ -875,7 +888,8 @@ End Class
             Dim expectedCode = <text>
 Class C
     Implements IC
-    Public Sub Foo() Implements IC.Foo
+
+    Public Sub Goo() Implements IC.Goo
     End Sub
 
     Public Function Bar() As Integer Implements IC.Bar
@@ -893,15 +907,15 @@ Class C
     End Property
 End Class
 </text>.NormalizedValue()
-            TestExtractInterfaceCommandVisualBasic(markup, expectedSuccess:=True, expectedUpdatedOriginalDocumentCode:=expectedCode)
-        End Sub
+            Await TestExtractInterfaceCommandVisualBasicAsync(markup, expectedSuccess:=True, expectedUpdatedOriginalDocumentCode:=expectedCode)
+        End Function
 
-        <Fact, Trait(Traits.Feature, Traits.Features.ExtractInterface)>
-        Public Sub ExtractInterface_CodeGen_UpdateMemberDefinitions_AddToExistingImplementsClause()
+        <WpfFact, Trait(Traits.Feature, Traits.Features.ExtractInterface)>
+        Public Async Function TestExtractInterface_CodeGen_UpdateMemberDefinitions_AddToExistingImplementsClause() As Task
             Dim markup = <text>
 Class C$$
     Implements IC
-    Public Sub Foo() Implements IC.Foo
+    Public Sub Goo() Implements IC.Goo
     End Sub
 
     Public Function Bar() As Integer Implements IC.Bar
@@ -922,15 +936,15 @@ End Class
 Interface IC
     Property Prop As Integer
     Event E As Action
-    Sub Foo()
+    Sub Goo()
     Function Bar() As Integer
 End Interface
 </text>.NormalizedValue()
             Dim expectedCode = <text>
 Class C
-    Implements IC
-    Implements IC1
-    Public Sub Foo() Implements IC.Foo, IC1.Foo
+    Implements IC, IC1
+
+    Public Sub Goo() Implements IC.Goo, IC1.Goo
     End Sub
 
     Public Function Bar() As Integer Implements IC.Bar, IC1.Bar
@@ -951,15 +965,15 @@ End Class
 Interface IC
     Property Prop As Integer
     Event E As Action
-    Sub Foo()
+    Sub Goo()
     Function Bar() As Integer
 End Interface
 </text>.NormalizedValue()
-            TestExtractInterfaceCommandVisualBasic(markup, expectedSuccess:=True, expectedUpdatedOriginalDocumentCode:=expectedCode)
-        End Sub
+            Await TestExtractInterfaceCommandVisualBasicAsync(markup, expectedSuccess:=True, expectedUpdatedOriginalDocumentCode:=expectedCode)
+        End Function
 
-        <Fact, Trait(Traits.Feature, Traits.Features.ExtractInterface)>
-        Public Sub ExtractInterface_TypeDiscovery_NameOnly1()
+        <WpfFact, Trait(Traits.Feature, Traits.Features.ExtractInterface)>
+        Public Async Function TestExtractInterface_TypeDiscovery_NameOnly1() As Task
             Dim markup = <text>
 Interface ISomeInterface(Of T)
 End Interface
@@ -967,14 +981,14 @@ End Interface
 Class Program(Of T As U, U)
     Implements ISomeInterface(Of T)
 
-    $$Public Sub Foo(t As T, u As U)
+    $$Public Sub Goo(t As T, u As U)
     End Sub
 End Class</text>.NormalizedValue()
-            TestTypeDiscovery(markup, TypeDiscoveryRule.TypeNameOnly, expectedExtractable:=False)
-        End Sub
+            Await TestTypeDiscoveryAsync(markup, TypeDiscoveryRule.TypeNameOnly, expectedExtractable:=False)
+        End Function
 
-        <Fact, Trait(Traits.Feature, Traits.Features.ExtractInterface)>
-        Public Sub ExtractInterface_TypeDiscovery_NameOnly2()
+        <WpfFact, Trait(Traits.Feature, Traits.Features.ExtractInterface)>
+        Public Async Function TestExtractInterface_TypeDiscovery_NameOnly2() As Task
             Dim markup = <text>
 Interface ISomeInterface(Of T)
 End Interface
@@ -982,14 +996,14 @@ End Interface
 Class Program(Of T As U, U)
     $$Implements ISomeInterface(Of T)
 
-    Public Sub Foo(t As T, u As U)
+    Public Sub Goo(t As T, u As U)
     End Sub
 End Class</text>.NormalizedValue()
-            TestTypeDiscovery(markup, TypeDiscoveryRule.TypeNameOnly, expectedExtractable:=False)
-        End Sub
+            Await TestTypeDiscoveryAsync(markup, TypeDiscoveryRule.TypeNameOnly, expectedExtractable:=False)
+        End Function
 
-        <Fact, Trait(Traits.Feature, Traits.Features.ExtractInterface)>
-        Public Sub ExtractInterface_TypeDiscovery_NameOnly3()
+        <WpfFact, Trait(Traits.Feature, Traits.Features.ExtractInterface)>
+        Public Async Function TestExtractInterface_TypeDiscovery_NameOnly3() As Task
             Dim markup = <text>
 Interface ISomeInterface(Of T)
 End Interface
@@ -997,14 +1011,14 @@ End Interface
 Class$$ Program(Of T As U, U)
     Implements ISomeInterface(Of T)
 
-    Public Sub Foo(t As T, u As U)
+    Public Sub Goo(t As T, u As U)
     End Sub
 End Class</text>.NormalizedValue()
-            TestTypeDiscovery(markup, TypeDiscoveryRule.TypeNameOnly, expectedExtractable:=False)
-        End Sub
+            Await TestTypeDiscoveryAsync(markup, TypeDiscoveryRule.TypeNameOnly, expectedExtractable:=False)
+        End Function
 
-        <Fact, Trait(Traits.Feature, Traits.Features.ExtractInterface)>
-        Public Sub ExtractInterface_TypeDiscovery_NameOnly4()
+        <WpfFact, Trait(Traits.Feature, Traits.Features.ExtractInterface)>
+        Public Async Function TestExtractInterface_TypeDiscovery_NameOnly4() As Task
             Dim markup = <text>
 Interface ISomeInterface(Of T)
 End Interface
@@ -1012,14 +1026,14 @@ End Interface
 Class Program(Of T As U, $$U)
     Implements ISomeInterface(Of T)
 
-    Public Sub Foo(t As T, u As U)
+    Public Sub Goo(t As T, u As U)
     End Sub
 End Class</text>.NormalizedValue()
-            TestTypeDiscovery(markup, TypeDiscoveryRule.TypeNameOnly, expectedExtractable:=True)
-        End Sub
+            Await TestTypeDiscoveryAsync(markup, TypeDiscoveryRule.TypeNameOnly, expectedExtractable:=True)
+        End Function
 
-        <Fact, Trait(Traits.Feature, Traits.Features.ExtractInterface)>
-        Public Sub ExtractInterface_TypeDiscovery_NameOnly5()
+        <WpfFact, Trait(Traits.Feature, Traits.Features.ExtractInterface)>
+        Public Async Function TestExtractInterface_TypeDiscovery_NameOnly5() As Task
             Dim markup = <text>
 Interface ISomeInterface(Of T)
 End Interface
@@ -1027,14 +1041,14 @@ End Interface
 Class Program    $$  (Of T As U, U)
     Implements ISomeInterface(Of T)
 
-    Public Sub Foo(t As T, u As U)
+    Public Sub Goo(t As T, u As U)
     End Sub
 End Class</text>.NormalizedValue()
-            TestTypeDiscovery(markup, TypeDiscoveryRule.TypeNameOnly, expectedExtractable:=True)
-        End Sub
+            Await TestTypeDiscoveryAsync(markup, TypeDiscoveryRule.TypeNameOnly, expectedExtractable:=True)
+        End Function
 
-        <Fact, Trait(Traits.Feature, Traits.Features.ExtractInterface)>
-        Public Sub ExtractInterface_TypeDiscovery_NameOnly6()
+        <WpfFact, Trait(Traits.Feature, Traits.Features.ExtractInterface)>
+        Public Async Function TestExtractInterface_TypeDiscovery_NameOnly6() As Task
             Dim markup = <text>
 Interface ISomeInterface(Of T)
 End Interface
@@ -1042,14 +1056,14 @@ End Interface
 $$Class Program(Of T As U, U)
     Implements ISomeInterface(Of T)
 
-    Public Sub Foo(t As T, u As U)
+    Public Sub Goo(t As T, u As U)
     End Sub
 End Class</text>.NormalizedValue()
-            TestTypeDiscovery(markup, TypeDiscoveryRule.TypeNameOnly, expectedExtractable:=False)
-        End Sub
+            Await TestTypeDiscoveryAsync(markup, TypeDiscoveryRule.TypeNameOnly, expectedExtractable:=False)
+        End Function
 
-        <Fact, Trait(Traits.Feature, Traits.Features.ExtractInterface)>
-        Public Sub ExtractInterface_TypeDiscovery_NameOnly7()
+        <WpfFact, Trait(Traits.Feature, Traits.Features.ExtractInterface)>
+        Public Async Function TestExtractInterface_TypeDiscovery_NameOnly7() As Task
             Dim markup = <text>
 Interface ISomeInterface(Of T)
 End Interface
@@ -1057,14 +1071,14 @@ End Interface
 Class $$Program(Of T As U, U)
     Implements ISomeInterface(Of T)
 
-    Public Sub Foo(t As T, u As U)
+    Public Sub Goo(t As T, u As U)
     End Sub
 End Class</text>.NormalizedValue()
-            TestTypeDiscovery(markup, TypeDiscoveryRule.TypeNameOnly, expectedExtractable:=True)
-        End Sub
+            Await TestTypeDiscoveryAsync(markup, TypeDiscoveryRule.TypeNameOnly, expectedExtractable:=True)
+        End Function
 
-        <Fact, Trait(Traits.Feature, Traits.Features.ExtractInterface)>
-        Public Sub ExtractInterface_TypeDiscovery_NameOnly8()
+        <WpfFact, Trait(Traits.Feature, Traits.Features.ExtractInterface)>
+        Public Async Function TestExtractInterface_TypeDiscovery_NameOnly8() As Task
             Dim markup = <text>
 Interface ISomeInterface(Of T)
 End Interface
@@ -1072,14 +1086,14 @@ End Interface
 Class$$ Program(Of T As U, U)
     Implements ISomeInterface(Of T)
 
-    Public Sub Foo(t As T, u As U)
+    Public Sub Goo(t As T, u As U)
     End Sub
 End Class</text>.NormalizedValue()
-            TestTypeDiscovery(markup, TypeDiscoveryRule.TypeNameOnly, expectedExtractable:=False)
-        End Sub
+            Await TestTypeDiscoveryAsync(markup, TypeDiscoveryRule.TypeNameOnly, expectedExtractable:=False)
+        End Function
 
-        <Fact, Trait(Traits.Feature, Traits.Features.ExtractInterface)>
-        Public Sub ExtractInterface_TypeDiscovery_NameOnly9()
+        <WpfFact, Trait(Traits.Feature, Traits.Features.ExtractInterface)>
+        Public Async Function TestExtractInterface_TypeDiscovery_NameOnly9() As Task
             Dim markup = <text>
 Interface ISomeInterface(Of T)
 End Interface
@@ -1087,53 +1101,53 @@ End Interface
 Class Program(Of T As U, U) $$
     Implements ISomeInterface(Of T)
 
-    Public Sub Foo(t As T, u As U)
+    Public Sub Goo(t As T, u As U)
     End Sub
 End Class</text>.NormalizedValue()
-            TestTypeDiscovery(markup, TypeDiscoveryRule.TypeNameOnly, expectedExtractable:=False)
-        End Sub
+            Await TestTypeDiscoveryAsync(markup, TypeDiscoveryRule.TypeNameOnly, expectedExtractable:=False)
+        End Function
 
-        <Fact, Trait(Traits.Feature, Traits.Features.ExtractInterface)>
-        Public Sub ExtractInterface_GeneratedNameTypeParameterSuffix1()
+        <WpfFact, Trait(Traits.Feature, Traits.Features.ExtractInterface)>
+        Public Async Function TestExtractInterface_GeneratedNameTypeParameterSuffix1() As Task
             Dim markup = <text>
 Class Test(Of T)$$
     Public Sub M(a As T)
     End Sub
 End Class</text>.NormalizedValue()
             Dim expectedTypeParameterSuffix = "(Of T)"
-            TestExtractInterfaceCommandVisualBasic(markup, expectedSuccess:=True, expectedTypeParameterSuffix:=expectedTypeParameterSuffix)
-        End Sub
+            Await TestExtractInterfaceCommandVisualBasicAsync(markup, expectedSuccess:=True, expectedTypeParameterSuffix:=expectedTypeParameterSuffix)
+        End Function
 
-        <Fact, Trait(Traits.Feature, Traits.Features.ExtractInterface)>
-        Public Sub ExtractInterface_GeneratedNameTypeParameterSuffix2()
+        <WpfFact, Trait(Traits.Feature, Traits.Features.ExtractInterface)>
+        Public Async Function TestExtractInterface_GeneratedNameTypeParameterSuffix2() As Task
             Dim markup = <text>
 Class Test(Of T, U)$$
     Public Sub M(a As T)
     End Sub
 End Class</text>.NormalizedValue()
             Dim expectedTypeParameterSuffix = "(Of T)"
-            TestExtractInterfaceCommandVisualBasic(markup, expectedSuccess:=True, expectedTypeParameterSuffix:=expectedTypeParameterSuffix)
-        End Sub
+            Await TestExtractInterfaceCommandVisualBasicAsync(markup, expectedSuccess:=True, expectedTypeParameterSuffix:=expectedTypeParameterSuffix)
+        End Function
 
-        <Fact, Trait(Traits.Feature, Traits.Features.ExtractInterface)>
-        Public Sub ExtractInterface_GeneratedNameTypeParameterSuffix3()
+        <WpfFact, Trait(Traits.Feature, Traits.Features.ExtractInterface)>
+        Public Async Function TestExtractInterface_GeneratedNameTypeParameterSuffix3() As Task
             Dim markup = <text>
 Class Test(Of T, U)$$
     Public Sub M(a As T, b as U)
     End Sub
 End Class</text>.NormalizedValue()
             Dim expectedTypeParameterSuffix = "(Of T, U)"
-            TestExtractInterfaceCommandVisualBasic(markup, expectedSuccess:=True, expectedTypeParameterSuffix:=expectedTypeParameterSuffix)
-        End Sub
+            Await TestExtractInterfaceCommandVisualBasicAsync(markup, expectedSuccess:=True, expectedTypeParameterSuffix:=expectedTypeParameterSuffix)
+        End Function
 
-        <Fact, Trait(Traits.Feature, Traits.Features.ExtractInterface)>
-        Public Sub ExtractInterface_PartialClass()
+        <WpfFact, Trait(Traits.Feature, Traits.Features.ExtractInterface)>
+        Public Async Function TestExtractInterface_PartialClass() As Task
             Dim workspaceXml =
 <Workspace>
     <Project Language="Visual Basic" CommonReferences="true">
         <Document>
 Partial Class C$$
-    Public Sub Foo()
+    Public Sub Goo()
     End Sub
     Public Function Bar() As Integer
         Return 5
@@ -1141,7 +1155,7 @@ Partial Class C$$
 End Class</Document>
         <Document>
 Partial Class C
-    Public Event Foo4 As Action
+    Public Event Goo4 As Action
     Public WriteOnly Property Prop() As List(Of E)
         Set(value As List(Of E))
         End Set
@@ -1153,7 +1167,8 @@ End Class</Document>
             Dim expectedDoc1Text = <text>
 Partial Class C
     Implements IC
-    Public Sub Foo() Implements IC.Foo
+
+    Public Sub Goo() Implements IC.Goo
     End Sub
     Public Function Bar() As Integer Implements IC.Bar
         Return 5
@@ -1162,7 +1177,7 @@ End Class</text>.NormalizedValue()
 
             Dim expectedDoc2Text = <text>
 Partial Class C
-    Public Event Foo4 As Action Implements IC.Foo4
+    Public Event Goo4 As Action Implements IC.Goo4
 
     Public WriteOnly Property Prop() As List(Of E) Implements IC.Prop
         Set(value As List(Of E))
@@ -1170,24 +1185,24 @@ Partial Class C
     End Property
 End Class</text>.NormalizedValue()
 
-            Dim workspace = TestWorkspaceFactory.CreateWorkspace(workspaceXml, exportProvider:=ExtractInterfaceTestState.ExportProvider)
+            Dim workspace = TestWorkspace.Create(workspaceXml, composition:=ExtractInterfaceTestState.Composition)
             Using testState = New ExtractInterfaceTestState(workspace)
-                Dim result = testState.ExtractViaCommand()
+                Dim result = Await testState.ExtractViaCommandAsync()
                 Assert.True(result.Succeeded)
 
                 Dim part1Id = workspace.Documents.Single(Function(d) d.CursorPosition.HasValue).Id
                 Dim part2Id = workspace.Documents.Single(Function(d) Not d.CursorPosition.HasValue).Id
 
-                Assert.Equal(expectedDoc1Text, result.UpdatedSolution.GetDocument(part1Id).GetTextAsync().Result.ToString())
-                Assert.Equal(expectedDoc2Text, result.UpdatedSolution.GetDocument(part2Id).GetTextAsync().Result.ToString())
+                Assert.Equal(expectedDoc1Text, (Await result.UpdatedSolution.GetDocument(part1Id).GetTextAsync()).ToString())
+                Assert.Equal(expectedDoc2Text, (Await result.UpdatedSolution.GetDocument(part2Id).GetTextAsync()).ToString())
             End Using
-        End Sub
+        End Function
 
-        <Fact, Trait(Traits.Feature, Traits.Features.ExtractInterface)>
-        Public Sub ExtractInterface_NonEmptyRootNamespace()
+        <WpfFact, Trait(Traits.Feature, Traits.Features.ExtractInterface)>
+        Public Async Function TestExtractInterface_NonEmptyRootNamespace() As Task
             Dim markup = <text>Imports System
 Class TestClass
-    Public Sub Foo()$$
+    Public Sub Goo()$$
     End Sub
 End Class
 </text>.NormalizedValue()
@@ -1195,30 +1210,31 @@ End Class
             Dim expectedUpdatedDocument = <text>Imports System
 Class TestClass
     Implements ITestClass
-    Public Sub Foo() Implements ITestClass.Foo
+
+    Public Sub Goo() Implements ITestClass.Goo
     End Sub
 End Class
 </text>.NormalizedValue()
 
             Dim expectedInterfaceCode = <text>Interface ITestClass
-    Sub Foo()
+    Sub Goo()
 End Interface
 </text>.NormalizedValue()
 
-            TestExtractInterfaceCommandVisualBasic(
+            Await TestExtractInterfaceCommandVisualBasicAsync(
                 markup,
                 expectedSuccess:=True,
                 expectedUpdatedOriginalDocumentCode:=expectedUpdatedDocument,
                 expectedInterfaceCode:=expectedInterfaceCode,
                 rootNamespace:="RootNamespace")
-        End Sub
+        End Function
 
-        <Fact, Trait(Traits.Feature, Traits.Features.ExtractInterface)>
-        Public Sub ExtractInterface_NonEmptyRootNamespace_ClassInAdditionalNamespace()
+        <WpfFact, Trait(Traits.Feature, Traits.Features.ExtractInterface)>
+        Public Async Function TestExtractInterface_NonEmptyRootNamespace_ClassInAdditionalNamespace() As Task
             Dim markup = <text>Imports System
 Namespace NS1
     Class TestClass
-        Public Sub Foo()$$
+        Public Sub Goo()$$
         End Sub
     End Class
 End Namespace
@@ -1228,7 +1244,8 @@ End Namespace
 Namespace NS1
     Class TestClass
         Implements ITestClass
-        Public Sub Foo() Implements ITestClass.Foo
+
+        Public Sub Goo() Implements ITestClass.Goo
         End Sub
     End Class
 End Namespace
@@ -1236,24 +1253,177 @@ End Namespace
 
             Dim expectedInterfaceCode = <text>Namespace NS1
     Interface ITestClass
-        Sub Foo()
+        Sub Goo()
     End Interface
 End Namespace
 </text>.NormalizedValue()
 
-            TestExtractInterfaceCommandVisualBasic(
+            Await TestExtractInterfaceCommandVisualBasicAsync(
                 markup,
                 expectedSuccess:=True,
                 expectedUpdatedOriginalDocumentCode:=expectedUpdatedDocument,
                 expectedInterfaceCode:=expectedInterfaceCode,
                 rootNamespace:="RootNamespace")
-        End Sub
+        End Function
 
-        Private Shared Sub TestTypeDiscovery(markup As String, typeDiscoveryRule As TypeDiscoveryRule, expectedExtractable As Boolean)
-            Using testState = New ExtractInterfaceTestState(markup, LanguageNames.VisualBasic, compilationOptions:=Nothing)
-                Dim result = testState.GetTypeAnalysisResult(typeDiscoveryRule)
-                Assert.Equal(expectedExtractable, result.CanExtractInterface)
+        <WpfFact>
+        <Trait(Traits.Feature, Traits.Features.ExtractInterface)>
+        <Trait(Traits.Feature, Traits.Features.Interactive)>
+        Public Sub TestExtractInterfaceCommandDisabledInSubmission()
+            Using workspace = TestWorkspace.Create(
+                <Workspace>
+                    <Submission Language="Visual Basic" CommonReferences="true">  
+                        Public Class C
+                            Public Sub M()
+                            End Sub
+                        End Class
+                    </Submission>
+                </Workspace>,
+                workspaceKind:=WorkspaceKind.Interactive,
+                composition:=EditorTestCompositions.EditorFeaturesWpf)
+
+                ' Force initialization.
+                workspace.GetOpenDocumentIds().Select(Function(id) workspace.GetTestDocument(id).GetTextView()).ToList()
+
+                Dim textView = workspace.Documents.Single().GetTextView()
+
+                Dim handler = New ExtractInterfaceCommandHandler(workspace.ExportProvider.GetExportedValue(Of IThreadingContext))
+
+                Dim state = handler.GetCommandState(New ExtractInterfaceCommandArgs(textView, textView.TextBuffer))
+                Assert.True(state.IsUnspecified)
             End Using
         End Sub
+
+        <WorkItem(23855, "https://github.com/dotnet/roslyn/issues/23855")>
+        <WpfFact, Trait(Traits.Feature, Traits.Features.ExtractInterface)>
+        Public Async Function TestExtractInterface_WithCopyright1() As Task
+            Dim markup = <text>'' Copyright
+
+Imports System
+Class TestClass
+    Public Sub Goo()$$
+    End Sub
+End Class
+</text>.NormalizedValue()
+
+            Dim expectedUpdatedDocument = <text>'' Copyright
+
+Imports System
+Class TestClass
+    Implements ITestClass
+
+    Public Sub Goo() Implements ITestClass.Goo
+    End Sub
+End Class
+</text>.NormalizedValue()
+
+            Dim expectedInterfaceCode = <text>'' Copyright
+
+Interface ITestClass
+    Sub Goo()
+End Interface
+</text>.NormalizedValue()
+
+            Await TestExtractInterfaceCommandVisualBasicAsync(
+                markup,
+                expectedSuccess:=True,
+                expectedUpdatedOriginalDocumentCode:=expectedUpdatedDocument,
+                expectedInterfaceCode:=expectedInterfaceCode,
+                rootNamespace:="RootNamespace")
+        End Function
+
+        <WorkItem(23855, "https://github.com/dotnet/roslyn/issues/23855")>
+        <WpfFact, Trait(Traits.Feature, Traits.Features.ExtractInterface)>
+        Public Async Function TestExtractInterface_WithCopyright2() As Task
+            Dim markup = <text>'' Copyright
+
+Imports System
+
+Class Program
+    Class A$$
+        Sub Main(args As String())
+        End Sub
+    End Class
+End Class
+</text>.NormalizedValue()
+
+            Dim expectedUpdatedDocument = <text>'' Copyright
+
+Imports System
+
+Class Program
+    Class A
+        Implements IA
+
+        Sub Main(args As String()) Implements IA.Main
+        End Sub
+    End Class
+End Class
+</text>.NormalizedValue()
+
+            Dim expectedInterfaceCode = <text>'' Copyright
+
+Interface IA
+    Sub Main(args() As String)
+End Interface
+</text>.NormalizedValue()
+
+            Await TestExtractInterfaceCommandVisualBasicAsync(
+                markup,
+                expectedSuccess:=True,
+                expectedUpdatedOriginalDocumentCode:=expectedUpdatedDocument,
+                expectedInterfaceCode:=expectedInterfaceCode,
+                rootNamespace:="RootNamespace")
+        End Function
+
+        <WorkItem(43952, "https://github.com/dotnet/roslyn/issues/43952")>
+        <WpfFact, Trait(Traits.Feature, Traits.Features.ExtractInterface)>
+        Public Async Function TestExtractInterface_IgnoreWithEvents() As Task
+            Dim markup = <text>Class C$$
+    Public WithEvents X As Object
+End Class</text>.NormalizedValue()
+            Await TestExtractInterfaceCommandVisualBasicAsync(markup, expectedSuccess:=False)
+        End Function
+
+        <WorkItem(43952, "https://github.com/dotnet/roslyn/issues/43952")>
+        <WpfFact, Trait(Traits.Feature, Traits.Features.ExtractInterface)>
+        Public Async Function TestExtractInterface_IgnoreWithEvents2() As Task
+            Dim markup = <text>Class C$$
+    Public WithEvents X As Object
+
+    Sub Method()
+    End Sub
+End Class
+</text>.NormalizedValue()
+
+            Dim expectedUpdatedDocument = <text>Class C
+    Implements IC
+
+    Public WithEvents X As Object
+
+    Sub Method() Implements IC.Method
+    End Sub
+End Class
+</text>.NormalizedValue()
+
+            Dim expectedInterfaceCode = <text>Interface IC
+    Sub Method()
+End Interface
+</text>.NormalizedValue()
+
+            Await TestExtractInterfaceCommandVisualBasicAsync(
+                markup,
+                expectedSuccess:=True,
+                expectedUpdatedOriginalDocumentCode:=expectedUpdatedDocument,
+                expectedInterfaceCode:=expectedInterfaceCode,
+                rootNamespace:="RootNamespace")
+        End Function
+
+        Private Shared Async Function TestTypeDiscoveryAsync(markup As String, typeDiscoveryRule As TypeDiscoveryRule, expectedExtractable As Boolean) As System.Threading.Tasks.Task
+            Using testState = ExtractInterfaceTestState.Create(markup, LanguageNames.VisualBasic, compilationOptions:=Nothing)
+                Dim result = Await testState.GetTypeAnalysisResultAsync(typeDiscoveryRule)
+                Assert.Equal(expectedExtractable, result.CanExtractInterface)
+            End Using
+        End Function
     End Class
 End Namespace

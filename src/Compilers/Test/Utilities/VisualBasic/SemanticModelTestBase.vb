@@ -1,5 +1,10 @@
-﻿' Copyright (c) Microsoft.  All Rights Reserved.  Licensed under the Apache License, Version 2.0.  See License.txt in the project root for license information.
+﻿' Licensed to the .NET Foundation under one or more agreements.
+' The .NET Foundation licenses this file to you under the MIT license.
+' See the LICENSE file in the project root for more information.
 
+Imports System.Collections.Immutable
+Imports System.Xml.Linq
+Imports Microsoft.CodeAnalysis.Test.Utilities
 Imports Microsoft.CodeAnalysis.Text
 Imports Microsoft.CodeAnalysis.VisualBasic.Symbols
 Imports Microsoft.CodeAnalysis.VisualBasic.Syntax
@@ -16,13 +21,13 @@ Public MustInherit Class SemanticModelTestBase : Inherits BasicTestBase
     Protected Function GetPosition(compilation As VisualBasicCompilation, treeName As String, textToFind As String) As Integer
         Dim tree = CompilationUtils.GetTree(compilation, treeName)
         Dim text As String = tree.GetText().ToString()
-        Dim position As Integer = text.IndexOf(textToFind)
+        Dim position As Integer = text.IndexOf(textToFind, StringComparison.Ordinal)
         Return position
     End Function
 
     Private Function GetAncestor(Of T As VisualBasicSyntaxNode)(node As VisualBasicSyntaxNode) As T
         If node Is Nothing Then
-            Throw New ArgumentNullException("node")
+            Throw New ArgumentNullException(NameOf(node))
         End If
 
         Dim parent = node.Parent
@@ -68,9 +73,9 @@ Public MustInherit Class SemanticModelTestBase : Inherits BasicTestBase
         End If
 
         Dim text As String = tree.GetRoot().ToFullString()
-        Dim bindCommentIndex As Integer = text.IndexOf(bindMarker) + bindMarker.Length
-        bindText = text.Substring(bindCommentIndex, text.IndexOf("""", bindCommentIndex) - bindCommentIndex)
-        Dim bindPoint = text.LastIndexOf(bindText, bindCommentIndex - bindMarker.Length)
+        Dim bindCommentIndex As Integer = text.IndexOf(bindMarker, StringComparison.Ordinal) + bindMarker.Length
+        bindText = text.Substring(bindCommentIndex, text.IndexOf(""""c, bindCommentIndex) - bindCommentIndex)
+        Dim bindPoint = text.LastIndexOf(bindText, bindCommentIndex - bindMarker.Length, StringComparison.Ordinal)
         Return bindPoint
     End Function
 
@@ -87,13 +92,13 @@ Public MustInherit Class SemanticModelTestBase : Inherits BasicTestBase
         Dim token As SyntaxToken = tree.GetRoot().FindToken(bindPoint)
         Dim node = token.Parent
 
-        While (node IsNot Nothing AndAlso node.ToString.StartsWith(bindText) AndAlso Not (TypeOf node Is TNode))
+        While (node IsNot Nothing AndAlso node.ToString.StartsWith(bindText, StringComparison.Ordinal) AndAlso Not (TypeOf node Is TNode))
             node = node.Parent
         End While
 
         Assert.NotNull(node)  ' If this trips, then node  wasn't found
         Assert.IsAssignableFrom(GetType(TNode), node)
-        Assert.Contains(bindText, node.ToString())
+        Assert.Contains(bindText, node.ToString(), StringComparison.Ordinal)
 
         Return DirectCast(node, TNode)
     End Function
@@ -150,5 +155,4 @@ Public MustInherit Class SemanticModelTestBase : Inherits BasicTestBase
             binding.LookupSymbols(position, container, name, includeReducedExtensionMethods)
             ).Where(Function(s) anyArity OrElse DirectCast(s, Symbol).GetArity() = arity.Value).ToList()
     End Function
-
 End Class

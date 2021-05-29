@@ -1,10 +1,12 @@
-﻿' Copyright (c) Microsoft.  All Rights Reserved.  Licensed under the Apache License, Version 2.0.  See License.txt in the project root for license information.
+﻿' Licensed to the .NET Foundation under one or more agreements.
+' The .NET Foundation licenses this file to you under the MIT license.
+' See the LICENSE file in the project root for more information.
 
 Imports System.IO
 Imports <xmlns="http://schemas.microsoft.com/VisualStudio/Roslyn/Compiler">
 
 Public Class XmlRenamer
-    Private _xDoc As XDocument
+    Private ReadOnly _xDoc As XDocument
 
     Public Sub New(xDoc As XDocument)
         _xDoc = xDoc
@@ -53,10 +55,10 @@ Public Class XmlRenamer
 
     Private Function Cleanup(s As String) As String
         s = s.Trim()
-        If s.StartsWith("[") AndAlso s.EndsWith("]") Then
+        If s.StartsWith("[", StringComparison.Ordinal) AndAlso s.EndsWith("]", StringComparison.Ordinal) Then
             s = s.Substring(1, s.Length - 2)
         End If
-        If s.StartsWith("Optional") Then
+        If s.StartsWith("Optional", StringComparison.Ordinal) Then
             s = s.Substring("Optional".Length)
         End If
 
@@ -121,7 +123,7 @@ Public Class XmlRenamer
             Return -1
         End If
 
-        Dim index As Integer = attrValue.IndexOf(kind)
+        Dim index As Integer = attrValue.IndexOf(kind, StringComparison.Ordinal)
 
         If (index > 0 AndAlso attrValue(index - 1) <> "|"c) Then
             Return -1    ' must be preceded by vert bar or nothing.
@@ -161,16 +163,14 @@ Public Class XmlRenamer
     End Sub
 End Class
 
-
-
-Class NameToUpdate
+Friend Class NameToUpdate
     Public kind As updateKind
     Public typeName As String
     Public memberName As String
     Public newName As String
 End Class
 
-Enum UpdateKind
+Friend Enum UpdateKind
     [Enum]
     Enumerator
     [Class]

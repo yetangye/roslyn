@@ -1,7 +1,10 @@
-﻿' Copyright (c) Microsoft.  All Rights Reserved.  Licensed under the Apache License, Version 2.0.  See License.txt in the project root for license information.
+﻿' Licensed to the .NET Foundation under one or more agreements.
+' The .NET Foundation licenses this file to you under the MIT license.
+' See the LICENSE file in the project root for more information.
 
 Imports System.Collections.Immutable
 Imports System.Threading
+Imports Microsoft.CodeAnalysis.PooledObjects
 Imports Microsoft.CodeAnalysis.Text
 Imports Microsoft.CodeAnalysis.VisualBasic.Symbols
 Imports Microsoft.CodeAnalysis.VisualBasic.Syntax
@@ -11,9 +14,9 @@ Namespace Microsoft.CodeAnalysis.VisualBasic.Symbols
     Friend NotInheritable Class CustomEventAccessorSymbol
         Inherits SourceNonPropertyAccessorMethodSymbol
 
-        Private ReadOnly m_event As SourceEventSymbol
-        Private ReadOnly m_name As String
-        Private m_lazyExplicitImplementations As ImmutableArray(Of MethodSymbol) ' lazily populated with explicit implementations
+        Private ReadOnly _event As SourceEventSymbol
+        Private ReadOnly _name As String
+        Private _lazyExplicitImplementations As ImmutableArray(Of MethodSymbol) ' lazily populated with explicit implementations
 
         Friend Sub New(container As SourceMemberContainerTypeSymbol,
                        [event] As SourceEventSymbol,
@@ -23,13 +26,13 @@ Namespace Microsoft.CodeAnalysis.VisualBasic.Symbols
                        location As Location)
             MyBase.New(container, flags, syntaxRef, locations:=ImmutableArray.Create(location))
 
-            m_event = [event]
-            m_name = name
+            _event = [event]
+            _name = name
         End Sub
 
         Public Overrides ReadOnly Property Name As String
             Get
-                Return m_name
+                Return _name
             End Get
         End Property
 
@@ -37,7 +40,7 @@ Namespace Microsoft.CodeAnalysis.VisualBasic.Symbols
             Get
                 ' Event symbols aren't affected if the output kind is winmd, mark false
                 ' (N.B., events only emits helpers named add_ and remove_, not set_)
-                Return Binder.GetAccessorName(m_event.MetadataName, Me.MethodKind, isWinMd:=False)
+                Return Binder.GetAccessorName(_event.MetadataName, Me.MethodKind, isWinMd:=False)
             End Get
         End Property
 
@@ -54,11 +57,11 @@ Namespace Microsoft.CodeAnalysis.VisualBasic.Symbols
                     Return Accessibility.Private
                 End If
 
-                Return m_event.DeclaredAccessibility
+                Return _event.DeclaredAccessibility
             End Get
         End Property
 
-        Protected Overrides Function GetParameters(sourceModule As SourceModuleSymbol, diagBag As DiagnosticBag) As ImmutableArray(Of ParameterSymbol)
+        Protected Overrides Function GetParameters(sourceModule As SourceModuleSymbol, diagBag As BindingDiagnosticBag) As ImmutableArray(Of ParameterSymbol)
             Dim type = DirectCast(Me.ContainingType, SourceMemberContainerTypeSymbol)
             Dim binder As Binder = BinderBuilder.CreateBinderForType(sourceModule, Me.SyntaxTree, type)
             binder = New LocationSpecificBinder(BindingLocation.EventAccessorSignature, Me, binder)
@@ -68,27 +71,27 @@ Namespace Microsoft.CodeAnalysis.VisualBasic.Symbols
 
         Public Overrides ReadOnly Property AssociatedSymbol As Symbol
             Get
-                Return m_event
+                Return _event
             End Get
 
         End Property
 
         Friend Overrides ReadOnly Property ShadowsExplicitly As Boolean
             Get
-                Return m_event.ShadowsExplicitly
+                Return _event.ShadowsExplicitly
             End Get
         End Property
 
         Public Overrides ReadOnly Property ExplicitInterfaceImplementations As ImmutableArray(Of MethodSymbol)
             Get
-                If m_lazyExplicitImplementations.IsDefault Then
+                If _lazyExplicitImplementations.IsDefault Then
                     ImmutableInterlocked.InterlockedCompareExchange(
-                        m_lazyExplicitImplementations,
-                        m_event.GetAccessorImplementations(Me.MethodKind),
+                        _lazyExplicitImplementations,
+                        _event.GetAccessorImplementations(Me.MethodKind),
                         Nothing)
                 End If
 
-                Return m_lazyExplicitImplementations
+                Return _lazyExplicitImplementations
             End Get
         End Property
 
@@ -101,7 +104,7 @@ Namespace Microsoft.CodeAnalysis.VisualBasic.Symbols
 
         Public Overrides ReadOnly Property ReturnTypeCustomModifiers As ImmutableArray(Of CustomModifier)
             Get
-                ' custom event methods do not have explicit returns and nver implement or override
+                ' custom event methods do not have explicit returns and never implement or override
                 Return ImmutableArray(Of CustomModifier).Empty
             End Get
         End Property
@@ -137,7 +140,7 @@ Namespace Microsoft.CodeAnalysis.VisualBasic.Symbols
         ''' </remarks>
         Public Overrides ReadOnly Property IsSub As Boolean
             Get
-                Return Not (Me.MethodKind = MethodKind.EventAdd AndAlso m_event.IsWindowsRuntimeEvent)
+                Return Not (Me.MethodKind = MethodKind.EventAdd AndAlso _event.IsWindowsRuntimeEvent)
             End Get
         End Property
 
@@ -147,13 +150,13 @@ Namespace Microsoft.CodeAnalysis.VisualBasic.Symbols
         Private Function BindParameters(location As Location,
                                         binder As Binder,
                                         parameterListOpt As ParameterListSyntax,
-                                        diagnostics As DiagnosticBag) As ImmutableArray(Of ParameterSymbol)
+                                        diagnostics As BindingDiagnosticBag) As ImmutableArray(Of ParameterSymbol)
 
             Dim parameterListSyntax = If(parameterListOpt Is Nothing, Nothing, parameterListOpt.Parameters)
             Dim nParameters = parameterListSyntax.Count
             Dim paramBuilder = ArrayBuilder(Of ParameterSymbol).GetInstance(nParameters)
 
-            ' Bind all parameters (even though we kow how many to expect), 
+            ' Bind all parameters (even though we know how many to expect), 
             ' to ensure all diagnostics are generated and ensure parameter symbols are available for binding the method body.
             binder.DecodeParameterList(
                 Me,
@@ -162,8 +165,8 @@ Namespace Microsoft.CodeAnalysis.VisualBasic.Symbols
                 parameterListSyntax,
                 paramBuilder,
                 If(Me.MethodKind = MethodKind.EventRaise,
-                   CheckRaiseParameterModifierCallback,
-                   CheckAddRemoveParameterModifierCallback),
+                   s_checkRaiseParameterModifierCallback,
+                   s_checkAddRemoveParameterModifierCallback),
                 diagnostics)
 
             Dim parameters = paramBuilder.ToImmutableAndFree()
@@ -171,12 +174,12 @@ Namespace Microsoft.CodeAnalysis.VisualBasic.Symbols
             If Me.MethodKind = MethodKind.EventRaise Then
                 ' Dev10 does something weird here - it checks for method conversion, but does it 
                 ' backwards - it allows delegate Invoke to be more specific than signature of Raise. 
-                ' Example: delegate mey take int, but Raise may take long argument.
+                ' Example: delegate may take int, but Raise may take long argument.
                 '
-                ' For backwards ccompatibility we will do the same.
+                ' For backwards compatibility we will do the same.
                 '
                 ' NOTE: no change in raise event shape for WinRT events.
-                Dim eventType = TryCast(m_event.Type, NamedTypeSymbol)
+                Dim eventType = TryCast(_event.Type, NamedTypeSymbol)
                 If eventType IsNot Nothing AndAlso
                     Not eventType.IsErrorType Then
 
@@ -184,13 +187,13 @@ Namespace Microsoft.CodeAnalysis.VisualBasic.Symbols
 
                     ' If delegate is a function method we should already have diagnostics about that
                     If delInvoke IsNot Nothing AndAlso delInvoke.IsSub Then
-                        Dim useSiteDiagnostics As HashSet(Of DiagnosticInfo) = Nothing
+                        Dim useSiteInfo = binder.GetNewCompoundUseSiteInfo(diagnostics)
                         Dim conversion = Conversions.ClassifyMethodConversionForEventRaise(
                                                             delInvoke,
                                                             parameters,
-                                                            useSiteDiagnostics)
+                                                            useSiteInfo)
 
-                        If Not diagnostics.Add(location, useSiteDiagnostics) AndAlso
+                        If Not diagnostics.Add(location, useSiteInfo) AndAlso
                             (Not Conversions.IsDelegateRelaxationSupportedFor(conversion) OrElse
                              (binder.OptionStrict = OptionStrict.On AndAlso Conversions.IsNarrowingMethodConversion(conversion, False))) Then
 
@@ -203,37 +206,37 @@ Namespace Microsoft.CodeAnalysis.VisualBasic.Symbols
                 If parameters.Length <> 1 Then
                     diagnostics.Add(ERRID.ERR_EventAddRemoveHasOnlyOneParam, location)
                 Else
-                    Dim eventType = m_event.Type
+                    Dim eventType = _event.Type
                     Debug.Assert(eventType IsNot Nothing)
                     Dim parameterType = parameters(0).Type
                     Debug.Assert(parameterType IsNot Nothing)
 
                     If Me.MethodKind = MethodKind.EventAdd Then
-                        If Not eventType.IsErrorType AndAlso eventType <> parameterType Then
-                            Dim errid As ERRID = If(m_event.IsWindowsRuntimeEvent, errid.ERR_AddParamWrongForWinRT, errid.ERR_AddRemoveParamNotEventType)
+                        If Not eventType.IsErrorType AndAlso Not TypeSymbol.Equals(eventType, parameterType, TypeCompareKind.ConsiderEverything) Then
+                            Dim errid As ERRID = If(_event.IsWindowsRuntimeEvent, ERRID.ERR_AddParamWrongForWinRT, ERRID.ERR_AddRemoveParamNotEventType)
                             diagnostics.Add(errid, location)
                         End If
                     Else
                         Debug.Assert(Me.MethodKind = MethodKind.EventRemove)
 
-                        If m_event.ExplicitInterfaceImplementations.Any() Then
+                        If _event.ExplicitInterfaceImplementations.Any() Then
                             ' Reporting diagnostics when this type is missing will only ever result in cascading, so don't bother.
                             Dim registrationTokenType As NamedTypeSymbol =
                                 binder.Compilation.GetWellKnownType(WellKnownType.System_Runtime_InteropServices_WindowsRuntime_EventRegistrationToken)
 
-                            Dim firstImplementedEvent As EventSymbol = m_event.ExplicitInterfaceImplementations(0)
-                            If Not registrationTokenType.IsErrorType AndAlso firstImplementedEvent.IsWindowsRuntimeEvent <> (parameterType = registrationTokenType) Then
-                                diagnostics.Add(ERRID.ERR_EventImplRemoveHandlerParamWrong, location, m_event.Name, firstImplementedEvent.Name, firstImplementedEvent.ContainingType)
+                            Dim firstImplementedEvent As EventSymbol = _event.ExplicitInterfaceImplementations(0)
+                            If Not registrationTokenType.IsErrorType AndAlso firstImplementedEvent.IsWindowsRuntimeEvent <> (TypeSymbol.Equals(parameterType, registrationTokenType, TypeCompareKind.ConsiderEverything)) Then
+                                diagnostics.Add(ERRID.ERR_EventImplRemoveHandlerParamWrong, location, _event.Name, firstImplementedEvent.Name, firstImplementedEvent.ContainingType)
                             End If
-                        ElseIf m_event.IsWindowsRuntimeEvent Then
+                        ElseIf _event.IsWindowsRuntimeEvent Then
                             ' Reporting diagnostics when this type is missing will only ever result in cascading, so don't bother.
                             Dim registrationTokenType As NamedTypeSymbol =
                                 binder.Compilation.GetWellKnownType(WellKnownType.System_Runtime_InteropServices_WindowsRuntime_EventRegistrationToken)
-                            If Not registrationTokenType.IsErrorType AndAlso parameterType <> registrationTokenType Then
+                            If Not registrationTokenType.IsErrorType AndAlso Not TypeSymbol.Equals(parameterType, registrationTokenType, TypeCompareKind.ConsiderEverything) Then
                                 diagnostics.Add(ERRID.ERR_RemoveParamWrongForWinRT, location)
                             End If
                         Else
-                            If Not eventType.IsErrorType AndAlso eventType <> parameterType Then
+                            If Not eventType.IsErrorType AndAlso Not TypeSymbol.Equals(eventType, parameterType, TypeCompareKind.ConsiderEverything) Then
                                 diagnostics.Add(ERRID.ERR_AddRemoveParamNotEventType, location)
                             End If
                         End If
@@ -244,11 +247,11 @@ Namespace Microsoft.CodeAnalysis.VisualBasic.Symbols
             Return parameters
         End Function
 
-        Private Shared ReadOnly CheckAddRemoveParameterModifierCallback As Binder.CheckParameterModifierDelegate = AddressOf CheckAddRemoveParameterModifier
-        Private Shared ReadOnly CheckRaiseParameterModifierCallback As Binder.CheckParameterModifierDelegate = AddressOf CheckEventMethodParameterModifier
+        Private Shared ReadOnly s_checkAddRemoveParameterModifierCallback As Binder.CheckParameterModifierDelegate = AddressOf CheckAddRemoveParameterModifier
+        Private Shared ReadOnly s_checkRaiseParameterModifierCallback As Binder.CheckParameterModifierDelegate = AddressOf CheckEventMethodParameterModifier
 
         ' applicable to all event methods
-        Private Shared Function CheckEventMethodParameterModifier(container As Symbol, token As SyntaxToken, flag As SourceParameterFlags, diagnostics As DiagnosticBag) As SourceParameterFlags
+        Private Shared Function CheckEventMethodParameterModifier(container As Symbol, token As SyntaxToken, flag As SourceParameterFlags, diagnostics As BindingDiagnosticBag) As SourceParameterFlags
             If (flag And SourceParameterFlags.Optional) <> 0 Then
                 Dim location = token.GetLocation()
                 diagnostics.Add(ERRID.ERR_EventMethodOptionalParamIllegal1, location, token.ToString())
@@ -265,7 +268,7 @@ Namespace Microsoft.CodeAnalysis.VisualBasic.Symbols
         End Function
 
         ' additional rules for Add and Remove
-        Private Shared Function CheckAddRemoveParameterModifier(container As Symbol, token As SyntaxToken, flag As SourceParameterFlags, diagnostics As DiagnosticBag) As SourceParameterFlags
+        Private Shared Function CheckAddRemoveParameterModifier(container As Symbol, token As SyntaxToken, flag As SourceParameterFlags, diagnostics As BindingDiagnosticBag) As SourceParameterFlags
             If (flag And SourceParameterFlags.ByRef) <> 0 Then
                 Dim location = token.GetLocation()
                 diagnostics.Add(ERRID.ERR_EventAddRemoveByrefParamIllegal, location, token.ToString())

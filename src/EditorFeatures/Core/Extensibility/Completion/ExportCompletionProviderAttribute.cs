@@ -1,33 +1,27 @@
-﻿// Copyright (c) Microsoft.  All Rights Reserved.  Licensed under the Apache License, Version 2.0.  See License.txt in the project root for license information.
+﻿// Licensed to the .NET Foundation under one or more agreements.
+// The .NET Foundation licenses this file to you under the MIT license.
+// See the LICENSE file in the project root for more information.
+
+#nullable disable
 
 using System;
 using System.ComponentModel.Composition;
-using Microsoft.CodeAnalysis.Completion.Providers;
+using Microsoft.CodeAnalysis.Completion;
 
 namespace Microsoft.CodeAnalysis.Editor
 {
     [MetadataAttribute]
     [AttributeUsage(AttributeTargets.Class)]
-    internal class ExportCompletionProviderAttribute : ExportAttribute
+    internal class ExportCompletionProviderMef1Attribute : ExportAttribute
     {
-        public string Name { get; private set; }
-        public string Language { get; private set; }
+        public string Name { get; }
+        public string Language { get; }
 
-        public ExportCompletionProviderAttribute(string name, string language)
-            : base(typeof(ICompletionProvider))
+        public ExportCompletionProviderMef1Attribute(string name, string language)
+            : base(typeof(CompletionProvider))
         {
-            if (name == null)
-            {
-                throw new ArgumentNullException("name");
-            }
-
-            if (language == null)
-            {
-                throw new ArgumentNullException("language");
-            }
-
-            this.Name = name;
-            this.Language = language;
+            this.Name = name ?? throw new ArgumentNullException(nameof(name));
+            this.Language = language ?? throw new ArgumentNullException(nameof(language));
         }
     }
 }

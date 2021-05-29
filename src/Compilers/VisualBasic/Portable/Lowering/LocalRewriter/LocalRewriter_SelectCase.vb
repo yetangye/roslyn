@@ -1,9 +1,12 @@
-﻿' Copyright (c) Microsoft.  All Rights Reserved.  Licensed under the Apache License, Version 2.0.  See License.txt in the project root for license information.
+﻿' Licensed to the .NET Foundation under one or more agreements.
+' The .NET Foundation licenses this file to you under the MIT license.
+' See the LICENSE file in the project root for more information.
 
 Imports System.Collections.Immutable
 Imports System.Diagnostics
 Imports System.Runtime.InteropServices
 Imports Microsoft.CodeAnalysis.CodeGen
+Imports Microsoft.CodeAnalysis.PooledObjects
 Imports Microsoft.CodeAnalysis.Text
 Imports Microsoft.CodeAnalysis.VisualBasic.Symbols
 Imports Microsoft.CodeAnalysis.VisualBasic.Syntax
@@ -22,7 +25,7 @@ Namespace Microsoft.CodeAnalysis.VisualBasic
     ' For switch table based approach we have an option of completely rewriting the switch header
     ' and switch sections into simpler constructs, i.e. we can rewrite the select header
     ' using bound conditional goto statements and the rewrite the case blocks into
-    ' bound labeleled statements.
+    ' bound labeled statements.
     ' However, all the logic for emitting the switch jump tables is language agnostic
     ' and includes IL optimizations. Hence we delay the switch jump table generation
     ' till the emit phase. This way we also get additional benefit of sharing this code
@@ -41,7 +44,7 @@ Namespace Microsoft.CodeAnalysis.VisualBasic
     ' We need to emit this function to compute the hash value into the compiler generated
     ' <PrivateImplementationDetails> class. 
     ' If we have at least one string type select case statement in a module that needs a
-    ' hash table based jump table, we generate a single public string hash sythesized method (SynthesizedStringSwitchHashMethod)
+    ' hash table based jump table, we generate a single public string hash synthesized method (SynthesizedStringSwitchHashMethod)
     ' that is shared across the module.
 
 
@@ -59,7 +62,7 @@ Namespace Microsoft.CodeAnalysis.VisualBasic
 
         Protected Function RewriteSelectStatement(
             node As BoundSelectStatement,
-            syntaxNode As VisualBasicSyntaxNode,
+            syntaxNode As SyntaxNode,
             selectExpressionStmt As BoundExpressionStatement,
             exprPlaceholderOpt As BoundRValuePlaceholder,
             caseBlocks As ImmutableArray(Of BoundCaseBlock),
@@ -67,6 +70,15 @@ Namespace Microsoft.CodeAnalysis.VisualBasic
             exitLabel As LabelSymbol
         ) As BoundNode
             Dim statementBuilder = ArrayBuilder(Of BoundStatement).GetInstance()
+            Dim instrument = Me.Instrument(node)
+
+            If instrument Then
+                ' Add select case begin sequence point
+                Dim prologue As BoundStatement = _instrumenterOpt.CreateSelectStatementPrologue(node)
+                If prologue IsNot Nothing Then
+                    statementBuilder.Add(prologue)
+                End If
+            End If
 
             ' Rewrite select expression
             Dim rewrittenSelectExpression As BoundExpression = Nothing
@@ -107,7 +119,17 @@ Namespace Microsoft.CodeAnalysis.VisualBasic
 
             Else
                 ' Rewrite select statement case blocks as IF List
-                statementBuilder.Add(RewriteCaseBlocks(generateUnstructuredExceptionHandlingResumeCode, caseBlocks, startFrom:=0))
+                Dim lazyConditionalBranchLocal As LocalSymbol = Nothing
+
+                statementBuilder.Add(RewriteCaseBlocksRecursive(node,
+                                                                generateUnstructuredExceptionHandlingResumeCode,
+                                                                caseBlocks,
+                                                                startFrom:=0,
+                                                                lazyConditionalBranchLocal:=lazyConditionalBranchLocal))
+
+                If lazyConditionalBranchLocal IsNot Nothing Then
+                    tempLocals = tempLocals.Add(lazyConditionalBranchLocal)
+                End If
 
                 ' Add label statement for exit label
                 statementBuilder.Add(New BoundLabelStatement(syntaxNode, exitLabel))
@@ -117,17 +139,14 @@ Namespace Microsoft.CodeAnalysis.VisualBasic
                 RemovePlaceholderReplacement(exprPlaceholderOpt)
             End If
 
-            If Me.GenerateDebugInfo Then
+            Dim epilogue As BoundStatement = endSelectResumeLabel
+            If instrument Then
                 ' Add End Select sequence point
-                Dim selectSyntax = DirectCast(syntaxNode, SelectBlockSyntax)
-                If selectSyntax IsNot Nothing Then
-                    statementBuilder.Add(New BoundSequencePoint(selectSyntax.EndSelectStatement, endSelectResumeLabel))
-                    endSelectResumeLabel = Nothing
-                End If
+                epilogue = _instrumenterOpt.InstrumentSelectStatementEpilogue(node, epilogue)
             End If
 
-            If endSelectResumeLabel IsNot Nothing Then
-                statementBuilder.Add(endSelectResumeLabel)
+            If epilogue IsNot Nothing Then
+                statementBuilder.Add(epilogue)
             End If
 
             Return New BoundBlock(syntaxNode, Nothing, tempLocals, statementBuilder.ToImmutableAndFree()).MakeCompilerGenerated()
@@ -154,23 +173,23 @@ Namespace Microsoft.CodeAnalysis.VisualBasic
             Me.ReportBadType(selectCaseExpr, Compilation.GetSpecialType(SpecialType.System_UInt32))
             Me.ReportBadType(selectCaseExpr, Compilation.GetSpecialType(SpecialType.System_String))
 
-            If emitModule Is Nothing Then
+            If _emitModule Is Nothing Then
                 Return
             End If
 
-            If Not ShouldGenerateHashTableSwitch(emitModule, node) Then
+            If Not ShouldGenerateHashTableSwitch(_emitModule, node) Then
                 Return
             End If
 
             ' If we have already generated this helper method, possibly for another select case
             ' or on another thread, we don't need to regenerate it.
-            Dim privateImplClass = emitModule.GetPrivateImplClass(node.Syntax, diagnostics)
+            Dim privateImplClass = _emitModule.GetPrivateImplClass(node.Syntax, _diagnostics.DiagnosticBag)
             If privateImplClass.GetMethod(PrivateImplementationDetails.SynthesizedStringHashFunctionName) IsNot Nothing Then
                 Return
             End If
 
-            Dim method = New SynthesizedStringSwitchHashMethod(emitModule.SourceModule, privateImplClass)
-            privateImplClass.TryAddSynthesizedMethod(method)
+            Dim method = New SynthesizedStringSwitchHashMethod(_emitModule.SourceModule, privateImplClass)
+            privateImplClass.TryAddSynthesizedMethod(method.GetCciAdapter())
         End Sub
 
         Private Function RewriteSelectExpression(
@@ -188,11 +207,6 @@ Namespace Microsoft.CodeAnalysis.VisualBasic
             Debug.Assert(Not caseBlocks.IsDefault)
 
             Dim selectExprStmtSyntax = selectExpressionStmt.Syntax
-            If Me.GenerateDebugInfo Then
-                ' Add select case begin sequence point
-                statementBuilder.Add(New BoundSequencePoint(selectExprStmtSyntax, Nothing))
-            End If
-
 
             If generateUnstructuredExceptionHandlingResumeCode Then
                 RegisterUnstructuredExceptionHandlingResumeTarget(selectExprStmtSyntax, canThrow:=True, statements:=statementBuilder)
@@ -219,15 +233,15 @@ Namespace Microsoft.CodeAnalysis.VisualBasic
 
                 ' Store the select expression result in a temp
                 Dim selectStatementSyntax = DirectCast(selectExprStmtSyntax.Parent, SelectBlockSyntax).SelectStatement
-                Dim tempLocal = New SynthesizedLocal(Me.currentMethodOrLambda, selectExprType, SynthesizedLocalKind.SelectCaseValue, selectStatementSyntax)
+                Dim tempLocal = New SynthesizedLocal(Me._currentMethodOrLambda, selectExprType, SynthesizedLocalKind.SelectCaseValue, selectStatementSyntax)
                 tempLocals = ImmutableArray.Create(Of LocalSymbol)(tempLocal)
 
                 Dim boundTemp = New BoundLocal(rewrittenSelectExpression.Syntax, tempLocal, selectExprType)
-                statementBuilder.Add(New BoundAssignmentOperator(Syntax:=selectExprStmtSyntax,
-                                                                 Left:=boundTemp,
-                                                                 Right:=rewrittenSelectExpression,
+                statementBuilder.Add(New BoundAssignmentOperator(syntax:=selectExprStmtSyntax,
+                                                                 left:=boundTemp,
+                                                                 right:=rewrittenSelectExpression,
                                                                  suppressObjectClone:=True,
-                                                                 Type:=selectExprType).ToStatement().MakeCompilerGenerated())
+                                                                 type:=selectExprType).ToStatement().MakeCompilerGenerated())
                 rewrittenSelectExpression = boundTemp.MakeRValue()
             Else
 
@@ -238,10 +252,12 @@ Namespace Microsoft.CodeAnalysis.VisualBasic
         End Function
 
         ' Rewrite select statement case blocks as IF List
-        Private Function RewriteCaseBlocks(
+        Private Function RewriteCaseBlocksRecursive(
+            selectStatement As BoundSelectStatement,
             generateUnstructuredExceptionHandlingResumeCode As Boolean,
             caseBlocks As ImmutableArray(Of BoundCaseBlock),
-            startFrom As Integer
+            startFrom As Integer,
+            ByRef lazyConditionalBranchLocal As LocalSymbol
         ) As BoundStatement
             Debug.Assert(startFrom <= caseBlocks.Length)
 
@@ -264,6 +280,8 @@ Namespace Microsoft.CodeAnalysis.VisualBasic
                 rewrittenBody = AppendToBlock(rewrittenBody, RegisterUnstructuredExceptionHandlingNonThrowingResumeTarget(curCaseBlock.Syntax))
             End If
 
+            Dim instrument = Me.Instrument(selectStatement)
+
             If rewrittenCaseCondition Is Nothing Then
                 ' This must be a Case Else Block
                 Debug.Assert(curCaseBlock.Syntax.Kind = SyntaxKind.CaseElseBlock)
@@ -273,22 +291,26 @@ Namespace Microsoft.CodeAnalysis.VisualBasic
                 Debug.Assert(startFrom = caseBlocks.Length - 1)
 
                 ' Case Else statement needs a sequence point
-                If Me.GenerateDebugInfo Then
-                    rewrittenStatement = New BoundSequencePoint(curCaseBlock.CaseStatement.Syntax, rewrittenBody)
+                If instrument Then
+                    rewrittenStatement = _instrumenterOpt.InstrumentCaseElseBlock(curCaseBlock, rewrittenBody)
                 Else
                     rewrittenStatement = rewrittenBody
                 End If
             Else
                 Debug.Assert(curCaseBlock.Syntax.Kind = SyntaxKind.CaseBlock)
+                If instrument Then
+                    rewrittenCaseCondition = _instrumenterOpt.InstrumentSelectStatementCaseCondition(selectStatement, rewrittenCaseCondition, _currentMethodOrLambda, lazyConditionalBranchLocal)
+                End If
 
+                ' EnC: We need to insert a hidden sequence point to handle function remapping in case 
+                ' the containing method is edited while methods invoked in the condition are being executed.
                 rewrittenStatement = RewriteIfStatement(
                     syntaxNode:=curCaseBlock.Syntax,
-                    conditionSyntax:=curCaseBlock.CaseStatement.Syntax,
                     rewrittenCondition:=rewrittenCaseCondition,
                     rewrittenConsequence:=rewrittenBody,
-                    rewrittenAlternative:=RewriteCaseBlocks(generateUnstructuredExceptionHandlingResumeCode, caseBlocks, startFrom + 1),
+                    rewrittenAlternative:=RewriteCaseBlocksRecursive(selectStatement, generateUnstructuredExceptionHandlingResumeCode, caseBlocks, startFrom + 1, lazyConditionalBranchLocal),
                     unstructuredExceptionHandlingResumeTarget:=unstructuredExceptionHandlingResumeTarget,
-                    generateDebugInfo:=True)
+                    instrumentationTargetOpt:=If(instrument, curCaseBlock, Nothing))
             End If
 
             Return rewrittenStatement
@@ -345,10 +367,10 @@ Namespace Microsoft.CodeAnalysis.VisualBasic
                             Dim relationalCaseClause = DirectCast(caseClause, BoundRelationalCaseClause)
 
                             Debug.Assert(relationalCaseClause.OperatorKind = BinaryOperatorKind.Equals)
-                            Debug.Assert(relationalCaseClause.OperandOpt IsNot Nothing)
+                            Debug.Assert(relationalCaseClause.ValueOpt IsNot Nothing)
                             Debug.Assert(relationalCaseClause.ConditionOpt Is Nothing)
 
-                            constant = relationalCaseClause.OperandOpt.ConstantValueOpt
+                            constant = relationalCaseClause.ValueOpt.ConstantValueOpt
 
                         Case Else
                             Throw ExceptionUtilities.UnexpectedValue(caseClause.Kind)

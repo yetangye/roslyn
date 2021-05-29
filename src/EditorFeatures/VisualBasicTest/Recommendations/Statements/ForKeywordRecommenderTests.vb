@@ -1,16 +1,17 @@
-' Copyright (c) Microsoft.  All Rights Reserved.  Licensed under the Apache License, Version 2.0.  See License.txt in the project root for license information.
+﻿' Licensed to the .NET Foundation under one or more agreements.
+' The .NET Foundation licenses this file to you under the MIT license.
+' See the LICENSE file in the project root for more information.
 
-Imports Microsoft.CodeAnalysis.Text
 Namespace Microsoft.CodeAnalysis.Editor.VisualBasic.UnitTests.Recommendations.Statements
     Public Class ForKeywordRecommenderTests
 
         <Fact, Trait(Traits.Feature, Traits.Features.KeywordRecommending)>
-        Public Sub ForInMethodBody()
+        Public Sub ForInMethodBodyTest()
             VerifyRecommendationsContain(<MethodBody>|</MethodBody>, "For")
         End Sub
 
         <Fact, Trait(Traits.Feature, Traits.Features.KeywordRecommending)>
-        Public Sub ForInLambda()
+        Public Sub ForInLambdaTest()
             VerifyRecommendationsContain(<MethodBody>
 Dim x = Sub()
 |
@@ -18,14 +19,14 @@ Dim x = Sub()
         End Sub
 
         <Fact, Trait(Traits.Feature, Traits.Features.KeywordRecommending)>
-        Public Sub ForAfterStatement()
+        Public Sub ForAfterStatementTest()
             VerifyRecommendationsContain(<MethodBody>
 Dim x
 |</MethodBody>, "For")
         End Sub
 
         <Fact, Trait(Traits.Feature, Traits.Features.KeywordRecommending)>
-        Public Sub ForAfterExitKeyword()
+        Public Sub ForAfterExitKeywordTest()
             VerifyRecommendationsContain(<MethodBody>
 For
 Exit |
@@ -33,7 +34,7 @@ Loop</MethodBody>, "For")
         End Sub
 
         <Fact, Trait(Traits.Feature, Traits.Features.KeywordRecommending)>
-        Public Sub ForAfterContinueKeyword()
+        Public Sub ForAfterContinueKeywordTest()
             VerifyRecommendationsContain(<MethodBody>
 For
 Continue |
@@ -41,28 +42,28 @@ Loop</MethodBody>, "For")
         End Sub
 
         <Fact, Trait(Traits.Feature, Traits.Features.KeywordRecommending)>
-        Public Sub ForNotAfterContinueKeywordOutsideLoop()
+        Public Sub ForNotAfterContinueKeywordOutsideLoopTest()
             VerifyRecommendationsMissing(<MethodBody>
 Continue |
 </MethodBody>, "For")
         End Sub
 
         <Fact, Trait(Traits.Feature, Traits.Features.KeywordRecommending)>
-        Public Sub ForNotAfterExitKeywordOutsideLoop()
+        Public Sub ForNotAfterExitKeywordOutsideLoopTest()
             VerifyRecommendationsMissing(<MethodBody>
 Exit |
 </MethodBody>, "For")
         End Sub
 
         <Fact, Trait(Traits.Feature, Traits.Features.KeywordRecommending)>
-        Public Sub ForNotInSingleLineLambda()
+        Public Sub ForNotInSingleLineLambdaTest()
             VerifyRecommendationsMissing(<MethodBody>Dim x = Sub() |</MethodBody>, "For")
         End Sub
 
         <Fact, Trait(Traits.Feature, Traits.Features.KeywordRecommending)>
-        Public Sub NoForAfterExitInsideLambdaInsideLoop()
+        Public Sub NoForAfterExitInsideLambdaInsideLoopTest()
             VerifyRecommendationsMissing(<MethodBody>
-For Each i In foo
+For Each i In goo
     x = Sub()
             Exit |
         End Sub
@@ -71,18 +72,18 @@ Next
         End Sub
 
         <Fact, Trait(Traits.Feature, Traits.Features.KeywordRecommending)>
-        Public Sub ForAfterExitInsideForLoopInsideLambda()
+        Public Sub ForAfterExitInsideForLoopInsideLambdaTest()
             VerifyRecommendationsContain(<MethodBody>
 Dim x = Sub()
             For Each i in bar
                 Exit |
-            End Sub
+        End Function
         Next
 </MethodBody>, "For")
         End Sub
 
         <Fact, Trait(Traits.Feature, Traits.Features.KeywordRecommending)>
-        Public Sub ForNotAfterExitInsideForLoopInsideFinallyBlock()
+        Public Sub ForNotAfterExitInsideForLoopInsideFinallyBlockTest()
             Dim code =
 <MethodBody>
 For i = 1 to 100
@@ -93,6 +94,5 @@ For i = 1 to 100
 
             VerifyRecommendationsMissing(code, "For")
         End Sub
-
     End Class
 End Namespace

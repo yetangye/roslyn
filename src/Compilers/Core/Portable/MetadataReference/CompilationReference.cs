@@ -1,16 +1,19 @@
-﻿// Copyright (c) Microsoft.  All Rights Reserved.  Licensed under the Apache License, Version 2.0.  See License.txt in the project root for license information.
+﻿// Licensed to the .NET Foundation under one or more agreements.
+// The .NET Foundation licenses this file to you under the MIT license.
+// See the LICENSE file in the project root for more information.
 
 using System;
 using System.Collections.Generic;
 using System.Collections.Immutable;
 using System.Diagnostics;
+using Roslyn.Utilities;
 
 namespace Microsoft.CodeAnalysis
 {
     /// <summary>
     /// Reference to another C# or VB compilation.
     /// </summary>
-    public abstract class CompilationReference : MetadataReference
+    public abstract class CompilationReference : MetadataReference, IEquatable<CompilationReference>
     {
         public Compilation Compilation { get { return CompilationCore; } }
         internal abstract Compilation CompilationCore { get; }
@@ -58,7 +61,7 @@ namespace Microsoft.CodeAnalysis
         /// <exception cref="ArgumentException">Alias is invalid for the metadata kind.</exception> 
         public new CompilationReference WithAliases(ImmutableArray<string> aliases)
         {
-            return WithProperties(new MetadataReferenceProperties(this.Properties.Kind, aliases, this.Properties.EmbedInteropTypes));
+            return WithProperties(Properties.WithAliases(aliases));
         }
 
         /// <summary>
@@ -68,7 +71,7 @@ namespace Microsoft.CodeAnalysis
         /// <exception cref="ArgumentException">Interop types can't be embedded from modules.</exception> 
         public new CompilationReference WithEmbedInteropTypes(bool value)
         {
-            return WithProperties(new MetadataReferenceProperties(this.Properties.Kind, this.Properties.Aliases, value));
+            return WithProperties(Properties.WithEmbedInteropTypes(value));
         }
 
         /// <summary>
@@ -103,12 +106,38 @@ namespace Microsoft.CodeAnalysis
 
         internal abstract CompilationReference WithPropertiesImpl(MetadataReferenceProperties properties);
 
-        public override string Display
+        public override string? Display
         {
             get
             {
                 return Compilation.AssemblyName;
             }
+        }
+
+        public bool Equals(CompilationReference? other)
+        {
+            if (other == null)
+            {
+                return false;
+            }
+
+            if (object.ReferenceEquals(this, other))
+            {
+                return true;
+            }
+
+            // MetadataProperty implements value equality
+            return object.Equals(this.Compilation, other.Compilation) && object.Equals(this.Properties, other.Properties);
+        }
+
+        public override bool Equals(object? obj)
+        {
+            return Equals(obj as CompilationReference);
+        }
+
+        public override int GetHashCode()
+        {
+            return Hash.Combine(this.Compilation.GetHashCode(), this.Properties.GetHashCode());
         }
     }
 }

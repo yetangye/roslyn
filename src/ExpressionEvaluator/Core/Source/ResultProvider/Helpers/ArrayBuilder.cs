@@ -1,8 +1,15 @@
-// Copyright (c) Microsoft.  All Rights Reserved.  Licensed under the Apache License, Version 2.0.  See License.txt in the project root for license information.
+﻿// Licensed to the .NET Foundation under one or more agreements.
+// The .NET Foundation licenses this file to you under the MIT license.
+// See the LICENSE file in the project root for more information.
+
+#nullable disable
+
+#pragma warning disable CA1825 // Avoid zero-length array allocations.
 
 using System.Collections.Generic;
 using System.Collections.ObjectModel;
 using System.Diagnostics;
+using Microsoft.CodeAnalysis.PooledObjects;
 using Roslyn.Utilities;
 
 namespace Microsoft.CodeAnalysis
@@ -12,7 +19,7 @@ namespace Microsoft.CodeAnalysis
         private static readonly ObjectPool<ArrayBuilder<T>> s_poolInstance = new ObjectPool<ArrayBuilder<T>>(() => new ArrayBuilder<T>(), 16);
         private static readonly ReadOnlyCollection<T> s_empty = new ReadOnlyCollection<T>(new T[0]);
 
-        private List<T> _items;
+        private readonly List<T> _items;
 
         public static ArrayBuilder<T> GetInstance(int size = 0)
         {
@@ -25,7 +32,7 @@ namespace Microsoft.CodeAnalysis
             return builder;
         }
 
-        private ArrayBuilder()
+        internal ArrayBuilder()
         {
             _items = new List<T>();
         }
@@ -51,6 +58,24 @@ namespace Microsoft.CodeAnalysis
         public void AddRange(IEnumerable<T> items)
         {
             _items.AddRange(items);
+        }
+
+        public T Peek()
+        {
+            return _items[_items.Count - 1];
+        }
+
+        public void Push(T item)
+        {
+            Add(item);
+        }
+
+        public T Pop()
+        {
+            var position = _items.Count - 1;
+            var result = _items[position];
+            _items.RemoveAt(position);
+            return result;
         }
 
         public void Clear()

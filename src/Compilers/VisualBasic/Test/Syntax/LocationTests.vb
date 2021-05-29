@@ -1,4 +1,6 @@
-﻿' Copyright (c) Microsoft.  All Rights Reserved.  Licensed under the Apache License, Version 2.0.  See License.txt in the project root for license information.
+﻿' Licensed to the .NET Foundation under one or more agreements.
+' The .NET Foundation licenses this file to you under the MIT license.
+' See the LICENSE file in the project root for more information.
 
 Imports System.Collections.Immutable
 Imports Microsoft.CodeAnalysis.Text
@@ -9,12 +11,12 @@ Namespace Microsoft.CodeAnalysis.VisualBasic.UnitTests
     Public Class LocationTests
         Inherits TestBase
 
-        Private Shared ReadOnly _resolver As New TestSourceResolver()
+        Private Shared ReadOnly s_resolver As New TestSourceResolver()
 
         Private Class TestSourceResolver
             Inherits SourceFileResolver
 
-            Sub New()
+            Public Sub New()
                 MyBase.New(ImmutableArray(Of String).Empty, Nothing)
             End Sub
 
@@ -34,7 +36,7 @@ Namespace Microsoft.CodeAnalysis.VisualBasic.UnitTests
 
             Dim span = GetSpanIn(syntaxTree, sourceText)
             Dim mappedSpan = syntaxTree.GetMappedLineSpan(span)
-            Dim actualDisplayPath = syntaxTree.GetDisplayPath(span, _resolver)
+            Dim actualDisplayPath = syntaxTree.GetDisplayPath(span, s_resolver)
 
             Assert.Equal(expectedPath, mappedSpan.Path)
             If expectedPath.IsEmpty Then
@@ -52,7 +54,7 @@ Namespace Microsoft.CodeAnalysis.VisualBasic.UnitTests
 
         Private Function GetSpanIn(tree As SyntaxTree, textToFind As String) As TextSpan
             Dim s = tree.GetText().ToString()
-            Dim index = s.IndexOf(textToFind)
+            Dim index = s.IndexOf(textToFind, StringComparison.Ordinal)
             Assert.True(index >= 0, "textToFind not found in the tree")
             Return New TextSpan(index, textToFind.Length)
         End Function
@@ -60,22 +62,22 @@ Namespace Microsoft.CodeAnalysis.VisualBasic.UnitTests
         <Fact>
         Public Sub TestGetSourceLocationInFile()
             Dim sampleProgram = "Class X" + vbCrLf + "Public x As Integer" + vbCrLf + "End Class" + vbCrLf
-            Dim tree = VisualBasicSyntaxTree.ParseText(sampleProgram, path:="c:\\foo.vb")
+            Dim tree = VisualBasicSyntaxTree.ParseText(sampleProgram, path:="c:\\goo.vb")
 
-            Dim xSpan As New TextSpan(sampleProgram.IndexOf("x As"), 1)
-            Dim xToEndClassSpan As New TextSpan(xSpan.Start, sampleProgram.IndexOf("End Class") - xSpan.Start + 3)
+            Dim xSpan As New TextSpan(sampleProgram.IndexOf("x As", StringComparison.Ordinal), 1)
+            Dim xToEndClassSpan As New TextSpan(xSpan.Start, sampleProgram.IndexOf("End Class", StringComparison.Ordinal) - xSpan.Start + 3)
             Dim locX As New SourceLocation(tree, xSpan)
             Dim locXToEndClass As New SourceLocation(tree, xToEndClassSpan)
 
             Dim flpsX = locX.GetLineSpan()
-            Assert.Equal("c:\\foo.vb", flpsX.Path)
+            Assert.Equal("c:\\goo.vb", flpsX.Path)
             Assert.Equal(1, flpsX.StartLinePosition.Line)
             Assert.Equal(7, flpsX.StartLinePosition.Character)
             Assert.Equal(1, flpsX.EndLinePosition.Line)
             Assert.Equal(8, flpsX.EndLinePosition.Character)
 
             Dim flpsXToEndClass = locXToEndClass.GetLineSpan()
-            Assert.Equal("c:\\foo.vb", flpsXToEndClass.Path)
+            Assert.Equal("c:\\goo.vb", flpsXToEndClass.Path)
             Assert.Equal(1, flpsXToEndClass.StartLinePosition.Line)
             Assert.Equal(7, flpsXToEndClass.StartLinePosition.Character)
             Assert.Equal(2, flpsXToEndClass.EndLinePosition.Line)
@@ -105,15 +107,15 @@ public a as integer
 #End If
 End Class
 "
-            Dim tree = VisualBasicSyntaxTree.ParseText(sampleProgram, path:="c:\foo.vb")
+            Dim tree = VisualBasicSyntaxTree.ParseText(sampleProgram, path:="c:\goo.vb")
 
-            AssertMappedSpanEqual(tree, "ports Sy", "c:\foo.vb", 0, 2, 0, 10, hasMappedPath:=False)
+            AssertMappedSpanEqual(tree, "ports Sy", "c:\goo.vb", 0, 2, 0, 10, hasMappedPath:=False)
             AssertMappedSpanEqual(tree, "x as", "banana.vb", 19, 7, 19, 11, hasMappedPath:=True)
             AssertMappedSpanEqual(tree, "y as", "banana.vb", 20, 7, 20, 11, hasMappedPath:=True)
             AssertMappedSpanEqual(tree, "z as", "banana.vb", 43, 7, 43, 11, hasMappedPath:=True)
-            AssertMappedSpanEqual(tree, "w as", "c:\foo.vb", 9, 7, 9, 11, hasMappedPath:=False)
-            AssertMappedSpanEqual(tree, "q as", "c:\foo.vb", 10, 7, 10, 11, hasMappedPath:=False)
-            AssertMappedSpanEqual(tree, "a as", "c:\foo.vb", 14, 7, 14, 11, hasMappedPath:=False)
+            AssertMappedSpanEqual(tree, "w as", "c:\goo.vb", 9, 7, 9, 11, hasMappedPath:=False)
+            AssertMappedSpanEqual(tree, "q as", "c:\goo.vb", 10, 7, 10, 11, hasMappedPath:=False)
+            AssertMappedSpanEqual(tree, "a as", "c:\goo.vb", 14, 7, 14, 11, hasMappedPath:=False)
         End Sub
 
         <Fact()>
@@ -125,10 +127,10 @@ public x as integer
 public y as integer
 End Class
 </value>.Value
-            Dim tree = VisualBasicSyntaxTree.ParseText(sampleProgram, path:="c:\foo.vb")
+            Dim tree = VisualBasicSyntaxTree.ParseText(sampleProgram, path:="c:\goo.vb")
 
-            AssertMappedSpanEqual(tree, "ports Sy", "c:\foo.vb", 0, 2, 0, 10, hasMappedPath:=False)
-            AssertMappedSpanEqual(tree, "x as", "c:\foo.vb", 2, 7, 2, 11, hasMappedPath:=False)
+            AssertMappedSpanEqual(tree, "ports Sy", "c:\goo.vb", 0, 2, 0, 10, hasMappedPath:=False)
+            AssertMappedSpanEqual(tree, "x as", "c:\goo.vb", 2, 7, 2, 11, hasMappedPath:=False)
 
         End Sub
 
@@ -160,7 +162,7 @@ end class </text>.Value
             Assert.NotEqual(loc3, loc4)
         End Sub
 
-        <Fact(), WorkItem(537926, "DevDiv"), WorkItem(545223, "DevDiv")>
+        <Fact(), WorkItem(537926, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/537926"), WorkItem(545223, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/545223")>
         Public Sub TestSourceLocationToString()
             Dim sampleProgram As String = <text>Imports System
 Class Test
@@ -171,8 +173,8 @@ Class Test
 End Class</text>.Value
 
             Dim tree = VisualBasicSyntaxTree.ParseText(sampleProgram)
-            Dim span1 As New TextSpan(sampleProgram.IndexOf("x As"), 1)
-            Dim span2 As New TextSpan(sampleProgram.IndexOf("y As"), 1)
+            Dim span1 As New TextSpan(sampleProgram.IndexOf("x As", StringComparison.Ordinal), 1)
+            Dim span2 As New TextSpan(sampleProgram.IndexOf("y As", StringComparison.Ordinal), 1)
 
             Dim loc1 = New SourceLocation(tree, span1)
             Dim loc2 = New SourceLocation(tree, span2)

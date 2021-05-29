@@ -1,17 +1,13 @@
-' Copyright (c) Microsoft.  All Rights Reserved.  Licensed under the Apache License, Version 2.0.  See License.txt in the project root for license information.
-
-Imports Microsoft.CodeAnalysis.Text
-Imports Microsoft.CodeAnalysis.VisualBasic
-Imports Microsoft.CodeAnalysis.VisualBasic.Symbols
-Imports Microsoft.CodeAnalysis.VisualBasic.Syntax
-Imports Roslyn.Test.Utilities
-Imports Xunit
+﻿' Licensed to the .NET Foundation under one or more agreements.
+' The .NET Foundation licenses this file to you under the MIT license.
+' See the LICENSE file in the project root for more information.
 
 Namespace Microsoft.CodeAnalysis.Editor.VisualBasic.UnitTests.Recommendations.EventHandling
     Public Class RaiseEventKeywordRecommenderTests
-        <WorkItem(808406)>
+        <Fact>
+        <WorkItem(808406, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/808406")>
         <Trait(Traits.Feature, Traits.Features.KeywordRecommending)>
-        Public Sub RaiseEventInCustomEvent()
+        Public Sub RaiseEventInCustomEventTest()
             Dim code = <File>
 Public Class Z
     Public Custom Event E As Action
@@ -22,9 +18,10 @@ End Class</File>
             VerifyRecommendationsContain(code, "RaiseEvent")
         End Sub
 
-        <WorkItem(899057)>
+        <Fact>
+        <WorkItem(899057, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/899057")>
         <Trait(Traits.Feature, Traits.Features.KeywordRecommending)>
-        Public Sub RaiseEventInSingleLineLambda()
+        Public Sub RaiseEventInSingleLineLambdaTest()
             Dim code = <File>
 Public Class Z
     Public Sub Main()
@@ -36,9 +33,9 @@ End Class</File>
         End Sub
 
         <Fact>
-        <WorkItem(808406)>
+        <WorkItem(808406, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/808406")>
         <Trait(Traits.Feature, Traits.Features.KeywordRecommending)>
-        Public Sub NotRaiseEventInCustomEventWithRaiseEvent()
+        Public Sub NotRaiseEventInCustomEventWithRaiseEventTest()
             Dim code = <File>
 Public Class Z
     Public Custom Event E As Action

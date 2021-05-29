@@ -1,77 +1,90 @@
-' Copyright (c) Microsoft.  All Rights Reserved.  Licensed under the Apache License, Version 2.0.  See License.txt in the project root for license information.
+﻿' Licensed to the .NET Foundation under one or more agreements.
+' The .NET Foundation licenses this file to you under the MIT license.
+' See the LICENSE file in the project root for more information.
+
+Imports System.Threading.Tasks
+Imports Microsoft.CodeAnalysis.Options
+Imports Microsoft.CodeAnalysis.Test.Utilities
 
 Namespace Microsoft.VisualStudio.LanguageServices.UnitTests.CodeModel
+    <[UseExportProvider]>
     Partial Public MustInherit Class AbstractCodeModelObjectTests(Of TCodeModelObject As Class)
 
         Protected MustOverride ReadOnly Property LanguageName As String
 
-        Protected Function GetWorkspaceDefinition(code As XElement) As XElement
+        Protected Function GetWorkspaceDefinition(code As XElement, Optional editorConfig As String = "") As XElement
             Return <Workspace>
                        <Project Language=<%= LanguageName %> CommonReferences="true">
                            <Document><%= code.Value.Trim() %></Document>
+                           <AnalyzerConfigDocument FilePath="z:\\.editorconfig">
+                               <%= editorConfig %>
+                           </AnalyzerConfigDocument>
                        </Project>
                    </Workspace>
         End Function
 
-        Protected Overridable Sub TestAddAttribute(code As XElement, expectedCode As XElement, data As AttributeData)
+        Protected Overridable Function TestAddAttribute(code As XElement, expectedCode As XElement, data As AttributeData) As Task
             Throw New NotImplementedException
-        End Sub
+        End Function
 
-        Protected Overridable Sub TestAddClass(code As XElement, expectedCode As XElement, data As ClassData)
+        Protected Overridable Function TestAddClass(code As XElement, expectedCode As XElement, data As ClassData) As Task
             Throw New NotImplementedException
-        End Sub
+        End Function
 
-        Protected Overridable Sub TestAddDelegate(code As XElement, expectedCode As XElement, data As DelegateData)
+        Protected Overridable Function TestAddDelegate(code As XElement, expectedCode As XElement, data As DelegateData) As Task
             Throw New NotImplementedException
-        End Sub
+        End Function
 
-        Protected Overridable Sub TestAddEnum(code As XElement, expectedCode As XElement, data As EnumData)
+        Protected Overridable Function TestAddEnum(code As XElement, expectedCode As XElement, data As EnumData) As Task
             Throw New NotImplementedException
-        End Sub
+        End Function
 
-        Protected Overridable Sub TestAddEnumMember(code As XElement, expectedCode As XElement, data As EnumMemberData)
+        Protected Overridable Function TestAddEnumMember(code As XElement, expectedCode As XElement, data As EnumMemberData) As Task
             Throw New NotImplementedException
-        End Sub
+        End Function
 
-        Protected Overridable Sub TestAddEvent(code As XElement, expectedCode As XElement, data As EventData)
+        Protected Overridable Function TestAddEvent(code As XElement, expectedCode As XElement, data As EventData) As Task
             Throw New NotImplementedException
-        End Sub
+        End Function
 
-        Protected Overridable Sub TestAddFunction(code As XElement, expectedCode As XElement, data As FunctionData)
+        Protected Overridable Function TestAddFunction(code As XElement, expectedCode As XElement, data As FunctionData) As Task
             Throw New NotImplementedException
-        End Sub
+        End Function
 
-        Protected Overridable Sub TestAddImport(code As XElement, expectedCode As XElement, data As ImportData)
+        Protected Overridable Function TestAddImport(code As XElement, expectedCode As XElement, data As ImportData) As Task
             Throw New NotImplementedException
-        End Sub
+        End Function
 
-        Protected Overridable Sub TestAddInterface(code As XElement, expectedCode As XElement, data As InterfaceData)
+        Protected Overridable Function TestAddInterface(code As XElement, expectedCode As XElement, data As InterfaceData) As Task
             Throw New NotImplementedException
-        End Sub
+        End Function
 
-        Protected Overridable Sub TestAddNamespace(code As XElement, expectedCode As XElement, data As NamespaceData)
+        Protected Overridable Function TestAddNamespace(code As XElement, expectedCode As XElement, data As NamespaceData) As Task
             Throw New NotImplementedException
-        End Sub
+        End Function
 
-        Protected Overridable Sub TestAddParameter(code As XElement, expectedCode As XElement, data As ParameterData)
+        Protected Overridable Function TestAddParameter(code As XElement, expectedCode As XElement, data As ParameterData) As Task
             Throw New NotImplementedException
-        End Sub
+        End Function
 
-        Protected Overridable Sub TestAddProperty(code As XElement, expectedCode As XElement, data As PropertyData)
+        Private Protected Overridable Function TestAddProperty(
+                code As XElement, expectedCode As XElement, data As PropertyData,
+                Optional options As IDictionary(Of OptionKey2, Object) = Nothing,
+                Optional editorConfig As String = "") As Task
             Throw New NotImplementedException
-        End Sub
+        End Function
 
-        Protected Overridable Sub TestAddStruct(code As XElement, expectedCode As XElement, data As StructData)
+        Protected Overridable Function TestAddStruct(code As XElement, expectedCode As XElement, data As StructData) As Task
             Throw New NotImplementedException
-        End Sub
+        End Function
 
-        Protected Overridable Sub TestAddVariable(code As XElement, expectedCode As XElement, data As VariableData)
+        Protected Overridable Function TestAddVariable(code As XElement, expectedCode As XElement, data As VariableData) As Task
             Throw New NotImplementedException
-        End Sub
+        End Function
 
-        Protected Overridable Sub TestRemoveChild(code As XElement, expectedCode As XElement, child As Object)
+        Protected Overridable Function TestRemoveChild(code As XElement, expectedCode As XElement, child As Object) As Task
             Throw New NotImplementedException
-        End Sub
+        End Function
 
         Protected Sub TestCodeTypeRef(codeTypeRef As EnvDTE.CodeTypeRef, data As CodeTypeRefData)
             Assert.NotNull(codeTypeRef)
@@ -102,6 +115,8 @@ Namespace Microsoft.VisualStudio.LanguageServices.UnitTests.CodeModel
                    End Sub
         End Function
 
+        Protected MustOverride Sub TestChildren(code As XElement, ParamArray expectedChildren() As Action(Of Object))
+
         Protected Function IsElement(name As String, Optional kind? As EnvDTE.vsCMElement = Nothing) As Action(Of Object)
             Return _
                 Sub(o)
@@ -115,7 +130,7 @@ Namespace Microsoft.VisualStudio.LanguageServices.UnitTests.CodeModel
                 End Sub
         End Function
 
-        Protected ReadOnly NoElements As Action(Of Object)() = {}
+        Protected ReadOnly NoElements As Action(Of Object)() = Array.Empty(Of Action(Of Object))()
 
     End Class
 End Namespace

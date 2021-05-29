@@ -1,10 +1,10 @@
-﻿// Copyright (c) Microsoft.  All Rights Reserved.  Licensed under the Apache License, Version 2.0.  See License.txt in the project root for license information.
+﻿// Licensed to the .NET Foundation under one or more agreements.
+// The .NET Foundation licenses this file to you under the MIT license.
+// See the LICENSE file in the project root for more information.
 
-using Roslyn.Utilities;
 using System;
 using System.IO;
 using System.Threading;
-using System.Diagnostics;
 using System.Collections.Immutable;
 using System.Collections.Generic;
 
@@ -15,14 +15,14 @@ namespace Microsoft.CodeAnalysis
     /// </summary>
     public abstract class PortableExecutableReference : MetadataReference
     {
-        private readonly string _filePath;
+        private readonly string? _filePath;
 
-        private DocumentationProvider _lazyDocumentation;
+        private DocumentationProvider? _lazyDocumentation;
 
         protected PortableExecutableReference(
             MetadataReferenceProperties properties,
-            string fullPath = null,
-            DocumentationProvider initialDocumentation = null)
+            string? fullPath = null,
+            DocumentationProvider? initialDocumentation = null)
             : base(properties)
         {
             _filePath = fullPath;
@@ -32,7 +32,7 @@ namespace Microsoft.CodeAnalysis
         /// <summary>
         /// Display string used in error messages to identity the reference.
         /// </summary>
-        public override string Display
+        public override string? Display
         {
             get { return FilePath; }
         }
@@ -40,7 +40,7 @@ namespace Microsoft.CodeAnalysis
         /// <summary>
         /// Path describing the location of the metadata, or null if the metadata have no location.
         /// </summary>
-        public string FilePath
+        public string? FilePath
         {
             get { return _filePath; }
         }
@@ -88,7 +88,7 @@ namespace Microsoft.CodeAnalysis
         /// <exception cref="ArgumentException">Alias is invalid for the metadata kind.</exception> 
         public new PortableExecutableReference WithAliases(ImmutableArray<string> aliases)
         {
-            return WithProperties(new MetadataReferenceProperties(this.Properties.Kind, aliases, this.Properties.EmbedInteropTypes));
+            return WithProperties(Properties.WithAliases(aliases));
         }
 
         /// <summary>
@@ -98,7 +98,7 @@ namespace Microsoft.CodeAnalysis
         /// <exception cref="ArgumentException">Interop types can't be embedded from modules.</exception> 
         public new PortableExecutableReference WithEmbedInteropTypes(bool value)
         {
-            return WithProperties(new MetadataReferenceProperties(this.Properties.Kind, this.Properties.Aliases, value));
+            return WithProperties(Properties.WithEmbedInteropTypes(value));
         }
 
         /// <summary>
@@ -142,20 +142,45 @@ namespace Microsoft.CodeAnalysis
         /// Any other exception is considered an unexpected error in the implementation and is not caught.
         ///
         /// <see cref="Metadata"/> objects may cache information decoded from the PE image.
-        /// Reusing <see cref="Metadata"/> instances accross metadata references will result in better performance.
+        /// Reusing <see cref="Metadata"/> instances across metadata references will result in better performance.
         /// 
         /// The calling <see cref="Compilation"/> doesn't take ownership of the <see cref="Metadata"/> objects returned by this method.
         /// The implementation needs to retrieve the object from a provider that manages their lifetime (such as metadata cache).
-        /// The <see cref="Metadata"/> object is kept alive by the <see cref="Compilation"/> that called <see cref="GetMetadata"/>
+        /// The <see cref="Metadata"/> object is kept alive by the <see cref="Compilation"/> that called <see cref="GetMetadataNoCopy"/>
         /// and by all compilations created from it via calls to With- factory methods on <see cref="Compilation"/>, 
         /// other than <see cref="Compilation.WithReferences(MetadataReference[])"/> overloads. A compilation created using 
-        /// <see cref="Compilation.WithReferences(MetadataReference[])"/> will call to <see cref="GetMetadata"/> again.
+        /// <see cref="Compilation.WithReferences(MetadataReference[])"/> will call to <see cref="GetMetadataNoCopy"/> again.
         /// </remarks>
         protected abstract Metadata GetMetadataImpl();
 
-        internal Metadata GetMetadata()
+        internal Metadata GetMetadataNoCopy()
         {
             return GetMetadataImpl();
+        }
+
+        /// <summary>
+        /// Returns a copy of the <see cref="Metadata"/> object this <see cref="PortableExecutableReference"/>
+        /// contains.  This copy does not need to be <see cref="IDisposable.Dispose"/>d.
+        /// </summary>
+        /// <exception cref="BadImageFormatException">If the PE image format is invalid.</exception>
+        /// <exception cref="IOException">The metadata image content can't be read.</exception>
+        /// <exception cref="FileNotFoundException">The metadata image is stored in a file that can't be found.</exception>
+        public Metadata GetMetadata()
+        {
+            return GetMetadataNoCopy().Copy();
+        }
+
+        /// <summary>
+        /// Returns the <see cref="MetadataId"/> for this reference's <see cref="Metadata"/>.
+        /// This will be equivalent to calling <see cref="GetMetadata()"/>.<see cref="Metadata.Id"/>,
+        /// but can be done more efficiently.
+        /// </summary>
+        /// <exception cref="BadImageFormatException">If the PE image format is invalid.</exception>
+        /// <exception cref="IOException">The metadata image content can't be read.</exception>
+        /// <exception cref="FileNotFoundException">The metadata image is stored in a file that can't be found.</exception>
+        public MetadataId GetMetadataId()
+        {
+            return GetMetadataNoCopy().Id;
         }
 
         internal static Diagnostic ExceptionToDiagnostic(Exception e, CommonMessageProvider messageProvider, Location location, string display, MetadataImageKind kind)

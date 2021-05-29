@@ -1,7 +1,10 @@
-// Copyright (c) Microsoft.  All Rights Reserved.  Licensed under the Apache License, Version 2.0.  See License.txt in the project root for license information.
+﻿// Licensed to the .NET Foundation under one or more agreements.
+// The .NET Foundation licenses this file to you under the MIT license.
+// See the LICENSE file in the project root for more information.
+
+#nullable disable
 
 using System;
-using System.Collections.Generic;
 using System.Globalization;
 using System.Linq;
 using System.Text;
@@ -34,6 +37,7 @@ namespace Microsoft.VisualStudio.LanguageServices.Implementation.CodeModel.Metho
         private const string NameRefElementName = "NameRef";
         private const string NewArrayElementName = "NewArray";
         private const string NewClassElementName = "NewClass";
+        private const string NewDelegateElementName = "NewDelegate";
         private const string NullElementName = "Null";
         private const string NumberElementName = "Number";
         private const string ParenthesesElementName = "Parentheses";
@@ -43,8 +47,13 @@ namespace Microsoft.VisualStudio.LanguageServices.Implementation.CodeModel.Metho
         private const string TypeElementName = "Type";
 
         private const string BinaryOperatorAttributeName = "binaryoperator";
+        private const string DirectCastAttributeName = "directcast";
+        private const string FullNameAttributeName = "fullname";
+        private const string ImplicitAttributeName = "implicit";
         private const string LineAttributeName = "line";
+        private const string NameAttributeName = "name";
         private const string RankAttributeName = "rank";
+        private const string TryCastAttributeName = "trycast";
         private const string TypeAttributeName = "type";
         private const string VariableKindAttributeName = "variablekind";
 
@@ -66,9 +75,7 @@ namespace Microsoft.VisualStudio.LanguageServices.Implementation.CodeModel.Metho
         }
 
         public override string ToString()
-        {
-            return _builder.ToString();
-        }
+            => _builder.ToString();
 
         private void AppendEncoded(string text)
         {
@@ -131,47 +138,29 @@ namespace Microsoft.VisualStudio.LanguageServices.Implementation.CodeModel.Metho
         }
 
         private static string GetBinaryOperatorKindText(BinaryOperatorKind kind)
-        {
-            switch (kind)
+            => kind switch
             {
-                case BinaryOperatorKind.Plus:
-                    return "plus";
-                case BinaryOperatorKind.BitwiseOr:
-                    return "bitor";
-                case BinaryOperatorKind.BitwiseAnd:
-                    return "bitand";
-                case BinaryOperatorKind.Concatenate:
-                    return "concatenate";
-                case BinaryOperatorKind.AddDelegate:
-                    return "adddelegate";
-                default:
-                    throw new InvalidOperationException("Invalid BinaryOperatorKind: " + kind.ToString());
-            }
-        }
+                BinaryOperatorKind.Plus => "plus",
+                BinaryOperatorKind.BitwiseOr => "bitor",
+                BinaryOperatorKind.BitwiseAnd => "bitand",
+                BinaryOperatorKind.Concatenate => "concatenate",
+                BinaryOperatorKind.AddDelegate => "adddelegate",
+                _ => throw new InvalidOperationException("Invalid BinaryOperatorKind: " + kind.ToString()),
+            };
 
         private static string GetVariableKindText(VariableKind kind)
-        {
-            switch (kind)
+            => kind switch
             {
-                case VariableKind.Property:
-                    return "property";
-                case VariableKind.Method:
-                    return "method";
-                case VariableKind.Field:
-                    return "field";
-                case VariableKind.Local:
-                    return "local";
-                case VariableKind.Unknown:
-                    return "unknown";
-                default:
-                    throw new InvalidOperationException("Invalid SymbolKind: " + kind.ToString());
-            }
-        }
+                VariableKind.Property => "property",
+                VariableKind.Method => "method",
+                VariableKind.Field => "field",
+                VariableKind.Local => "local",
+                VariableKind.Unknown => "unknown",
+                _ => throw new InvalidOperationException("Invalid SymbolKind: " + kind.ToString()),
+            };
 
         private IDisposable Tag(string name, params AttributeInfo[] attributes)
-        {
-            return new AutoTag(this, name, attributes);
-        }
+            => new AutoTag(this, name, attributes);
 
         private AttributeInfo BinaryOperatorAttribute(BinaryOperatorKind kind)
         {
@@ -183,15 +172,49 @@ namespace Microsoft.VisualStudio.LanguageServices.Implementation.CodeModel.Metho
             return new AttributeInfo(BinaryOperatorAttributeName, GetBinaryOperatorKindText(kind));
         }
 
-        private AttributeInfo LineNumberAttribute(int lineNumber)
+        private AttributeInfo FullNameAttribute(string name)
         {
-            return new AttributeInfo(LineAttributeName, lineNumber.ToString());
+            if (string.IsNullOrWhiteSpace(name))
+            {
+                return AttributeInfo.Empty;
+            }
+
+            return new AttributeInfo(FullNameAttributeName, name);
+        }
+
+        private AttributeInfo ImplicitAttribute(bool? @implicit)
+        {
+            if (@implicit == null)
+            {
+                return AttributeInfo.Empty;
+            }
+
+            return new AttributeInfo(ImplicitAttributeName, @implicit.Value ? "yes" : "no");
+        }
+
+        private AttributeInfo LineNumberAttribute(int lineNumber)
+            => new AttributeInfo(LineAttributeName, lineNumber.ToString());
+
+        private AttributeInfo NameAttribute(string name)
+        {
+            if (string.IsNullOrWhiteSpace(name))
+            {
+                return AttributeInfo.Empty;
+            }
+
+            return new AttributeInfo(NameAttributeName, name);
         }
 
         private AttributeInfo RankAttribute(int rank)
-        {
-            return new AttributeInfo(RankAttributeName, rank.ToString());
-        }
+            => new AttributeInfo(RankAttributeName, rank.ToString());
+
+        private AttributeInfo SpecialCastKindAttribute(SpecialCastKind? specialCastKind = null)
+            => specialCastKind switch
+            {
+                SpecialCastKind.DirectCast => new AttributeInfo(DirectCastAttributeName, "yes"),
+                SpecialCastKind.TryCast => new AttributeInfo(TryCastAttributeName, "yes"),
+                _ => AttributeInfo.Empty,
+            };
 
         private AttributeInfo TypeAttribute(string typeName)
         {
@@ -214,169 +237,106 @@ namespace Microsoft.VisualStudio.LanguageServices.Implementation.CodeModel.Metho
         }
 
         protected IDisposable ArgumentTag()
-        {
-            return Tag(ArgumentElementName);
-        }
+            => Tag(ArgumentElementName);
 
         protected IDisposable ArrayElementAccessTag()
-        {
-            return Tag(ArrayElementAccessElementName);
-        }
+            => Tag(ArrayElementAccessElementName);
 
         protected IDisposable ArrayTag()
-        {
-            return Tag(ArrayElementName);
-        }
+            => Tag(ArrayElementName);
 
         protected IDisposable ArrayTypeTag(int rank)
-        {
-            return Tag(ArrayTypeElementName, RankAttribute(rank));
-        }
+            => Tag(ArrayTypeElementName, RankAttribute(rank));
 
         protected IDisposable AssignmentTag(BinaryOperatorKind kind = BinaryOperatorKind.None)
-        {
-            return Tag(AssignmentElementName, BinaryOperatorAttribute(kind));
-        }
+            => Tag(AssignmentElementName, BinaryOperatorAttribute(kind));
 
         protected void BaseReferenceTag()
-        {
-            AppendLeafTag(BaseReferenceElementName);
-        }
+            => AppendLeafTag(BaseReferenceElementName);
 
         protected IDisposable BinaryOperationTag(BinaryOperatorKind kind)
-        {
-            return Tag(BinaryOperationElementName, BinaryOperatorAttribute(kind));
-        }
+            => Tag(BinaryOperationElementName, BinaryOperatorAttribute(kind));
 
         protected IDisposable BlockTag()
-        {
-            return Tag(BlockElementName);
-        }
+            => Tag(BlockElementName);
 
         protected IDisposable BooleanTag()
-        {
-            return Tag(BooleanElementName);
-        }
+            => Tag(BooleanElementName);
 
         protected IDisposable BoundTag()
-        {
-            return Tag(BoundElementName);
-        }
+            => Tag(BoundElementName);
 
-        protected IDisposable CastTag()
-        {
-            return Tag(CastElementName);
-        }
+        protected IDisposable CastTag(SpecialCastKind? specialCastKind = null)
+            => Tag(CastElementName, SpecialCastKindAttribute(specialCastKind));
 
         protected IDisposable CharTag()
-        {
-            return Tag(CharElementName);
-        }
+            => Tag(CharElementName);
 
         protected IDisposable CommentTag()
-        {
-            return Tag(CommentElementName);
-        }
+            => Tag(CommentElementName);
 
         protected IDisposable ExpressionTag()
-        {
-            return Tag(ExpressionElementName);
-        }
+            => Tag(ExpressionElementName);
 
         protected IDisposable ExpressionStatementTag(int lineNumber)
-        {
-            return Tag(ExpressionStatementElementName, LineNumberAttribute(lineNumber));
-        }
+            => Tag(ExpressionStatementElementName, LineNumberAttribute(lineNumber));
 
         protected IDisposable LiteralTag()
-        {
-            return Tag(LiteralElementName);
-        }
+            => Tag(LiteralElementName);
 
         protected IDisposable LocalTag(int lineNumber)
-        {
-            return Tag(LocalElementName, LineNumberAttribute(lineNumber));
-        }
+            => Tag(LocalElementName, LineNumberAttribute(lineNumber));
 
         protected IDisposable MethodCallTag()
-        {
-            return Tag(MethodCallElementName);
-        }
+            => Tag(MethodCallElementName);
 
         protected IDisposable NameTag()
-        {
-            return Tag(NameElementName);
-        }
+            => Tag(NameElementName);
 
-        protected IDisposable NameRefTag(VariableKind kind)
-        {
-            return Tag(NameRefElementName, VariableKindAttribute(kind));
-        }
+        protected IDisposable NameRefTag(VariableKind kind, string name = null, string fullName = null)
+            => Tag(NameRefElementName, VariableKindAttribute(kind), NameAttribute(name), FullNameAttribute(fullName));
 
         protected IDisposable NewArrayTag()
-        {
-            return Tag(NewArrayElementName);
-        }
+            => Tag(NewArrayElementName);
 
         protected IDisposable NewClassTag()
-        {
-            return Tag(NewClassElementName);
-        }
+            => Tag(NewClassElementName);
+
+        protected IDisposable NewDelegateTag(string name)
+            => Tag(NewDelegateElementName, NameAttribute(name));
 
         protected void NullTag()
-        {
-            AppendLeafTag(NullElementName);
-        }
+            => AppendLeafTag(NullElementName);
 
         protected IDisposable NumberTag(string typeName = null)
-        {
-            return Tag(NumberElementName, TypeAttribute(typeName));
-        }
+            => Tag(NumberElementName, TypeAttribute(typeName));
 
         protected IDisposable ParenthesesTag()
-        {
-            return Tag(ParenthesesElementName);
-        }
+            => Tag(ParenthesesElementName);
 
         protected IDisposable QuoteTag(int lineNumber)
-        {
-            return Tag(QuoteElementName, LineNumberAttribute(lineNumber));
-        }
+            => Tag(QuoteElementName, LineNumberAttribute(lineNumber));
 
         protected IDisposable StringTag()
-        {
-            return Tag(StringElementName);
-        }
+            => Tag(StringElementName);
 
         protected void ThisReferenceTag()
-        {
-            AppendLeafTag(ThisReferenceElementName);
-        }
+            => AppendLeafTag(ThisReferenceElementName);
 
-        protected IDisposable TypeTag()
-        {
-            return Tag(TypeElementName);
-        }
+        protected IDisposable TypeTag(bool? @implicit = null)
+            => Tag(TypeElementName, ImplicitAttribute(@implicit));
 
         protected void LineBreak()
-        {
-            _builder.AppendLine();
-        }
+            => _builder.AppendLine();
 
         protected void EncodedText(string text)
-        {
-            AppendEncoded(text);
-        }
+            => AppendEncoded(text);
 
         protected int GetMark()
-        {
-            return _builder.Length;
-        }
+            => _builder.Length;
 
         protected void Rewind(int mark)
-        {
-            _builder.Length = mark;
-        }
+            => _builder.Length = mark;
 
         protected virtual VariableKind GetVariableKind(ISymbol symbol)
         {
@@ -403,14 +363,10 @@ namespace Microsoft.VisualStudio.LanguageServices.Implementation.CodeModel.Metho
         }
 
         protected string GetTypeName(ITypeSymbol typeSymbol)
-        {
-            return MetadataNameHelpers.GetMetadataName(typeSymbol);
-        }
+            => MetadataNameHelpers.GetMetadataName(typeSymbol);
 
         protected int GetLineNumber(SyntaxNode node)
-        {
-            return Text.Lines.IndexOf(node.SpanStart);
-        }
+            => Text.Lines.IndexOf(node.SpanStart);
 
         protected void GenerateUnknown(SyntaxNode node)
         {
@@ -428,24 +384,30 @@ namespace Microsoft.VisualStudio.LanguageServices.Implementation.CodeModel.Metho
             }
         }
 
-        protected void GenerateType(ITypeSymbol type)
+        protected void GenerateType(ITypeSymbol type, bool? @implicit = null, bool assemblyQualify = false)
         {
             if (type.TypeKind == TypeKind.Array)
             {
                 var arrayType = (IArrayTypeSymbol)type;
-                using (var tag = ArrayTypeTag(arrayType.Rank))
-                {
-                    GenerateType(arrayType.ElementType);
-                }
+                using var tag = ArrayTypeTag(arrayType.Rank);
+
+                GenerateType(arrayType.ElementType, @implicit, assemblyQualify);
             }
             else
             {
-                using (TypeTag())
+                using (TypeTag(@implicit))
                 {
-                    EncodedText(GetTypeName(type));
+                    var typeName = assemblyQualify
+                        ? GetTypeName(type) + ", " + type.ContainingAssembly.ToDisplayString()
+                        : GetTypeName(type);
+
+                    EncodedText(typeName);
                 }
             }
         }
+
+        protected void GenerateType(SpecialType specialType)
+            => GenerateType(SemanticModel.Compilation.GetSpecialType(specialType));
 
         protected void GenerateNullLiteral()
         {
@@ -459,10 +421,24 @@ namespace Microsoft.VisualStudio.LanguageServices.Implementation.CodeModel.Metho
         {
             using (NumberTag(GetTypeName(type)))
             {
-                // TODO(DustinCa): Add more unit tests to ensure that floats are correct.
-                EncodedText(Convert.ToString(value, CultureInfo.InvariantCulture));
+                if (value is double d)
+                {
+                    // Note: use G17 for doubles to ensure that we roundtrip properly on 64-bit
+                    EncodedText(d.ToString("G17", CultureInfo.InvariantCulture));
+                }
+                else if (value is float f)
+                {
+                    EncodedText(f.ToString("R", CultureInfo.InvariantCulture));
+                }
+                else
+                {
+                    EncodedText(Convert.ToString(value, CultureInfo.InvariantCulture));
+                }
             }
         }
+
+        protected void GenerateNumber(object value, SpecialType specialType)
+            => GenerateNumber(value, SemanticModel.Compilation.GetSpecialType(specialType));
 
         protected void GenerateChar(char value)
         {
@@ -489,13 +465,9 @@ namespace Microsoft.VisualStudio.LanguageServices.Implementation.CodeModel.Metho
         }
 
         protected void GenerateThisReference()
-        {
-            ThisReferenceTag();
-        }
+            => ThisReferenceTag();
 
         protected void GenerateBaseReference()
-        {
-            BaseReferenceTag();
-        }
+            => BaseReferenceTag();
     }
 }

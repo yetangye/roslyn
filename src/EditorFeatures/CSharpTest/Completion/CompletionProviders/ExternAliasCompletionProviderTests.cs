@@ -1,12 +1,13 @@
-﻿// Copyright (c) Microsoft.  All Rights Reserved.  Licensed under the Apache License, Version 2.0.  See License.txt in the project root for license information.
+﻿// Licensed to the .NET Foundation under one or more agreements.
+// The .NET Foundation licenses this file to you under the MIT license.
+// See the LICENSE file in the project root for more information.
+
+#nullable disable
 
 using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Text;
 using System.Threading.Tasks;
-using Microsoft.CodeAnalysis.Completion.Providers;
 using Microsoft.CodeAnalysis.CSharp.Completion.Providers;
+using Microsoft.CodeAnalysis.Test.Utilities;
 using Roslyn.Test.Utilities;
 using Xunit;
 
@@ -14,15 +15,13 @@ namespace Microsoft.CodeAnalysis.Editor.CSharp.UnitTests.Completion.CompletionPr
 {
     public class ExternAliasCompletionProviderTests : AbstractCSharpCompletionProviderTests
     {
-        internal override ICompletionProvider CreateCompletionProvider()
-        {
-            return new ExternAliasCompletionProvider();
-        }
+        internal override Type GetCompletionProviderType()
+            => typeof(ExternAliasCompletionProvider);
 
         [Fact, Trait(Traits.Feature, Traits.Features.Completion)]
-        public void NoAliases()
+        public async Task NoAliases()
         {
-            VerifyNoItemsExist(@"
+            await VerifyNoItemsExistAsync(@"
 extern alias $$
 class C
 {
@@ -30,45 +29,46 @@ class C
         }
 
         [Fact, Trait(Traits.Feature, Traits.Features.Completion)]
-        public void ExternAlias()
+        [WorkItem(44423, "https://github.com/dotnet/roslyn/issues/44423")]
+        public async Task ExternAlias()
         {
             var markup = @"
 extern alias $$ ";
-            VerifyItemWithAliasedMetadataReferences(markup, "foo", "foo", 1, "C#", "C#", false);
+            await VerifyItemWithAliasedMetadataReferencesAsync(markup, "goo", "goo", 1, "C#", "C#", false);
         }
 
         [Fact, Trait(Traits.Feature, Traits.Features.Completion)]
-        public void NotAfterExternAlias()
+        public async Task NotAfterExternAlias()
         {
             var markup = @"
-extern alias foo $$ ";
-            VerifyItemWithAliasedMetadataReferences(markup, "foo", "foo", 0, "C#", "C#", false);
+extern alias goo $$ ";
+            await VerifyItemWithAliasedMetadataReferencesAsync(markup, "goo", "goo", 0, "C#", "C#", false);
         }
 
         [Fact, Trait(Traits.Feature, Traits.Features.Completion)]
-        public void NotGlobal()
+        public async Task NotGlobal()
         {
             var markup = @"
 extern alias $$ ";
-            VerifyItemWithAliasedMetadataReferences(markup, "foo", "global", 0, "C#", "C#", false);
+            await VerifyItemWithAliasedMetadataReferencesAsync(markup, "goo", "global", 0, "C#", "C#", false);
         }
 
         [Fact, Trait(Traits.Feature, Traits.Features.Completion)]
-        public void NotIfAlreadyUsed()
+        public async Task NotIfAlreadyUsed()
         {
             var markup = @"
-extern alias foo;
+extern alias goo;
 extern alias $$";
-            VerifyItemWithAliasedMetadataReferences(markup, "foo", "foo", 0, "C#", "C#", false);
+            await VerifyItemWithAliasedMetadataReferencesAsync(markup, "goo", "goo", 0, "C#", "C#", false);
         }
 
-        [WorkItem(1075278)]
+        [WorkItem(1075278, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/1075278")]
         [Fact, Trait(Traits.Feature, Traits.Features.Completion)]
-        public void NotInComment()
+        public async Task NotInComment()
         {
             var markup = @"
 extern alias // $$ ";
-            VerifyNoItemsExist(markup);
+            await VerifyNoItemsExistAsync(markup);
         }
     }
 }

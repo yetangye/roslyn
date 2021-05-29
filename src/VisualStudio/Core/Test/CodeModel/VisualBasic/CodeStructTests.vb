@@ -1,7 +1,11 @@
-' Copyright (c) Microsoft.  All Rights Reserved.  Licensed under the Apache License, Version 2.0.  See License.txt in the project root for license information.
+﻿' Licensed to the .NET Foundation under one or more agreements.
+' The .NET Foundation licenses this file to you under the MIT license.
+' See the LICENSE file in the project root for more information.
 
 Imports System.Runtime.InteropServices
+Imports System.Threading.Tasks
 Imports Microsoft.CodeAnalysis
+Imports Microsoft.CodeAnalysis.Test.Utilities
 Imports Microsoft.VisualStudio.LanguageServices.VisualBasic.CodeModel.Extenders
 Imports Microsoft.VisualStudio.LanguageServices.VisualBasic.CodeModel.Interop
 Imports Roslyn.Test.Utilities
@@ -11,8 +15,8 @@ Namespace Microsoft.VisualStudio.LanguageServices.UnitTests.CodeModel.VisualBasi
         Inherits AbstractCodeStructTests
 
 #Region "Parts tests"
-        <ConditionalFact(GetType(x86)), Trait(Traits.Feature, Traits.Features.CodeModel)>
-        Public Sub Parts1()
+        <WpfFact, Trait(Traits.Feature, Traits.Features.CodeModel)>
+        Public Sub TestParts1()
             Dim code =
 <Code>
 Structure $$S
@@ -22,8 +26,8 @@ End Structure
             TestParts(code, 1)
         End Sub
 
-        <ConditionalFact(GetType(x86)), Trait(Traits.Feature, Traits.Features.CodeModel)>
-        Public Sub Parts2()
+        <WpfFact, Trait(Traits.Feature, Traits.Features.CodeModel)>
+        Public Sub TestParts2()
             Dim code =
 <Code>
 Partial Structure $$S
@@ -33,8 +37,8 @@ End Structure
             TestParts(code, 1)
         End Sub
 
-        <ConditionalFact(GetType(x86)), Trait(Traits.Feature, Traits.Features.CodeModel)>
-        Public Sub Parts3()
+        <WpfFact, Trait(Traits.Feature, Traits.Features.CodeModel)>
+        Public Sub TestParts3()
             Dim code =
 <Code>
 Partial Structure $$S
@@ -49,13 +53,14 @@ End Structure
 #End Region
 
 #Region "AddAttribute tests"
-        <ConditionalFact(GetType(x86)), Trait(Traits.Feature, Traits.Features.CodeModel)>
-        Public Sub AddAttribute1()
+
+        <WpfFact, Trait(Traits.Feature, Traits.Features.CodeModel)>
+        Public Async Function TestAddAttribute1() As Task
             Dim code =
 <Code>
 Imports System
 
-Structure $$C
+Structure $$S
 End Structure
 </Code>
 
@@ -64,20 +69,20 @@ End Structure
 Imports System
 
 &lt;Serializable()&gt;
-Structure C
+Structure S
 End Structure
 </Code>
-            TestAddAttribute(code, expected, New AttributeData With {.Name = "Serializable"})
-        End Sub
+            Await TestAddAttribute(code, expected, New AttributeData With {.Name = "Serializable"})
+        End Function
 
-        <ConditionalFact(GetType(x86)), Trait(Traits.Feature, Traits.Features.CodeModel)>
-        Public Sub AddAttribute2()
+        <WpfFact, Trait(Traits.Feature, Traits.Features.CodeModel)>
+        Public Async Function TestAddAttribute2() As Task
             Dim code =
 <Code>
 Imports System
 
 &lt;Serializable&gt;
-Structure $$C
+Structure $$S
 End Structure
 </Code>
 
@@ -87,17 +92,42 @@ Imports System
 
 &lt;Serializable&gt;
 &lt;CLSCompliant(True)&gt;
-Structure C
+Structure S
 End Structure
 </Code>
-            TestAddAttribute(code, expected, New AttributeData With {.Name = "CLSCompliant", .Value = "True", .Position = 1})
-        End Sub
+            Await TestAddAttribute(code, expected, New AttributeData With {.Name = "CLSCompliant", .Value = "True", .Position = 1})
+        End Function
+
+        <WorkItem(2825, "https://github.com/dotnet/roslyn/issues/2825")>
+        <WpfFact, Trait(Traits.Feature, Traits.Features.CodeModel)>
+        Public Async Function TestAddAttribute_BelowDocComment() As Task
+            Dim code =
+<Code>
+Imports System
+
+''' &lt;summary&gt;&lt;/summary&gt;
+Structure $$S
+End Structure
+</Code>
+
+            Dim expected =
+<Code>
+Imports System
+
+''' &lt;summary&gt;&lt;/summary&gt;
+&lt;CLSCompliant(True)&gt;
+Structure S
+End Structure
+</Code>
+            Await TestAddAttribute(code, expected, New AttributeData With {.Name = "CLSCompliant", .Value = "True"})
+        End Function
+
 #End Region
 
 #Region "AddImplementedInterface tests"
 
-        <ConditionalFact(GetType(x86)), Trait(Traits.Feature, Traits.Features.CodeModel)>
-        Public Sub AddImplementedInterface1()
+        <WpfFact, Trait(Traits.Feature, Traits.Features.CodeModel)>
+        Public Async Function TestAddImplementedInterface1() As Task
             Dim code =
 <Code>
 Structure $$S
@@ -111,11 +141,11 @@ Structure S
 End Structure
 </Code>
 
-            TestAddImplementedInterface(code, "I", Nothing, expected)
-        End Sub
+            Await TestAddImplementedInterface(code, "I", Nothing, expected)
+        End Function
 
-        <ConditionalFact(GetType(x86)), Trait(Traits.Feature, Traits.Features.CodeModel)>
-        Public Sub AddImplementedInterface2()
+        <WpfFact, Trait(Traits.Feature, Traits.Features.CodeModel)>
+        Public Async Function TestAddImplementedInterface2() As Task
             Dim code =
 <Code>
 Structure $$S
@@ -131,11 +161,11 @@ Structure S
 End Structure
 </Code>
 
-            TestAddImplementedInterface(code, "J", Nothing, expected)
-        End Sub
+            Await TestAddImplementedInterface(code, "J", Nothing, expected)
+        End Function
 
-        <ConditionalFact(GetType(x86)), Trait(Traits.Feature, Traits.Features.CodeModel)>
-        Public Sub AddImplementedInterface3()
+        <WpfFact, Trait(Traits.Feature, Traits.Features.CodeModel)>
+        Public Async Function TestAddImplementedInterface3() As Task
             Dim code =
 <Code>
 Structure $$S
@@ -151,11 +181,11 @@ Structure S
 End Structure
 </Code>
 
-            TestAddImplementedInterface(code, "J", -1, expected)
-        End Sub
+            Await TestAddImplementedInterface(code, "J", -1, expected)
+        End Function
 
-        <ConditionalFact(GetType(x86)), Trait(Traits.Feature, Traits.Features.CodeModel)>
-        Public Sub AddImplementedInterface4()
+        <WpfFact, Trait(Traits.Feature, Traits.Features.CodeModel)>
+        Public Sub TestAddImplementedInterface4()
             Dim code =
 <Code>
 Structure $$S
@@ -169,8 +199,8 @@ End Structure
 
 #Region "RemoveImplementedInterface tests"
 
-        <ConditionalFact(GetType(x86)), Trait(Traits.Feature, Traits.Features.CodeModel)>
-        Public Sub RemoveImplementedInterface1()
+        <WpfFact, Trait(Traits.Feature, Traits.Features.CodeModel)>
+        Public Async Function TestRemoveImplementedInterface1() As Task
             Dim code =
 <Code>
 Structure $$S
@@ -183,11 +213,11 @@ End Structure
 Structure S
 End Structure
 </Code>
-            TestRemoveImplementedInterface(code, "I", expected)
-        End Sub
+            Await TestRemoveImplementedInterface(code, "I", expected)
+        End Function
 
-        <ConditionalFact(GetType(x86)), Trait(Traits.Feature, Traits.Features.CodeModel)>
-        Public Sub RemoveImplementedInterface2()
+        <WpfFact, Trait(Traits.Feature, Traits.Features.CodeModel)>
+        Public Sub TestRemoveImplementedInterface2()
             Dim code =
 <Code>
 Structure $$S
@@ -197,8 +227,8 @@ End Structure
             TestRemoveImplementedInterfaceThrows(Of COMException)(code, "I")
         End Sub
 
-        <ConditionalFact(GetType(x86)), Trait(Traits.Feature, Traits.Features.CodeModel)>
-        Public Sub RemoveImplementedInterface3()
+        <WpfFact, Trait(Traits.Feature, Traits.Features.CodeModel)>
+        Public Async Function TestRemoveImplementedInterface3() As Task
             Dim code =
 <Code>
 Structure $$S
@@ -212,11 +242,11 @@ Structure S
     Implements I
 End Structure
 </Code>
-            TestRemoveImplementedInterface(code, "J", expected)
-        End Sub
+            Await TestRemoveImplementedInterface(code, "J", expected)
+        End Function
 
-        <ConditionalFact(GetType(x86)), Trait(Traits.Feature, Traits.Features.CodeModel)>
-        Public Sub RemoveImplementedInterface4()
+        <WpfFact, Trait(Traits.Feature, Traits.Features.CodeModel)>
+        Public Async Function TestRemoveImplementedInterface4() As Task
             Dim code =
 <Code>
 Structure $$S
@@ -230,11 +260,11 @@ Structure S
     Implements J
 End Structure
 </Code>
-            TestRemoveImplementedInterface(code, "I", expected)
-        End Sub
+            Await TestRemoveImplementedInterface(code, "I", expected)
+        End Function
 
-        <ConditionalFact(GetType(x86)), Trait(Traits.Feature, Traits.Features.CodeModel)>
-        Public Sub RemoveImplementedInterface5()
+        <WpfFact, Trait(Traits.Feature, Traits.Features.CodeModel)>
+        Public Async Function TestRemoveImplementedInterface5() As Task
             Dim code =
 <Code>
 Structure $$S
@@ -248,17 +278,17 @@ Structure S
     Implements I, K
 End Structure
 </Code>
-            TestRemoveImplementedInterface(code, "J", expected)
-        End Sub
+            Await TestRemoveImplementedInterface(code, "J", expected)
+        End Function
 
 #End Region
 
 #Region "Set Name tests"
-        <ConditionalFact(GetType(x86)), Trait(Traits.Feature, Traits.Features.CodeModel)>
-        Sub SetName1()
+        <WpfFact, Trait(Traits.Feature, Traits.Features.CodeModel)>
+        Public Async Function TestSetName1() As Task
             Dim code =
 <Code>
-Structure $$Foo
+Structure $$Goo
 End Structure
 </Code>
 
@@ -268,14 +298,14 @@ Structure Bar
 End Structure
 </Code>
 
-            TestSetName(code, expected, "Bar", NoThrow(Of String)())
-        End Sub
+            Await TestSetName(code, expected, "Bar", NoThrow(Of String)())
+        End Function
 #End Region
 
 #Region "GenericExtender"
 
-        <ConditionalFact(GetType(x86)), Trait(Traits.Feature, Traits.Features.CodeModel)>
-        Sub GenericExtender_GetBaseTypesCount()
+        <WpfFact, Trait(Traits.Feature, Traits.Features.CodeModel)>
+        Public Sub TestGenericExtender_GetBaseTypesCount()
             Dim code =
 <Code>
 Structure S$$
@@ -285,8 +315,8 @@ End Structure
             TestGenericNameExtender_GetBaseTypesCount(code, 1)
         End Sub
 
-        <ConditionalFact(GetType(x86)), Trait(Traits.Feature, Traits.Features.CodeModel)>
-        Sub GenericExtender_GetBaseGenericName()
+        <WpfFact, Trait(Traits.Feature, Traits.Features.CodeModel)>
+        Public Sub TestGenericExtender_GetBaseGenericName()
             Dim code =
 <Code>
 Structure S$$
@@ -296,8 +326,8 @@ End Structure
             TestGenericNameExtender_GetBaseGenericName(code, 1, "System.ValueType")
         End Sub
 
-        <ConditionalFact(GetType(x86)), Trait(Traits.Feature, Traits.Features.CodeModel)>
-        Sub GenericExtender_GetImplementedTypesCount1()
+        <WpfFact, Trait(Traits.Feature, Traits.Features.CodeModel)>
+        Public Sub TestGenericExtender_GetImplementedTypesCount1()
             Dim code =
 <Code>
 Structure S$$
@@ -307,17 +337,17 @@ End Structure
             TestGenericNameExtender_GetImplementedTypesCount(code, 0)
         End Sub
 
-        <ConditionalFact(GetType(x86)), Trait(Traits.Feature, Traits.Features.CodeModel)>
-        Sub GenericExtender_GetImplementedTypesCount2()
+        <WpfFact, Trait(Traits.Feature, Traits.Features.CodeModel)>
+        Public Sub TestGenericExtender_GetImplementedTypesCount2()
             Dim code =
 <Code>
 Namespace N
     Structure S$$
-        Implements IFoo(Of Integer)
+        Implements IGoo(Of Integer)
 
     End Structure
 
-    Interface IFoo(Of T)
+    Interface IGoo(Of T)
     End Interface
 End Namespace
 </Code>
@@ -325,8 +355,8 @@ End Namespace
             TestGenericNameExtender_GetImplementedTypesCount(code, 1)
         End Sub
 
-        <ConditionalFact(GetType(x86)), Trait(Traits.Feature, Traits.Features.CodeModel)>
-        Sub GenericExtender_GetImplTypeGenericName1()
+        <WpfFact, Trait(Traits.Feature, Traits.Features.CodeModel)>
+        Public Sub TestGenericExtender_GetImplTypeGenericName1()
             Dim code =
 <Code>
 Structure S$$
@@ -336,22 +366,22 @@ End Structure
             TestGenericNameExtender_GetImplTypeGenericName(code, 1, Nothing)
         End Sub
 
-        <ConditionalFact(GetType(x86)), Trait(Traits.Feature, Traits.Features.CodeModel)>
-        Sub GenericExtender_GetImplTypeGenericName2()
+        <WpfFact, Trait(Traits.Feature, Traits.Features.CodeModel)>
+        Public Sub TestGenericExtender_GetImplTypeGenericName2()
             Dim code =
 <Code>
 Namespace N
     Structure S$$
-        Implements IFoo(Of Integer)
+        Implements IGoo(Of Integer)
 
     End Structure
 
-    Interface IFoo(Of T)
+    Interface IGoo(Of T)
     End Interface
 End Namespace
 </Code>
 
-            TestGenericNameExtender_GetImplTypeGenericName(code, 1, "N.IFoo(Of Integer)")
+            TestGenericNameExtender_GetImplTypeGenericName(code, 1, "N.IGoo(Of Integer)")
         End Sub
 
 #End Region

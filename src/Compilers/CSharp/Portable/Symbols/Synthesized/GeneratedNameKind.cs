@@ -1,4 +1,10 @@
-﻿// Copyright (c) Microsoft.  All Rights Reserved.  Licensed under the Apache License, Version 2.0.  See License.txt in the project root for license information.
+﻿// Licensed to the .NET Foundation under one or more agreements.
+// The .NET Foundation licenses this file to you under the MIT license.
+// See the LICENSE file in the project root for more information.
+
+#nullable disable
+
+using System;
 
 namespace Microsoft.CodeAnalysis.CSharp.Symbols
 {
@@ -13,6 +19,7 @@ namespace Microsoft.CodeAnalysis.CSharp.Symbols
         LambdaMethod = 'b',
         LambdaDisplayClass = 'c',
         StateMachineType = 'd',
+        LocalFunction = 'g', // note collision with Deprecated_InitializerLocal, however this one is only used for method names
 
         // Used by EnC:
         AwaiterField = 'u',
@@ -25,6 +32,9 @@ namespace Microsoft.CodeAnalysis.CSharp.Symbols
         ReusableHoistedLocalField = '7',
         LambdaCacheField = '9',
         FixedBufferField = 'e',
+        AnonymousType = 'f',
+        TransparentIdentifier = 'h',
+        AnonymousTypeField = 'i',
         AutoPropertyBackingField = 'k',
         IteratorCurrentThreadIdField = 'l',
         IteratorFinallyMethod = 'm',
@@ -32,6 +42,24 @@ namespace Microsoft.CodeAnalysis.CSharp.Symbols
         AsyncBuilderField = 't',
         DynamicCallSiteContainerType = 'o',
         DynamicCallSiteField = 'p',
+        AsyncIteratorPromiseOfValueOrEndBackingField = 'v',
+        DisposeModeField = 'w',
+        CombinedTokensField = 'x', // last
+
+        // Deprecated - emitted by Dev12, but not by Roslyn.
+        // Don't reuse the values because the debugger might encounter them when consuming old binaries.
+        [Obsolete]
+        Deprecated_OuterscopeLocals = '6',
+        [Obsolete]
+        Deprecated_IteratorInstance = 'a',
+        [Obsolete]
+        Deprecated_InitializerLocal = 'g',
+        [Obsolete]
+        Deprecated_AnonymousTypeTypeParameter = 'j',
+        [Obsolete]
+        Deprecated_DynamicDelegate = 'q',
+        [Obsolete]
+        Deprecated_ComrefCallLocal = 'r',
     }
 
     internal static class GeneratedNameKindExtensions

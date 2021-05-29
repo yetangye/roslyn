@@ -1,19 +1,17 @@
-﻿// Copyright (c) Microsoft.  All Rights Reserved.  Licensed under the Apache License, Version 2.0.  See License.txt in the project root for license information.
+﻿// Licensed to the .NET Foundation under one or more agreements.
+// The .NET Foundation licenses this file to you under the MIT license.
+// See the LICENSE file in the project root for more information.
+
+#nullable disable
 
 using System;
 using System.Collections.Generic;
 using System.Composition;
 using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
 using Microsoft.CodeAnalysis;
-using Microsoft.CodeAnalysis.Editor;
-using Microsoft.CodeAnalysis.Editor.Implementation.InlineRename;
-using Microsoft.CodeAnalysis.Editor.Shared.Extensions;
 using Microsoft.CodeAnalysis.Host;
 using Microsoft.CodeAnalysis.Host.Mef;
 using Microsoft.VisualStudio.Text;
-using Microsoft.VisualStudio.Text.Editor;
 using Microsoft.VisualStudio.Text.Operations;
 using Roslyn.Utilities;
 
@@ -25,15 +23,12 @@ namespace Microsoft.CodeAnalysis.Editor.Implementation.InlineRename
         private readonly InlineRenameService _inlineRenameService;
 
         [ImportingConstructor]
+        [Obsolete(MefConstruction.ImportingConstructorMessage, error: true)]
         public UndoManagerServiceFactory(InlineRenameService inlineRenameService)
-        {
-            _inlineRenameService = inlineRenameService;
-        }
+            => _inlineRenameService = inlineRenameService;
 
         public IWorkspaceService CreateService(HostWorkspaceServices workspaceServices)
-        {
-            return new InlineRenameUndoManager(_inlineRenameService);
-        }
+            => new InlineRenameUndoManager(_inlineRenameService);
 
         internal class InlineRenameUndoManager : AbstractInlineRenameUndoManager<InlineRenameUndoManager.BufferUndoState>, IInlineRenameUndoManager
         {
@@ -48,11 +43,10 @@ namespace Microsoft.CodeAnalysis.Editor.Implementation.InlineRename
             {
             }
 
-            public void CreateStartRenameUndoTransaction(Workspace workspace, ITextBuffer subjectBuffer, InlineRenameSession inlineRenameSession)
+            public void CreateStartRenameUndoTransaction(Workspace workspace, ITextBuffer subjectBuffer, IInlineRenameSession inlineRenameSession)
             {
                 var textUndoHistoryService = workspace.Services.GetService<ITextUndoHistoryWorkspaceService>();
-                ITextUndoHistory undoHistory;
-                Contract.ThrowIfFalse(textUndoHistoryService.TryGetTextUndoHistory(workspace, subjectBuffer, out undoHistory));
+                Contract.ThrowIfFalse(textUndoHistoryService.TryGetTextUndoHistory(workspace, subjectBuffer, out var undoHistory));
                 UndoManagers[subjectBuffer] = new BufferUndoState() { TextUndoHistory = undoHistory };
                 CreateStartRenameUndoTransaction(subjectBuffer);
             }
@@ -62,12 +56,11 @@ namespace Microsoft.CodeAnalysis.Editor.Implementation.InlineRename
                 var undoHistory = this.UndoManagers[subjectBuffer].TextUndoHistory;
 
                 // Create an undo transaction to mark the starting point of the rename session in this buffer
-                using (var undoTransaction = undoHistory.CreateTransaction(EditorFeaturesResources.StartRename))
-                {
-                    undoTransaction.Complete();
-                    this.UndoManagers[subjectBuffer].StartRenameSessionUndoTransaction = undoTransaction;
-                    this.UndoManagers[subjectBuffer].ConflictResolutionUndoTransaction = null;
-                }
+                using var undoTransaction = undoHistory.CreateTransaction(EditorFeaturesResources.Start_Rename);
+
+                undoTransaction.Complete();
+                this.UndoManagers[subjectBuffer].StartRenameSessionUndoTransaction = undoTransaction;
+                this.UndoManagers[subjectBuffer].ConflictResolutionUndoTransaction = null;
             }
 
             public void CreateConflictResolutionUndoTransaction(ITextBuffer subjectBuffer, Action applyEdit)
@@ -84,23 +77,19 @@ namespace Microsoft.CodeAnalysis.Editor.Implementation.InlineRename
                     undoHistory.Undo(1);
                 }
 
-                using (var undoTransaction = undoHistory.CreateTransaction(EditorFeaturesResources.StartRename))
-                {
-                    applyEdit();
-                    undoTransaction.Complete();
-                    UndoManagers[subjectBuffer].ConflictResolutionUndoTransaction = undoTransaction;
-                }
+                using var undoTransaction = undoHistory.CreateTransaction(EditorFeaturesResources.Start_Rename);
+
+                applyEdit();
+                undoTransaction.Complete();
+                UndoManagers[subjectBuffer].ConflictResolutionUndoTransaction = undoTransaction;
             }
 
             public void UndoTemporaryEdits(ITextBuffer subjectBuffer, bool disconnect)
-            {
-                UndoTemporaryEdits(subjectBuffer, disconnect, true);
-            }
+                => UndoTemporaryEdits(subjectBuffer, disconnect, true);
 
             protected override void UndoTemporaryEdits(ITextBuffer subjectBuffer, bool disconnect, bool undoConflictResolution)
             {
-                BufferUndoState bufferUndoState;
-                if (!this.UndoManagers.TryGetValue(subjectBuffer, out bufferUndoState))
+                if (!this.UndoManagers.TryGetValue(subjectBuffer, out var bufferUndoState))
                 {
                     return;
                 }
@@ -132,10 +121,8 @@ namespace Microsoft.CodeAnalysis.Editor.Implementation.InlineRename
                 var undoHistory = this.UndoManagers[subjectBuffer].TextUndoHistory;
                 foreach (var state in this.RedoStack.Reverse())
                 {
-                    using (var transaction = undoHistory.CreateTransaction(GetUndoTransactionDescription(state.ReplacementText)))
-                    {
-                        transaction.Complete();
-                    }
+                    using var transaction = undoHistory.CreateTransaction(GetUndoTransactionDescription(state.ReplacementText));
+                    transaction.Complete();
                 }
 
                 if (this.RedoStack.Any())

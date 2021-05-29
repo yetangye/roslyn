@@ -1,26 +1,35 @@
-﻿' Copyright (c) Microsoft.  All Rights Reserved.  Licensed under the Apache License, Version 2.0.  See License.txt in the project root for license information.
+﻿' Licensed to the .NET Foundation under one or more agreements.
+' The .NET Foundation licenses this file to you under the MIT license.
+' See the LICENSE file in the project root for more information.
 
 Imports System.Globalization
+Imports System.Threading
 Imports Microsoft.CodeAnalysis.VisualBasic
 Imports Microsoft.CodeAnalysis.VisualBasic.Syntax
 
 Namespace Microsoft.CodeAnalysis.VisualBasic
     Friend NotInheritable Class MessageProvider
         Inherits CommonMessageProvider
-        Implements IObjectWritable, IObjectReadable
+        Implements IObjectWritable
 
         Public Shared ReadOnly Instance As MessageProvider = New MessageProvider()
+
+        Shared Sub New()
+            ObjectBinder.RegisterTypeReader(GetType(MessageProvider), Function(r) Instance)
+        End Sub
 
         Private Sub New()
         End Sub
 
+        Private ReadOnly Property IObjectWritable_ShouldReuseInSerialization As Boolean Implements IObjectWritable.ShouldReuseInSerialization
+            Get
+                Return True
+            End Get
+        End Property
+
         Private Sub WriteTo(writer As ObjectWriter) Implements IObjectWritable.WriteTo
             ' don't write anything since we always return the shared 'Instance' when read.
         End Sub
-
-        Private Function GetReader() As Func(Of ObjectReader, Object) Implements IObjectReadable.GetReader
-            Return Function(r) Instance
-        End Function
 
         Public Overrides ReadOnly Property CodePrefix As String
             Get
@@ -85,7 +94,7 @@ Namespace Microsoft.CodeAnalysis.VisualBasic
             End If
         End Function
 
-        Overrides ReadOnly Property ErrorCodeType As Type
+        Public Overrides ReadOnly Property ErrorCodeType As Type
             Get
                 Return GetType(ERRID)
             End Get
@@ -95,26 +104,13 @@ Namespace Microsoft.CodeAnalysis.VisualBasic
             Return New VBDiagnostic(ErrorFactory.ErrorInfo(CType(code, ERRID), args), location)
         End Function
 
-        Public Overrides Function ConvertSymbolToString(errorCode As Integer, symbol As ISymbol) As String
-            ' show extra info for assembly if possible such as version, publictoken and etc
+        Public Overrides Function CreateDiagnostic(info As DiagnosticInfo) As Diagnostic
+            Return New VBDiagnostic(info, Location.None)
+        End Function
+
+        Public Overrides Function GetErrorDisplayString(symbol As ISymbol) As String
+            ' show extra info for assembly if possible such as version, public key token etc.
             If symbol.Kind = SymbolKind.Assembly OrElse symbol.Kind = SymbolKind.Namespace Then
-                Return symbol.ToString()
-            End If
-
-            ' cases where we actually want fully qualified name
-            If errorCode = ERRID.ERR_AmbiguousAcrossInterfaces3 OrElse
-               errorCode = ERRID.ERR_TypeConflict6 OrElse
-               errorCode = ERRID.ERR_ExportedTypesConflict OrElse
-               errorCode = ERRID.ERR_ForwardedTypeConflictsWithDeclaration OrElse
-               errorCode = ERRID.ERR_ForwardedTypeConflictsWithExportedType OrElse
-               errorCode = ERRID.ERR_ForwardedTypesConflict Then
-                Return symbol.ToString()
-            End If
-
-            ' show fully qualified name for missing special types
-            If errorCode = ERRID.ERR_UnreferencedAssembly3 AndAlso
-               TypeOf symbol Is ITypeSymbol AndAlso
-               DirectCast(symbol, ITypeSymbol).SpecialType <> SpecialType.None Then
                 Return symbol.ToString()
             End If
 
@@ -129,13 +125,17 @@ Namespace Microsoft.CodeAnalysis.VisualBasic
         End Function
 
         Public Overrides Function GetDiagnosticReport(diagnosticInfo As DiagnosticInfo, options As CompilationOptions) As ReportDiagnostic
+            Dim hasSourceSuppression = False
             Return VisualBasicDiagnosticFilter.GetDiagnosticReport(diagnosticInfo.Severity,
                                                                    True,
                                                                    diagnosticInfo.MessageIdentifier,
                                                                    Location.None,
                                                                    diagnosticInfo.Category,
                                                                    options.GeneralDiagnosticOption,
-                                                                   options.SpecificDiagnosticOptions)
+                                                                   options.SpecificDiagnosticOptions,
+                                                                   options.SyntaxTreeOptionsProvider,
+                                                                   CancellationToken.None, ' We don't have a tree so there's no need to pass cancellation to the SyntaxTreeOptionsProvider
+                                                                   hasSourceSuppression)
         End Function
 
 
@@ -145,10 +145,16 @@ Namespace Microsoft.CodeAnalysis.VisualBasic
             End Get
         End Property
 
-        ' command line:
-        Public Overrides ReadOnly Property ERR_NoScriptsSpecified As Integer
+        Public Overrides ReadOnly Property ERR_MultipleAnalyzerConfigsInSameDir As Integer
             Get
-                Return ERRID.ERR_NoScriptsSpecified
+                Return ERRID.ERR_MultipleAnalyzerConfigsInSameDir
+            End Get
+        End Property
+
+        ' command line:
+        Public Overrides ReadOnly Property ERR_ExpectedSingleScript As Integer
+            Get
+                Return ERRID.ERR_ExpectedSingleScript
             End Get
         End Property
 
@@ -158,9 +164,15 @@ Namespace Microsoft.CodeAnalysis.VisualBasic
             End Get
         End Property
 
-        Public Overrides ReadOnly Property FTL_InputFileNameTooLong As Integer
+        Public Overrides ReadOnly Property ERR_InvalidPathMap As Integer
             Get
-                Return ERRID.FTL_InputFileNameTooLong
+                Return ERRID.ERR_InvalidPathMap
+            End Get
+        End Property
+
+        Public Overrides ReadOnly Property FTL_InvalidInputFileName As Integer
+            Get
+                Return ERRID.FTL_InvalidInputFileName
             End Get
         End Property
 
@@ -218,6 +230,12 @@ Namespace Microsoft.CodeAnalysis.VisualBasic
             End Get
         End Property
 
+        Public Overrides ReadOnly Property WRN_AnalyzerReferencesFramework As Integer
+            Get
+                Return ERRID.WRN_AnalyzerReferencesFramework
+            End Get
+        End Property
+
         Public Overrides ReadOnly Property INF_UnableToLoadSomeTypesInAnalyzer As Integer
             Get
                 Return ERRID.INF_UnableToLoadSomeTypesInAnalyzer
@@ -227,6 +245,41 @@ Namespace Microsoft.CodeAnalysis.VisualBasic
         Public Overrides ReadOnly Property ERR_CantReadRulesetFile As Integer
             Get
                 Return ERRID.ERR_CantReadRulesetFile
+            End Get
+        End Property
+
+        Public Overrides ReadOnly Property ERR_CompileCancelled As Integer
+            Get
+                ' TODO: Add an error code for CompileCancelled
+                Return ERRID.ERR_None
+            End Get
+        End Property
+
+        ' parse options:
+
+        Public Overrides ReadOnly Property ERR_BadSourceCodeKind As Integer
+            Get
+                Return ERRID.ERR_BadSourceCodeKind
+            End Get
+        End Property
+
+        Public Overrides ReadOnly Property ERR_BadDocumentationMode As Integer
+            Get
+                Return ERRID.ERR_BadDocumentationMode
+            End Get
+        End Property
+
+        ' compilation options:
+
+        Public Overrides ReadOnly Property ERR_BadCompilationOptionValue As Integer
+            Get
+                Return ERRID.ERR_InvalidSwitchValue
+            End Get
+        End Property
+
+        Public Overrides ReadOnly Property ERR_MutuallyExclusiveOptions As Integer
+            Get
+                Return ERRID.ERR_MutuallyExclusiveOptions
             End Get
         End Property
 
@@ -256,6 +309,17 @@ Namespace Microsoft.CodeAnalysis.VisualBasic
             End Get
         End Property
 
+        Public Overrides ReadOnly Property ERR_InvalidHashAlgorithmName As Integer
+            Get
+                Return ERRID.ERR_InvalidHashAlgorithmName
+            End Get
+        End Property
+
+        Public Overrides ReadOnly Property ERR_InvalidInstrumentationKind As Integer
+            Get
+                Return ERRID.ERR_InvalidInstrumentationKind
+            End Get
+        End Property
 
         ' reference manager:
         Public Overrides ReadOnly Property ERR_MetadataFileNotAssembly As Integer
@@ -345,6 +409,12 @@ Namespace Microsoft.CodeAnalysis.VisualBasic
             End Get
         End Property
 
+        Public Overrides ReadOnly Property ERR_OptionMustBeAbsolutePath As Integer
+            Get
+                Return ERRID.ERR_OptionMustBeAbsolutePath
+            End Get
+        End Property
+
         ' resources:
         Public Overrides ReadOnly Property ERR_CantOpenWin32Resource As Integer
             Get
@@ -402,42 +472,48 @@ Namespace Microsoft.CodeAnalysis.VisualBasic
             End Get
         End Property
 
-        Public Overrides Sub ReportInvalidAttributeArgument(diagnostics As DiagnosticBag, attributeSyntax As SyntaxNode, parameterIndex As Integer, attribute As AttributeData)
+        Protected Overrides Sub ReportInvalidAttributeArgument(diagnostics As DiagnosticBag, attributeSyntax As SyntaxNode, parameterIndex As Integer, attribute As AttributeData)
             Dim node = DirectCast(attributeSyntax, AttributeSyntax)
             diagnostics.Add(ERRID.ERR_BadAttribute1, node.ArgumentList.Arguments(parameterIndex).GetLocation(), attribute.AttributeClass)
         End Sub
 
-        Public Overrides Sub ReportInvalidNamedArgument(diagnostics As DiagnosticBag, attributeSyntax As SyntaxNode, namedArgumentIndex As Integer, attributeClass As ITypeSymbol, parameterName As String)
+        Protected Overrides Sub ReportInvalidNamedArgument(diagnostics As DiagnosticBag, attributeSyntax As SyntaxNode, namedArgumentIndex As Integer, attributeClass As ITypeSymbol, parameterName As String)
             Dim node = DirectCast(attributeSyntax, AttributeSyntax)
             diagnostics.Add(ERRID.ERR_BadAttribute1, node.ArgumentList.Arguments(namedArgumentIndex).GetLocation(), attributeClass)
         End Sub
 
-        Public Overrides Sub ReportParameterNotValidForType(diagnostics As DiagnosticBag, attributeSyntax As SyntaxNode, namedArgumentIndex As Integer)
+        Protected Overrides Sub ReportParameterNotValidForType(diagnostics As DiagnosticBag, attributeSyntax As SyntaxNode, namedArgumentIndex As Integer)
             Dim node = DirectCast(attributeSyntax, AttributeSyntax)
             diagnostics.Add(ERRID.ERR_ParameterNotValidForType, node.ArgumentList.Arguments(namedArgumentIndex).GetLocation())
         End Sub
 
-        Public Overrides Sub ReportMarshalUnmanagedTypeNotValidForFields(diagnostics As DiagnosticBag, attributeSyntax As SyntaxNode, parameterIndex As Integer, unmanagedTypeName As String, attribute As AttributeData)
+        Protected Overrides Sub ReportMarshalUnmanagedTypeNotValidForFields(diagnostics As DiagnosticBag, attributeSyntax As SyntaxNode, parameterIndex As Integer, unmanagedTypeName As String, attribute As AttributeData)
             Dim node = DirectCast(attributeSyntax, AttributeSyntax)
             diagnostics.Add(ERRID.ERR_MarshalUnmanagedTypeNotValidForFields, node.ArgumentList.Arguments(parameterIndex).GetLocation(), unmanagedTypeName)
         End Sub
 
-        Public Overrides Sub ReportMarshalUnmanagedTypeOnlyValidForFields(diagnostics As DiagnosticBag, attributeSyntax As SyntaxNode, parameterIndex As Integer, unmanagedTypeName As String, attribute As AttributeData)
+        Protected Overrides Sub ReportMarshalUnmanagedTypeOnlyValidForFields(diagnostics As DiagnosticBag, attributeSyntax As SyntaxNode, parameterIndex As Integer, unmanagedTypeName As String, attribute As AttributeData)
             Dim node = DirectCast(attributeSyntax, AttributeSyntax)
             diagnostics.Add(ERRID.ERR_MarshalUnmanagedTypeOnlyValidForFields, node.ArgumentList.Arguments(parameterIndex).GetLocation(), unmanagedTypeName)
         End Sub
 
-        Public Overrides Sub ReportAttributeParameterRequired(diagnostics As DiagnosticBag, attributeSyntax As SyntaxNode, parameterName As String)
+        Protected Overrides Sub ReportAttributeParameterRequired(diagnostics As DiagnosticBag, attributeSyntax As SyntaxNode, parameterName As String)
             Dim node = DirectCast(attributeSyntax, AttributeSyntax)
             diagnostics.Add(ERRID.ERR_AttributeParameterRequired1, node.Name.GetLocation(), parameterName)
         End Sub
 
-        Public Overrides Sub ReportAttributeParameterRequired(diagnostics As DiagnosticBag, attributeSyntax As SyntaxNode, parameterName1 As String, parameterName2 As String)
+        Protected Overrides Sub ReportAttributeParameterRequired(diagnostics As DiagnosticBag, attributeSyntax As SyntaxNode, parameterName1 As String, parameterName2 As String)
             Dim node = DirectCast(attributeSyntax, AttributeSyntax)
             diagnostics.Add(ERRID.ERR_AttributeParameterRequired2, node.Name.GetLocation(), parameterName1, parameterName2)
         End Sub
 
         ' PDB Writer
+        Public Overrides ReadOnly Property ERR_EncodinglessSyntaxTree As Integer
+            Get
+                Return ERRID.ERR_EncodinglessSyntaxTree
+            End Get
+        End Property
+
         Public Overrides ReadOnly Property WRN_PdbUsingNameTooLong As Integer
             Get
                 Return ERRID.WRN_PdbUsingNameTooLong
@@ -468,6 +544,56 @@ Namespace Microsoft.CodeAnalysis.VisualBasic
                 Return ERRID.ERR_EncReferenceToAddedMember
             End Get
         End Property
+
+        Public Overrides ReadOnly Property ERR_TooManyUserStrings As Integer
+            Get
+                Return ERRID.ERR_TooManyUserStrings
+            End Get
+        End Property
+
+        Public Overrides ReadOnly Property ERR_PeWritingFailure As Integer
+            Get
+                Return ERRID.ERR_PeWritingFailure
+            End Get
+        End Property
+
+        Public Overrides ReadOnly Property ERR_ModuleEmitFailure As Integer
+            Get
+                Return ERRID.ERR_ModuleEmitFailure
+            End Get
+        End Property
+
+        Public Overrides ReadOnly Property ERR_EncUpdateFailedMissingAttribute As Integer
+            Get
+                Return ERRID.ERR_EncUpdateFailedMissingAttribute
+            End Get
+        End Property
+
+        Public Overrides ReadOnly Property ERR_BadAssemblyName As Integer
+            Get
+                Return ERRID.ERR_BadAssemblyName
+            End Get
+        End Property
+
+        Public Overrides ReadOnly Property ERR_InvalidDebugInfo As Integer
+            Get
+                Return ERRID.ERR_InvalidDebugInfo
+            End Get
+        End Property
+
+        ' Generators
+        Public Overrides ReadOnly Property WRN_GeneratorFailedDuringInitialization As Integer
+            Get
+                Return ERRID.WRN_GeneratorFailedDuringInitialization
+            End Get
+        End Property
+
+        Public Overrides ReadOnly Property WRN_GeneratorFailedDuringGeneration As Integer
+            Get
+                Return ERRID.WRN_GeneratorFailedDuringGeneration
+            End Get
+        End Property
+
     End Class
 
 End Namespace

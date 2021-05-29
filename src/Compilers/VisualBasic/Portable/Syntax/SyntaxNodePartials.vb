@@ -1,4 +1,6 @@
-﻿' Copyright (c) Microsoft.  All Rights Reserved.  Licensed under the Apache License, Version 2.0.  See License.txt in the project root for license information.
+﻿' Licensed to the .NET Foundation under one or more agreements.
+' The .NET Foundation licenses this file to you under the MIT license.
+' See the LICENSE file in the project root for more information.
 
 '-----------------------------------------------------------------------------------------------------------
 ' Contains hand-written Partial class extensions to certain of the syntax nodes (other that the 
@@ -12,15 +14,15 @@ Imports Microsoft.CodeAnalysis.VisualBasic.Syntax
 
 Namespace Microsoft.CodeAnalysis.VisualBasic.Syntax
 
-    Partial Class DocumentationCommentTriviaSyntax
+    Partial Public Class DocumentationCommentTriviaSyntax
         Friend Function GetInteriorXml() As String
             ' NOTE: is only used in parse tests
             Return DirectCast(Me.Green, InternalSyntax.DocumentationCommentTriviaSyntax).GetInteriorXml
         End Function
     End Class
 
-    Partial Class DirectiveTriviaSyntax
-        Private Shared ReadOnly hasDirectivesFunction As Func(Of SyntaxToken, Boolean) = Function(n) n.ContainsDirectives
+    Partial Public Class DirectiveTriviaSyntax
+        Private Shared ReadOnly s_hasDirectivesFunction As Func(Of SyntaxToken, Boolean) = Function(n) n.ContainsDirectives
 
         Public Function GetNextDirective(Optional predicate As Func(Of DirectiveTriviaSyntax, Boolean) = Nothing) As DirectiveTriviaSyntax
             Dim token = CType(MyBase.ParentTrivia.Token, SyntaxToken)
@@ -42,7 +44,7 @@ Namespace Microsoft.CodeAnalysis.VisualBasic.Syntax
                         [next] = True
                     End If
                 Next
-                token = token.GetNextToken(hasDirectivesFunction)
+                token = token.GetNextToken(s_hasDirectivesFunction)
             Loop
             Return Nothing
         End Function
@@ -64,13 +66,13 @@ Namespace Microsoft.CodeAnalysis.VisualBasic.Syntax
                         [next] = True
                     End If
                 Next
-                token = token.GetPreviousToken(hasDirectivesFunction)
+                token = token.GetPreviousToken(s_hasDirectivesFunction)
             Loop
             Return Nothing
         End Function
     End Class
 
-    Partial Class SingleLineLambdaExpressionSyntax
+    Partial Public Class SingleLineLambdaExpressionSyntax
         ''' <summary>
         ''' Single line subs only have a single statement.  However, when binding it is convenient to have a statement list.  For example,
         ''' dim statements are not valid in a single line lambda.  However, it is nice to be able to provide semantic info about the local.
@@ -87,7 +89,7 @@ Namespace Microsoft.CodeAnalysis.VisualBasic.Syntax
         End Property
     End Class
 
-    Partial Class MethodBaseSyntax
+    Partial Public Class MethodBaseSyntax
 
         Friend ReadOnly Property AsClauseInternal As AsClauseSyntax
             Get

@@ -1,4 +1,6 @@
-﻿// Copyright (c) Microsoft.  All Rights Reserved.  Licensed under the Apache License, Version 2.0.  See License.txt in the project root for license information.
+﻿// Licensed to the .NET Foundation under one or more agreements.
+// The .NET Foundation licenses this file to you under the MIT license.
+// See the LICENSE file in the project root for more information.
 
 using Microsoft.CodeAnalysis.CodeActions;
 
@@ -21,15 +23,6 @@ namespace Microsoft.CodeAnalysis.CodeFixes
         /// <see cref="ApplyChangesOperation"/> present within the individual diagnostic fixes. Other types of
         /// operations present within these fixes are ignored.
         /// </remarks>
-        public static readonly FixAllProvider BatchFixer = BatchFixAllProvider.Instance;
-
-        /// <summary>
-        /// Default batch fix all provider for simplification fixers which only add Simplifier annotations to documents.
-        /// This provider batches all the simplifier annotation actions within a document into a single code action,
-        /// instead of creating separate code actions for each added annotation.
-        /// This fixer supports fixes for the following fix all scopes:
-        /// <see cref="FixAllScope.Document"/>, <see cref="FixAllScope.Project"/> and <see cref="FixAllScope.Solution"/>.
-        /// </summary>
-        internal static readonly FixAllProvider BatchSimplificationFixer = BatchSimplificationFixAllProvider.Instance;
+        public static FixAllProvider BatchFixer => BatchFixAllProvider.Instance;
     }
 }

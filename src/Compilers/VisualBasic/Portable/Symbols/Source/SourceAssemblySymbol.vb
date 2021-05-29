@@ -1,4 +1,6 @@
-﻿' Copyright (c) Microsoft.  All Rights Reserved.  Licensed under the Apache License, Version 2.0.  See License.txt in the project root for license information.
+﻿' Licensed to the .NET Foundation under one or more agreements.
+' The .NET Foundation licenses this file to you under the MIT license.
+' See the LICENSE file in the project root for more information.
 
 Imports System.Collections.Concurrent
 Imports System.Collections.Immutable
@@ -6,7 +8,10 @@ Imports System.Reflection
 Imports System.Reflection.Metadata
 Imports System.Runtime.CompilerServices
 Imports System.Runtime.InteropServices
+Imports System.Security.Cryptography
 Imports System.Threading
+Imports Microsoft.CodeAnalysis.PooledObjects
+Imports Microsoft.CodeAnalysis.Symbols
 Imports Microsoft.CodeAnalysis.VisualBasic.Symbols
 Imports Microsoft.CodeAnalysis.VisualBasic.Symbols.Metadata.PE
 Imports Microsoft.CodeAnalysis.VisualBasic.Syntax
@@ -18,17 +23,17 @@ Namespace Microsoft.CodeAnalysis.VisualBasic.Symbols
     ''' Represents an assembly built by compiler.
     ''' </summary>
     ''' <remarks></remarks>
-    Friend NotInheritable Class SourceAssemblySymbol
+    Partial Friend NotInheritable Class SourceAssemblySymbol
         Inherits MetadataOrSourceAssemblySymbol
-        Implements IAttributeTargetSymbol
+        Implements ISourceAssemblySymbol, ISourceAssemblySymbolInternal, IAttributeTargetSymbol
 
         ''' <summary>
         ''' A Compilation the assembly is created for.
         ''' </summary>
         ''' <remarks></remarks>
-        Private ReadOnly m_Compilation As VisualBasicCompilation
+        Private ReadOnly _compilation As VisualBasicCompilation
 
-        Private m_lazyStrongNameKeys As StrongNameKeys
+        Private _lazyStrongNameKeys As StrongNameKeys
 
         ''' <summary>
         ''' Assembly's identity.
@@ -40,11 +45,11 @@ Namespace Microsoft.CodeAnalysis.VisualBasic.Symbols
         ''' A list of modules the assembly consists of. 
         ''' The first (index=0) module is a SourceModuleSymbol, which is a primary module, the rest are net-modules.
         ''' </summary>
-        Private ReadOnly m_Modules As ImmutableArray(Of ModuleSymbol)
+        Private ReadOnly _modules As ImmutableArray(Of ModuleSymbol)
 
-        Private m_lazySourceAttributesBag As CustomAttributesBag(Of VisualBasicAttributeData)
+        Private _lazySourceAttributesBag As CustomAttributesBag(Of VisualBasicAttributeData)
 
-        Private m_lazyNetModuleAttributesBag As CustomAttributesBag(Of VisualBasicAttributeData)
+        Private _lazyNetModuleAttributesBag As CustomAttributesBag(Of VisualBasicAttributeData)
 
         ''' <summary>
         ''' Indices of duplicate assembly attributes, i.e. attributes that bind to the same constructor and have identical arguments, that must not be emitted.
@@ -52,22 +57,23 @@ Namespace Microsoft.CodeAnalysis.VisualBasic.Symbols
         ''' <remarks>
         ''' These indices correspond to the merged assembly attributes from source and added net modules, i.e. attributes returned by <see cref="GetAttributes"/> method.
         ''' </remarks>
-        Private m_lazyDuplicateAttributeIndices As HashSet(Of Integer)
+        Private _lazyDuplicateAttributeIndices As HashSet(Of Integer)
 
-        Private m_lazyEmitExtensionAttribute As Byte = ThreeState.Unknown
+        Private _lazyEmitExtensionAttribute As Byte = ThreeState.Unknown
 
-        Private m_lazyIsVbRuntime As ThreeState = ThreeState.Unknown
+        Private _lazyIsVbRuntime As ThreeState = ThreeState.Unknown
 
-        Private m_lazyAssemblyLevelDeclarationErrors As ImmutableArray(Of Diagnostic)
+        Private _lazyAssemblyLevelDeclarationErrors As ImmutableArray(Of Diagnostic)
+        Private _lazyAssemblyLevelDeclarationDependencies As ImmutableArray(Of AssemblySymbol)
 
-        Private ReadOnly m_AssemblySimpleName As String
+        Private ReadOnly _assemblySimpleName As String
 
         'This maps from assembly name to a set of public keys. It uses concurrent dictionaries because it is built,
         'one attribute at a time, in the callback that validates an attribute's application to a symbol. It is assumed
         'to be complete after a call to GetAttributes(). The second dictionary is acting like a set. The value element is
         'only used when the key is empty in which case it stores the location and value of the attribute string which
         'may be used to construct a diagnostic if the assembly being compiled is found to be strong named.
-        Private m_lazyInternalsVisibleToMap As ConcurrentDictionary(Of String, ConcurrentDictionary(Of ImmutableArray(Of Byte), Tuple(Of Location, String)))
+        Private _lazyInternalsVisibleToMap As ConcurrentDictionary(Of String, ConcurrentDictionary(Of ImmutableArray(Of Byte), Tuple(Of Location, String)))
 
         Friend Sub New(compilation As VisualBasicCompilation,
                        assemblySimpleName As String,
@@ -75,12 +81,12 @@ Namespace Microsoft.CodeAnalysis.VisualBasic.Symbols
                        netModules As ImmutableArray(Of PEModule))
 
             Debug.Assert(compilation IsNot Nothing)
-            Debug.Assert(Not String.IsNullOrWhiteSpace(assemblySimpleName))
+            Debug.Assert(assemblySimpleName IsNot Nothing)
             Debug.Assert(Not String.IsNullOrWhiteSpace(moduleName))
             Debug.Assert(Not netModules.IsDefault)
 
-            m_Compilation = compilation
-            m_AssemblySimpleName = assemblySimpleName
+            _compilation = compilation
+            _assemblySimpleName = assemblySimpleName
 
             Dim moduleBuilder As New ArrayBuilder(Of ModuleSymbol)(1 + netModules.Length)
 
@@ -96,8 +102,12 @@ Namespace Microsoft.CodeAnalysis.VisualBasic.Symbols
                 ' a fresh manager, in CreateSourceAssemblyReuseData for a reused one).
             Next
 
-            m_Modules = moduleBuilder.ToImmutableAndFree()
+            _modules = moduleBuilder.ToImmutableAndFree()
 
+            If Not compilation.Options.CryptoPublicKey.IsEmpty Then
+                ' Private key Is Not necessary for assembly identity, only when emitting.  For this reason, the private key can remain null.
+                _lazyStrongNameKeys = StrongNameKeys.Create(compilation.Options.CryptoPublicKey, privateKey:=Nothing, hasCounterSignature:=False, MessageProvider.Instance)
+            End If
         End Sub
 
         ''' <summary>
@@ -105,21 +115,21 @@ Namespace Microsoft.CodeAnalysis.VisualBasic.Symbols
         ''' </summary>
         Friend Overrides ReadOnly Property DeclaringCompilation As VisualBasicCompilation
             Get
-                Return m_Compilation
+                Return _compilation
             End Get
         End Property
 
 
         Public Overrides ReadOnly Property IsInteractive As Boolean
             Get
-                Return m_Compilation.IsSubmission
+                Return _compilation.IsSubmission
             End Get
         End Property
 
         Friend Function MightContainNoPiaLocalTypes() As Boolean
 
-            For i As Integer = 1 To m_Modules.Length - 1
-                Dim peModuleSymbol = DirectCast(m_Modules(i), Symbols.Metadata.PE.PEModuleSymbol)
+            For i As Integer = 1 To _modules.Length - 1
+                Dim peModuleSymbol = DirectCast(_modules(i), Symbols.Metadata.PE.PEModuleSymbol)
                 If peModuleSymbol.[Module].ContainsNoPiaLocalTypes() Then
                     Return True
                 End If
@@ -139,7 +149,7 @@ Namespace Microsoft.CodeAnalysis.VisualBasic.Symbols
         End Property
 
         Friend Overrides Function GetSpecialTypeMember(member As SpecialMember) As Symbol
-            If m_Compilation.IsMemberMissing(member) Then
+            If _compilation.IsMemberMissing(member) Then
                 Return Nothing
             End If
 
@@ -148,7 +158,7 @@ Namespace Microsoft.CodeAnalysis.VisualBasic.Symbols
 
         Public Overrides ReadOnly Property Name As String
             Get
-                Return m_AssemblySimpleName
+                Return _assemblySimpleName
             End Get
         End Property
 
@@ -217,7 +227,7 @@ Namespace Microsoft.CodeAnalysis.VisualBasic.Symbols
             Return uniqueAttributes.Add(attribute)
         End Function
 
-        Private Function ValidateAttributeUsageForNetModuleAttribute(attribute As VisualBasicAttributeData, netModuleName As String, diagnostics As DiagnosticBag, ByRef uniqueAttributes As HashSet(Of VisualBasicAttributeData)) As Boolean
+        Private Function ValidateAttributeUsageForNetModuleAttribute(attribute As VisualBasicAttributeData, netModuleName As String, diagnostics As BindingDiagnosticBag, ByRef uniqueAttributes As HashSet(Of VisualBasicAttributeData)) As Boolean
             Debug.Assert(Not attribute.HasErrors)
 
             Dim attributeClass = attribute.AttributeClass
@@ -228,7 +238,7 @@ Namespace Microsoft.CodeAnalysis.VisualBasic.Symbols
             Else
                 ' Duplicate attributes with same attribute type are not allowed.
                 ' Check if there is an existing assembly attribute with same attribute type.
-                If uniqueAttributes Is Nothing OrElse Not uniqueAttributes.Contains(Function(a) a.AttributeClass = attributeClass) Then
+                If uniqueAttributes Is Nothing OrElse Not uniqueAttributes.Contains(Function(a) TypeSymbol.Equals(a.AttributeClass, attributeClass, TypeCompareKind.ConsiderEverything)) Then
                     ' Attribute with unique attribute type, not a duplicate.
                     Dim success As Boolean = AddUniqueAssemblyAttribute(attribute, uniqueAttributes)
                     Debug.Assert(success)
@@ -256,7 +266,7 @@ Namespace Microsoft.CodeAnalysis.VisualBasic.Symbols
                 End If
             End If
 
-            ' CONSIDER Handling badly targetted assembly attributes from netmodules
+            ' CONSIDER Handling badly targeted assembly attributes from netmodules
             'If (attributeUsage.ValidTargets And AttributeTargets.Assembly) = 0 Then
             '    If Not attribute.HasErrors Then
             '        'Error and skip
@@ -269,8 +279,8 @@ Namespace Microsoft.CodeAnalysis.VisualBasic.Symbols
             Dim netModuleNamesBuilder As ArrayBuilder(Of String) = Nothing
             Dim moduleAssemblyAttributesBuilder As ArrayBuilder(Of VisualBasicAttributeData) = Nothing
 
-            For i As Integer = 1 To m_Modules.Length - 1
-                Dim peModuleSymbol = DirectCast(m_Modules(i), Symbols.Metadata.PE.PEModuleSymbol)
+            For i As Integer = 1 To _modules.Length - 1
+                Dim peModuleSymbol = DirectCast(_modules(i), Symbols.Metadata.PE.PEModuleSymbol)
                 Dim netModuleName As String = peModuleSymbol.Name
                 For Each attributeData In peModuleSymbol.GetAssemblyAttributes()
                     If netModuleNamesBuilder Is Nothing Then
@@ -295,7 +305,7 @@ Namespace Microsoft.CodeAnalysis.VisualBasic.Symbols
         Private Function ValidateAttributeUsageAndDecodeWellKnownNetModuleAttributes(
             attributesFromNetModules As ImmutableArray(Of VisualBasicAttributeData),
             netModuleNames As ImmutableArray(Of String),
-            diagnostics As DiagnosticBag,
+            diagnostics As BindingDiagnosticBag,
             <Out> ByRef attributeIndicesToSkip As HashSet(Of Integer)) As WellKnownAttributeData
 
             Debug.Assert(attributesFromNetModules.Any())
@@ -347,13 +357,13 @@ Namespace Microsoft.CodeAnalysis.VisualBasic.Symbols
             ' Indices of duplicate assembly attributes, i.e. attributes that bind to the same constructor and have identical arguments, that must not be emitted.
             Dim attributeIndicesToSkip As HashSet(Of Integer) = Nothing
 
-            If m_Compilation.Options.OutputKind.IsNetModule() Then
+            If _compilation.Options.OutputKind.IsNetModule() Then
                 ' Compute duplicate source assembly attributes, i.e. attributes with same constructor and arguments, that must not be emitted.
                 Dim unused = GetUniqueSourceAssemblyAttributes(attributeIndicesToSkip)
 
                 Interlocked.CompareExchange(lazyNetModuleAttributesBag, CustomAttributesBag(Of VisualBasicAttributeData).Empty, Nothing)
             Else
-                Dim diagnostics = DiagnosticBag.GetInstance()
+                Dim diagnostics = BindingDiagnosticBag.GetInstance()
                 Dim netModuleNames As ImmutableArray(Of String) = Nothing
                 Dim attributesFromNetModules As ImmutableArray(Of VisualBasicAttributeData) = GetNetModuleAttributes(netModuleNames)
                 Dim wellKnownData As WellKnownAttributeData = Nothing
@@ -370,8 +380,8 @@ Namespace Microsoft.CodeAnalysis.VisualBasic.Symbols
 
                 ' Similar to attributes, type forwarders from the second added module should override type forwarders from the first added module, etc. 
                 ' This affects only diagnostics.
-                For i As Integer = m_Modules.Length - 1 To 1 Step -1
-                    Dim peModuleSymbol = DirectCast(m_Modules(i), PEModuleSymbol)
+                For i As Integer = _modules.Length - 1 To 1 Step -1
+                    Dim peModuleSymbol = DirectCast(_modules(i), PEModuleSymbol)
 
                     For Each forwarded As NamedTypeSymbol In peModuleSymbol.GetForwardedTypes()
                         If forwardedTypes Is Nothing Then
@@ -388,7 +398,7 @@ Namespace Microsoft.CodeAnalysis.VisualBasic.Symbols
 
                         If forwardedTypes.Add(forwarded) Then
                             If forwarded.IsErrorType() Then
-                                Dim info As DiagnosticInfo = If(forwarded.GetUseSiteErrorInfo(), DirectCast(forwarded, ErrorTypeSymbol).ErrorInfo)
+                                Dim info As DiagnosticInfo = If(forwarded.GetUseSiteInfo().DiagnosticInfo, DirectCast(forwarded, ErrorTypeSymbol).ErrorInfo)
 
                                 If info IsNot Nothing Then
                                     diagnostics.Add(info, NoLocation.Singleton)
@@ -413,10 +423,10 @@ Namespace Microsoft.CodeAnalysis.VisualBasic.Symbols
                 ' unless we are emitting a net module.
                 If attributeIndicesToSkip IsNot Nothing Then
                     Debug.Assert(attributeIndicesToSkip.Any())
-                    Interlocked.CompareExchange(m_lazyDuplicateAttributeIndices, attributeIndicesToSkip, Nothing)
+                    Interlocked.CompareExchange(_lazyDuplicateAttributeIndices, attributeIndicesToSkip, Nothing)
                 End If
 
-                SourceModule.AtomicStoreReferenceAndDiagnostics(lazyNetModuleAttributesBag, netModuleAttributesBag, diagnostics, CompilationStage.Declare)
+                SourceModule.AtomicStoreReferenceAndDiagnostics(lazyNetModuleAttributesBag, netModuleAttributesBag, diagnostics)
                 diagnostics.Free()
 
                 Debug.Assert(attributeIndicesToSkip Is Nothing OrElse
@@ -426,9 +436,13 @@ Namespace Microsoft.CodeAnalysis.VisualBasic.Symbols
             Debug.Assert(lazyNetModuleAttributesBag.IsSealed)
         End Sub
 
+        Friend Overrides Function GetAllTopLevelForwardedTypes() As IEnumerable(Of NamedTypeSymbol)
+            Return Emit.PEModuleBuilder.GetForwardedTypes(Me, builderOpt:=Nothing)
+        End Function
+
         Private Sub EnsureNetModuleAttributesAreBound()
-            If m_lazyNetModuleAttributesBag Is Nothing Then
-                LoadAndValidateNetModuleAttributes(m_lazyNetModuleAttributesBag)
+            If _lazyNetModuleAttributesBag Is Nothing Then
+                LoadAndValidateNetModuleAttributes(_lazyNetModuleAttributesBag)
             End If
         End Sub
 
@@ -440,17 +454,16 @@ Namespace Microsoft.CodeAnalysis.VisualBasic.Symbols
         ''' This method must be invoked only after all the assembly attributes have been bound.
         ''' </remarks>
         Friend Function IsIndexOfDuplicateAssemblyAttribute(index As Integer) As Boolean
-            Debug.Assert(Me.m_lazySourceAttributesBag.IsSealed)
-            Debug.Assert(Me.m_lazyNetModuleAttributesBag.IsSealed)
+            Debug.Assert(Me._lazySourceAttributesBag.IsSealed)
+            Debug.Assert(Me._lazyNetModuleAttributesBag.IsSealed)
             Debug.Assert(index >= 0)
             Debug.Assert(index < Me.GetAttributes().Length)
-            Debug.Assert(Me.m_lazyDuplicateAttributeIndices Is Nothing OrElse
-                         Not Me.DeclaringCompilation.Options.OutputKind.IsNetModule())
+            Debug.Assert(Me._lazyDuplicateAttributeIndices Is Nothing OrElse Not IsNetModule)
 
-            Return Me.m_lazyDuplicateAttributeIndices IsNot Nothing AndAlso Me.m_lazyDuplicateAttributeIndices.Contains(index)
+            Return Me._lazyDuplicateAttributeIndices IsNot Nothing AndAlso Me._lazyDuplicateAttributeIndices.Contains(index)
         End Function
 
-        ReadOnly Property DefaultAttributeLocation As AttributeLocation Implements IAttributeTargetSymbol.DefaultAttributeLocation
+        Public ReadOnly Property DefaultAttributeLocation As AttributeLocation Implements IAttributeTargetSymbol.DefaultAttributeLocation
             Get
                 Return AttributeLocation.Assembly
             End Get
@@ -458,8 +471,9 @@ Namespace Microsoft.CodeAnalysis.VisualBasic.Symbols
 
         Friend Function GetAttributeDeclarations() As ImmutableArray(Of SyntaxList(Of AttributeListSyntax))
             Dim attributeBlocks = ArrayBuilder(Of SyntaxList(Of AttributeListSyntax)).GetInstance()
+            Dim declarations = DeclaringCompilation.MergedRootDeclaration.Declarations
 
-            For Each rootNs In DeclaringCompilation.Declarations.AllRootNamespaces
+            For Each rootNs As RootSingleNamespaceDeclaration In declarations
                 If rootNs.HasAssemblyAttributes Then
                     Dim compilationUnitSyntax = DirectCast(rootNs.Location.SourceTree.GetRoot(), CompilationUnitSyntax)
                     Dim attributeStatements = compilationUnitSyntax.Attributes
@@ -486,7 +500,7 @@ Namespace Microsoft.CodeAnalysis.VisualBasic.Symbols
         ''' </remarks>
         Friend Function GetNetModuleAttributesBag() As CustomAttributesBag(Of VisualBasicAttributeData)
             EnsureNetModuleAttributesAreBound()
-            Return m_lazyNetModuleAttributesBag
+            Return _lazyNetModuleAttributesBag
         End Function
 
         Private Function GetNetModuleAttributes() As ImmutableArray(Of VisualBasicAttributeData)
@@ -529,7 +543,7 @@ Namespace Microsoft.CodeAnalysis.VisualBasic.Symbols
 
         Friend Function GetSourceAttributesBag() As CustomAttributesBag(Of VisualBasicAttributeData)
             EnsureAttributesAreBound()
-            Return Me.m_lazySourceAttributesBag
+            Return Me._lazySourceAttributesBag
         End Function
 
         ''' <summary>
@@ -542,7 +556,7 @@ Namespace Microsoft.CodeAnalysis.VisualBasic.Symbols
         ''' </returns>
         ''' <remarks></remarks>
         Friend Function GetSourceDecodedWellKnownAttributeData() As CommonAssemblyWellKnownAttributeData
-            Dim attributesBag As CustomAttributesBag(Of VisualBasicAttributeData) = Me.m_lazySourceAttributesBag
+            Dim attributesBag As CustomAttributesBag(Of VisualBasicAttributeData) = Me._lazySourceAttributesBag
             If attributesBag Is Nothing OrElse Not attributesBag.IsDecodedWellKnownAttributeDataComputed Then
                 attributesBag = Me.GetSourceAttributesBag()
             End If
@@ -662,10 +676,9 @@ Namespace Microsoft.CodeAnalysis.VisualBasic.Symbols
         ''' This represents what the user claimed in source through the AssemblyFlagsAttribute.
         ''' It may be modified as emitted due to presence or absence of the public key.
         ''' </summary>
-        Friend ReadOnly Property Flags As AssemblyNameFlags
+        Public ReadOnly Property AssemblyFlags As AssemblyFlags Implements ISourceAssemblySymbolInternal.AssemblyFlags
             Get
-                Dim defaultValue As AssemblyNameFlags = AssemblyNameFlags.None
-                Dim fieldValue = defaultValue
+                Dim fieldValue As AssemblyFlags = Nothing
 
                 Dim data = GetSourceDecodedWellKnownAttributeData()
                 If data IsNot Nothing Then
@@ -702,7 +715,7 @@ Namespace Microsoft.CodeAnalysis.VisualBasic.Symbols
             End Get
         End Property
 
-        Friend ReadOnly Property AssemblySignatureKeyAttributeSetting As String
+        Public ReadOnly Property SignatureKey As String Implements ISourceAssemblySymbolInternal.SignatureKey
             Get
                 Return GetWellKnownAttributeDataStringField(Function(data) data.AssemblySignatureKeyAttributeSetting)
             End Get
@@ -747,7 +760,14 @@ Namespace Microsoft.CodeAnalysis.VisualBasic.Symbols
             End Get
         End Property
 
-        Friend ReadOnly Property AssemblyHashAlgorithm As AssemblyHashAlgorithm
+        Public Overrides ReadOnly Property AssemblyVersionPattern As Version Implements ISourceAssemblySymbolInternal.AssemblyVersionPattern
+            Get
+                Dim attributeValue = AssemblyVersionAttributeSetting
+                Return If(attributeValue Is Nothing OrElse (attributeValue.Build <> UShort.MaxValue AndAlso attributeValue.Revision <> UShort.MaxValue), Nothing, attributeValue)
+            End Get
+        End Property
+
+        Public ReadOnly Property HashAlgorithm As AssemblyHashAlgorithm Implements ISourceAssemblySymbolInternal.HashAlgorithm
             Get
                 Return If(AssemblyAlgorithmIdAttributeSetting, AssemblyHashAlgorithm.Sha1)
             End Get
@@ -774,8 +794,8 @@ Namespace Microsoft.CodeAnalysis.VisualBasic.Symbols
         End Property
 
         Private Sub EnsureAttributesAreBound()
-            If m_lazySourceAttributesBag Is Nothing OrElse Not m_lazySourceAttributesBag.IsSealed Then
-                LoadAndValidateAttributes(OneOrMany.Create(GetAttributeDeclarations()), m_lazySourceAttributesBag)
+            If _lazySourceAttributesBag Is Nothing OrElse Not _lazySourceAttributesBag.IsSealed Then
+                LoadAndValidateAttributes(OneOrMany.Create(GetAttributeDeclarations()), _lazySourceAttributesBag)
             End If
         End Sub
 
@@ -788,7 +808,7 @@ Namespace Microsoft.CodeAnalysis.VisualBasic.Symbols
 
         Public Overrides ReadOnly Property Modules As ImmutableArray(Of ModuleSymbol)
             Get
-                Return m_Modules
+                Return _modules
             End Get
         End Property
 
@@ -836,13 +856,13 @@ Namespace Microsoft.CodeAnalysis.VisualBasic.Symbols
 
         ' A collection of assemblies to which we were granted internals access by only checking matches for assembly name
         ' and ignoring public key. This just acts as a set. The Boolean is ignored.
-        Private m_optimisticallyGrantedInternalsAccess As ConcurrentDictionary(Of AssemblySymbol, Boolean)
+        Private _optimisticallyGrantedInternalsAccess As ConcurrentDictionary(Of AssemblySymbol, Boolean)
 
         ' Once the computation of the AssemblyIdentity is complete, check whether
         ' any of the IVT access grants that were optimistically made during AssemblyIdentity computation
         ' are in fact invalid now that the full identity is known.
-        Private Sub CheckOptimisticIVTAccessGrants(bag As DiagnosticBag)
-            Dim haveGrantedAssemblies As ConcurrentDictionary(Of AssemblySymbol, Boolean) = m_optimisticallyGrantedInternalsAccess
+        Private Sub CheckOptimisticIVTAccessGrants(bag As BindingDiagnosticBag)
+            Dim haveGrantedAssemblies As ConcurrentDictionary(Of AssemblySymbol, Boolean) = _optimisticallyGrantedInternalsAccess
 
             If haveGrantedAssemblies IsNot Nothing Then
                 For Each otherAssembly In haveGrantedAssemblies.Keys
@@ -872,13 +892,13 @@ Namespace Microsoft.CodeAnalysis.VisualBasic.Symbols
             'incomplete because another thread is in the process of building it.
             EnsureAttributesAreBound()
 
-            If m_lazyInternalsVisibleToMap Is Nothing Then
+            If _lazyInternalsVisibleToMap Is Nothing Then
                 Return SpecializedCollections.EmptyEnumerable(Of ImmutableArray(Of Byte))()
             End If
 
             Dim result As ConcurrentDictionary(Of ImmutableArray(Of Byte), Tuple(Of Location, String)) = Nothing
 
-            m_lazyInternalsVisibleToMap.TryGetValue(simpleName, result)
+            _lazyInternalsVisibleToMap.TryGetValue(simpleName, result)
 
             Return If(result IsNot Nothing, result.Keys, SpecializedCollections.EmptyEnumerable(Of ImmutableArray(Of Byte))())
         End Function
@@ -897,7 +917,7 @@ Namespace Microsoft.CodeAnalysis.VisualBasic.Symbols
 
         Friend ReadOnly Property SourceModule As SourceModuleSymbol
             Get
-                Return DirectCast(m_Modules(0), SourceModuleSymbol)
+                Return DirectCast(_modules(0), SourceModuleSymbol)
             End Get
         End Property
 
@@ -909,10 +929,10 @@ Namespace Microsoft.CodeAnalysis.VisualBasic.Symbols
             End Get
         End Property
 
-        Private Function ProcessOneInternalsVisibleToAttribute(nodeOpt As AttributeSyntax, attrData As VisualBasicAttributeData, diagnostics As DiagnosticBag) As Boolean
+        Private Function ProcessOneInternalsVisibleToAttribute(nodeOpt As AttributeSyntax, attrData As VisualBasicAttributeData, diagnostics As BindingDiagnosticBag) As Boolean
             'assume that this code won't be called unless we bound a well-formed, semantically
             'correct ctor call.
-            Dim displayName As String = TryCast(attrData.CommonConstructorArguments(0).Value, String)
+            Dim displayName As String = TryCast(attrData.CommonConstructorArguments(0).ValueInternal, String)
 
             If displayName Is Nothing Then
                 diagnostics.Add(ERRID.ERR_FriendAssemblyNameInvalid, If(nodeOpt IsNot Nothing, nodeOpt.GetLocation(), NoLocation.Singleton), displayName)
@@ -926,15 +946,16 @@ Namespace Microsoft.CodeAnalysis.VisualBasic.Symbols
                 Return False
             End If
 
-            Const allowedParts = AssemblyIdentityParts.Name Or AssemblyIdentityParts.PublicKey
+            ' Allow public key token due to compatibility reasons, but we are not going to use its value.
+            Const allowedParts = AssemblyIdentityParts.Name Or AssemblyIdentityParts.PublicKey Or AssemblyIdentityParts.PublicKeyToken
 
             If (parts And Not allowedParts) <> 0 Then
                 diagnostics.Add(ERRID.ERR_FriendAssemblyBadArguments, If(nodeOpt IsNot Nothing, nodeOpt.GetLocation(), NoLocation.Singleton), displayName)
                 Return False
             End If
 
-            If m_lazyInternalsVisibleToMap Is Nothing Then
-                Interlocked.CompareExchange(m_lazyInternalsVisibleToMap,
+            If _lazyInternalsVisibleToMap Is Nothing Then
+                Interlocked.CompareExchange(_lazyInternalsVisibleToMap,
                                             New ConcurrentDictionary(Of String, ConcurrentDictionary(Of ImmutableArray(Of Byte), Tuple(Of Location, String)))(StringComparer.OrdinalIgnoreCase), Nothing)
             End If
 
@@ -955,12 +976,12 @@ Namespace Microsoft.CodeAnalysis.VisualBasic.Symbols
             'calls can fail. We assume that the 'other' thread in that case will successfully add the same
             'contents eventually.
             Dim keys As ConcurrentDictionary(Of ImmutableArray(Of Byte), Tuple(Of Location, String)) = Nothing
-            If m_lazyInternalsVisibleToMap.TryGetValue(identity.Name, keys) Then
+            If _lazyInternalsVisibleToMap.TryGetValue(identity.Name, keys) Then
                 keys.TryAdd(identity.PublicKey, locationAndValue)
             Else
                 keys = New ConcurrentDictionary(Of ImmutableArray(Of Byte), Tuple(Of Location, String))
                 keys.TryAdd(identity.PublicKey, locationAndValue)
-                m_lazyInternalsVisibleToMap.TryAdd(identity.Name, keys)
+                _lazyInternalsVisibleToMap.TryAdd(identity.Name, keys)
             End If
 
             Return True
@@ -970,87 +991,92 @@ Namespace Microsoft.CodeAnalysis.VisualBasic.Symbols
             Dim attrData = arguments.Attribute
             Debug.Assert(Not attrData.HasErrors)
             Debug.Assert(arguments.SymbolPart = AttributeLocation.None)
+            Dim diagnostics = DirectCast(arguments.Diagnostics, BindingDiagnosticBag)
 
             If attrData.IsTargetAttribute(Me, AttributeDescription.CaseInsensitiveExtensionAttribute) Then
                 ' Already have an attribute, no need to add another one.
-                Debug.Assert(m_lazyEmitExtensionAttribute <> ThreeState.True)
-                m_lazyEmitExtensionAttribute = ThreeState.False
+                Debug.Assert(_lazyEmitExtensionAttribute <> ThreeState.True)
+                _lazyEmitExtensionAttribute = ThreeState.False
             ElseIf attrData.IsTargetAttribute(Me, AttributeDescription.InternalsVisibleToAttribute) Then
-                ProcessOneInternalsVisibleToAttribute(arguments.AttributeSyntaxOpt, attrData, arguments.Diagnostics)
+                ProcessOneInternalsVisibleToAttribute(arguments.AttributeSyntaxOpt, attrData, diagnostics)
             ElseIf attrData.IsTargetAttribute(Me, AttributeDescription.AssemblySignatureKeyAttribute) Then
-                Dim signatureKey = DirectCast(attrData.CommonConstructorArguments(0).Value, String)
+                Dim signatureKey = DirectCast(attrData.CommonConstructorArguments(0).ValueInternal, String)
                 arguments.GetOrCreateData(Of CommonAssemblyWellKnownAttributeData)().AssemblySignatureKeyAttributeSetting = signatureKey
 
                 If Not StrongNameKeys.IsValidPublicKeyString(signatureKey) Then
-                    arguments.Diagnostics.Add(ERRID.ERR_InvalidSignaturePublicKey, GetAssemblyAttributeFirstArgumentLocation(arguments.AttributeSyntaxOpt))
+                    diagnostics.Add(ERRID.ERR_InvalidSignaturePublicKey, GetAssemblyAttributeFirstArgumentLocation(arguments.AttributeSyntaxOpt))
                 End If
 
             ElseIf attrData.IsTargetAttribute(Me, AttributeDescription.AssemblyKeyFileAttribute) Then
-                arguments.GetOrCreateData(Of CommonAssemblyWellKnownAttributeData)().AssemblyKeyFileAttributeSetting = DirectCast(attrData.CommonConstructorArguments(0).Value, String)
+                arguments.GetOrCreateData(Of CommonAssemblyWellKnownAttributeData)().AssemblyKeyFileAttributeSetting = DirectCast(attrData.CommonConstructorArguments(0).ValueInternal, String)
             ElseIf attrData.IsTargetAttribute(Me, AttributeDescription.AssemblyKeyNameAttribute) Then
-                arguments.GetOrCreateData(Of CommonAssemblyWellKnownAttributeData)().AssemblyKeyContainerAttributeSetting = DirectCast(attrData.CommonConstructorArguments(0).Value, String)
+                arguments.GetOrCreateData(Of CommonAssemblyWellKnownAttributeData)().AssemblyKeyContainerAttributeSetting = DirectCast(attrData.CommonConstructorArguments(0).ValueInternal, String)
             ElseIf attrData.IsTargetAttribute(Me, AttributeDescription.AssemblyDelaySignAttribute) Then
-                arguments.GetOrCreateData(Of CommonAssemblyWellKnownAttributeData)().AssemblyDelaySignAttributeSetting = If(DirectCast(attrData.CommonConstructorArguments(0).Value, Boolean), ThreeState.True, ThreeState.False)
+                arguments.GetOrCreateData(Of CommonAssemblyWellKnownAttributeData)().AssemblyDelaySignAttributeSetting = If(DirectCast(attrData.CommonConstructorArguments(0).ValueInternal, Boolean), ThreeState.True, ThreeState.False)
             ElseIf attrData.IsTargetAttribute(Me, AttributeDescription.AssemblyVersionAttribute) Then
-                Dim verString = DirectCast(attrData.CommonConstructorArguments(0).Value, String)
+                Dim verString = DirectCast(attrData.CommonConstructorArguments(0).ValueInternal, String)
                 Dim version As Version = Nothing
-                If Not VersionHelper.TryParseAssemblyVersion(verString, allowWildcard:=True, version:=version )Then
-                    arguments.Diagnostics.Add(ERRID.ERR_InvalidVersionFormat, GetAssemblyAttributeFirstArgumentLocation(arguments.AttributeSyntaxOpt))
+                If Not VersionHelper.TryParseAssemblyVersion(verString, allowWildcard:=Not _compilation.IsEmitDeterministic, version:=version) Then
+                    diagnostics.Add(ERRID.ERR_InvalidVersionFormat, GetAssemblyAttributeFirstArgumentLocation(arguments.AttributeSyntaxOpt))
                 End If
                 arguments.GetOrCreateData(Of CommonAssemblyWellKnownAttributeData)().AssemblyVersionAttributeSetting = version
             ElseIf attrData.IsTargetAttribute(Me, AttributeDescription.AssemblyFileVersionAttribute) Then
                 Dim dummy As Version = Nothing
-                Dim verString = DirectCast(attrData.CommonConstructorArguments(0).Value, String)
-                If Not VersionHelper.TryParseAssemblyVersion(verString, allowWildcard:=False, version:=dummy) Then
-                    arguments.Diagnostics.Add(ERRID.WRN_InvalidVersionFormat, GetAssemblyAttributeFirstArgumentLocation(arguments.AttributeSyntaxOpt))
+                Dim verString = DirectCast(attrData.CommonConstructorArguments(0).ValueInternal, String)
+                If Not VersionHelper.TryParse(verString, version:=dummy) Then
+                    diagnostics.Add(ERRID.WRN_InvalidVersionFormat, GetAssemblyAttributeFirstArgumentLocation(arguments.AttributeSyntaxOpt))
                 End If
 
                 arguments.GetOrCreateData(Of CommonAssemblyWellKnownAttributeData)().AssemblyFileVersionAttributeSetting = verString
+            ElseIf attrData.IsTargetAttribute(Me, AttributeDescription.AssemblyInformationalVersionAttribute) Then
+                arguments.GetOrCreateData(Of CommonAssemblyWellKnownAttributeData)().AssemblyInformationalVersionAttributeSetting = DirectCast(attrData.CommonConstructorArguments(0).ValueInternal, String)
             ElseIf attrData.IsTargetAttribute(Me, AttributeDescription.AssemblyTitleAttribute) Then
-                arguments.GetOrCreateData(Of CommonAssemblyWellKnownAttributeData)().AssemblyTitleAttributeSetting = DirectCast(attrData.CommonConstructorArguments(0).Value, String)
+                arguments.GetOrCreateData(Of CommonAssemblyWellKnownAttributeData)().AssemblyTitleAttributeSetting = DirectCast(attrData.CommonConstructorArguments(0).ValueInternal, String)
             ElseIf attrData.IsTargetAttribute(Me, AttributeDescription.AssemblyDescriptionAttribute) Then
-                arguments.GetOrCreateData(Of CommonAssemblyWellKnownAttributeData)().AssemblyDescriptionAttributeSetting = DirectCast(attrData.CommonConstructorArguments(0).Value, String)
+                arguments.GetOrCreateData(Of CommonAssemblyWellKnownAttributeData)().AssemblyDescriptionAttributeSetting = DirectCast(attrData.CommonConstructorArguments(0).ValueInternal, String)
             ElseIf attrData.IsTargetAttribute(Me, AttributeDescription.AssemblyCultureAttribute) Then
-                Dim cultureString = DirectCast(attrData.CommonConstructorArguments(0).Value, String)
+                Dim cultureString = DirectCast(attrData.CommonConstructorArguments(0).ValueInternal, String)
                 If Not String.IsNullOrEmpty(cultureString) Then
                     If Me.DeclaringCompilation.Options.OutputKind.IsApplication() Then
-                        arguments.Diagnostics.Add(ERRID.ERR_InvalidAssemblyCultureForExe, GetAssemblyAttributeFirstArgumentLocation(arguments.AttributeSyntaxOpt))
+                        diagnostics.Add(ERRID.ERR_InvalidAssemblyCultureForExe, GetAssemblyAttributeFirstArgumentLocation(arguments.AttributeSyntaxOpt))
                     ElseIf Not AssemblyIdentity.IsValidCultureName(cultureString) Then
-                        arguments.Diagnostics.Add(ERRID.ERR_InvalidAssemblyCulture,  GetAssemblyAttributeFirstArgumentLocation(arguments.AttributeSyntaxOpt))
+                        diagnostics.Add(ERRID.ERR_InvalidAssemblyCulture, GetAssemblyAttributeFirstArgumentLocation(arguments.AttributeSyntaxOpt))
                         cultureString = Nothing
                     End If
                 End If
 
                 arguments.GetOrCreateData(Of CommonAssemblyWellKnownAttributeData)().AssemblyCultureAttributeSetting = cultureString
             ElseIf attrData.IsTargetAttribute(Me, AttributeDescription.AssemblyCompanyAttribute) Then
-                arguments.GetOrCreateData(Of CommonAssemblyWellKnownAttributeData)().AssemblyCompanyAttributeSetting = DirectCast(attrData.CommonConstructorArguments(0).Value, String)
+                arguments.GetOrCreateData(Of CommonAssemblyWellKnownAttributeData)().AssemblyCompanyAttributeSetting = DirectCast(attrData.CommonConstructorArguments(0).ValueInternal, String)
             ElseIf attrData.IsTargetAttribute(Me, AttributeDescription.AssemblyProductAttribute) Then
-                arguments.GetOrCreateData(Of CommonAssemblyWellKnownAttributeData)().AssemblyProductAttributeSetting = DirectCast(attrData.CommonConstructorArguments(0).Value, String)
+                arguments.GetOrCreateData(Of CommonAssemblyWellKnownAttributeData)().AssemblyProductAttributeSetting = DirectCast(attrData.CommonConstructorArguments(0).ValueInternal, String)
             ElseIf attrData.IsTargetAttribute(Me, AttributeDescription.AssemblyInformationalVersionAttribute) Then
-                arguments.GetOrCreateData(Of CommonAssemblyWellKnownAttributeData)().AssemblyInformationalVersionAttributeSetting = DirectCast(attrData.CommonConstructorArguments(0).Value, String)
+                arguments.GetOrCreateData(Of CommonAssemblyWellKnownAttributeData)().AssemblyInformationalVersionAttributeSetting = DirectCast(attrData.CommonConstructorArguments(0).ValueInternal, String)
             ElseIf attrData.IsTargetAttribute(Me, AttributeDescription.SatelliteContractVersionAttribute) Then
                 'just check the format of this one, don't do anything else with it.
                 Dim dummy As Version = Nothing
-                Dim verString = DirectCast(attrData.CommonConstructorArguments(0).Value, String)
+                Dim verString = DirectCast(attrData.CommonConstructorArguments(0).ValueInternal, String)
                 If Not VersionHelper.TryParseAssemblyVersion(verString, allowWildcard:=False, version:=dummy) Then
-                    arguments.Diagnostics.Add(ERRID.ERR_InvalidVersionFormat2, GetAssemblyAttributeFirstArgumentLocation(arguments.AttributeSyntaxOpt))
+                    diagnostics.Add(ERRID.ERR_InvalidVersionFormat2, GetAssemblyAttributeFirstArgumentLocation(arguments.AttributeSyntaxOpt))
                 End If
             ElseIf attrData.IsTargetAttribute(Me, AttributeDescription.AssemblyCopyrightAttribute) Then
-                arguments.GetOrCreateData(Of CommonAssemblyWellKnownAttributeData)().AssemblyCopyrightAttributeSetting = DirectCast(attrData.CommonConstructorArguments(0).Value, String)
+                arguments.GetOrCreateData(Of CommonAssemblyWellKnownAttributeData)().AssemblyCopyrightAttributeSetting = DirectCast(attrData.CommonConstructorArguments(0).ValueInternal, String)
             ElseIf attrData.IsTargetAttribute(Me, AttributeDescription.AssemblyTrademarkAttribute) Then
-                arguments.GetOrCreateData(Of CommonAssemblyWellKnownAttributeData)().AssemblyTrademarkAttributeSetting = DirectCast(attrData.CommonConstructorArguments(0).Value, String)
+                arguments.GetOrCreateData(Of CommonAssemblyWellKnownAttributeData)().AssemblyTrademarkAttributeSetting = DirectCast(attrData.CommonConstructorArguments(0).ValueInternal, String)
             ElseIf attrData.IsSecurityAttribute(Me.DeclaringCompilation) Then
                 attrData.DecodeSecurityAttribute(Of CommonAssemblyWellKnownAttributeData)(Me, Me.DeclaringCompilation, arguments)
             ElseIf attrData.IsTargetAttribute(Me, AttributeDescription.ClassInterfaceAttribute) Then
-                attrData.DecodeClassInterfaceAttribute(arguments.AttributeSyntaxOpt, arguments.Diagnostics)
+                attrData.DecodeClassInterfaceAttribute(arguments.AttributeSyntaxOpt, diagnostics)
             ElseIf attrData.IsTargetAttribute(Me, AttributeDescription.TypeLibVersionAttribute) Then
-                ValidateIntegralAttributeNonNegativeArguments(attrData, arguments.AttributeSyntaxOpt, arguments.Diagnostics)
+                ValidateIntegralAttributeNonNegativeArguments(attrData, arguments.AttributeSyntaxOpt, diagnostics)
             ElseIf attrData.IsTargetAttribute(Me, AttributeDescription.ComCompatibleVersionAttribute) Then
-                ValidateIntegralAttributeNonNegativeArguments(attrData, arguments.AttributeSyntaxOpt, arguments.Diagnostics)
+                ValidateIntegralAttributeNonNegativeArguments(attrData, arguments.AttributeSyntaxOpt, diagnostics)
             ElseIf attrData.IsTargetAttribute(Me, AttributeDescription.GuidAttribute) Then
-                attrData.DecodeGuidAttribute(arguments.AttributeSyntaxOpt, arguments.Diagnostics)
+                attrData.DecodeGuidAttribute(arguments.AttributeSyntaxOpt, diagnostics)
             ElseIf attrData.IsTargetAttribute(Me, AttributeDescription.CompilationRelaxationsAttribute) Then
                 arguments.GetOrCreateData(Of CommonAssemblyWellKnownAttributeData)().HasCompilationRelaxationsAttribute = True
+            ElseIf attrData.IsTargetAttribute(Me, AttributeDescription.ReferenceAssemblyAttribute) Then
+                arguments.GetOrCreateData(Of CommonAssemblyWellKnownAttributeData)().HasReferenceAssemblyAttribute = True
             ElseIf attrData.IsTargetAttribute(Me, AttributeDescription.RuntimeCompatibilityAttribute) Then
                 ' VB doesn't need to decode argument values
                 arguments.GetOrCreateData(Of CommonAssemblyWellKnownAttributeData)().RuntimeCompatibilityWrapNonExceptionThrows = True
@@ -1060,7 +1086,7 @@ Namespace Microsoft.CodeAnalysis.VisualBasic.Symbols
                 Dim signature As Integer = attrData.GetTargetAttributeSignatureIndex(Me, AttributeDescription.AssemblyAlgorithmIdAttribute)
 
                 If signature <> -1 Then
-                    Dim value As Object = attrData.CommonConstructorArguments(0).Value
+                    Dim value As Object = attrData.CommonConstructorArguments(0).ValueInternal
                     Dim algorithmId As AssemblyHashAlgorithm
 
                     If signature = 0 Then
@@ -1074,13 +1100,13 @@ Namespace Microsoft.CodeAnalysis.VisualBasic.Symbols
                     signature = attrData.GetTargetAttributeSignatureIndex(Me, AttributeDescription.AssemblyFlagsAttribute)
 
                     If signature <> -1 Then
-                        Dim value As Object = attrData.CommonConstructorArguments(0).Value
-                        Dim nameFlags As AssemblyNameFlags
+                        Dim value As Object = attrData.CommonConstructorArguments(0).ValueInternal
+                        Dim nameFlags As AssemblyFlags
 
                         If signature = 0 OrElse signature = 1 Then
-                            nameFlags = CType(value, AssemblyNameFlags)
+                            nameFlags = CType(CType(value, AssemblyNameFlags), AssemblyFlags)
                         Else
-                            nameFlags = CType(CUInt(value), AssemblyNameFlags)
+                            nameFlags = CType(CUInt(value), AssemblyFlags)
                         End If
 
                         arguments.GetOrCreateData(Of CommonAssemblyWellKnownAttributeData)().AssemblyFlagsAttributeSetting = nameFlags
@@ -1100,7 +1126,7 @@ Namespace Microsoft.CodeAnalysis.VisualBasic.Symbols
         End Function
 
         ' Checks that the integral arguments for the given well-known attribute are non-negative.
-        Private Sub ValidateIntegralAttributeNonNegativeArguments(attrData As VisualBasicAttributeData, nodeOpt As AttributeSyntax, diagnostics As DiagnosticBag)
+        Private Sub ValidateIntegralAttributeNonNegativeArguments(attrData As VisualBasicAttributeData, nodeOpt As AttributeSyntax, diagnostics As BindingDiagnosticBag)
             Debug.Assert(Not attrData.HasErrors)
 
             Dim argCount As Integer = attrData.CommonConstructorArguments.Length
@@ -1115,27 +1141,27 @@ Namespace Microsoft.CodeAnalysis.VisualBasic.Symbols
         Friend Sub AnErrorHasBeenReportedAboutExtensionAttribute()
             ' Note, we are storing false because, even though we might be required to emit the attribute,
             ' we can't do that due to the error that we just reported.
-            Debug.Assert(m_lazyEmitExtensionAttribute <> ThreeState.True)
-            m_lazyEmitExtensionAttribute = ThreeState.False
+            Debug.Assert(_lazyEmitExtensionAttribute <> ThreeState.True)
+            _lazyEmitExtensionAttribute = ThreeState.False
         End Sub
 
-        Friend Function GetAllDeclarationErrors(Optional cancellationToken As CancellationToken = Nothing) As ImmutableArray(Of Diagnostic)
+        Friend Sub GetAllDeclarationErrors(diagnostics As BindingDiagnosticBag, Optional cancellationToken As CancellationToken = Nothing)
             Dim hasExtensionMethods As Boolean = False
-            Dim moduleErrors = SourceModule.GetAllDeclarationErrors(cancellationToken, hasExtensionMethods)
-            Return moduleErrors.Concat(GetAssemblyLevelDeclarationErrors(hasExtensionMethods))
-        End Function
+            SourceModule.GetAllDeclarationErrors(diagnostics, cancellationToken, hasExtensionMethods)
+            diagnostics.AddRange(GetAssemblyLevelDeclarationErrors(hasExtensionMethods), allowMismatchInDependencyAccumulation:=True)
+        End Sub
 
         ''' <summary>
         ''' Get assembly level declaration errors.
         ''' </summary>
         Private Function GetAssemblyLevelDeclarationErrors(
-            haveExtensionMethodsInSource As Boolean) As ImmutableArray(Of Diagnostic)
+            haveExtensionMethodsInSource As Boolean) As ImmutableBindingDiagnostic(Of AssemblySymbol)
 
-            If m_lazyAssemblyLevelDeclarationErrors.IsDefault Then
+            If _lazyAssemblyLevelDeclarationErrors.IsDefault OrElse _lazyAssemblyLevelDeclarationDependencies.IsDefault Then
 
-                Dim diagnostics = DiagnosticBag.GetInstance()
+                Dim diagnostics = BindingDiagnosticBag.GetInstance()
 
-                Dim emitExtensionAttribute As ThreeState = CType(m_lazyEmitExtensionAttribute, ThreeState)
+                Dim emitExtensionAttribute As ThreeState = CType(_lazyEmitExtensionAttribute, ThreeState)
                 If emitExtensionAttribute = ThreeState.Unknown Then
 
                     Dim needAttribute As Boolean = haveExtensionMethodsInSource
@@ -1145,10 +1171,10 @@ Namespace Microsoft.CodeAnalysis.VisualBasic.Symbols
                     Else
                         ' We need to emit an Extension attribute on the assembly. 
                         ' Can we locate it?
-                        Dim useSiteError As DiagnosticInfo = Nothing
-                        m_Compilation.GetExtensionAttributeConstructor(useSiteError:=useSiteError)
+                        Dim useSiteInfo As UseSiteInfo(Of AssemblySymbol) = Nothing
+                        _compilation.GetExtensionAttributeConstructor(useSiteInfo:=useSiteInfo)
 
-                        If useSiteError IsNot Nothing Then
+                        If useSiteInfo.DiagnosticInfo IsNot Nothing Then
                             ' Note, we are storing false because, even though we should emit the attribute,
                             ' we can't do that due to the use site error.
                             ' The diagnostic itself was already reported at the location where the attribute was applied to.
@@ -1158,12 +1184,16 @@ Namespace Microsoft.CodeAnalysis.VisualBasic.Symbols
                             emitExtensionAttribute = ThreeState.True
                         End If
                     End If
-
                 End If
+
+                Debug.Assert(_lazyEmitExtensionAttribute = ThreeState.Unknown OrElse
+                             _lazyEmitExtensionAttribute = emitExtensionAttribute)
+
+                _lazyEmitExtensionAttribute = emitExtensionAttribute
 
                 'strong name key settings are not validated when building netmodules.
                 'They are validated when the netmodule is added to an assembly.
-                If StrongNameKeys.DiagnosticOpt IsNot Nothing AndAlso Not DeclaringCompilation.Options.OutputKind.IsNetModule() Then
+                If StrongNameKeys.DiagnosticOpt IsNot Nothing AndAlso Not IsNetModule Then
                     diagnostics.Add(StrongNameKeys.DiagnosticOpt)
                 End If
 
@@ -1172,89 +1202,118 @@ Namespace Microsoft.CodeAnalysis.VisualBasic.Symbols
 
                 DetectAttributeAndOptionConflicts(diagnostics)
 
-                If IsDelaySign AndAlso Not Identity.HasPublicKey Then
+                If IsDelaySigned AndAlso Not Identity.HasPublicKey Then
                     diagnostics.Add(ERRID.WRN_DelaySignButNoKey, NoLocation.Singleton)
                 End If
 
-                'A container cannot contain just the public key. So if we have the public
-                'key, no keyPair, and no container, then the public key came from a file
-                'that contained only that. In that case we cannot sign.
+                If DeclaringCompilation.Options.PublicSign Then
+                    If IsNetModule Then
+                        diagnostics.Add(ERRID.ERR_PublicSignNetModule, NoLocation.Singleton)
+                    ElseIf Not Identity.HasPublicKey Then
+                        diagnostics.Add(ERRID.ERR_PublicSignNoKey, NoLocation.Singleton)
+                    End If
+                End If
+
+                ' If the options and attributes applied on the compilation imply real signing,
+                ' but we have no private key to sign it with report an error.
+                ' Note that if public key is set and delay sign is off we do OSS signing, which doesn't require private key.
+                ' Consider: should we allow to OSS sign if the key file only contains public key?
+
                 If DeclaringCompilation.Options.OutputKind <> OutputKind.NetModule AndAlso
+                   DeclaringCompilation.Options.CryptoPublicKey.IsEmpty AndAlso
                    Identity.HasPublicKey AndAlso
-                   Not IsDelaySign AndAlso
+                   Not IsDelaySigned AndAlso
+                   Not DeclaringCompilation.Options.PublicSign AndAlso
                    Not StrongNameKeys.CanSign Then
+
+                    ' Since the container always contains both keys, the problem is that the key file didn't contain private key.
                     diagnostics.Add(ERRID.ERR_SignButNoPrivateKey, NoLocation.Singleton, StrongNameKeys.KeyFilePath)
                 End If
 
                 ReportDiagnosticsForSynthesizedAttributes(DeclaringCompilation, diagnostics)
-
                 ReportDiagnosticsForAddedModules(diagnostics)
 
-                Dim vbDiagnostics = diagnostics.ToReadOnlyAndFree(Of Diagnostic)()
-                If ImmutableInterlocked.InterlockedInitialize(m_lazyAssemblyLevelDeclarationErrors, vbDiagnostics) Then
-                    m_lazyEmitExtensionAttribute = emitExtensionAttribute
-                End If
+                Dim immutableBindingDiagnostic As ImmutableBindingDiagnostic(Of AssemblySymbol) = diagnostics.ToReadOnlyAndFree()
+                ImmutableInterlocked.InterlockedInitialize(_lazyAssemblyLevelDeclarationDependencies, immutableBindingDiagnostic.Dependencies)
+                ImmutableInterlocked.InterlockedInitialize(_lazyAssemblyLevelDeclarationErrors, immutableBindingDiagnostic.Diagnostics)
             End If
 
-            Return m_lazyAssemblyLevelDeclarationErrors
+            Debug.Assert(Not _lazyAssemblyLevelDeclarationErrors.IsDefault)
+            Debug.Assert(Not _lazyAssemblyLevelDeclarationDependencies.IsDefault)
+
+            Return New ImmutableBindingDiagnostic(Of AssemblySymbol)(_lazyAssemblyLevelDeclarationErrors, _lazyAssemblyLevelDeclarationDependencies)
         End Function
 
-        Private Sub DetectAttributeAndOptionConflicts(diagnostics As DiagnosticBag)
+        Private Sub DetectAttributeAndOptionConflicts(diagnostics As BindingDiagnosticBag)
             EnsureAttributesAreBound()
 
-            If m_Compilation.Options.OutputKind = OutputKind.NetModule Then
-                If Not String.IsNullOrEmpty(m_Compilation.Options.CryptoKeyContainer) Then
+            If _compilation.Options.PublicSign AndAlso DelaySignAttributeSetting Then
+                diagnostics.Add(ERRID.ERR_CmdOptionConflictsSource, NoLocation.Singleton,
+                                AttributeDescription.AssemblyDelaySignAttribute.FullName,
+                                NameOf(_compilation.Options.PublicSign))
+            End If
+
+            If _compilation.Options.OutputKind = OutputKind.NetModule Then
+                If Not String.IsNullOrEmpty(_compilation.Options.CryptoKeyContainer) Then
                     Dim assemblyKeyContainerAttributeSetting As String = Me.AssemblyKeyContainerAttributeSetting
 
                     If assemblyKeyContainerAttributeSetting Is CommonAssemblyWellKnownAttributeData.StringMissingValue Then
                         ' We need to synthesize this attribute for .NET module,
                         ' touch the constructor in order to generate proper use-site diagnostics
-                        Binder.ReportUseSiteErrorForSynthesizedAttribute(
+                        Binder.ReportUseSiteInfoForSynthesizedAttribute(
                             WellKnownMember.System_Reflection_AssemblyKeyNameAttribute__ctor,
-                            m_Compilation,
+                            _compilation,
                             NoLocation.Singleton,
                             diagnostics)
 
-                    ElseIf String.Compare(m_Compilation.Options.CryptoKeyContainer, assemblyKeyContainerAttributeSetting, StringComparison.OrdinalIgnoreCase) <> 0 Then
+                    ElseIf String.Compare(_compilation.Options.CryptoKeyContainer, assemblyKeyContainerAttributeSetting, StringComparison.OrdinalIgnoreCase) <> 0 Then
                         ' If we are building a .NET module, things get more complicated. In particular, we don't sign the module, we emit an attribute with the key 
                         ' information, which will be used to sign an assembly once the module is linked into it. If there is already an attribute like that in source,
                         ' native compiler emits both of them, synthetic attribute is emitted after the one from source. Incidentally, ALink picks the last attribute
                         ' for signing and things seem to work out. However, relying on the order of attributes feels fragile, especially given that Roslyn emits
                         ' synthetic attributes before attributes from source. The behavior we settled on for .NET modules is that, if the attribute in source has the
-                        ' same value as the one in compilation options, we won't emit the senthetic attribute. If the value doesn't match, we report an error, which 
+                        ' same value as the one in compilation options, we won't emit the synthetic attribute. If the value doesn't match, we report an error, which 
                         ' is a breaking change. Bottom line, we will never produce a module or an assembly with two attributes, regardless whether values are the same
                         ' or not.
                         diagnostics.Add(ERRID.ERR_CmdOptionConflictsSource, NoLocation.Singleton, AttributeDescription.AssemblyKeyNameAttribute.FullName, "CryptoKeyContainer")
                     End If
                 End If
 
-                If Not String.IsNullOrEmpty(m_Compilation.Options.CryptoKeyFile) Then
+                If Not String.IsNullOrEmpty(_compilation.Options.CryptoKeyFile) Then
                     Dim assemblyKeyFileAttributeSetting As String = Me.AssemblyKeyFileAttributeSetting
 
                     If assemblyKeyFileAttributeSetting Is CommonAssemblyWellKnownAttributeData.StringMissingValue Then
                         ' We need to synthesize this attribute for .NET module,
                         ' touch the constructor in order to generate proper use-site diagnostics
-                        Binder.ReportUseSiteErrorForSynthesizedAttribute(
+                        Binder.ReportUseSiteInfoForSynthesizedAttribute(
                             WellKnownMember.System_Reflection_AssemblyKeyFileAttribute__ctor,
-                            m_Compilation,
+                            _compilation,
                             NoLocation.Singleton,
                             diagnostics)
 
-                    ElseIf String.Compare(m_Compilation.Options.CryptoKeyFile, assemblyKeyFileAttributeSetting, StringComparison.OrdinalIgnoreCase) <> 0 Then
+                    ElseIf String.Compare(_compilation.Options.CryptoKeyFile, assemblyKeyFileAttributeSetting, StringComparison.OrdinalIgnoreCase) <> 0 Then
                         ' Comment in similar section for CryptoKeyContainer is applicable here as well.
                         diagnostics.Add(ERRID.ERR_CmdOptionConflictsSource, NoLocation.Singleton, AttributeDescription.AssemblyKeyFileAttribute.FullName, "CryptoKeyFile")
                     End If
                 End If
+            ElseIf _compilation.Options.PublicSign Then
+                If Me.AssemblyKeyContainerAttributeSetting IsNot CommonAssemblyWellKnownAttributeData.StringMissingValue Then
+                    diagnostics.Add(ERRID.WRN_AttributeIgnoredWhenPublicSigning, NoLocation.Singleton, AttributeDescription.AssemblyKeyNameAttribute.FullName)
+                End If
+
+                If Me.AssemblyKeyFileAttributeSetting IsNot CommonAssemblyWellKnownAttributeData.StringMissingValue Then
+                    diagnostics.Add(ERRID.WRN_AttributeIgnoredWhenPublicSigning, NoLocation.Singleton, AttributeDescription.AssemblyKeyFileAttribute.FullName)
+                End If
             End If
         End Sub
 
-        Private Sub ReportDiagnosticsForAddedModules(diagnostics As DiagnosticBag)
-            For Each pair In m_Compilation.GetBoundReferenceManager().ReferencedModuleIndexMap
+        Private Sub ReportDiagnosticsForAddedModules(diagnostics As BindingDiagnosticBag)
+            For Each pair In _compilation.GetBoundReferenceManager().ReferencedModuleIndexMap
                 Dim fileRef = TryCast(pair.Key, PortableExecutableReference)
 
                 If fileRef IsNot Nothing AndAlso fileRef.FilePath IsNot Nothing Then
                     Dim fileName As String = FileNameUtilities.GetFileName(fileRef.FilePath)
-                    Dim moduleName As String = m_Modules(pair.Value).Name
+                    Dim moduleName As String = _modules(pair.Value).Name
 
                     If Not String.Equals(fileName, moduleName, StringComparison.OrdinalIgnoreCase) Then
                         ' Used to be ERR_UnableToEmitAssembly
@@ -1264,7 +1323,7 @@ Namespace Microsoft.CodeAnalysis.VisualBasic.Symbols
             Next
 
             ' Alink performed these checks only when emitting an assembly.
-            If m_Modules.Length > 1 AndAlso Not m_Compilation.Options.OutputKind.IsNetModule() Then
+            If _modules.Length > 1 AndAlso Not _compilation.Options.OutputKind.IsNetModule() Then
                 Dim assemblyMachine = Me.Machine
                 Dim isPlatformAgnostic As Boolean = (assemblyMachine = PortableExecutable.Machine.I386 AndAlso Not Me.Bit32Required)
                 Dim knownModuleNames As New HashSet(Of String)(StringComparer.OrdinalIgnoreCase)
@@ -1310,7 +1369,7 @@ Namespace Microsoft.CodeAnalysis.VisualBasic.Symbols
             End If
         End Sub
 
-        Friend ReadOnly Property IsDelaySign As Boolean
+        Friend ReadOnly Property IsDelaySigned As Boolean
             Get
                 EnsureAttributesAreBound()
                 'TODO need to figure out the right behavior when command line and 
@@ -1323,15 +1382,15 @@ Namespace Microsoft.CodeAnalysis.VisualBasic.Symbols
             End Get
         End Property
 
-        Protected Sub ValidateIVTPublicKeys(diagnostics As DiagnosticBag)
+        Protected Sub ValidateIVTPublicKeys(diagnostics As BindingDiagnosticBag)
             EnsureAttributesAreBound()
 
             If Not Me.Identity.IsStrongName Then
                 Return
             End If
 
-            If m_lazyInternalsVisibleToMap IsNot Nothing Then
-                For Each keys In m_lazyInternalsVisibleToMap.Values
+            If _lazyInternalsVisibleToMap IsNot Nothing Then
+                For Each keys In _lazyInternalsVisibleToMap.Values
                     For Each oneKey In keys
                         If oneKey.Key.IsDefaultOrEmpty Then
                             diagnostics.Add(ERRID.ERR_FriendAssemblyStrongNameRequired, oneKey.Value.Item1, oneKey.Value.Item2)
@@ -1342,11 +1401,25 @@ Namespace Microsoft.CodeAnalysis.VisualBasic.Symbols
         End Sub
 
         ''' <summary>
+        ''' True if internals are exposed at all.
+        ''' </summary>
+        ''' <remarks>
+        ''' Forces binding and decoding of attributes.
+        ''' This property shouldn't be accessed during binding as it can lead to attribute binding cycle.
+        ''' </remarks>
+        Public ReadOnly Property InternalsAreVisible As Boolean Implements ISourceAssemblySymbolInternal.InternalsAreVisible
+            Get
+                EnsureAttributesAreBound()
+                Return _lazyInternalsVisibleToMap IsNot Nothing
+            End Get
+        End Property
+
+        ''' <summary>
         ''' We may synthesize some well-known attributes for this assembly symbol.  However, at synthesis time, it is
         ''' too late to report diagnostics or cancel the emit.  Instead, we check for use site errors on the types and members
         ''' we know we'll need at synthesis time.
         ''' </summary>
-        Private Shared Sub ReportDiagnosticsForSynthesizedAttributes(compilation As VisualBasicCompilation, diagnostics As DiagnosticBag)
+        Private Shared Sub ReportDiagnosticsForSynthesizedAttributes(compilation As VisualBasicCompilation, diagnostics As BindingDiagnosticBag)
             ' May need to synthesize CompilationRelaxationsAttribute and/or RuntimeCompatibilityAttribute if we are not building a net-module.
             ' NOTE: Native compiler skips synthesizing these attributes if the respective well-known attribute types aren't available, we do the same.
 
@@ -1354,13 +1427,13 @@ Namespace Microsoft.CodeAnalysis.VisualBasic.Symbols
             If Not compilationOptions.OutputKind.IsNetModule() Then
                 Dim compilationRelaxationsAttributeType = compilation.GetWellKnownType(WellKnownType.System_Runtime_CompilerServices_CompilationRelaxationsAttribute)
                 If TryCast(compilationRelaxationsAttributeType, MissingMetadataTypeSymbol) Is Nothing Then
-                    Binder.ReportUseSiteErrorForSynthesizedAttribute(WellKnownMember.System_Runtime_CompilerServices_CompilationRelaxationsAttribute__ctorInt32, compilation, NoLocation.Singleton, diagnostics)
+                    Binder.ReportUseSiteInfoForSynthesizedAttribute(WellKnownMember.System_Runtime_CompilerServices_CompilationRelaxationsAttribute__ctorInt32, compilation, NoLocation.Singleton, diagnostics)
                 End If
 
                 Dim runtimeCompatibilityAttributeType = compilation.GetWellKnownType(WellKnownType.System_Runtime_CompilerServices_RuntimeCompatibilityAttribute)
                 If TryCast(runtimeCompatibilityAttributeType, MissingMetadataTypeSymbol) Is Nothing Then
-                    Binder.ReportUseSiteErrorForSynthesizedAttribute(WellKnownMember.System_Runtime_CompilerServices_RuntimeCompatibilityAttribute__ctor, compilation, NoLocation.Singleton, diagnostics)
-                    Binder.ReportUseSiteErrorForSynthesizedAttribute(WellKnownMember.System_Runtime_CompilerServices_RuntimeCompatibilityAttribute__WrapNonExceptionThrows, compilation, NoLocation.Singleton, diagnostics)
+                    Binder.ReportUseSiteInfoForSynthesizedAttribute(WellKnownMember.System_Runtime_CompilerServices_RuntimeCompatibilityAttribute__ctor, compilation, NoLocation.Singleton, diagnostics)
+                    Binder.ReportUseSiteInfoForSynthesizedAttribute(WellKnownMember.System_Runtime_CompilerServices_RuntimeCompatibilityAttribute__WrapNonExceptionThrows, compilation, NoLocation.Singleton, diagnostics)
                 End If
             End If
         End Sub
@@ -1381,19 +1454,26 @@ Namespace Microsoft.CodeAnalysis.VisualBasic.Symbols
             End Get
         End Property
 
-        Friend Overrides Sub AddSynthesizedAttributes(compilationState as ModuleCompilationState, ByRef attributes As ArrayBuilder(Of SynthesizedAttributeData))
+        Private ReadOnly Property HasReferenceAssemblyAttribute As Boolean
+            Get
+                Dim assemblyData As CommonAssemblyWellKnownAttributeData = Me.GetSourceDecodedWellKnownAttributeData()
+                Return assemblyData IsNot Nothing AndAlso assemblyData.HasReferenceAssemblyAttribute
+            End Get
+        End Property
+
+        Friend Overrides Sub AddSynthesizedAttributes(compilationState As ModuleCompilationState, ByRef attributes As ArrayBuilder(Of SynthesizedAttributeData))
             MyBase.AddSynthesizedAttributes(compilationState, attributes)
 
-            Debug.Assert(m_lazyEmitExtensionAttribute <> ThreeState.Unknown)
-            Debug.Assert(m_lazySourceAttributesBag.IsSealed)
+            Debug.Assert(_lazyEmitExtensionAttribute <> ThreeState.Unknown)
+            Debug.Assert(_lazySourceAttributesBag.IsSealed)
 
             Dim options As VisualBasicCompilationOptions = Me.DeclaringCompilation.Options
             Dim isBuildingNetModule As Boolean = options.OutputKind.IsNetModule()
 
-            Dim emitExtensionAttribute As Boolean = m_lazyEmitExtensionAttribute = ThreeState.True
+            Dim emitExtensionAttribute As Boolean = _lazyEmitExtensionAttribute = ThreeState.True
 
             If emitExtensionAttribute Then
-                AddSynthesizedAttribute(attributes, m_Compilation.SynthesizeExtensionAttribute())
+                AddSynthesizedAttribute(attributes, _compilation.SynthesizeExtensionAttribute())
             End If
 
             ' Note that manager's collection of referenced symbols may not be sealed 
@@ -1419,7 +1499,7 @@ Namespace Microsoft.CodeAnalysis.VisualBasic.Symbols
                 Dim compilationRelaxationsAttributeType = DeclaringCompilation.GetWellKnownType(WellKnownType.System_Runtime_CompilerServices_CompilationRelaxationsAttribute)
                 If TryCast(compilationRelaxationsAttributeType, MissingMetadataTypeSymbol) Is Nothing Then
                     Dim int32Type = Me.DeclaringCompilation.GetSpecialType(SpecialType.System_Int32)
-                    Debug.Assert(int32Type.GetUseSiteErrorInfo() Is Nothing, "Use site errors should have been checked ahead of time (type int).")
+                    Debug.Assert(int32Type.GetUseSiteInfo().DiagnosticInfo Is Nothing, "Use site errors should have been checked ahead of time (type int).")
                     Dim typedConstantNoStringInterning = New TypedConstant(int32Type, TypedConstantKind.Primitive, Cci.Constants.CompilationRelaxations_NoStringInterning)
 
                     AddSynthesizedAttribute(attributes, DeclaringCompilation.TrySynthesizeAttribute(
@@ -1437,7 +1517,7 @@ Namespace Microsoft.CodeAnalysis.VisualBasic.Symbols
                 Dim runtimeCompatibilityAttributeType = DeclaringCompilation.GetWellKnownType(WellKnownType.System_Runtime_CompilerServices_RuntimeCompatibilityAttribute)
                 If TryCast(runtimeCompatibilityAttributeType, MissingMetadataTypeSymbol) Is Nothing Then
                     Dim boolType = Me.DeclaringCompilation.GetSpecialType(SpecialType.System_Boolean)
-                    Debug.Assert(boolType.GetUseSiteErrorInfo() Is Nothing, "Use site errors should have been checked ahead of time (type bool).")
+                    Debug.Assert(boolType.GetUseSiteInfo().DiagnosticInfo Is Nothing, "Use site errors should have been checked ahead of time (type bool).")
                     Dim typedConstantTrue = New TypedConstant(boolType, TypedConstantKind.Primitive, True)
 
                     AddSynthesizedAttribute(attributes, DeclaringCompilation.TrySynthesizeAttribute(
@@ -1458,7 +1538,7 @@ Namespace Microsoft.CodeAnalysis.VisualBasic.Symbols
                 ' Synthesize attribute: <DebuggableAttribute(DebuggableAttribute.DebuggingMode.<Value>)>
 
                 Dim int32Type = Me.DeclaringCompilation.GetSpecialType(SpecialType.System_Int32)
-                If int32Type.GetUseSiteErrorInfo() Is Nothing Then
+                If int32Type.GetUseSiteInfo().DiagnosticInfo Is Nothing Then
                     Dim debuggingMode = DebuggableAttribute.DebuggingModes.IgnoreSymbolStoreSequencePoints
 
                     ' Since .NET 2.0 the combinations of None, Default And DisableOptimizations have the following effect
@@ -1484,26 +1564,26 @@ Namespace Microsoft.CodeAnalysis.VisualBasic.Symbols
                 End If
             End If
 
-            If m_Compilation.Options.OutputKind = OutputKind.NetModule Then
+            If _compilation.Options.OutputKind = OutputKind.NetModule Then
                 ' If the attribute is applied in source, do not add synthetic one.
                 ' If its value is different from the supplied through options, an error should have been reported by now.
 
-                If Not String.IsNullOrEmpty(m_Compilation.Options.CryptoKeyContainer) AndAlso
+                If Not String.IsNullOrEmpty(_compilation.Options.CryptoKeyContainer) AndAlso
                    AssemblyKeyContainerAttributeSetting Is CommonAssemblyWellKnownAttributeData.StringMissingValue Then
-                    Dim stringType = m_Compilation.GetSpecialType(SpecialType.System_String)
-                    Debug.Assert(stringType.GetUseSiteErrorInfo Is Nothing, "Use site errors should have been checked ahead of time (type string).")
+                    Dim stringType = _compilation.GetSpecialType(SpecialType.System_String)
+                    Debug.Assert(stringType.GetUseSiteInfo.DiagnosticInfo Is Nothing, "Use site errors should have been checked ahead of time (type string).")
 
-                    Dim typedConstant = New TypedConstant(stringType, TypedConstantKind.Primitive, m_Compilation.Options.CryptoKeyContainer)
-                    AddSynthesizedAttribute(attributes, m_Compilation.TrySynthesizeAttribute(WellKnownMember.System_Reflection_AssemblyKeyNameAttribute__ctor, ImmutableArray.Create(typedConstant)))
+                    Dim typedConstant = New TypedConstant(stringType, TypedConstantKind.Primitive, _compilation.Options.CryptoKeyContainer)
+                    AddSynthesizedAttribute(attributes, _compilation.TrySynthesizeAttribute(WellKnownMember.System_Reflection_AssemblyKeyNameAttribute__ctor, ImmutableArray.Create(typedConstant)))
                 End If
 
-                If Not String.IsNullOrEmpty(m_Compilation.Options.CryptoKeyFile) AndAlso
+                If Not String.IsNullOrEmpty(_compilation.Options.CryptoKeyFile) AndAlso
                    AssemblyKeyFileAttributeSetting Is CommonAssemblyWellKnownAttributeData.StringMissingValue Then
-                    Dim stringType = m_Compilation.GetSpecialType(SpecialType.System_String)
-                    Debug.Assert(stringType.GetUseSiteErrorInfo Is Nothing, "Use site errors should have been checked ahead of time (type string).")
+                    Dim stringType = _compilation.GetSpecialType(SpecialType.System_String)
+                    Debug.Assert(stringType.GetUseSiteInfo.DiagnosticInfo Is Nothing, "Use site errors should have been checked ahead of time (type string).")
 
-                    Dim typedConstant = New TypedConstant(stringType, TypedConstantKind.Primitive, m_Compilation.Options.CryptoKeyFile)
-                    AddSynthesizedAttribute(attributes, m_Compilation.TrySynthesizeAttribute(WellKnownMember.System_Reflection_AssemblyKeyFileAttribute__ctor, ImmutableArray.Create(typedConstant)))
+                    Dim typedConstant = New TypedConstant(stringType, TypedConstantKind.Primitive, _compilation.Options.CryptoKeyFile)
+                    AddSynthesizedAttribute(attributes, _compilation.TrySynthesizeAttribute(WellKnownMember.System_Reflection_AssemblyKeyFileAttribute__ctor, ImmutableArray.Create(typedConstant)))
                 End If
             End If
         End Sub
@@ -1520,16 +1600,16 @@ Namespace Microsoft.CodeAnalysis.VisualBasic.Symbols
             ' two threads are checking IVT access but only one of them is in the process of computing identity.
 
             'as an optimization confirm that the identity has not yet been computed to avoid testing TLS
-            If m_lazyStrongNameKeys Is Nothing Then
+            If _lazyStrongNameKeys Is Nothing Then
                 Dim assemblyWhoseKeysAreBeingComputed = s_AssemblyForWhichCurrentThreadIsComputingKeys
                 If assemblyWhoseKeysAreBeingComputed IsNot Nothing Then
                     Debug.Assert(assemblyWhoseKeysAreBeingComputed Is Me)
                     If Not potentialGiverOfAccess.GetInternalsVisibleToPublicKeys(Me.Name).IsEmpty() Then
-                        If m_optimisticallyGrantedInternalsAccess Is Nothing Then
-                            Interlocked.CompareExchange(m_optimisticallyGrantedInternalsAccess, New ConcurrentDictionary(Of AssemblySymbol, Boolean), Nothing)
+                        If _optimisticallyGrantedInternalsAccess Is Nothing Then
+                            Interlocked.CompareExchange(_optimisticallyGrantedInternalsAccess, New ConcurrentDictionary(Of AssemblySymbol, Boolean), Nothing)
                         End If
 
-                        m_optimisticallyGrantedInternalsAccess.TryAdd(potentialGiverOfAccess, True)
+                        _optimisticallyGrantedInternalsAccess.TryAdd(potentialGiverOfAccess, True)
                         Return True
                     Else
                         Return False
@@ -1537,13 +1617,14 @@ Namespace Microsoft.CodeAnalysis.VisualBasic.Symbols
                 End If
             End If
 
-
-            Return MakeFinalIVTDetermination(potentialGiverOfAccess) = IVTConclusion.Match
+            Dim conclusion As IVTConclusion = MakeFinalIVTDetermination(potentialGiverOfAccess)
+            Return conclusion = IVTConclusion.Match
+            ' Note that C#, for error recovery, includes OrElse conclusion = IVTConclusion.OneSignedOneNot
         End Function
 
         Friend ReadOnly Property StrongNameKeys As StrongNameKeys
             Get
-                If m_lazyStrongNameKeys Is Nothing Then
+                If _lazyStrongNameKeys Is Nothing Then
                     Try
                         Debug.Assert(s_AssemblyForWhichCurrentThreadIsComputingKeys Is Nothing)
                         s_AssemblyForWhichCurrentThreadIsComputingKeys = Me
@@ -1554,7 +1635,7 @@ Namespace Microsoft.CodeAnalysis.VisualBasic.Symbols
                     End Try
                 End If
 
-                Return m_lazyStrongNameKeys
+                Return _lazyStrongNameKeys
             End Get
         End Property
 
@@ -1567,10 +1648,32 @@ Namespace Microsoft.CodeAnalysis.VisualBasic.Symbols
             ' make sure keycontainer and keyfile attribute contents fields will be set
             EnsureAttributesAreBound()
 
+            ' Creating strong names is a potentially expensive operation, so we will check
+            ' if keys could have been created and published already.
+            If _lazyStrongNameKeys IsNot Nothing Then
+                Return
+            End If
+
+            Dim keys As StrongNameKeys
+            Dim keyFile As String = _compilation.Options.CryptoKeyFile
+
+            ' Public sign requires a keyfile
+            If DeclaringCompilation.Options.PublicSign Then
+                If Not String.IsNullOrEmpty(keyFile) AndAlso Not PathUtilities.IsAbsolute(keyFile) Then
+                    ' If keyFile has a relative path then there should be a diagnostic
+                    ' about it
+                    Debug.Assert(Not DeclaringCompilation.Options.Errors.IsEmpty)
+                    keys = StrongNameKeys.None
+                Else
+                    keys = StrongNameKeys.Create(keyFile, MessageProvider.Instance)
+                End If
+
+                ' Public signing doesn't require a strong name provider to be used. 
+                Interlocked.CompareExchange(_lazyStrongNameKeys, keys, Nothing)
+                Return
+            End If
+
             ' when both attributes and command-line options specified, cmd line wins.
-
-            Dim keyFile As String = m_Compilation.Options.CryptoKeyFile
-
             If String.IsNullOrEmpty(keyFile) Then
                 keyFile = Me.AssemblyKeyFileAttributeSetting
 
@@ -1579,7 +1682,7 @@ Namespace Microsoft.CodeAnalysis.VisualBasic.Symbols
                 End If
             End If
 
-            Dim keyContainer As String = m_Compilation.Options.CryptoKeyContainer
+            Dim keyContainer As String = _compilation.Options.CryptoKeyContainer
 
             If String.IsNullOrEmpty(keyContainer) Then
                 keyContainer = Me.AssemblyKeyContainerAttributeSetting
@@ -1589,20 +1692,17 @@ Namespace Microsoft.CodeAnalysis.VisualBasic.Symbols
                 End If
             End If
 
-            ' Creating strong names is a potentially expensive operation, so we will check again here
-            ' if keys could have been created and published already.
-            If m_lazyStrongNameKeys Is Nothing Then
-                Dim keys = StrongNameKeys.Create(DeclaringCompilation.Options.StrongNameProvider, keyFile, keyContainer, MessageProvider.Instance)
-                Interlocked.CompareExchange(m_lazyStrongNameKeys, keys, Nothing)
-            End If
+            Dim hasCounterSignature = Not String.IsNullOrEmpty(SignatureKey)
+            keys = StrongNameKeys.Create(DeclaringCompilation.Options.StrongNameProvider, keyFile, keyContainer, hasCounterSignature, MessageProvider.Instance)
+            Interlocked.CompareExchange(_lazyStrongNameKeys, keys, Nothing)
         End Sub
 
         Private Function ComputeIdentity() As AssemblyIdentity
 
             EnsureAttributesAreBound()
 
-            Return New AssemblyIdentity(m_AssemblySimpleName,
-                                        Me.AssemblyVersionAttributeSetting,
+            Return New AssemblyIdentity(_assemblySimpleName,
+                                        VersionHelper.GenerateVersionFromPatternAndCurrentTime(_compilation.Options.CurrentLocalTime, AssemblyVersionAttributeSetting),
                                         Me.AssemblyCultureAttributeSetting,
                                         StrongNameKeys.PublicKey,
                                         hasPublicKey:=Not StrongNameKeys.PublicKey.IsDefault)
@@ -1611,11 +1711,11 @@ Namespace Microsoft.CodeAnalysis.VisualBasic.Symbols
 
         Friend ReadOnly Property IsVbRuntime As Boolean
             Get
-                If Me.m_lazyIsVbRuntime = ThreeState.Unknown Then
-                    Me.m_lazyIsVbRuntime = CheckForRuntime().ToThreeState
+                If Me._lazyIsVbRuntime = ThreeState.Unknown Then
+                    Me._lazyIsVbRuntime = CheckForRuntime().ToThreeState
                 End If
 
-                Return Me.m_lazyIsVbRuntime = ThreeState.True
+                Return Me._lazyIsVbRuntime = ThreeState.True
             End Get
         End Property
 
@@ -1627,18 +1727,22 @@ Namespace Microsoft.CodeAnalysis.VisualBasic.Symbols
         End Function
 
         Friend Overrides Function TryLookupForwardedMetadataTypeWithCycleDetection(ByRef emittedName As MetadataTypeName, visitedAssemblies As ConsList(Of AssemblySymbol), ignoreCase As Boolean) As NamedTypeSymbol
-            If Not m_Compilation.Options.OutputKind.IsNetModule() Then
+            If Not _compilation.Options.OutputKind.IsNetModule() Then
                 ' See if any of added modules forward the type.
                 Dim matchedName As String = Nothing
 
                 ' Similar to attributes, type forwarders from the second added module should override type forwarders from the first added module, etc. 
-                For i As Integer = m_Modules.Length - 1 To 1 Step -1
-                    Dim peModuleSymbol = DirectCast(m_Modules(i), PEModuleSymbol)
+                For i As Integer = _modules.Length - 1 To 1 Step -1
+                    Dim peModuleSymbol = DirectCast(_modules(i), PEModuleSymbol)
+                    Dim forwardedToAssemblies = peModuleSymbol.GetAssembliesForForwardedType(emittedName, ignoreCase, matchedName)
 
-                    Dim forwardedToAssembly = peModuleSymbol.GetAssemblyForForwardedType(emittedName, ignoreCase, matchedName)
-                    If forwardedToAssembly IsNot Nothing Then
+                    If forwardedToAssemblies.FirstSymbol IsNot Nothing Then
+                        If forwardedToAssemblies.SecondSymbol IsNot Nothing Then
+                            Return CreateMultipleForwardingErrorTypeSymbol(emittedName, peModuleSymbol, forwardedToAssemblies.FirstSymbol, forwardedToAssemblies.SecondSymbol)
+                        End If
+
                         ' Don't bother to check the forwarded-to assembly if we've already seen it.
-                        If visitedAssemblies IsNot Nothing AndAlso visitedAssemblies.Contains(forwardedToAssembly) Then
+                        If visitedAssemblies IsNot Nothing AndAlso visitedAssemblies.Contains(forwardedToAssemblies.FirstSymbol) Then
                             Return CreateCycleInTypeForwarderErrorTypeSymbol(emittedName)
                         Else
                             visitedAssemblies = New ConsList(Of AssemblySymbol)(Me, If(visitedAssemblies, ConsList(Of AssemblySymbol).Empty))
@@ -1647,7 +1751,7 @@ Namespace Microsoft.CodeAnalysis.VisualBasic.Symbols
                                 emittedName = MetadataTypeName.FromFullName(matchedName, emittedName.UseCLSCompliantNameArityEncoding, emittedName.ForcedArity)
                             End If
 
-                            Return forwardedToAssembly.LookupTopLevelMetadataTypeWithCycleDetection(emittedName, visitedAssemblies, digThroughForwardedTypes:=True)
+                            Return forwardedToAssemblies.FirstSymbol.LookupTopLevelMetadataTypeWithCycleDetection(emittedName, visitedAssemblies, digThroughForwardedTypes:=True)
                         End If
                     End If
                 Next
@@ -1656,5 +1760,14 @@ Namespace Microsoft.CodeAnalysis.VisualBasic.Symbols
             Return Nothing
         End Function
 
+        Public Overrides Function GetMetadata() As AssemblyMetadata
+            Return Nothing
+        End Function
+
+        Private ReadOnly Property ISourceAssemblySymbol_Compilation As Compilation Implements ISourceAssemblySymbol.Compilation
+            Get
+                Return _compilation
+            End Get
+        End Property
     End Class
 End Namespace

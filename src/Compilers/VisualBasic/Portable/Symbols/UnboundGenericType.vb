@@ -1,4 +1,6 @@
-﻿' Copyright (c) Microsoft.  All Rights Reserved.  Licensed under the Apache License, Version 2.0.  See License.txt in the project root for license information.
+﻿' Licensed to the .NET Foundation under one or more agreements.
+' The .NET Foundation licenses this file to you under the MIT license.
+' See the LICENSE file in the project root for more information.
 
 Imports System.Collections.Generic
 Imports System.Collections.Immutable
@@ -7,6 +9,7 @@ Imports System.Globalization
 Imports System.Runtime.InteropServices
 Imports System.Text
 Imports System.Threading
+Imports Microsoft.CodeAnalysis.PooledObjects
 Imports Microsoft.CodeAnalysis.Text
 Imports Microsoft.CodeAnalysis.VisualBasic.Symbols
 Imports Microsoft.CodeAnalysis.VisualBasic.Syntax
@@ -67,7 +70,7 @@ Namespace Microsoft.CodeAnalysis.VisualBasic.Symbols
             End Get
         End Property
 
-        Friend NotOverridable Overrides ReadOnly Property IsSerializable As Boolean
+        Public NotOverridable Overrides ReadOnly Property IsSerializable As Boolean
             Get
                 Return OriginalDefinition.IsSerializable
             End Get
@@ -109,6 +112,16 @@ Namespace Microsoft.CodeAnalysis.VisualBasic.Symbols
 
         Friend MustOverride Overrides ReadOnly Property TypeArgumentsNoUseSiteDiagnostics As ImmutableArray(Of TypeSymbol)
 
+        Public NotOverridable Overrides Function GetTypeArgumentCustomModifiers(ordinal As Integer) As ImmutableArray(Of CustomModifier)
+            Return GetEmptyTypeArgumentCustomModifiers(ordinal)
+        End Function
+
+        Friend NotOverridable Overrides ReadOnly Property HasTypeArgumentsCustomModifiers As Boolean
+            Get
+                Return False
+            End Get
+        End Property
+
         Public Overrides ReadOnly Property EnumUnderlyingType As NamedTypeSymbol
             Get
                 Return OriginalDefinition.EnumUnderlyingType
@@ -121,9 +134,15 @@ Namespace Microsoft.CodeAnalysis.VisualBasic.Symbols
             End Get
         End Property
 
-        Friend Overrides ReadOnly Property HasEmbeddedAttribute As Boolean
+        Friend Overrides ReadOnly Property HasCodeAnalysisEmbeddedAttribute As Boolean
             Get
-                Return OriginalDefinition.HasEmbeddedAttribute
+                Return OriginalDefinition.HasCodeAnalysisEmbeddedAttribute
+            End Get
+        End Property
+
+        Friend Overrides ReadOnly Property HasVisualBasicEmbeddedAttribute As Boolean
+            Get
+                Return OriginalDefinition.HasVisualBasicEmbeddedAttribute
             End Get
         End Property
 
@@ -231,44 +250,54 @@ Namespace Microsoft.CodeAnalysis.VisualBasic.Symbols
             Throw ExceptionUtilities.Unreachable
         End Function
 
-        Friend MustOverride Overrides Function InternalSubstituteTypeParameters(additionalSubstitution As TypeSubstitution) As TypeSymbol
+        Friend MustOverride Overrides Function InternalSubstituteTypeParameters(additionalSubstitution As TypeSubstitution) As TypeWithModifiers
 
-        Friend Overrides Function MakeDeclaredBase(basesBeingResolved As ConsList(Of Symbol), diagnostics As DiagnosticBag) As NamedTypeSymbol
+        Friend Overrides Function MakeDeclaredBase(basesBeingResolved As BasesBeingResolved, diagnostics As BindingDiagnosticBag) As NamedTypeSymbol
             Return Nothing
         End Function
 
-        Friend Overrides Function MakeAcyclicBaseType(diagnostics As DiagnosticBag) As NamedTypeSymbol
+        Friend Overrides Function MakeAcyclicBaseType(diagnostics As BindingDiagnosticBag) As NamedTypeSymbol
             Return Nothing
         End Function
 
-        Friend Overrides Function GetDirectBaseTypeNoUseSiteDiagnostics(basesBeingResolved As ConsList(Of Symbol)) As NamedTypeSymbol
+        Friend Overrides Function GetDirectBaseTypeNoUseSiteDiagnostics(basesBeingResolved As BasesBeingResolved) As NamedTypeSymbol
             Return Nothing
         End Function
 
-        Friend Overrides Function GetDeclaredBase(basesBeingResolved As ConsList(Of Symbol)) As NamedTypeSymbol
+        Friend Overrides Function GetDeclaredBase(basesBeingResolved As BasesBeingResolved) As NamedTypeSymbol
             Return Nothing
         End Function
 
-        Friend Overrides Function MakeDeclaredInterfaces(basesBeingResolved As ConsList(Of Symbol), diagnostics As DiagnosticBag) As ImmutableArray(Of NamedTypeSymbol)
+        Friend Overrides Function MakeDeclaredInterfaces(basesBeingResolved As BasesBeingResolved, diagnostics As BindingDiagnosticBag) As ImmutableArray(Of NamedTypeSymbol)
             Return ImmutableArray(Of NamedTypeSymbol).Empty
         End Function
 
-        Friend Overrides Function MakeAcyclicInterfaces(diagnostics As DiagnosticBag) As ImmutableArray(Of NamedTypeSymbol)
+        Friend Overrides Function MakeAcyclicInterfaces(diagnostics As BindingDiagnosticBag) As ImmutableArray(Of NamedTypeSymbol)
             Return ImmutableArray(Of NamedTypeSymbol).Empty
         End Function
 
-        Friend Overrides Function GetDeclaredInterfacesNoUseSiteDiagnostics(basesBeingResolved As ConsList(Of Symbol)) As ImmutableArray(Of NamedTypeSymbol)
+        Friend Overrides Function GetDeclaredInterfacesNoUseSiteDiagnostics(basesBeingResolved As BasesBeingResolved) As ImmutableArray(Of NamedTypeSymbol)
             Return ImmutableArray(Of NamedTypeSymbol).Empty
         End Function
 
-        Friend Overrides Function GetUseSiteErrorInfo() As DiagnosticInfo
-            Return OriginalDefinition.GetUseSiteErrorInfo()
+        Friend Overrides Function GetUseSiteInfo() As UseSiteInfo(Of AssemblySymbol)
+            Return OriginalDefinition.GetUseSiteInfo()
         End Function
 
-        Public MustOverride Overrides Function Equals(obj As Object) As Boolean
+        Public NotOverridable Overrides Function Equals(other As TypeSymbol, comparison As TypeCompareKind) As Boolean
+            Return Equals(TryCast(other, UnboundGenericType), comparison)
+        End Function
 
-        Public Overrides Function GetHashCode() As Integer
-            Return OriginalDefinition.GetHashCode()
+        Public Overloads Function Equals(other As UnboundGenericType, comparison As TypeCompareKind) As Boolean
+            If Me Is other Then
+                Return True
+            End If
+
+            Return other IsNot Nothing AndAlso other.GetType() = Me.GetType() AndAlso other.OriginalDefinition.Equals(OriginalDefinition, comparison)
+        End Function
+
+        Public NotOverridable Overrides Function GetHashCode() As Integer
+            Return Hash.Combine(Me.GetType(), OriginalDefinition.GetHashCode())
         End Function
 
         Friend Overrides ReadOnly Property CanConstruct As Boolean
@@ -305,14 +334,18 @@ Namespace Microsoft.CodeAnalysis.VisualBasic.Symbols
             Throw ExceptionUtilities.Unreachable
         End Function
 
+        Friend NotOverridable Overrides Function GetSynthesizedWithEventsOverrides() As IEnumerable(Of PropertySymbol)
+            Return SpecializedCollections.EmptyEnumerable(Of PropertySymbol)()
+        End Function
+
         Private NotInheritable Class ConstructedSymbol
             Inherits UnboundGenericType
 
-            Private ReadOnly m_OriginalDefinition As NamedTypeSymbol
-            Private m_lazyContainingSymbol As Symbol
-            Private m_lazyConstructedFrom As NamedTypeSymbol
-            Private m_lazyTypeArguments As ImmutableArray(Of TypeSymbol)
-            Private m_lazyTypeSubstitution As TypeSubstitution
+            Private ReadOnly _originalDefinition As NamedTypeSymbol
+            Private _lazyContainingSymbol As Symbol
+            Private _lazyConstructedFrom As NamedTypeSymbol
+            Private _lazyTypeArguments As ImmutableArray(Of TypeSymbol)
+            Private _lazyTypeSubstitution As TypeSubstitution
 
             Public Sub New(originalDefinition As NamedTypeSymbol)
                 MyBase.New()
@@ -321,10 +354,10 @@ Namespace Microsoft.CodeAnalysis.VisualBasic.Symbols
                 Debug.Assert(originalDefinition.IsGenericType)
 
                 If originalDefinition.Arity = 0 Then
-                    m_lazyTypeArguments = ImmutableArray(Of TypeSymbol).Empty
+                    _lazyTypeArguments = ImmutableArray(Of TypeSymbol).Empty
                 End If
 
-                m_OriginalDefinition = originalDefinition
+                _originalDefinition = originalDefinition
             End Sub
 
             Public Overrides ReadOnly Property IsUnboundGenericType As Boolean
@@ -335,13 +368,13 @@ Namespace Microsoft.CodeAnalysis.VisualBasic.Symbols
 
             Public Overrides ReadOnly Property OriginalDefinition As NamedTypeSymbol
                 Get
-                    Return m_OriginalDefinition
+                    Return _originalDefinition
                 End Get
             End Property
 
             Public Overrides ReadOnly Property ContainingSymbol As Symbol
                 Get
-                    If m_lazyContainingSymbol Is Nothing Then
+                    If _lazyContainingSymbol Is Nothing Then
                         Dim result As Symbol
 
                         Dim originalDefinitionContainingType As NamedTypeSymbol = OriginalDefinition.ContainingType
@@ -356,16 +389,16 @@ Namespace Microsoft.CodeAnalysis.VisualBasic.Symbols
                             result = OriginalDefinition.ContainingSymbol
                         End If
 
-                        Interlocked.CompareExchange(m_lazyContainingSymbol, result, Nothing)
+                        Interlocked.CompareExchange(_lazyContainingSymbol, result, Nothing)
                     End If
 
-                    Return m_lazyContainingSymbol
+                    Return _lazyContainingSymbol
                 End Get
             End Property
 
             Public Overrides ReadOnly Property ConstructedFrom As NamedTypeSymbol
                 Get
-                    If m_lazyConstructedFrom Is Nothing Then
+                    If _lazyConstructedFrom Is Nothing Then
                         Dim result As NamedTypeSymbol
                         Dim originalDefinitionContainingType As NamedTypeSymbol = OriginalDefinition.ContainingType
 
@@ -378,10 +411,10 @@ Namespace Microsoft.CodeAnalysis.VisualBasic.Symbols
                             result = New UnboundGenericType.ConstructedFromSymbol(Me)
                         End If
 
-                        Interlocked.CompareExchange(m_lazyConstructedFrom, result, Nothing)
+                        Interlocked.CompareExchange(_lazyConstructedFrom, result, Nothing)
                     End If
 
-                    Return m_lazyConstructedFrom
+                    Return _lazyConstructedFrom
                 End Get
             End Property
 
@@ -397,7 +430,7 @@ Namespace Microsoft.CodeAnalysis.VisualBasic.Symbols
 
             Friend Overrides ReadOnly Property TypeArgumentsNoUseSiteDiagnostics As ImmutableArray(Of TypeSymbol)
                 Get
-                    If m_lazyTypeArguments.IsDefault Then
+                    If _lazyTypeArguments.IsDefault Then
                         Debug.Assert(OriginalDefinition.Arity > 0)
                         Dim arguments(OriginalDefinition.Arity - 1) As TypeSymbol
 
@@ -405,20 +438,22 @@ Namespace Microsoft.CodeAnalysis.VisualBasic.Symbols
                             arguments(i) = UnboundTypeArgument
                         Next
 
-                        ImmutableInterlocked.InterlockedInitialize(m_lazyTypeArguments, arguments.AsImmutableOrNull())
+                        ImmutableInterlocked.InterlockedInitialize(_lazyTypeArguments, arguments.AsImmutableOrNull())
                     End If
 
-                    Return m_lazyTypeArguments
+                    Return _lazyTypeArguments
                 End Get
             End Property
 
             Friend Overrides ReadOnly Property TypeSubstitution As TypeSubstitution
                 Get
-                    If m_lazyTypeSubstitution Is Nothing Then
+                    If _lazyTypeSubstitution Is Nothing Then
                         Dim result As TypeSubstitution
 
                         Dim container As Symbol = ContainingSymbol
                         Dim containerAsConstructed = TryCast(container, UnboundGenericType.ConstructedSymbol)
+
+                        Debug.Assert(Not Me.HasTypeArgumentsCustomModifiers)
 
                         If containerAsConstructed IsNot Nothing Then
                             If OriginalDefinition.Arity = 0 Then
@@ -436,10 +471,10 @@ Namespace Microsoft.CodeAnalysis.VisualBasic.Symbols
                             result = VisualBasic.Symbols.TypeSubstitution.Create(OriginalDefinition, OriginalDefinition.TypeParameters, Me.TypeArgumentsNoUseSiteDiagnostics)
                         End If
 
-                        Interlocked.CompareExchange(m_lazyTypeSubstitution, result, Nothing)
+                        Interlocked.CompareExchange(_lazyTypeSubstitution, result, Nothing)
                     End If
 
-                    Return m_lazyTypeSubstitution
+                    Return _lazyTypeSubstitution
                 End Get
             End Property
 
@@ -496,19 +531,9 @@ Namespace Microsoft.CodeAnalysis.VisualBasic.Symbols
                 Return OriginalDefinition.GetTypeMembers(name, arity).SelectAsArray(Function(t) (New UnboundGenericType.ConstructedSymbol(t)).ConstructedFrom)
             End Function
 
-            Friend Overrides Function InternalSubstituteTypeParameters(additionalSubstitution As TypeSubstitution) As TypeSymbol
+            Friend Overrides Function InternalSubstituteTypeParameters(additionalSubstitution As TypeSubstitution) As TypeWithModifiers
                 ' Has no effect.
-                Return Me
-            End Function
-
-            Public Overrides Function Equals(obj As Object) As Boolean
-                If Me Is obj Then
-                    Return True
-                End If
-
-                Dim other = TryCast(obj, ConstructedSymbol)
-
-                Return other IsNot Nothing AndAlso other.OriginalDefinition.Equals(OriginalDefinition)
+                Return New TypeWithModifiers(Me)
             End Function
 
         End Class
@@ -517,8 +542,8 @@ Namespace Microsoft.CodeAnalysis.VisualBasic.Symbols
             Inherits UnboundGenericType
 
             Public ReadOnly Constructed As ConstructedSymbol
-            Private ReadOnly m_TypeParameters As ImmutableArray(Of TypeParameterSymbol)
-            Private ReadOnly m_TypeSubstitution As TypeSubstitution
+            Private ReadOnly _typeParameters As ImmutableArray(Of TypeParameterSymbol)
+            Private ReadOnly _typeSubstitution As TypeSubstitution
 
             Public Sub New(constructed As ConstructedSymbol)
                 MyBase.New()
@@ -537,12 +562,11 @@ Namespace Microsoft.CodeAnalysis.VisualBasic.Symbols
                 Dim newTypeParameters = alphaRenamedTypeParameters.AsImmutableOrNull()
                 Dim container = DirectCast(constructed.ContainingSymbol, ConstructedSymbol)
 
-                m_TypeParameters = StaticCast(Of TypeParameterSymbol).From(newTypeParameters)
+                _typeParameters = StaticCast(Of TypeParameterSymbol).From(newTypeParameters)
 
                 ' Add a substitution to map from type parameter definitions to corresponding
                 ' alpha-renamed type parameters.
-                Dim substitution = VisualBasic.Symbols.TypeSubstitution.CreateForAlphaRename(container.TypeSubstitution,
-                                                                         StaticCast(Of TypeParameterSymbol).From(newTypeParameters))
+                Dim substitution = VisualBasic.Symbols.TypeSubstitution.CreateForAlphaRename(container.TypeSubstitution, newTypeParameters)
 
                 Debug.Assert(substitution.TargetGenericDefinition Is originalDefinition)
 
@@ -551,7 +575,7 @@ Namespace Microsoft.CodeAnalysis.VisualBasic.Symbols
                     param.SetContainingSymbol(Me)
                 Next
 
-                m_TypeSubstitution = substitution
+                _typeSubstitution = substitution
             End Sub
 
             Public Overrides ReadOnly Property IsUnboundGenericType As Boolean
@@ -580,19 +604,19 @@ Namespace Microsoft.CodeAnalysis.VisualBasic.Symbols
 
             Public Overrides ReadOnly Property TypeParameters As ImmutableArray(Of TypeParameterSymbol)
                 Get
-                    Return m_TypeParameters
+                    Return _typeParameters
                 End Get
             End Property
 
             Friend Overrides ReadOnly Property TypeArgumentsNoUseSiteDiagnostics As ImmutableArray(Of TypeSymbol)
                 Get
-                    Return StaticCast(Of TypeSymbol).From(m_TypeParameters)
+                    Return StaticCast(Of TypeSymbol).From(_typeParameters)
                 End Get
             End Property
 
             Friend Overrides ReadOnly Property TypeSubstitution As TypeSubstitution
                 Get
-                    Return m_TypeSubstitution
+                    Return _typeSubstitution
                 End Get
             End Property
 
@@ -622,18 +646,8 @@ Namespace Microsoft.CodeAnalysis.VisualBasic.Symbols
                 Return ImmutableArray(Of NamedTypeSymbol).Empty
             End Function
 
-            Friend Overrides Function InternalSubstituteTypeParameters(additionalSubstitution As TypeSubstitution) As TypeSymbol
+            Friend Overrides Function InternalSubstituteTypeParameters(additionalSubstitution As TypeSubstitution) As TypeWithModifiers
                 Throw ExceptionUtilities.Unreachable
-            End Function
-
-            Public Overrides Function Equals(obj As Object) As Boolean
-                If Me Is obj Then
-                    Return True
-                End If
-
-                Dim other = TryCast(obj, ConstructedFromSymbol)
-
-                Return other IsNot Nothing AndAlso other.Constructed.OriginalDefinition.Equals(Constructed.OriginalDefinition)
             End Function
         End Class
     End Class
